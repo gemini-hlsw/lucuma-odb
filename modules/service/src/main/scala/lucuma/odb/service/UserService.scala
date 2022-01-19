@@ -1,0 +1,93 @@
+package lucuma.odb.service
+
+import cats.effect.MonadCancelThrow
+import cats.syntax.all._
+import lucuma.core.model.GuestUser
+import lucuma.core.model.ServiceUser
+import lucuma.core.model.StandardUser
+import lucuma.core.model.User
+import skunk.Command
+import skunk.Session
+import skunk.codec.all._
+import skunk.implicits._
+
+trait UserService[F[_]] {
+  def canonicalizeUser(u: User): F[Unit]
+}
+
+object UserService extends Codecs {
+
+  def fromSession[F[_]: MonadCancelThrow](s: Session[F]): UserService[F] =
+    new UserService[F] {
+      import Statements._
+
+      def canonicalizeUser(u: User): F[Unit] =
+        u match {
+          case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)
+          case su @ ServiceUser(_, _)        => canonicalizeServiceUser(su)
+          case su @ StandardUser(_, _, _, _) => canonicalizeStandardUser(su)
+        }
+
+      def canonicalizeGuestUser(gu: GuestUser): F[Unit] =
+        s.prepare(CanonicalizeGuestUser).use(_.execute(gu)).void
+
+      def canonicalizeServiceUser(su: ServiceUser): F[Unit] =
+        s.prepare(CanonicalizeServiceUser).use(_.execute(su)).void
+
+      def canonicalizeStandardUser(su: StandardUser): F[Unit] =
+        s.prepare(CanonicalizeStandardUser).use(_.execute(su)).void
+
+    }
+
+  object Statements {
+
+    // Guest users never change.
+    val CanonicalizeGuestUser: Command[GuestUser] =
+      sql"""
+        insert into t_user (c_user_id, c_user_type)
+        values ($user_id, 'guest')
+        on conflict do nothing
+      """.command.contramap(_.id)
+
+    // Service users should never change but we'll accommodate a name change here.
+    val CanonicalizeServiceUser: Command[ServiceUser] =
+      sql"""
+        insert into t_user (c_user_id, c_user_type, c_service_name)
+        values ($user_id, 'service', $varchar)
+        on conflict do
+        update set c_serbice_name = $varchar
+      """.command.contramap { su => su.id ~ su.name ~ su.name }
+
+    // Standard user ORCID profiles can change.
+    val CanonicalizeStandardUser: Command[StandardUser] =
+      sql"""
+        insert into t_user (
+          c_user_id,
+          c_user_type,
+          c_orcid_id,
+          c_orcid_given_name,
+          c_orcid_credit_name,
+          c_orcid_family_name,
+          c_orcid_email
+        ) values (
+          $user_id,
+          'standard',
+          $orcid_id,
+          ${varchar.opt},
+          ${varchar.opt},
+          ${varchar.opt},
+          ${varchar.opt}
+        ) on conflict (c_user_id) do update
+        set c_orcid_given_name  = ${varchar.opt},
+            c_orcid_credit_name = ${varchar.opt},
+            c_orcid_family_name = ${varchar.opt},
+            c_orcid_email       = ${varchar.opt}
+      """.command.contramap { su =>
+        val p = su.profile
+        su.id ~ p.orcidId ~ p.givenName ~ p.creditName ~ p.familyName ~ p.primaryEmail ~
+                            p.givenName ~ p.creditName ~ p.familyName ~ p.primaryEmail
+      }
+
+  }
+
+}
