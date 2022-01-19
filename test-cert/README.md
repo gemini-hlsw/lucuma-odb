@@ -1,0 +1,1 @@
+This is a self-signed cert for running local Postgres with SSL. It's only used by docker-compose.
