@@ -10,16 +10,21 @@ import edu.gemini.grackle.ObjectType
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.QueryCompiler
 import edu.gemini.grackle.{Query, Type}
+import edu.gemini.grackle.Query.Select
 import edu.gemini.grackle.Result
-import cats.kernel.Monoid
+import edu.gemini.grackle.TypeRef
 
 trait SnippetMapping[F[_]] extends Mapping[F] with SchemaInstances with SelectElaboratorInstances {
 
   case class Snippet(
     schema: Schema,
     typeMappings: List[ObjectMapping],
-    selectElaborator: QueryCompiler.SelectElaborator = Monoid.empty
-  )
+    elaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] = Map.empty
+  ) {
+    def selectElaborator = new QueryCompiler.SelectElaborator(elaborator.map { case (k, v) =>
+      schema.ref(k).getOrElse(sys.error(s"Elaborator references type $k, which is not present in schema:\n$schema")) -> v
+    })
+  }
 
   implicit val SemigroupObjectMapping: Semigroup[ObjectMapping] = (a, b) =>
     if (!(a.tpe.asNamed.map(_.name) == b.tpe.asNamed.map(_.name))) a
@@ -41,9 +46,12 @@ trait SnippetMapping[F[_]] extends Mapping[F] with SchemaInstances with SelectEl
       s1,
       (a.typeMappings.map(a => b.typeMappings.find(a.tpe.asNamed.map(_.name) === _.tpe.asNamed.map(_.name)).foldLeft(a)(_ |+| _)) ++
        b.typeMappings.filterNot(b => a.typeMappings.exists(_.tpe.asNamed.map(_.name) === b.tpe.asNamed.map(_.name)))).map(reref(s1)),
-      rerefSE(s1)(a.selectElaborator) |+| rerefSE(s1)(b.selectElaborator)
+      a.elaborator |+| b.elaborator,
     )
   }
+
+  implicit def semigroupPartialFunction[A, B]: Semigroup[PartialFunction[A, B]] = (a, b) =>
+    a orElse b
 
 }
 
@@ -56,19 +64,6 @@ trait SelectElaboratorInstances {
         s.ref(tpe).map(se.transform(query, vars, s, _)).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
       override def elaborateArgs(tpe: Type, fieldName: String, args: List[Query.Binding]): Result[List[Query.Binding]] =
         s.ref(tpe).map(se.elaborateArgs(_, fieldName, args)).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
-    }
-
-  implicit val MonoidSelectElaborator: Monoid[QueryCompiler.SelectElaborator] =
-    new Monoid[QueryCompiler.SelectElaborator] {
-      def combine(a: QueryCompiler.SelectElaborator, b: QueryCompiler.SelectElaborator): QueryCompiler.SelectElaborator =
-        new QueryCompiler.SelectElaborator(Map.empty) {
-          override def transform(query: Query, vars: Query.Vars, schema: Schema, tpe: Type): Result[Query] =
-            a.transform(query, vars, schema, tpe) orElse b.transform(query, vars, schema, tpe)
-          override def elaborateArgs(tpe: Type, fieldName: String, args: List[Query.Binding]): Result[List[Query.Binding]] =
-            a.elaborateArgs(tpe, fieldName, args) orElse b.elaborateArgs(tpe, fieldName, args)
-        }
-      val empty: QueryCompiler.SelectElaborator =
-        new QueryCompiler.SelectElaborator(Map.empty)
     }
 
 }

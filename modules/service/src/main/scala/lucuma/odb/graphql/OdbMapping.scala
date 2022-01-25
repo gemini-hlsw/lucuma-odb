@@ -37,9 +37,11 @@ object OdbMapping {
           NonEmptyList.of(
             FilterTypeSnippet(this),
             PartnerSnippet(this),
+            ProgramSnippet(this),
           ).reduce
         val schema = snippet.schema
         val typeMappings = snippet.typeMappings
+        override val selectElaborator = snippet.selectElaborator
       }
 
     ((_: User) => m).pure[F]
