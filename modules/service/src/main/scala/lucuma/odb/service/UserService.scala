@@ -10,12 +10,13 @@ import skunk.Command
 import skunk.Session
 import skunk.codec.all._
 import skunk.implicits._
+import lucuma.odb.util.Codecs._
 
 trait UserService[F[_]] {
   def canonicalizeUser(u: User): F[Unit]
 }
 
-object UserService extends Codecs {
+object UserService {
 
   def fromSession[F[_]: MonadCancelThrow](s: Session[F]): UserService[F] =
     new UserService[F] {

@@ -33,7 +33,7 @@ object PartnerSnippet {
       val ShortName = col("c_short_name", varchar)
       val LongName  = col("c_long_name", varchar)
       val Active    = col("c_active", bool)
-      // val c_sites = col("c_sites", varchar)
+      // val c_sites   = col("c_sites", _site) // need array support in grackle
     }
 
     val typeMappings =
@@ -55,8 +55,8 @@ object PartnerSnippet {
         )
       )
 
-      Snippet(schema, typeMappings)
+    Snippet(schema, typeMappings)
 
-    }
+  }
 
 }

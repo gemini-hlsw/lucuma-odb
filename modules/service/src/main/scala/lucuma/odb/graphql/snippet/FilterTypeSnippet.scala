@@ -46,8 +46,8 @@ object FilterTypeSnippet {
             SqlField("tag", FilterType.Tag, key = true),
             SqlField("shortName", FilterType.ShortName),
             SqlField("longName", FilterType.LongName),
-          ),
-        )
+          )
+        ),
       )
 
       Snippet(schema, typeMappings)
