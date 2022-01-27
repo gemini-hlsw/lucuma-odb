@@ -29,24 +29,26 @@ object OdbMapping {
     channels: Channels[F],
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
-  ): F[User => Mapping[F]] = {
+  ): F[User => Mapping[F]] = { (user: User) =>
 
-    val m: Mapping[F] =
-      new SkunkMapping[F](pool, monitor) with SnippetMapping[F] {
+      val m: Mapping[F] = new SkunkMapping[F](pool, monitor) with SnippetMapping[F] {
         val snippet: Snippet =
           NonEmptyList.of(
             FilterTypeSnippet(this),
             PartnerSnippet(this),
-            ProgramSnippet(this),
+            UserSnippet(this),
+            ProgramSnippet(this, pool, user),
           ).reduce
         val schema = snippet.schema
         val typeMappings = snippet.typeMappings
         override val selectElaborator = snippet.selectElaborator
       }
 
-    ((_: User) => m).pure[F]
+      m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
 
-  }
+      m
+
+  } .pure[F]
 
 
 }
