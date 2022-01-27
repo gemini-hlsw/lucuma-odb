@@ -18,7 +18,7 @@ trait SnippetMapping[F[_]] extends Mapping[F] with SchemaInstances with SelectEl
 
   case class Snippet(
     schema: Schema,
-    typeMappings: List[ObjectMapping],
+    typeMappings: List[TypeMapping],
     elaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] = Map.empty
   ) {
     def selectElaborator = new QueryCompiler.SelectElaborator(elaborator.map { case (k, v) =>
@@ -33,10 +33,20 @@ trait SnippetMapping[F[_]] extends Mapping[F] with SchemaInstances with SelectEl
       (a.fieldMappings ++ b.fieldMappings).distinctBy(_.fieldName)
     )
 
+  implicit val SemigroupTypeMapping: Semigroup[TypeMapping] = (a, b) =>
+    (a, b) match {
+      case (a: ObjectMapping, b: ObjectMapping) => a |+| b
+      case (a: LeafMapping[_], _: LeafMapping[_]) => a
+    }
+
+
   // Rereference a type in another schema. Failing to do this is an unrecoverable error.
-  def reref(s: Schema): ObjectMapping => ObjectMapping = {
+  def reref(s: Schema): TypeMapping => TypeMapping = {
     case om @ ObjectMapping.DefaultObjectMapping(tpe, fm) =>
+      // println(s"remapping $tpe defined at ${om.pos}")
       s.ref(tpe).map(ObjectMapping(_, fm)(om.pos)).getOrElse(sys.error(s"SnippetMapping: Type ${om.tpe} doesn't exist in schema:\n$s"))
+    case lm : LeafMapping.DefaultLeafMapping[_] => s.ref(lm.tpe).map(t => lm.copy(tpe = t)).getOrElse(sys.error(s"SnippetMapping: Type ${lm.tpe} doesn't exist in schema:\n$s"))
+    case PrimitiveMapping(tpe) => s.ref(tpe).map(PrimitiveMapping(_)).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
     case om => sys.error(s"SnippetMapping: I don't know how to retarget a type for a ${om.getClass.getName}")
   }
 

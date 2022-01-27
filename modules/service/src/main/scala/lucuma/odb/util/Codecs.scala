@@ -31,9 +31,16 @@ trait Codecs {
   }
 
   val user_id: Codec[User.Id] = gid[User.Id]
+  val program_id: Codec[Program.Id] = gid[Program.Id]
 
   val site: Codec[Site] =
     `enum`(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase), Type("e_site"))
+
+  val user_type: Codec[String] =
+    `enum`(identity, Some(_), Type("e_user_type"))
+
+  val program_user_role: Codec[String] =
+    `enum`(identity, Some(_), Type("e_program_user_role"))
 
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))

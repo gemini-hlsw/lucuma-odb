@@ -47,7 +47,7 @@ object UserService {
       sql"""
         insert into t_user (c_user_id, c_user_type)
         values ($user_id, 'guest')
-        on conflict do nothing
+        on conflict (c_user_id) do nothing
       """.command.contramap(_.id)
 
     // Service users should never change but we'll accommodate a name change here.
@@ -55,8 +55,8 @@ object UserService {
       sql"""
         insert into t_user (c_user_id, c_user_type, c_service_name)
         values ($user_id, 'service', $varchar)
-        on conflict do
-        update set c_serbice_name = $varchar
+        on conflict (c_user_id) do
+        update set c_service_name = $varchar
       """.command.contramap { su => su.id ~ su.name ~ su.name }
 
     // Standard user ORCID profiles can change.
