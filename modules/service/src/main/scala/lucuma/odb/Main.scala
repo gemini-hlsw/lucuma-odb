@@ -104,8 +104,9 @@ object Main extends IOApp.Simple {
       channels   <- OdbMapping.Channels(pool)
       userSvc    <- pool.map(UserService.fromSession(_))
       middleware <- Resource.eval(ServerMiddleware(config, ssoClient, userSvc))
+      cache      <- Resource.eval(GraphQLRoutes.cache[F])
     } yield { wsb =>
-      middleware(GraphQLRoutes(ssoClient, pool, channels, SkunkMonitor.noopMonitor[F], wsb))
+      middleware(GraphQLRoutes(ssoClient, pool, channels, SkunkMonitor.noopMonitor[F], wsb, cache))
     }
 
   /** A startup action that runs database migrations using Flyway. */

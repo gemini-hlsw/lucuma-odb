@@ -13,6 +13,13 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import natchez.Trace
 import lucuma.odb.graphql.snippet._
+import lucuma.core.model.GuestRole
+import lucuma.core.model.ServiceRole
+import lucuma.core.model.StandardRole
+import lucuma.core.model.StandardRole.Admin
+import lucuma.core.model.StandardRole.Ngo
+import lucuma.core.model.StandardRole.Pi
+import lucuma.core.model.StandardRole.Staff
 
 object OdbMapping {
 
@@ -25,30 +32,41 @@ object OdbMapping {
       }
   }
 
-  def apply[F[_]: Async: Trace](
+  def apply[F[_]: Sync: Trace](
     channels: Channels[F],
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
-  ): F[User => Mapping[F]] = { (user: User) =>
-
+    user:     User,
+  ):  F[Mapping[F]] =
+    Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
       val m: Mapping[F] = new SkunkMapping[F](pool, monitor) with SnippetMapping[F] {
+
         val snippet: Snippet =
-          NonEmptyList.of(
-            FilterTypeSnippet(this),
-            PartnerSnippet(this),
-            UserSnippet(this),
-            ProgramSnippet(this, pool, user),
-          ).reduce
+          user.role match {
+            // case Admin(id) =>
+            // case GuestRole =>
+            // case ServiceRole(serviceName) =>
+            // case Ngo(id, partner) =>
+            // case Pi(id) =>
+            // case Staff(id) =>
+            case _ =>
+              NonEmptyList.of(
+                FilterTypeSnippet(this),
+                PartnerSnippet(this),
+                UserSnippet(this),
+                ProgramSnippet(this, pool, user),
+              ).reduce
+
+          }
+
         val schema = snippet.schema
         val typeMappings = snippet.typeMappings
         override val selectElaborator = snippet.selectElaborator
+
       }
-
       m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
+      m.pure[F]
 
-      m
-
-  } .pure[F]
-
+    }
 
 }

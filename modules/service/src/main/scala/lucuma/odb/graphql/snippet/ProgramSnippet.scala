@@ -29,7 +29,7 @@ import lucuma.odb.service.ProgramService
 object ProgramSnippet {
 
   def apply[F[_]: MonadCancelThrow](m: SnippetMapping[F] with SkunkMapping[F], sessionPool: Resource[F, Session[F]], user: User): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, PrimitiveMapping }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping }
 
     val pool = sessionPool.map(ProgramService.fromSession(_))
 
