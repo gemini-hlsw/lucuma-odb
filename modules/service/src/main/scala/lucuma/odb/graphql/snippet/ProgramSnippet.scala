@@ -63,30 +63,15 @@ object ProgramSnippet {
           userId: UserId!
           user:   User!
         }
-
-        scalar UserId
-
-        # For some reason we need this here; introspection fails otherwise.
-        # Something in the schema remapping isn't right.
-        type User {
-          id: UserId!
-          type:            String! # TODO, should be an enum
-          serviceName:     String,
-          orcidId:         String,
-          orcidGivenName:  String,
-          orcidCreditName: String,
-          orcidFamilyName: String,
-          orcidEmail:      String,
-        }
       """
 
-    val QueryType       = schema.ref("Query")
-    val MutationType    = schema.ref("Mutation")
-    val ProgramType     = schema.ref("Program")
-    val ProgramUserType = schema.ref("ProgramUser")
+    val QueryType           = schema.ref("Query")
+    val MutationType        = schema.ref("Mutation")
+    val ProgramType         = schema.ref("Program")
+    val ProgramUserType     = schema.ref("ProgramUser")
     val ProgramUserRoleType = schema.ref("ProgramUserRole")
-    val ProgramIdType   = schema.ref("ProgramId")
-    val UserIdType      = schema.ref("UserId")
+    val ProgramIdType       = schema.ref("ProgramId")
+    val UserIdType          = schema.ref("UserId")
 
     object Program extends TableDef("t_program") {
       val Id        = col("c_program_id", program_id)

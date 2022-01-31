@@ -14,7 +14,7 @@ import edu.gemini.grackle.Query.Select
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 
-trait SnippetMapping[F[_]] extends Mapping[F] with SchemaInstances with SelectElaboratorInstances {
+trait SnippetMapping[F[_]] extends Mapping[F] {
 
   case class Snippet(
     schema: Schema,
@@ -26,61 +26,32 @@ trait SnippetMapping[F[_]] extends Mapping[F] with SchemaInstances with SelectEl
     })
   }
 
-  implicit val SemigroupObjectMapping: Semigroup[ObjectMapping] = (a, b) =>
-    if (!(a.tpe.asNamed.map(_.name) == b.tpe.asNamed.map(_.name))) a
-    else ObjectMapping(
-      a.tpe,
-      (a.fieldMappings ++ b.fieldMappings).distinctBy(_.fieldName)
-    )
-
-  implicit val SemigroupTypeMapping: Semigroup[TypeMapping] = (a, b) =>
-    (a, b) match {
-      case (a: ObjectMapping, b: ObjectMapping) => a |+| b
-      case (a: LeafMapping[_], _: LeafMapping[_]) => a
-    }
-
-
-  // Rereference a type in another schema. Failing to do this is an unrecoverable error.
-  def reref(s: Schema): TypeMapping => TypeMapping = {
-    case om @ ObjectMapping.DefaultObjectMapping(tpe, fm) =>
-      // println(s"remapping $tpe defined at ${om.pos}")
-      s.ref(tpe).map(ObjectMapping(_, fm)(om.pos)).getOrElse(sys.error(s"SnippetMapping: Type ${om.tpe} doesn't exist in schema:\n$s"))
-    case lm : LeafMapping.DefaultLeafMapping[_] => s.ref(lm.tpe).map(t => lm.copy(tpe = t)).getOrElse(sys.error(s"SnippetMapping: Type ${lm.tpe} doesn't exist in schema:\n$s"))
-    case PrimitiveMapping(tpe) => s.ref(tpe).map(PrimitiveMapping(_)).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
-    case om => sys.error(s"SnippetMapping: I don't know how to retarget a type for a ${om.getClass.getName}")
-  }
-
   implicit val SemigroupSnippetData: Semigroup[Snippet] = (a, b) => {
     val s1 = a.schema |+| b.schema
     Snippet(
       s1,
-      (a.typeMappings.map(a => b.typeMappings.find(a.tpe.asNamed.map(_.name) === _.tpe.asNamed.map(_.name)).foldLeft(a)(_ |+| _)) ++
-       b.typeMappings.filterNot(b => a.typeMappings.exists(_.tpe.asNamed.map(_.name) === b.tpe.asNamed.map(_.name)))).map(reref(s1)),
+      concatAndMergeWhen(a.typeMappings, b.typeMappings)(sameName).map(reref(s1)),
       a.elaborator |+| b.elaborator,
     )
   }
 
-  implicit def semigroupPartialFunction[A, B]: Semigroup[PartialFunction[A, B]] = (a, b) =>
-    a orElse b
+  private implicit val SemigroupObjectMapping: Semigroup[ObjectMapping] = (a, b) =>
+    if (!sameName(a.tpe, b.tpe)) a else ObjectMapping(
+      a.tpe,
+      (a.fieldMappings ++ b.fieldMappings).distinctBy(_.fieldName)
+    )
 
-}
-
-trait SelectElaboratorInstances {
-
-  // Rereference a SelectElaborator.
-  def rerefSE(s: Schema): QueryCompiler.SelectElaborator => QueryCompiler.SelectElaborator = se =>
-    new QueryCompiler.SelectElaborator(Map.empty) {
-      override def transform(query: Query, vars: Query.Vars, schema: Schema, tpe: Type): Result[Query] =
-        s.ref(tpe).map(se.transform(query, vars, s, _)).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
-      override def elaborateArgs(tpe: Type, fieldName: String, args: List[Query.Binding]): Result[List[Query.Binding]] =
-        s.ref(tpe).map(se.elaborateArgs(_, fieldName, args)).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
+  private implicit val SemigroupTypeMapping: Semigroup[TypeMapping] = (a, b) =>
+    (a, b) match {
+      case (a: ObjectMapping, b: ObjectMapping) => a |+| b
+      case (a: LeafMapping[_], _: LeafMapping[_]) => a
+      // other cases
     }
 
-}
+  private implicit def semigroupPartialFunction[A, B]: Semigroup[PartialFunction[A, B]] = (a, b) =>
+    a orElse b
 
-trait SchemaInstances {
-
-  implicit val SemigroupDirective: Semigroup[Directive] = (a, b) =>
+  private implicit val SemigroupDirective: Semigroup[Directive] = (a, b) =>
     if (a.name != b.name) a
     else Directive(
       a.name,
@@ -89,30 +60,55 @@ trait SchemaInstances {
       (a.args ++ b.args).distinctBy(_.name)
     )
 
-  implicit val SemigroupNamedType: Semigroup[NamedType] = {
-    case ((a: ObjectType), (b: ObjectType)) =>
+  private implicit val SemigroupNamedType: Semigroup[NamedType] = {
+    case ((a: ObjectType), (b: ObjectType)) if sameName(a, b) =>
       ObjectType(
         a.name,
         a.description orElse b.description,
         (a.fields ++ b.fields).distinctBy(_.name),
         (a.interfaces ++ b.interfaces).distinctBy(_.name),
       )
+    // todo: other named types
     case (a, _) => a
   }
 
-  implicit val SemigroupSchema: Semigroup[Schema] = (a, b) =>
-    new Schema {
-      val pos: SourcePos = a.pos
-      val types: List[NamedType] =
-        a.types.map(a => b.types.find(b => a.name === b.name).foldLeft(a)(_ |+| _)) ++
-        b.types.filterNot(b => a.types.exists(_.name === b.name))
-      lazy val directives: List[Directive] =
-        a.directives.map(a => b.directives.find(b => a.name === b.name).foldLeft(a)(_ |+| _)) ++
-        b.directives.filterNot(b => a.directives.exists(_.name === b.name))
+  private implicit val SemigroupSchema: Semigroup[Schema] = (a, b) =>
+    Remapper.remap {
+      new Schema {
+        val pos: SourcePos = a.pos
+        val types: List[NamedType] = concatAndMergeWhen(a.types, b.types)(sameName)
+        val directives: List[Directive] = concatAndMergeWhen(a.directives, b.directives)(_.name == _.name)
+      }
+    }
+
+  private implicit class SchemaOps(s: Schema) {
+    def unsafeRef(tpe: Type): TypeRef =
+      s.ref(tpe).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
+  }
+
+  // Rereference a type in another schema. Failing to do this is an unrecoverable error.
+  private def reref(s: Schema): TypeMapping => TypeMapping = {
+    case om @ ObjectMapping.DefaultObjectMapping(tpe, fm) => ObjectMapping(s.unsafeRef(tpe), fm)(om.pos) // n.b. copy doesn't work
+    case lm : LeafMapping.DefaultLeafMapping[_]           => lm.copy(tpe = s.unsafeRef(lm.tpe))
+    case PrimitiveMapping(tpe)                            => PrimitiveMapping(s.unsafeRef(tpe))
+    case tm                                               => sys.error(s"SnippetMapping: I don't know how to reref a ${tm.getClass.getName}")
+  }
+
+  // elements in `left` merged with corresponding elements in `right`, when available, followed by unmatched elements in `right`.
+  private def concatAndMergeWhen[A: Semigroup](left: List[A], right: List[A])(matches: (A, A) => Boolean): List[A] =
+    left.map(la => right.find(ra => matches(la, ra)).foldLeft(la)(_ |+| _)) ++
+    right.filterNot(ra => left.exists(matches(_, ra)))
+
+  private def sameName(a: TypeMapping, b: TypeMapping): Boolean =
+    sameName(a.tpe, b.tpe)
+
+  private def sameName(a: Type, b: Type): Boolean =
+    (a.asNamed, b.asNamed) match {
+      case (Some(na), Some(nb)) => na.name === nb.name
+      case _ => false
     }
 
 }
 
-object SchemaInstances extends SchemaInstances
 
 
