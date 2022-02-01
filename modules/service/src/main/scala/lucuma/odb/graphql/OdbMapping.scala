@@ -39,17 +39,22 @@ object OdbMapping {
     user:     User,
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
-      val m: Mapping[F] = new SkunkMapping[F](pool, monitor) with SnippetMapping[F] {
+
+      val m: Mapping[F] = new SkunkMapping[F](pool, monitor) with SnippetMapping[F] with ComputeMapping[F] {
 
         val snippet: Snippet =
           user.role match {
-            // case Admin(id) =>
-            // case GuestRole =>
-            // case ServiceRole(serviceName) =>
-            // case Ngo(id, partner) =>
-            // case Pi(id) =>
-            // case Staff(id) =>
-            case _ =>
+
+            case Admin(_) | ServiceRole(_) =>
+              NonEmptyList.of(
+                FilterTypeSnippet(this),
+                PartnerSnippet(this),
+                UserSnippet(this),
+                ProgramSnippet(this, pool, user),
+                ProgramAdminSnippet(this, pool), // only for admin/service users
+              ).reduce
+
+            case GuestRole | Ngo(_, _) | Pi(_) | Staff(_) =>
               NonEmptyList.of(
                 FilterTypeSnippet(this),
                 PartnerSnippet(this),

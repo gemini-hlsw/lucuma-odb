@@ -37,15 +37,15 @@ create type e_program_user_role as enum(
 );
 
 create table t_program_user (
-  c_program_id  d_program_id        not null references t_program(c_program_id),
-  c_user_id     d_user_id           not null references t_user(c_user_id),
+  c_program_id  d_program_id        not null references t_program(c_program_id) on delete cascade,
+  c_user_id     d_user_id           not null references t_user(c_user_id), -- don't cascade .. we shouldn't ever delete a user!
   c_role        e_program_user_role not null,
   unique (c_program_id, c_user_id)
 );
 
 create table t_time_allocation (
-  c_program_id   d_program_id  not null references t_program(c_program_id),
-  c_partner      d_tag         not null references t_partner(c_tag),
+  c_program_id   d_program_id  not null references t_program(c_program_id) on delete cascade,
+  c_partner      d_tag         not null references t_partner(c_tag), -- don't cascade .. we shouldn't ever delete a partner!
   c_duration     interval      not null -- check positive?
 )
 
