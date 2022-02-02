@@ -29,6 +29,7 @@ import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{ Command => _, _ }
+import scala.concurrent.duration._
 
 object Main extends IOApp.Simple {
 
@@ -38,7 +39,10 @@ object Main extends IOApp.Simple {
   // The name we're know by in the tracing back end.
   val ServiceName = "lucuma-odb"
 
-    /** A startup action that prints a banner. */
+  // Time GraphQL service instances are cached
+  val GraphQLServiceTTL = 30.minutes
+
+  /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
     val banner =
         s"""|
@@ -104,9 +108,9 @@ object Main extends IOApp.Simple {
       channels   <- OdbMapping.Channels(pool)
       userSvc    <- pool.map(UserService.fromSession(_))
       middleware <- Resource.eval(ServerMiddleware(config, ssoClient, userSvc))
-      cache      <- Resource.eval(GraphQLRoutes.cache[F])
+      routes     <- GraphQLRoutes(ssoClient, pool, channels, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL)
     } yield { wsb =>
-      middleware(GraphQLRoutes(ssoClient, pool, channels, SkunkMonitor.noopMonitor[F], wsb, cache))
+      middleware(routes(wsb))
     }
 
   /** A startup action that runs database migrations using Flyway. */
