@@ -19,44 +19,49 @@ import lucuma.core.model.User
 import cats.kernel.Order
 import org.http4s.headers.Authorization
 import lucuma.graphql.routes.GraphQLService
-import scala.collection.immutable.TreeMap
+import lucuma.odb.util.Cache
+import scala.concurrent.duration._
 
 object GraphQLRoutes {
 
   implicit val x: Order[Authorization] =
     Order.by(Header[Authorization].value)
 
-  def cache[F[_]: Ref.Make]: F[Ref[F, Map[Authorization, Option[GraphQLService[F]]]]] =
-    Ref[F].of(TreeMap.empty)
-
+  /**
+   * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
+   * based on the `Authorization` header and discarded when `ttl` expires.
+   */
   def apply[F[_]: Async: Trace: Logger](
     client:   SsoClient[F, User],
     pool:     Resource[F, Session[F]],
     channels: OdbMapping.Channels[F],
     monitor:  SkunkMonitor[F],
-    wsb:      WebSocketBuilder2[F],
-    cache:    Ref[F, Map[Authorization, Option[GraphQLService[F]]]]
-  ): HttpRoutes[F] =
-    LucumaGraphQLRoutes.forService[F](
-      {
-        case None    => none.pure[F]  // No auth, no service (for now)
-        case Some(a) =>
-          cache.get.map(_.get(a)).flatMap {
-            case Some(m) => m.pure[F] // It was in the cache
-            case None    =>           // It was not in the cache
-              {
-                for {
-                  user <- OptionT(client.get(a))
-                  map  <- OptionT.liftF(OdbMapping(channels, pool, monitor, user))
-                  svc   = new GrackleGraphQLService(map)
-                } yield svc
-              } .widen[GraphQLService[F]]
-                .value
-                .flatTap(os => cache.update(m => m + (a -> os)))
-          }
-      },
-      wsb
-    )
+    ttl:      FiniteDuration,
+  ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+    Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
+      LucumaGraphQLRoutes.forService[F](
+        {
+          case None    => none.pure[F]  // No auth, no service (for now)
+          case Some(a) =>
+            cache.get(a).flatMap {
+              case Some(opt) =>
+                Logger[F].info(s"Cache hit for $a").as(opt) // it was in the cache
+              case None    =>           // It was not in the cache
+                Logger[F].info(s"Cache miss for $a") *>
+                {
+                  for {
+                    user <- OptionT(client.get(a))
+                    map  <- OptionT.liftF(OdbMapping(channels, pool, monitor, user))
+                    svc   = new GrackleGraphQLService(map)
+                  } yield svc
+                } .widen[GraphQLService[F]]
+                  .value
+                  .flatTap(os => cache.put(a, os))
+            }
+        },
+        wsb
+      )
+    }
 
 }
 

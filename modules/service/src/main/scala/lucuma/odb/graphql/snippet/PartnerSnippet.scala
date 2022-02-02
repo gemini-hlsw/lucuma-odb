@@ -4,11 +4,17 @@ package snippet
 import edu.gemini.grackle.syntax._
 import skunk.codec.all._
 import edu.gemini.grackle.skunk.SkunkMapping
+import cats.Functor
+import skunk._
+import edu.gemini.grackle.EnumType
+import skunk.syntax.all._
+import cats.syntax.all._
+import edu.gemini.grackle.EnumValue
 
 object PartnerSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, PrimitiveMapping }
 
     val schema =
       schema"""
@@ -17,7 +23,7 @@ object PartnerSnippet {
         }
 
         type PartnerMeta {
-          tag:        String!
+          tag:        Partner!
           shortName:  String!
           longName:	  String!
           active:     Boolean!
@@ -26,6 +32,7 @@ object PartnerSnippet {
       """
 
     val QueryType        = schema.ref("Query")
+    val PartnerType      = schema.ref("Partner")
     val PartnerMetaType  = schema.ref("PartnerMeta")
 
     object Partner extends TableDef("t_partner") {
@@ -51,12 +58,22 @@ object PartnerSnippet {
             SqlField("shortName", Partner.ShortName),
             SqlField("longName", Partner.LongName),
             SqlField("active", Partner.Active),
-          ),
-        )
+          )
+        ),
+        PrimitiveMapping(PartnerType)
       )
 
     Snippet(schema, typeMappings)
 
   }
 
-}
+  def enumType[F[_]: Functor](s: Session[F]): F[EnumType] =
+    s.execute(sql"select c_tag, c_long_name, c_active from t_partner".query(varchar ~ varchar ~ bool)).map { elems =>
+      EnumType(
+        "Partner",
+        Some("Enumerated type of partners."),
+        elems.map { case tag ~ desc ~ active => EnumValue(tag, Some(desc), !active) }
+      )
+    }
+
+  }
