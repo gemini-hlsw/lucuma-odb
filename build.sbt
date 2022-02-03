@@ -38,6 +38,7 @@ lazy val service = project
     scalacOptions --= Seq("-Vtype-diffs"),
     libraryDependencies ++= Seq(
       "io.circe"       %% "circe-parser"        % circeVersion,
+      "io.circe"       %% "circe-refined"       % circeVersion,
       "is.cir"         %% "ciris"               % cirisVersion,
       "org.http4s"     %% "http4s-ember-client" % http4sVersion,
       "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
