@@ -1,4 +1,4 @@
-package lucuma.odb.graphql
+package lucuma.odb.graphql.util
 
 import cats.Semigroup
 import cats.syntax.all._

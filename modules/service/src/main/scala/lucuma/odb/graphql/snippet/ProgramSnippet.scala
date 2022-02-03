@@ -25,6 +25,7 @@ import io.circe.Encoder
 import org.tpolecat.typename.TypeName
 import org.tpolecat.sourcepos.SourcePos
 import lucuma.odb.service.ProgramService
+import lucuma.odb.graphql.util._
 
 object ProgramSnippet {
 

@@ -10,6 +10,7 @@ import edu.gemini.grackle.EnumType
 import skunk.syntax.all._
 import cats.syntax.all._
 import edu.gemini.grackle.EnumValue
+import lucuma.odb.graphql.util._
 
 object PartnerSnippet {
 
@@ -21,7 +22,6 @@ object PartnerSnippet {
         type Query {
           partnerMeta: [PartnerMeta!]!
         }
-
         type PartnerMeta {
           tag:        Partner!
           shortName:  String!

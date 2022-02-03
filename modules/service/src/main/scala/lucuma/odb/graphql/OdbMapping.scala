@@ -21,6 +21,7 @@ import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.StandardRole.Staff
 import org.tpolecat.sourcepos.SourcePos
 import cats.Applicative
+import lucuma.odb.graphql.util._
 
 object OdbMapping {
 
