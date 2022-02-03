@@ -1,4 +1,4 @@
-package lucuma.odb.graphql
+package lucuma.odb.graphql.util
 
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.Schema

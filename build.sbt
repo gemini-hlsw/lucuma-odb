@@ -35,6 +35,7 @@ lazy val service = project
   .settings(
     publish / skip := true,
     name := "lucuma-odb-service",
+    scalacOptions --= Seq("-Vtype-diffs"),
     libraryDependencies ++= Seq(
       "io.circe"       %% "circe-parser"        % circeVersion,
       "is.cir"         %% "ciris"               % cirisVersion,

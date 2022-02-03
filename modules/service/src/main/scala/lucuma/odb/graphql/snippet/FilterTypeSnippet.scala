@@ -10,6 +10,7 @@ import edu.gemini.grackle.EnumType
 import cats.Functor
 import cats.syntax.all._
 import edu.gemini.grackle.EnumValue
+import lucuma.odb.graphql.util._
 
 object FilterTypeSnippet {
 
@@ -21,7 +22,6 @@ object FilterTypeSnippet {
         type Query {
           filterTypeMeta: [FilterTypeMeta!]!
         }
-
         type FilterTypeMeta {
           tag:        FilterType!
           shortName:  String!

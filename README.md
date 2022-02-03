@@ -19,3 +19,15 @@ The highlights:
 
 To work on the schema I just do `docker-compose down; docker-compose up` to wipe it and rebuild from the schema. Any errors will be reported on the console. For now we're not worried about migrations so files can be edited arbitrarily. Once we're deployed migrations will need to be append-only.
 
+## Running the App
+
+The application assumes that you have an empty database initially because it wants to run migrations. To set this up, start the docker container as above, then do this:
+
+```
+psql -h localhost -U jimmy -d postgres -e -c 'drop database "lucuma-odb"'
+psql -h localhost -U jimmy -d postgres -e -c 'create database "lucuma-odb"'
+```
+
+You can now run the app, and you can do `docker-compose stop`, but if you do `down` and then `up` you'll need to clear out the db again.
+
+

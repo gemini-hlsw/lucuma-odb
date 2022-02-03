@@ -9,6 +9,7 @@ import lucuma.core.model
 import org.tpolecat.typename.TypeName
 import io.circe.Encoder
 import org.tpolecat.sourcepos.SourcePos
+import lucuma.odb.graphql.util._
 
 object UserSnippet {
 

@@ -17,6 +17,7 @@ import lucuma.core.model.Program
 import lucuma.core.util.Gid
 import lucuma.odb.service.ProgramService
 import skunk.Session
+import lucuma.odb.graphql.util._
 
 object ProgramAdminSnippet {
 
@@ -28,6 +29,7 @@ object ProgramAdminSnippet {
     val schema =
       schema"""
         type Mutation {
+          "Delete the specified program, returning true if it was deleted, false if it was not found."
           deleteProgram(id: ProgramId!): Boolean!
         }
       """
