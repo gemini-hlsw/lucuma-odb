@@ -10,9 +10,13 @@ import skunk.data.Type
 import lucuma.core.enum.Site
 import skunk.codec.all._
 import skunk.data.Arr
+import eu.timepit.refined.types.string.NonEmptyString
 
 // Codecs for some atomic types.
 trait Codecs {
+
+  val text_nonempty: Codec[NonEmptyString] =
+    text.eimap(NonEmptyString.from)(_.value)
 
   val orcid_id: Codec[OrcidId] =
     Codec.simple[OrcidId](

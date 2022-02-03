@@ -18,7 +18,6 @@ import edu.gemini.grackle.syntax._
 import fs2.Stream
 import lucuma.odb.util.Codecs._
 import skunk.Session
-import skunk.codec.all._
 import lucuma.core.model.User
 import lucuma.core.model.Access._
 import io.circe.Encoder
@@ -26,6 +25,7 @@ import org.tpolecat.typename.TypeName
 import org.tpolecat.sourcepos.SourcePos
 import lucuma.odb.service.ProgramService
 import lucuma.odb.graphql.util._
+import eu.timepit.refined.types.string.NonEmptyString
 
 object ProgramSnippet {
 
@@ -36,20 +36,49 @@ object ProgramSnippet {
 
     val schema =
       schema"""
+
         type Query {
           programs: [Program!]!
         }
 
         type Mutation {
-          createProgram(name: String): Program!
+          createProgram(name: NonEmptyString): Program!
         }
 
         scalar ProgramId
 
         type Program {
-          id:      ProgramId!
-          name:    String!
+
+          "Program ID"
+          id: ProgramId!
+
+          #"DELETED or PRESENT"
+          #existence: Existence!
+
+          "Program name"
+          name: NonEmptyString
+
+          #"All observations associated with the program (needs pagination)."
+          #observations(
+          #  "Retrieve `first` values after the given cursor"
+          #  first: Int
+          #
+          #  "Retrieve values after the one associated with this cursor"
+          #  after: Cursor
+          #
+          #  "Set to true to include deleted values"
+          #  includeDeleted: Boolean! = false
+          #): ObservationConnection!
+
+          #"Program planned time calculation."
+          #plannedTime(
+          #  "Set to true to include deleted values"
+          #  includeDeleted: Boolean! = false
+          #): PlannedTimeSummary!
+
+          "Users associated with this science program"
           users:   [ProgramUser!]!
+
         }
 
         enum ProgramUserRole {
@@ -77,7 +106,7 @@ object ProgramSnippet {
     object Program extends TableDef("t_program") {
       val Id        = col("c_program_id", program_id)
       val Existence = col("c_existence", existence)
-      val Name      = col("c_name", text)
+      val Name      = col("c_name", text_nonempty.opt)
     }
 
     object ProgramUser extends TableDef("t_program_user") {
@@ -92,7 +121,7 @@ object ProgramSnippet {
 
     def createProgram: Mutation =
       Mutation { (child, env) =>
-        env.get[String]("name") match {
+        env.get[Option[NonEmptyString]]("name") match {
           case None =>
             QueryInterpreter.mkErrorResult[(Query, Cursor.Env)](s"Implementation error: expected 'name' in $env.").pure[Stream[F,*]]
           case Some(name) =>
@@ -167,11 +196,23 @@ object ProgramSnippet {
           ).rightIor
       },
       MutationType -> {
+
         case Select("createProgram", List(Binding("name", Value.StringValue(name))), child) =>
+          NonEmptyString.from(name) match {
+            case Left(_)     => Result.failure("'name' may not be empty.")
+            case Right(name) =>
+              Environment(
+                Cursor.Env("name" -> Some(name)),
+                Select("createProgram", Nil, child)
+              ).rightIor
+          }
+
+        case Select("createProgram", List(Binding("name", Value.AbsentValue | Value.NullValue)), child) =>
           Environment(
-            Cursor.Env("name" -> name),
+            Cursor.Env("name" -> None),
             Select("createProgram", Nil, child)
           ).rightIor
+
       }
     )
 

@@ -49,6 +49,7 @@ object OdbMapping {
 
               case Admin(_) | ServiceRole(_) =>
                 NonEmptyList.of(
+                  BaseSnippet(this),
                   Snippet(enums, Nil),
                   FilterTypeSnippet(this),
                   PartnerSnippet(this),
@@ -59,6 +60,7 @@ object OdbMapping {
 
               case GuestRole | Ngo(_, _) | Pi(_) | Staff(_) =>
                 NonEmptyList.of(
+                  BaseSnippet(this),
                   Snippet(enums, Nil),
                   FilterTypeSnippet(this),
                   PartnerSnippet(this),

@@ -22,7 +22,7 @@ create table t_program (
   -- c_band        d_band   , -- 1, 2, 3, 4, or 5 (which means it's a proposal)
   -- c_index       smallint , -- index in-band?
 
-  c_name        text         not null default 'Untitled Science Program'
+  c_name        text         check (c_name is null or length(c_name) > 0)
 
 );
 comment on table t_program is 'Science programs.';
