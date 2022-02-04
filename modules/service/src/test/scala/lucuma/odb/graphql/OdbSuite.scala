@@ -1,0 +1,234 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+
+import cats.data.OptionT
+import cats.effect._
+import cats.implicits._
+import clue.ApolloWebSocketClient
+import clue.GraphQLOperation
+import clue.PersistentStreamingClient
+import clue.ResponseException
+import clue.TransactionalClient
+import clue.http4sjdk.Http4sJDKBackend
+import clue.http4sjdk.Http4sJDKWSBackend
+import com.dimafeng.testcontainers.PostgreSQLContainer
+import com.dimafeng.testcontainers.munit.TestContainerForAll
+import io.circe.Json
+import io.circe.literal._
+import lucuma.core.model.User
+import lucuma.odb.Config
+import lucuma.odb.Main
+import lucuma.sso.client.SsoClient
+import munit.CatsEffectSuite
+import natchez.Trace.Implicits.noop
+import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.headers.Authorization
+import org.http4s.server.Server
+import org.http4s.server.websocket.WebSocketBuilder2
+import org.http4s.{Uri => Http4sUri, _}
+import org.testcontainers.containers.BindMode
+import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
+import org.testcontainers.utility.DockerImageName
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+
+import scala.concurrent.duration._
+import org.slf4j
+import munit.internal.console.AnsiColors
+
+/**
+ * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
+ * among all tests.
+ */
+trait OdbSuite extends CatsEffectSuite with TestContainerForAll {
+
+  val jlogger: slf4j.Logger =
+    slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
+
+  var container: PostgreSQLContainer = null
+
+  def showContainerLog: Boolean = false
+
+  override val containerDef = new PostgreSQLContainer.Def(DockerImageName.parse("postgres:11")) {
+    override def createContainer(): PostgreSQLContainer = {
+      val c = super.createContainer()
+      c.container.withClasspathResourceMapping("/db/migration", "/docker-entrypoint-initdb.d/", BindMode.READ_ONLY)
+      if (showContainerLog)
+        c.container.withLogConsumer(f => jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}"))
+      container = c
+      c
+    }
+  }
+
+  def user: Option[User]
+
+  private implicit val log: Logger[IO] =
+    Slf4jLogger.getLoggerFromName("lucuma-odb-test")
+
+  private def ssoClient(u: Option[User]): SsoClient[IO, User] =
+    new SsoClient.AbstractSsoClient[IO, User] {
+      def find(req: Request[IO]): IO[Option[User]] = OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
+      def get(authorization: Authorization): IO[Option[User]] = IO.pure(u)
+    }
+
+  private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+    Main.routesResource(
+      Config.Database(
+        host     = container.containerIpAddress,
+        port     = container.mappedPort(POSTGRESQL_PORT),
+        user     = container.username,
+        password = container.password,
+        database = container.databaseName,
+      ),
+      ssoClient(user).pure[Resource[IO, *]],
+      "unused"
+    ).map(_.map(_.orNotFound))
+
+  private def server: Resource[IO, Server] =
+    // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
+    httpApp.flatMap { app =>
+      BlazeServerBuilder[IO]
+        .withHttpWebSocketApp(app)
+        .bindAny()
+        .resource
+        // .flatTap(_ => Resource.eval(IO.println("  • Server started.")))
+    }
+
+  private def transactionalClient(svr: Server): Resource[IO, TransactionalClient[IO, Nothing]] =
+    for {
+      xbe <- Http4sJDKBackend.apply[IO]
+      uri  = svr.baseUri / "odb"
+      xc  <- Resource.eval(TransactionalClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, "123"))))(Async[IO], xbe, Logger[IO]))
+    } yield xc
+
+  private def streamingClient(svr: Server): Resource[IO, PersistentStreamingClient[IO, Nothing, _, _]] =
+    for {
+      sbe <- Http4sJDKWSBackend[IO]
+      uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
+      sc  <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[IO], Logger[IO], sbe))
+      ps   = Map("Authorization" -> Json.fromString("Bearer 123"))
+      _   <- Resource.make(sc.connect() *> sc.initialize(ps))(_ => sc.terminate() *> sc.disconnect())
+    } yield sc
+
+  case class Operation(
+    document: String
+  ) extends GraphQLOperation[Nothing] {
+    type Data       = Json
+    type Variables  = Json
+    val varEncoder  = implicitly
+    val dataDecoder = implicitly
+  }
+
+  private lazy val serverFixture: Fixture[Server] =
+    ResourceSuiteLocalFixture("server", server)
+
+  override def munitFixtures = List(serverFixture)
+
+  sealed trait ClientOption extends Product with Serializable {
+
+    def prefix: String =
+      this match {
+        case ClientOption.Http => "[http]"
+        case ClientOption.Ws   => "[ws]  "
+      }
+
+    def connection: Server => Resource[IO, TransactionalClient[IO, Nothing]] =
+      this match {
+        case ClientOption.Http => transactionalClient
+        case ClientOption.Ws   => streamingClient
+      }
+
+  }
+
+  object ClientOption {
+    case object Http extends ClientOption
+    case object Ws   extends ClientOption
+
+    val All: List[ClientOption] = List(Http, Ws)
+  }
+
+  /** Run a query and ensure that the responses are as expected. */
+  def queryTest(
+    name:      String,
+    query:     String,
+    expected:  Json,
+    variables: Option[Json] = None,
+    clients:   List[ClientOption] = ClientOption.All
+  ): Unit =
+    queryTestImpl(name, query, expected.asRight, variables, clients)
+
+  def queryTestFailure(
+    name:      String,
+    query:     String,
+    errors:    List[String],
+    variables: Option[Json] = None,
+    clients:   List[ClientOption] = ClientOption.All
+  ): Unit =
+    queryTestImpl(name, query, errors.asLeft, variables, clients)
+
+  private def queryTestImpl(
+    name:      String,
+    query:     String,
+    expected:  Either[List[String], Json],
+    variables: Option[Json],
+    clients:   List[ClientOption]
+  ): Unit = {
+
+    def go(client: ClientOption): Unit = {
+      test(s"${client.prefix} $name") {
+        Resource.eval(IO(serverFixture()))
+          .flatMap(client.connection)
+          .use { conn =>
+            val req = conn.request(Operation(query))
+            val op  = variables.fold(req.apply)(req.apply)
+
+            expected.fold(errors => {
+              op.intercept[ResponseException]
+                .map(e => e.asGraphQLErrors.toList.flatten.map(_.message))
+                .assertEquals(errors)
+            }, success => {
+              op.map(_.spaces2)
+                .assertEquals(success.spaces2) // by comparing strings we get more useful errors
+            })
+          }
+      }
+    }
+
+    clients.foreach(go)
+  }
+
+  def subscriptionTest(query: String, mutations: Either[List[(String, Option[Json])], IO[Unit]], expected: List[Json], variables: Option[Json] = None) = {
+    val suffix = query.linesIterator.dropWhile(_.trim.isEmpty).next().trim + " ..."
+    test(s"[sub]  $suffix") {
+      Resource.eval(IO(serverFixture()))
+        .flatMap(streamingClient)
+        .use { conn =>
+          val req = conn.subscribe(Operation(query))
+          variables
+            .fold(req.apply)(req.apply) // awkward API
+            .flatMap { sub =>
+              for {
+                _   <- log.debug("*** ----- about to start stream fiber")
+                fib <- sub.stream.compile.toList.start
+                _   <- log.debug("*** ----- pausing a bit")
+                _   <- IO.sleep(200.millis)
+                _   <- log.debug("*** ----- running mutations")
+                _   <- mutations.fold(_.traverse_ { case (query, vars) =>
+                         val req = conn.request(Operation(query))
+                         vars.fold(req.apply)(req.apply)
+                       }, identity)
+                _   <- log.debug("*** ----- pausing a bit")
+                _   <- IO.sleep(200.millis)
+                _   <- log.debug("*** ----- stopping subscription")
+                _   <- sub.stop()
+                _   <- log.debug("*** ----- joining fiber")
+                obt <- fib.joinWithNever
+              } yield assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
+            }
+        }
+    }
+  }
+
+}

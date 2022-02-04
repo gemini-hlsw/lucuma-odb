@@ -74,7 +74,7 @@ object Config {
   object Database {
 
     // postgres://username:password@host:port/database name
-    private def fromHerokuUri(uri: URI): Option[Database] =
+    def fromHerokuUri(uri: URI): Option[Database] =
       uri.getUserInfo.split(":") match {
         case Array(user, password) =>
           Some(Database(
@@ -99,7 +99,7 @@ object Config {
     private implicit val ConfigDecoderDatabaseConfig: ConfigDecoder[URI, Database] =
       ConfigDecoder[URI].mapOption("Database")(Database.fromHerokuUri)
 
-    val fromCiris: ConfigValue[Effect, Database] =
+    lazy val fromCiris: ConfigValue[Effect, Database] =
       envOrProp("DATABASE_URL").as[URI].as[Database] // passed by Heroku
 
   }

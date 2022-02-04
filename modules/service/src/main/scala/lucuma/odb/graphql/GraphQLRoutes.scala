@@ -34,7 +34,6 @@ object GraphQLRoutes {
   def apply[F[_]: Async: Trace: Logger](
     client:   SsoClient[F, User],
     pool:     Resource[F, Session[F]],
-    channels: OdbMapping.Channels[F],
     monitor:  SkunkMonitor[F],
     ttl:      FiniteDuration,
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
@@ -51,7 +50,7 @@ object GraphQLRoutes {
                 {
                   for {
                     user <- OptionT(client.get(a))
-                    map  <- OptionT.liftF(OdbMapping(channels, pool, monitor, user))
+                    map  <- OptionT.liftF(OdbMapping(pool, monitor, user))
                     svc   = new GrackleGraphQLService(map)
                   } yield svc
                 } .widen[GraphQLService[F]]
@@ -59,7 +58,8 @@ object GraphQLRoutes {
                   .flatTap(os => cache.put(a, os))
             }
         },
-        wsb
+        wsb,
+        "odb"
       )
     }
 
