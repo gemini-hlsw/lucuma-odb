@@ -35,7 +35,6 @@ object OdbMapping {
   }
 
   def apply[F[_]: Sync: Trace](
-    channels: Channels[F],
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user:     User,

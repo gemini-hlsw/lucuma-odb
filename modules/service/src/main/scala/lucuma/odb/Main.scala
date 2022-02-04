@@ -13,7 +13,6 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import lucuma.odb.graphql.GraphQLRoutes
-import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.service.UserService
 import natchez.EntryPoint
 import natchez.Trace
@@ -30,6 +29,8 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{ Command => _, _ }
 import scala.concurrent.duration._
+import lucuma.sso.client.SsoClient
+import lucuma.core.model.User
 
 object Main extends IOApp.Simple {
 
@@ -102,13 +103,21 @@ object Main extends IOApp.Simple {
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+    routesResource(config.database, config.ssoClient, config.domain)
+
+  /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
+  def routesResource[F[_]: Async: Trace: Logger: Network: Console](
+    databaseConfig:    Config.Database,
+    ssoClientResource: Resource[F, SsoClient[F, User]],
+    domain:            String,
+  ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
-      pool       <- databasePoolResource[F](config.database)
-      ssoClient  <- config.ssoClient[F]
-      channels   <- OdbMapping.Channels(pool)
+      pool       <- databasePoolResource[F](databaseConfig)
+      ssoClient  <- ssoClientResource
+      // channels   <- OdbMapping.Channels(pool)
       userSvc    <- pool.map(UserService.fromSession(_))
-      middleware <- Resource.eval(ServerMiddleware(config, ssoClient, userSvc))
-      routes     <- GraphQLRoutes(ssoClient, pool, channels, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL)
+      middleware <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
+      routes     <- GraphQLRoutes(ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL)
     } yield { wsb =>
       middleware(routes(wsb))
     }

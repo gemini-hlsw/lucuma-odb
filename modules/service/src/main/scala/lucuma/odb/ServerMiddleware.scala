@@ -78,13 +78,13 @@ object ServerMiddleware {
 
   /** A middleware that composes all the others defined in this module. */
   def apply[F[_]: Async: Trace: Logger](
-    config: Config,
+    domain: String,
     client: SsoClient[F, User],
     userService: UserService[F],
   ): F[Middleware[F]] =
     userCache(client, userService).map { userCache =>
       List[Middleware[F]](
-        cors(config.domain),
+        cors(domain),
         logging,
         natchez,
         errorReporting,

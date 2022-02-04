@@ -47,9 +47,10 @@ create table t_time_allocation (
   c_program_id   d_program_id  not null references t_program(c_program_id) on delete cascade,
   c_partner      d_tag         not null references t_partner(c_tag), -- don't cascade .. we shouldn't ever delete a partner!
   c_duration     interval      not null -- check positive?
-)
+);
 
 -- for PI role: select ... from t_collaborator join t_program on t_collaborator.c_program_id = t_program.c_program_id
 -- for NGO role: ... from t_time_allocation join ...
 
-
+insert into t_program (c_program_id, c_name) values ('p-2', 'The real dark matter was the friends we made along the way');
+insert into t_program (c_program_id, c_name) values ('p-3', 'An Empty Placeholder Program');

@@ -45,7 +45,7 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
     (a, b) match {
       case (a: ObjectMapping, b: ObjectMapping) => a |+| b
       case (a: LeafMapping[_], _: LeafMapping[_]) => a
-      // other cases
+      case (a, b) => sys.error(s"Can't combine $a and $b")
     }
 
   private implicit def semigroupPartialFunction[A, B]: Semigroup[PartialFunction[A, B]] = (a, b) =>
