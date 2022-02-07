@@ -37,62 +37,62 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scala.concurrent.duration._
 import org.slf4j
 import munit.internal.console.AnsiColors
+import cats.data.NonEmptyList
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-trait OdbSuite extends CatsEffectSuite with TestContainerForAll {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll {
 
   val jlogger: slf4j.Logger =
     slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
 
   var container: PostgreSQLContainer = null
 
-  def showContainerLog: Boolean = false
-
   override val containerDef = new PostgreSQLContainer.Def(DockerImageName.parse("postgres:11")) {
     override def createContainer(): PostgreSQLContainer = {
       val c = super.createContainer()
       c.container.withClasspathResourceMapping("/db/migration", "/docker-entrypoint-initdb.d/", BindMode.READ_ONLY)
-      if (showContainerLog)
+      if (debug)
         c.container.withLogConsumer(f => jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}"))
       container = c
       c
     }
   }
 
-  def user: Option[User]
-
   private implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test")
 
-  private def ssoClient(u: Option[User]): SsoClient[IO, User] =
+  private def ssoClient(ref: Ref[IO, User]): SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User] {
       def find(req: Request[IO]): IO[Option[User]] = OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
-      def get(authorization: Authorization): IO[Option[User]] = IO.pure(u)
+      def get(authorization: Authorization): IO[Option[User]] = ref.get.map(_.some)
     }
 
-  private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
-    Main.routesResource(
-      Config.Database(
-        host     = container.containerIpAddress,
-        port     = container.mappedPort(POSTGRESQL_PORT),
-        user     = container.username,
-        password = container.password,
-        database = container.databaseName,
-      ),
-      ssoClient(user).pure[Resource[IO, *]],
-      "unused"
-    ).map(_.map(_.orNotFound))
+  private def httpApp: Resource[IO, (Ref[IO, User], WebSocketBuilder2[IO] => HttpApp[IO])] =
+    Resource.eval(Ref[IO].of(null:User /* hmm */)).flatMap { userRef =>
+      Main.routesResource(
+        Config.Database(
+          host     = container.containerIpAddress,
+          port     = container.mappedPort(POSTGRESQL_PORT),
+          user     = container.username,
+          password = container.password,
+          database = container.databaseName,
+        ),
+        ssoClient(userRef).pure[Resource[IO, *]],
+        "unused"
+      ).map(_.map(_.orNotFound)).map(x => (userRef, x))
+    }
 
-  private def server: Resource[IO, Server] =
+  private def server: Resource[IO, (Ref[IO, User], Server)] =
     // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
-    httpApp.flatMap { app =>
+    httpApp.flatMap { case (ref, app) =>
       BlazeServerBuilder[IO]
         .withHttpWebSocketApp(app)
         .bindAny()
         .resource
+        .map(x => (ref, x))
         // .flatTap(_ => Resource.eval(IO.println("  • Server started.")))
     }
 
@@ -121,7 +121,7 @@ trait OdbSuite extends CatsEffectSuite with TestContainerForAll {
     val dataDecoder = implicitly
   }
 
-  private lazy val serverFixture: Fixture[Server] =
+  private lazy val serverFixture: Fixture[(Ref[IO, User], Server)] =
     ResourceSuiteLocalFixture("server", server)
 
   override def munitFixtures = List(serverFixture)
@@ -130,8 +130,8 @@ trait OdbSuite extends CatsEffectSuite with TestContainerForAll {
 
     def prefix: String =
       this match {
-        case ClientOption.Http => "[http]"
-        case ClientOption.Ws   => "[ws]  "
+        case ClientOption.Http => "http     "
+        case ClientOption.Ws   => "websocket"
       }
 
     def connection: Server => Resource[IO, TransactionalClient[IO, Nothing]] =
@@ -152,57 +152,67 @@ trait OdbSuite extends CatsEffectSuite with TestContainerForAll {
   /** Run a query and ensure that the responses are as expected. */
   def queryTest(
     name:      String,
+    users:     NonEmptyList[User],
     query:     String,
     expected:  Json,
     variables: Option[Json] = None,
-    clients:   List[ClientOption] = ClientOption.All
+    clients:   List[ClientOption] = ClientOption.All, // List(ClientOption.Ws),
   ): Unit =
-    queryTestImpl(name, query, expected.asRight, variables, clients)
+    queryTestImpl(name, query, expected.asRight, variables, clients, users)
 
   def queryTestFailure(
     name:      String,
+    users:     NonEmptyList[User],
     query:     String,
     errors:    List[String],
     variables: Option[Json] = None,
-    clients:   List[ClientOption] = ClientOption.All
+    clients:   List[ClientOption] = ClientOption.All, // List(ClientOption.Ws),
   ): Unit =
-    queryTestImpl(name, query, errors.asLeft, variables, clients)
+    queryTestImpl(name, query, errors.asLeft, variables, clients, users)
 
   private def queryTestImpl(
     name:      String,
     query:     String,
     expected:  Either[List[String], Json],
     variables: Option[Json],
-    clients:   List[ClientOption]
-  ): Unit = {
-
-    def go(client: ClientOption): Unit = {
-      test(s"${client.prefix} $name") {
-        Resource.eval(IO(serverFixture()))
-          .flatMap(client.connection)
-          .use { conn =>
-            val req = conn.request(Operation(query))
-            val op  = variables.fold(req.apply)(req.apply)
-
-            expected.fold(errors => {
-              op.intercept[ResponseException]
-                .map(e => e.asGraphQLErrors.toList.flatten.map(_.message))
-                .assertEquals(errors)
-            }, success => {
-              op.map(_.spaces2)
-                .assertEquals(success.spaces2) // by comparing strings we get more useful errors
-            })
-          }
+    clients:   List[ClientOption],
+    users:     NonEmptyList[User],
+  ): Unit =
+    for {
+      c <- clients
+      u <- users.toList
+    } test(f"${u.id.toString}%-5s ${u.role.access.toString}%-10s ${c.prefix}%s  $name") {
+        expect(u, query, expected, variables, c)
       }
-    }
 
-    clients.foreach(go)
-  }
+  def expect(
+    user:      User,
+    query:     String,
+    expected:  Either[List[String], Json],
+    variables: Option[Json] = None,
+    client:    ClientOption = ClientOption.Ws,
+  ): IO[Unit] =
+    Resource.eval(IO(serverFixture()))
+      .flatMap { case (r, a) => client.connection(a).tupleLeft(r) }
+      .use { case (ref, conn) =>
+        ref.set(user) >> {
+          val req = conn.request(Operation(query))
+          val op  = variables.fold(req.apply)(req.apply)
+          expected.fold(errors => {
+            op.intercept[ResponseException]
+              .map(e => e.asGraphQLErrors.toList.flatten.map(_.message))
+              .assertEquals(errors)
+          }, success => {
+            op.map(_.spaces2)
+              .assertEquals(success.spaces2) // by comparing strings we get more useful errors
+          })
+        }
+      }
 
   def subscriptionTest(query: String, mutations: Either[List[(String, Option[Json])], IO[Unit]], expected: List[Json], variables: Option[Json] = None) = {
     val suffix = query.linesIterator.dropWhile(_.trim.isEmpty).next().trim + " ..."
     test(s"[sub]  $suffix") {
-      Resource.eval(IO(serverFixture()))
+      Resource.eval(IO(serverFixture())).map(_._2) // TODO: users!
         .flatMap(streamingClient)
         .use { conn =>
           val req = conn.subscribe(Operation(query))

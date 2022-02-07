@@ -1,36 +1,20 @@
 package lucuma.odb.graphql
 
-import cats.syntax.all._
+import cats.data.NonEmptyList
 import io.circe.literal._
-import lucuma.core.model.OrcidId
-import lucuma.core.model.OrcidProfile
-import lucuma.core.model.StandardRole
-import lucuma.core.model.StandardUser
-import lucuma.core.model.User
-import lucuma.core.util.Gid
 import lucuma.odb.graphql.OdbSuite
 
 class EnumMetaSuite extends OdbSuite {
 
-  // we need to generate a random user here and then tear the user down on completion
+  val pi       = TestUsers.Standard.pi(1, 30)
+  val guest    = TestUsers.guest(2)
+  val service  = TestUsers.service(3)
 
-  override def showContainerLog: Boolean = true
-
-  lazy val user = StandardUser(
-    id         = Gid[User.Id].fromString.getOption("u-107").get,
-    role       = StandardRole.Pi(Gid[StandardRole.Id].fromString.getOption("r-100").get), // unused
-    otherRoles = Nil,
-    profile    = OrcidProfile(
-      orcidId      = OrcidId.fromValue("0000-0003-1301-6629").toOption.get,
-      givenName    = Some("Rob"),
-      familyName   = Some("Norris"),
-      creditName   = Some("Testing!"),
-      primaryEmail = Some(""),
-    )
-  ).some
+  val allUsers = NonEmptyList.of(pi, guest, service)
 
   queryTest(
     name  = "filterTypeMeta",
+    users = allUsers,
     query = """
       query {
         filterTypeMeta {
@@ -75,6 +59,7 @@ class EnumMetaSuite extends OdbSuite {
 
   queryTest(
     name  = "partnerMeta",
+    users = allUsers,
     query = """
       query {
         partnerMeta {
