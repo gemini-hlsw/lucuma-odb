@@ -46,6 +46,12 @@ object Bindings {
       case other                   => outer.validate(other).map(Some(_))
     }
 
+    lazy val OptionalNullable: Matcher[Option[Option[A]]] = {
+      case AbsentValue => Right(None)
+      case NullValue   => Right(Some(None))
+      case other       => outer.validate(other).map(a => Some(Some(a)))
+    }
+
     lazy val List: Matcher[List[A]] =
       ListBinding.emap { vs =>
         // This fast-fails on the first invalid one, which is the best we can do
