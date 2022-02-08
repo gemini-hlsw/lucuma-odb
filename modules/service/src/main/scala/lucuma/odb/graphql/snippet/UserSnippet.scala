@@ -6,10 +6,8 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 import lucuma.core.model
-import org.tpolecat.typename.TypeName
-import io.circe.Encoder
-import org.tpolecat.sourcepos.SourcePos
 import lucuma.odb.graphql.util._
+import lucuma.odb.data
 
 object UserSnippet {
 
@@ -40,7 +38,7 @@ object UserSnippet {
 
     object User extends TableDef("t_user") {
       val UserId          = col("c_user_id", user_id)
-      val UserType        = col("c_user_type", user_type) // enum mapped to string
+      val UserType        = col("c_user_type", user_type)
       val ServiceName     = col("c_service_name", varchar.opt)
       val OrcidId         = col("c_orcid_id", varchar.opt)
       val OrcidGivenName  = col("c_orcid_given_name", varchar.opt)
@@ -69,7 +67,7 @@ object UserSnippet {
           ),
         ),
         LeafMapping[model.User.Id](UserIdType),
-        LeafMapping(UserTypeType)(TypeName.typeName[String], Encoder[String].contramap[String](_.toUpperCase), SourcePos.instance),
+        LeafMapping[data.UserType](UserTypeType)
       )
 
     Snippet(schema, typeMappings)

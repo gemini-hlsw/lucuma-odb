@@ -13,6 +13,8 @@ import skunk.data.Arr
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.Existence
+import lucuma.odb.data.UserType
+import lucuma.odb.data.ProgramUserRole
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -45,11 +47,11 @@ trait Codecs {
   val site: Codec[Site] =
     `enum`(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase), Type("e_site"))
 
-  val user_type: Codec[String] =
-    `enum`(identity, Some(_), Type("e_user_type"))
+  val user_type: Codec[UserType] =
+    enumerated(Type("e_user_type"))
 
-  val program_user_role: Codec[String] =
-    `enum`(identity, Some(_), Type("e_program_user_role"))
+  val program_user_role: Codec[ProgramUserRole] =
+    enumerated(Type("e_program_user_role"))
 
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
