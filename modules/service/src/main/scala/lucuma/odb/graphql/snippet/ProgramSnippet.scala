@@ -5,27 +5,32 @@ import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.QueryInterpreter
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.Value
+import edu.gemini.grackle.Value._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax._
-import fs2.Stream
-import lucuma.odb.util.Codecs._
-import skunk.Session
-import lucuma.core.model.User
-import lucuma.core.model.Access._
-import io.circe.Encoder
-import org.tpolecat.typename.TypeName
-import org.tpolecat.sourcepos.SourcePos
-import lucuma.odb.service.ProgramService
-import lucuma.odb.graphql.util._
 import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Stream
+import io.circe.Encoder
+import lucuma.core.model
+import lucuma.core.model.Access._
+import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.util._
+import lucuma.odb.service.ProgramService
+import lucuma.odb.util.Codecs._
+import org.tpolecat.sourcepos.SourcePos
+import org.tpolecat.typename.TypeName
+import skunk.Session
 
 object ProgramSnippet {
 
@@ -38,11 +43,50 @@ object ProgramSnippet {
       schema"""
 
         type Query {
-          programs: [Program!]!
+
+          "Returns the program with the given id, if any."
+          program(
+            "Program ID"
+            programId: ProgramId!
+            "Set to true to include deleted values"
+            includeDeleted: Boolean! = false
+          ): Program
+
+          # TODO: connection
+          programs(
+            "(Optional) listing of programs to retrieve (all programs if empty)"
+            programIds: [ProgramId!]
+            "Set to true to include deleted values"
+            includeDeleted: Boolean! = false
+          ): [Program!]!
+
+          # Pages through all requested programs (or all programs if no ids are given).
+          # programs(
+          #   "(Optional) listing of programs to retrieve (all programs if empty)"
+          #   programIds: [ProgramId!]
+          #
+          #   "Retrieve `first` values after the given cursor"
+          #   first: Int
+          #
+          #   "Retrieve values after the one associated with this cursor"
+          #   after: Cursor
+          #
+          #   # Set to true to include deleted values
+          #   includeDeleted: Boolean! = false
+          # ): ProgramConnection!
+
+        }
+
+        "Program creation parameters"
+        input CreateProgramInput {
+          name: NonEmptyString
         }
 
         type Mutation {
-          createProgram(name: NonEmptyString): Program!
+          createProgram(
+            "Program description"
+            input: CreateProgramInput!
+          ): Program!
         }
 
         scalar ProgramId
@@ -53,7 +97,7 @@ object ProgramSnippet {
           id: ProgramId!
 
           #"DELETED or PRESENT"
-          #existence: Existence!
+          existence: Existence!
 
           "Program name"
           name: NonEmptyString
@@ -141,6 +185,7 @@ object ProgramSnippet {
           tpe = QueryType,
           fieldMappings = List(
             SqlRoot("programs"),
+            SqlRoot("program"),
           )
         ),
         ObjectMapping(
@@ -172,46 +217,80 @@ object ProgramSnippet {
         LeafMapping(ProgramUserRoleType)(TypeName.typeName[String], Encoder[String].contramap[String](_.toUpperCase), SourcePos.instance),
       )
 
+
+    // Predicates we use our elaborator.
+    object Predicates {
+
+      def includeDeleted(b: Boolean): Predicate =
+        if (b) True else Eql(UniquePath(List("existence")), Const[Existence](Existence.Present))
+
+      def hasProgramId(pid: model.Program.Id): Predicate =
+        Eql(UniquePath(List("id")), Const(pid))
+
+      def hasProgramId(pids: List[model.Program.Id]): Predicate =
+        In(UniquePath(List("id")), pids)
+
+      def hasProgramId(pids: Option[List[model.Program.Id]]): Predicate =
+        pids.fold[Predicate](True)(hasProgramId)
+
+      def isVisibleTo(user: model.User): Predicate =
+        user.role.access match {
+          // TODO: handle NGO case
+          case Guest | Pi    | Ngo     => Eql(UniquePath(List("users", "userId")), Const(user.id))
+          case Staff | Admin | Service => True
+        }
+
+    }
+
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
       QueryType -> {
-        case Select("programs", Nil, child) =>
-          Select("programs", Nil,
-            Filter(
-              user.role.access match {
 
-                // Guests and PIs can see their own programs
-                case Guest | Pi | Ngo /* TODO */ =>
+        case Select("program", List(
+          ProgramIdBinding("programId", rPid),
+          BooleanBinding("includeDeleted", rIncludeDeleted)
+        ), child) =>
+          (rPid, rIncludeDeleted).parMapN { (pid, includeDeleted) =>
+            Select("program", Nil,
+              Unique(
+                Filter(
                   And(
-                    Eql(UniquePath(List("existence")), Const(true)),
-                    Eql(UniquePath(List("users", "userId")), Const(user.id))
-                  )
-
-                // Staff, Admin, and Service users can see everything
-                case Staff | Admin | Service =>
-                  Eql(UniquePath(List("existence")), Const(true))
-
-              },
-              child
+                    Predicates.hasProgramId(pid),
+                    Predicates.includeDeleted(includeDeleted),
+                    Predicates.isVisibleTo(user),
+                  ),
+                  child
+                )
+              )
             )
-          ).rightIor
+          }
+
+        case Select("programs", List(
+          ProgramIdBinding.List.NullableOptional("programIds", rOptPids),
+          BooleanBinding("includeDeleted", rIncludeDeleted)
+        ), child) =>
+          (rOptPids, rIncludeDeleted).parMapN { (optPids, includeDeleted) =>
+            Select("programs", Nil,
+              Filter(
+                And(
+                  Predicates.hasProgramId(optPids),
+                  Predicates.includeDeleted(includeDeleted),
+                  Predicates.isVisibleTo(user)
+                ),
+                child
+              )
+            )
+          }
+
       },
       MutationType -> {
 
-        case Select("createProgram", List(Binding("name", Value.StringValue(name))), child) =>
-          NonEmptyString.from(name) match {
-            case Left(_)     => Result.failure("'name' may not be empty.")
-            case Right(name) =>
-              Environment(
-                Cursor.Env("name" -> Some(name)),
-                Select("createProgram", Nil, child)
-              ).rightIor
+        case Select("createProgram", List(Binding("input", ObjectValue(List(StringBinding.NullableOptional("name", rName))))), child) =>
+          rName.map { oName =>
+            Environment(
+              Env("name" -> oName),
+              Select("createProgram", Nil, child)
+            )
           }
-
-        case Select("createProgram", List(Binding("name", Value.AbsentValue | Value.NullValue)), child) =>
-          Environment(
-            Cursor.Env("name" -> None),
-            Select("createProgram", Nil, child)
-          ).rightIor
 
       }
     )
