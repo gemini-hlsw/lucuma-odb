@@ -11,6 +11,8 @@ import lucuma.core.enum.Site
 import skunk.codec.all._
 import skunk.data.Arr
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.util.Enumerated
+import lucuma.odb.data.Existence
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -34,6 +36,9 @@ trait Codecs {
     )
   }
 
+  def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
+    `enum`(ev.tag, ev.fromTag, tpe)
+
   val user_id: Codec[User.Id] = gid[User.Id]
   val program_id: Codec[Program.Id] = gid[Program.Id]
 
@@ -49,12 +54,8 @@ trait Codecs {
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
 
-  val existence: Codec[Boolean] =
-    `enum`(b => if (b) "present" else "deleted", {
-      case "present" => Some(true)
-      case "deleted" => Some(false)
-      case _         => None
-    }, Type("e_existence"))
+  val existence: Codec[Existence] =
+    enumerated(Type("e_existence"))
 
 }
 
