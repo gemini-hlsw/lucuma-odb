@@ -19,17 +19,15 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
-import io.circe.Encoder
 import lucuma.core.model
 import lucuma.core.model.Access._
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ProgramService
 import lucuma.odb.util.Codecs._
-import org.tpolecat.sourcepos.SourcePos
-import org.tpolecat.typename.TypeName
 import skunk.Session
 
 object ProgramSnippet {
@@ -214,7 +212,7 @@ object ProgramSnippet {
         ),
         LeafMapping[lucuma.core.model.User.Id](UserIdType),
         LeafMapping[lucuma.core.model.Program.Id](ProgramIdType),
-        LeafMapping(ProgramUserRoleType)(TypeName.typeName[String], Encoder[String].contramap[String](_.toUpperCase), SourcePos.instance),
+        LeafMapping[ProgramUserRole](ProgramUserRoleType),
       )
 
 
@@ -284,7 +282,11 @@ object ProgramSnippet {
       },
       MutationType -> {
 
-        case Select("createProgram", List(Binding("input", ObjectValue(List(StringBinding.NullableOptional("name", rName))))), child) =>
+        case Select("createProgram", List(
+          Binding("input", ObjectValue(List(
+            NonEmptyStringBinding.NullableOptional("name", rName))
+          ))
+        ), child) =>
           rName.map { oName =>
             Environment(
               Env("name" -> oName),
