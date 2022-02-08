@@ -1,0 +1,111 @@
+type Query {
+
+  "Returns the program with the given id, if any."
+  program(
+
+    "Program ID"
+    programId: ProgramId!
+
+    "Set to true to include deleted values"
+    includeDeleted: Boolean! = false
+
+  ): Program
+
+  "Pages through all requested programs (or all programs if no ids are given)."
+  programs(
+
+    "(Optional) listing of programs to retrieve (all programs if empty)"
+    programIds: [ProgramId!]
+
+  #   "Retrieve `first` values after the given cursor"
+  #   first: Int
+
+  #   "Retrieve values after the one associated with this cursor"
+  #   after: Cursor
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+  ): [Program!]! # ProgramConnection!
+
+}
+
+"Program creation parameters"
+input CreateProgramInput {
+
+  "Program name (can be null but cannot be empty)."
+  name: NonEmptyString
+
+}
+
+"Edit program"
+input EditProgramInput {
+
+  programId: ProgramId!
+
+  "The existence field must be either specified or skipped altogether.  It cannot be unset with a null value."
+  existence: Existence
+
+  "The name field may be unset by assigning a null value, or ignored by skipping it altogether"
+  name: NonEmptyString
+
+}
+
+type Mutation {
+
+  createProgram("Program description" input: CreateProgramInput!): Program!
+
+  updateProgram("Edit program" input: EditProgramInput!): Program!
+
+}
+
+scalar ProgramId
+
+type Program {
+
+  "Program ID"
+  id: ProgramId!
+
+  "DELETED or PRESENT"
+  existence: Existence!
+
+  "Program name"
+  name: NonEmptyString
+
+  #"All observations associated with the program (needs pagination)."
+  #observations(
+  #  "Retrieve `first` values after the given cursor"
+  #  first: Int
+  #
+  #  "Retrieve values after the one associated with this cursor"
+  #  after: Cursor
+  #
+  #  "Set to true to include deleted values"
+  #  includeDeleted: Boolean! = false
+  #): ObservationConnection!
+
+  #"Program planned time calculation."
+  #plannedTime(
+  #  "Set to true to include deleted values"
+  #  includeDeleted: Boolean! = false
+  #): PlannedTimeSummary!
+
+  "Users assigned to this science program"
+  users:   [ProgramUser!]!
+
+}
+
+"The role a user a plays when assigned to a program."
+enum ProgramUserRole {
+  "Principal Investigator"      PI
+  "Co-Investigator"             COI
+  "Observer (read-only access)" OBSERVER
+  "Staff Support"               SUPPORT
+}
+
+"An assignment of a user to a program."
+type ProgramUser {
+  role:   ProgramUserRole!
+  userId: UserId!
+  user:   User!
+}
