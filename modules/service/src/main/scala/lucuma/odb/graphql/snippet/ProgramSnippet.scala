@@ -93,9 +93,15 @@ object ProgramSnippet {
 
     // TODO: upstream this
     implicit class MutationCompanionOps(self: Mutation.type) {
+
       // A mutation that yields a single result and doesn't change the environment
       def simple(f: (Query, Env) => F[Result[Query]]): Mutation =
-        Mutation((q, e) => Stream.eval(f(q, e).map(_.map((_, e)))))
+        Mutation((q, e) => Stream.eval(f(q, e).map(_.tupleRight(e))))
+
+      // A mutation that yields a stream of results and doesn't change the environment
+      def simpleStream(f: (Query, Env) => Stream[F, Result[Query]]): Mutation =
+        Mutation((q, e) => f(q, e).map(_.tupleRight(e)))
+
     }
 
     /**
@@ -127,13 +133,13 @@ object ProgramSnippet {
       }
 
     def programEdit: Mutation =
-      Mutation { (child, env) =>
+      Mutation.simpleStream { (child, env) =>
         env.get[Option[model.Program.Id]]("programId").map { pid =>
           topics
             .program
             .subscribe(1024)
             .filter(e => e.canRead(user) && pid.forall(_ === e.programId))
-            .map(e => uniqueProgramNoFiltering(e.programId, child) .tupleRight(env))
+            .map(e => uniqueProgramNoFiltering(e.programId, child))
         } getOrElse Result.failure(s"Implementation error: expected 'programId' in $env.").pure[Stream[F, *]].widen
       }
 
