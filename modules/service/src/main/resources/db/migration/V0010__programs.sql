@@ -54,3 +54,21 @@ create table t_time_allocation (
 
 insert into t_program (c_program_id, c_name) values ('p-2', 'The real dark matter was the friends we made along the way');
 insert into t_program (c_program_id, c_name) values ('p-3', 'An Empty Placeholder Program');
+
+-- trigger to notify when rows are updated
+
+CREATE OR REPLACE FUNCTION ch_program_edit()
+  RETURNS trigger AS $$
+DECLARE
+BEGIN
+  PERFORM pg_notify('ch_program_edit', NEW.c_program_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ch_program_edit_trigger
+  AFTER INSERT OR UPDATE ON t_program
+  DEFERRABLE
+  FOR EACH ROW
+  EXECUTE PROCEDURE ch_program_edit();
+

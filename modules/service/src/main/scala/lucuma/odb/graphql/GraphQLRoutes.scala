@@ -37,30 +37,32 @@ object GraphQLRoutes {
     monitor:  SkunkMonitor[F],
     ttl:      FiniteDuration,
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-    Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
-      LucumaGraphQLRoutes.forService[F](
-        {
-          case None    => none.pure[F]  // No auth, no service (for now)
-          case Some(a) =>
-            cache.get(a).flatMap {
-              case Some(opt) =>
-                Logger[F].info(s"Cache hit for $a").as(opt) // it was in the cache
-              case None    =>           // It was not in the cache
-                Logger[F].info(s"Cache miss for $a") *>
-                {
-                  for {
-                    user <- OptionT(client.get(a))
-                    map  <- OptionT.liftF(OdbMapping(pool, monitor, user))
-                    svc   = new GrackleGraphQLService(map)
-                  } yield svc
-                } .widen[GraphQLService[F]]
-                  .value
-                  .flatTap(os => cache.put(a, os))
-            }
-        },
-        wsb,
-        "odb"
-      )
+    OdbMapping.Topics(pool).flatMap { topics =>
+      Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
+        LucumaGraphQLRoutes.forService[F](
+          {
+            case None    => none.pure[F]  // No auth, no service (for now)
+            case Some(a) =>
+              cache.get(a).flatMap {
+                case Some(opt) =>
+                  Logger[F].info(s"Cache hit for $a").as(opt) // it was in the cache
+                case None    =>           // It was not in the cache
+                  Logger[F].info(s"Cache miss for $a") *>
+                  {
+                    for {
+                      user <- OptionT(client.get(a))
+                      map  <- OptionT.liftF(OdbMapping(pool, monitor, user, topics))
+                      svc   = new GrackleGraphQLService(map)
+                    } yield svc
+                  } .widen[GraphQLService[F]]
+                    .value
+                    .flatTap(os => cache.put(a, os))
+              }
+          },
+          wsb,
+          "odb"
+        )
+      }
     }
 
 }

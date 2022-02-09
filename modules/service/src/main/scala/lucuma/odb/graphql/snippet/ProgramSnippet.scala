@@ -34,6 +34,7 @@ object ProgramSnippet {
   // The types that we're going to map.
   val QueryType           = schema.ref("Query")
   val MutationType        = schema.ref("Mutation")
+  val SubscriptionType    = schema.ref("Subscription")
   val ProgramType         = schema.ref("Program")
   val ProgramUserType     = schema.ref("ProgramUser")
   val ProgramUserRoleType = schema.ref("ProgramUserRole")
@@ -43,7 +44,8 @@ object ProgramSnippet {
   def apply[F[_]: MonadCancelThrow](
     m: SnippetMapping[F] with SkunkMapping[F],
     sessionPool: Resource[F, Session[F]],
-    user: User
+    user: User,
+    topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
     import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping }
@@ -96,20 +98,17 @@ object ProgramSnippet {
         Mutation((q, e) => Stream.eval(f(q, e).map(_.map((_, e)))))
     }
 
-    // Mutations for our mapping
+    /**
+     * Query for a specific program without any filtering, for cases where we already know the
+     * user is allowed to see the program in question.
+     */
+    def uniqueProgramNoFiltering(id: model.Program.Id, child: Query): Result[Query] =
+      Result(Unique(Filter(Predicates.hasProgramId(id), child)))
+
     def createProgram: Mutation =
       Mutation.simple { (child, env) =>
         env.get[Option[NonEmptyString]]("name").map { name =>
-          pool.use(_.insertProgram(name, user.id)).map { id =>
-            Result[Query](
-              Unique(
-                Filter(
-                  Predicates.hasProgramId(id), // no further filtering needed; we know it's visible to `user`
-                  child
-                )
-              )
-            )
-         }
+          pool.use(_.insertProgram(name, user.id)).map(uniqueProgramNoFiltering(_, child))
         } getOrElse Result.failure(s"Implementation error: expected 'name' in $env.").pure[F].widen
       }
 
@@ -122,17 +121,20 @@ object ProgramSnippet {
           pool.use(_.updateProgram(programId, existence, name, user)).map {
             case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
             case UpdateResult.NoSuchObject    => Result.failure(s"Program $programId does not exist or is not editable by user ${user.id}.")
-            case UpdateResult.Success(id)     =>
-              Result[Query](
-                Unique(
-                  Filter(
-                    Predicates.hasProgramId(id), // no further filtering needed; we know it's editable by `user` and we want to see it even if it was deleted
-                    child
-                  )
-                )
-              )
+            case UpdateResult.Success(id)     => uniqueProgramNoFiltering(id, child)
           }
         } getOrElse Result.failure(s"Implementation error: expected 'programId', 'existence', and 'name' in $env.").pure[F].widen
+      }
+
+    def programEdit: Mutation =
+      Mutation { (child, env) =>
+        env.get[Option[model.Program.Id]]("programId").map { pid =>
+          topics
+            .program
+            .subscribe(1024)
+            .filter(e => e.canRead(user) && pid.forall(_ === e.programId))
+            .map(e => uniqueProgramNoFiltering(e.programId, child) .tupleRight(env))
+        } getOrElse Result.failure(s"Implementation error: expected 'programId' in $env.").pure[Stream[F, *]].widen
       }
 
     // Our mapping, finally.
@@ -150,6 +152,12 @@ object ProgramSnippet {
           fieldMappings = List(
             SqlRoot("createProgram", mutation = createProgram),
             SqlRoot("updateProgram", mutation = updateProgram),
+          )
+        ),
+        ObjectMapping(
+          tpe = SubscriptionType,
+          fieldMappings = List(
+            SqlRoot("programEdit", mutation = programEdit)
           )
         ),
         ObjectMapping(
@@ -248,6 +256,21 @@ object ProgramSnippet {
             )
           }
 
+
+      },
+      SubscriptionType -> {
+
+        case Select("programEdit", List(
+          ProgramIdBinding.Optional("programId", rPid)
+        ), child) =>
+          rPid.map { oPid =>
+            Environment(
+              Env(
+                "programId" -> oPid
+              ),
+              Select("programEdit", Nil, child)
+            )
+          }
 
       }
     )

@@ -42,10 +42,12 @@ object ProgramService {
     new ProgramService[F] {
 
       def insertProgram(name: Option[NonEmptyString], userId: User.Id): F[Program.Id] =
-        for {
-          id <- s.prepare(Statements.InsertProgram).use(ps => ps.unique(name))
-          _  <- s.prepare(Statements.AddPI).use(pc => pc.execute(id ~ userId))
-        } yield id
+        s.transaction.use { _ =>
+          for {
+            id <- s.prepare(Statements.InsertProgram).use(ps => ps.unique(name))
+            _  <- s.prepare(Statements.AddPI).use(pc => pc.execute(id ~ userId))
+          } yield id
+        }
 
       def updateProgram(
         programId: Program.Id,

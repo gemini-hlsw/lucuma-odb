@@ -22,22 +22,31 @@ import lucuma.core.model.StandardRole.Staff
 import org.tpolecat.sourcepos.SourcePos
 import cats.Applicative
 import lucuma.odb.graphql.util._
+import fs2.concurrent.Topic
+import lucuma.odb.graphql.topic.ProgramTopic
+import cats.effect.std.Supervisor
+import org.typelevel.log4cats.Logger
 
 object OdbMapping {
 
-  case class Channels[F[_]]()
+  case class Topics[F[_]](
+    program: Topic[F, ProgramTopic.Element]
+  )
 
-  object Channels {
-    def apply[F[_]](pool: Resource[F, Session[F]]): Resource[F, Channels[F]] =
-      pool.map { _ =>
-        Channels()
-      }
+  object Topics {
+    def apply[F[_]: Concurrent: Logger](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
+      for {
+        sup <- Supervisor[F]
+        ses <- pool
+        pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
+      } yield Topics(pro)
   }
 
   def apply[F[_]: Sync: Trace](
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user:     User,
+    topics:   Topics[F],
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
       pool.use(enumSchema(_)).map { enums =>
@@ -53,7 +62,7 @@ object OdbMapping {
                   FilterTypeSnippet(this),
                   PartnerSnippet(this),
                   UserSnippet(this),
-                  ProgramSnippet(this, pool, user),
+                  ProgramSnippet(this, pool, user, topics),
                   ProgramAdminSnippet(this, pool), // only for admin/service users
                 ).reduce
 
@@ -64,7 +73,7 @@ object OdbMapping {
                   FilterTypeSnippet(this),
                   PartnerSnippet(this),
                   UserSnippet(this),
-                  ProgramSnippet(this, pool, user),
+                  ProgramSnippet(this, pool, user, topics),
                 ).reduce
 
             }
