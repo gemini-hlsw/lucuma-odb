@@ -109,3 +109,17 @@ type ProgramUser {
   userId: UserId!
   user:   User!
 }
+
+type Subscription {
+
+  """
+  Subscribes to an event that is generated whenever a program is created
+  or edited. A particular program id may be provided to limit events to
+  that program.
+  """
+  programEdit(
+    "Program ID"
+    programId: ProgramId
+  ): Program!
+
+}
