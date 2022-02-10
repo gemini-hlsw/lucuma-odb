@@ -69,7 +69,7 @@ object ServerMiddleware {
             OptionT.liftF(ref.modify { cache =>
               // Update the user if not present in the cache, or if it has changed since the last time we saw it.
               // The cache will grow in an unbounded fashion, which is fine. Not all that many users.
-              val update = userService.canonicalizeUser(user).whenA(cache.get(user.id).forall(_ === user))
+              val update = userService.canonicalizeUser(user).whenA(cache.get(user.id).forall(_ =!= user))
               (cache + (user.id -> user), OptionT.liftF(update) *> routes(req))
             }).flatten
         }
