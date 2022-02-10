@@ -16,6 +16,12 @@ import skunk._
 import skunk.implicits._
 
 import scala.collection.immutable.TreeMap
+import lucuma.core.model.Access.Admin
+import lucuma.core.model.Access.Guest
+import lucuma.core.model.Access.Ngo
+import lucuma.core.model.Access.Pi
+import lucuma.core.model.Access.Service
+import lucuma.core.model.Access.Staff
 
 object ProgramTopic {
 
@@ -29,7 +35,11 @@ object ProgramTopic {
     // TODO: time allocation
   ) {
     def canRead(u: User): Boolean =
-      users.contains(u.id)
+      u.role.access match {
+        case Admin | Service | Staff => true
+        case Ngo                     => ??? // TODO
+        case Guest | Pi              => users.contains(u.id)
+      }
   }
 
   /** Infinite stream of program ids. */
