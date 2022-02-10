@@ -63,7 +63,7 @@ object OdbMapping {
                   PartnerSnippet(this),
                   UserSnippet(this),
                   ProgramSnippet(this, pool, user, topics),
-                  ProgramAdminSnippet(this, pool), // only for admin/service users
+                  // ProgramAdminSnippet(this, pool), // only for admin/service users
                 ).reduce
 
               case GuestRole | Ngo(_, _) | Pi(_) | Staff(_) =>
@@ -83,7 +83,7 @@ object OdbMapping {
           override val selectElaborator = snippet.selectElaborator
 
         }
-        m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
+        // m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
         m
       }
     }
