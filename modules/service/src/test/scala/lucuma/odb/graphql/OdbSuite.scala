@@ -37,7 +37,6 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scala.concurrent.duration._
 import org.slf4j
 import munit.internal.console.AnsiColors
-import cats.data.NonEmptyList
 import lucuma.core.util.Gid
 import org.typelevel.ci.CIString
 import cats.effect.std.Supervisor
@@ -161,42 +160,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     val All: List[ClientOption] = List(Http, Ws)
   }
 
-  // /** Run a query and ensure that the responses are as expected. */
-  // def queryTest(
-  //   name:      String,
-  //   users:     NonEmptyList[User],
-  //   query:     String,
-  //   expected:  Json,
-  //   variables: Option[Json] = None,
-  //   clients:   List[ClientOption] = ClientOption.All, // List(ClientOption.Ws),
-  // ): Unit =
-  //   queryTestImpl(name, query, expected.asRight, variables, clients, users)
-
-  // def queryTestFailure(
-  //   name:      String,
-  //   users:     NonEmptyList[User],
-  //   query:     String,
-  //   errors:    List[String],
-  //   variables: Option[Json] = None,
-  //   clients:   List[ClientOption] = ClientOption.All, // List(ClientOption.Ws),
-  // ): Unit =
-  //   queryTestImpl(name, query, errors.asLeft, variables, clients, users)
-
-  // private def queryTestImpl(
-  //   name:      String,
-  //   query:     String,
-  //   expected:  Either[List[String], Json],
-  //   variables: Option[Json],
-  //   clients:   List[ClientOption],
-  //   users:     NonEmptyList[User],
-  // ): Unit =
-  //   for {
-  //     c <- clients
-  //     u <- users.toList
-  //   } test(f"$name (${u.id.toString}%-5s ${u.role.access.toString}%-10s ${c.prefix}%s)") {
-  //       expect(u, query, expected, variables, c)
-  //     }
-
   def expect(
     user:      User,
     query:     String,
@@ -239,20 +202,20 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             .fold(req.apply)(req.apply) // awkward API
             .flatMap { sub =>
               for {
-                _   <- log.info("*** ----- about to start stream fiber")
+                _   <- log.debug("*** ----- about to start stream fiber")
                 fib <- sup.supervise(sub.stream.compile.toList)
-                _   <- log.info("*** ----- pausing a bit")
+                _   <- log.debug("*** ----- pausing a bit")
                 _   <- IO.sleep(200.millis)
-                _   <- log.info("*** ----- running mutations")
+                _   <- log.debug("*** ----- running mutations")
                 _   <- mutations.fold(_.traverse_ { case (query, vars) =>
                         val req = conn.request(Operation(query))
                         vars.fold(req.apply)(req.apply)
                       }, identity)
-                _   <- log.info("*** ----- pausing a bit")
+                _   <- log.debug("*** ----- pausing a bit")
                 _   <- IO.sleep(200.millis)
-                _   <- log.info("*** ----- stopping subscription")
+                _   <- log.debug("*** ----- stopping subscription")
                 _   <- sub.stop()
-                _   <- log.info("*** ----- joining fiber")
+                _   <- log.debug("*** ----- joining fiber")
                 obt <- fib.joinWithNever
               } yield assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
             }
