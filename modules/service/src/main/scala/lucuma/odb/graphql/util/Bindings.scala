@@ -6,6 +6,7 @@ import edu.gemini.grackle.EnumValue
 import edu.gemini.grackle.Value
 import edu.gemini.grackle.Result
 import cats.syntax.all._
+import lucuma.odb.data
 
 object Bindings {
 
@@ -31,27 +32,17 @@ object Bindings {
     final def unapply(kv: (String, Value)): Some[(String, Result[A])] =
       unapply(Binding(kv._1, kv._2))
 
-    lazy val Nullable: Matcher[Option[A]] = {
-      case NullValue => Right(None)
-      case other     => outer.validate(other).map(Some(_))
+    lazy val Nullable: Matcher[data.Nullable[A]] = {
+      case NullValue   => Right(data.Nullable.Null)
+      case AbsentValue => Right(data.Nullable.Absent)
+      case other       => outer.validate(other).map(data.Nullable.NonNull(_))
     }
 
-    lazy val Optional: Matcher[Option[A]] = {
-      case AbsentValue => Right(None)
-      case other       => outer.validate(other).map(Some(_))
-    }
+    /** A matcher that treats `NullValue` and `AbsentValue` as `None` */
+    lazy val Option: Matcher[Option[A]] =
+      Nullable.map(_.toOption)
 
-    lazy val NullableOptional: Matcher[Option[A]] = {
-      case NullValue | AbsentValue => Right(None)
-      case other                   => outer.validate(other).map(Some(_))
-    }
-
-    lazy val OptionalNullable: Matcher[Option[Option[A]]] = {
-      case AbsentValue => Right(None)
-      case NullValue   => Right(Some(None))
-      case other       => outer.validate(other).map(a => Some(Some(a)))
-    }
-
+    /** A matcher that matches a list of `A` */
     lazy val List: Matcher[List[A]] =
       ListBinding.emap { vs =>
         // This fast-fails on the first invalid one, which is the best we can do
@@ -60,14 +51,25 @@ object Bindings {
 
   }
 
-  val IntBinding:             Matcher[Int]         = v => v match { case IntValue(value)            => Right(value) ; case other => Left(s"expected Int, found $other.") }
-  val FloatBinding:           Matcher[Double]      = v => v match { case FloatValue(value)          => Right(value) ; case other => Left(s"expected Float, found $other.") }
-  val StringBinding:          Matcher[String]      = v => v match { case StringValue(value)         => Right(value) ; case other => Left(s"expected String, found $other.") }
-  val BooleanBinding:         Matcher[Boolean]     = v => v match { case BooleanValue(value)        => Right(value) ; case other => Left(s"expected Boolean, found $other.") }
-  val IDBinding:              Matcher[String]      = v => v match { case IDValue(value)             => Right(value) ; case other => Left(s"expected ID, found $other.") }
-  val UntypedEnumBinding:     Matcher[String]      = v => v match { case UntypedEnumValue(name)     => Right(name)  ; case other => Left(s"expected UntypedEnum, found $other.") }
-  val TypedEnumBinding:       Matcher[EnumValue]   = v => v match { case TypedEnumValue(value)      => Right(value) ; case other => Left(s"expected TypedEnum, found $other.") }
-  val UntypedVariableBinding: Matcher[String]      = v => v match { case UntypedVariableValue(name) => Right(name)  ; case other => Left(s"expected UntypedVariable, found $other.") }
-  val ListBinding:            Matcher[List[Value]] = v => v match { case ListValue(elems)           => Right(elems) ; case other => Left(s"expected List, found $other.") }
+  /** A primitive non-nullable binding. */
+  def primitiveBinding[A](name: String)(pf: PartialFunction[Value, A]): Matcher[A] = {
+    case NullValue   => Left(s"cannot be null")
+    case AbsentValue => Left(s"is not optional")
+    case other =>
+      pf.lift(other) match {
+        case Some(value) => Right(value)
+        case None        => Left(s"expected $name, found $other")
+      }
+  }
+
+  val IntBinding:             Matcher[Int]         = primitiveBinding("Int")             { case IntValue(value)            => value }
+  val FloatBinding:           Matcher[Double]      = primitiveBinding("Float")           { case FloatValue(value)          => value }
+  val StringBinding:          Matcher[String]      = primitiveBinding("String")          { case StringValue(value)         => value }
+  val BooleanBinding:         Matcher[Boolean]     = primitiveBinding("Boolean")         { case BooleanValue(value)        => value }
+  val IDBinding:              Matcher[String]      = primitiveBinding("ID")              { case IDValue(value)             => value }
+  val UntypedEnumBinding:     Matcher[String]      = primitiveBinding("UntypedEnum")     { case UntypedEnumValue(name)     => name }
+  val TypedEnumBinding:       Matcher[EnumValue]   = primitiveBinding("TypedEnum")       { case TypedEnumValue(value)      => value }
+  val UntypedVariableBinding: Matcher[String]      = primitiveBinding("UntypedVariable") { case UntypedVariableValue(name) => name }
+  val ListBinding:            Matcher[List[Value]] = primitiveBinding("List")            { case ListValue(elems)           => elems }
 
 }

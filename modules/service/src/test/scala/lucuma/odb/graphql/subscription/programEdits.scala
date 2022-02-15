@@ -70,7 +70,7 @@ class programEdits extends OdbSuite {
     }
   }
 
-  test("trigger for my own new programs (but nobodu else's) as guest user") {
+  test("trigger for my own new programs (but nobody else's) as guest user") {
     import Group2._
     subscriptionTest(
       user = guest,
@@ -95,7 +95,7 @@ class programEdits extends OdbSuite {
     )
   }
 
-  test("trigger for my own new programs (but nobodu else's) as standard user in PI role") {
+  test("trigger for my own new programs (but nobody else's) as standard user in PI role") {
     import Group2._
     subscriptionTest(
       user = pi,

@@ -21,6 +21,15 @@ object BaseSnippet {
           PRESENT
           DELETED
         }
+
+        scalar Cursor
+
+        type PageInfo {
+          hasPreviousPage: Boolean!
+          hasNextPage: Boolean!
+          startCursor: Cursor!
+          endCursor: Cursor!
+        }
       """
 
     val NonEmptyStringType = schema.ref("NonEmptyString")
