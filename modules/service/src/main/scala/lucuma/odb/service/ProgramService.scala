@@ -17,6 +17,8 @@ import lucuma.core.model.Access.Guest
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Pi
 import lucuma.core.model.Access.Staff
+import lucuma.odb.data.Nullable.Absent
+import lucuma.odb.data.Nullable.NonNull
 
 trait ProgramService[F[_]] {
 
@@ -27,7 +29,7 @@ trait ProgramService[F[_]] {
   def updateProgram(
     programId: Program.Id,
     ex: Option[Existence],
-    name: Option[Option[NonEmptyString]],
+    name: Nullable[NonEmptyString],
     userId: User
   ): F[UpdateResult[Program.Id]]
 
@@ -52,7 +54,7 @@ object ProgramService {
       def updateProgram(
         programId: Program.Id,
         ex: Option[Existence],
-        name: Option[Option[NonEmptyString]],
+        name: Nullable[NonEmptyString],
         user: User
       ): F[UpdateResult[Program.Id]] =
         Statements.updateProgram(programId, ex, name, user) match {
@@ -80,7 +82,7 @@ object ProgramService {
     def updateProgram(
       programId: Program.Id,
       ex: Option[Existence],
-      name: Option[Option[NonEmptyString]],
+      name: Nullable[NonEmptyString],
       user: User
     ): Option[AppliedFragment] = {
 
@@ -92,7 +94,11 @@ object ProgramService {
       val ups: List[AppliedFragment] =
         List(
           ex.map(upExistence),
-          name.map(upName)
+          name match {
+            case Nullable.Null => Some(upName(None))
+            case Absent => None
+            case NonNull(value) => Some(upName(Some(value)))
+          }
         ).flatten
 
       NonEmptyList.fromList(ups).map { nel =>

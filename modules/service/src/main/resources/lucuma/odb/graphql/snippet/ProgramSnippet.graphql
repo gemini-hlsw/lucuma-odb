@@ -17,11 +17,11 @@ type Query {
     "(Optional) listing of programs to retrieve (all programs if empty)"
     programIds: [ProgramId!]
 
-  #   "Retrieve `first` values after the given cursor"
-  #   first: Int
+    "Retrieve `first` values after the given cursor"
+    first: Int
 
-  #   "Retrieve values after the one associated with this cursor"
-  #   after: Cursor
+    "Retrieve values after the one associated with this cursor"
+    after: Cursor
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
@@ -94,6 +94,16 @@ type Program {
   users:   [ProgramUser!]!
 
 }
+
+ type ProgramConnection {
+   edges: [ProgramEdge!]!
+   pageInfo: PageInfo!
+ }
+
+ type ProgramEdge {
+   node: Program!
+   cursor: Cursor!
+ }
 
 "The role a user a plays when assigned to a program."
 enum ProgramUserRole {

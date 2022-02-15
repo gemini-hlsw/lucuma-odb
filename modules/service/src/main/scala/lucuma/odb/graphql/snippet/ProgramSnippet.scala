@@ -121,8 +121,8 @@ object ProgramSnippet {
     def updateProgram: Mutation =
       Mutation.simple { (child, env) =>
         ( env.get[model.Program.Id]("programId"),
-          env.get[Option[Existence]]("existence"),
-          env.get[Option[Option[NonEmptyString]]]("name")
+          env.get[Option[Existence]]("existence"),   // null/absent means don't update
+          env.get[Nullable[NonEmptyString]]("name"), // null means update to null, absent means don't update
         ).mapN { (programId, existence, name) =>
           pool.use(_.updateProgram(programId, existence, name, user)).map {
             case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
@@ -213,10 +213,12 @@ object ProgramSnippet {
           }
 
         case Select("programs", List(
-          ProgramIdBinding.List.NullableOptional("programIds", rOptPids),
+          ProgramIdBinding.List.Option("programIds", rOptPids),
+          IntBinding.Nullable("first", rOptFirst),
+          StringBinding.Nullable("after", rOptCursor),
           BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
-          (rOptPids, rIncludeDeleted).parMapN { (optPids, includeDeleted) =>
+          (rOptPids, rOptFirst, rOptCursor, rIncludeDeleted).parMapN { (optPids, optFirst, rOptCursor, includeDeleted) =>
             Select("programs", Nil,
               Filter(
                 And(
@@ -234,7 +236,7 @@ object ProgramSnippet {
 
         case Select("createProgram", List(
           Binding("input", ObjectValue(List(
-            NonEmptyStringBinding.NullableOptional("name", rName)
+            NonEmptyStringBinding.Option("name", rName)
           )))
         ), child) =>
           rName.map { oName =>
@@ -247,8 +249,8 @@ object ProgramSnippet {
         case Select("updateProgram", List(
           Binding("input", ObjectValue(List(
             ProgramIdBinding("programId", rProgramId),
-            ExistenceBinding.Optional("existence", rExistence),
-            NonEmptyStringBinding.OptionalNullable("name", rName),
+            ExistenceBinding.Option("existence", rExistence),
+            NonEmptyStringBinding.Nullable("name", rName),
           )))
         ), child) =>
           (rProgramId, rExistence, rName).mapN { (pid, ex, name) =>
@@ -267,7 +269,7 @@ object ProgramSnippet {
       SubscriptionType -> {
 
         case Select("programEdit", List(
-          ProgramIdBinding.Optional("programId", rPid)
+          ProgramIdBinding.Option("programId", rPid)
         ), child) =>
           rPid.map { oPid =>
             Environment(
