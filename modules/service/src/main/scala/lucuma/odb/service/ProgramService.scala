@@ -19,18 +19,22 @@ import lucuma.core.model.Access.Pi
 import lucuma.core.model.Access.Staff
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
+import lucuma.core.model.ServiceUser
+import natchez.Trace
 
 trait ProgramService[F[_]] {
 
-  /** Insert a new program, where `userId` is the PI. */
-  def insertProgram(name: Option[NonEmptyString], userId: User.Id): F[Program.Id]
+  /**
+   * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
+   * case the PI is left empty.
+   */
+  def insertProgram(name: Option[NonEmptyString]): F[Program.Id]
 
   /** Update a program, where `userId` is the current user. */
   def updateProgram(
     programId: Program.Id,
     ex: Option[Existence],
     name: Nullable[NonEmptyString],
-    userId: User
   ): F[UpdateResult[Program.Id]]
 
   /** Delete a program with the given id, returning true if deleted, false if not found. */
@@ -40,39 +44,46 @@ trait ProgramService[F[_]] {
 
 object ProgramService {
 
-  def fromSession[F[_]: MonadCancelThrow](s: Session[F]): ProgramService[F] =
+  /**
+   * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
+   * operations will be performed on behalf of `user`.
+   */
+  def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
 
-      def insertProgram(name: Option[NonEmptyString], userId: User.Id): F[Program.Id] =
-        s.transaction.use { _ =>
-          for {
-            id <- s.prepare(Statements.InsertProgram).use(ps => ps.unique(name))
-            _  <- s.prepare(Statements.AddPI).use(pc => pc.execute(id ~ userId))
-          } yield id
+      def fail[A](msg: String): F[A] =
+        MonadCancelThrow[F].raiseError(new RuntimeException(msg))
+
+      def insertProgram(name: Option[NonEmptyString]): F[Program.Id] =
+        Trace[F].span("insertProgram") {
+          s.prepare(Statements.InsertProgram).use(ps => ps.unique(name ~ user))
         }
 
       def updateProgram(
         programId: Program.Id,
-        ex: Option[Existence],
-        name: Nullable[NonEmptyString],
-        user: User
+        ex:        Option[Existence],
+        name:      Nullable[NonEmptyString],
       ): F[UpdateResult[Program.Id]] =
-        Statements.updateProgram(programId, ex, name, user) match {
-          case None => UpdateResult.NothingToBeDone.pure[F].widen
-          case Some(af) =>
-            s.prepare(af.fragment.command).use(_.execute(af.argument)).flatMap {
-              case Completion.Update(0) => UpdateResult.NoSuchObject.pure[F].widen
-              case Completion.Update(1) => UpdateResult.Success(programId).pure[F].widen
-              case other => MonadCancelThrow[F].raiseError(new RuntimeException(s"Expected `Update(0)` or `Update(1)`, found $other."))
-            }
+        Trace[F].span("updateProgram") {
+          Statements.updateProgram(programId, ex, name, user) match {
+            case None => UpdateResult.NothingToBeDone.pure[F].widen
+            case Some(af) =>
+              s.prepare(af.fragment.command).use(_.execute(af.argument)).flatMap {
+                case Completion.Update(0) => UpdateResult.NoSuchObject.pure[F].widen
+                case Completion.Update(1) => UpdateResult.Success(programId).pure[F].widen
+                case other => fail(s"Expected `Update(0)` or `Update(1)`, found $other.")
+              }
+          }
         }
 
       def deleteProgram(programId: Program.Id): F[Boolean] =
-        s.prepare(Statements.DeleteProgram).use(pc => pc.execute(programId))
-          .flatMap {
-            case Completion.Delete(0) => false.pure[F]
-            case Completion.Delete(1) => true.pure[F]
-            case other => MonadCancelThrow[F].raiseError(new RuntimeException(s"Expected `Delete(0)` or `Delete(1)`, found $other."))
+        Trace[F].span("deleteProgram") {
+          s.prepare(Statements.DeleteProgram).use(pc => pc.execute(programId))
+            .flatMap {
+              case Completion.Delete(0) => false.pure[F]
+              case Completion.Delete(1) => true.pure[F]
+              case other => fail(s"Expected `Delete(0)` or `Delete(1)`, found $other.")
+            }
           }
 
      }
@@ -117,11 +128,13 @@ object ProgramService {
           case Guest | Pi =>
             sql"""
               from  t_program_user pu
-              where t_program.c_program_id = $program_id
-              and   pu.c_program_id = t_program.c_program_id
-              and   pu.c_user_id = $user_id
-              and   pu.c_role in ('pi', 'coi', 'support')
-            """.apply(programId ~ user.id)
+              where (t_program.c_pi_user_id = $user_id) or (
+                 t_program.c_program_id = $program_id
+                 and   pu.c_program_id = t_program.c_program_id
+                 and   pu.c_user_id = $user_id
+                 and   pu.c_role in ('coi', 'support')
+              )
+            """.apply(user.id ~ programId ~ user.id)
 
         }
 
@@ -130,17 +143,18 @@ object ProgramService {
       }
     }
 
-    val InsertProgram: Query[Option[NonEmptyString], Program.Id] =
+    /** Insert a program, making the passed user PI if it's a non-service user. */
+    val InsertProgram: Query[Option[NonEmptyString] ~ User, Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name) VALUES (${text_nonempty.opt})
+        INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
+        VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
         RETURNING c_program_id
       """.query(program_id)
+         .contramap {
+            case oNes ~ ServiceUser(_, _) => oNes ~ None
+            case oNes ~ nonServiceUser    => oNes ~ Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser))
+         }
 
-    val AddPI: Command[Program.Id ~ User.Id] =
-      sql"""
-        INSERT INTO t_program_user (c_program_id, c_user_id, c_role)
-        VALUES ($program_id, $user_id, 'pi')
-      """.command
 
     val DeleteProgram: Command[Program.Id] =
       sql"""

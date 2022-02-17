@@ -11,6 +11,10 @@ create table t_program (
   c_program_id  d_program_id not null primary key default 'p-' || to_hex(nextval('s_program_id')),
   c_existence   e_existence  not null default 'present',
 
+  -- principal investigator (composite fk here, see below)
+  c_pi_user_id    d_user_id,
+  c_pi_user_type  e_user_type check (c_pi_user_type = 'guest' or c_pi_user_type = 'standard'),
+
   -- -- semester
   -- c_year        smallint check (c_year >= 2004), -- 2021
   -- c_half        d_half   , -- A or B
@@ -22,7 +26,11 @@ create table t_program (
   -- c_band        d_band   , -- 1, 2, 3, 4, or 5 (which means it's a proposal)
   -- c_index       smallint , -- index in-band?
 
-  c_name        text         check (c_name is null or length(c_name) > 0)
+  c_name        text         check (c_name is null or length(c_name) > 0),
+
+  -- We link back to the user table thus.
+  FOREIGN KEY (c_pi_user_id, c_pi_user_type)
+  REFERENCES t_user (c_user_id, c_user_type)
 
 );
 comment on table t_program is 'Science programs.';
@@ -30,17 +38,34 @@ comment on table t_program is 'Science programs.';
 
 -- User have a role with respect to a given program, distinct from their lucuma role
 create type e_program_user_role as enum(
-  'pi',         -- "owner" of the science program
   'coi',        -- collaborators with mostly the same access as PIs
   'observer',   -- others who can read but not update
-  'support'     -- gemini staff assigned to support this program
+  'support'     -- gemini or ngo staff assigned to support this program
+);
+
+-- User have a role with respect to a given program, distinct from their lucuma role
+create type e_program_user_support_type as enum(
+  'staff',      -- staff support
+  'partner'     -- partner support
 );
 
 create table t_program_user (
-  c_program_id  d_program_id        not null references t_program(c_program_id) on delete cascade,
-  c_user_id     d_user_id           not null references t_user(c_user_id), -- don't cascade .. we shouldn't ever delete a user!
-  c_role        e_program_user_role not null,
-  unique (c_program_id, c_user_id)
+  c_program_id      d_program_id                 not null references t_program(c_program_id) on delete cascade,
+  c_user_id         d_user_id                    not null references t_user(c_user_id), -- don't cascade .. we shouldn't ever delete a user!
+  c_user_type       e_user_type                  check (c_user_type = 'standard'), -- only standard users
+  c_role            e_program_user_role          not null,
+  c_support_type    e_program_user_support_type  default null,
+  c_support_partner d_tag                        default null references t_partner(c_tag), -- check constraint below
+  unique (c_program_id, c_user_id),
+  check (
+    (c_support_type = 'partner' and c_support_partner is not null) or
+    (c_support_partner is null)
+  ),
+
+    -- We link back to the user table thus.
+  FOREIGN KEY (c_user_id, c_user_type)
+  REFERENCES t_user (c_user_id, c_user_type)
+
 );
 
 create table t_time_allocation (

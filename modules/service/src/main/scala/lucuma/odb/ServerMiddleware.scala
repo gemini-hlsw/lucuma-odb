@@ -76,6 +76,26 @@ object ServerMiddleware {
       }
     }
 
+  /**
+   * Add the user to the trace, if known.
+   */
+  def traceUser[F[_]: Monad: Trace](
+    client: SsoClient[F, User]
+  ): Middleware[F] = routes =>
+    Kleisli { req =>
+      val putFields: F[Unit] =
+        client.find(req).flatMap {
+          case None    => Monad[F].unit
+          case Some(u) =>
+            Trace[F].put(
+              "user.id"          -> u.id.toString,
+              "user.access"      -> u.role.access.tag,
+              "user.displayName" -> u.displayName,
+            )
+        }
+      OptionT.liftF(putFields) >> routes(req)
+    }
+
   /** A middleware that composes all the others defined in this module. */
   def apply[F[_]: Async: Trace: Logger](
     domain: String,
@@ -87,6 +107,7 @@ object ServerMiddleware {
         cors(domain),
         logging,
         natchez,
+        traceUser(client),
         errorReporting,
         userCache,
       ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
