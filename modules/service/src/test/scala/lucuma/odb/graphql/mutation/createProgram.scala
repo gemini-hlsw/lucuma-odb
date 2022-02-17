@@ -4,14 +4,18 @@ package mutation
 import io.circe.literal._
 import lucuma.odb.graphql.OdbSuite
 import cats.syntax.all._
+import lucuma.core.model.Partner
 
 class createProgram extends OdbSuite {
 
-  val pi       = TestUsers.Standard.pi(1, 30)
-  val guest    = TestUsers.guest(2)
-  val service  = TestUsers.service(3)
+  val pi       = TestUsers.Standard.pi(1, 101)
+  val ngo      = TestUsers.Standard.ngo(2, 102, Partner.Ca)
+  val staff    = TestUsers.Standard.staff(3, 103)
+  val admin    = TestUsers.Standard.admin(4, 104)
+  val guest    = TestUsers.guest(5)
+  val service  = TestUsers.service(6)
 
-  val validUsers = List(pi, guest, service).toList
+  val validUsers = List(pi, ngo, staff, admin, guest, service).toList
 
   test("empty 'name' is disallowed") {
     expect(
@@ -56,8 +60,8 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("guest/pi user becomes the PI") {
-    List(guest, pi).traverse { u =>
+  test("guest + standard/pi,ngo,staff,admin user becomes the PI") {
+    List(guest, pi, ngo, staff, admin).traverse { u =>
       val name = s"${u.displayName}'s Science Program"
       expect(
         user   = u,
