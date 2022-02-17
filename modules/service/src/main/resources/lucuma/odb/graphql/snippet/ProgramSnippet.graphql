@@ -72,6 +72,9 @@ type Program {
   "Program name"
   name: NonEmptyString
 
+  "Principal Investigator"
+  pi: User
+
   #"All observations associated with the program (needs pagination)."
   #observations(
   #  "Retrieve `first` values after the given cursor"

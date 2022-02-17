@@ -18,13 +18,19 @@ import lucuma.core.util.Gid
 import lucuma.odb.service.ProgramService
 import skunk.Session
 import lucuma.odb.graphql.util._
+import lucuma.core.model.User
+import natchez.Trace
 
 object ProgramAdminSnippet {
 
-  def apply[F[_]: MonadCancelThrow](m: SnippetMapping[F] with ComputeMapping[F], sessionPool: Resource[F, Session[F]]): m.Snippet = {
+  def apply[F[_]: MonadCancelThrow: Trace](
+    m: SnippetMapping[F] with ComputeMapping[F],
+    sessionPool: Resource[F, Session[F]],
+    user: User,
+  ): m.Snippet = {
     import m.{ ObjectMapping, ComputeRoot, Snippet }
 
-    val pool = sessionPool.map(ProgramService.fromSession(_))
+    val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
     val schema =
       schema"""

@@ -22,7 +22,10 @@ create table t_user (
 
   -- guest users can't have an ORCID iD, but others must have one
   CHECK (((c_user_type =  'guest' OR  c_user_type = 'service') AND c_orcid_id IS NULL)
-     OR   (c_user_type != 'guest' AND c_user_type != 'service' AND c_orcid_id IS NOT NULL))
+     OR   (c_user_type != 'guest' AND c_user_type != 'service' AND c_orcid_id IS NOT NULL)),
+
+  -- required for composite fk elsewhere
+  unique (c_user_id, c_user_type)
 
 )
 

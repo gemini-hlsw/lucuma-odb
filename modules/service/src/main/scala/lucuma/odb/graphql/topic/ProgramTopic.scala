@@ -8,14 +8,12 @@ import fs2.concurrent.Topic
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
-import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.util.Codecs._
 import org.typelevel.log4cats.Logger
 import skunk.Query
 import skunk._
 import skunk.implicits._
 
-import scala.collection.immutable.TreeMap
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Guest
 import lucuma.core.model.Access.Ngo
@@ -31,7 +29,7 @@ object ProgramTopic {
    */
   case class Element(
     programId: Program.Id,
-    users:     TreeMap[User.Id, ProgramUserRole],
+    users:     List[User.Id],
     // TODO: time allocation
   ) {
     def canRead(u: User): Boolean =
@@ -51,9 +49,15 @@ object ProgramTopic {
       }
     }
 
-  def SelectProgramUsers: Query[Program.Id, User.Id ~ ProgramUserRole] =
-    sql"select c_user_id, c_role from t_program_user where c_program_id = $program_id"
-      .query(user_id ~ program_user_role)
+  def SelectProgramUsers: Query[Program.Id, User.Id] =
+    sql"""
+      select c_pi_user_id from t_program where c_program_id = $program_id
+      and c_pi_user_id is not null
+      union
+      select c_user_id from t_program_user where c_program_id = $program_id
+      """
+      .query(user_id)
+      .contramap(pid => pid ~ pid)
 
   def elements[F[_]: Concurrent: Logger](
     s: Session[F],
@@ -62,7 +66,7 @@ object ProgramTopic {
     for {
       pq    <- Stream.resource(s.prepare(SelectProgramUsers))
       pid   <- updates(s, maxQueued)
-      users <- Stream.eval(pq.stream(pid, 1024).compile.toList.map(_.to(TreeMap)))
+      users <- Stream.eval(pq.stream(pid, 1024).compile.toList)
       elem   = Element(pid, users)
       _     <- Stream.eval(Logger[F].info(s"ProgramChannel: $elem"))
     } yield elem

@@ -56,8 +56,8 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("current user becomes the PI") {
-    List(guest, pi, service).traverse { u =>
+  test("guest/pi user becomes the PI") {
+    List(guest, pi).traverse { u =>
       val name = s"${u.displayName}'s Science Program"
       expect(
         user   = u,
@@ -66,9 +66,8 @@ class createProgram extends OdbSuite {
             mutation {
               createProgram(input: { name: "$name" }) {
                 name
-                users {
-                  userId
-                  role
+                pi {
+                  id
                 }
               }
             }
@@ -78,18 +77,43 @@ class createProgram extends OdbSuite {
             {
               "createProgram" : {
                 "name" : $name,
-                "users" : [
-                  {
-                    "userId" : ${u.id},
-                    "role" : "PI"
-                  }
-                ]
+                "pi" : {
+                    "id" : ${u.id}
+                }
               }
             }
           """
         ),
       )
     }
+  }
+
+  test("service user does not become the PI") {
+    val name = s"${service.displayName}'s Science Program"
+    expect(
+      user   = service,
+      query  =
+        s"""
+          mutation {
+            createProgram(input: { name: "$name" }) {
+              name
+              pi {
+                id
+              }
+            }
+          }
+        """,
+      expected = Right(
+        json"""
+          {
+            "createProgram" : {
+              "name" : $name,
+              "pi" : null
+            }
+          }
+        """
+      ),
+    )
   }
 
 }

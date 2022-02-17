@@ -5,7 +5,7 @@ import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path._
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -26,6 +26,7 @@ import lucuma.odb.graphql.util._
 import lucuma.odb.service.ProgramService
 import lucuma.odb.util.Codecs._
 import skunk.Session
+import natchez.Trace
 
 object ProgramSnippet {
 
@@ -41,7 +42,7 @@ object ProgramSnippet {
   val ProgramIdType       = schema.ref("ProgramId")
   val UserIdType          = schema.ref("UserId")
 
-  def apply[F[_]: MonadCancelThrow](
+  def apply[F[_]: MonadCancelThrow: Trace](
     m: SnippetMapping[F] with SkunkMapping[F],
     sessionPool: Resource[F, Session[F]],
     user: User,
@@ -50,11 +51,12 @@ object ProgramSnippet {
 
     import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping }
 
-    val pool = sessionPool.map(ProgramService.fromSession(_))
+    val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
     // Column references for our mapping.
     object Program extends TableDef("t_program") {
       val Id        = col("c_program_id", program_id)
+      val PiUserId  = col("c_pi_user_id", user_id)
       val Existence = col("c_existence", existence)
       val Name      = col("c_name", text_nonempty.opt)
     }
@@ -84,8 +86,19 @@ object ProgramSnippet {
 
       def isVisibleTo(user: model.User): Predicate =
         user.role.access match {
-          // TODO: handle NGO case
-          case Guest | Pi    | Ngo     => Eql(UniquePath(List("users", "userId")), Const(user.id))
+          case Guest | Pi =>
+            Or(
+
+              // This isn't good enough; we also need the role to be Pi, Coi, Observer (not support)
+              // Unfortunately you can't express this yet. See
+              // https://discord.com/channels/632277896739946517/840251119891906580/943887588144586782
+              Contains(ListPath(List("users", "userId")), Const(user.id)),
+
+              // Or user is the PI. This one is easy.
+              Eql(UniquePath(List("piUserId")), Const(user.id))
+
+            )
+          case Ngo => ???
           case Staff | Admin | Service => True
         }
 
@@ -114,7 +127,7 @@ object ProgramSnippet {
     def createProgram: Mutation =
       Mutation.simple { (child, env) =>
         env.get[Option[NonEmptyString]]("name").map { name =>
-          pool.use(_.insertProgram(name, user.id)).map(uniqueProgramNoFiltering(_, child))
+          pool.use(_.insertProgram(name)).map(uniqueProgramNoFiltering(_, child))
         } getOrElse Result.failure(s"Implementation error: expected 'name' in $env.").pure[F].widen
       }
 
@@ -124,7 +137,7 @@ object ProgramSnippet {
           env.get[Option[Existence]]("existence"),   // null/absent means don't update
           env.get[Nullable[NonEmptyString]]("name"), // null means update to null, absent means don't update
         ).mapN { (programId, existence, name) =>
-          pool.use(_.updateProgram(programId, existence, name, user)).map {
+          pool.use(_.updateProgram(programId, existence, name)).map {
             case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
             case UpdateResult.NoSuchObject    => Result.failure(s"Program $programId does not exist or is not editable by user ${user.id}.")
             case UpdateResult.Success(id)     => uniqueProgramNoFiltering(id, child)
@@ -172,7 +185,9 @@ object ProgramSnippet {
             SqlField("id", Program.Id, key = true),
             SqlField("existence", Program.Existence, hidden = true),
             SqlField("name", Program.Name),
-            SqlObject("users", Join(Program.Id, ProgramUser.ProgramId))
+            SqlField("piUserId", Program.PiUserId, hidden = true),
+            SqlObject("pi", Join(Program.PiUserId, User.Id)),
+            SqlObject("users", Join(Program.Id, ProgramUser.ProgramId)),
           ),
         ),
         ObjectMapping(

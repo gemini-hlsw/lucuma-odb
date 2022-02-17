@@ -11,6 +11,7 @@ import skunk.Session
 import skunk.codec.all._
 import skunk.implicits._
 import lucuma.odb.util.Codecs._
+import natchez.Trace
 
 trait UserService[F[_]] {
   def canonicalizeUser(u: User): F[Unit]
@@ -18,25 +19,33 @@ trait UserService[F[_]] {
 
 object UserService {
 
-  def fromSession[F[_]: MonadCancelThrow](s: Session[F]): UserService[F] =
+  def fromSession[F[_]: MonadCancelThrow: Trace](s: Session[F]): UserService[F] =
     new UserService[F] {
       import Statements._
 
       def canonicalizeUser(u: User): F[Unit] =
-        u match {
-          case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)
-          case su @ ServiceUser(_, _)        => canonicalizeServiceUser(su)
-          case su @ StandardUser(_, _, _, _) => canonicalizeStandardUser(su)
+        Trace[F].span("canonicalizeUser") {
+          u match {
+            case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)
+            case su @ ServiceUser(_, _)        => canonicalizeServiceUser(su)
+            case su @ StandardUser(_, _, _, _) => canonicalizeStandardUser(su)
+          }
         }
 
       def canonicalizeGuestUser(gu: GuestUser): F[Unit] =
-        s.prepare(CanonicalizeGuestUser).use(_.execute(gu)).void
+        Trace[F].span("canonicalizeGuestUser") {
+          s.prepare(CanonicalizeGuestUser).use(_.execute(gu)).void
+        }
 
       def canonicalizeServiceUser(su: ServiceUser): F[Unit] =
-        s.prepare(CanonicalizeServiceUser).use(_.execute(su)).void
+        Trace[F].span("canonicalizeServiceUser") {
+          s.prepare(CanonicalizeServiceUser).use(_.execute(su)).void
+        }
 
       def canonicalizeStandardUser(su: StandardUser): F[Unit] =
-        s.prepare(CanonicalizeStandardUser).use(_.execute(su)).void
+        Trace[F].span("canonicalizeStandardUser") {
+          s.prepare(CanonicalizeStandardUser).use(_.execute(su)).void
+        }
 
     }
 
