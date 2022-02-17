@@ -1,9 +1,7 @@
 package lucuma.odb.graphql
 package mutation
 
-import io.circe.literal._
 import lucuma.odb.graphql.OdbSuite
-import cats.syntax.all._
 import lucuma.core.model.Partner
 
 class editProgram extends OdbSuite {
