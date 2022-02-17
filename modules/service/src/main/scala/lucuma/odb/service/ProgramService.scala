@@ -127,14 +127,19 @@ object ProgramService {
 
           case Guest | Pi =>
             sql"""
-              from  t_program_user pu
-              where (t_program.c_pi_user_id = $user_id) or (
-                 t_program.c_program_id = $program_id
-                 and   pu.c_program_id = t_program.c_program_id
-                 and   pu.c_user_id = $user_id
-                 and   pu.c_role in ('coi', 'support')
+              where c_program_id = $program_id
+              and (
+                c_pi_user_id = $user_id
+                or
+                exists(
+                  select c_role
+                  from   t_program_user
+                  where  c_program_id = $program_id
+                  and    c_user_id = $user_id
+                  and    c_role = 'coi'
+                )
               )
-            """.apply(user.id ~ programId ~ user.id)
+            """.apply(programId ~ user.id ~ programId ~ user.id)
 
         }
 
