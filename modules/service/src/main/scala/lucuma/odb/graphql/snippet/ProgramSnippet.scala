@@ -233,7 +233,7 @@ object ProgramSnippet {
           StringBinding.Nullable("after", rOptCursor),
           BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
-          (rOptPids, rOptFirst, rOptCursor, rIncludeDeleted).parMapN { (optPids, optFirst, rOptCursor, includeDeleted) =>
+          (rOptPids, rOptFirst, rOptCursor, rIncludeDeleted).parMapN { (optPids, _, _, includeDeleted) =>
             Select("programs", Nil,
               Filter(
                 And(
