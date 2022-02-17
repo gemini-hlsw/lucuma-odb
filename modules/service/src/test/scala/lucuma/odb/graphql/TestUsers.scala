@@ -8,6 +8,7 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.core.util.Gid
+import lucuma.core.model.Partner
 
 object TestUsers {
 
@@ -38,18 +39,31 @@ object TestUsers {
 
   object Standard {
 
-    def pi(id: Long, roleId: Long) = StandardUser(
-      id         = Gid[User.Id].fromLong.getOption(id).get,
-      role       = StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(roleId).get),
-      otherRoles = Nil,
-      profile    = OrcidProfile(
-        orcidId      = orcidId(id),
-        givenName    = None,
-        familyName   = None,
-        creditName   = None,
-        primaryEmail = None,
+    def apply(id: Long, role: StandardRole): StandardUser =
+      StandardUser(
+        id         = Gid[User.Id].fromLong.getOption(id).get,
+        role       = role,
+        otherRoles = Nil,
+        profile    = OrcidProfile(
+          orcidId      = orcidId(id),
+          givenName    = None,
+          familyName   = None,
+          creditName   = None,
+          primaryEmail = None,
+        )
       )
-    )
+
+    def pi(id: Long, roleId: Long) =
+      Standard(id, StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(roleId).get))
+
+    def ngo(id: Long, roleId: Long, partner: Partner) =
+      Standard(id, StandardRole.Ngo(Gid[StandardRole.Id].fromLong.getOption(roleId).get, partner))
+
+    def staff(id: Long, roleId: Long) =
+      Standard(id, StandardRole.Staff(Gid[StandardRole.Id].fromLong.getOption(roleId).get))
+
+    def admin(id: Long, roleId: Long) =
+      Standard(id, StandardRole.Admin(Gid[StandardRole.Id].fromLong.getOption(roleId).get))
 
   }
 
