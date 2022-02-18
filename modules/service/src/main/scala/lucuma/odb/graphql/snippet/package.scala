@@ -10,6 +10,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.data.Existence
 import io.circe.Json
 import cats.syntax.all._
+import lucuma.odb.data.Tag
 
 package object snippet {
 
@@ -30,6 +31,9 @@ package object snippet {
     StringBinding.emap { s =>
       string.NonEmptyString.unapply(s).toRight("string value must be non-empty.")
     }
+
+  val TagBinding =
+    TypedEnumBinding.map(v => Tag(v.name.toLowerCase))
 
   implicit class AndCompanionOps(val self: Predicate.And.type) extends AnyVal {
     def apply(preds: Predicate*): Predicate =

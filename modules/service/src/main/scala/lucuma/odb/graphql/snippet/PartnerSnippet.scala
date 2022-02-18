@@ -11,11 +11,13 @@ import skunk.syntax.all._
 import cats.syntax.all._
 import edu.gemini.grackle.EnumValue
 import lucuma.odb.graphql.util._
+import lucuma.odb.util.Codecs._
+import lucuma.odb.data.Tag
 
 object PartnerSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, PrimitiveMapping }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, LeafMapping }
 
     val schema =
       schema"""
@@ -36,7 +38,7 @@ object PartnerSnippet {
     val PartnerMetaType  = schema.ref("PartnerMeta")
 
     object Partner extends TableDef("t_partner") {
-      val Tag       = col("c_tag", varchar)
+      val Tag       = col("c_tag", tag)
       val ShortName = col("c_short_name", varchar)
       val LongName  = col("c_long_name", varchar)
       val Active    = col("c_active", bool)
@@ -60,7 +62,7 @@ object PartnerSnippet {
             SqlField("active", Partner.Active),
           )
         ),
-        PrimitiveMapping(PartnerType)
+        LeafMapping[Tag](PartnerType)
       )
 
     Snippet(schema, typeMappings)

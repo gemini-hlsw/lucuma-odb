@@ -11,11 +11,13 @@ import cats.Functor
 import cats.syntax.all._
 import edu.gemini.grackle.EnumValue
 import lucuma.odb.graphql.util._
+import lucuma.odb.util.Codecs._
+import lucuma.odb.data.Tag
 
 object FilterTypeSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, PrimitiveMapping }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, LeafMapping }
 
     val schema =
       schema"""
@@ -34,7 +36,7 @@ object FilterTypeSnippet {
     val FilterTypeMetaType = schema.ref("FilterTypeMeta")
 
     object FilterTypeMeta extends TableDef("t_filter_type") {
-      val Tag       = col("c_tag", varchar)
+      val Tag       = col("c_tag", tag)
       val ShortName = col("c_short_name", varchar)
       val LongName  = col("c_long_name", varchar)
     }
@@ -55,7 +57,7 @@ object FilterTypeSnippet {
             SqlField("longName", FilterTypeMeta.LongName),
           )
         ),
-        PrimitiveMapping(FilterTypeType)
+        LeafMapping[Tag](FilterTypeType)
       )
 
       Snippet(schema, typeMappings)

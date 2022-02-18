@@ -15,6 +15,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.data.Existence
 import lucuma.odb.data.UserType
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.Tag
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -58,6 +59,9 @@ trait Codecs {
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
+
+  val tag: Codec[Tag] =
+    varchar.gimap
 
 }
 
