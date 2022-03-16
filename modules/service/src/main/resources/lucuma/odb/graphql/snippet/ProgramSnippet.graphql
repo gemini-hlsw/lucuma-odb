@@ -51,11 +51,51 @@ input EditProgramInput {
 
 }
 
+"Link user"
+input LinkUserInput {
+
+  "The program to add a user to."
+  programId: ProgramId!
+
+  "The user to be added."
+  userId: UserId!
+
+  "The role this user will play in the program."
+  role: ProgramUserRole!
+
+  "Must be specified if and only if 'role' is SUPPORT"
+  supportType: ProgramUserSupportRoleType
+
+  "Must be specified if and only if 'supportType' is PARTNER"
+  supportPartner: Partner
+
+}
+
 type Mutation {
 
   createProgram("Program description" input: CreateProgramInput!): Program!
 
   updateProgram("Edit program" input: EditProgramInput!): Program!
+
+  """
+  Link a user to a program. Any existing link will be replaced.
+  This operation is available only to Admin and Service users.
+  """
+  linkUser(input: LinkUserInput!): ProgramUser!
+
+  """
+  Unlink a user from a program. Returns true if the user was unlinked, false if no such link exists.
+  This operation is available only to Admin and Service users.
+  """
+  unlinkUser(
+
+    "The program to unlink the user from."
+    programId: ProgramId!
+
+    "The user to unlink."
+    userId: UserId!
+
+  ): Boolean!
 
 }
 
@@ -98,22 +138,17 @@ type Program {
 
 }
 
- type ProgramConnection {
-   edges: [ProgramEdge!]!
-   pageInfo: PageInfo!
- }
-
- type ProgramEdge {
-   node: Program!
-   cursor: Cursor!
- }
-
 "The role a user a plays when assigned to a program."
 enum ProgramUserRole {
-  "Principal Investigator"      PI
   "Co-Investigator"             COI
   "Observer (read-only access)" OBSERVER
-  "Staff Support"               SUPPORT
+  "Staff/Partner Support"       SUPPORT
+}
+
+"The type of support role."
+enum ProgramUserSupportRoleType {
+  "Staff support"   STAFF
+  "Partner support" PARTNER
 }
 
 "An assignment of a user to a program."

@@ -16,6 +16,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.UserType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
+import lucuma.odb.data.ProgramUserSupportType
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -53,6 +54,9 @@ trait Codecs {
 
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
+
+  val program_user_support_type: Codec[ProgramUserSupportType] =
+    enumerated(Type("e_program_user_support_type"))
 
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))

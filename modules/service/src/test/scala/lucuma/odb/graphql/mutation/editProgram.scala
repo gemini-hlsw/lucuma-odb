@@ -15,41 +15,52 @@ class editProgram extends OdbSuite {
 
   val validUsers = List(pi, ngo, staff, admin, guest, service).toList
 
-  test("edits are applied".fail) {
+  test("edits are applied") {
+    fail("not implemented")
     // create a program
     // edit it, ensure edits are applied
   }
 
-  test("empty edit is an error".fail) {
+  test("empty edit is an error") {
+    fail("not implemented")
     // create a program
-    // ensure that an empty edit fails
+    // ensure that an empty edit.ignores
   }
 
-  test("Guest + Standard/pi can edit if they have Pi/Coi roles".fail) {
+  test("Guest + Standard/pi can edit if they have Pi/Coi roles") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/pi cannot edit without a role, nor with Observer or Support role".fail) {
+  test("Guest + Standard/pi cannot edit without a role, nor with Observer or Support role") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/ngo (non-admin) can edit with matching partner support role.".fail) {
+  test("Guest + Standard/ngo (non-admin) can edit with matching partner support role.") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/ngo (non-admin) cannot edit a program with a matching time allocation.".fail) {
+  test("Guest + Standard/ngo (non-admin) cannot edit a program with a matching time allocation.") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/ngo (non-admin) cannot edit without a role, nor with coi, observer, non-matching partner support, or staff support role.".fail) {
+  test("Guest + Standard/ngo (non-admin) cannot edit without a role, nor with coi, observer, non-matching partner support, or staff support role.") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/ngo (admin) can edit with matching partner support role.".fail) {
+  test("Guest + Standard/ngo (admin) can edit with matching partner support role.") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/ngo (admin) can edit a program with a matching time allocation.".fail) {
+  test("Guest + Standard/ngo (admin) can edit a program with a matching time allocation.") {
+    fail("not implemented")
   }
 
-  test("Guest + Standard/ngo (admin) cannot edit without a role, nor with coi, observer, non-matching partner support, or staff support role.".fail) {
+  test("Guest + Standard/ngo (admin) cannot edit without a role, nor with coi, observer, non-matching partner support, or staff support role.") {
+    fail("not implemented")
   }
 
-  test("Service + Standard/staff,admin users can edit regardless of roles".fail) {
+  test("Service + Standard/staff,admin users can edit regardless of roles") {
+    fail("not implemented")
   }
 
 }
