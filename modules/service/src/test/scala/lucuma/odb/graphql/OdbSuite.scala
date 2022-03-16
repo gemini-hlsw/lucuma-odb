@@ -47,6 +47,11 @@ import cats.effect.std.Supervisor
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll {
 
+  private val it = Iterator.from(1)
+
+  /** Generate a new id, impurely. */
+  def nextId = it.next().toLong
+
   val jlogger: slf4j.Logger =
     slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
 

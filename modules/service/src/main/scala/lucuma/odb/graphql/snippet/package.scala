@@ -11,12 +11,20 @@ import lucuma.odb.data.Existence
 import io.circe.Json
 import cats.syntax.all._
 import lucuma.odb.data.Tag
+import lucuma.core.model.User
+import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.ProgramUserSupportType
 
 package object snippet {
 
   val ProgramIdBinding =
     StringBinding.emap { s =>
-      Gid[Program.Id].fromString.getOption(s).toRight(s"'$s' is not a valid ProgramId.")
+      Gid[Program.Id].fromString.getOption(s).toRight(s"'$s' is not a valid Program.Id")
+    }
+
+  val UserIdBinding =
+    StringBinding.emap { s =>
+      Gid[User.Id].fromString.getOption(s).toRight(s"'$s' is not a valid User.Id")
     }
 
   def enumeratedBinding[A](implicit ev: Enumerated[A]) =
@@ -26,6 +34,12 @@ package object snippet {
 
   val ExistenceBinding =
     enumeratedBinding[Existence]
+
+  val ProgramUserRoleBinding =
+    enumeratedBinding[ProgramUserRole]
+
+  val ProgramUserSupportRoleTypeBinding =
+    enumeratedBinding[ProgramUserSupportType]
 
   val NonEmptyStringBinding =
     StringBinding.emap { s =>

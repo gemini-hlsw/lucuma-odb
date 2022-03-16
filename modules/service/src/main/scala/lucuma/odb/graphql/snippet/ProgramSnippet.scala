@@ -27,6 +27,7 @@ import lucuma.odb.service.ProgramService
 import lucuma.odb.util.Codecs._
 import skunk.Session
 import natchez.Trace
+import lucuma.odb.service.ProgramService.LinkUserResponse._
 
 object ProgramSnippet {
 
@@ -88,15 +89,8 @@ object ProgramSnippet {
         user.role.access match {
           case Guest | Pi =>
             Or(
-
-              // This isn't good enough; we also need the role to be Pi, Coi, Observer (not support)
-              // Unfortunately you can't express this yet. See
-              // https://discord.com/channels/632277896739946517/840251119891906580/943887588144586782
-              Contains(ListPath(List("users", "userId")), Const(user.id)),
-
-              // Or user is the PI. This one is easy.
-              Eql(UniquePath(List("piUserId")), Const(user.id))
-
+              Contains(ListPath(List("users", "userId")), Const(user.id)), // user is linked, or
+              Eql(UniquePath(List("piUserId")), Const(user.id))            // user is the PI
             )
           case Ngo => ???
           case Staff | Admin | Service => True
@@ -145,6 +139,22 @@ object ProgramSnippet {
         } getOrElse Result.failure(s"Implementation error: expected 'programId', 'existence', and 'name' in $env.").pure[F].widen
       }
 
+    def linkUser: Mutation =
+      Mutation.simple { (child, env) =>
+        env.get[ProgramService.LinkUserRequest]("req").map { req =>
+          pool.use(_.linkUser(req)).map[Result[Query]] {
+            case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
+            case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
+            case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
+            case Success(pid, uid)       =>
+              Result(Unique(Filter(And(
+                Eql(UniquePath(List("programId")), Const(pid)),
+                Eql(UniquePath(List("userId")), Const(uid)),
+              ), child)))
+          }
+        } getOrElse Result.failure(s"Implementation error: expected 'req' in $env.").pure[F].widen
+      }
+
     def programEdit: Mutation =
       Mutation.simpleStream { (child, env) =>
         env.get[Option[model.Program.Id]]("programId").map { pid =>
@@ -171,6 +181,7 @@ object ProgramSnippet {
           fieldMappings = List(
             SqlRoot("createProgram", mutation = createProgram),
             SqlRoot("updateProgram", mutation = updateProgram),
+            SqlRoot("linkUser", mutation = linkUser),
           )
         ),
         ObjectMapping(
@@ -279,6 +290,26 @@ object ProgramSnippet {
             )
           }
 
+        case Select("linkUser", List(
+          Binding("input", ObjectValue(List(
+            ProgramIdBinding("programId", rProgramId),
+            UserIdBinding("userId", rUserId),
+            ProgramUserRoleBinding("role", rRole),
+            ProgramUserSupportRoleTypeBinding.Option("supportType", rSupportType),
+            TagBinding.Option("supportPartner", rPartner),
+          )))
+        ), child) =>
+          (rProgramId, rUserId, rRole, rSupportType, rPartner).mapN { (pid, uid, role, tpe, tag) =>
+            ProgramService.LinkUserRequest.validate(pid, uid, role, tpe, tag) match {
+              case Left(err)  => Result.failure(err)
+              case Right(req) => Result(req)
+            }
+          } .flatten.map { req =>
+            Environment(
+              Env("req" -> req),
+              Select("linkUser", Nil, child)
+            )
+          }
 
       },
       SubscriptionType -> {
