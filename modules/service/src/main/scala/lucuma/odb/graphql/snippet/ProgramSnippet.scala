@@ -44,13 +44,13 @@ object ProgramSnippet {
   val UserIdType          = schema.ref("UserId")
 
   def apply[F[_]: MonadCancelThrow: Trace](
-    m: SnippetMapping[F] with SkunkMapping[F],
+    m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
     sessionPool: Resource[F, Session[F]],
     user: User,
     topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
@@ -95,19 +95,6 @@ object ProgramSnippet {
           case Ngo => ???
           case Staff | Admin | Service => True
         }
-
-    }
-
-    // TODO: upstream this
-    implicit class MutationCompanionOps(self: Mutation.type) {
-
-      // A mutation that yields a single result and doesn't change the environment
-      def simple(f: (Query, Env) => F[Result[Query]]): Mutation =
-        Mutation((q, e) => Stream.eval(f(q, e).map(_.tupleRight(e))))
-
-      // A mutation that yields a stream of results and doesn't change the environment
-      def simpleStream(f: (Query, Env) => Stream[F, Result[Query]]): Mutation =
-        Mutation((q, e) => f(q, e).map(_.tupleRight(e)))
 
     }
 

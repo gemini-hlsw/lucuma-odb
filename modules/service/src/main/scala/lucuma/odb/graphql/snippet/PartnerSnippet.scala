@@ -74,7 +74,7 @@ object PartnerSnippet {
       EnumType(
         "Partner",
         Some("Enumerated type of partners."),
-        elems.map { case tag ~ desc ~ active => EnumValue(tag, Some(desc), !active) }
+        elems.map { case tag ~ desc ~ active => EnumValue(tag.toUpperCase(), Some(desc), !active) }
       )
     }
 

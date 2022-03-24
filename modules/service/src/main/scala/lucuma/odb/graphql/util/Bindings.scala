@@ -7,6 +7,11 @@ import edu.gemini.grackle.Value
 import edu.gemini.grackle.Result
 import cats.syntax.all._
 import lucuma.odb.data
+import io.circe.Decoder
+import io.circe.parser.parse
+import java.time.Duration
+import cats.syntax.all._
+import java.time.format.DateTimeParseException
 
 object Bindings {
 
@@ -71,5 +76,11 @@ object Bindings {
   val TypedEnumBinding:       Matcher[EnumValue]   = primitiveBinding("TypedEnum")       { case TypedEnumValue(value)      => value }
   val UntypedVariableBinding: Matcher[String]      = primitiveBinding("UntypedVariable") { case UntypedVariableValue(name) => name }
   val ListBinding:            Matcher[List[Value]] = primitiveBinding("List")            { case ListValue(elems)           => elems }
+
+  val DurationBinding: Matcher[Duration] =
+    StringBinding.emap(s =>
+      Either.catchOnly[DateTimeParseException](Duration.parse(s))
+        .leftMap(_ => "Invalid ISO-8601 duration.")
+    )
 
 }

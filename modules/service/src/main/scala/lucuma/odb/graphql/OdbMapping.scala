@@ -50,33 +50,22 @@ object OdbMapping {
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
       pool.use(enumSchema(_)).map { enums =>
-        val m: Mapping[F] = new SkunkMapping[F](pool, monitor) with SnippetMapping[F] with ComputeMapping[F] {
+        val m: Mapping[F] =
+           new SkunkMapping[F](pool, monitor)
+          with SnippetMapping[F]
+          with ComputeMapping[F]
+          with MutationCompanionOps[F] {
 
           val snippet: Snippet =
-            user.role match {
-
-              case Admin(_) | ServiceRole(_) =>
-                NonEmptyList.of(
-                  BaseSnippet(this),
-                  Snippet(enums, Nil),
-                  FilterTypeSnippet(this),
-                  PartnerSnippet(this),
-                  UserSnippet(this),
-                  ProgramSnippet(this, pool, user, topics),
-                  // ProgramAdminSnippet(this, pool), // only for admin/service users
-                ).reduce
-
-              case GuestRole | Ngo(_, _) | Pi(_) | Staff(_) =>
-                NonEmptyList.of(
-                  BaseSnippet(this),
-                  Snippet(enums, Nil),
-                  FilterTypeSnippet(this),
-                  PartnerSnippet(this),
-                  UserSnippet(this),
-                  ProgramSnippet(this, pool, user, topics),
-                ).reduce
-
-            }
+            NonEmptyList.of(
+              BaseSnippet(this),
+              Snippet(enums, Nil),
+              FilterTypeSnippet(this),
+              PartnerSnippet(this),
+              UserSnippet(this),
+              ProgramSnippet(this, pool, user, topics),
+              AllocationSnippet(this, pool, user),
+            ).reduce
 
           val schema = snippet.schema
           val typeMappings = snippet.typeMappings
