@@ -13,6 +13,69 @@ class partnerMeta extends OdbSuite {
 
   def validUsers = List(pi, guest, service)
 
+  test("enum should be correct") {
+    expect(
+      user = pi,
+      query = """
+        query {
+          __type(name: "Partner") {
+            kind
+            enumValues {
+              name
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "__type": {
+              "kind": "ENUM",
+              "enumValues": [
+                {
+                  "name": "AR"
+                },
+                {
+                  "name": "BR"
+                },
+                {
+                  "name": "CA"
+                },
+                {
+                  "name": "CFH"
+                },
+                {
+                  "name": "CL"
+                },
+                {
+                  "name": "KECK"
+                },
+                {
+                  "name": "KR"
+                },
+                {
+                  "name": "LP"
+                },
+                {
+                  "name": "SUBARU"
+                },
+                {
+                  "name": "UH"
+                },
+                {
+                  "name": "US"
+                },
+                {
+                  "name": "GT"
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
+  }
+
   test("all users should have access") {
     validUsers.traverse { user =>
       expect(

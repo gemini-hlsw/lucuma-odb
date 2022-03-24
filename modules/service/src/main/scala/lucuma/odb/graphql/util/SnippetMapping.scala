@@ -31,9 +31,14 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
     Snippet(
       s1,
       concatAndMergeWhen(a.typeMappings, b.typeMappings)(sameName).map(reref(s1)),
-      a.elaborator |+| b.elaborator,
+      rerefKeys(a.elaborator, s1) |+| rerefKeys(b.elaborator, s1) // doh! need to remap the keys
     )
   }
+
+  def rerefKeys[A](m: Map[TypeRef, A], s: Schema): Map[TypeRef, A] =
+    m.map { case (k, v) =>
+      s.ref(k.name) -> v
+    }
 
   private implicit val SemigroupObjectMapping: Semigroup[ObjectMapping] = (a, b) =>
     if (!sameName(a.tpe, b.tpe)) a else ObjectMapping(

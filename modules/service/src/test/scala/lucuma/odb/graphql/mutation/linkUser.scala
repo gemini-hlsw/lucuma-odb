@@ -8,12 +8,13 @@ import cats.syntax.all._
 import lucuma.core.model.User
 import lucuma.core.model.Program
 import io.circe.literal._
-import clue.ResponseException
 import lucuma.odb.data.ProgramUserRole
 import io.circe.syntax._
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.Tag
+import java.time.Duration
 
-class linkUser extends OdbSuite {
+class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
@@ -26,80 +27,8 @@ class linkUser extends OdbSuite {
 
   lazy val validUsers = List(pi, pi2, pi3, ngo, staff, admin, guest, service)
 
-  def createProgramAs(user: User): IO[Program.Id] =
-    query(user, "mutation { createProgram(input: { name: null }) { id } }").flatMap { js =>
-      js.hcursor
-        .downField("createProgram")
-        .downField("id")
-        .as[Program.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
-  def linkAs(
-    user: User,
-    uid: User.Id,
-    pid: Program.Id,
-    role: ProgramUserRole,
-    supportType: Option[ProgramUserSupportType] = None,
-    partner: Option[Partner] = None,
-  ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          linkUser(input: {
-            programId: ${pid.asJson}
-            userId: ${uid.asJson}
-            role: ${role.tag.toUpperCase}
-            supportType: ${supportType.fold("null")(_.tag.toUpperCase)}
-            supportPartner: ${partner.fold("null")(_.tag.toUpperCase)}
-          }) {
-            role
-            userId
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "linkUser" : {
-            "role" : $role,
-            "userId" : $uid
-          }
-        }
-      """.asRight
-    )
-
-  def linkCoiAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Coi)
-
-  def linkCoiAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkCoiAs(user, arrow._1, arrow._2)
-
-  def linkObserverAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Observer)
-
-  def linkObserverAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkObserverAs(user, arrow._1, arrow._2)
-
-  def linkStaffSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
-
-  def linkStaffSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkStaffSupportAs(user, arrow._1, arrow._2)
-
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs) // TODO: something cheaper
-
-  /** Ensure that exactly the specified errors are reported, in order. */
-  def interceptGraphQL(messages: String*)(fa: IO[_]): IO[Unit] =
-    fa.attempt.flatMap {
-      case Left(e: ResponseException) =>
-        assertEquals(messages.toList, e.asGraphQLErrors.toList.flatten.map(_.message)).pure[IO]
-      case Left(other) => IO.raiseError(other)
-      case Right(a) => fail(s"Expected failure, got $a")
-    }
-
 
   // LINKING A COI
 
@@ -147,8 +76,21 @@ class linkUser extends OdbSuite {
     }
   }
 
-  test("[coi] ngo user can add coi to program with time allocated by user's partner".ignore) {
-    // TODO
+  test("[coi] ngo user can add coi to program with time allocated by user's partner") {
+    createUsers(pi, pi2, ngo, admin) >>
+    createProgramAs(pi).flatMap { pid =>
+      setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
+      linkCoiAs(ngo, pi2.id -> pid)
+    }
+  }
+
+  test("[coi] ngo user can't add coi to program without time allocated by user's partner") {
+    createUsers(pi, pi2, ngo) >>
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+        linkCoiAs(ngo, pi2.id -> pid)
+      }
+    }
   }
 
   // LINKING AN OBSERVER
@@ -205,8 +147,21 @@ class linkUser extends OdbSuite {
     }
   }
 
-  test("[coi] ngo user can add observer to program with time allocated by user's partner".ignore) {
-    // TODO
+  test("[observer] ngo user can add observer to program with time allocated by user's partner") {
+    createUsers(pi, pi2, ngo, admin) >>
+    createProgramAs(pi).flatMap { pid =>
+      setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
+      linkObserverAs(ngo, pi2.id -> pid)
+    }
+  }
+
+  test("[observer] ngo user can't add observer to program without time allocated by user's partner") {
+    createUsers(pi, pi2, ngo) >>
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+        linkObserverAs(ngo, pi2.id -> pid)
+      }
+    }
   }
 
   // LINKING STAFF SUPPORT
@@ -238,21 +193,52 @@ class linkUser extends OdbSuite {
     }
   }
 
-  test("[staff support] ngo user can't link a staff support user".ignore) {
+  test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
+    createUsers(pi, pi2, ngo, admin) >>
+    createProgramAs(pi).flatMap { pid =>
+      setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+        linkStaffSupportAs(ngo, pi2.id -> pid)
+      }
+    }
   }
 
   // LINKING NGO SUPPORT
 
-  test("[ngo support] guest user can't link a ngo support user".ignore) {
+  test("[ngo support] guest user can't link a ngo support user") {
+    createUsers(guest, pi) >>
+    createProgramAs(guest).flatMap { pid =>
+      interceptGraphQL(s"User ${guest.id} is not authorized to perform this action") {
+        linkNgoSupportAs(guest, pi.id -> pid, Partner.Br)
+      }
+    }
   }
 
-  test("[ngo support] pi user can't link a ngo support user".ignore) {
+  test("[ngo support] pi user can't link a ngo support user") {
+    createUsers(pi, pi2) >>
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(s"User ${pi.id} is not authorized to perform this action") {
+        linkNgoSupportAs(pi, pi2.id -> pid, Partner.Br)
+      }
+    }
   }
 
-  test("[ngo support] service, admin, and service users can add a ngo support user to any program".ignore) {
+  test("[ngo support] staff, admin, and service users can add a ngo support user to any program") {
+    createUsers(pi, pi2) >>
+    List(staff, service, admin).traverse { u =>
+      createProgramAs(pi).flatMap { pid =>
+        linkNgoSupportAs(u, pi2.id -> pid, Partner.Br)
+      }
+    }
   }
 
-  test("[ngo support] ngo user can't link a ngo support user".ignore) {
+  test("[ngo support] ngo user can't link a ngo support user") {
+    createUsers(ngo, pi, pi2) >>
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+        linkNgoSupportAs(ngo, pi2.id -> pid, Partner.Br)
+      }
+    }
   }
 
   // GENERAL RULES
@@ -284,5 +270,67 @@ class linkUser extends OdbSuite {
       }
     }
   }
+
+}
+
+trait LinkUserOps { this: OdbSuite =>
+
+  def linkAs(
+    user: User,
+    uid: User.Id,
+    pid: Program.Id,
+    role: ProgramUserRole,
+    supportType: Option[ProgramUserSupportType] = None,
+    partner: Option[Partner] = None,
+  ): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          linkUser(input: {
+            programId: ${pid.asJson}
+            userId: ${uid.asJson}
+            role: ${role.tag.toUpperCase}
+            supportType: ${supportType.fold("null")(_.tag.toUpperCase)}
+            supportPartner: ${partner.fold("null")(_.tag.toUpperCase)}
+          }) {
+            role
+            userId
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "linkUser" : {
+            "role" : $role,
+            "userId" : $uid
+          }
+        }
+      """.asRight
+    )
+
+  def linkCoiAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.Coi)
+
+  def linkCoiAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
+    linkCoiAs(user, arrow._1, arrow._2)
+
+  def linkObserverAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.Observer)
+
+  def linkObserverAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
+    linkObserverAs(user, arrow._1, arrow._2)
+
+  def linkStaffSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
+
+  def linkStaffSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
+    linkStaffSupportAs(user, arrow._1, arrow._2)
+
+  def linkNgoSupportAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partner))
+
+  def linkNgoSupportAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
+    linkNgoSupportAs(user, arrow._1, arrow._2, partner)
 
 }

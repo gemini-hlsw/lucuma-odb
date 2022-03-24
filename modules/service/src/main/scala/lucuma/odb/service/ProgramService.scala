@@ -146,7 +146,7 @@ object ProgramService {
             case LinkUserRequest.Coi(programId, userId) => Statements.linkCoi(programId, userId, user)
             case LinkUserRequest.Observer(programId, userId) => Statements.linkObserver(programId, userId, user)
             case StaffSupport(programId, userId) => Statements.linkStaffSupport(programId, userId, user)
-            case PartnerSupport(programId, userId, partnerTag) => ???
+            case PartnerSupport(programId, userId, partnerTag) => Statements.linkPartnerSupport(programId, userId, user, partnerTag)
           }
         af match {
           case None     =>  Monad[F].pure(LinkUserResponse.NotAuthorized(user))
@@ -184,6 +184,14 @@ object ProgramService {
       sql"""
         EXISTS (select c_role from t_program_user where  c_program_id = $program_id and c_user_id = $user_id and c_role = 'coi')
       """.apply(programId ~ userId)
+
+    def existsAllocationForPartner(
+      programId: Program.Id,
+      partner: Tag
+    ): AppliedFragment =
+      sql"""
+        EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=$tag and c_duration > 'PT')
+        """.apply(programId ~ partner)
 
     def updateProgram(
       programId: Program.Id,
@@ -287,7 +295,7 @@ object ProgramService {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
         case StandardRole.Admin(_)        => Some(up)
-        case StandardRole.Ngo(_, partner) => ??? // TODO
+        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, Tag(partner.tag)))
         case StandardRole.Pi(_)           => Some(up |+| void" WHERE " |+| existsUserAsPi(targetProgram, user.id))
         case StandardRole.Staff(_)        => Some(up)
       }
@@ -309,7 +317,7 @@ object ProgramService {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
         case StandardRole.Admin(_)        => Some(up)
-        case StandardRole.Ngo(_, partner) => ??? // TODO
+        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, Tag(partner.tag)))
         case StandardRole.Staff(_)        => Some(up)
         case StandardRole.Pi(_)           =>
           Some(
@@ -329,8 +337,27 @@ object ProgramService {
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
-        import lucuma.core.model.Access._
+      import lucuma.core.model.Access._
       val up = LinkUser(targetProgram ~ targetUser ~ ProgramUserRole.Support ~ Some(ProgramUserSupportType.Staff) ~ None)
+      user.role.access match {
+        case Admin | Staff | Service => Some(up) // ok
+        case _                       => None // nobody else can do this
+      }
+    }
+
+    /**
+     * Link partner support to a program.
+     * - Staff, Admin, and Service users can always do this.
+     * - Nobody else can do this.
+     */
+    def linkPartnerSupport(
+      targetProgram: Program.Id,
+      targetUser: User.Id, // user to link
+      user: User, // current user
+      partner: Tag, // partner
+    ): Option[AppliedFragment] = {
+      import lucuma.core.model.Access._
+      val up = LinkUser(targetProgram ~ targetUser ~ ProgramUserRole.Support ~ Some(ProgramUserSupportType.Partner) ~ Some(partner))
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this

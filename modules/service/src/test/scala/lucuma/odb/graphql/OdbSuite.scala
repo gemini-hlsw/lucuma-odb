@@ -47,6 +47,15 @@ import cats.effect.std.Supervisor
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll {
 
+  /** Ensure that exactly the specified errors are reported, in order. */
+  def interceptGraphQL(messages: String*)(fa: IO[_]): IO[Unit] =
+    fa.attempt.flatMap {
+      case Left(e: ResponseException) =>
+        assertEquals(messages.toList, e.asGraphQLErrors.toList.flatten.map(_.message)).pure[IO]
+      case Left(other) => IO.raiseError(other)
+      case Right(a) => fail(s"Expected failure, got $a")
+    }
+
   private val it = Iterator.from(1)
 
   /** Generate a new id, impurely. */

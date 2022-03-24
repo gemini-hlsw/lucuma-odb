@@ -5,6 +5,9 @@ import io.circe.literal._
 import lucuma.odb.graphql.OdbSuite
 import cats.syntax.all._
 import lucuma.core.model.Partner
+import lucuma.core.model.User
+import cats.effect.IO
+import lucuma.core.model.Program
 
 class createProgram extends OdbSuite {
 
@@ -119,5 +122,19 @@ class createProgram extends OdbSuite {
       ),
     )
   }
+
+}
+
+trait CreateProgramOps { this: OdbSuite =>
+
+  def createProgramAs(user: User): IO[Program.Id] =
+    query(user, "mutation { createProgram(input: { name: null }) { id } }").flatMap { js =>
+      js.hcursor
+        .downField("createProgram")
+        .downField("id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
 
 }
