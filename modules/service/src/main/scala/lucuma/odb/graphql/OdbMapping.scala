@@ -26,6 +26,7 @@ import fs2.concurrent.Topic
 import lucuma.odb.graphql.topic.ProgramTopic
 import cats.effect.std.Supervisor
 import org.typelevel.log4cats.Logger
+import cats.Traverse
 
 object OdbMapping {
 
@@ -65,6 +66,7 @@ object OdbMapping {
               UserSnippet(this),
               ProgramSnippet(this, pool, user, topics),
               AllocationSnippet(this, pool, user),
+              ObservationSnippet(this, pool, user),
             ).reduce
 
           val schema = snippet.schema

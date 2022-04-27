@@ -14,6 +14,8 @@ import lucuma.odb.data.Tag
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.ObsActiveStatus
 
 package object snippet {
 
@@ -63,5 +65,11 @@ package object snippet {
     try Schema(src.getLines().mkString("\n")).getOrElse(sys.error(s"Invalid schema: $fileName"))
     finally src.close()
   }
+
+  val ObsStatusBinding: Matcher[ObsStatus] =
+    enumeratedBinding
+
+  val ObsActiveStatusBinding: Matcher[ObsActiveStatus] =
+    enumeratedBinding
 
 }

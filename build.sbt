@@ -1,15 +1,15 @@
 val circeVersion               = "0.14.1"
-val cirisVersion               = "2.0.1"
+val cirisVersion               = "2.3.2"
 val clueVersion                = "0.20.2"
-val declineVersion             = "2.1.0"
+val declineVersion             = "2.2.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "7.11.4"
-val grackleVersion             = "0.1.16+17-6f247fe9+20220214-1513-SNAPSHOT"
+val grackleVersion             = "0.1.16+17-6f247fe9+20220407-1243-SNAPSHOT"
 val http4sVersion              = "0.23.6"
 val jwtVersion                 = "5.0.0"
 val log4catsVersion            = "2.1.1"
 val lucumaCoreVersion          = "0.14.3"
-val lucumaGraphQLRoutesVersion = "0.2.0-3-bec8835-20220216T213237Z-SNAPSHOT"
+val lucumaGraphQLRoutesVersion = "0.2.0-3-bec8835-20220407T175637Z-SNAPSHOT"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val natcchezHttp4sVersion      = "0.2.0"
@@ -18,7 +18,7 @@ val postgresVersion            = "42.3.1"
 val skunkVersion               = "0.3.1"
 val slf4jVersion               = "1.7.32"
 val lucumaSsoVersion           = "0.0.13"
-val testcontainersScalaVersion = "0.40.0"
+val testcontainersScalaVersion = "0.40.7"
 
 inThisBuild(Seq(
   homepage := Some(url("https://github.com/gemini-hlsw/lucuma-sso")),
@@ -36,6 +36,7 @@ lazy val service = project
     publish / skip := true,
     name := "lucuma-odb-service",
     scalacOptions --= Seq("-Vtype-diffs"),
+    scalacOptions ++= Seq("-Xcheckinit"),
     libraryDependencies ++= Seq(
       "com.monovore"   %% "decline-effect"                  % declineVersion,
       "com.monovore"   %% "decline"                         % declineVersion,
