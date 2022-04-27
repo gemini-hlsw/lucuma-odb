@@ -17,6 +17,8 @@ import lucuma.odb.data.UserType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -45,6 +47,7 @@ trait Codecs {
 
   val user_id: Codec[User.Id] = gid[User.Id]
   val program_id: Codec[Program.Id] = gid[Program.Id]
+  val observation_id: Codec[Observation.Id] = gid[Observation.Id]
 
   val site: Codec[Site] =
     `enum`(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase), Type("e_site"))
@@ -66,6 +69,12 @@ trait Codecs {
 
   val tag: Codec[Tag] =
     varchar.gimap
+
+  val obs_status: Codec[ObsStatus] =
+    enumerated(Type("e_obs_status"))
+
+  val obs_active_status: Codec[ObsActiveStatus] =
+    enumerated(Type("e_obs_active_status"))
 
 }
 

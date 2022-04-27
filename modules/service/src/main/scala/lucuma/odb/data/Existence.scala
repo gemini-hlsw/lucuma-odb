@@ -10,6 +10,8 @@ object Existence {
   case object Present extends Existence("present")
   case object Deleted extends Existence("deleted")
 
+  val Default = Present
+
   implicit val EnumeratedExistence: Enumerated[Existence] =
     new Enumerated[Existence] {
       def all: List[Existence] = List(Present, Deleted)
