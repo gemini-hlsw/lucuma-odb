@@ -16,6 +16,10 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ObsActiveStatus
+import lucuma.core.math.Epoch
+import scala.util.control.NonFatal
+import lucuma.core.math.Angle
+import lucuma.core.math.HourAngle
 
 package object snippet {
 
@@ -71,5 +75,27 @@ package object snippet {
 
   val ObsActiveStatusBinding: Matcher[ObsActiveStatus] =
     enumeratedBinding
+
+  val EpochBinding: Matcher[Epoch] =
+    StringBinding.emap { s =>
+      Epoch.fromString.getOption(s).toRight(s"Invalid epoch: $s")
+    }
+
+  val LongBinding: Matcher[Long] =
+    StringBinding.emap { s =>
+      try Right(s.toLong)
+      catch { case NonFatal(e) => Left(s"Invalid Long: $s: ${e.getMessage}") }
+    }
+
+  val BigDecimalBinding: Matcher[BigDecimal] =
+    StringBinding.emap { s =>
+      try Right(BigDecimal(s))
+      catch { case NonFatal(e) => Left(s"Invalid BigDecimal: $s: ${e.getMessage}") }
+    }
+
+  val DmsBinding: Matcher[Angle] =
+    StringBinding.emap { s =>
+      Angle.fromStringDMS.getOption(s).toRight(s"Invalid angle: $s")
+    }
 
 }
