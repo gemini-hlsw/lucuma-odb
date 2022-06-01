@@ -1,0 +1,539 @@
+
+
+
+
+type Mutation {
+
+  # Creates a new target according to the provided parameters.  Only one of sidereal or nonsidereal may be specified.
+  createTarget(
+    # Program ID
+    programId: ProgramId!
+
+    # Target description.  One (and only one) of sidereal or nonsidereal must be specified.
+    input: CreateTargetInput!
+  ): Target!
+
+  # # Makes a copy of an existing target, setting it to unobserved and to PRESENT.  If observationIds is specified, the clone will replace the existing target in those observations
+  # cloneTarget(
+  #   # The existing target's id
+  #   existingTargetId: TargetId!
+
+  #   # The new target clone's id (will be generated if not supplied)
+  #   suggestedCloneId: TargetId
+
+  #   # Observation IDs
+  #   observationIds: [ObservationId!]
+  # ): Target!
+
+  # Edits an existing target
+  updateTarget(
+    # Parameters for editing an existing target. Nonsidereal edits are ignored for sidereal targets and vice versa.
+    input: EditTargetInput!
+  ): Target!
+
+  # Marks the target as DELETED.  Use undeleteTarget to retrieve it.
+  deleteTarget(
+    # Target ID
+    targetId: TargetId!
+  ): Target!
+
+  # Marks the target as PRESENT.
+  undeleteTarget(
+    # Target ID
+    targetId: TargetId!
+  ): Target!
+
+}
+
+# Target creation parameters
+input CreateTargetInput {
+  name: NonEmptyString!
+  sidereal: SiderealInput
+  nonsidereal: NonsiderealInput
+  sourceProfile: SourceProfileInput!
+}
+
+# Sidereal target edit parameters
+input SiderealInput {
+  # The ra field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  ra: RightAscensionInput
+
+  # The dec field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  dec: DeclinationInput
+
+  # The epoch field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  epoch: EpochString
+
+  # The properMotion field may be unset by assigning a null value, or ignored by skipping it altogether
+  properMotion: ProperMotionInput
+
+  # The radialVelocity field may be unset by assigning a null value, or ignored by skipping it altogether
+  radialVelocity: RadialVelocityInput
+
+  # The parallax field may be unset by assigning a null value, or ignored by skipping it altogether
+  parallax: ParallaxModelInput
+
+  # The catalogInfo field may be unset by assigning a null value, or ignored by skipping it altogether
+  catalogInfo: CatalogInfoInput
+}
+
+# Right Ascension, choose one of the available units
+input RightAscensionInput {
+  microarcseconds: Long
+  degrees: BigDecimal
+  hours: BigDecimal
+  hms: HmsString
+  fromLong: RightAscensionLongInput
+  fromDecimal: RightAscensionDecimalInput
+}
+
+# Integral value in RightAscension
+input RightAscensionLongInput {
+  # integral value in associated units
+  value: Long!
+
+  # units for associated value
+  units: RightAscensionUnits!
+}
+
+# Decimal value in RightAscension
+input RightAscensionDecimalInput {
+  # decimal value in associated units
+  value: BigDecimal!
+
+  # units for associated value
+  units: RightAscensionUnits!
+}
+
+# Unit options for RightAscension values
+enum RightAscensionUnits {
+  # RightAscensionUnits Microarcseconds
+  MICROARCSECONDS
+
+  # RightAscensionUnits Degrees
+  DEGREES
+
+  # RightAscensionUnits Hours
+  HOURS
+}
+
+# Declination, choose one of the available units
+input DeclinationInput {
+  microarcseconds: Long
+  degrees: BigDecimal
+  dms: DmsString
+  fromLong: DeclinationLongInput
+  fromDecimal: DeclinationDecimalInput
+}
+
+# Decimal value in Declination
+input DeclinationDecimalInput {
+  # decimal value in associated units
+  value: BigDecimal!
+
+  # units for associated value
+  units: DeclinationUnits!
+}
+
+# Integral value in Declination
+input DeclinationLongInput {
+  # integral value in associated units
+  value: Long!
+
+  # units for associated value
+  units: DeclinationUnits!
+}
+
+# Unit options for Declination values
+enum DeclinationUnits {
+  # DeclinationUnits Microarcseconds
+  MICROARCSECONDS
+
+  # DeclinationUnits Degrees
+  DEGREES
+}
+
+# Reference observation epoch in format '[JB]YYYY.YYY'
+scalar EpochString
+
+# Decimal value in ProperMotionComponent
+input ProperMotionComponentDecimalInput {
+  # decimal value in associated units
+  value: BigDecimal!
+
+  # units for associated value
+  units: ProperMotionComponentUnits!
+}
+
+# Proper motion component, choose one of the available units
+input ProperMotionComponentInput {
+  microarcsecondsPerYear: Long
+  milliarcsecondsPerYear: BigDecimal
+  fromLong: ProperMotionComponentLongInput
+  fromDecimal: ProperMotionComponentDecimalInput
+}
+
+# Integral value in ProperMotionComponent
+input ProperMotionComponentLongInput {
+  # integral value in associated units
+  value: Long!
+
+  # units for associated value
+  units: ProperMotionComponentUnits!
+}
+
+# Unit options for proper motion components (RA and Dec)
+enum ProperMotionComponentUnits {
+  # ProperMotionComponentUnits MicroarcsecondsPerYear
+  MICROARCSECONDS_PER_YEAR
+
+  # ProperMotionComponentUnits MilliarcsecondsPerYear
+  MILLIARCSECONDS_PER_YEAR
+}
+
+# Proper motion, choose one of the available units
+input ProperMotionInput {
+  ra: ProperMotionComponentInput!
+  dec: ProperMotionComponentInput!
+}
+
+# Decimal value in RadialVelocity
+input RadialVelocityDecimalInput {
+  # decimal value in associated units
+  value: BigDecimal!
+
+  # units for associated value
+  units: RadialVelocityUnits!
+}
+
+# Radial velocity, choose one of the available units
+input RadialVelocityInput {
+  centimetersPerSecond: Long
+  metersPerSecond: BigDecimal
+  kilometersPerSecond: BigDecimal
+  fromLong: RadialVelocityLongInput
+  fromDecimal: RadialVelocityDecimalInput
+}
+
+# Integral value in RadialVelocity
+input RadialVelocityLongInput {
+  # integral value in associated units
+  value: Long!
+
+  # units for associated value
+  units: RadialVelocityUnits!
+}
+
+# Unit options for radial velocity values
+enum RadialVelocityUnits {
+  # RadialVelocityUnits CentimetersPerSecond
+  CENTIMETERS_PER_SECOND
+
+  # RadialVelocityUnits MetersPerSecond
+  METERS_PER_SECOND
+
+  # RadialVelocityUnits KilometersPerSecond
+  KILOMETERS_PER_SECOND
+}
+
+# Decimal value in Parallax
+input ParallaxDecimalInput {
+  # decimal value in associated units
+  value: BigDecimal!
+
+  # units for associated value
+  units: ParallaxUnits!
+}
+
+# Integral value in Parallax
+input ParallaxLongInput {
+  # integral value in associated units
+  value: Long!
+
+  # units for associated value
+  units: ParallaxUnits!
+}
+
+# Parallax, choose one of the available units
+input ParallaxModelInput {
+  microarcseconds: Long
+  milliarcseconds: BigDecimal
+  fromLong: ParallaxLongInput
+  fromDecimal: ParallaxDecimalInput
+}
+
+# Unit options for parallax values
+enum ParallaxUnits {
+  # ParallaxUnits Microarcseconds
+  MICROARCSECONDS
+
+  # ParallaxUnits Milliarcseconds
+  MILLIARCSECONDS
+}
+
+# Catalog id consisting of catalog name, string identifier and an optional object type
+input CatalogInfoInput {
+  # The name field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  name: CatalogName
+
+  # The id field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  id: NonEmptyString
+
+  # The objectType field may be unset by assigning a null value, or ignored by skipping it altogether
+  objectType: NonEmptyString
+}
+
+# Catalog name values
+enum CatalogName {
+  # CatalogName Simbad
+  SIMBAD
+
+  # CatalogName Gaia
+  GAIA
+}
+
+# Nonsidereal target parameters.  Supply `keyType` and `des` or `key`
+input NonsiderealInput {
+  # The keyType field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  keyType: EphemerisKeyType
+
+  # The des field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  des: NonEmptyString
+
+  # The key field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  key: NonEmptyString
+}
+
+# Ephemeris key type options
+enum EphemerisKeyType {
+  # EphemerisKeyType Comet
+  COMET
+
+  # EphemerisKeyType AsteroidNew
+  ASTEROID_NEW
+
+  # EphemerisKeyType AsteroidOld
+  ASTEROID_OLD
+
+  # EphemerisKeyType MajorBody
+  MAJOR_BODY
+
+  # EphemerisKeyType UserSupplied
+  USER_SUPPLIED
+}
+
+# Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
+input SourceProfileInput {
+  point: SpectralDefinitionIntegratedInput
+  uniform: SpectralDefinitionSurfaceInput
+  gaussian: GaussianInput
+}
+
+# Spectral definition input with integrated units.  Specify exactly one of "bandNormalized" or "emissionLines"
+input SpectralDefinitionIntegratedInput {
+  bandNormalized: BandNormalizedIntegratedInput
+  emissionLines: EmissionLinesIntegratedInput
+}
+
+# Spectral definition input with surface units.  Specify exactly one of "bandNormalized" or "emissionLines"
+input SpectralDefinitionSurfaceInput {
+  bandNormalized: BandNormalizedSurfaceInput
+  emissionLines: EmissionLinesSurfaceInput
+}
+
+# Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
+input GaussianInput {
+  # The fwhm field is required when creating a new instance of Gaussian, but optional when editing
+  fwhm: AngleInput
+
+  # The spectralDefinition field is required when creating a new instance of Gaussian, but optional when editing
+  spectralDefinition: SpectralDefinitionIntegratedInput
+}
+
+# Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
+input BandBrightnessIntegratedInput {
+  band: Band!
+
+  # The value field is required when creating a new instance of BandBrightnessIntegrated, but optional when editing
+  value: BigDecimal
+
+  # The units field is required when creating a new instance of BandBrightnessIntegrated, but optional when editing
+  units: BrightnessIntegratedUnits
+
+  # Error values are optional
+  error: BigDecimal
+}
+
+# Create or edit a band brightness value with surface magnitude units.  When creating a new value, all fields except "error" are required.
+input BandBrightnessSurfaceInput {
+  band: Band!
+
+  # The value field is required when creating a new instance of BandBrightnessSurface, but optional when editing
+  value: BigDecimal
+
+  # The units field is required when creating a new instance of BandBrightnessSurface, but optional when editing
+  units: BrightnessSurfaceUnits
+
+  # Error values are optional
+  error: BigDecimal
+}
+
+# Create or edit a band normalized value with integrated magnitude units.  Specify both "sed" and "brightnesses" when creating a new BandNormalizedIntegrated.
+input BandNormalizedIntegratedInput {
+  # The sed field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
+  sed: UnnormalizedSedInput
+
+  # The brightnesses field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
+  brightnesses: [BandBrightnessIntegratedInput!]
+
+  # Optional field that may be provided to edit existing brightness definitions or add new ones
+  editBrightnesses: [BandBrightnessIntegratedInput!]
+
+  # Optional field that may be provided to delete existing brightness definitions identified by band
+  deleteBrightnesses: [Band!]
+}
+
+# Create or edit a band normalized value with surface magnitude units.  Specify both "sed" and "brightnesses" when creating a new BandNormalizedSurface.
+input BandNormalizedSurfaceInput {
+  # The sed field is required when creating a new instance of BandNormalizedSurface, but optional when editing
+  sed: UnnormalizedSedInput
+
+  # The brightnesses field is required when creating a new instance of BandNormalizedSurface, but optional when editing
+  brightnesses: [BandBrightnessSurfaceInput!]
+
+  # Optional field that may be provided to edit existing brightness definitions or add new ones
+  editBrightnesses: [BandBrightnessSurfaceInput!]
+
+  # Optional field that may be provided to delete existing brightness definitions identified by band
+  deleteBrightnesses: [Band!]
+}
+
+# Create or edit an emission line with integrated line flux units.  When creating a new value, all fields are required.
+input EmissionLineIntegratedInput {
+  wavelength: WavelengthInput!
+
+  # The lineWidth field is required when creating a new instance of EmissionLineIntegrated, but optional when editing
+  lineWidth: BigDecimal
+
+  # The lineFlux field is required when creating a new instance of EmissionLineIntegrated, but optional when editing
+  lineFlux: LineFluxIntegratedInput
+}
+
+# Create or edit an emission line with surface line flux units.  When creating a new value, all fields are required.
+input EmissionLineSurfaceInput {
+  wavelength: WavelengthInput!
+
+  # The lineWidth field is required when creating a new instance of EmissionLineSurface, but optional when editing
+  lineWidth: BigDecimal
+
+  # The lineFlux field is required when creating a new instance of EmissionLineSurface, but optional when editing
+  lineFlux: LineFluxSurfaceInput
+}
+
+# Create or edit emission lines with integrated line flux and flux density continuum units. Both "lines" and "fluxDensityContinuum" are required when creating a new EmissionLinesIntegrated.
+input EmissionLinesIntegratedInput {
+  # The lines field is required when creating a new instance of EmissionLinesIntegrated, but optional when editing
+  lines: [EmissionLineIntegratedInput!]
+
+  # Optional field that may be provided to edit existing emission line definitions or add new ones
+  editLines: [EmissionLineIntegratedInput!]
+
+  # Optional field that may be provided to delete existing emission lines identified by wavelength
+  deleteLines: [WavelengthInput!]
+
+  # The fluxDensityContinuum field is required when creating a new instance of EmissionLinesIntegrated, but optional when editing
+  fluxDensityContinuum: FluxDensityContinuumIntegratedInput
+}
+
+# Create or edit emission lines with surface line flux and flux density continuum units. Both "lines" and "fluxDensityContinuum" are required when creating a new EmissionLinesSurface.
+input EmissionLinesSurfaceInput {
+  # The lines field is required when creating a new instance of EmissionLinesSurface, but optional when editing
+  lines: [EmissionLineSurfaceInput!]
+
+  # Optional field that may be provided to edit existing emission line definitions or add new ones
+  editLines: [EmissionLineSurfaceInput!]
+
+  # Optional field that may be provided to delete existing emission lines identified by wavelength
+  deleteLines: [WavelengthInput!]
+
+  # The fluxDensityContinuum field is required when creating a new instance of EmissionLinesSurface, but optional when editing
+  fluxDensityContinuum: FluxDensityContinuumSurfaceInput
+}
+
+# Flux density entry
+input FluxDensity {
+  wavelength: WavelengthInput!
+  density: BigDecimal!
+}
+
+# A flux density continuum value with integrated units
+input FluxDensityContinuumIntegratedInput {
+  value: BigDecimal!
+  units: FluxDensityContinuumIntegratedUnits!
+}
+
+# A flux density continuum value with surface units
+input FluxDensityContinuumSurfaceInput {
+  value: BigDecimal!
+  units: FluxDensityContinuumSurfaceUnits!
+}
+
+
+# Flux density continuum integrated units
+enum FluxDensityContinuumIntegratedUnits {
+  # W/m²/µm
+  W_PER_M_SQUARED_PER_UM
+
+  # erg/s/cm²/Å
+  ERG_PER_S_PER_CM_SQUARED_PER_A
+}
+
+# Flux density continuum surface units
+enum FluxDensityContinuumSurfaceUnits {
+  # W/m²/µm/arcsec²
+  W_PER_M_SQUARED_PER_UM_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/Å/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+}
+
+type FluxDensityEntry {
+  wavelength: Wavelength!
+  density: BigDecimal!
+}
+
+# Focal plane Single/Multi/IFU
+enum FocalPlane {
+  # FocalPlane SingleSlit
+  SINGLE_SLIT
+
+  # FocalPlane MultipleSlit
+  MULTIPLE_SLIT
+
+  # FocalPlane IFU
+  IFU
+}
+
+# Galaxy spectrum
+enum GalaxySpectrum {
+  # GalaxySpectrum Elliptical
+  ELLIPTICAL
+
+  # GalaxySpectrum Spiral
+  SPIRAL
+}
+
+# Un-normalized SED input parameters.  Define one value only.
+input UnnormalizedSedInput {
+  stellarLibrary: StellarLibrarySpectrum
+  coolStar: CoolStarTemperature
+  galaxy: GalaxySpectrum
+  planet: PlanetSpectrum
+  quasar: QuasarSpectrum
+  hiiRegion: HiiRegionSpectrum
+  planetaryNebula: PlanetaryNebulaSpectrum
+  powerLaw: BigDecimal
+  blackBodyTempK: BigDecimal
+  fluxDensities: [FluxDensity!]
+}
+

@@ -12,6 +12,7 @@ import io.circe.parser.parse
 import java.time.Duration
 import cats.syntax.all._
 import java.time.format.DateTimeParseException
+import io.circe.Json
 
 object Bindings {
 
@@ -31,7 +32,10 @@ object Bindings {
     final def emap[B](f: A => Either[String, B]): Matcher[B] = v =>
       outer.validate(v).flatMap(f)
 
-    final def unapply(b: Binding): Some[(String, Result[A])] =
+    final def rmap[B](f: A => Result[B]): Matcher[B] = v =>
+      outer.validate(v).flatMap { a => f(a).toEither.leftMap(_.head.message) } // only preserves the first problem, rats
+
+    def unapply(b: Binding): Some[(String, Result[A])] =
       Some((b.name, validate(b)))
 
     final def unapply(kv: (String, Value)): Some[(String, Result[A])] =
@@ -76,6 +80,11 @@ object Bindings {
   val TypedEnumBinding:       Matcher[EnumValue]   = primitiveBinding("TypedEnum")       { case TypedEnumValue(value)      => value }
   val UntypedVariableBinding: Matcher[String]      = primitiveBinding("UntypedVariable") { case UntypedVariableValue(name) => name }
   val ListBinding:            Matcher[List[Value]] = primitiveBinding("List")            { case ListValue(elems)           => elems }
+  val ObjectBinding:          Matcher[ObjectValue] = primitiveBinding("Input") { case ov : ObjectValue        => ov }
+  val ObjectFieldsBinding = ObjectBinding.map(_.fields)
+
+  val ObjectAsJsonBinding: Matcher[Json] =
+    ObjectBinding.emap(ValueAsJson.toJson)
 
   val DurationBinding: Matcher[Duration] =
     StringBinding.emap(s =>
