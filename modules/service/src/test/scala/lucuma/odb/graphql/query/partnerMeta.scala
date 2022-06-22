@@ -48,6 +48,9 @@ class partnerMeta extends OdbSuite {
                   "name": "CL"
                 },
                 {
+                  "name": "GT"
+                },
+                {
                   "name": "KECK"
                 },
                 {
@@ -64,9 +67,6 @@ class partnerMeta extends OdbSuite {
                 },
                 {
                   "name": "US"
-                },
-                {
-                  "name": "GT"
                 }
               ]
             }
@@ -126,6 +126,12 @@ class partnerMeta extends OdbSuite {
                     "active" : true
                   },
                   {
+                    "tag" : "GT",
+                    "shortName" : "Guaranteed Time",
+                    "longName" : "Guaranteed Time",
+                    "active" : true
+                  },
+                  {
                     "tag" : "KECK",
                     "shortName" : "Keck",
                     "longName" : "Keck Observatory",
@@ -159,12 +165,6 @@ class partnerMeta extends OdbSuite {
                     "tag" : "US",
                     "shortName" : "United States",
                     "longName" : "United States",
-                    "active" : true
-                  },
-                  {
-                    "tag" : "GT",
-                    "shortName" : "Guaranteed Time",
-                    "longName" : "Guaranteed Time",
                     "active" : true
                   }
                 ]
