@@ -20,13 +20,17 @@ import lucuma.odb.graphql.util._
 import lucuma.odb.service.TargetService
 import lucuma.odb.util.Codecs._
 import skunk.Session
-import skunk.circe.codec.json.json
+import skunk.circe.codec.json.jsonb
 import skunk.codec.all._
 import lucuma.core.model.Target
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Path.UniquePath
 import lucuma.odb.data.Existence
+import lucuma.core.math.Epoch
+import io.circe.Encoder
+import io.circe.Json
+import scala.reflect.ClassTag
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
@@ -46,6 +50,8 @@ object TargetSnippet {
   val ProperMotionRAType          = schema.ref("ProperMotionRA")
   val RadialVelocityType          = schema.ref("RadialVelocity")
   val ParallaxType                = schema.ref("Parallax")
+  val TargetIdType                = schema.ref("TargetId")
+  val EpochStringType             = schema.ref("EpochString")
 
   def apply[F[_]: MonadCancelThrow](
     m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
@@ -64,6 +70,7 @@ object TargetSnippet {
     import m.SqlObject
     import m.SqlRoot
     import m.TableDef
+    import m.LeafMapping
 
     val servicePool: Resource[F, TargetService[F]] =
       sessionPool.map(TargetService.fromSession(_, user))
@@ -71,35 +78,36 @@ object TargetSnippet {
     object TargetView extends TableDef("v_target") {
       val Id            = col("c_program_id", program_id)
       val TargetId      = col("c_target_id", target_id)
-      val Name          = col("c_name", text_nonempty.opt)
+      val Name          = col("c_name", text_nonempty)
       val Existence     = col("c_existence", existence)
-      val SourceProfile = col("c_source_profile", json.opt)
+      val SourceProfile = col("c_source_profile", jsonb)
       object Sidereal {
-        val SyntheticId    = col("c_sidereal_id", target_id)         // synthetic; non-null only if type = 'sidereal'
-        val Ra             = col("c_sid_ra", right_ascension)        // nullable in db, but not here
-        val Dec            = col("c_sid_dec", declination)           // nullable in db, but not here
-        val Epoch          = col("c_sid_epoch", epoch)               // nullable in db, but not here
+        val SyntheticId    = col("c_sidereal_id", target_id.embedded)   // synthetic; non-null only if type = 'sidereal'
+        val Ra             = col("c_sid_ra", right_ascension.embedded)  // logically never null if id is non-null
+        val Dec            = col("c_sid_dec", declination.embedded)     // logically never null if id is non-null
+        val Epoch          = col("c_sid_epoch", epoch.embedded)         // logically never null if id is non-null
         object RadialVelocity {
-          val SyntheticId = col("c_sid_rv_id", target_id)   // synthetic
-          val Value       = col("c_sid_rv", numeric)
+          val SyntheticId = col("c_sid_rv_id", target_id.embedded)   // synthetic
+          val Value       = col("c_sid_rv", numeric.embedded)
         }
         val Parallax       = col("c_sid_parallax", angle_µas.opt)
         object Catalog {
-          val SyntheticId = col("c_sid_catalog_info_id", target_id)   // synthetic; non-null only if c_sid_catalog_name is defined
-          val Name        = col("c_sid_catalog_name", catalog_name)   // nullable in db, but not here
-          val Id          = col("c_sid_catalog_id", varchar)          // nullable in db, but not here
-          val ObjectType  = col("c_sid_catalog_object_type", varchar) // nullable in db, but not here
+          val SyntheticId = col("c_sid_catalog_info_id", target_id.embedded)   // synthetic; non-null only if c_sid_catalog_name is defined
+          val Name        = col("c_sid_catalog_name", catalog_name.embedded)   // logically never null if id is non-null
+          val Id          = col("c_sid_catalog_id", varchar.embedded)          // logically never null if id is non-null
+          val ObjectType  = col("c_sid_catalog_object_type", varchar.embedded) // logically never null if id is non-null
         }
         object ProperMotion {
-          val SyntheticId = col("c_sid_pm_id", target_id)            // synthetic; non-null only if c_sid_pm_ra is defined
-          val Ra  = col("c_sid_pm_ra", angle_µas)                    // nullable in db, but not here
-          val Dec = col("c_sid_pm_dec", angle_µas)                   // nullable in db, but not here
+          val SyntheticId = col("c_sid_pm_id", target_id.embedded)            // synthetic; non-null only if c_sid_pm_ra is defined
+          val Ra  = col("c_sid_pm_ra", angle_µas.embedded)                    // logically never null if id is non-null
+          val Dec = col("c_sid_pm_dec", angle_µas.embedded)                   // logically never null if id is non-null
         }
       }
       object Nonsidereal {
-        val Des     = col("c_nsid_des", varchar.opt)
-        val KeyType = col("c_nsid_key_type", varchar.opt) // todo: ephemeris_key_type
-        val Key     = col("c_nsid_key", varchar.opt)
+        val SyntheticId    = col("c_nonsidereal_id", target_id.embedded)         // synthetic; non-null only if type = 'sidereal'
+        val Des     = col("c_nsid_des", varchar.embedded)
+        val KeyType = col("c_nsid_key_type", varchar.embedded) // todo: ephemeris_key_type
+        val Key     = col("c_nsid_key", varchar.embedded)
       }
     }
 
@@ -137,20 +145,32 @@ object TargetSnippet {
       }
 
     // TODO: ergonomics
-    def fromRightAscension[A](f: RightAscension => A): Cursor => Result[A] = c =>
-      c.field("microarcseconds", None).flatMap(_.as[RightAscension]).map(f)
 
     def fromDeclination[A](f: Declination => A): Cursor => Result[A] = c =>
       c.field("microarcseconds", None).flatMap(_.as[Declination]).map(f)
 
+    // this is required by the leaf mapping
+    implicit val EncoderEpoch: Encoder[Epoch] =
+      e => Json.fromString(Epoch.fromString.reverseGet(e))
+
+    object UnderlyingField {
+      def apply[A](underlyingField: String) = new Partial[A](underlyingField)
+      class Partial[A](underlyingField: String) {
+        def as[B: Encoder](field: String, f: A => B)(implicit ev: ClassTag[A]): CursorField[B] =
+          CursorField(field, c => c.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
+      }
+    }
+
     val typeMappings = List(
+      LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[Epoch](EpochStringType),
       ObjectMapping(
         tpe = TargetType, // top-level type
         fieldMappings = List(
           SqlField("id", TargetView.Id, key = true),
           SqlField("existence", TargetView.Existence),
           SqlField("name", TargetView.Name),
-          SqlObject("program", Join(ProgramTable.Id, TargetView.Id)),
+          SqlObject("program", Join(TargetView.Id, ProgramTable.Id)),
           SqlJson("sourceProfile", TargetView.SourceProfile),
           SqlObject("sidereal"),
           SqlObject("nonsidereal"),
@@ -161,7 +181,7 @@ object TargetSnippet {
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
           SqlObject("ra"),
-          SqlObject("declination"),
+          SqlObject("dec"),
           SqlField("epoch", TargetView.Sidereal.Epoch),
           SqlObject("properMotion"),
           SqlObject("radialVelocity"),
@@ -173,19 +193,21 @@ object TargetSnippet {
         tpe = RightAscensionType,
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-          CursorField[String]("hms", fromRightAscension(RightAscension.fromStringHMS.reverseGet)),
-          CursorField[BigDecimal]("hours", fromRightAscension(c => BigDecimal(c.toHourAngle.toDoubleHours))),
-          CursorField[BigDecimal]("degrees", fromRightAscension(c => BigDecimal(c.toAngle.toDoubleDegrees))),
-          SqlField("microarcseconds", TargetView.Sidereal.Ra),
+          SqlField("ra", TargetView.Sidereal.Ra, hidden = true),
+          UnderlyingField[RightAscension]("ra").as("hms", RightAscension.fromStringHMS.reverseGet),
+          UnderlyingField[RightAscension]("ra").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
+          UnderlyingField[RightAscension]("ra").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+          UnderlyingField[RightAscension]("ra").as("microarcseconds", _.toAngle.toMicroarcseconds),
         ),
       ),
       ObjectMapping(
         tpe = DeclinationType,
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-          CursorField[String]("dms", fromDeclination(Declination.fromStringSignedDMS.reverseGet)),
-          CursorField[BigDecimal]("degrees", fromDeclination(c => BigDecimal(c.toAngle.toDoubleDegrees))),
-          SqlField("microarcseconds", TargetView.Sidereal.Dec),
+          SqlField("dec", TargetView.Sidereal.Dec, hidden = true),
+          UnderlyingField[Declination]("dec").as("dms", Declination.fromStringSignedDMS.reverseGet),
+          UnderlyingField[Declination]("dec").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+          UnderlyingField[Declination]("dec").as("microarcseconds", _.toAngle.toMicroarcseconds),
         ),
       ),
       ObjectMapping(
@@ -240,7 +262,8 @@ object TargetSnippet {
       ObjectMapping(
         tpe = NonsiderealType,
         fieldMappings = List(
-          // TODO
+          SqlField("synthetic_id", TargetView.Nonsidereal.SyntheticId, key = true, hidden = true),
+          SqlField("des", TargetView.Nonsidereal.Des),
         )
       ),
       ObjectMapping(

@@ -25,6 +25,8 @@ import scala.reflect.ClassTag
 import edu.gemini.grackle.Result
 import cats.data.NonEmptyChain
 import edu.gemini.grackle.Problem
+import skunk.Codec
+import edu.gemini.grackle.sql.FailedJoin
 
 package object snippet {
 
@@ -118,5 +120,10 @@ package object snippet {
     StringBinding.emap { s =>
       Angle.fromStringDMS.getOption(s).toRight(s"Invalid angle: $s")
     }
+
+  implicit class CodecOps[A](self: Codec[A]) {
+    def embedded: Codec[Any] =
+      self.opt.imap(_.getOrElse(FailedJoin))(x => Some(x.asInstanceOf[A])) // whee
+  }
 
 }
