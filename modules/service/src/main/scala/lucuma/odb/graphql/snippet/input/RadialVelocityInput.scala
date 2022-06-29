@@ -21,7 +21,7 @@ object RadialVelocityInput {
         val rCentimetersPerSecondʹ = OptionT(rCentimetersPerSecond).map(BigDecimal(_)).semiflatMap(resultFromCentimetersPerSecond).value
         val rMetersPerSecondʹ      = OptionT(rMetersPerSecond).semiflatMap(resultFromMetersPerSecond).value
         val rKilometersPerSecondʹ  = OptionT(rKilometersPerSecond).semiflatMap(resultFromKilometersPerSecond).value
-        (rCentimetersPerSecondʹ, rMetersPerSecondʹ, rKilometersPerSecondʹ, rFromLong, rFromDecimal).tupled.flatMap {
+        (rCentimetersPerSecondʹ, rMetersPerSecondʹ, rKilometersPerSecondʹ, rFromLong, rFromDecimal).parTupled.flatMap {
           case (centimetersPerSecond, metersPerSecond, kilometersPerSecond, fromLong, fromDecimal) =>
             List(centimetersPerSecond, metersPerSecond, kilometersPerSecond, fromLong, fromDecimal).flatten match {
               case List(r) => Result(r)
@@ -44,7 +44,7 @@ object RadialVelocityInput {
 object RadialVelocityLongInput {
   import RadialVelocityInput._
 
-  def Binding[A]: Matcher[RadialVelocity] =
+  def Binding: Matcher[RadialVelocity] =
     LongInput("RadialVelocityUnits") {
       case (value, "CENTIMETERS_PER_SECOND") => resultFromCentimetersPerSecond(BigDecimal(value))
       case (value, "METERS_PER_SECOND")      => resultFromMetersPerSecond(BigDecimal(value))
@@ -56,7 +56,7 @@ object RadialVelocityLongInput {
 object RadialVelocityDecimalInput {
   import RadialVelocityInput._
 
-  def Binding[A]: Matcher[RadialVelocity] =
+  def Binding: Matcher[RadialVelocity] =
     DecimalInput("RadialVelocityUnits") {
       case (value, "CENTIMETERS_PER_SECOND") => resultFromCentimetersPerSecond(value)
       case (value, "METERS_PER_SECOND")      => resultFromMetersPerSecond(value)

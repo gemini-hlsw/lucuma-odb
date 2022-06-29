@@ -19,7 +19,7 @@ object RightAscensionInput {
         HourAngleBinding.Hms.Option("hms", rHms),
         RightAscensionLongInput.Binding.Option("fromLong", rFromLong),
         RightAscensionDecimalInput.Binding.Option("fromDecimal", rFromDecimal),
-      ) => (rMicroarcseconds, rDegrees, rHours, rHms, rFromLong, rFromDecimal).tupled.flatMap {
+      ) => (rMicroarcseconds, rDegrees, rHours, rHms, rFromLong, rFromDecimal).parTupled.flatMap {
         case (microarcseconds, degrees, hours, hms, fromLong, fromDecimal) =>
           List(microarcseconds, degrees, hours, hms, fromLong, fromDecimal).flatten match {
             case List(ha) => Result(RightAscension(ha))

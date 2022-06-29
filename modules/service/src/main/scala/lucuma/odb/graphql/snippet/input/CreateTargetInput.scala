@@ -21,7 +21,7 @@ object CreateTargetInput {
         SiderealInput.Binding.Option("sidereal", rSidereal),
         NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
         ObjectAsJsonBinding("sourceProfile", rSourceProfile)
-      ) => (rName, rSidereal, rNonsidereal, rSourceProfile).tupled.flatMap {
+      ) => (rName, rSidereal, rNonsidereal, rSourceProfile).parTupled.flatMap {
         case (name, sidereal, nonsidereal, sourceProfile) =>
           (sidereal, nonsidereal) match {
             case (Some(s), None)    => Result(CreateTargetInput(name, Left(s), sourceProfile))

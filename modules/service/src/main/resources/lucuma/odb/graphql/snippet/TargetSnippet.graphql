@@ -25,23 +25,23 @@ type Mutation {
   #   observationIds: [ObservationId!]
   # ): Target!
 
-  # Edits an existing target
-  updateTarget(
-    # Parameters for editing an existing target. Nonsidereal edits are ignored for sidereal targets and vice versa.
-    input: EditTargetInput!
-  ): Target!
+  # # Edits an existing target
+  # updateTarget(
+  #   # Parameters for editing an existing target. Nonsidereal edits are ignored for sidereal targets and vice versa.
+  #   input: EditTargetInput!
+  # ): Target!
 
-  # Marks the target as DELETED.  Use undeleteTarget to retrieve it.
-  deleteTarget(
-    # Target ID
-    targetId: TargetId!
-  ): Target!
+  # # Marks the target as DELETED.  Use undeleteTarget to retrieve it.
+  # deleteTarget(
+  #   # Target ID
+  #   targetId: TargetId!
+  # ): Target!
 
-  # Marks the target as PRESENT.
-  undeleteTarget(
-    # Target ID
-    targetId: TargetId!
-  ): Target!
+  # # Marks the target as PRESENT.
+  # undeleteTarget(
+  #   # Target ID
+  #   targetId: TargetId!
+  # ): Target!
 
 }
 
@@ -341,6 +341,129 @@ input SpectralDefinitionSurfaceInput {
   emissionLines: EmissionLinesSurfaceInput
 }
 
+# Brightness bands
+enum Band {
+  # Band SloanU
+  SLOAN_U
+
+  # Band SloanG
+  SLOAN_G
+
+  # Band SloanR
+  SLOAN_R
+
+  # Band SloanI
+  SLOAN_I
+
+  # Band SloanZ
+  SLOAN_Z
+
+  # Band U
+  U
+
+  # Band B
+  B
+
+  # Band V
+  V
+
+  # Band R
+  R
+
+  # Band I
+  I
+
+  # Band Y
+  Y
+
+  # Band J
+  J
+
+  # Band H
+  H
+
+  # Band K
+  K
+
+  # Band L
+  L
+
+  # Band M
+  M
+
+  # Band N
+  N
+
+  # Band Q
+  Q
+
+  # Band Ap
+  AP
+}
+
+# Create an angle from a signed value.  Choose exactly one of the available units.
+input AngleInput {
+  microarcseconds: Long
+  microseconds: BigDecimal
+  milliarcseconds: BigDecimal
+  milliseconds: BigDecimal
+  arcseconds: BigDecimal
+  seconds: BigDecimal
+  arcminutes: BigDecimal
+  minutes: BigDecimal
+  degrees: BigDecimal
+  hours: BigDecimal
+  dms: String
+  hms: String
+  fromLong: LongAngleInput
+  fromDecimal: DecimalAngleInput
+}
+
+# Create an angle from a signed integral value and its units.
+input LongAngleInput {
+  value: Long!
+  units: AngleUnits!
+}
+
+# Create an angle from a signed decimal value and its units.
+input DecimalAngleInput {
+  value: BigDecimal!
+  units: AngleUnits!
+}
+
+# Angle units
+enum AngleUnits {
+  # AngleUnits Microarcseconds
+  MICROARCSECONDS
+
+  # AngleUnits Microseconds
+  MICROSECONDS
+
+  # AngleUnits Milliarcseconds
+  MILLIARCSECONDS
+
+  # AngleUnits Milliseconds
+  MILLISECONDS
+
+  # AngleUnits Arcseconds
+  ARCSECONDS
+
+  # AngleUnits Seconds
+  SECONDS
+
+  # AngleUnits Arcminutes
+  ARCMINUTES
+
+  # AngleUnits Minutes
+  MINUTES
+
+  # AngleUnits Degrees
+  DEGREES
+
+  # AngleUnits Hours
+  HOURS
+}
+
 # Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
 input GaussianInput {
   # The fwhm field is required when creating a new instance of Gaussian, but optional when editing
@@ -362,6 +485,48 @@ input BandBrightnessIntegratedInput {
 
   # Error values are optional
   error: BigDecimal
+}
+
+# Brightness integrated units
+enum BrightnessIntegratedUnits {
+  # Vega mag
+  VEGA_MAGNITUDE
+
+  # AB mag
+  AB_MAGNITUDE
+
+  # Jy
+  JANSKY
+
+  # W/m²/µm
+  W_PER_M_SQUARED_PER_UM
+
+  # erg/s/cm²/Å
+  ERG_PER_S_PER_CM_SQUARED_PER_A
+
+  # erg/s/cm²/Hz
+  ERG_PER_S_PER_CM_SQUARED_PER_HZ
+}
+
+# Brightness surface units
+enum BrightnessSurfaceUnits {
+  # Vega mag/arcsec²
+  VEGA_MAG_PER_ARCSEC_SQUARED
+
+  # AB mag/arcsec²
+  AB_MAG_PER_ARCSEC_SQUARED
+
+  # Jy/arcsec²
+  JY_PER_ARCSEC_SQUARED
+
+  # W/m²/µm/arcsec²
+  W_PER_M_SQUARED_PER_UM_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/Å/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/Hz/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_HZ_PER_ARCSEC_SQUARED
 }
 
 # Create or edit a band brightness value with surface magnitude units.  When creating a new value, all fields except "error" are required.
@@ -537,3 +702,476 @@ input UnnormalizedSedInput {
   fluxDensities: [FluxDensity!]
 }
 
+# Decimal value in Wavelength
+input WavelengthDecimalInput {
+  # decimal value in associated units
+  value: BigDecimal!
+
+  # units for associated value
+  units: WavelengthUnits!
+}
+
+# Wavelength, choose one of the available units
+input WavelengthInput {
+  picometers: Long
+  angstroms: BigDecimal
+  nanometers: BigDecimal
+  micrometers: BigDecimal
+  fromLong: WavelengthLongInput
+  fromDecimal: WavelengthDecimalInput
+}
+
+# Integral value in Wavelength
+input WavelengthLongInput {
+  # integral value in associated units
+  value: Long!
+
+  # units for associated value
+  units: WavelengthUnits!
+}
+
+# Wavelength units
+enum WavelengthUnits {
+  # WavelengthUnits Picometers
+  PICOMETERS
+
+  # WavelengthUnits Angstroms
+  ANGSTROMS
+
+  # WavelengthUnits Nanometers
+  NANOMETERS
+
+  # WavelengthUnits Micrometers
+  MICROMETERS
+}
+
+# A line flux value with integrated units
+input LineFluxIntegratedInput {
+  value: BigDecimal!
+  units: LineFluxIntegratedUnits!
+}
+
+# A line flux value with surface units
+input LineFluxSurfaceInput {
+  value: BigDecimal!
+  units: LineFluxSurfaceUnits!
+}
+
+# Line flux integrated units
+enum LineFluxIntegratedUnits {
+  # W/m²
+  W_PER_M_SQUARED
+
+  # erg/s/cm²
+  ERG_PER_S_PER_CM_SQUARED
+}
+
+# Line flux surface units
+enum LineFluxSurfaceUnits {
+  # W/m²/arcsec²
+  W_PER_M_SQUARED_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+}
+
+type Wavelength {
+  # Wavelength in pm
+  picometers: Int!
+
+  # Wavelength in Å
+  angstroms: BigDecimal!
+
+  # Wavelength in nm
+  nanometers: BigDecimal!
+
+  # Wavelength in µm
+  micrometers: BigDecimal!
+}
+
+enum StellarLibrarySpectrum {
+  # StellarLibrarySpectrum O5V
+  O5_V
+
+  # StellarLibrarySpectrum O8III
+  O8_III
+
+  # StellarLibrarySpectrum B0V
+  B0_V
+
+  # StellarLibrarySpectrum B5_7V
+  B5_7_V
+
+  # StellarLibrarySpectrum B5III
+  B5_III
+
+  # StellarLibrarySpectrum B5I
+  B5_I
+
+  # StellarLibrarySpectrum A0V
+  A0_V
+
+  # StellarLibrarySpectrum A0III
+  A0_III
+
+  # StellarLibrarySpectrum A0I
+  A0_I
+
+  # StellarLibrarySpectrum A5V
+  A5_V
+
+  # StellarLibrarySpectrum A5III
+  A5_III
+
+  # StellarLibrarySpectrum F0V
+  F0_V
+
+  # StellarLibrarySpectrum F0III
+  F0_III
+
+  # StellarLibrarySpectrum F0I
+  F0_I
+
+  # StellarLibrarySpectrum F5V
+  F5_V
+
+  # StellarLibrarySpectrum F5V_w
+  F5_V_W
+
+  # StellarLibrarySpectrum F6V_r
+  F6_V_R
+
+  # StellarLibrarySpectrum F5III
+  F5_III
+
+  # StellarLibrarySpectrum F5I
+  F5_I
+
+  # StellarLibrarySpectrum G0V
+  G0_V
+
+  # StellarLibrarySpectrum G0V_w
+  G0_V_W
+
+  # StellarLibrarySpectrum G0V_r
+  G0_V_R
+
+  # StellarLibrarySpectrum G0III
+  G0_III
+
+  # StellarLibrarySpectrum G0I
+  G0_I
+
+  # StellarLibrarySpectrum G2V
+  G2_V
+
+  # StellarLibrarySpectrum G5V
+  G5_V
+
+  # StellarLibrarySpectrum G5V_w
+  G5_V_W
+
+  # StellarLibrarySpectrum G5V_r
+  G5_V_R
+
+  # StellarLibrarySpectrum G5III
+  G5_III
+
+  # StellarLibrarySpectrum G5III_w
+  G5_III_W
+
+  # StellarLibrarySpectrum G5III_r
+  G5_III_R
+
+  # StellarLibrarySpectrum G5I
+  G5_I
+
+  # StellarLibrarySpectrum K0V
+  K0_V
+
+  # StellarLibrarySpectrum K0V_r
+  K0_V_R
+
+  # StellarLibrarySpectrum K0III
+  K0_III
+
+  # StellarLibrarySpectrum K0III_w
+  K0_III_W
+
+  # StellarLibrarySpectrum K0III_r
+  K0_III_R
+
+  # StellarLibrarySpectrum K0_1II
+  K0_1_II
+
+  # StellarLibrarySpectrum K4V
+  K4_V
+
+  # StellarLibrarySpectrum K4III
+  K4_III
+
+  # StellarLibrarySpectrum K4III_w
+  K4_III_W
+
+  # StellarLibrarySpectrum K4III_r
+  K4_III_R
+
+  # StellarLibrarySpectrum K4I
+  K4_I
+
+  # StellarLibrarySpectrum M0V
+  M0_V
+
+  # StellarLibrarySpectrum M0III
+  M0_III
+
+  # StellarLibrarySpectrum M3V
+  M3_V
+
+  # StellarLibrarySpectrum M3III
+  M3_III
+
+  # StellarLibrarySpectrum M6V
+  M6_V
+
+  # StellarLibrarySpectrum M6III
+  M6_III
+
+  # StellarLibrarySpectrum M9III
+  M9_III
+}
+
+# Cool star temperature options
+enum CoolStarTemperature {
+  # 400 K
+  T400_K
+
+  # 600 K
+  T600_K
+
+  # 800 K
+  T800_K
+
+  # 900 K
+  T900_K
+
+  # 1000 K
+  T1000_K
+
+  # 1200 K
+  T1200_K
+
+  # 1400 K
+  T1400_K
+
+  # 1600 K
+  T1600_K
+
+  # 1800 K
+  T1800_K
+
+  # 2000 K
+  T2000_K
+
+  # 2200 K
+  T2200_K
+
+  # 2400 K
+  T2400_K
+
+  # 2600 K
+  T2600_K
+
+  # 2800 K
+  T2800_K
+}
+
+# Planet spectrum
+enum PlanetSpectrum {
+  # PlanetSpectrum Mars
+  MARS
+
+  # PlanetSpectrum Jupiter
+  JUPITER
+
+  # PlanetSpectrum Saturn
+  SATURN
+
+  # PlanetSpectrum Uranus
+  URANUS
+
+  # PlanetSpectrum Neptune
+  NEPTUNE
+}
+
+# Planetary nebula spectrum
+enum PlanetaryNebulaSpectrum {
+  # PlanetaryNebulaSpectrum NGC7009
+  NGC7009
+
+  # PlanetaryNebulaSpectrum IC5117
+  IC5117
+}
+
+# Quasar spectrum
+enum QuasarSpectrum {
+  # QuasarSpectrum QS0
+  QS0
+
+  # QuasarSpectrum QS02
+  QS02
+}
+
+
+# HII Region spectrum
+enum HiiRegionSpectrum {
+  # HiiRegionSpectrum OrionNebula
+  ORION_NEBULA
+}
+
+# Target description
+type Target {
+
+  # Target ID
+  id: TargetId!
+
+  # DELETED or PRESENT
+  existence: Existence!
+
+  # Target name.
+  name: NonEmptyString!
+
+  # Program that contains this target
+  program(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): Program!
+
+  # source profile
+  sourceProfile: SourceProfile!
+
+  # Sidereal tracking information, if this is a sidereal target
+  sidereal: Sidereal
+
+  # Nonsidereal tracking information, if this is a nonsidereal target
+  nonsidereal: Nonsidereal
+
+}
+
+type Sidereal {
+  # Right ascension at epoch
+  ra: RightAscension!
+
+  # Declination at epoch
+  dec: Declination!
+
+  # Epoch, time of base observation
+  epoch: EpochString!
+
+  # Proper motion per year in right ascension and declination
+  properMotion: ProperMotion
+
+  # Radial velocity
+  radialVelocity: RadialVelocity
+
+  # Parallax
+  parallax: Parallax
+
+  # Catalog info, if any, describing from where the information in this target was obtained
+  catalogInfo: CatalogInfo
+}
+
+type RightAscension {
+  # Right Ascension (RA) in HH:MM:SS.SSS format
+  hms: HmsString!
+
+  # Right Ascension (RA) in hours
+  hours: BigDecimal!
+
+  # Right Ascension (RA) in degrees
+  degrees: BigDecimal!
+
+  # Right Ascension (RA) in µas
+  microarcseconds: Long!
+}
+
+type Declination {
+  # Declination in DD:MM:SS.SS format
+  dms: DmsString!
+
+  # Declination in signed degrees
+  degrees: BigDecimal!
+
+  # Declination in signed µas
+  microarcseconds: Long!
+}
+
+# Target declination coordinate in format '[+/-]DD:MM:SS.sss'
+scalar DmsString
+
+type RadialVelocity {
+  # Radial velocity in cm/s
+  centimetersPerSecond: Long!
+
+  # Radial velocity in m/s
+  metersPerSecond: BigDecimal!
+
+  # Radial velocity in km/s
+  kilometersPerSecond: BigDecimal!
+}
+
+type Parallax {
+  # Parallax in microarcseconds
+  microarcseconds: Long!
+
+  # Parallax in milliarcseconds
+  milliarcseconds: BigDecimal!
+}
+
+
+type CatalogInfo {
+  # Catalog name option
+  name: CatalogName!
+
+  # Catalog id string
+  id: String!
+
+  # Catalog description of object morphology
+  objectType: String
+}
+
+type ProperMotion {
+  # Proper motion in RA
+  ra: ProperMotionRA!
+
+  # Proper motion in declination
+  dec: ProperMotionDeclination!
+}
+
+type ProperMotionDeclination {
+  # Proper motion in properMotion μas/year
+  microarcsecondsPerYear: Long!
+
+  # Proper motion in properMotion mas/year
+  milliarcsecondsPerYear: BigDecimal!
+}
+
+type ProperMotionRA {
+  # Proper motion in properMotion μas/year
+  microarcsecondsPerYear: Long!
+
+  # Proper motion in properMotion mas/year
+  milliarcsecondsPerYear: BigDecimal!
+}
+
+
+type Nonsidereal {
+  # Human readable designation that discriminates among ephemeris keys of the same type.
+  des: String!
+
+  # Nonsidereal target lookup type.
+  keyType: EphemerisKeyType!
+
+  # Synthesis of `keyType` and `des`
+  key: String!
+}

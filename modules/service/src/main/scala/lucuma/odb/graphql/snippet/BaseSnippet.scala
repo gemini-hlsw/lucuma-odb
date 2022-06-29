@@ -17,6 +17,10 @@ object BaseSnippet {
     val schema =
       schema"""
         scalar NonEmptyString
+        scalar Long
+        scalar BigDecimal
+        scalar HmsString
+        scalar DmsString
 
         "ISO-8601 duration, as String"
         scalar Duration
@@ -34,6 +38,7 @@ object BaseSnippet {
           startCursor: Cursor!
           endCursor: Cursor!
         }
+
       """
 
     val NonEmptyStringType = schema.ref("NonEmptyString")
