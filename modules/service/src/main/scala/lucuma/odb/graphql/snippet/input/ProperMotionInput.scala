@@ -13,7 +13,7 @@ object ProperMotionInput {
         ProperMotionComponentInput.RA.Binding("ra", rRa),
         ProperMotionComponentInput.Dec.Binding("dec", rDec)
       ) =>
-        (rRa, rDec).mapN(ProperMotion.apply)
+        (rRa, rDec).parMapN(ProperMotion.apply)
     }
 
 }

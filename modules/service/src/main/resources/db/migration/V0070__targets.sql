@@ -46,36 +46,36 @@ create table t_target (
     ) = 3),
 
   -- sidereal
-  c_sid_ra      d_angle_µas     null,
-  c_sid_dec     d_angle_µas     null,
+  c_sid_ra      d_angle_µas     null default null,
+  c_sid_dec     d_angle_µas     null default null,
 
   -- both null or both defined
   check (num_nulls(c_sid_pm_ra, c_sid_pm_dec) <> 1),
 
-  c_sid_epoch   d_epoch         null,
+  c_sid_epoch   d_epoch         null default null,
 
   -- proper motion (both defined or both null)
-  c_sid_pm_ra   d_angle_µas     null,
-  c_sid_pm_dec  d_angle_µas     null,
+  c_sid_pm_ra   d_angle_µas     null default null,
+  c_sid_pm_dec  d_angle_µas     null default null,
 
   -- radial velocity
-  c_sid_rv decimal, -- TODO  -- km/sec
+  c_sid_rv numeric, -- TODO  -- km/sec
 
   -- parallax -- µas
-  c_sid_parallax d_angle_µas    null,
+  c_sid_parallax d_angle_µas    null default null,
 
   -- catalog info
-  c_sid_catalog_name        e_catalog_name null,
-  c_sid_catalog_id          varchar        null,
-  c_sid_catalog_object_type varchar        null,
+  c_sid_catalog_name        e_catalog_name null default null,
+  c_sid_catalog_id          varchar        null default null,
+  c_sid_catalog_object_type varchar        null default null,
 
   -- both defined or both null
   check (num_nulls(c_sid_catalog_name, c_sid_catalog_id) != 1),
 
   -- nonsidereal
-  c_nsid_des        varchar null,
-  c_nsid_key_type   e_ephemeris_key_type null,
-  c_nsid_key        varchar null,
+  c_nsid_des        varchar null default null,
+  c_nsid_key_type   e_ephemeris_key_type null default null,
+  c_nsid_key        varchar null default null,
 
   -- required for nonsidereal targets
   check (c_type = 'sidereal' or num_nulls(c_nsid_des, c_nsid_key_type, c_nsid_key) = 0),
@@ -83,5 +83,17 @@ create table t_target (
   -- source profile is just a blob. we'll see how this works
   c_source_profile jsonb not null
 
-)
+);
+
+
+-- a view that has synthetic nullable ids for nullable embedded objects (required by grackle)
+create view v_target as
+  select *,
+  case when c_type='sidereal'              then c_target_id end as c_sidereal_id,
+  case when c_type='nonsidereal'           then c_target_id end as c_nonsidereal_id,
+  case when c_sid_catalog_name is not null then c_target_id end as c_sid_catalog_info_id,
+  case when c_sid_pm_ra        is not null then c_target_id end as c_sid_pm_id,
+  case when c_sid_parallax     is not null then c_target_id end as c_sid_parallax_id
+  from t_target;
+
 

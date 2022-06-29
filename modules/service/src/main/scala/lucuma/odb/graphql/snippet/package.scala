@@ -19,9 +19,30 @@ import lucuma.odb.data.ObsActiveStatus
 import lucuma.core.math.Epoch
 import scala.util.control.NonFatal
 import lucuma.core.math.Angle
-import lucuma.core.math.HourAngle
+import edu.gemini.grackle.Cursor
+import org.tpolecat.typename._
+import scala.reflect.ClassTag
+import edu.gemini.grackle.Result
+import cats.data.NonEmptyChain
+import edu.gemini.grackle.Problem
 
 package object snippet {
+
+    implicit class EnvOps(self: Cursor.Env) {
+      def getR[A: ClassTag: TypeName](name: String): Result[A] =
+        self.get[A](name) match {
+          case None        => Result.failure(s"Key '$name' of type ${typeName[A]} was not found in $self")
+          case Some(value) => Result(value)
+        }
+    }
+
+  implicit class ResultCompanionOps(self: Result.type) {
+    def fromOption[A](oa: Option[A], ifNone: => String): Result[A] =
+      oa match {
+        case Some(a) => Result(a)
+        case None    => Result.failure(ifNone)
+      }
+  }
 
   val ProgramIdBinding =
     StringBinding.emap { s =>
@@ -66,7 +87,7 @@ package object snippet {
     val fileName = s"${clazz.getSimpleName().dropRight(1)}.graphql"
     val stream = clazz.getResourceAsStream(fileName)
     val src  = Source.fromInputStream(stream, "UTF-8")
-    try Schema(src.getLines().mkString("\n")).getOrElse(sys.error(s"Invalid schema: $fileName"))
+    try Schema(src.getLines().mkString("\n")).toEither.fold(x => sys.error(s"Invalid schema: $fileName: ${x.toList.mkString(", ")}"), identity)
     finally src.close()
   }
 

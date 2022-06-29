@@ -18,7 +18,7 @@ object DeclinationInput {
         AngleBinding.Dms.Option("dms", rDms),
         DeclinationLongInput.Binding.Option("fromLong", rFromLong),
         DeclinationDecimalInput.Binding.Option("fromDecimal", rFromDecimal),
-      ) => (rMicroarcseconds, rDegrees, rDms, rFromLong, rFromDecimal).tupled.flatMap {
+      ) => (rMicroarcseconds, rDegrees, rDms, rFromLong, rFromDecimal).parTupled.flatMap {
         case (microarcseconds, degrees, hms, fromLong, fromDecimal) =>
           List(microarcseconds, degrees, hms, fromLong, fromDecimal).flatten match {
             case List(a) =>

@@ -26,13 +26,13 @@ object ProperMotionComponentInput {
         LongBinding.Option("microarcsecondsPerYear", rMicroarcsecondsPerYear),
         BigDecimalBinding.Option("milliarcsecondsPerYear", rMilliarcsecondsPerYear),
         ProperMotionComponentLongInput.Binding.Option("fromLong", rFromLong),
-        ProperMotionComponentDecimalInput.Binding.Option("fromBigDecimal", rFromBigDecimal),
+        ProperMotionComponentDecimalInput.Binding.Option("fromDecimal", rFromDecimal),
       ) =>
         val rMicroarcsecondsPerYearʹ = Nested(rMicroarcsecondsPerYear).map(_.withUnit[MicroArcSecondPerYear]).value
         val rMilliarcsecondsPerYearʹ = Nested(rMilliarcsecondsPerYear).map(n => (n * 1000).toLong.withUnit[MicroArcSecondPerYear]).value
-        (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ, rFromLong, rFromBigDecimal).tupled.flatMap {
-          case (microarcsecondsPerYear, milliarcsecondsPerYear, fomLong, fromBigDecimal) =>
-            List(microarcsecondsPerYear, milliarcsecondsPerYear, fomLong, fromBigDecimal).flatten match {
+        (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ, rFromLong, rFromDecimal).parTupled.flatMap {
+          case (microarcsecondsPerYear, milliarcsecondsPerYear, fomLong, fromDecimal) =>
+            List(microarcsecondsPerYear, milliarcsecondsPerYear, fomLong, fromDecimal).flatten match {
               case List(a) => Result(ProperMotion.AngularVelocityComponent(a))
               case as => Result.failure(s"Expected exactly one proper motion component format; found ${as.length}.")
             }

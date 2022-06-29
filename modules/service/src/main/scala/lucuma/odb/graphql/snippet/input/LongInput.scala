@@ -25,7 +25,7 @@ object LongInput {
         LongBinding("value", rValue),
         TypedEnumBinding("units", rEnum)
       ) =>
-        (rValue, rEnum.map(_.name)).tupled.flatMap {
+        (rValue, rEnum.map(_.name)).parTupled.flatMap {
           case (value, label) =>
             handler.lift((value, label)) match {
               case Some(r) => r
