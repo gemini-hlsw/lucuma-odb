@@ -44,12 +44,14 @@ object BaseSnippet {
     val NonEmptyStringType = schema.ref("NonEmptyString")
     val ExistenceType = schema.ref("Existence")
     val DurationType = schema.ref("Duration")
+    val BigDecimalType = schema.ref("BigDecimal")
 
     val typeMappings =
       List(
         LeafMapping[NonEmptyString](NonEmptyStringType),
         LeafMapping[Existence](ExistenceType),
-        LeafMapping[Duration](DurationType)
+        LeafMapping[Duration](DurationType),
+        LeafMapping[BigDecimal](BigDecimalType),
       )
 
       Snippet(schema, typeMappings)

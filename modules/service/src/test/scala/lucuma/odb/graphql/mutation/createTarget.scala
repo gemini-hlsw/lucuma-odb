@@ -43,12 +43,59 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
                 sourceProfile: {
                 }
               }) {
-              program {
-                id
-              }
+
+            id
+            existence
+            name
+            program {
+              id
             }
+            sourceProfile {
+
+              point {
+                bandNormalized {
+                  # brightness
+                  sed {
+                    stellarLibrary
+                    # coolStar
+                    # galaxy
+                    # planet
+                    # quasar
+                    # hiiRegion
+                    # planetaryNebula
+                    # powerLaw
+                    # blackBodyTempK
+                    # fluxDensities
+                  }
+                }
+                # emissionLines
+              }
+
+            }
+            sidereal {
+              ra {
+                hms
+                hours
+                degrees
+                microarcseconds
+              }
+              dec {
+                dms
+                degrees
+                microarcseconds
+              }
+              epoch
+            }
+            nonsidereal {
+              des
+            }
+
           }
-          """).flatMap { js =>
+        }
+        """).flatMap { js =>
+
+        println(js)
+
         val get = js.hcursor
           .downField("createTarget")
           .downField("program")

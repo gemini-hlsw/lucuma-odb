@@ -1175,3 +1175,56 @@ type Nonsidereal {
   # Synthesis of `keyType` and `des`
   key: String!
 }
+
+scalar TargetId
+
+
+
+# Source profile, exactly one of the fields will be defined
+type SourceProfile {
+  # point source, integrated units
+  point: SpectralDefinitionIntegrated
+
+  # uniform source, surface units
+  # uniform: SpectralDefinitionSurface
+
+  # gaussian source, integrated units
+  # gaussian: GaussianSource
+}
+
+# Spectral definition integrated.  Exactly one of the fields will be defined.
+type SpectralDefinitionIntegrated {
+  # Band normalized spectral definition
+  bandNormalized: BandNormalizedIntegrated
+
+  # Emission lines spectral definition
+  # emissionLines: EmissionLinesIntegrated
+}
+
+type BandNormalizedIntegrated implements BandNormalized {
+  brightnesses: [BandBrightnessIntegrated!]!
+
+  # Un-normalized spectral energy distribution
+  sed: UnnormalizedSed!
+}
+
+
+
+interface BandNormalized {
+  # Un-normalized spectral energy distribution
+  sed: UnnormalizedSed!
+}
+
+# Un-normalized spectral energy distribution.  Exactly one of the definitions will be non-null.
+type UnnormalizedSed {
+  stellarLibrary: StellarLibrarySpectrum
+  coolStar: CoolStarTemperature
+  galaxy: GalaxySpectrum
+  planet: PlanetSpectrum
+  quasar: QuasarSpectrum
+  hiiRegion: HiiRegionSpectrum
+  planetaryNebula: PlanetaryNebulaSpectrum
+  powerLaw: BigDecimal
+  blackBodyTempK: BigDecimal
+  fluxDensities: [FluxDensityEntry!]
+}

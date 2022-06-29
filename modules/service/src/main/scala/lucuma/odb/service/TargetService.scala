@@ -22,6 +22,7 @@ import skunk.AppliedFragment
 import skunk.Session
 import skunk.circe.codec.all._
 import skunk.implicits._
+import skunk.codec.all._
 
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse
@@ -95,7 +96,10 @@ object TargetService {
           ${right_ascension.opt},
           ${declination.opt},
           ${epoch.opt},
+          0, -- TODO
+          0, -- TODO
           ${radial_velocity.opt},
+          ${numeric.opt}, -- TODO
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
@@ -107,6 +111,7 @@ object TargetService {
         si.dec ~
         si.epoch ~
         si.radialVelocity ~
+        si.parallax.as(BigDecimal(0.0)) ~ // TODO
         si.catalogInfo.flatMap(_.name) ~
         si.catalogInfo.flatMap(_.id) ~
         si.catalogInfo.flatMap(_.objectType) ~
@@ -114,18 +119,21 @@ object TargetService {
       )
     }
 
-    def whereFragment(pid: Program.Id, user: User): AppliedFragment =
-      user match {
-        case GuestUser(id)                => void"WHERE " |+| existsUserAsPi(pid, id)
-        case ServiceUser(id, name)        => void""
-        case StandardUser(id, role, _, _) =>
-          role match {
-            case Admin(_)        => void""
-            case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(pid, Tag(partner.tag))
-            case Pi(_)           => void"WHERE " |+| existsUserAsPi(pid, id) |+| void" OR " |+| existsUserAsCoi(pid, id)
-            case Staff(_)        => void""
-          }
-      }
+    def whereFragment(pid: Program.Id, user: User): AppliedFragment = {
+      val insert =
+        user match {
+          case GuestUser(id)                => void"WHERE " |+| existsUserAsPi(pid, id)
+          case ServiceUser(id, name)        => void""
+          case StandardUser(id, role, _, _) =>
+            role match {
+              case Admin(_)        => void""
+              case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(pid, Tag(partner.tag))
+              case Pi(_)           => void"WHERE " |+| existsUserAsPi(pid, id) |+| void" OR " |+| existsUserAsCoi(pid, id)
+              case Staff(_)        => void""
+            }
+        }
+      insert |+| void" RETURNING c_target_id"
+    }
 
   }
 
