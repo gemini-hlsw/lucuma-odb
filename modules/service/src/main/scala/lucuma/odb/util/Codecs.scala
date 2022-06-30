@@ -26,6 +26,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.RadialVelocity
 import lucuma.core.enum.CatalogName
 import lucuma.core.enum.EphemerisKeyType
+import lucuma.core.math.Parallax
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -116,6 +117,12 @@ trait Codecs {
 
   val ephemeris_key_type: Codec[EphemerisKeyType] =
     enumerated(Type("e_ephemeris_key_type"))
+
+  val parallax: Codec[Parallax] =
+    angle_µas.imap(
+      a => Parallax.fromMicroarcseconds(a.toMicroarcseconds))(
+      p => Angle.fromMicroarcseconds(p.μas.value.value)
+    )
 
 }
 

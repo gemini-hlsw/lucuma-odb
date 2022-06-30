@@ -23,6 +23,7 @@ import skunk.Session
 import skunk.circe.codec.all._
 import skunk.implicits._
 import skunk.codec.all._
+import lucuma.core.model.EphemerisKey
 
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse
@@ -47,7 +48,7 @@ object TargetService {
           val insert: AppliedFragment =
             input.tracking match {
               case Left(s) => insertSiderealFragment(pid, input.name, s, input.sourceProfile)
-              case Right(n) => ???
+              case Right(n) => insertNonsiderealFragment(pid, input.name, n, input.sourceProfile)
             }
           val where = whereFragment(pid, u)
           val appl  = insert |+| void" " |+| where
@@ -99,7 +100,7 @@ object TargetService {
           ${int8.opt},
           ${int8.opt},
           ${radial_velocity.opt},
-          ${numeric.opt},
+          ${parallax.opt},
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
@@ -113,10 +114,44 @@ object TargetService {
         si.properMotion.map(_.ra.μasy.value) ~
         si.properMotion.map(_.dec.μasy.value) ~
         si.radialVelocity ~
-        si.parallax.as(BigDecimal(0.0)) ~ // TODO
+        si.parallax ~ // TODO
         si.catalogInfo.flatMap(_.name) ~
         si.catalogInfo.flatMap(_.id) ~
         si.catalogInfo.flatMap(_.objectType) ~
+        sourceProfile
+      )
+    }
+
+    def insertNonsiderealFragment(
+      pid:  Program.Id,
+      name: NonEmptyString,
+      ek:  EphemerisKey,
+      sourceProfile: Json
+    ): AppliedFragment = {
+      sql"""
+        insert into t_target (
+          c_program_id,
+          c_name,
+          c_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_nsid_key,
+          c_source_profile
+        )
+        select
+          $program_id,
+          $text_nonempty,
+          'nonsidereal',
+          ${text_nonempty},
+          ${ephemeris_key_type},
+          ${text_nonempty},
+          $json
+      """.apply(
+        pid ~
+        name ~
+        NonEmptyString.from(ek.des).toOption.get ~ // we know this is never emptyek.des ~
+        ek.keyType ~
+        NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get ~ // we know this is never empty
         sourceProfile
       )
     }

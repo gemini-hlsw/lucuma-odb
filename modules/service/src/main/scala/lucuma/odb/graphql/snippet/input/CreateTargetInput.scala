@@ -6,10 +6,11 @@ import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.graphql.util.Bindings._
 import io.circe.Json
+import lucuma.core.model.EphemerisKey
 
 final case class CreateTargetInput(
   name: NonEmptyString,
-  tracking: Either[SiderealInput, NonsiderealInput],
+  tracking: Either[SiderealInput, EphemerisKey],
   sourceProfile: Json
 )
 
