@@ -36,61 +36,150 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
               input: {
                 name: "Crunchy Target"
                 sidereal: {
-                  ra: { degrees: "12.345" }
-                  dec: { degrees: "45.678" }
+                  ra: {
+                    degrees: "12.345"
+                  }
+                  dec: {
+                    degrees: "45.678"
+                  }
                   epoch: "J2000.000"
-                }
-                sourceProfile: {
-                }
-              }) {
-
-            id
-            existence
-            name
-            program {
-              id
-            }
-            sourceProfile {
-
-              point {
-                bandNormalized {
-                  # brightness
-                  sed {
-                    stellarLibrary
-                    # coolStar
-                    # galaxy
-                    # planet
-                    # quasar
-                    # hiiRegion
-                    # planetaryNebula
-                    # powerLaw
-                    # blackBodyTempK
-                    # fluxDensities
+                  properMotion: {
+                    ra: {
+                      milliarcsecondsPerYear: "12.345"
+                    }
+                    dec: {
+                      milliarcsecondsPerYear: "-7.0"
+                    }
+                  }
+                  radialVelocity: {
+                    fromDecimal: {
+                      value: "78.91"
+                      units: CENTIMETERS_PER_SECOND
+                    }
                   }
                 }
-                # emissionLines
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: B5_III
+                      }
+                    }
+                    emissionLines: {
+                      lines: [
+                        {
+                          wavelength: {
+                            angstroms: "20"
+                          }
+                          lineWidth: "1.2"
+                          lineFlux: {
+                            value: "42"
+                            units: ERG_PER_S_PER_CM_SQUARED
+                          }
+                        }
+                      ]
+                      fluxDensityContinuum: {
+                        value: "42"
+                        units: W_PER_M_SQUARED_PER_UM
+                      }
+                    }
+                  }
+                }
               }
+            )
+            {
 
-            }
-            sidereal {
-              ra {
-                hms
-                hours
-                degrees
-                microarcseconds
+              existence
+              name
+              program {
+                id
               }
-              dec {
-                dms
-                degrees
-                microarcseconds
+              sourceProfile {
+                point {
+                  bandNormalized {
+                    sed {
+                      stellarLibrary
+                      coolStar
+                      galaxy
+                      planet
+                      quasar
+                      hiiRegion
+                      planetaryNebula
+                      powerLaw
+                      blackBodyTempK
+                      fluxDensities {
+                        wavelength {
+                          picometers
+                          angstroms
+                          nanometers
+                          micrometers
+                        }
+                        density
+                      }
+                    }
+                  }
+                  emissionLines {
+                    lines {
+                      wavelength {
+                        # picometers
+                        angstroms
+                        # nanometers
+                        # micrometers
+                      }
+                      lineWidth
+                      lineFlux {
+                        value
+                        units
+                      }
+                    }
+                    fluxDensityContinuum {
+                      value
+                      units
+                    }
+                  }
+                }
               }
-              epoch
-            }
-            nonsidereal {
-              des
+              sidereal {
+                ra {
+                  hms
+                  hours
+                  degrees
+                  microarcseconds
+                }
+                dec {
+                  dms
+                  degrees
+                  microarcseconds
+                }
+                epoch
+                properMotion {
+                  ra {
+                    microarcsecondsPerYear
+                    milliarcsecondsPerYear
+                  }
+                  dec {
+                    microarcsecondsPerYear
+                    milliarcsecondsPerYear
+                  }
+                }
+                radialVelocity {
+                  centimetersPerSecond
+                  metersPerSecond
+                  kilometersPerSecond
+                }
+                catalogInfo {
+                  name
+                  id
+                  objectType
+                }
+              }
+              nonsidereal {
+                des
+                keyType
+                key
+              }
             }
 
-          }
         }
         """).flatMap { js =>
 

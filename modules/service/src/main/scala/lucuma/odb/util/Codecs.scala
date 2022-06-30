@@ -25,6 +25,7 @@ import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RadialVelocity
 import lucuma.core.enum.CatalogName
+import lucuma.core.enum.EphemerisKeyType
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -112,6 +113,9 @@ trait Codecs {
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
+
+  val ephemeris_key_type: Codec[EphemerisKeyType] =
+    enumerated(Type("e_ephemeris_key_type"))
 
 }
 

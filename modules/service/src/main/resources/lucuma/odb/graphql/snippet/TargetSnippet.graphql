@@ -1198,7 +1198,7 @@ type SpectralDefinitionIntegrated {
   bandNormalized: BandNormalizedIntegrated
 
   # Emission lines spectral definition
-  # emissionLines: EmissionLinesIntegrated
+  emissionLines: EmissionLinesIntegrated
 }
 
 type BandNormalizedIntegrated implements BandNormalized {
@@ -1227,4 +1227,27 @@ type UnnormalizedSed {
   powerLaw: BigDecimal
   blackBodyTempK: BigDecimal
   fluxDensities: [FluxDensityEntry!]
+}
+
+type EmissionLinesIntegrated {
+  lines: [EmissionLineIntegrated!]!
+  fluxDensityContinuum: FluxDensityContinuumIntegrated!
+}
+
+type EmissionLineIntegrated {
+  wavelength: Wavelength!
+
+  # km/s
+  lineWidth: BigDecimal!
+  lineFlux: LineFluxIntegrated!
+}
+
+type LineFluxIntegrated {
+  value: BigDecimal!
+  units: LineFluxIntegratedUnits!
+}
+
+type FluxDensityContinuumIntegrated {
+  value: BigDecimal!
+  units: FluxDensityContinuumIntegratedUnits!
 }

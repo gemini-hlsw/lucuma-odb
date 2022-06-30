@@ -93,7 +93,8 @@ create view v_target as
   case when c_type='nonsidereal'           then c_target_id end as c_nonsidereal_id,
   case when c_sid_catalog_name is not null then c_target_id end as c_sid_catalog_info_id,
   case when c_sid_pm_ra        is not null then c_target_id end as c_sid_pm_id,
-  case when c_sid_parallax     is not null then c_target_id end as c_sid_parallax_id
+  case when c_sid_parallax     is not null then c_target_id end as c_sid_parallax_id,
+  case when c_sid_rv           is not null then c_target_id end as c_sid_rv_id
   from t_target;
 
 
