@@ -33,6 +33,9 @@ import io.circe.Json
 import scala.reflect.ClassTag
 import lucuma.core.math.Angle
 import lucuma.core.math.RadialVelocity
+import lucuma.core.math.Parallax
+import java.math.MathContext
+import lucuma.core.enum.EphemerisKeyType
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
@@ -54,6 +57,7 @@ object TargetSnippet {
   val ParallaxType                = schema.ref("Parallax")
   val TargetIdType                = schema.ref("TargetId")
   val EpochStringType             = schema.ref("EpochString")
+  val EphemerisKeyTypeType        = schema.ref("EphemerisKeyType")
 
   def apply[F[_]: MonadCancelThrow](
     m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
@@ -89,10 +93,13 @@ object TargetSnippet {
         val Dec            = col("c_sid_dec", declination.embedded)     // logically never null if id is non-null
         val Epoch          = col("c_sid_epoch", epoch.embedded)         // logically never null if id is non-null
         object RadialVelocity {
-          val SyntheticId = col("c_sid_rv_id", target_id.embedded)   // synthetic
+          val SyntheticId = col("c_sid_rv_id", target_id.embedded)      // synthetic
           val Value       = col("c_sid_rv", radial_velocity.embedded)
         }
-        val Parallax       = col("c_sid_parallax", angle_µas.opt)
+        object Parallax {
+          val SyntheticId = col("c_sid_parallax_id", target_id.embedded)   // synthetic
+          val Value = col("c_sid_parallax", parallax.embedded)
+        }
         object Catalog {
           val SyntheticId = col("c_sid_catalog_info_id", target_id.embedded)   // synthetic; non-null only if c_sid_catalog_name is defined
           val Name        = col("c_sid_catalog_name", catalog_name.embedded)   // logically never null if id is non-null
@@ -108,7 +115,7 @@ object TargetSnippet {
       object Nonsidereal {
         val SyntheticId    = col("c_nonsidereal_id", target_id.embedded)         // synthetic; non-null only if type = 'sidereal'
         val Des     = col("c_nsid_des", varchar.embedded)
-        val KeyType = col("c_nsid_key_type", ephemeris_key_type.embedded) // todo: ephemeris_key_type
+        val KeyType = col("c_nsid_key_type", ephemeris_key_type.embedded)
         val Key     = col("c_nsid_key", varchar.embedded)
       }
     }
@@ -161,6 +168,7 @@ object TargetSnippet {
     val typeMappings = List(
       LeafMapping[Target.Id](TargetIdType),
       LeafMapping[Epoch](EpochStringType),
+      LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       ObjectMapping(
         tpe = TargetType, // top-level type
         fieldMappings = List(
@@ -246,7 +254,10 @@ object TargetSnippet {
       ObjectMapping(
         tpe = ParallaxType,
         fieldMappings = List(
-          // TODO
+          SqlField("synthetic_id", TargetView.Sidereal.Parallax.SyntheticId, key = true, hidden = true),
+          SqlField("value", TargetView.Sidereal.Parallax.Value, hidden = true),
+          FieldRef[Parallax]("value").as("microarcseconds", _.μas.value.value),
+          FieldRef[Parallax]("value").as("milliarcseconds", a => a.mas.value.toBigDecimal(MathContext.DECIMAL128)),
         )
       ),
       ObjectMapping(

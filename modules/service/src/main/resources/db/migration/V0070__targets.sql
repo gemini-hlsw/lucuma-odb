@@ -5,7 +5,7 @@ comment on domain d_target_id is 'GID type for targets.';
 
 create type e_target_type as enum('sidereal', 'nonsidereal');
 create type e_catalog_name as enum('simbad', 'gaia');
-create type e_ephemeris_key_type as enum('comet', 'asteroid_new', 'asteroid_old', 'major_body', 'user_supplied');
+create type e_ephemeris_key_type as enum('Comet', 'AsteroidNew', 'AsteroidOld', 'MajorBody', 'UserSupplied');
 
 -- Reference observation epoch in format '[JB]YYYY.YYY'
 create domain d_epoch as varchar check(value similar to '[JB]\d{4}\.\d{3}');
@@ -23,6 +23,7 @@ create table t_target (
   c_type        e_target_type   not null,
 
   -- either it's sidereal or all the sidereal fields must be null
+  constraint sidereal_or_all_columns_null
   check (c_type = 'sidereal' or
     num_nulls(
       c_sid_ra,
@@ -38,6 +39,7 @@ create table t_target (
     ) = 10),
 
   -- either it's nonsidereal or all the nonsidereal fields must be null
+  constraint nonsidereal_or_all_columns_null
   check (c_type = 'nonsidereal' or
     num_nulls(
       c_nsid_des,
@@ -49,12 +51,11 @@ create table t_target (
   c_sid_ra      d_angle_µas     null default null,
   c_sid_dec     d_angle_µas     null default null,
 
-  -- both null or both defined
-  check (num_nulls(c_sid_pm_ra, c_sid_pm_dec) <> 1),
-
   c_sid_epoch   d_epoch         null default null,
 
   -- proper motion (both defined or both null)
+  constraint pm_neither_or_both
+  check (num_nulls(c_sid_pm_ra, c_sid_pm_dec) <> 1),
   c_sid_pm_ra   d_angle_µas     null default null,
   c_sid_pm_dec  d_angle_µas     null default null,
 
@@ -70,6 +71,7 @@ create table t_target (
   c_sid_catalog_object_type varchar        null default null,
 
   -- both defined or both null
+  constraint catalog_name_id_neither_or_both
   check (num_nulls(c_sid_catalog_name, c_sid_catalog_id) != 1),
 
   -- nonsidereal
@@ -78,7 +80,11 @@ create table t_target (
   c_nsid_key        varchar null default null,
 
   -- required for nonsidereal targets
-  check (c_type = 'sidereal' or num_nulls(c_nsid_des, c_nsid_key_type, c_nsid_key) = 0),
+  constraint nonsidereal_all_non_null
+  check (
+    c_type = 'sidereal' or
+    num_nulls(c_nsid_des, c_nsid_key_type, c_nsid_key) = 0
+  ),
 
   -- source profile is just a blob. we'll see how this works
   c_source_profile jsonb not null
