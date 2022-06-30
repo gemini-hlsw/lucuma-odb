@@ -96,10 +96,10 @@ object TargetService {
           ${right_ascension.opt},
           ${declination.opt},
           ${epoch.opt},
-          0, -- TODO
-          0, -- TODO
+          ${int8.opt},
+          ${int8.opt},
           ${radial_velocity.opt},
-          ${numeric.opt}, -- TODO
+          ${numeric.opt},
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
@@ -110,6 +110,8 @@ object TargetService {
         si.ra ~
         si.dec ~
         si.epoch ~
+        si.properMotion.map(_.ra.μasy.value) ~
+        si.properMotion.map(_.dec.μasy.value) ~
         si.radialVelocity ~
         si.parallax.as(BigDecimal(0.0)) ~ // TODO
         si.catalogInfo.flatMap(_.name) ~

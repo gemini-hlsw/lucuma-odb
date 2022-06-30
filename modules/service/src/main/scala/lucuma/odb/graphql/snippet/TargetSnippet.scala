@@ -31,6 +31,8 @@ import lucuma.core.math.Epoch
 import io.circe.Encoder
 import io.circe.Json
 import scala.reflect.ClassTag
+import lucuma.core.math.Angle
+import lucuma.core.math.RadialVelocity
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
@@ -88,7 +90,7 @@ object TargetSnippet {
         val Epoch          = col("c_sid_epoch", epoch.embedded)         // logically never null if id is non-null
         object RadialVelocity {
           val SyntheticId = col("c_sid_rv_id", target_id.embedded)   // synthetic
-          val Value       = col("c_sid_rv", numeric.embedded)
+          val Value       = col("c_sid_rv", radial_velocity.embedded)
         }
         val Parallax       = col("c_sid_parallax", angle_µas.opt)
         object Catalog {
@@ -106,7 +108,7 @@ object TargetSnippet {
       object Nonsidereal {
         val SyntheticId    = col("c_nonsidereal_id", target_id.embedded)         // synthetic; non-null only if type = 'sidereal'
         val Des     = col("c_nsid_des", varchar.embedded)
-        val KeyType = col("c_nsid_key_type", varchar.embedded) // todo: ephemeris_key_type
+        val KeyType = col("c_nsid_key_type", ephemeris_key_type.embedded) // todo: ephemeris_key_type
         val Key     = col("c_nsid_key", varchar.embedded)
       }
     }
@@ -144,16 +146,11 @@ object TargetSnippet {
         }
       }
 
-    // TODO: ergonomics
-
-    def fromDeclination[A](f: Declination => A): Cursor => Result[A] = c =>
-      c.field("microarcseconds", None).flatMap(_.as[Declination]).map(f)
-
     // this is required by the leaf mapping
     implicit val EncoderEpoch: Encoder[Epoch] =
       e => Json.fromString(Epoch.fromString.reverseGet(e))
 
-    object UnderlyingField {
+    object FieldRef {
       def apply[A](underlyingField: String) = new Partial[A](underlyingField)
       class Partial[A](underlyingField: String) {
         def as[B: Encoder](field: String, f: A => B)(implicit ev: ClassTag[A]): CursorField[B] =
@@ -193,21 +190,21 @@ object TargetSnippet {
         tpe = RightAscensionType,
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-          SqlField("ra", TargetView.Sidereal.Ra, hidden = true),
-          UnderlyingField[RightAscension]("ra").as("hms", RightAscension.fromStringHMS.reverseGet),
-          UnderlyingField[RightAscension]("ra").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
-          UnderlyingField[RightAscension]("ra").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-          UnderlyingField[RightAscension]("ra").as("microarcseconds", _.toAngle.toMicroarcseconds),
+          SqlField("value", TargetView.Sidereal.Ra, hidden = true),
+          FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),
+          FieldRef[RightAscension]("value").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
+          FieldRef[RightAscension]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+          FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
         ),
       ),
       ObjectMapping(
         tpe = DeclinationType,
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-          SqlField("dec", TargetView.Sidereal.Dec, hidden = true),
-          UnderlyingField[Declination]("dec").as("dms", Declination.fromStringSignedDMS.reverseGet),
-          UnderlyingField[Declination]("dec").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-          UnderlyingField[Declination]("dec").as("microarcseconds", _.toAngle.toMicroarcseconds),
+          SqlField("value", TargetView.Sidereal.Dec, hidden = true),
+          FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
+          FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+          FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
         ),
       ),
       ObjectMapping(
@@ -222,16 +219,18 @@ object TargetSnippet {
         tpe = ProperMotionRAType,
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
-          SqlField("microarcsecondsPerYear", TargetView.Sidereal.ProperMotion.Ra),
-          // TODO: kilometersPerSecond
+          SqlField("value", TargetView.Sidereal.ProperMotion.Ra, hidden = true),
+          FieldRef[Angle]("value").as("microarcsecondsPerYear", _.toMicroarcseconds),
+          FieldRef[Angle]("value").as("milliarcsecondsPerYear", a => BigDecimal(a.toMicroarcseconds) / BigDecimal(1000)),
         )
       ),
       ObjectMapping(
         tpe = ProperMotionDeclinationType,
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
-          SqlField("microarcsecondsPerYear", TargetView.Sidereal.ProperMotion.Dec),
-          // TODO: milliarcsecondsPerYear
+          SqlField("value", TargetView.Sidereal.ProperMotion.Dec, hidden = true),
+          FieldRef[Angle]("value").as("microarcsecondsPerYear", _.toMicroarcseconds),
+          FieldRef[Angle]("value").as("milliarcsecondsPerYear", a => BigDecimal(a.toMicroarcseconds) / BigDecimal(1000)),
         )
       ),
       ObjectMapping(
@@ -239,9 +238,9 @@ object TargetSnippet {
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.RadialVelocity.SyntheticId, key = true, hidden = true),
           SqlField("value", TargetView.Sidereal.RadialVelocity.Value, hidden = true),
-          // CursorField[Long]("centimetersPerSecond", ???),
-          // CursorField[BigDecimal]("metersPerSecond", ???),
-          // CursorField[BigDecimal]("kilometersPerSecond", ???),
+          FieldRef[RadialVelocity]("value").as("metersPerSecond", _.rv.value),
+          FieldRef[RadialVelocity]("value").as("kilometersPerSecond", _.rv.value / BigDecimal(1000)),
+          FieldRef[RadialVelocity]("value").as("centimetersPerSecond", _.rv.value.toLong * 100L),
         )
       ),
       ObjectMapping(
@@ -264,6 +263,8 @@ object TargetSnippet {
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Nonsidereal.SyntheticId, key = true, hidden = true),
           SqlField("des", TargetView.Nonsidereal.Des),
+          SqlField("keyType", TargetView.Nonsidereal.KeyType),
+          SqlField("key", TargetView.Nonsidereal.Key),
         )
       ),
       ObjectMapping(
