@@ -4,7 +4,6 @@ package snippet
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
-import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
@@ -88,32 +87,32 @@ object TargetSnippet {
       val Existence     = col("c_existence", existence)
       val SourceProfile = col("c_source_profile", jsonb)
       object Sidereal {
-        val SyntheticId    = col("c_sidereal_id", target_id.embedded)   // synthetic; non-null only if type = 'sidereal'
-        val Ra             = col("c_sid_ra", right_ascension.embedded)  // logically never null if id is non-null
-        val Dec            = col("c_sid_dec", declination.embedded)     // logically never null if id is non-null
-        val Epoch          = col("c_sid_epoch", epoch.embedded)         // logically never null if id is non-null
+        val SyntheticId    = col("c_sidereal_id", target_id.embedded)
+        val Ra             = col("c_sid_ra", right_ascension.embedded)
+        val Dec            = col("c_sid_dec", declination.embedded)
+        val Epoch          = col("c_sid_epoch", epoch.embedded)
         object RadialVelocity {
-          val SyntheticId = col("c_sid_rv_id", target_id.embedded)      // synthetic
+          val SyntheticId = col("c_sid_rv_id", target_id.embedded)
           val Value       = col("c_sid_rv", radial_velocity.embedded)
         }
         object Parallax {
-          val SyntheticId = col("c_sid_parallax_id", target_id.embedded)   // synthetic
+          val SyntheticId = col("c_sid_parallax_id", target_id.embedded)
           val Value = col("c_sid_parallax", parallax.embedded)
         }
         object Catalog {
-          val SyntheticId = col("c_sid_catalog_info_id", target_id.embedded)   // synthetic; non-null only if c_sid_catalog_name is defined
-          val Name        = col("c_sid_catalog_name", catalog_name.embedded)   // logically never null if id is non-null
-          val Id          = col("c_sid_catalog_id", varchar.embedded)          // logically never null if id is non-null
-          val ObjectType  = col("c_sid_catalog_object_type", varchar.embedded) // logically never null if id is non-null
+          val SyntheticId = col("c_sid_catalog_info_id", target_id.embedded)
+          val Name        = col("c_sid_catalog_name", catalog_name.embedded)
+          val Id          = col("c_sid_catalog_id", varchar.embedded)
+          val ObjectType  = col("c_sid_catalog_object_type", varchar.embedded)
         }
         object ProperMotion {
-          val SyntheticId = col("c_sid_pm_id", target_id.embedded)            // synthetic; non-null only if c_sid_pm_ra is defined
-          val Ra  = col("c_sid_pm_ra", angle_µas.embedded)                    // logically never null if id is non-null
-          val Dec = col("c_sid_pm_dec", angle_µas.embedded)                   // logically never null if id is non-null
+          val SyntheticId = col("c_sid_pm_id", target_id.embedded)
+          val Ra  = col("c_sid_pm_ra", angle_µas.embedded)
+          val Dec = col("c_sid_pm_dec", angle_µas.embedded)
         }
       }
       object Nonsidereal {
-        val SyntheticId    = col("c_nonsidereal_id", target_id.embedded)         // synthetic; non-null only if type = 'sidereal'
+        val SyntheticId    = col("c_nonsidereal_id", target_id.embedded)
         val Des     = col("c_nsid_des", varchar.embedded)
         val KeyType = col("c_nsid_key_type", ephemeris_key_type.embedded)
         val Key     = col("c_nsid_key", varchar.embedded)
@@ -123,7 +122,6 @@ object TargetSnippet {
     object ProgramTable extends TableDef("t_program") {
       val Id  = col("c_program_id", program_id)
     }
-
 
     object Predicates {
 
