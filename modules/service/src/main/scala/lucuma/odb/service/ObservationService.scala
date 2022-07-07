@@ -1,20 +1,24 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.service
 
-import lucuma.core.model.Program
-import lucuma.odb.data.Existence
-import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.odb.data.ObsStatus
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.core.model.Observation
-import skunk._, skunk.implicits._
-import lucuma.odb.util.Codecs._
-import lucuma.core.model.User
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.GuestRole
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole._
+import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
+import lucuma.odb.util.Codecs._
+import skunk._
+import skunk.implicits._
 
 trait ObservationService[F[_]] {
   import ObservationService._

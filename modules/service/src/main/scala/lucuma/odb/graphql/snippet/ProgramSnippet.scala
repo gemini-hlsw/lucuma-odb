@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
@@ -19,15 +22,15 @@ import fs2.Stream
 import lucuma.core.model
 import lucuma.core.model.Access._
 import lucuma.core.model.User
-import lucuma.odb.data._
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data._
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ProgramService
-import lucuma.odb.util.Codecs._
-import skunk.Session
-import natchez.Trace
 import lucuma.odb.service.ProgramService.LinkUserResponse._
+import lucuma.odb.util.Codecs._
+import natchez.Trace
+import skunk.Session
 
 object ProgramSnippet {
 

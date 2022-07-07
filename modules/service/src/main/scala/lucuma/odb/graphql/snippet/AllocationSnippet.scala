@@ -1,37 +1,42 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
-import edu.gemini.grackle.syntax._
-import lucuma.odb.service.ProgramService
-import skunk.Session
-import lucuma.odb.graphql.util._
-import lucuma.core.model.User
-import natchez.Trace
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.util.Codecs._
-import skunk.codec.temporal.interval
-import lucuma.core.model.Partner
-import lucuma.odb.data.Tag
-import lucuma.core.model.Program
-import java.time.Duration
 import cats.syntax.all._
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value
 import edu.gemini.grackle.Value.ObjectValue
-import edu.gemini.grackle.Cursor.Env
-import Bindings._
+import edu.gemini.grackle.skunk.SkunkMapping
+import edu.gemini.grackle.syntax._
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AllocationService.SetAllocationResponse.NotAuthorized
 import lucuma.odb.service.AllocationService.SetAllocationResponse.PartnerNotFound
 import lucuma.odb.service.AllocationService.SetAllocationResponse.ProgramNotFound
 import lucuma.odb.service.AllocationService.SetAllocationResponse.Success
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Path.UniquePath
+import lucuma.odb.service.ProgramService
+import lucuma.odb.util.Codecs._
+import natchez.Trace
+import skunk.Session
+import skunk.codec.temporal.interval
+
+import java.time.Duration
+
+import Bindings._
 
 object AllocationSnippet {
 

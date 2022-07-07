@@ -1,11 +1,15 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
 import edu.gemini.grackle.syntax._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.refined._
-import lucuma.odb.graphql.util._
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.util._
+
 import java.time.Duration
 
 /** Snippet with base types, mostly scalars. */

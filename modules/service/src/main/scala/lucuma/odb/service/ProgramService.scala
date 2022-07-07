@@ -1,26 +1,29 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.service
 
-import lucuma.core.model.User
+import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import skunk._
-import skunk.syntax.all._
-import lucuma.core.model.Program
-import lucuma.odb.util.Codecs._
-import skunk.data.Completion
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.odb.data._
-import cats.data.NonEmptyList
+import lucuma.core.model.GuestRole
+import lucuma.core.model.Program
+import lucuma.core.model.ServiceRole
+import lucuma.core.model.ServiceUser
+import lucuma.core.model.StandardRole
+import lucuma.core.model.User
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
-import lucuma.core.model.ServiceUser
-import natchez.Trace
-import lucuma.core.model.GuestRole
-import lucuma.core.model.ServiceRole
-import lucuma.core.model.StandardRole
-import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
+import lucuma.odb.data._
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
-import cats.Monad
+import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
+import lucuma.odb.util.Codecs._
+import natchez.Trace
+import skunk._
+import skunk.data.Completion
+import skunk.syntax.all._
 
 trait ProgramService[F[_]] {
 

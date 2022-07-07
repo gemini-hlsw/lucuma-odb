@@ -1,34 +1,39 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.util._
-import lucuma.odb.util.Codecs._
-import lucuma.core.model.User
-import cats.effect.kernel.Resource
-import skunk.Session
-import lucuma.odb.service.ObservationService
 import cats.effect.MonadCancelThrow
-import lucuma.odb.data.Existence
-import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.model.Program
-import edu.gemini.grackle.Result
+import cats.effect.kernel.Resource
 import cats.syntax.all._
-import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
-import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
 import edu.gemini.grackle.Cursor.Env
-import lucuma.odb.data.ObsStatus
-import lucuma.odb.data.ObsActiveStatus
-import scala.reflect.ClassTag
+import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
-import edu.gemini.grackle.Path.UniquePath
-import lucuma.core.model.Observation
+import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value._
-import org.tpolecat.typename.{TypeName, typeName}
+import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.graphql.util._
+import lucuma.odb.service.ObservationService
+import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
+import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
+import lucuma.odb.util.Codecs._
+import org.tpolecat.typename.TypeName
+import org.tpolecat.typename.typeName
+import skunk.Session
+
+import scala.reflect.ClassTag
 
 object ObservationSnippet {
 

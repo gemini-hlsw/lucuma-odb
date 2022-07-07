@@ -1,32 +1,32 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
 
 import _root_.skunk.Session
+import cats.Applicative
+import cats.Traverse
 import cats.data.NonEmptyList
+import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
-import lucuma.core.model.User
-import natchez.Trace
-import lucuma.odb.graphql.snippet._
+import fs2.concurrent.Topic
 import lucuma.core.model.GuestRole
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole.Admin
 import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.StandardRole.Staff
-import org.tpolecat.sourcepos.SourcePos
-import cats.Applicative
-import lucuma.odb.graphql.util._
-import fs2.concurrent.Topic
+import lucuma.core.model.User
+import lucuma.odb.graphql.snippet._
 import lucuma.odb.graphql.topic.ProgramTopic
-import cats.effect.std.Supervisor
+import lucuma.odb.graphql.util._
+import natchez.Trace
+import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
-import cats.Traverse
 
 object OdbMapping {
 

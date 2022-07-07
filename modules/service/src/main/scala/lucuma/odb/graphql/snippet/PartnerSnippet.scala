@@ -1,18 +1,21 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
-import edu.gemini.grackle.syntax._
-import skunk.codec.all._
-import edu.gemini.grackle.skunk.SkunkMapping
 import cats.Functor
-import skunk._
-import edu.gemini.grackle.EnumType
-import skunk.syntax.all._
 import cats.syntax.all._
+import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.EnumValue
+import edu.gemini.grackle.skunk.SkunkMapping
+import edu.gemini.grackle.syntax._
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.util._
 import lucuma.odb.util.Codecs._
-import lucuma.odb.data.Tag
+import skunk._
+import skunk.codec.all._
+import skunk.syntax.all._
 
 object PartnerSnippet {
 
