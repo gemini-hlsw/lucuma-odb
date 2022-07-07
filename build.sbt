@@ -16,7 +16,7 @@ val natcchezHttp4sVersion      = "0.2.0"
 val natchezVersion             = "0.1.5"
 val postgresVersion            = "42.3.1"
 val skunkVersion               = "0.3.1"
-val slf4jVersion               = "1.7.32"
+val slf4jVersion               = "1.7.36"
 val lucumaSsoVersion           = "0.0.13"
 val testcontainersScalaVersion = "0.40.7"
 
