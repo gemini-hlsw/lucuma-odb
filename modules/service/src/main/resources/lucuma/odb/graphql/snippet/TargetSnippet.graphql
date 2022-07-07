@@ -1186,10 +1186,10 @@ type SourceProfile {
   point: SpectralDefinitionIntegrated
 
   # uniform source, surface units
-  # uniform: SpectralDefinitionSurface
+  uniform: SpectralDefinitionSurface
 
   # gaussian source, integrated units
-  # gaussian: GaussianSource
+  gaussian: GaussianSource
 }
 
 # Spectral definition integrated.  Exactly one of the fields will be defined.
