@@ -1,6 +1,6 @@
 val circeVersion               = "0.14.1"
 val cirisVersion               = "2.3.2"
-val clueVersion                = "0.20.2"
+val clueVersion                = "0.20.3"
 val declineVersion             = "2.2.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "7.11.4"
