@@ -23,10 +23,9 @@ import edu.gemini.grackle.Cursor
 import org.tpolecat.typename._
 import scala.reflect.ClassTag
 import edu.gemini.grackle.Result
-import cats.data.NonEmptyChain
-import edu.gemini.grackle.Problem
 import skunk.Codec
 import edu.gemini.grackle.sql.FailedJoin
+import lucuma.core.enum.Band
 
 package object snippet {
 
@@ -44,6 +43,10 @@ package object snippet {
         case Some(a) => Result(a)
         case None    => Result.failure(ifNone)
       }
+
+    def warning[A](warning: String, value: A): Result[A] =
+      Result.failure[A](warning).putRight(value)
+
   }
 
   val ProgramIdBinding =
@@ -125,5 +128,9 @@ package object snippet {
     def embedded: Codec[Any] =
       self.opt.imap(_.getOrElse(FailedJoin))(x => Some(x.asInstanceOf[A])) // whee
   }
+
+  val BandBinding: Matcher[Band] =
+    enumeratedBinding[Band]
+
 
 }

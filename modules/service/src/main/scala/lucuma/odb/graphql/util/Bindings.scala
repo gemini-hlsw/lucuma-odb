@@ -13,6 +13,7 @@ import java.time.Duration
 import cats.syntax.all._
 import java.time.format.DateTimeParseException
 import io.circe.Json
+import lucuma.core.enum.Band
 
 object Bindings {
 
