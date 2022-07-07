@@ -18,7 +18,7 @@ val postgresVersion            = "42.3.1"
 val skunkVersion               = "0.3.1"
 val slf4jVersion               = "1.7.32"
 val lucumaSsoVersion           = "0.0.13"
-val testcontainersScalaVersion = "0.40.7"
+val testcontainersScalaVersion = "0.40.8"
 
 inThisBuild(Seq(
   homepage := Some(url("https://github.com/gemini-hlsw/lucuma-sso")),
