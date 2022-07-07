@@ -21,6 +21,7 @@ val lucumaSsoVersion           = "0.0.13"
 val testcontainersScalaVersion = "0.40.7"
 
 ThisBuild / Test / fork := true
+ThisBuild / tlFatalWarnings := false // TODO!
 
 lazy val service = project
   .in(file("modules/service"))
