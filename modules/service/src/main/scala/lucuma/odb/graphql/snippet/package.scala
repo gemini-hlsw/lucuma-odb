@@ -26,6 +26,7 @@ import edu.gemini.grackle.Result
 import skunk.Codec
 import edu.gemini.grackle.sql.FailedJoin
 import lucuma.core.enum.Band
+import lucuma.core.math.BrightnessUnits
 
 package object snippet {
 
@@ -132,5 +133,7 @@ package object snippet {
   val BandBinding: Matcher[Band] =
     enumeratedBinding[Band]
 
+  val x: Matcher[BrightnessUnits.Integrated] =
+    ???
 
 }
