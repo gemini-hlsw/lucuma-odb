@@ -1,16 +1,14 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
+import cats.syntax.all._
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
-import lucuma.core.math.RightAscension
-import edu.gemini.grackle.Result
-import cats.syntax.all._
+import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
-import lucuma.core.math.Parallax
-import lucuma.core.model.CatalogInfo
+import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.util.Bindings._
 
 final case class SiderealInput(
   ra: Option[RightAscension],

@@ -33,8 +33,13 @@ object Bindings {
     final def emap[B](f: A => Either[String, B]): Matcher[B] = v =>
       outer.validate(v).flatMap(f)
 
-    final def rmap[B](f: A => Result[B]): Matcher[B] = v =>
-      outer.validate(v).flatMap { a => f(a).toEither.leftMap(_.head.message) } // only preserves the first problem, rats
+    final def rmap[B](f: PartialFunction[A, Result[B]]): Matcher[B] = v =>
+      outer.validate(v).flatMap { a =>
+        f.lift(a) match {
+          case Some(r) => r.toEither.leftMap(_.head.message)
+          case None    => Left(s"rmap: unhandled case; no match for $v") // todo: this sucks
+        }
+      } // only preserves the first problem, rats
 
     def unapply(b: Binding): Some[(String, Result[A])] =
       Some((b.name, validate(b)))
