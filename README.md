@@ -6,7 +6,8 @@ This is the Postgres-backed observing database for GPP, under construction.
 
 The highlights:
 
-- To start up a local database and a simple web UI: `docker-compose up -d`
+- Step 1 is `chmod 0600 test-cert/*`
+- To start up a local database and a simple web UI: `docker-compose up -d` ... if stuff doesn't seem to work drop the `-d` and see what's going on. You can then `^C` out of it and try again.
 - The database will be created and initialized if it doesn't yet exist.
 - The Schema is defined by `.sql` files in `modules/service/src/main/resources/db/migration/`.
 - To inspect the database using a web UI, go [here](http://localhost:8686)
