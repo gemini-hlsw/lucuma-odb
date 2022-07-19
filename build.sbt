@@ -4,15 +4,15 @@ val clueVersion                = "0.20.2"
 val declineVersion             = "2.2.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "7.11.4"
-val grackleVersion             = "0.2.1"
+val grackleVersion             = "0.2.0" // "0.1.16+17-6f247fe9+20220407-1243-SNAPSHOT"
 val http4sVersion              = "0.23.6"
 val jwtVersion                 = "5.0.0"
 val log4catsVersion            = "2.1.1"
-val lucumaCoreVersion          = "0.14.3"
-val lucumaGraphQLRoutesVersion = "0.3.4"
+val lucumaCoreVersion          = "0.2.0" //"0.14.3"
+val lucumaGraphQLRoutesVersion = "0.3.4" // "0.2.0-3-bec8835-20220407T175637Z-SNAPSHOT"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
-val natcchezHttp4sVersion      = "0.2.0"
+val natchezHttp4sVersion      = "0.2.0"
 val natchezVersion             = "0.1.5"
 val postgresVersion            = "42.3.1"
 val skunkVersion               = "0.3.1"
@@ -45,7 +45,7 @@ lazy val service = project
       "org.postgresql" %  "postgresql"                      % postgresVersion,
       "org.slf4j"      %  "slf4j-simple"                    % slf4jVersion,
       "org.tpolecat"   %% "natchez-honeycomb"               % natchezVersion,
-      "org.tpolecat"   %% "natchez-http4s"                  % natcchezHttp4sVersion,
+      "org.tpolecat"   %% "natchez-http4s"                  % natchezHttp4sVersion,
       "org.tpolecat"   %% "natchez-log"                     % natchezVersion,
       "org.tpolecat"   %% "skunk-core"                      % skunkVersion,
       "com.dimafeng"   %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,

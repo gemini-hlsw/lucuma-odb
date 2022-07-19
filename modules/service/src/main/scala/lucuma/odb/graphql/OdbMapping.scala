@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 import _root_.skunk.Session
 import cats.Applicative
-import cats.Traverse
 import cats.data.NonEmptyList
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
@@ -14,12 +13,6 @@ import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import fs2.concurrent.Topic
-import lucuma.core.model.GuestRole
-import lucuma.core.model.ServiceRole
-import lucuma.core.model.StandardRole.Admin
-import lucuma.core.model.StandardRole.Ngo
-import lucuma.core.model.StandardRole.Pi
-import lucuma.core.model.StandardRole.Staff
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
 import lucuma.odb.graphql.topic.ProgramTopic
@@ -67,6 +60,7 @@ object OdbMapping {
               ProgramSnippet(this, pool, user, topics),
               AllocationSnippet(this, pool, user),
               ObservationSnippet(this, pool, user),
+              TargetSnippet(this, pool, user),
             ).reduce
 
           val schema = snippet.schema
