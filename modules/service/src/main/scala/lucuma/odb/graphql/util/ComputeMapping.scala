@@ -22,7 +22,7 @@ trait ComputeMapping[F[_]] { this: CirceMapping[F] =>
     run: Cursor.Env => F[Result[Json]],
   ) extends RootMapping {
     def cursor(query: Query, env: Cursor.Env, resultName: Option[String]): fs2.Stream[F,Result[(Query, Cursor)]] =
-        fs2.Stream.eval(run(env)).map { r => r.map(a => (query, CirceCursor(Cursor.Context(fieldName, resultName, tpe), a, None, env))) }
+        fs2.Stream.eval(run(env)).map { r => r.map(a => (query, CirceCursor(Cursor.Context(tpe, fieldName, resultName).getOrElse(sys.error("bogus cursor")), a, None, env))) }
     def mutation: Mutation = Mutation.None
     def withParent(tpe: Type): RootMapping = this
   }
