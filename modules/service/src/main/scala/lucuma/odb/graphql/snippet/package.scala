@@ -39,11 +39,15 @@ package object snippet {
     }
 
   implicit class ResultCompanionOps(self: Result.type) {
+
     def fromOption[A](oa: Option[A], ifNone: => String): Result[A] =
       oa match {
         case Some(a) => Result(a)
         case None    => Result.failure(ifNone)
       }
+
+    def fromEither[A](ea: Either[String, A]): Result[A] =
+      ea.fold(Result.failure(_), Result.apply)
 
     def warning[A](warning: String, value: A): Result[A] =
       Result.failure[A](warning).putRight(value)
