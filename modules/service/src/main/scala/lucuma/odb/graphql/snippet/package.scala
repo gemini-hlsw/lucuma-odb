@@ -141,7 +141,4 @@ package object snippet {
   val BandBinding: Matcher[Band] =
     enumeratedBinding[Band]
 
-  val x: Matcher[BrightnessUnits.Integrated] =
-    ???
-
 }
