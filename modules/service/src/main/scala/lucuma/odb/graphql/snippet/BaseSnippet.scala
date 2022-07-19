@@ -17,6 +17,10 @@ object BaseSnippet {
     val schema =
       schema"""
         scalar NonEmptyString
+        scalar Long
+        scalar BigDecimal
+        scalar HmsString
+        scalar DmsString
 
         "ISO-8601 duration, as String"
         scalar Duration
@@ -34,17 +38,20 @@ object BaseSnippet {
           startCursor: Cursor!
           endCursor: Cursor!
         }
+
       """
 
     val NonEmptyStringType = schema.ref("NonEmptyString")
     val ExistenceType = schema.ref("Existence")
     val DurationType = schema.ref("Duration")
+    val BigDecimalType = schema.ref("BigDecimal")
 
     val typeMappings =
       List(
         LeafMapping[NonEmptyString](NonEmptyStringType),
         LeafMapping[Existence](ExistenceType),
-        LeafMapping[Duration](DurationType)
+        LeafMapping[Duration](DurationType),
+        LeafMapping[BigDecimal](BigDecimalType),
       )
 
       Snippet(schema, typeMappings)
