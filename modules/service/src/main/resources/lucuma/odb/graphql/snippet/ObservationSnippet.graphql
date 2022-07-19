@@ -3,10 +3,10 @@ type Mutation {
     # Observation description
     input: CreateObservationInput!
   ): Observation
-  updateObservation(
-    # Edit observation
-    input: EditObservationInput!
-  ): Observation!
+  # updateObservation(
+  #   # Edit observation
+  #   input: EditObservationInput!
+  # ): Observation!
 }
 
 scalar ObservationId
