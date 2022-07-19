@@ -38,24 +38,24 @@ class filterTypeMeta extends OdbSuite {
                     "longName": "Broad-Band Filter"
                   },
                   {
-                    "tag": "NARROW_BAND",
-                    "shortName": "Narrow-Band",
-                    "longName": "Narrow-Band Filter"
-                  },
-                  {
                     "tag": "COMBINATION",
                     "shortName": "Combination",
                     "longName": "Combination Filter"
                   },
                   {
-                    "tag": "SPECTROSCOPIC",
-                    "shortName": "Spectroscopic",
-                    "longName": "Spectroscopic Filter"
-                  },
-                  {
                     "tag": "ENGINEERING",
                     "shortName": "Engineering",
                     "longName": "Engineering Filter"
+                  },
+                  {
+                    "tag": "NARROW_BAND",
+                    "shortName": "Narrow-Band",
+                    "longName": "Narrow-Band Filter"
+                  },
+                  {
+                    "tag": "SPECTROSCOPIC",
+                    "shortName": "Spectroscopic",
+                    "longName": "Spectroscopic Filter"
                   }
                 ]
               }
