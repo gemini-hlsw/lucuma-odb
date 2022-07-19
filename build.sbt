@@ -20,6 +20,8 @@ val slf4jVersion               = "1.7.32"
 val lucumaSsoVersion           = "0.0.13"
 val testcontainersScalaVersion = "0.40.7"
 
+enablePlugins(NoPublishPlugin)
+
 ThisBuild / Test / fork := true
 ThisBuild / tlFatalWarnings := false // TODO!
 
