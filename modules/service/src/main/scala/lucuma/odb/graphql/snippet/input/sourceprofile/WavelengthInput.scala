@@ -25,11 +25,11 @@ object WavelengthInput {
     case (v, "MICROMETERS") => getMicrometers(v)
   }
 
-  val Picometers = LongBinding.map(BigDecimal(_)).rmap(PartialFunction.fromFunction(getPicometers))
-  val Angstroms = BigDecimalBinding.rmap(PartialFunction.fromFunction(getAngstroms))
-  val Nanometers = BigDecimalBinding.rmap(PartialFunction.fromFunction(getNanometers))
+  val Picometers  = LongBinding.map(BigDecimal(_)).rmap(PartialFunction.fromFunction(getPicometers))
+  val Angstroms   = BigDecimalBinding.rmap(PartialFunction.fromFunction(getAngstroms))
+  val Nanometers  = BigDecimalBinding.rmap(PartialFunction.fromFunction(getNanometers))
   val Micrometers = BigDecimalBinding.rmap(PartialFunction.fromFunction(getMicrometers))
-  val FromLong = LongInput("Wavelength")(decimalInputHandler compose { case (v, s) => (BigDecimal(v), s) })
+  val FromLong    = LongInput("Wavelength")(decimalInputHandler compose { case (v, s) => (BigDecimal(v), s) })
   val FromDecimal = DecimalInput("Wavelength")(decimalInputHandler)
 
   def oneOrFail(all: Option[Wavelength]*): Result[Wavelength] =
