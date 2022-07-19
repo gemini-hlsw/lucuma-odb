@@ -5,10 +5,10 @@ package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
 
-import lucuma.core.model.SourceProfile
-import lucuma.odb.graphql.util.Bindings._
 import cats.syntax.all._
 import edu.gemini.grackle.Result
+import lucuma.core.model.SourceProfile
+import lucuma.odb.graphql.util.Bindings._
 
 object GaussianInput {
 

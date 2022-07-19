@@ -4,12 +4,12 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.math.Declination
-import edu.gemini.grackle.Result
 import cats.syntax.all._
-import lucuma.odb.graphql.snippet.binding.AngleBinding
+import edu.gemini.grackle.Result
 import lucuma.core.math.Angle
+import lucuma.core.math.Declination
+import lucuma.odb.graphql.snippet.binding.AngleBinding
+import lucuma.odb.graphql.util.Bindings._
 
 object DeclinationInput {
 

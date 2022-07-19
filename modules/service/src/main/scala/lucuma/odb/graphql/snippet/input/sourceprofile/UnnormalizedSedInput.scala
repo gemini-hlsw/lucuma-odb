@@ -5,15 +5,15 @@ package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
 
-import lucuma.core.model.UnnormalizedSED
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.enum.StellarLibrarySpectrum
-import lucuma.core.enum._
+import cats.data.NonEmptyMap
 import cats.syntax.all._
+import coulomb.Quantity
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosBigDecimal
-import coulomb.Quantity
-import cats.data.NonEmptyMap
+import lucuma.core.enum.StellarLibrarySpectrum
+import lucuma.core.enum._
+import lucuma.core.model.UnnormalizedSED
+import lucuma.odb.graphql.util.Bindings._
 
 object UnnormalizedSedInput {
 

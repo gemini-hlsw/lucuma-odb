@@ -5,14 +5,14 @@ package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
 
+import cats.syntax.all._
+import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Of
-import lucuma.odb.graphql.util.Bindings._
-import cats.syntax.all._
 import lucuma.core.math.dimensional.Units
-import edu.gemini.grackle.Result
+import lucuma.odb.graphql.util.Bindings._
 
 object FluxDensityContinuumInput {
 

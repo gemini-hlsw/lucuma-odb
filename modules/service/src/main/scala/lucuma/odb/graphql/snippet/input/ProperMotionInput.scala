@@ -5,8 +5,8 @@ package lucuma.odb.graphql.snippet
 package input
 
 import cats.syntax.all._
-import lucuma.odb.graphql.util.Bindings._
 import lucuma.core.math.ProperMotion
+import lucuma.odb.graphql.util.Bindings._
 
 object ProperMotionInput {
 

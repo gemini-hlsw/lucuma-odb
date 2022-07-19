@@ -4,14 +4,14 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.math.ProperMotion
-import lucuma.core.math.units._
 import cats.data.Nested
 import cats.syntax.all._
 import coulomb._
 import edu.gemini.grackle.Result
+import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
+import lucuma.core.math.units._
+import lucuma.odb.graphql.util.Bindings._
 
 object ProperMotionComponentInput {
 

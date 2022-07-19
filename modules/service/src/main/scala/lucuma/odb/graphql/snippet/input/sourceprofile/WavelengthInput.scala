@@ -5,11 +5,11 @@ package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
 
-import lucuma.core.math.Wavelength
-import lucuma.odb.graphql.util.Bindings._
-import edu.gemini.grackle.Result
-import lucuma.core.optics.Format
 import cats.syntax.all._
+import edu.gemini.grackle.Result
+import lucuma.core.math.Wavelength
+import lucuma.core.optics.Format
+import lucuma.odb.graphql.util.Bindings._
 
 object WavelengthInput {
 

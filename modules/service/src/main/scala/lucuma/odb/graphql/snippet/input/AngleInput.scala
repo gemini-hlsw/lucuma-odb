@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 package snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
+import cats.syntax.all._
+import edu.gemini.grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
-import edu.gemini.grackle.Result
-import cats.syntax.all._
+import lucuma.odb.graphql.util.Bindings._
 
 object AngleInput {
 

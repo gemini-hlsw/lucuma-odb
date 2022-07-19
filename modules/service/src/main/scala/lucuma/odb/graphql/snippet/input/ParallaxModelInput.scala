@@ -4,11 +4,11 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.math.Parallax
 import cats.data.OptionT
-import edu.gemini.grackle.Result
 import cats.syntax.all._
+import edu.gemini.grackle.Result
+import lucuma.core.math.Parallax
+import lucuma.odb.graphql.util.Bindings._
 
 object ParallaxModelInput {
 

@@ -17,7 +17,8 @@ import lucuma.core.model.EmissionLine
 import lucuma.core.model.SpectralDefinition.EmissionLines
 import lucuma.odb.graphql.util.Bindings._
 
-import scala.collection.immutable.{ SortedMap, TreeMap }
+import scala.collection.immutable.SortedMap
+import scala.collection.immutable.TreeMap
 
 object EmissionLinesInput {
 

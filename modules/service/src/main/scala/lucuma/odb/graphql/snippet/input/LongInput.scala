@@ -4,9 +4,9 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
 import cats.syntax.all._
 import edu.gemini.grackle.Result
+import lucuma.odb.graphql.util.Bindings._
 
 /**
  * Constructor for matchers of the pattern:

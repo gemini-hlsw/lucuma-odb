@@ -4,8 +4,8 @@
 package lucuma.odb.graphql.snippet
 package binding
 
-import lucuma.odb.graphql.util.Bindings._
 import lucuma.core.math.Angle
+import lucuma.odb.graphql.util.Bindings._
 
 object AngleBinding {
 

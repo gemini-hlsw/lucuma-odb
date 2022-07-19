@@ -4,11 +4,11 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.enum.EphemerisKeyType
 import cats.syntax.all._
 import edu.gemini.grackle.Result
+import lucuma.core.enum.EphemerisKeyType
 import lucuma.core.model.EphemerisKey
+import lucuma.odb.graphql.util.Bindings._
 
 object NonsiderealInput {
 

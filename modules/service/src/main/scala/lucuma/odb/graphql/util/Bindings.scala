@@ -11,13 +11,13 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.Value
 import edu.gemini.grackle.Value._
 import io.circe.Decoder
+import io.circe.Json
 import io.circe.parser.parse
+import lucuma.core.enum.Band
 import lucuma.odb.data
 
 import java.time.Duration
 import java.time.format.DateTimeParseException
-import io.circe.Json
-import lucuma.core.enum.Band
 
 object Bindings {
 

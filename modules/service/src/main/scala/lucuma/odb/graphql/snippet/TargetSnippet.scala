@@ -8,15 +8,27 @@ import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import io.circe.Encoder
+import io.circe.Json
+import lucuma.core.enum.EphemerisKeyType
+import lucuma.core.math.Angle
 import lucuma.core.math.Declination
+import lucuma.core.math.Epoch
+import lucuma.core.math.Parallax
+import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.Existence
 import lucuma.odb.graphql.snippet.input.CreateTargetInput
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.TargetService
@@ -24,20 +36,9 @@ import lucuma.odb.util.Codecs._
 import skunk.Session
 import skunk.circe.codec.json.jsonb
 import skunk.codec.all._
-import lucuma.core.model.Target
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Path.UniquePath
-import lucuma.odb.data.Existence
-import lucuma.core.math.Epoch
-import io.circe.Encoder
-import io.circe.Json
-import scala.reflect.ClassTag
-import lucuma.core.math.Angle
-import lucuma.core.math.RadialVelocity
-import lucuma.core.math.Parallax
+
 import java.math.MathContext
-import lucuma.core.enum.EphemerisKeyType
+import scala.reflect.ClassTag
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._

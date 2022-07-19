@@ -5,9 +5,9 @@ package lucuma.odb.graphql.snippet
 package input
 
 import cats.syntax.all._
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.enum.CatalogName
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enum.CatalogName
+import lucuma.odb.graphql.util.Bindings._
 
 final case class CatalogInfoInput(
   name: Option[CatalogName],

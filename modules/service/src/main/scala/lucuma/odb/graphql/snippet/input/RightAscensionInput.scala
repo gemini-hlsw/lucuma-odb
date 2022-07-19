@@ -4,12 +4,12 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.math.RightAscension
-import edu.gemini.grackle.Result
 import cats.syntax.all._
-import lucuma.odb.graphql.snippet.binding.HourAngleBinding
+import edu.gemini.grackle.Result
 import lucuma.core.math.HourAngle
+import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.snippet.binding.HourAngleBinding
+import lucuma.odb.graphql.util.Bindings._
 
 object RightAscensionInput {
 
