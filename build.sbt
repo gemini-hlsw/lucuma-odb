@@ -12,7 +12,7 @@ val lucumaCoreVersion          = "0.2.0" //"0.14.3"
 val lucumaGraphQLRoutesVersion = "0.3.4" // "0.2.0-3-bec8835-20220407T175637Z-SNAPSHOT"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
-val natcchezHttp4sVersion      = "0.2.0"
+val natchezHttp4sVersion      = "0.2.0"
 val natchezVersion             = "0.1.5"
 val postgresVersion            = "42.3.1"
 val skunkVersion               = "0.3.1"
@@ -52,7 +52,7 @@ lazy val service = project
       "org.postgresql" %  "postgresql"                      % postgresVersion,
       "org.slf4j"      %  "slf4j-simple"                    % slf4jVersion,
       "org.tpolecat"   %% "natchez-honeycomb"               % natchezVersion,
-      "org.tpolecat"   %% "natchez-http4s"                  % natcchezHttp4sVersion,
+      "org.tpolecat"   %% "natchez-http4s"                  % natchezHttp4sVersion,
       "org.tpolecat"   %% "natchez-log"                     % natchezVersion,
       "org.tpolecat"   %% "skunk-core"                      % skunkVersion,
       "com.dimafeng"   %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,

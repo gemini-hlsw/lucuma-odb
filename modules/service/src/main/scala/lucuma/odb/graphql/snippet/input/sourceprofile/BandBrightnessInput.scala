@@ -13,19 +13,19 @@ import lucuma.odb.graphql.util.Bindings._
 object BandBrightnessInput {
 
   object Integrated {
-    val CreateBinding: Matcher[(Band, BrightnessMeasure[Integrated])] =
-      create(enumeratedBinding[Units Of Brightness[Integrated]])
+    val Binding: Matcher[(Band, BrightnessMeasure[Integrated])] =
+      binding(enumeratedBinding[Units Of Brightness[Integrated]])
   }
 
   object Surface {
-    val CreateBinding: Matcher[(Band, BrightnessMeasure[Surface])] =
-      create(enumeratedBinding[Units Of Brightness[Surface]])
+    val Binding: Matcher[(Band, BrightnessMeasure[Surface])] =
+      binding(enumeratedBinding[Units Of Brightness[Surface]])
   }
 
   val BrightnessValueBinding: Matcher[BrightnessValue] =
     BigDecimalBinding.map(BrightnessValue.fromBigDecimal.get)
 
-  def create[A](
+  def binding[A](
     unitsBinding: Matcher[Units Of Brightness[A]]
   ): Matcher[(Band, BrightnessMeasure[A])] =
     ObjectFieldsBinding.rmap {
