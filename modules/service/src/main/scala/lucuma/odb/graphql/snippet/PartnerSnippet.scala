@@ -13,6 +13,11 @@ import edu.gemini.grackle.EnumValue
 import lucuma.odb.graphql.util._
 import lucuma.odb.util.Codecs._
 import lucuma.odb.data.Tag
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.{ Select, OrderBy, OrderSelections, OrderSelection }
+import edu.gemini.grackle.Path.UniquePath
 
 object PartnerSnippet {
 
@@ -65,12 +70,21 @@ object PartnerSnippet {
         LeafMapping[Tag](PartnerType)
       )
 
-    Snippet(schema, typeMappings)
+    val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
+      QueryType -> {
+        case Select("partnerMeta", Nil, child) =>
+          Result(Select("partnerMeta", Nil,
+            OrderBy(OrderSelections(List(OrderSelection(UniquePath[Tag](List("tag"))))), child)
+          ))
+      }
+    )
+
+    Snippet(schema, typeMappings, elaborator)
 
   }
 
   def enumType[F[_]: Functor](s: Session[F]): F[EnumType] =
-    s.execute(sql"select c_tag, c_long_name, c_active from t_partner".query(varchar ~ varchar ~ bool)).map { elems =>
+    s.execute(sql"select c_tag, c_long_name, c_active from t_partner order by c_tag".query(varchar ~ varchar ~ bool)).map { elems =>
       EnumType(
         "Partner",
         Some("Enumerated type of partners."),

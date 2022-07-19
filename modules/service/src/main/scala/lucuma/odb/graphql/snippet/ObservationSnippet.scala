@@ -79,14 +79,6 @@ object ObservationSnippet {
       val Id        = col("c_program_id", program_id)
     }
 
-    implicit class EnvOps(self: Env) {
-      def getR[A: ClassTag: TypeName](name: String): Result[A] =
-        self.get[A](name) match {
-          case None        => Result.failure(s"Key '$name' of type ${typeName[A]} was not found in $self")
-          case Some(value) => Result(value)
-        }
-    }
-
     def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Result[Query] =
       Result(Unique(Filter(Predicates.hasObservationId(id), child)))
 

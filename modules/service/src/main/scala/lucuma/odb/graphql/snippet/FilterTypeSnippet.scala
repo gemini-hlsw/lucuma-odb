@@ -13,6 +13,11 @@ import edu.gemini.grackle.EnumValue
 import lucuma.odb.graphql.util._
 import lucuma.odb.util.Codecs._
 import lucuma.odb.data.Tag
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.{ Select, OrderBy, OrderSelections, OrderSelection }
+import edu.gemini.grackle.Path.UniquePath
 
 object FilterTypeSnippet {
 
@@ -60,12 +65,21 @@ object FilterTypeSnippet {
         LeafMapping[Tag](FilterTypeType)
       )
 
-      Snippet(schema, typeMappings)
+    val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
+      QueryType -> {
+        case Select("filterTypeMeta", Nil, child) =>
+          Result(Select("filterTypeMeta", Nil,
+            OrderBy(OrderSelections(List(OrderSelection(UniquePath[Tag](List("tag"))))), child)
+          ))
+      }
+    )
 
-    }
+    Snippet(schema, typeMappings, elaborator)
+
+  }
 
     def enumType[F[_]: Functor](s: Session[F]): F[EnumType] =
-      s.execute(sql"select c_tag, c_long_name from t_filter_type".query(varchar ~ varchar)).map { elems =>
+      s.execute(sql"select c_tag, c_long_name from t_filter_type order by c_tag".query(varchar ~ varchar)).map { elems =>
         EnumType(
           "FilterType",
           Some("Enumerated type of filters."),
