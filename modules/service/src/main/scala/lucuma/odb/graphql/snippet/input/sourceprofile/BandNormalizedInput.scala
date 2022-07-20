@@ -4,7 +4,7 @@ package sourceprofile
 
 import cats.syntax.all._
 import edu.gemini.grackle.Result
-import lucuma.core.enum.Band
+import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.odb.graphql.util.Bindings._
