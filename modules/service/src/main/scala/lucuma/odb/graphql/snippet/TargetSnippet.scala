@@ -76,6 +76,7 @@ object TargetSnippet {
     import m.SqlRoot
     import m.TableDef
     import m.LeafMapping
+    import m.col
 
     val servicePool: Resource[F, TargetService[F]] =
       sessionPool.map(TargetService.fromSession(_, user))

@@ -50,7 +50,7 @@ object ProgramSnippet {
     topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
