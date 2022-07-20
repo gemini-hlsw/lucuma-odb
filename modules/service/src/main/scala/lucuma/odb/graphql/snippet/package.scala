@@ -25,7 +25,7 @@ import scala.reflect.ClassTag
 import edu.gemini.grackle.Result
 import skunk.Codec
 import edu.gemini.grackle.sql.FailedJoin
-import lucuma.core.enum.Band
+import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits
 
 package object snippet {

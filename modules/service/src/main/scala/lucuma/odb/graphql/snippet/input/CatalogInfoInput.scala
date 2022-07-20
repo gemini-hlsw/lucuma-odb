@@ -3,7 +3,7 @@ package input
 
 import cats.syntax.all._
 import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.enum.CatalogName
+import lucuma.core.enums.CatalogName
 import eu.timepit.refined.types.string.NonEmptyString
 
 final case class CatalogInfoInput(

@@ -4,13 +4,13 @@ package sourceprofile
 
 import lucuma.core.model.UnnormalizedSED
 import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.enum.StellarLibrarySpectrum
-import lucuma.core.enum._
+import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.enums._
 import cats.syntax.all._
 import edu.gemini.grackle.Result
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import coulomb.Quantity
 import cats.data.NonEmptyMap
+import eu.timepit.refined.types.numeric
 
 object UnnormalizedSedInput {
 
@@ -33,7 +33,7 @@ object UnnormalizedSedInput {
         HiiRegionSpectrum.Option("hiiRegion", rHiiRegion),
         PlanetaryNebulaSpectrum.Option("planetaryNebula", rPlanetaryNebula),
         BigDecimalBinding.Option("powerLaw", rPowerLaw),
-        BigDecimalBinding.Option("blackBodyTempK", rBlackBodyTempK),
+        IntBinding.Option("blackBodyTempK", rBlackBodyTempK),
         FluxDensityInput.Binding.List.Option("fluxDensities", rFluxDensities),
       ) =>
         (rStellarLibrary, rCoolStar, rGalaxy, rPlanet, rQuasar, rHiiRegion, rPlanetaryNebula, rPowerLaw, rBlackBodyTempK, rFluxDensities).parTupled.flatMap {
@@ -48,7 +48,7 @@ object UnnormalizedSedInput {
           case (None, None, None, None, None, None, None, Some(v), None, None) => Result(UnnormalizedSED.PowerLaw(v))
 
           case (None, None, None, None, None, None, None, None, Some(v), None) =>
-            PosBigDecimal.from(v) match {
+            numeric.PosInt.from(v) match {
               case Left(err)  => Result.failure(err)
               case Right(pbd) => Result(UnnormalizedSED.BlackBody(Quantity(pbd)))
             }

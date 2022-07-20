@@ -34,7 +34,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.Parallax
 import java.math.MathContext
-import lucuma.core.enum.EphemerisKeyType
+import lucuma.core.enums.EphemerisKeyType
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
