@@ -28,17 +28,9 @@ object ProgramAdminSnippet {
     sessionPool: Resource[F, Session[F]],
     user: User,
   ): m.Snippet = {
-    import m.{ ObjectMapping, ComputeRoot, Snippet }
+    import m.{ ObjectMapping, ComputeRoot, Snippet, schema }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
-
-    val schema =
-      schema"""
-        type Mutation {
-          "Delete the specified program, returning true if it was deleted, false if it was not found."
-          deleteProgram(id: ProgramId!): Boolean!
-        }
-      """
 
     val MutationType = schema.ref("Mutation")
 
@@ -73,7 +65,7 @@ object ProgramAdminSnippet {
       }
     )
 
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 

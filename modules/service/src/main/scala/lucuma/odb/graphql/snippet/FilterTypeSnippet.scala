@@ -22,19 +22,7 @@ import edu.gemini.grackle.Path.UniquePath
 object FilterTypeSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, LeafMapping, col }
-
-    val schema =
-      schema"""
-        type Query {
-          filterTypeMeta: [FilterTypeMeta!]!
-        }
-        type FilterTypeMeta {
-          tag:        FilterType!
-          shortName:  String!
-          longName:	  String!
-        }
-      """
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, LeafMapping, col, schema }
 
     val QueryType          = schema.ref("Query")
     val FilterTypeType     = schema.ref("FilterType")
@@ -74,7 +62,7 @@ object FilterTypeSnippet {
       }
     )
 
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 

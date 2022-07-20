@@ -17,7 +17,6 @@ import edu.gemini.grackle.TypeRef
 trait SnippetMapping[F[_]] extends Mapping[F] {
 
   case class Snippet(
-    schema: Schema,
     typeMappings: List[TypeMapping],
     elaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] = Map.empty
   ) {
@@ -27,18 +26,11 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
   }
 
   implicit val SemigroupSnippetData: Semigroup[Snippet] = (a, b) => {
-    val s1 = a.schema |+| b.schema
     Snippet(
-      s1,
-      concatAndMergeWhen(a.typeMappings, b.typeMappings)(sameName).map(reref(s1)),
-      rerefKeys(a.elaborator, s1) |+| rerefKeys(b.elaborator, s1) // doh! need to remap the keys
+      concatAndMergeWhen(a.typeMappings, b.typeMappings)(sameName),
+     a.elaborator |+| b.elaborator
     )
   }
-
-  def rerefKeys[A](m: Map[TypeRef, A], s: Schema): Map[TypeRef, A] =
-    m.map { case (k, v) =>
-      s.ref(k.name) -> v
-    }
 
   private implicit val SemigroupObjectMapping: Semigroup[ObjectMapping] = (a, b) =>
     if (!sameName(a.tpe, b.tpe)) a else ObjectMapping(
@@ -77,7 +69,7 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
     case (a, _) => a
   }
 
-  private implicit val SemigroupSchema: Semigroup[Schema] = (a, b) =>
+  implicit val SemigroupSchema: Semigroup[Schema] = (a, b) =>
     Remapper.remap {
       new Schema {
         val pos: SourcePos = a.pos
@@ -86,18 +78,6 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
       }
     }
 
-  private implicit class SchemaOps(s: Schema) {
-    def unsafeRef(tpe: Type): TypeRef =
-      s.ref(tpe).getOrElse(sys.error(s"SnippetMapping: Type ${tpe} doesn't exist in schema:\n$s"))
-  }
-
-  // Rereference a type in another schema. Failing to do this is an unrecoverable error.
-  private def reref(s: Schema): TypeMapping => TypeMapping = {
-    case om @ ObjectMapping.DefaultObjectMapping(tpe, fm) => ObjectMapping(s.unsafeRef(tpe), fm)(om.pos) // n.b. copy doesn't work
-    case lm : LeafMapping.DefaultLeafMapping[_]           => lm.copy(tpe = s.unsafeRef(lm.tpe))
-    case PrimitiveMapping(tpe)                            => PrimitiveMapping(s.unsafeRef(tpe))
-    case tm                                               => sys.error(s"SnippetMapping: I don't know how to reref a ${tm.getClass.getName}")
-  }
 
   // elements in `left` merged with corresponding elements in `right`, when available, followed by unmatched elements in `right`.
   private def concatAndMergeWhen[A: Semigroup](left: List[A], right: List[A])(matches: (A, A) => Boolean): List[A] =

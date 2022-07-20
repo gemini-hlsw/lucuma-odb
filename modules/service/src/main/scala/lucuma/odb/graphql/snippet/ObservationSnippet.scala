@@ -19,7 +19,6 @@ import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
 import edu.gemini.grackle.Cursor.Env
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ObsActiveStatus
-import scala.reflect.ClassTag
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -28,20 +27,8 @@ import edu.gemini.grackle.Path.UniquePath
 import lucuma.core.model.Observation
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value._
-import org.tpolecat.typename.{TypeName, typeName}
 
 object ObservationSnippet {
-
-  val schema = unsafeLoadSchema(this)
-
-  // The types that we're going to map.
-  val QueryType         = schema.ref("Query")
-  val MutationType      = schema.ref("Mutation")
-  val SubscriptionType  = schema.ref("Subscription")
-  val ObservationType   = schema.ref("Observation")
-  val ObservationIdType = schema.ref("ObservationId")
-  val ObsStatusType     = schema.ref("ObsStatus")
-  val ObsActiveStatusType = schema.ref("ObsActiveStatus")
 
   def apply[F[_]: MonadCancelThrow](
     m:    SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
@@ -49,7 +36,16 @@ object ObservationSnippet {
     user: User,
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col }
+    import m.{ TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col, schema }
+
+    // The types that we're going to map.
+    // val QueryType         = schema.ref("Query")
+    val MutationType      = schema.ref("Mutation")
+    // val SubscriptionType  = schema.ref("Subscription")
+    val ObservationType   = schema.ref("Observation")
+    val ObservationIdType = schema.ref("ObservationId")
+    val ObsStatusType     = schema.ref("ObsStatus")
+    val ObsActiveStatusType = schema.ref("ObsActiveStatus")
 
     val pool = dbPool.map(ObservationService.fromUserAndSession(user, _))
 
@@ -151,7 +147,7 @@ object ObservationSnippet {
     )
 
     // Done.
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 

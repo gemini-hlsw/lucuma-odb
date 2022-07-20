@@ -39,25 +39,6 @@ import lucuma.core.enums.EphemerisKeyType
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
 
-  val schema = unsafeLoadSchema(this)
-
-  val QueryType                   = schema.ref("Query")
-  val MutationType                = schema.ref("Mutation")
-  val TargetType                  = schema.ref("Target")
-  val SiderealType                = schema.ref("Sidereal")
-  val NonsiderealType             = schema.ref("Nonsidereal")
-  val CatalogInfoType             = schema.ref("CatalogInfo")
-  val RightAscensionType          = schema.ref("RightAscension")
-  val DeclinationType             = schema.ref("Declination")
-  val ProperMotionType            = schema.ref("ProperMotion")
-  val ProperMotionDeclinationType = schema.ref("ProperMotionDeclination")
-  val ProperMotionRAType          = schema.ref("ProperMotionRA")
-  val RadialVelocityType          = schema.ref("RadialVelocity")
-  val ParallaxType                = schema.ref("Parallax")
-  val TargetIdType                = schema.ref("TargetId")
-  val EpochStringType             = schema.ref("EpochString")
-  val EphemerisKeyTypeType        = schema.ref("EphemerisKeyType")
-
   def apply[F[_]: MonadCancelThrow](
     m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
     sessionPool: Resource[F, Session[F]],
@@ -77,6 +58,24 @@ object TargetSnippet {
     import m.TableDef
     import m.LeafMapping
     import m.col
+    import m.schema
+
+    val QueryType                   = schema.ref("Query")
+    val MutationType                = schema.ref("Mutation")
+    val TargetType                  = schema.ref("Target")
+    val SiderealType                = schema.ref("Sidereal")
+    val NonsiderealType             = schema.ref("Nonsidereal")
+    val CatalogInfoType             = schema.ref("CatalogInfo")
+    val RightAscensionType          = schema.ref("RightAscension")
+    val DeclinationType             = schema.ref("Declination")
+    val ProperMotionType            = schema.ref("ProperMotion")
+    val ProperMotionDeclinationType = schema.ref("ProperMotionDeclination")
+    val ProperMotionRAType          = schema.ref("ProperMotionRA")
+    val RadialVelocityType          = schema.ref("RadialVelocity")
+    val ParallaxType                = schema.ref("Parallax")
+    val TargetIdType                = schema.ref("TargetId")
+    val EpochStringType             = schema.ref("EpochString")
+    val EphemerisKeyTypeType        = schema.ref("EphemerisKeyType")
 
     val servicePool: Resource[F, TargetService[F]] =
       sessionPool.map(TargetService.fromSession(_, user))
@@ -306,7 +305,7 @@ object TargetSnippet {
       }
     )
 
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 
