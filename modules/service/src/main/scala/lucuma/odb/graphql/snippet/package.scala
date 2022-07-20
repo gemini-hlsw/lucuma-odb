@@ -91,16 +91,6 @@ package object snippet {
       Predicate.and(preds.toList)
   }
 
-  // Loads a GraphQL file with the same simple classname as the given object, minus the trailing $
-  def unsafeLoadSchema(snippetObject: AnyRef): Schema = {
-    val clazz    = snippetObject.getClass
-    val fileName = s"${clazz.getSimpleName().dropRight(1)}.graphql"
-    val stream = clazz.getResourceAsStream(fileName)
-    val src  = Source.fromInputStream(stream, "UTF-8")
-    try Schema(src.getLines().mkString("\n")).toEither.fold(x => sys.error(s"Invalid schema: $fileName: ${x.toList.mkString(", ")}"), identity)
-    finally src.close()
-  }
-
   val ObsStatusBinding: Matcher[ObsStatus] =
     enumeratedBinding
 

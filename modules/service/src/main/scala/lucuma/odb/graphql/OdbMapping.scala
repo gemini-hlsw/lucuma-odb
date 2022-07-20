@@ -20,6 +20,7 @@ import lucuma.odb.graphql.util._
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
+import scala.io.Source
 
 object OdbMapping {
 
@@ -36,6 +37,14 @@ object OdbMapping {
       } yield Topics(pro)
   }
 
+  // Loads a GraphQL file from the classpath, relative to this Class.
+  def unsafeLoadSchema(fileName: String): Schema = {
+    val stream = getClass.getResourceAsStream(fileName)
+    val src  = Source.fromInputStream(stream, "UTF-8")
+    try Schema(src.getLines().mkString("\n")).toEither.fold(x => sys.error(s"Invalid schema: $fileName: ${x.toList.mkString(", ")}"), identity)
+    finally src.close()
+  }
+
   def apply[F[_]: Sync: Trace](
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
@@ -50,10 +59,11 @@ object OdbMapping {
           with ComputeMapping[F]
           with MutationCompanionOps[F] {
 
+          val schema = unsafeLoadSchema("TmpApi.graphql") |+| enums
+
           val snippet: Snippet =
             NonEmptyList.of(
               BaseSnippet(this),
-              Snippet(enums, Nil),
               FilterTypeSnippet(this),
               PartnerSnippet(this),
               UserSnippet(this),
@@ -63,7 +73,6 @@ object OdbMapping {
               TargetSnippet(this, pool, user),
             ).reduce
 
-          val schema = snippet.schema
           val typeMappings = snippet.typeMappings
           override val selectElaborator = snippet.selectElaborator
 

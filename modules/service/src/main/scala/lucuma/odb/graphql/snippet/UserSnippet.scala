@@ -1,7 +1,6 @@
 package lucuma.odb.graphql
 package snippet
 
-import edu.gemini.grackle.syntax._
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
@@ -12,29 +11,7 @@ import lucuma.odb.data
 object UserSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlField, LeafMapping, col }
-
-    val schema =
-      schema"""
-        scalar UserId
-
-        enum UserType {
-          GUEST
-          STANDARD
-          SERVICE
-        }
-
-        type User {
-          id:              UserId!
-          type:            UserType!
-          serviceName:     String,
-          orcidId:         String,
-          orcidGivenName:  String,
-          orcidCreditName: String,
-          orcidFamilyName: String,
-          orcidEmail:      String,
-        }
-      """
+    import m.{ TableDef, ObjectMapping, Snippet, SqlField, LeafMapping, col, schema }
 
     object User extends TableDef("t_user") {
       val UserId          = col("c_user_id", user_id)
@@ -70,7 +47,7 @@ object UserSnippet {
         LeafMapping[data.UserType](UserTypeType)
       )
 
-    Snippet(schema, typeMappings)
+    Snippet(typeMappings)
 
   }
 

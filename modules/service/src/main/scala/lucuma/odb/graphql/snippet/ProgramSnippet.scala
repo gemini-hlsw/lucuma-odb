@@ -31,18 +31,6 @@ import lucuma.odb.service.ProgramService.LinkUserResponse._
 
 object ProgramSnippet {
 
-  val schema = unsafeLoadSchema(this)
-
-  // The types that we're going to map.
-  val QueryType           = schema.ref("Query")
-  val MutationType        = schema.ref("Mutation")
-  val SubscriptionType    = schema.ref("Subscription")
-  val ProgramType         = schema.ref("Program")
-  val ProgramUserType     = schema.ref("ProgramUser")
-  val ProgramUserRoleType = schema.ref("ProgramUserRole")
-  val ProgramIdType       = schema.ref("ProgramId")
-  val UserIdType          = schema.ref("UserId")
-
   def apply[F[_]: MonadCancelThrow: Trace](
     m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
     sessionPool: Resource[F, Session[F]],
@@ -50,9 +38,19 @@ object ProgramSnippet {
     topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
+
+    // The types that we're going to map.
+    val QueryType           = schema.ref("Query")
+    val MutationType        = schema.ref("Mutation")
+    val SubscriptionType    = schema.ref("Subscription")
+    val ProgramType         = schema.ref("Program")
+    val ProgramUserType     = schema.ref("ProgramUser")
+    val ProgramUserRoleType = schema.ref("ProgramUserRole")
+    val ProgramIdType       = schema.ref("ProgramId")
+    val UserIdType          = schema.ref("UserId")
 
     // Column references for our mapping.
     object Program extends TableDef("t_program") {
@@ -317,7 +315,7 @@ object ProgramSnippet {
     )
 
     // Done.
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 
