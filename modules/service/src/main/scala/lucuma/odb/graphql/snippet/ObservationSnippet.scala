@@ -49,7 +49,7 @@ object ObservationSnippet {
     user: User,
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping }
+    import m.{ TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col }
 
     val pool = dbPool.map(ObservationService.fromUserAndSession(user, _))
 

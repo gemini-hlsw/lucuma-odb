@@ -12,7 +12,7 @@ import lucuma.odb.data
 object UserSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlField, LeafMapping }
+    import m.{ TableDef, ObjectMapping, Snippet, SqlField, LeafMapping, col }
 
     val schema =
       schema"""

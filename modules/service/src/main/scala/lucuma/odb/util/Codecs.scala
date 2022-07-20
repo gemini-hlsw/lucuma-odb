@@ -7,7 +7,7 @@ import lucuma.core.model._
 import lucuma.core.util.Gid
 import skunk._
 import skunk.data.Type
-import lucuma.core.enum.Site
+import lucuma.core.enums.Site
 import skunk.codec.all._
 import skunk.data.Arr
 import eu.timepit.refined.types.string.NonEmptyString
@@ -24,8 +24,8 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RadialVelocity
-import lucuma.core.enum.CatalogName
-import lucuma.core.enum.EphemerisKeyType
+import lucuma.core.enums.CatalogName
+import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.math.Parallax
 
 // Codecs for some atomic types.

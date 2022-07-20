@@ -40,7 +40,7 @@ object AllocationSnippet {
     sessionPool: Resource[F, Session[F]],
     user: User,
   ): m.Snippet = {
-    import m.{ ObjectMapping, Snippet, TableDef, SqlField, SqlRoot, Mutation, MutationCompanionOps }
+    import m.{ ObjectMapping, Snippet, TableDef, SqlField, SqlRoot, Mutation, MutationCompanionOps, col }
 
     val pool = sessionPool.map(AllocationService.fromSessionAndUser(_, user))
 

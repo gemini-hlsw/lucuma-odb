@@ -34,7 +34,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.Parallax
 import java.math.MathContext
-import lucuma.core.enum.EphemerisKeyType
+import lucuma.core.enums.EphemerisKeyType
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
@@ -76,6 +76,7 @@ object TargetSnippet {
     import m.SqlRoot
     import m.TableDef
     import m.LeafMapping
+    import m.col
 
     val servicePool: Resource[F, TargetService[F]] =
       sessionPool.map(TargetService.fromSession(_, user))
