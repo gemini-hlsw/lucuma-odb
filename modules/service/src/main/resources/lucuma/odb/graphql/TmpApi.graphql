@@ -27,10 +27,10 @@ input AddStepEventInput {
   stage: StepStage!
 }
 
-# Airmass range creation and edit parameters
-input AirmassRangeInput {
-  min: BigDecimal
-  max: BigDecimal
+# Air mass range creation and edit parameters
+input AirMassRangeInput {
+  min: PosBigDecimal
+  max: PosBigDecimal
 }
 
 # Create an angle from a signed value.  Choose exactly one of the available units.
@@ -341,10 +341,10 @@ enum EditType {
   UPDATED
 }
 
-# Elevation range creation and edit parameters.  Choose one of airmass or hour angle constraints.
+# Elevation range creation and edit parameters.  Choose one of airMass or hourAngle constraints.
 input ElevationRangeInput {
-  airmassRange: AirmassRangeInput
-  hourAngleRange: HourAngleRangeInput
+  airMass: AirMassRangeInput
+  hourAngle: HourAngleRangeInput
 }
 
 # Create or edit an emission line with integrated line flux units.  When creating a new value, all fields are required.
@@ -1619,11 +1619,11 @@ enum WavelengthUnits {
 }
 
 type AirMassRange {
-  # Minimum Airmass (unitless)
-  min: BigDecimal!
+  # Minimum air mass (unitless)
+  min: PosBigDecimal!
 
-  # Maximum Airmass (unitless)
-  max: BigDecimal!
+  # Maximum air mass (unitless)
+  max: PosBigDecimal!
 }
 
 type Angle {
@@ -1949,7 +1949,7 @@ type ConstraintSet {
   # Water vapor
   waterVapor: WaterVapor!
 
-  # Either airmass range or elevation range
+  # Either air mass range or elevation range
   elevationRange: ElevationRange!
 }
 
@@ -2195,12 +2195,12 @@ input DurationInput {
   hours: BigDecimal
 }
 
-# Either airmass range or elevation range
+# Either air mass range or elevation range
 type ElevationRange {
-  # Airmass range if elevation range is an Airmass range
-  airmassRange: AirMassRange
+  # AirMassRange if elevation range is an air mass range
+  airMassRange: AirMassRange
 
-  # Hour angle range if elevation range is an Hour angle range
+  # HourAngleRange if elevation range is an hour angle range
   hourAngleRange: HourAngleRange
 }
 
