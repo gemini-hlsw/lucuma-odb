@@ -1,0 +1,6214 @@
+# DatasetEvent creation parameters
+input AddDatasetEventInput {
+  visitId: VisitId!
+  location: DatasetIdInput!
+  payload: DatasetEventPayloadInput!
+}
+
+# The result of adding a dataset event.
+type AddDatasetEventResult {
+  # The new dataset event that was added.
+  event: DatasetEvent!
+}
+
+# SequenceEvent creation parameters
+input AddSequenceEventInput {
+  visitId: VisitId!
+  location: SequenceEventLocationInput!
+  payload: SequenceEventPayloadInput!
+}
+
+# The result of adding a sequence event.
+type AddSequenceEventResult {
+  # The new sequence event that was added.
+  event: SequenceEvent!
+}
+
+# StepEvent creation parameters
+input AddStepEventInput {
+  visitId: VisitId!
+  location: StepEventLocationInput!
+  payload: StepEventPayloadInput!
+}
+
+# The result of adding a step event.
+type AddStepEventResult {
+  # The new step event that was added.
+  event: StepEvent!
+}
+
+# Air mass range creation and edit parameters
+input AirMassRangeInput {
+  min: PosBigDecimal
+  max: PosBigDecimal
+}
+
+# Create an angle from a signed value.  Choose exactly one of the available units.
+input AngleInput {
+  microarcseconds: Long
+  microseconds: BigDecimal
+  milliarcseconds: BigDecimal
+  milliseconds: BigDecimal
+  arcseconds: BigDecimal
+  seconds: BigDecimal
+  arcminutes: BigDecimal
+  minutes: BigDecimal
+  degrees: BigDecimal
+  hours: BigDecimal
+  dms: String
+  hms: String
+}
+
+# Sequence atom
+interface Atom {
+  # Atom id
+  id: AtomId!
+}
+
+# AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+scalar AtomId
+
+# Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
+input BandBrightnessIntegratedInput {
+  band: Band!
+
+  # The value field is required when creating a new instance of BandBrightnessIntegrated, but optional when editing
+  value: BigDecimal
+
+  # The units field is required when creating a new instance of BandBrightnessIntegrated, but optional when editing
+  units: BrightnessIntegratedUnits
+
+  # Error values are optional
+  error: BigDecimal
+}
+
+# Create or edit a band brightness value with surface magnitude units.  When creating a new value, all fields except "error" are required.
+input BandBrightnessSurfaceInput {
+  band: Band!
+
+  # The value field is required when creating a new instance of BandBrightnessSurface, but optional when editing
+  value: BigDecimal
+
+  # The units field is required when creating a new instance of BandBrightnessSurface, but optional when editing
+  units: BrightnessSurfaceUnits
+
+  # Error values are optional
+  error: BigDecimal
+}
+
+# Create or edit a band normalized value with integrated magnitude units.  Specify both "sed" and "brightnesses" when creating a new BandNormalizedIntegrated.
+input BandNormalizedIntegratedInput {
+  # The sed field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
+  sed: UnnormalizedSedInput
+
+  # The brightnesses field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
+  brightnesses: [BandBrightnessIntegratedInput!]
+}
+
+# Create or edit a band normalized value with surface magnitude units.  Specify both "sed" and "brightnesses" when creating a new BandNormalizedSurface.
+input BandNormalizedSurfaceInput {
+  # The sed field is required when creating a new instance of BandNormalizedSurface, but optional when editing
+  sed: UnnormalizedSedInput
+
+  # The brightnesses field is required when creating a new instance of BandNormalizedSurface, but optional when editing
+  brightnesses: [BandBrightnessSurfaceInput!]
+}
+
+# Bias calibration step
+type Bias implements StepConfig {
+  # Step type
+  stepType: StepType!
+}
+
+# Stopping point in a series of steps
+enum Breakpoint {
+  # Breakpoint Enabled
+  ENABLED
+
+  # Breakpoint Disabled
+  DISABLED
+}
+
+# Catalog id consisting of catalog name, string identifier and an optional object type
+input CatalogInfoInput {
+  # The name field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  name: CatalogName
+
+  # The id field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  id: NonEmptyString
+
+  # The objectType field may be unset by assigning a null value, or ignored by skipping it altogether
+  objectType: NonEmptyString
+}
+
+# Classical observing at Gemini
+input ClassicalInput {
+  # The minPercentTime field is required when creating a new instance of classical, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Describes an observation clone operation, making any edits in the `SET` parameter.  The observation status in the cloned observation defaults to NEW.
+input CloneObservationInput {
+  observationId: ObservationId!
+  SET: ObservationPropertiesInput
+}
+
+# The result of cloning an observation, containing the original and new observations.
+type CloneObservationResult {
+  # The original unmodified observation which was cloned.
+  originalObservation: Observation!
+
+  # The new cloned (but possibly modified) observation.
+  newObservation: Observation!
+}
+
+# Describes a target clone operation, making any edits in the `SET` parameter and replacing the target in the selected `REPLACE_IN` observations
+input CloneTargetInput {
+  targetId: TargetId!
+  SET: TargetPropertiesInput
+  REPLACE_IN: [ObservationId!]
+}
+
+# The result of cloning a target, containing the original and new targets.
+type CloneTargetResult {
+  # The original unmodified target which was cloned
+  originalTarget: Target!
+
+  # The new cloned (but possibly modified) target
+  newTarget: Target!
+}
+
+# Constraint set creation and editing parameters
+input ConstraintSetInput {
+  # The imageQuality field is required when creating a new instance of ConstraintSet, but optional when editing
+  imageQuality: ImageQuality
+
+  # The cloudExtinction field is required when creating a new instance of ConstraintSet, but optional when editing
+  cloudExtinction: CloudExtinction
+
+  # The skyBackground field is required when creating a new instance of ConstraintSet, but optional when editing
+  skyBackground: SkyBackground
+
+  # The waterVapor field is required when creating a new instance of ConstraintSet, but optional when editing
+  waterVapor: WaterVapor
+
+  # The elevationRange field is required when creating a new instance of ConstraintSet, but optional when editing
+  elevationRange: ElevationRangeInput
+}
+
+# Absolute coordinates relative base epoch
+input CoordinatesInput {
+  ra: RightAscensionInput!
+  dec: DeclinationInput!
+}
+
+# Observation creation parameters
+input CreateObservationInput {
+  programId: ProgramId!
+  SET: ObservationPropertiesInput
+}
+
+# The result of creating a new observation.
+type CreateObservationResult {
+  # The newly created observation.
+  observation: Observation!
+}
+
+# Program creation parameters
+input CreateProgramInput {
+  SET: ProgramPropertiesInput
+}
+
+# The result of creating a new program.
+type CreateProgramResult {
+  # The newly created program.
+  program: Program!
+}
+
+# Target creation parameters
+input CreateTargetInput {
+  programId: ProgramId!
+  SET: TargetPropertiesInput
+}
+
+# The result of creating a new target.
+type CreateTargetResult {
+  # The newly created target.
+  target: Target!
+}
+
+# Dark calibration step
+type Dark implements StepConfig {
+  # Step type
+  stepType: StepType!
+}
+
+# DatasetEvent payload parameters
+input DatasetEventPayloadInput {
+  datasetStage: DatasetStage!
+  filename: DatasetFilename
+}
+
+# Editable dataset properties
+input DatasetPropertiesInput {
+  qaState: DatasetQaState
+}
+
+# Declination, choose one of the available units
+input DeclinationInput {
+  microarcseconds: Long
+  degrees: BigDecimal
+  dms: DmsString
+}
+
+# Selects the observations for delete
+input DeleteObservationsInput {
+  # Filters the observations for delete according to those that match the given constraints.
+  WHERE: WhereObservation
+
+  # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+# The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+type DeleteObservationsResult {
+  # The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  observations: [Observation!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Selects the targets for delete
+input DeleteTargetsInput {
+  # Filters the targets for delete according to those that match the given constraints.
+  WHERE: WhereTarget
+
+  # Caps the number of results returned to the given value (if additional targets match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+# The result of updating the selected targets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional targets were modified and not included here.
+type DeleteTargetsResult {
+  # The edited targets, up to the specified LIMIT or the default maximum of 1000.
+  targets: [Target!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Demo science
+input DemoScienceInput {
+  # The minPercentTime field is required when creating a new instance of demoScience, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Director's time
+input DirectorsTimeInput {
+  # The minPercentTime field is required when creating a new instance of directorsTime, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Add or delete targets in an asterism
+input EditAsterismsPatchInput {
+  ADD: TargetId
+  DELETE: TargetId
+}
+
+# Type of edit that triggered an event
+enum EditType {
+  # EditType Created
+  CREATED
+
+  # EditType Updated
+  UPDATED
+}
+
+# Elevation range creation and edit parameters.  Choose one of airMass or hourAngle constraints.
+input ElevationRangeInput {
+  airMass: AirMassRangeInput
+  hourAngle: HourAngleRangeInput
+}
+
+# Create or edit an emission line with integrated line flux units.  When creating a new value, all fields are required.
+input EmissionLineIntegratedInput {
+  wavelength: WavelengthInput!
+
+  # The lineWidth field is required when creating a new instance of EmissionLineIntegrated, but optional when editing
+  lineWidth: PosBigDecimal
+
+  # The lineFlux field is required when creating a new instance of EmissionLineIntegrated, but optional when editing
+  lineFlux: LineFluxIntegratedInput
+}
+
+# Create or edit an emission line with surface line flux units.  When creating a new value, all fields are required.
+input EmissionLineSurfaceInput {
+  wavelength: WavelengthInput!
+
+  # The lineWidth field is required when creating a new instance of EmissionLineSurface, but optional when editing
+  lineWidth: PosBigDecimal
+
+  # The lineFlux field is required when creating a new instance of EmissionLineSurface, but optional when editing
+  lineFlux: LineFluxSurfaceInput
+}
+
+# Create or edit emission lines with integrated line flux and flux density continuum units. Both "lines" and "fluxDensityContinuum" are required when creating a new EmissionLinesIntegrated.
+input EmissionLinesIntegratedInput {
+  # The lines field is required when creating a new instance of EmissionLinesIntegrated, but optional when editing
+  lines: [EmissionLineIntegratedInput!]
+
+  # The fluxDensityContinuum field is required when creating a new instance of EmissionLinesIntegrated, but optional when editing
+  fluxDensityContinuum: FluxDensityContinuumIntegratedInput
+}
+
+# Create or edit emission lines with surface line flux and flux density continuum units. Both "lines" and "fluxDensityContinuum" are required when creating a new EmissionLinesSurface.
+input EmissionLinesSurfaceInput {
+  # The lines field is required when creating a new instance of EmissionLinesSurface, but optional when editing
+  lines: [EmissionLineSurfaceInput!]
+
+  # The fluxDensityContinuum field is required when creating a new instance of EmissionLinesSurface, but optional when editing
+  fluxDensityContinuum: FluxDensityContinuumSurfaceInput
+}
+
+# Common fields shared by all events
+interface Event {
+  id: Long!
+}
+
+# Exchange observing at Keck/Subaru
+input ExchangeInput {
+  # The minPercentTime field is required when creating a new instance of exchange, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Exposure time mode input.  Specify fixed or signal to noise, but not both
+input ExposureTimeModeInput {
+  # The signalToNoise field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  signalToNoise: SignalToNoiseModeInput
+
+  # The fixedExposure field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  fixedExposure: FixedExposureModeInput
+}
+
+# Fast turnaround observing at Gemini
+input FastTurnaroundInput {
+  # The minPercentTime field is required when creating a new instance of fastTurnaround, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Fixed exposure time mode parameters
+input FixedExposureModeInput {
+  # exposure count
+  count: NonNegInt!
+
+  # exposure time
+  time: NonNegDurationInput!
+}
+
+# Flux density entry
+input FluxDensity {
+  wavelength: WavelengthInput!
+  density: PosBigDecimal!
+}
+
+# A flux density continuum value with integrated units
+input FluxDensityContinuumIntegratedInput {
+  value: PosBigDecimal!
+  units: FluxDensityContinuumIntegratedUnits!
+}
+
+# A flux density continuum value with surface units
+input FluxDensityContinuumSurfaceInput {
+  value: PosBigDecimal!
+  units: FluxDensityContinuumSurfaceUnits!
+}
+
+# Focal plane angle source angle in appropriate units
+input FocalPlaneAngleInput {
+  microarcseconds: Long
+  milliarcseconds: BigDecimal
+  arcseconds: BigDecimal
+}
+
+# Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
+input GaussianInput {
+  # The fwhm field is required when creating a new instance of Gaussian, but optional when editing
+  fwhm: AngleInput
+
+  # The spectralDefinition field is required when creating a new instance of Gaussian, but optional when editing
+  spectralDefinition: SpectralDefinitionIntegratedInput
+}
+
+# GCAL calibration step (flat / arc)
+type Gcal implements StepConfig {
+  # GCAL continuum, present if no arcs are used
+  continuum: GcalContinuum
+
+  # GCAL arcs, one or more present if no continuum is used
+  arcs: [GcalArc!]!
+
+  # GCAL filter
+  filter: GcalFilter!
+
+  # GCAL diffuser
+  diffuser: GcalDiffuser!
+
+  # GCAL shutter
+  shutter: GcalShutter!
+
+  # Step type
+  stepType: StepType!
+}
+
+# GCAL arc
+enum GcalArc {
+  # GcalArc ArArc
+  AR_ARC
+
+  # GcalArc ThArArc
+  TH_AR_ARC
+
+  # GcalArc CuArArc
+  CU_AR_ARC
+
+  # GcalArc XeArc
+  XE_ARC
+}
+
+# GCAL configuration creation input
+input GcalConfigurationInput {
+  continuum: GcalContinuum
+  arcs: [GcalArc!]!
+  diffuser: GcalDiffuser!
+  shutter: GcalShutter!
+}
+
+# GCAL continuum
+enum GcalContinuum {
+  # GcalContinuum IrGreyBodyLow
+  IR_GREY_BODY_LOW
+
+  # GcalContinuum IrGreyBodyHigh
+  IR_GREY_BODY_HIGH
+
+  # GcalContinuum QuartzHalogen
+  QUARTZ_HALOGEN
+}
+
+# GCAL diffuser
+enum GcalDiffuser {
+  # GcalDiffuser Ir
+  IR
+
+  # GcalDiffuser Visible
+  VISIBLE
+}
+
+# GCAL filter
+enum GcalFilter {
+  # GcalFilter None
+  NONE
+
+  # GcalFilter Gmos
+  GMOS
+
+  # GcalFilter Hros
+  HROS
+
+  # GcalFilter Nir
+  NIR
+
+  # GcalFilter Nd10
+  ND10
+
+  # GcalFilter Nd16
+  ND16
+
+  # GcalFilter Nd20
+  ND20
+
+  # GcalFilter Nd30
+  ND30
+
+  # GcalFilter Nd40
+  ND40
+
+  # GcalFilter Nd45
+  ND45
+
+  # GcalFilter Nd50
+  ND50
+}
+
+# GCAL shutter
+enum GcalShutter {
+  # GcalShutter Open
+  OPEN
+
+  # GcalShutter Closed
+  CLOSED
+}
+
+# GMOS amp count
+enum GmosAmpCount {
+  # GmosAmpCount Three
+  THREE
+
+  # GmosAmpCount Six
+  SIX
+
+  # GmosAmpCount Twelve
+  TWELVE
+}
+
+# CCD Readout Configuration
+type GmosCcdMode {
+  # GMOS X-binning
+  xBin: GmosXBinning!
+
+  # GMOS Y-binning
+  yBin: GmosYBinning!
+
+  # GMOS Amp Count
+  ampCount: GmosAmpCount!
+
+  # GMOS Amp Gain
+  ampGain: GmosAmpGain!
+
+  # GMOS Amp Read Mode
+  ampReadMode: GmosAmpReadMode!
+}
+
+# GMOS CCD readout input parameters
+input GmosCcdReadoutInput {
+  # X Binning
+  xBin: GmosXBinning! = ONE
+
+  # Y Binning
+  yBin: GmosYBinning! = ONE
+
+  # Amp Count
+  ampCount: GmosAmpCount! = TWELVE
+
+  # Amp Gain
+  ampGain: GmosAmpGain! = LOW
+
+  # Amp Read Mode
+  ampRead: GmosAmpReadMode! = SLOW
+}
+
+# GMOS Custom Mask
+type GmosCustomMask {
+  # Custom Mask Filename
+  filename: String!
+
+  # Custom Slit Width
+  slitWidth: GmosCustomSlitWidth!
+}
+
+# GMOS custom mask input parameters
+input GmosCustomMaskInput {
+  # Custom mask file name
+  filename: String!
+
+  # Custom mask slit width
+  slitWidth: GmosCustomSlitWidth!
+}
+
+# GMOS Custom Slit Width
+enum GmosCustomSlitWidth {
+  # GmosCustomSlitWidth CustomWidth_0_25
+  CUSTOM_WIDTH_0_25
+
+  # GmosCustomSlitWidth CustomWidth_0_50
+  CUSTOM_WIDTH_0_50
+
+  # GmosCustomSlitWidth CustomWidth_0_75
+  CUSTOM_WIDTH_0_75
+
+  # GmosCustomSlitWidth CustomWidth_1_00
+  CUSTOM_WIDTH_1_00
+
+  # GmosCustomSlitWidth CustomWidth_1_50
+  CUSTOM_WIDTH_1_50
+
+  # GmosCustomSlitWidth CustomWidth_2_00
+  CUSTOM_WIDTH_2_00
+
+  # GmosCustomSlitWidth CustomWidth_5_00
+  CUSTOM_WIDTH_5_00
+}
+
+# GMOS Detector Translation X Offset
+enum GmosDtax {
+  # GmosDtax MinusSix
+  MINUS_SIX
+
+  # GmosDtax MinusFive
+  MINUS_FIVE
+
+  # GmosDtax MinusFour
+  MINUS_FOUR
+
+  # GmosDtax MinusThree
+  MINUS_THREE
+
+  # GmosDtax MinusTwo
+  MINUS_TWO
+
+  # GmosDtax MinusOne
+  MINUS_ONE
+
+  # GmosDtax Zero
+  ZERO
+
+  # GmosDtax One
+  ONE
+
+  # GmosDtax Two
+  TWO
+
+  # GmosDtax Three
+  THREE
+
+  # GmosDtax Four
+  FOUR
+
+  # GmosDtax Five
+  FIVE
+
+  # GmosDtax Six
+  SIX
+}
+
+# Electronic offsetting
+enum GmosEOffsetting {
+  # GmosEOffsetting On
+  ON
+
+  # GmosEOffsetting Off
+  OFF
+}
+
+# GMOS grating order
+enum GmosGratingOrder {
+  # GmosGratingOrder Zero
+  ZERO
+
+  # GmosGratingOrder One
+  ONE
+
+  # GmosGratingOrder Two
+  TWO
+}
+
+type GmosNodAndShuffle {
+  # Offset position A
+  posA: Offset!
+
+  # Offset position B
+  posB: Offset!
+
+  # Whether to use electronic offsetting
+  eOffset: GmosEOffsetting!
+
+  # Shuffle offset
+  shuffleOffset: Int!
+
+  # Shuffle cycles
+  shuffleCycles: Int!
+}
+
+# Creation input parameters for GMOS nod and shuffle
+input GmosNodAndShuffleInput {
+  # Offset position A
+  posA: OffsetInput!
+
+  # Offset position B
+  posB: OffsetInput!
+
+  # Electronic offsetting
+  eOffset: GmosEOffsetting!
+
+  # Shuffle offset
+  shuffleOffset: Int!
+
+  # Suffle cycles
+  shuffleCycles: Int!
+}
+
+# GmosNorth atom, a collection of steps that should be executed in their entirety
+type GmosNorthAtom implements Atom {
+  # Individual steps that comprise the atom
+  steps: [GmosNorthStep!]!
+
+  # Time estimate for this atom's execution, the sum of each step's time.
+  time: StepTime!
+
+  # Atom id
+  id: AtomId!
+}
+
+# GmosNorth bias step creation input
+input GmosNorthBiasInput {
+  # instrument configuration
+  config: GmosNorthDynamicInput!
+}
+
+# GmosNorth dark step creation input
+input GmosNorthDarkInput {
+  # instrument configuration
+  config: GmosNorthDynamicInput!
+}
+
+# GmosNorth Detector type
+enum GmosNorthDetector {
+  # GmosNorthDetector E2V
+  E2_V
+
+  # GmosNorthDetector HAMAMATSU
+  HAMAMATSU
+}
+
+# GMOS North dynamic step configuration
+type GmosNorthDynamic {
+  # GMOS exposure time
+  exposure: NonNegDuration!
+
+  # GMOS CCD Readout
+  readout: GmosCcdMode!
+
+  # GMOS detector x offset
+  dtax: GmosDtax!
+
+  # GMOS region of interest
+  roi: GmosRoi!
+
+  # GMOS North grating
+  gratingConfig: GmosNorthGratingConfig
+
+  # GMOS North filter
+  filter: GmosNorthFilter
+
+  # GMOS North FPU
+  fpu: GmosNorthFpu
+}
+
+# GMOS North instrument configuration input
+input GmosNorthDynamicInput {
+  # Exposure time
+  exposure: NonNegDurationInput!
+
+  # GMOS CCD readout
+  readout: GmosCcdReadoutInput!
+
+  # GMOS detector x offset
+  dtax: GmosDtax!
+
+  # GMOS region of interest
+  roi: GmosRoi!
+
+  # GMOS North grating
+  gratingConfig: GmosNorthGratingConfigInput
+
+  # GMOS North filter
+  filter: GmosNorthFilter
+
+  # GMOS North FPU
+  fpu: GmosNorthFpuInput
+}
+
+# GMOS North Execution Config
+type GmosNorthExecutionConfig implements ExecutionConfig {
+  # GMOS North static configuration
+  static: GmosNorthStatic!
+
+  # GMOS North acquisition execution
+  acquisition: GmosNorthExecutionSequence!
+
+  # GMOS North science execution
+  science: GmosNorthExecutionSequence!
+  visits: [GmosNorthVisitRecord!]!
+
+  # Instrument type
+  instrument: InstrumentType!
+}
+
+# Next atom to execute and potential future atoms
+type GmosNorthExecutionSequence {
+  # Next atom to execute, if any
+  nextAtom: GmosNorthAtom
+
+  # Remaining atoms to execute, if any
+  possibleFuture: [GmosNorthAtom!]!
+}
+
+# GMOS North FPU option, either builtin or custom mask
+type GmosNorthFpu {
+  # The custom mask, if in use
+  customMask: GmosCustomMask
+
+  # GMOS North builtin FPU, if in use
+  builtin: GmosNorthBuiltinFpu
+}
+
+# GMOS North FPU input parameters (choose custom or builtin).
+input GmosNorthFpuInput {
+  # Custom mask FPU option
+  customMask: GmosCustomMaskInput
+
+  # Builtin FPU option
+  builtin: GmosNorthBuiltinFpu
+}
+
+# GmosNorth GCAL step creation input
+input GmosNorthGcalInput {
+  # instrument configuration
+  config: GmosNorthDynamicInput!
+
+  # GCAL configuration
+  gcalConfig: GcalConfigurationInput!
+}
+
+# GMOS North Grating Configuration
+type GmosNorthGratingConfig {
+  # GMOS North Grating
+  grating: GmosNorthGrating!
+
+  # GMOS grating order
+  order: GmosGratingOrder!
+
+  # Grating wavelength
+  wavelength: Wavelength!
+}
+
+# GMOS North grating input parameters
+input GmosNorthGratingConfigInput {
+  # GmosGmosNorth grating
+  grating: GmosNorthGrating!
+
+  # GMOS grating order
+  order: GmosGratingOrder!
+
+  # Grating wavelength
+  wavelength: WavelengthInput!
+}
+
+# Edit or create GMOS North Long Slit advanced configuration
+input GmosNorthLongSlitAdvancedConfigInput {
+  # The overrideWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideWavelength: WavelengthInput
+
+  # The overrideGrating field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideGrating: GmosNorthGrating
+
+  # The overrideFilter field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideFilter: GmosNorthFilter
+
+  # The overrideFpu field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideFpu: GmosNorthBuiltinFpu
+
+  # The overrideExposureTimeMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideExposureTimeMode: ExposureTimeModeInput
+
+  # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitXBin: GmosXBinning
+
+  # The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitYBin: GmosYBinning
+
+  # The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitAmpReadMode: GmosAmpReadMode
+
+  # The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitAmpGain: GmosAmpGain
+
+  # The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitRoi: GmosRoi
+
+  # The explicitWavelengthDithersNm field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitWavelengthDithersNm: [BigDecimal!]
+
+  # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitSpatialOffsets: [OffsetComponentInput!]
+}
+
+# Edit or create GMOS North Long Slit basic configuration
+input GmosNorthLongSlitBasicConfigInput {
+  # The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  grating: GmosNorthGrating
+
+  # The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  filter: GmosNorthFilter
+
+  # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  fpu: GmosNorthBuiltinFpu
+}
+
+# Edit or create GMOS North Long Slit configuration
+input GmosNorthLongSlitInput {
+  # The basic field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  basic: GmosNorthLongSlitBasicConfigInput
+
+  # The advanced field may be unset by assigning a null value, or ignored by skipping it altogether
+  advanced: GmosNorthLongSlitAdvancedConfigInput
+}
+
+# GMOS North Manual Configuration
+type GmosNorthManualConfig implements ManualConfig {
+  # Static/unchanging configuration
+  static: GmosNorthStatic!
+
+  # Acquisition sequence.
+  acquisition: GmosNorthSequence!
+
+  # Science sequence.
+  science: GmosNorthSequence!
+
+  # Instrument type
+  instrument: InstrumentType!
+
+  # Planned time for this configuration
+  plannedTime: PlannedTime!
+}
+
+# GmosNorth science step creation input
+input GmosNorthScienceInput {
+  # instrument configuration
+  config: GmosNorthDynamicInput!
+
+  # offset position
+  offset: OffsetInput!
+}
+
+# A series of GmosNorth atoms that comprise the sequence
+type GmosNorthSequence {
+  # Sequence atoms
+  atoms: [GmosNorthAtom!]!
+
+  # Time required for the full execution of this sequence
+  time: StepTime!
+}
+
+# GMOS North stage mode
+enum GmosNorthStageMode {
+  # GmosNorthStageMode NoFollow
+  NO_FOLLOW
+
+  # GmosNorthStageMode FollowXyz
+  FOLLOW_XYZ
+
+  # GmosNorthStageMode FollowXy
+  FOLLOW_XY
+
+  # GmosNorthStageMode FollowZ
+  FOLLOW_Z
+}
+
+# Unchanging (over the course of the sequence) configuration values
+type GmosNorthStatic {
+  # Stage mode
+  stageMode: GmosNorthStageMode!
+
+  # Detector in use (always HAMAMATSU for recent and new observations)
+  detector: GmosNorthDetector!
+
+  # Is MOS Pre-Imaging Observation
+  mosPreImaging: MosPreImaging!
+
+  # Nod-and-shuffle configuration
+  nodAndShuffle: GmosNodAndShuffle
+}
+
+# GMOS North static configuration input parameters
+input GmosNorthStaticInput {
+  # GMOS North Detector option
+  detector: GmosNorthDetector! = HAMAMATSU
+
+  # Whether this is a MOS pre-imaging observation
+  mosPreImaging: MosPreImaging! = IS_NOT_MOS_PRE_IMAGING
+
+  # GMOS Nod And Shuffle configuration
+  nodAndShuffle: GmosNodAndShuffleInput
+
+  # GMOS North Stage Mode
+  stageMode: GmosNorthStageMode! = FOLLOW_XY
+}
+
+# GmosNorth step with potential breakpoint
+type GmosNorthStep implements Step {
+  # Instrument configuration for this step
+  instrumentConfig: GmosNorthDynamic!
+
+  # Step id
+  id: StepId!
+
+  # Whether to pause before the execution of this step
+  breakpoint: Breakpoint!
+
+  # The sequence step itself
+  stepConfig: StepConfig!
+
+  # Time estimate for this step's execution
+  time: StepTime!
+}
+
+# GmosNorth step creation input.  Choose exactly one step type.
+input GmosNorthStepInput {
+  # Bias step creation option
+  bias: GmosNorthBiasInput
+
+  # Dark step creation option
+  dark: GmosNorthDarkInput
+
+  # GCAL step creation option
+  gcal: GmosNorthGcalInput
+
+  # Science step creation option
+  science: GmosNorthScienceInput
+}
+
+# A GmosNorth step configuration as recorded by Observe
+type GmosNorthStepRecord {
+  # Step id
+  id: StepId!
+
+  # Visit id
+  visitId: VisitId!
+
+  # Created by Observe at time
+  created: Instant!
+
+  # Started at time
+  startTime: Instant
+
+  # Ended at time
+  endTime: Instant
+
+  # Step duration
+  duration: NonNegDuration!
+
+  # GmosNorth configuration for this step
+  instrumentConfig: GmosNorthDynamic!
+
+  # The executed step itself
+  stepConfig: StepConfig!
+
+  # Step events associated with this step
+  stepEvents: [StepEvent!]!
+
+  # Step QA state based on a combination of dataset QA states
+  stepQaState: StepQaState
+
+  # Dataset events associated with this step
+  datasetEvents: [DatasetEvent!]!
+
+  # Datasets associated with this step
+  datasets: [Dataset!]!
+}
+
+# A GmosNorth visit as recorded by Observe
+type GmosNorthVisitRecord {
+  # Visit id
+  id: VisitId!
+
+  # Created by Observe at time
+  created: Instant!
+
+  # Started at time
+  startTime: Instant
+
+  # Ended at time
+  endTime: Instant
+
+  # Step duration
+  duration: NonNegDuration!
+
+  # GmosNorth static instrument configuration
+  staticConfig: GmosNorthStatic!
+
+  # GmosNorth recorded steps
+  steps: [GmosNorthStepRecord!]!
+
+  # Sequence events associated with this visit
+  sequenceEvents: [SequenceEvent!]!
+}
+
+# GmosSouth atom, a collection of steps that should be executed in their entirety
+type GmosSouthAtom implements Atom {
+  # Individual steps that comprise the atom
+  steps: [GmosSouthStep!]!
+
+  # Time estimate for this atom's execution, the sum of each step's time.
+  time: StepTime!
+
+  # Atom id
+  id: AtomId!
+}
+
+# GmosSouth bias step creation input
+input GmosSouthBiasInput {
+  # instrument configuration
+  config: GmosSouthDynamicInput!
+}
+
+# GmosSouth dark step creation input
+input GmosSouthDarkInput {
+  # instrument configuration
+  config: GmosSouthDynamicInput!
+}
+
+# GmosSouth Detector type
+enum GmosSouthDetector {
+  # GmosSouthDetector E2V
+  E2_V
+
+  # GmosSouthDetector HAMAMATSU
+  HAMAMATSU
+}
+
+# GMOS South dynamic step configuration
+type GmosSouthDynamic {
+  # GMOS exposure time
+  exposure: NonNegDuration!
+
+  # GMOS CCD Readout
+  readout: GmosCcdMode!
+
+  # GMOS detector x offset
+  dtax: GmosDtax!
+
+  # GMOS region of interest
+  roi: GmosRoi!
+
+  # GMOS South grating
+  gratingConfig: GmosSouthGratingConfig
+
+  # GMOS South filter
+  filter: GmosSouthFilter
+
+  # GMOS South FPU
+  fpu: GmosSouthFpu
+}
+
+# GMOS South instrument configuration input
+input GmosSouthDynamicInput {
+  # Exposure time
+  exposure: NonNegDurationInput!
+
+  # GMOS CCD readout
+  readout: GmosCcdReadoutInput!
+
+  # GMOS detector x offset
+  dtax: GmosDtax!
+
+  # GMOS region of interest
+  roi: GmosRoi!
+
+  # GMOS South grating
+  gratingConfig: GmosSouthGratingConfigInput
+
+  # GMOS South filter
+  filter: GmosSouthFilter
+
+  # GMOS South FPU
+  fpu: GmosSouthFpuInput
+}
+
+# GMOS South Execution Config
+type GmosSouthExecutionConfig implements ExecutionConfig {
+  # GMOS South static configuration
+  static: GmosSouthStatic!
+
+  # GMOS South acquisition execution
+  acquisition: GmosSouthExecutionSequence!
+
+  # GMOS South science execution
+  science: GmosSouthExecutionSequence!
+  visits: [GmosSouthVisitRecord!]!
+
+  # Instrument type
+  instrument: InstrumentType!
+}
+
+# Next atom to execute and potential future atoms
+type GmosSouthExecutionSequence {
+  # Next atom to execute, if any
+  nextAtom: GmosSouthAtom
+
+  # Remaining atoms to execute, if any
+  possibleFuture: [GmosSouthAtom!]!
+}
+
+# GMOS South FPU option, either builtin or custom mask
+type GmosSouthFpu {
+  # The custom mask, if in use
+  customMask: GmosCustomMask
+
+  # GMOS South builtin FPU, if in use
+  builtin: GmosSouthBuiltinFpu
+}
+
+# GMOS South FPU input parameters (choose custom or builtin).
+input GmosSouthFpuInput {
+  # Custom mask FPU option
+  customMask: GmosCustomMaskInput
+
+  # Builtin FPU option
+  builtin: GmosSouthBuiltinFpu
+}
+
+# GmosSouth GCAL step creation input
+input GmosSouthGcalInput {
+  # instrument configuration
+  config: GmosSouthDynamicInput!
+
+  # GCAL configuration
+  gcalConfig: GcalConfigurationInput!
+}
+
+# GMOS South Grating Configuration
+type GmosSouthGratingConfig {
+  # GMOS South Grating
+  grating: GmosSouthGrating!
+
+  # GMOS grating order
+  order: GmosGratingOrder!
+
+  # Grating wavelength
+  wavelength: Wavelength!
+}
+
+# GMOS South grating input parameters
+input GmosSouthGratingConfigInput {
+  # GmosGmosSouth grating
+  grating: GmosSouthGrating!
+
+  # GMOS grating order
+  order: GmosGratingOrder!
+
+  # Grating wavelength
+  wavelength: WavelengthInput!
+}
+
+# Edit or create GMOS South Long Slit advanced configuration
+input GmosSouthLongSlitAdvancedConfigInput {
+  # The overrideWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideWavelength: WavelengthInput
+
+  # The overrideGrating field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideGrating: GmosSouthGrating
+
+  # The overrideFilter field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideFilter: GmosSouthFilter
+
+  # The overrideFpu field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideFpu: GmosSouthBuiltinFpu
+
+  # The overrideExposureTimeMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  overrideExposureTimeMode: ExposureTimeModeInput
+
+  # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitXBin: GmosXBinning
+
+  # The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitYBin: GmosYBinning
+
+  # The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitAmpReadMode: GmosAmpReadMode
+
+  # The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitAmpGain: GmosAmpGain
+
+  # The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitRoi: GmosRoi
+
+  # The explicitWavelengthDithersNm field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitWavelengthDithersNm: [BigDecimal!]
+
+  # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitSpatialOffsets: [OffsetComponentInput!]
+}
+
+# Edit or create GMOS South Long Slit basic configuration
+input GmosSouthLongSlitBasicConfigInput {
+  # The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  grating: GmosSouthGrating
+
+  # The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  filter: GmosSouthFilter
+
+  # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  fpu: GmosSouthBuiltinFpu
+}
+
+# Edit or create GMOS South Long Slit configuration
+input GmosSouthLongSlitInput {
+  # The basic field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  basic: GmosSouthLongSlitBasicConfigInput
+
+  # The advanced field may be unset by assigning a null value, or ignored by skipping it altogether
+  advanced: GmosSouthLongSlitAdvancedConfigInput
+}
+
+# GMOS South Manual Configuration
+type GmosSouthManualConfig implements ManualConfig {
+  # Static/unchanging configuration
+  static: GmosSouthStatic!
+
+  # Acquisition sequence.
+  acquisition: GmosSouthSequence!
+
+  # Science sequence.
+  science: GmosSouthSequence!
+
+  # Instrument type
+  instrument: InstrumentType!
+
+  # Planned time for this configuration
+  plannedTime: PlannedTime!
+}
+
+# GmosSouth science step creation input
+input GmosSouthScienceInput {
+  # instrument configuration
+  config: GmosSouthDynamicInput!
+
+  # offset position
+  offset: OffsetInput!
+}
+
+# A series of GmosSouth atoms that comprise the sequence
+type GmosSouthSequence {
+  # Sequence atoms
+  atoms: [GmosSouthAtom!]!
+
+  # Time required for the full execution of this sequence
+  time: StepTime!
+}
+
+# GMOS South stage mode
+enum GmosSouthStageMode {
+  # GmosSouthStageMode NoFollow
+  NO_FOLLOW
+
+  # GmosSouthStageMode FollowXyz
+  FOLLOW_XYZ
+
+  # GmosSouthStageMode FollowXy
+  FOLLOW_XY
+
+  # GmosSouthStageMode FollowZ
+  FOLLOW_Z
+}
+
+# Unchanging (over the course of the sequence) configuration values
+type GmosSouthStatic {
+  # Stage mode
+  stageMode: GmosSouthStageMode!
+
+  # Detector in use (always HAMAMATSU for recent and new observations)
+  detector: GmosSouthDetector!
+
+  # Is MOS Pre-Imaging Observation
+  mosPreImaging: MosPreImaging!
+
+  # Nod-and-shuffle configuration
+  nodAndShuffle: GmosNodAndShuffle
+}
+
+# GMOS South static configuration input parameters
+input GmosSouthStaticInput {
+  # GMOS North Detector option
+  detector: GmosNorthDetector! = HAMAMATSU
+
+  # Whether this is a MOS pre-imaging observation
+  mosPreImaging: MosPreImaging! = IS_NOT_MOS_PRE_IMAGING
+
+  # GMOS Nod And Shuffle configuration
+  nodAndShuffle: GmosNodAndShuffleInput
+
+  # GMOS North Stage Mode
+  stageMode: GmosSouthStageMode! = FOLLOW_XY
+}
+
+# GmosSouth step with potential breakpoint
+type GmosSouthStep implements Step {
+  # Instrument configuration for this step
+  instrumentConfig: GmosSouthDynamic!
+
+  # Step id
+  id: StepId!
+
+  # Whether to pause before the execution of this step
+  breakpoint: Breakpoint!
+
+  # The sequence step itself
+  stepConfig: StepConfig!
+
+  # Time estimate for this step's execution
+  time: StepTime!
+}
+
+# GmosSouth step creation input.  Choose exactly one step type.
+input GmosSouthStepInput {
+  # Bias step creation option
+  bias: GmosSouthBiasInput
+
+  # Dark step creation option
+  dark: GmosSouthDarkInput
+
+  # GCAL step creation option
+  gcal: GmosSouthGcalInput
+
+  # Science step creation option
+  science: GmosSouthScienceInput
+}
+
+# A GmosSouth step configuration as recorded by Observe
+type GmosSouthStepRecord {
+  # Step id
+  id: StepId!
+
+  # Visit id
+  visitId: VisitId!
+
+  # Created by Observe at time
+  created: Instant!
+
+  # Started at time
+  startTime: Instant
+
+  # Ended at time
+  endTime: Instant
+
+  # Step duration
+  duration: NonNegDuration!
+
+  # GmosSouth configuration for this step
+  instrumentConfig: GmosSouthDynamic!
+
+  # The executed step itself
+  stepConfig: StepConfig!
+
+  # Step events associated with this step
+  stepEvents: [StepEvent!]!
+
+  # Step QA state based on a combination of dataset QA states
+  stepQaState: StepQaState
+
+  # Dataset events associated with this step
+  datasetEvents: [DatasetEvent!]!
+
+  # Datasets associated with this step
+  datasets: [Dataset!]!
+}
+
+# A GmosSouth visit as recorded by Observe
+type GmosSouthVisitRecord {
+  # Visit id
+  id: VisitId!
+
+  # Created by Observe at time
+  created: Instant!
+
+  # Started at time
+  startTime: Instant
+
+  # Ended at time
+  endTime: Instant
+
+  # Step duration
+  duration: NonNegDuration!
+
+  # GmosSouth static instrument configuration
+  staticConfig: GmosSouthStatic!
+
+  # GmosSouth recorded steps
+  steps: [GmosSouthStepRecord!]!
+
+  # Sequence events associated with this visit
+  sequenceEvents: [SequenceEvent!]!
+}
+
+# Hour angle range creation parameters
+input HourAngleRangeInput {
+  minHours: BigDecimal
+  maxHours: BigDecimal
+}
+
+# Intensive program observing at Subaru
+input IntensiveInput {
+  # The minPercentTime field is required when creating a new instance of intensive, but optional when editing
+  minPercentTime: IntPercent
+
+  # The minPercentTotalTime field is required when creating a new instance of intensive, but optional when editing
+  minPercentTotalTime: IntPercent
+
+  # The totalTime field is required when creating a new instance of intensive, but optional when editing
+  totalTime: NonNegDurationInput
+}
+
+# Large program observing at Gemini
+input LargeProgramInput {
+  # The minPercentTime field is required when creating a new instance of largeProgram, but optional when editing
+  minPercentTime: IntPercent
+
+  # The minPercentTotalTime field is required when creating a new instance of largeProgram, but optional when editing
+  minPercentTotalTime: IntPercent
+
+  # The totalTime field is required when creating a new instance of largeProgram, but optional when editing
+  totalTime: NonNegDurationInput
+}
+
+# A line flux value with integrated units
+input LineFluxIntegratedInput {
+  value: PosBigDecimal!
+  units: LineFluxIntegratedUnits!
+}
+
+# A line flux value with surface units
+input LineFluxSurfaceInput {
+  value: PosBigDecimal!
+  units: LineFluxSurfaceUnits!
+}
+
+# MOS pre-imaging observation
+enum MosPreImaging {
+  # MosPreImaging IsMosPreImaging
+  IS_MOS_PRE_IMAGING
+
+  # MosPreImaging IsNotMosPreImaging
+  IS_NOT_MOS_PRE_IMAGING
+}
+
+type Mutation {
+  # Adds a new dataset event associated with the given visit.  The
+  # generation of a single dataset will produce multiple events as it
+  # transitions through the observe, readout and write stages.
+  #
+  addDatasetEvent(
+    # Describes the dataset event to add.  All events are associated with a
+    # particular visit (see 'record{InstrumentName}Visit').  Dataset events
+    # are further associated with an |observation, step and index because a
+    # step may produce multiple datasets.  The three form its 'location'.
+    # (See also 'record{InstrumentName}Step'.) Each dataset event 'payload'
+    # identifies the stage (observe, readout, or write) and possibly the
+    # dataset filename.
+    #
+    input: AddDatasetEventInput!
+  ): AddDatasetEventResult!
+
+  # Adds a sequence event associated with the given visit. Multiple events
+  # will be produced during the execution of a sequence as it is started,
+  # paused, continued, etc.
+  #
+  addSequenceEvent(
+    # Describes the sequence event to add.  All events are associated with a
+    # particular visit (see 'record{InstrumentName}Visit').  Sequence events
+    # are further associated with an observation (i.e., its 'location').
+    # Each sequence event 'payload' identifies the sequence command that
+    # acted upon the sequence.
+    #
+    input: AddSequenceEventInput!
+  ): AddSequenceEventResult!
+
+  # Adds a new step event associated with the given visit. Multiple events
+  # will be produced during the execution of a single step as it
+  # transitions through configure and observe stages.
+  #
+  addStepEvent(
+    # Describes the step event to add.  All events are associated with a
+    # particular visit (see 'record{InstrumentName}Visit'.  Step events are
+    # further associated with an observation and step (i.e., its 'location').
+    # (See also 'record{InstrumentName}Step'.) Each step event 'payload'
+    # identifies the sequence type (acquisition or science) and the stage
+    # through which the step execution is passing.
+    #
+    input: AddStepEventInput!
+  ): AddStepEventResult!
+  cloneObservation(
+    # Parameters for cloning an existing observation
+    input: CloneObservationInput!
+  ): CloneObservationResult!
+
+  # Makes a copy of an existing target, setting it to unobserved and to PRESENT.  If `REPLACE_IN` observationIds are specified in the input, the clone will replace the existing target in those observations
+  cloneTarget(
+    # Parameters for cloning an existing target
+    input: CloneTargetInput!
+  ): CloneTargetResult!
+
+  # Creates a new observation according to provided parameters
+  createObservation(
+    # Observation description
+    input: CreateObservationInput!
+  ): CreateObservationResult!
+
+  # Creates a new program according to provided properties
+  createProgram(
+    # Program description
+    input: CreateProgramInput!
+  ): CreateProgramResult!
+
+  # Creates a new target according to the provided parameters.  Only one of sidereal or nonsidereal may be specified.
+  createTarget(
+    # Target description.  One (and only one) of sidereal or nonsidereal must be specified.
+    input: CreateTargetInput!
+  ): CreateTargetResult!
+
+  # Deletes all the observations identified by the `WHERE` field
+  deleteObservations(
+    # Parameters used to select observations for delete
+    input: DeleteObservationsInput!
+  ): DeleteObservationsResult!
+
+  # Deletes all the targets identified by the `WHERE` field
+  deleteTargets(
+    # Parameters used to select observations for delete
+    input: DeleteTargetsInput!
+  ): DeleteTargetsResult!
+
+  # Record a new step
+  recordGmosNorthStep(
+    # GmosNorth step configuration parameters
+    input: RecordGmosNorthStepInput!
+  ): RecordGmosNorthStepResult!
+
+  # Record a new visit
+  recordGmosNorthVisit(
+    # VisitRecord creation parameters
+    input: RecordGmosNorthVisitInput!
+  ): RecordGmosNorthVisitResult!
+
+  # Record a new step
+  recordGmosSouthStep(
+    # GmosSouth step configuration parameters
+    input: RecordGmosSouthStepInput!
+  ): RecordGmosSouthStepResult!
+
+  # Record a new visit
+  recordGmosSouthVisit(
+    # VisitRecord creation parameters
+    input: RecordGmosSouthVisitInput!
+  ): RecordGmosSouthVisitResult!
+
+  # Undeletes all the observations identified by the `WHERE` field
+  undeleteObservations(
+    # Parameters used to select observations for undelete
+    input: UndeleteObservationsInput!
+  ): UndeleteObservationsResult!
+
+  # Undeletes all the targets identified by the `WHERE` field
+  undeleteTargets(
+    # Parameters used to select observations for undelete
+    input: UndeleteTargetsInput!
+  ): UndeleteTargetsResult!
+
+  # Update asterisms, adding or deleting targets, in (potentially) multiple
+  # observations at once.
+  #
+  updateAsterisms(
+    # Bulk update asterism
+    input: UpdateAsterismsInput!
+  ): UpdateAsterismsResult!
+  updateDatasets(
+    # Parameters for editing existing datasets
+    input: UpdateDatasetsInput!
+  ): UpdateDatasetsResult!
+
+  # Updates existing observations
+  updateObservations(
+    # Parameters for editing existing observations.
+    input: UpdateObservationsInput!
+  ): UpdateObservationsResult!
+  updatePrograms(
+    # Parameters for updating existing programs.
+    input: UpdateProgramsInput!
+  ): UpdateProgramsResult!
+
+  # Updates existing targets
+  updateTargets(
+    # Parameters for updating existing targets.
+    input: UpdateTargetsInput!
+  ): UpdateTargetsResult!
+}
+
+# Time duration input
+input NonNegDurationInput {
+  # Time duration in µs
+  microseconds: PosLong
+
+  # Time duration in ms
+  milliseconds: NonNegBigDecimal
+
+  # Time duration in seconds
+  seconds: NonNegBigDecimal
+
+  # Time duration in minutes
+  minutes: NonNegBigDecimal
+
+  # Time duration in hours
+  hours: NonNegBigDecimal
+}
+
+# Nonsidereal target parameters.  Supply `keyType` and `des` or `key`
+input NonsiderealInput {
+  # The keyType field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  keyType: EphemerisKeyType
+
+  # The des field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  des: NonEmptyString
+
+  # The key field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  key: NonEmptyString
+}
+
+# Event sent when a new object is created or updated
+type ObservationEdit implements Event {
+  # Type of edit
+  editType: EditType!
+
+  # Edited object
+  value: Observation!
+  id: Long!
+}
+
+# Observation properties
+input ObservationPropertiesInput {
+  # Subtitle adds additional detail to the target-based observation title, and is both optional and nullable
+  subtitle: NonEmptyString
+
+  # The observation status will default to New if not specified when an observation is created and may be edited but not deleted
+  status: ObsStatus
+
+  # The observation active status will default to Active if not specified when an observation is created and may be edited but not deleted
+  activeStatus: ObsActiveStatus
+
+  # Reference time used for time-dependent calculations such as average parallactic angle
+  visualizationTime: Instant
+
+  # Position angle constraint, if any. Set to null to remove all position angle constraints
+  posAngleConstraint: PosAngleConstraintInput
+
+  # The targetEnvironment defaults to empty if not specified on creation, and may be edited but not deleted
+  targetEnvironment: TargetEnvironmentInput
+
+  # The constraintSet defaults to standard values if not specified on creation, and may be edited but not deleted
+  constraintSet: ConstraintSetInput
+
+  # The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
+  scienceRequirements: ScienceRequirementsInput
+
+  # The scienceMode describes the chosen observing mode and instrument, is optional and may be deleted
+  scienceMode: ScienceModeInput
+
+  # Whether the observation is considered deleted (defaults to PRESENT) but may be edited
+  existence: Existence
+}
+
+type Offset {
+  # Offset in p
+  p: p!
+
+  # Offset in q
+  q: q!
+}
+
+# Offset component (p or q) input parameters. Choose one angle units definition.
+input OffsetComponentInput {
+  # Angle in µas
+  microarcseconds: Long
+
+  # Angle in mas
+  milliarcseconds: BigDecimal
+
+  # Angle in arcsec
+  arcseconds: BigDecimal
+}
+
+# Offset input.  Define offset in p and q.
+input OffsetInput {
+  # Offset in p
+  p: OffsetComponentInput!
+
+  # Offset in q
+  q: OffsetComponentInput!
+}
+
+# Parallax, choose one of the available units
+input ParallaxInput {
+  microarcseconds: Long
+  milliarcseconds: BigDecimal
+}
+
+# Partner time allocation: must be empty or sum to 100%
+input PartnerSplitsInput {
+  # The partner field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  partner: partner
+
+  # The percent field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  percent: IntPercent
+}
+
+# Poor weather
+input PoorWeatherInput {
+  # The minPercentTime field is required when creating a new instance of poorWeather, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Create or edit position angle constraint.  If not specified, then the
+# position angle required to reach the best guide star option will be used.
+#
+input PosAngleConstraintInput {
+  # The constraint field is required when creating a new instance of position angle constraint type, but optional when editing
+  constraint: PosAngleConstraintType
+
+  # The angle field is required when creating a new instance of fixed any, if any (not required for average parallactic, but optional when editing
+  angle: AngleInput
+}
+
+# An `Long` in the range from 1 to 9223372036854775807
+scalar PosLong
+
+# Event sent when a new object is created or updated
+type ProgramEdit implements Event {
+  # Type of edit
+  editType: EditType!
+
+  # Edited object
+  value: Program!
+  id: Long!
+}
+
+# Program properties
+input ProgramPropertiesInput {
+  # The program name, which is both optional and nullable
+  name: NonEmptyString
+
+  # The program proposal is both optional and nullable
+  proposal: ProposalInput
+
+  # Whether the program is considered deleted (defaults to PRESENT) but may be edited
+  existence: Existence
+}
+
+# Proper motion component, choose one of the available units
+input ProperMotionComponentInput {
+  microarcsecondsPerYear: Long
+  milliarcsecondsPerYear: BigDecimal
+}
+
+# Proper motion, choose one of the available units
+input ProperMotionInput {
+  ra: ProperMotionComponentInput!
+  dec: ProperMotionComponentInput!
+}
+
+# Proposal class. Choose exactly one class type
+input ProposalClassInput {
+  # Classical observing at Gemini
+  classical: ClassicalInput
+
+  # Demo science
+  demoScience: DemoScienceInput
+
+  # Director's time
+  directorsTime: DirectorsTimeInput
+
+  # Exchange observing at Keck/Subaru
+  exchange: ExchangeInput
+
+  # Fast turnaround observing at Gemini
+  fastTurnaround: FastTurnaroundInput
+
+  # Poor weather
+  poorWeather: PoorWeatherInput
+
+  # Queue observing at Gemini
+  queue: QueueInput
+
+  # System verification
+  systemVerification: SystemVerificationInput
+
+  # Large program observing at Gemini
+  largeProgram: LargeProgramInput
+
+  # Intensive program observing at Subaru
+  intensive: IntensiveInput
+}
+
+# Program proposal
+input ProposalInput {
+  # The title field may be unset by assigning a null value, or ignored by skipping it altogether
+  title: NonEmptyString
+
+  # The proposalClass field is required when creating a new instance of proposal, but optional when editing
+  proposalClass: ProposalClassInput
+
+  # The category field may be unset by assigning a null value, or ignored by skipping it altogether
+  category: tacCategory
+
+  # The toOActivation field is required when creating a new instance of proposal, but optional when editing
+  toOActivation: toOActivation
+
+  # The abstract field may be unset by assigning a null value, or ignored by skipping it altogether
+  abstract: NonEmptyString
+
+  # The partnerSplits field is required when creating a new instance of proposal, but optional when editing
+  partnerSplits: [PartnerSplitsInput!]
+}
+
+# Queue observing at Gemini
+input QueueInput {
+  # The minPercentTime field is required when creating a new instance of queue, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Radial velocity, choose one of the available units
+input RadialVelocityInput {
+  centimetersPerSecond: Long
+  metersPerSecond: BigDecimal
+  kilometersPerSecond: BigDecimal
+}
+
+# Input parameters for creating a new GmosNorth StepRecord
+input RecordGmosNorthStepInput {
+  observationId: ObservationId!
+  visitId: VisitId!
+  stepConfig: GmosNorthStepInput!
+}
+
+# The result of recording a GmosNorth step.
+type RecordGmosNorthStepResult {
+  # The newly added step record itself.
+  stepRecord: GmosNorthStepRecord!
+}
+
+# Input parameters for creating a new GmosNorth VisitRecord
+input RecordGmosNorthVisitInput {
+  observationId: ObservationId!
+  static: GmosNorthStaticInput!
+}
+
+# The result of recording a GmosNorth visit.
+type RecordGmosNorthVisitResult {
+  # The newly added visit record itself.
+  visitRecord: GmosNorthVisitRecord!
+}
+
+# Input parameters for creating a new GmosSouth StepRecord
+input RecordGmosSouthStepInput {
+  observationId: ObservationId!
+  visitId: VisitId!
+  stepConfig: GmosSouthStepInput!
+}
+
+# The result of recording a GmosSouth step.
+type RecordGmosSouthStepResult {
+  # The newly added step record itself.
+  stepRecord: GmosSouthStepRecord!
+}
+
+# Input parameters for creating a new GmosSouth VisitRecord
+input RecordGmosSouthVisitInput {
+  observationId: ObservationId!
+  static: GmosSouthStaticInput!
+}
+
+# The result of recording a GmosSouth visit.
+type RecordGmosSouthVisitResult {
+  # The newly added visit record itself.
+  visitRecord: GmosSouthVisitRecord!
+}
+
+# Right Ascension, choose one of the available units
+input RightAscensionInput {
+  microarcseconds: Long
+  degrees: BigDecimal
+  hours: BigDecimal
+  hms: HmsString
+}
+
+# Science step
+type Science implements StepConfig {
+  # Offset
+  offset: Offset!
+
+  # Step type
+  stepType: StepType!
+}
+
+# Edit or create an observation's science mode
+input ScienceModeInput {
+  # The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  gmosNorthLongSlit: GmosNorthLongSlitInput
+
+  # The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  gmosSouthLongSlit: GmosSouthLongSlitInput
+}
+
+# Edit science requirements
+input ScienceRequirementsInput {
+  # The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  mode: ScienceRequirementMode
+
+  # The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  spectroscopy: SpectroscopyScienceRequirementsInput
+}
+
+# SequenceEvent location parameters
+input SequenceEventLocationInput {
+  observationId: ObservationId!
+}
+
+# SequenceEvent payload creation parameters
+input SequenceEventPayloadInput {
+  command: SequenceCommand!
+}
+
+# Sidereal target edit parameters
+input SiderealInput {
+  # The ra field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  ra: RightAscensionInput
+
+  # The dec field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  dec: DeclinationInput
+
+  # The epoch field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  epoch: EpochString
+
+  # The properMotion field may be unset by assigning a null value, or ignored by skipping it altogether
+  properMotion: ProperMotionInput
+
+  # The radialVelocity field may be unset by assigning a null value, or ignored by skipping it altogether
+  radialVelocity: RadialVelocityInput
+
+  # The parallax field may be unset by assigning a null value, or ignored by skipping it altogether
+  parallax: ParallaxInput
+
+  # The catalogInfo field may be unset by assigning a null value, or ignored by skipping it altogether
+  catalogInfo: CatalogInfoInput
+}
+
+# Signal-to-noise mode parameters
+input SignalToNoiseModeInput {
+  # s/n value
+  value: PosBigDecimal!
+}
+
+# Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
+input SourceProfileInput {
+  point: SpectralDefinitionIntegratedInput
+  uniform: SpectralDefinitionSurfaceInput
+  gaussian: GaussianInput
+}
+
+# Spectral definition input with integrated units.  Specify exactly one of "bandNormalized" or "emissionLines"
+input SpectralDefinitionIntegratedInput {
+  bandNormalized: BandNormalizedIntegratedInput
+  emissionLines: EmissionLinesIntegratedInput
+}
+
+# Spectral definition input with surface units.  Specify exactly one of "bandNormalized" or "emissionLines"
+input SpectralDefinitionSurfaceInput {
+  bandNormalized: BandNormalizedSurfaceInput
+  emissionLines: EmissionLinesSurfaceInput
+}
+
+# Edit or create spectroscopy science requirements
+input SpectroscopyScienceRequirementsInput {
+  # The wavelength field may be unset by assigning a null value, or ignored by skipping it altogether
+  wavelength: WavelengthInput
+
+  # The resolution field may be unset by assigning a null value, or ignored by skipping it altogether
+  resolution: PosInt
+
+  # The signalToNoise field may be unset by assigning a null value, or ignored by skipping it altogether
+  signalToNoise: PosBigDecimal
+
+  # The signalToNoiseAt field may be unset by assigning a null value, or ignored by skipping it altogether
+  signalToNoiseAt: WavelengthInput
+
+  # The wavelengthCoverage field may be unset by assigning a null value, or ignored by skipping it altogether
+  wavelengthCoverage: WavelengthInput
+
+  # The focalPlane field may be unset by assigning a null value, or ignored by skipping it altogether
+  focalPlane: FocalPlane
+
+  # The focalPlaneAngle field may be unset by assigning a null value, or ignored by skipping it altogether
+  focalPlaneAngle: FocalPlaneAngleInput
+
+  # The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
+  capabilities: SpectroscopyCapabilities
+}
+
+# Sequence step
+interface Step {
+  # Step id
+  id: StepId!
+
+  # Whether to pause before the execution of this step
+  breakpoint: Breakpoint!
+
+  # The sequence step itself
+  stepConfig: StepConfig!
+
+  # Time estimate for this step's execution
+  time: StepTime!
+}
+
+# Step (bias, dark, gcal, science, etc.)
+interface StepConfig {
+  # Step type
+  stepType: StepType!
+}
+
+# StepEvent location parameters
+input StepEventLocationInput {
+  observationId: ObservationId!
+  stepId: StepId!
+}
+
+# StepEvent payload parameters
+input StepEventPayloadInput {
+  sequenceType: SequenceType!
+  stepStage: StepStage!
+}
+
+# Step QA State
+enum StepQaState {
+  # StepQaState Pass
+  PASS
+
+  # StepQaState Fail
+  FAIL
+}
+
+# Step type
+enum StepType {
+  # StepType Bias
+  BIAS
+
+  # StepType Dark
+  DARK
+
+  # StepType Gcal
+  GCAL
+
+  # StepType Science
+  SCIENCE
+
+  # StepType SmartGcal
+  SMART_GCAL
+}
+
+type Subscription {
+  #
+  # Subscribes to an event that is generated whenever a(n) observation is
+  # created or updated.  If a(n) observation id is provided, the event is only
+  # generated for edits to that particular observation.  If a program id is
+  # provided then the event must correspond to a(n) observation referenced by
+  # that program.
+  #
+  observationEdit(
+    # Observation ID
+    observationId: ObservationId
+
+    # Program ID
+    programId: ProgramId
+  ): ObservationEdit!
+
+  #
+  # Subscribes to an event that is generated whenever a program is created
+  # or edited. A particular program id may be provided to limit events to
+  # that program.
+  #
+  programEdit(
+    # Program ID
+    programId: ProgramId
+  ): ProgramEdit!
+
+  #
+  # Subscribes to an event that is generated whenever a(n) target is
+  # created or updated.  If a(n) target id is provided, the event is only
+  # generated for edits to that particular target.  If a program id is
+  # provided then the event must correspond to a(n) target referenced by
+  # that program.
+  #
+  targetEdit(
+    # Target ID
+    targetId: TargetId
+
+    # Program ID
+    programId: ProgramId
+  ): TargetEdit!
+}
+
+# System verification
+input SystemVerificationInput {
+  # The minPercentTime field is required when creating a new instance of systemVerification, but optional when editing
+  minPercentTime: IntPercent
+}
+
+# Event sent when a new object is created or updated
+type TargetEdit implements Event {
+  # Type of edit
+  editType: EditType!
+
+  # Edited object
+  value: Target!
+  id: Long!
+}
+
+# Target environment editing and creation parameters
+input TargetEnvironmentInput {
+  # The explicitBase field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitBase: CoordinatesInput
+  asterism: [TargetId!]
+}
+
+# Target properties
+input TargetPropertiesInput {
+  name: NonEmptyString
+  sidereal: SiderealInput
+  nonsidereal: NonsiderealInput
+  sourceProfile: SourceProfileInput
+  existence: Existence
+}
+
+# Selects the observations for undelete
+input UndeleteObservationsInput {
+  # Filters the observations for undelete according to those that match the given constraints.
+  WHERE: WhereObservation
+
+  # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+# The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+type UndeleteObservationsResult {
+  # The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  observations: [Observation!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Selects the targets for undelete
+input UndeleteTargetsInput {
+  # Filters the targets for undelete according to those that match the given constraints.
+  WHERE: WhereTarget
+
+  # Caps the number of results returned to the given value (if additional targets match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+# The result of updating the selected targets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional targets were modified and not included here.
+type UndeleteTargetsResult {
+  # The edited targets, up to the specified LIMIT or the default maximum of 1000.
+  targets: [Target!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Un-normalized SED input parameters.  Define one value only.
+input UnnormalizedSedInput {
+  stellarLibrary: StellarLibrarySpectrum
+  coolStar: CoolStarTemperature
+  galaxy: GalaxySpectrum
+  planet: PlanetSpectrum
+  quasar: QuasarSpectrum
+  hiiRegion: HiiRegionSpectrum
+  planetaryNebula: PlanetaryNebulaSpectrum
+  powerLaw: BigDecimal
+  blackBodyTempK: PosInt
+  fluxDensities: [FluxDensity!]
+}
+
+# Input for bulk updating multiple observations.  Select observations
+# with the 'WHERE' input and specify the changes in 'SET'.
+#
+input UpdateAsterismsInput {
+  # Describes the values to modify.
+  SET: [EditAsterismsPatchInput!]!
+
+  # Filters the observations to be updated according to those that match the given constraints.
+  WHERE: WhereObservation
+
+  # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+# The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+type UpdateAsterismsResult {
+  # The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  observations: [Observation!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Dataset selection and update description. Use `SET` to specify the changes, `WHERE` to select the datasets to update, and `LIMIT` to control the size of the return value.
+input UpdateDatasetsInput {
+  # Describes the dataset values to modify.
+  SET: DatasetPropertiesInput!
+
+  # Filters the datasets to be updated according to those that match the given constraints.
+  WHERE: WhereDataset
+
+  # Caps the number of results returned to the given value (if additional datasets match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+# The result of updating the selected datasets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional datasets were modified and not included here.
+type UpdateDatasetsResult {
+  # The edited datasets, up to the specified LIMIT or the default maximum of 1000.
+  datasets: [Dataset!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Observation selection and update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
+input UpdateObservationsInput {
+  # Describes the observation values to modify.
+  SET: ObservationPropertiesInput!
+
+  # Filters the observations to be updated according to those that match the given constraints.
+  WHERE: WhereObservation
+
+  # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+
+  # Set to `true` to include deleted observations.
+  includeDeleted: Boolean = false
+}
+
+# The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+type UpdateObservationsResult {
+  # The edited observations, up to the specified LIMIT or the default maximum of 1000.
+  observations: [Observation!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Program selection and update description.  Use `SET` to specify the changes, `WHERE` to select the programs to update, and `LIMIT` to control the size of the return value.
+input UpdateProgramsInput {
+  # Describes the program values to modify.
+  SET: ProgramPropertiesInput!
+
+  # Filters the programs to be updated according to those that match the given constraints.
+  WHERE: WhereProgram
+
+  # Caps the number of results returned to the given value (if additional programs match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+
+  # Set to `true` to include deleted programs.
+  includeDeleted: Boolean = false
+}
+
+# The result of updating the selected programs, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional programs were modified and not included here.
+type UpdateProgramsResult {
+  # The edited programs, up to the specified LIMIT or the default maximum of 1000.
+  programs: [Program!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Target selection and update description. Use `SET` to specify the changes, `WHERE` to select the targets to update, and `LIMIT` to control the size of the return value.
+input UpdateTargetsInput {
+  # Describes the target values to modify.
+  SET: TargetPropertiesInput!
+
+  # Filters the targets to be updated according to those that match the given constraints.
+  WHERE: WhereTarget
+
+  # Caps the number of results returned to the given value (if additional targets match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+
+  # Set to `true` to include deleted targets
+  includeDeleted: Boolean = false
+}
+
+# The result of updating the selected targets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional targets were modified and not included here.
+type UpdateTargetsResult {
+  # The edited targets, up to the specified LIMIT or the default maximum of 1000.
+  targets: [Target!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
+# Wavelength, choose one of the available units
+input WavelengthInput {
+  picometers: PosInt
+  angstroms: PosBigDecimal
+  nanometers: PosBigDecimal
+  micrometers: PosBigDecimal
+}
+
+type p {
+  # p offset in µas
+  microarcseconds: Long!
+
+  # p offset in mas
+  milliarcseconds: BigDecimal!
+
+  # p offset in arcsec
+  arcseconds: BigDecimal!
+}
+
+# Partner
+enum partner {
+  # partner ar
+  AR
+
+  # partner br
+  BR
+
+  # partner ca
+  CA
+
+  # partner cl
+  CL
+
+  # partner kr
+  KR
+
+  # partner uh
+  UH
+
+  # partner us
+  US
+}
+
+# TAC category
+enum tacCategory {
+  # tacCategory SmallBodies
+  SMALL_BODIES
+
+  # tacCategory PlanetaryAtmospheres
+  PLANETARY_ATMOSPHERES
+
+  # tacCategory PlanetarySurfaces
+  PLANETARY_SURFACES
+
+  # tacCategory SolarSystemOther
+  SOLAR_SYSTEM_OTHER
+
+  # tacCategory ExoplanetRadialVelocities
+  EXOPLANET_RADIAL_VELOCITIES
+
+  # tacCategory ExoplanetAtmospheresActivity
+  EXOPLANET_ATMOSPHERES_ACTIVITY
+
+  # tacCategory ExoplanetTransits
+  EXOPLANET_TRANSITS
+
+  # tacCategory ExoplanetHostStar
+  EXOPLANET_HOST_STAR
+
+  # tacCategory ExoplanetOther
+  EXOPLANET_OTHER
+
+  # tacCategory StellarAstrophysics
+  STELLAR_ASTROPHYSICS
+
+  # tacCategory StellarPopulations
+  STELLAR_POPULATIONS
+
+  # tacCategory StarFormation
+  STAR_FORMATION
+
+  # tacCategory GaseousAstrophysics
+  GASEOUS_ASTROPHYSICS
+
+  # tacCategory StellarRemnants
+  STELLAR_REMNANTS
+
+  # tacCategory GalacticOther
+  GALACTIC_OTHER
+
+  # tacCategory Cosmology
+  COSMOLOGY
+
+  # tacCategory ClustersOfGalaxies
+  CLUSTERS_OF_GALAXIES
+
+  # tacCategory HighZUniverse
+  HIGH_Z_UNIVERSE
+
+  # tacCategory LowZUniverse
+  LOW_Z_UNIVERSE
+
+  # tacCategory ActiveGalaxies
+  ACTIVE_GALAXIES
+
+  # tacCategory ExtragalacticOther
+  EXTRAGALACTIC_OTHER
+}
+
+# Target of opportunity activation
+enum toOActivation {
+  # toOActivation None
+  NONE
+
+  # toOActivation Standard
+  STANDARD
+
+  # toOActivation Rapid
+  RAPID
+}
+
+type AirMassRange {
+  # Minimum AirMass (unitless)
+  min: PosBigDecimal!
+
+  # Maximum AirMass (unitless)
+  max: PosBigDecimal!
+}
+
+type Angle {
+  # Angle in µas
+  microarcseconds: Long!
+
+  # Angle in µs
+  microseconds: BigDecimal!
+
+  # Angle in mas
+  milliarcseconds: BigDecimal!
+
+  # Angle in ms
+  milliseconds: BigDecimal!
+
+  # Angle in asec
+  arcseconds: BigDecimal!
+
+  # Angle in sec
+  seconds: BigDecimal!
+
+  # Angle in amin
+  arcminutes: BigDecimal!
+
+  # Angle in min
+  minutes: BigDecimal!
+
+  # Angle in deg
+  degrees: BigDecimal!
+
+  # Angle in hrs
+  hours: BigDecimal!
+}
+
+type AsterismGroup {
+  # IDs of observations that use the same constraints
+  observationIds: [ObservationId!]!
+
+  # Observations associated with the common value
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Commonly held value across the observations
+  asterism: [Target!]!
+}
+
+# The matching asterismGroup results, limited to a maximum of 1000 entries.
+type AsterismGroupSelectResult {
+  # Matching asterismGroups up to the return size limit of 1000
+  matches: [AsterismGroup!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# Brightness bands
+enum Band {
+  # Band SloanU
+  SLOAN_U
+
+  # Band SloanG
+  SLOAN_G
+
+  # Band SloanR
+  SLOAN_R
+
+  # Band SloanI
+  SLOAN_I
+
+  # Band SloanZ
+  SLOAN_Z
+
+  # Band U
+  U
+
+  # Band B
+  B
+
+  # Band V
+  V
+
+  # Band R
+  R
+
+  # Band I
+  I
+
+  # Band Y
+  Y
+
+  # Band J
+  J
+
+  # Band H
+  H
+
+  # Band K
+  K
+
+  # Band L
+  L
+
+  # Band M
+  M
+
+  # Band N
+  N
+
+  # Band Q
+  Q
+
+  # Band Ap
+  AP
+
+  # Band Gaia
+  GAIA
+
+  # Band GaiaBP
+  GAIA_BP
+
+  # Band GaiaRP
+  GAIA_RP
+}
+
+type BandBrightnessIntegrated {
+  # Magnitude band
+  band: Band!
+  value: BigDecimal!
+  units: BrightnessIntegratedUnits!
+
+  # Error, if any
+  error: BigDecimal
+}
+
+type BandBrightnessSurface {
+  # Magnitude band
+  band: Band!
+  value: BigDecimal!
+  units: BrightnessSurfaceUnits!
+
+  # Error, if any
+  error: BigDecimal
+}
+
+# Band normalized common interface
+interface BandNormalized {
+  # Un-normalized spectral energy distribution
+  sed: UnnormalizedSed!
+}
+
+type BandNormalizedIntegrated implements BandNormalized {
+  brightnesses: [BandBrightnessIntegrated!]!
+
+  # Un-normalized spectral energy distribution
+  sed: UnnormalizedSed!
+}
+
+type BandNormalizedSurface implements BandNormalized {
+  brightnesses: [BandBrightnessSurface!]!
+
+  # Un-normalized spectral energy distribution
+  sed: UnnormalizedSed!
+}
+
+# Brightness integrated units
+enum BrightnessIntegratedUnits {
+  # Vega mag
+  VEGA_MAGNITUDE
+
+  # AB mag
+  AB_MAGNITUDE
+
+  # Jy
+  JANSKY
+
+  # W/m²/µm
+  W_PER_M_SQUARED_PER_UM
+
+  # erg/s/cm²/Å
+  ERG_PER_S_PER_CM_SQUARED_PER_A
+
+  # erg/s/cm²/Hz
+  ERG_PER_S_PER_CM_SQUARED_PER_HZ
+}
+
+# Brightness surface units
+enum BrightnessSurfaceUnits {
+  # Vega mag/arcsec²
+  VEGA_MAG_PER_ARCSEC_SQUARED
+
+  # AB mag/arcsec²
+  AB_MAG_PER_ARCSEC_SQUARED
+
+  # Jy/arcsec²
+  JY_PER_ARCSEC_SQUARED
+
+  # W/m²/µm/arcsec²
+  W_PER_M_SQUARED_PER_UM_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/Å/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/Hz/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_HZ_PER_ARCSEC_SQUARED
+}
+
+type CatalogInfo {
+  # Catalog name option
+  name: CatalogName!
+
+  # Catalog id string
+  id: String!
+
+  # Catalog description of object morphology
+  objectType: String
+}
+
+# Catalog name values
+enum CatalogName {
+  # CatalogName Simbad
+  SIMBAD
+
+  # CatalogName Horizon
+  HORIZON
+
+  # CatalogName Gaia
+  GAIA
+}
+
+# Classical observing at Gemini
+type Classical implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# Cloud extinction
+enum CloudExtinction {
+  # CloudExtinction PointOne
+  POINT_ONE
+
+  # CloudExtinction PointThree
+  POINT_THREE
+
+  # CloudExtinction PointFive
+  POINT_FIVE
+
+  # CloudExtinction OnePointZero
+  ONE_POINT_ZERO
+
+  # CloudExtinction OnePointFive
+  ONE_POINT_FIVE
+
+  # CloudExtinction TwoPointZero
+  TWO_POINT_ZERO
+
+  # CloudExtinction ThreePointZero
+  THREE_POINT_ZERO
+}
+
+# ConfigurationMode
+enum ConfigurationModeType {
+  # ConfigurationModeType GmosNorthLongSlit
+  GMOS_NORTH_LONG_SLIT
+
+  # ConfigurationModeType GmosSouthLongSlit
+  GMOS_SOUTH_LONG_SLIT
+}
+
+type ConstraintSet {
+  # Image quality
+  imageQuality: ImageQuality!
+
+  # Cloud extinction
+  cloudExtinction: CloudExtinction!
+
+  # Sky background
+  skyBackground: SkyBackground!
+
+  # Water vapor
+  waterVapor: WaterVapor!
+
+  # Either air mass range or elevation range
+  elevationRange: ElevationRange!
+}
+
+type ConstraintSetGroup {
+  # IDs of observations that use the same constraints
+  observationIds: [ObservationId!]!
+
+  # Observations associated with the common value
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Commonly held value across the observations
+  constraintSet: ConstraintSet!
+}
+
+# The matching constraintSetGroup results, limited to a maximum of 1000 entries.
+type ConstraintSetGroupSelectResult {
+  # Matching constraintSetGroups up to the return size limit of 1000
+  matches: [ConstraintSetGroup!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# Cool star temperature options
+enum CoolStarTemperature {
+  # 400 K
+  T400_K
+
+  # 600 K
+  T600_K
+
+  # 800 K
+  T800_K
+
+  # 900 K
+  T900_K
+
+  # 1000 K
+  T1000_K
+
+  # 1200 K
+  T1200_K
+
+  # 1400 K
+  T1400_K
+
+  # 1600 K
+  T1600_K
+
+  # 1800 K
+  T1800_K
+
+  # 2000 K
+  T2000_K
+
+  # 2200 K
+  T2200_K
+
+  # 2400 K
+  T2400_K
+
+  # 2600 K
+  T2600_K
+
+  # 2800 K
+  T2800_K
+}
+
+type Coordinates {
+  # Right Ascension
+  ra: RightAscension!
+
+  # Declination
+  dec: Declination!
+}
+
+type Dataset {
+  # Observation associated with this dataset
+  observation: Observation!
+
+  # Dataset id
+  id: DatasetId!
+
+  # Dataset filename
+  filename: DatasetFilename!
+
+  # Dataset QA state
+  qaState: DatasetQaState
+}
+
+# Dataset-level events.  A single dataset will be associated with multiple events.
+type DatasetEvent implements ExecutionEvent {
+  # Identifies the associated dataset
+  datasetId: DatasetId!
+
+  # Dataset event payload, identifying the associated filename and stage of dataset execution
+  payload: DatasetEventPayload!
+
+  # Event id
+  id: ExecutionEventId!
+
+  # Associated visit
+  visitId: VisitId!
+
+  # Observation whose execution produced this event
+  observation: Observation!
+
+  # Time at which this event was received
+  received: Instant!
+}
+
+# Dataset event payload.
+type DatasetEventPayload {
+  # Dataset filename, when known
+  filename: DatasetFilename
+
+  # Dataset execution stage
+  datasetStage: DatasetStage!
+}
+
+# Dataset filename in standard format in format 'N20210519S0001.fits'
+scalar DatasetFilename
+
+type DatasetId {
+  # Observation ID
+  observationId: ObservationId!
+
+  # Step ID
+  stepId: StepId!
+
+  # Dataset index
+  index: PosInt!
+}
+
+# Dataset ID input type
+input DatasetIdInput {
+  # Associated observation id.
+  observationId: ObservationId!
+
+  # Associated step id.
+  stepId: StepId!
+
+  # Dataset index within the step.
+  index: PosInt!
+}
+
+# Dataset QA State
+enum DatasetQaState {
+  # DatasetQaState Pass
+  PASS
+
+  # DatasetQaState Usable
+  USABLE
+
+  # DatasetQaState Fail
+  FAIL
+}
+
+# The matching dataset results, limited to a maximum of 1000 entries.
+type DatasetSelectResult {
+  # Matching datasets up to the return size limit of 1000
+  matches: [Dataset!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# Execution stage or phase of an individual dataset
+enum DatasetStage {
+  # DatasetStage END_OBSERVE
+  END_OBSERVE
+
+  # DatasetStage END_READOUT
+  END_READOUT
+
+  # DatasetStage END_WRITE
+  END_WRITE
+
+  # DatasetStage START_OBSERVE
+  START_OBSERVE
+
+  # DatasetStage START_READOUT
+  START_READOUT
+
+  # DatasetStage START_WRITE
+  START_WRITE
+}
+
+type Declination {
+  # Declination in DD:MM:SS.SS format
+  dms: DmsString!
+
+  # Declination in signed degrees
+  degrees: BigDecimal!
+
+  # Declination in signed µas
+  microarcseconds: Long!
+}
+
+# Demo science
+type DemoScience implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# Director's time
+type DirectorsTime implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# Target declination coordinate in format '[+/-]DD:MM:SS.sss'
+scalar DmsString
+
+# Either air mass range or elevation range
+type ElevationRange {
+  # AirMass range if elevation range is an Airmass range
+  airMass: AirMassRange
+
+  # Hour angle range if elevation range is an Hour angle range
+  hourAngle: HourAngleRange
+}
+
+type EmissionLineIntegrated {
+  wavelength: Wavelength!
+
+  # km/s
+  lineWidth: PosBigDecimal!
+  lineFlux: LineFluxIntegrated!
+}
+
+type EmissionLineSurface {
+  wavelength: Wavelength!
+
+  # km/s
+  lineWidth: PosBigDecimal!
+  lineFlux: LineFluxSurface!
+}
+
+type EmissionLinesIntegrated {
+  lines: [EmissionLineIntegrated!]!
+  fluxDensityContinuum: FluxDensityContinuumIntegrated!
+}
+
+type EmissionLinesSurface {
+  lines: [EmissionLineSurface!]!
+  fluxDensityContinuum: FluxDensityContinuumSurface!
+}
+
+# Ephemeris key type options
+enum EphemerisKeyType {
+  # EphemerisKeyType Comet
+  COMET
+
+  # EphemerisKeyType AsteroidNew
+  ASTEROID_NEW
+
+  # EphemerisKeyType AsteroidOld
+  ASTEROID_OLD
+
+  # EphemerisKeyType MajorBody
+  MAJOR_BODY
+
+  # EphemerisKeyType UserSupplied
+  USER_SUPPLIED
+}
+
+# Reference observation epoch in format '[JB]YYYY.YYY'
+scalar EpochString
+
+# Exchange observing at Keck/Subaru
+type Exchange implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+type Execution {
+  # Datasets associated with the observation
+  datasets(
+    # Starts the result set at (or after if not existent) the given dataset id.
+    OFFSET: DatasetIdInput
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  # Events associated with the observation
+  events(
+    # Starts the result set at (or after if not existent) the given execution event id.
+    OFFSET: ExecutionEventId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  # Execution config
+  executionConfig: ExecutionConfig!
+}
+
+# Execution configuration
+interface ExecutionConfig {
+  # Instrument type
+  instrument: InstrumentType!
+}
+
+# Execution event (sequence, step, or dataset events)
+interface ExecutionEvent {
+  # Event id
+  id: ExecutionEventId!
+
+  # Associated visit
+  visitId: VisitId!
+
+  # Observation whose execution produced this event
+  observation: Observation!
+
+  # Time at which this event was received
+  received: Instant!
+}
+
+# ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`
+scalar ExecutionEventId
+
+# The matching ExecutionEvent results, limited to a maximum of 1000 entries.
+type ExecutionEventSelectResult {
+  # Matching ExecutionEvents up to the return size limit of 1000
+  matches: [ExecutionEvent!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# State of being: either Deleted or Present
+enum Existence {
+  # Existence Present
+  PRESENT
+
+  # Existence Deleted
+  DELETED
+}
+
+# Exposure time mode, either signal to noise or fixed
+type ExposureTimeMode {
+  # Signal to noise exposure time mode data, if applicable
+  signalToNoise: SignalToNoiseMode
+
+  # Fixed exposure time mode data, if applicable
+  fixedExposure: FixedExposureMode
+}
+
+# Fast turnaround observing at Gemini
+type FastTurnaround implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# Fixed exposure time mode
+type FixedExposureMode {
+  # Exposure count
+  count: NonNegInt!
+
+  # Exposure time
+  time: NonNegDuration!
+}
+
+type FluxDensityContinuumIntegrated {
+  value: PosBigDecimal!
+  units: FluxDensityContinuumIntegratedUnits!
+}
+
+# Flux density continuum integrated units
+enum FluxDensityContinuumIntegratedUnits {
+  # W/m²/µm
+  W_PER_M_SQUARED_PER_UM
+
+  # erg/s/cm²/Å
+  ERG_PER_S_PER_CM_SQUARED_PER_A
+}
+
+type FluxDensityContinuumSurface {
+  value: PosBigDecimal!
+  units: FluxDensityContinuumSurfaceUnits!
+}
+
+# Flux density continuum surface units
+enum FluxDensityContinuumSurfaceUnits {
+  # W/m²/µm/arcsec²
+  W_PER_M_SQUARED_PER_UM_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/Å/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+}
+
+type FluxDensityEntry {
+  wavelength: Wavelength!
+  density: PosBigDecimal!
+}
+
+# Focal plane Single/Multi/IFU
+enum FocalPlane {
+  # FocalPlane SingleSlit
+  SINGLE_SLIT
+
+  # FocalPlane MultipleSlit
+  MULTIPLE_SLIT
+
+  # FocalPlane IFU
+  IFU
+}
+
+type FocalPlaneAngle {
+  # Focal plane angle in µas
+  microarcseconds: Long!
+
+  # Focal plane angle in mas
+  milliarcseconds: BigDecimal!
+
+  # Focal plane angle in arcsec
+  arcseconds: BigDecimal!
+}
+
+# Galaxy spectrum
+enum GalaxySpectrum {
+  # GalaxySpectrum Elliptical
+  ELLIPTICAL
+
+  # GalaxySpectrum Spiral
+  SPIRAL
+}
+
+# Gaussian source, one of bandNormalized and emissionLines will be defined.
+type GaussianSource {
+  # full width at half maximum
+  fwhm: Angle!
+
+  # Band normalized spectral definition
+  bandNormalized: BandNormalizedIntegrated
+
+  # Emission lines spectral definition
+  emissionLines: EmissionLinesIntegrated
+}
+
+# GMOS amp gain
+enum GmosAmpGain {
+  # GmosAmpGain Low
+  LOW
+
+  # GmosAmpGain High
+  HIGH
+}
+
+# GMOS amp read mode
+enum GmosAmpReadMode {
+  # GmosAmpReadMode Slow
+  SLOW
+
+  # GmosAmpReadMode Fast
+  FAST
+}
+
+# GMOS North FPU
+enum GmosNorthBuiltinFpu {
+  # GmosNorthBuiltinFpu Ns0
+  NS0
+
+  # GmosNorthBuiltinFpu Ns1
+  NS1
+
+  # GmosNorthBuiltinFpu Ns2
+  NS2
+
+  # GmosNorthBuiltinFpu Ns3
+  NS3
+
+  # GmosNorthBuiltinFpu Ns4
+  NS4
+
+  # GmosNorthBuiltinFpu Ns5
+  NS5
+
+  # GmosNorthBuiltinFpu LongSlit_0_25
+  LONG_SLIT_0_25
+
+  # GmosNorthBuiltinFpu LongSlit_0_50
+  LONG_SLIT_0_50
+
+  # GmosNorthBuiltinFpu LongSlit_0_75
+  LONG_SLIT_0_75
+
+  # GmosNorthBuiltinFpu LongSlit_1_00
+  LONG_SLIT_1_00
+
+  # GmosNorthBuiltinFpu LongSlit_1_50
+  LONG_SLIT_1_50
+
+  # GmosNorthBuiltinFpu LongSlit_2_00
+  LONG_SLIT_2_00
+
+  # GmosNorthBuiltinFpu LongSlit_5_00
+  LONG_SLIT_5_00
+
+  # GmosNorthBuiltinFpu Ifu2Slits
+  IFU2_SLITS
+
+  # GmosNorthBuiltinFpu IfuBlue
+  IFU_BLUE
+
+  # GmosNorthBuiltinFpu IfuRed
+  IFU_RED
+}
+
+# GMOS North Filter
+enum GmosNorthFilter {
+  # GmosNorthFilter GPrime
+  G_PRIME
+
+  # GmosNorthFilter RPrime
+  R_PRIME
+
+  # GmosNorthFilter IPrime
+  I_PRIME
+
+  # GmosNorthFilter ZPrime
+  Z_PRIME
+
+  # GmosNorthFilter Z
+  Z
+
+  # GmosNorthFilter Y
+  Y
+
+  # GmosNorthFilter GG455
+  GG455
+
+  # GmosNorthFilter OG515
+  OG515
+
+  # GmosNorthFilter RG610
+  RG610
+
+  # GmosNorthFilter CaT
+  CA_T
+
+  # GmosNorthFilter Ha
+  HA
+
+  # GmosNorthFilter HaC
+  HA_C
+
+  # GmosNorthFilter DS920
+  DS920
+
+  # GmosNorthFilter SII
+  SII
+
+  # GmosNorthFilter OIII
+  OIII
+
+  # GmosNorthFilter OIIIC
+  OIIIC
+
+  # GmosNorthFilter HeII
+  HE_II
+
+  # GmosNorthFilter HeIIC
+  HE_IIC
+
+  # GmosNorthFilter HartmannA_RPrime
+  HARTMANN_A_R_PRIME
+
+  # GmosNorthFilter HartmannB_RPrime
+  HARTMANN_B_R_PRIME
+
+  # GmosNorthFilter GPrime_GG455
+  G_PRIME_GG455
+
+  # GmosNorthFilter GPrime_OG515
+  G_PRIME_OG515
+
+  # GmosNorthFilter RPrime_RG610
+  R_PRIME_RG610
+
+  # GmosNorthFilter IPrime_CaT
+  I_PRIME_CA_T
+
+  # GmosNorthFilter ZPrime_CaT
+  Z_PRIME_CA_T
+
+  # GmosNorthFilter UPrime
+  U_PRIME
+}
+
+# GMOS North Grating
+enum GmosNorthGrating {
+  # GmosNorthGrating B1200_G5301
+  B1200_G5301
+
+  # GmosNorthGrating R831_G5302
+  R831_G5302
+
+  # GmosNorthGrating B600_G5303
+  B600_G5303
+
+  # GmosNorthGrating B600_G5307
+  B600_G5307
+
+  # GmosNorthGrating R600_G5304
+  R600_G5304
+
+  # GmosNorthGrating B480_G5309
+  B480_G5309
+
+  # GmosNorthGrating R400_G5305
+  R400_G5305
+
+  # GmosNorthGrating R150_G5306
+  R150_G5306
+
+  # GmosNorthGrating R150_G5308
+  R150_G5308
+}
+
+# GMOS North Long Slit mode
+type GmosNorthLongSlit {
+  # GMOS North Long Slit basic configuration
+  basic: GmosNorthLongSlitBasic!
+
+  # GMOS North Long Slit advanced configuration
+  advanced: GmosNorthLongSlitAdvanced
+}
+
+# GMOS North Long Slit advanced configuration
+type GmosNorthLongSlitAdvanced {
+  # Overrides the science requirement wavelength
+  overrideWavelength: Wavelength
+
+  # GMOS North Grating override, taking the place of the basic configuration grating
+  overrideGrating: GmosNorthGrating
+
+  # GMOS North filter override, taking the place of the basic configuration filter
+  overrideFilter: GmosNorthFilter
+
+  # GMOS North FPU override, taking the place of the basic configuration FPU
+  overrideFpu: GmosNorthBuiltinFpu
+
+  # Exposure time mode, taking the place of the value from science requirements
+  overrideExposureTimeMode: ExposureTimeMode
+
+  # Explicitly specified GMOS X-Binning, override the default (calculated from effective slit size)
+  explicitXBin: GmosXBinning
+
+  # Explicitly specified GMOS Y-Binning, override the default (TWO)
+  explicitYBin: GmosYBinning
+
+  # Explicitly specified GMOS amp read mode, override the default (SLOW)
+  explicitAmpReadMode: GmosAmpReadMode
+
+  # Explicitly specified GMOS amp gain, override the default (LOW)
+  explicitAmpGain: GmosAmpGain
+
+  # Explicitly specified GMOS ROI, overriding the default (FULL_FRAME)
+  explicitRoi: GmosRoi
+
+  # Explicitly specified wavelength dithers required to fill in the chip gaps (in nm), taking the place of the calculated value based on the grating dispersion
+  explicitWavelengthDithersNm: [BigDecimal!]
+
+  # Explicitly specified spatial q offsets, overriding the default
+  explicitSpatialOffsets: [q!]
+}
+
+# GMOS North Long Slit basic configuration
+type GmosNorthLongSlitBasic {
+  # GMOS North Grating
+  grating: GmosNorthGrating!
+
+  # GMOS North Filter
+  filter: GmosNorthFilter
+
+  # GMOS North FPU
+  fpu: GmosNorthBuiltinFpu!
+}
+
+# GMOS Region Of Interest
+enum GmosRoi {
+  # GmosRoi FullFrame
+  FULL_FRAME
+
+  # GmosRoi Ccd2
+  CCD2
+
+  # GmosRoi CentralSpectrum
+  CENTRAL_SPECTRUM
+
+  # GmosRoi CentralStamp
+  CENTRAL_STAMP
+
+  # GmosRoi TopSpectrum
+  TOP_SPECTRUM
+
+  # GmosRoi BottomSpectrum
+  BOTTOM_SPECTRUM
+
+  # GmosRoi Custom
+  CUSTOM
+}
+
+# GMOS South FPU
+enum GmosSouthBuiltinFpu {
+  # GmosSouthBuiltinFpu Bhros
+  BHROS
+
+  # GmosSouthBuiltinFpu Ns1
+  NS1
+
+  # GmosSouthBuiltinFpu Ns2
+  NS2
+
+  # GmosSouthBuiltinFpu Ns3
+  NS3
+
+  # GmosSouthBuiltinFpu Ns4
+  NS4
+
+  # GmosSouthBuiltinFpu Ns5
+  NS5
+
+  # GmosSouthBuiltinFpu LongSlit_0_25
+  LONG_SLIT_0_25
+
+  # GmosSouthBuiltinFpu LongSlit_0_50
+  LONG_SLIT_0_50
+
+  # GmosSouthBuiltinFpu LongSlit_0_75
+  LONG_SLIT_0_75
+
+  # GmosSouthBuiltinFpu LongSlit_1_00
+  LONG_SLIT_1_00
+
+  # GmosSouthBuiltinFpu LongSlit_1_50
+  LONG_SLIT_1_50
+
+  # GmosSouthBuiltinFpu LongSlit_2_00
+  LONG_SLIT_2_00
+
+  # GmosSouthBuiltinFpu LongSlit_5_00
+  LONG_SLIT_5_00
+
+  # GmosSouthBuiltinFpu Ifu2Slits
+  IFU2_SLITS
+
+  # GmosSouthBuiltinFpu IfuBlue
+  IFU_BLUE
+
+  # GmosSouthBuiltinFpu IfuRed
+  IFU_RED
+
+  # GmosSouthBuiltinFpu IfuNS2Slits
+  IFU_NS2_SLITS
+
+  # GmosSouthBuiltinFpu IfuNSBlue
+  IFU_NS_BLUE
+
+  # GmosSouthBuiltinFpu IfuNSRed
+  IFU_NS_RED
+}
+
+# GMOS South Filter
+enum GmosSouthFilter {
+  # GmosSouthFilter UPrime
+  U_PRIME
+
+  # GmosSouthFilter GPrime
+  G_PRIME
+
+  # GmosSouthFilter RPrime
+  R_PRIME
+
+  # GmosSouthFilter IPrime
+  I_PRIME
+
+  # GmosSouthFilter ZPrime
+  Z_PRIME
+
+  # GmosSouthFilter Z
+  Z
+
+  # GmosSouthFilter Y
+  Y
+
+  # GmosSouthFilter GG455
+  GG455
+
+  # GmosSouthFilter OG515
+  OG515
+
+  # GmosSouthFilter RG610
+  RG610
+
+  # GmosSouthFilter RG780
+  RG780
+
+  # GmosSouthFilter CaT
+  CA_T
+
+  # GmosSouthFilter HartmannA_RPrime
+  HARTMANN_A_R_PRIME
+
+  # GmosSouthFilter HartmannB_RPrime
+  HARTMANN_B_R_PRIME
+
+  # GmosSouthFilter GPrime_GG455
+  G_PRIME_GG455
+
+  # GmosSouthFilter GPrime_OG515
+  G_PRIME_OG515
+
+  # GmosSouthFilter RPrime_RG610
+  R_PRIME_RG610
+
+  # GmosSouthFilter IPrime_RG780
+  I_PRIME_RG780
+
+  # GmosSouthFilter IPrime_CaT
+  I_PRIME_CA_T
+
+  # GmosSouthFilter ZPrime_CaT
+  Z_PRIME_CA_T
+
+  # GmosSouthFilter Ha
+  HA
+
+  # GmosSouthFilter SII
+  SII
+
+  # GmosSouthFilter HaC
+  HA_C
+
+  # GmosSouthFilter OIII
+  OIII
+
+  # GmosSouthFilter OIIIC
+  OIIIC
+
+  # GmosSouthFilter HeII
+  HE_II
+
+  # GmosSouthFilter HeIIC
+  HE_IIC
+
+  # GmosSouthFilter Lya395
+  LYA395
+}
+
+# GMOS South Grating
+enum GmosSouthGrating {
+  # GmosSouthGrating B1200_G5321
+  B1200_G5321
+
+  # GmosSouthGrating R831_G5322
+  R831_G5322
+
+  # GmosSouthGrating B600_G5323
+  B600_G5323
+
+  # GmosSouthGrating R600_G5324
+  R600_G5324
+
+  # GmosSouthGrating B480_G5327
+  B480_G5327
+
+  # GmosSouthGrating R400_G5325
+  R400_G5325
+
+  # GmosSouthGrating R150_G5326
+  R150_G5326
+}
+
+# GMOS South Long Slit mode
+type GmosSouthLongSlit {
+  # GMOS South Long Slit basic configuration
+  basic: GmosSouthLongSlitBasic!
+
+  # GMOS South Long Slit advanced configuration
+  advanced: GmosSouthLongSlitAdvanced
+}
+
+# GMOS South Long Slit advanced configuration
+type GmosSouthLongSlitAdvanced {
+  # Overrides the science requirement wavelength
+  overrideWavelength: Wavelength
+
+  # GMOS North Grating override, taking the place of the basic configuration grating
+  overrideGrating: GmosSouthGrating
+
+  # GMOS North filter override, taking the place of the basic configuration filter
+  overrideFilter: GmosSouthFilter
+
+  # GMOS North FPU override, taking the place of the basic configuration FPU
+  overrideFpu: GmosSouthBuiltinFpu
+
+  # Exposure time mode, taking the place of the value from science requirements
+  overrideExposureTimeMode: ExposureTimeMode
+
+  # Explicitly specified GMOS X-Binning, override the default (calculated from effective slit size)
+  explicitXBin: GmosXBinning
+
+  # Explicitly specified GMOS Y-Binning, override the default (TWO)
+  explicitYBin: GmosYBinning
+
+  # Explicitly specified GMOS amp read mode, override the default (SLOW)
+  explicitAmpReadMode: GmosAmpReadMode
+
+  # Explicitly specified GMOS amp gain, override the default (LOW)
+  explicitAmpGain: GmosAmpGain
+
+  # Explicitly specified GMOS ROI, overriding the default (FULL_FRAME)
+  explicitRoi: GmosRoi
+
+  # Explicitly specified wavelength dithers required to fill in the chip gaps (in nm), taking the place of the calculated value based on the grating dispersion
+  explicitWavelengthDithersNm: [BigDecimal!]
+
+  # Explicitly specified spatial q offsets, overriding the default
+  explicitSpatialOffsets: [q!]
+}
+
+# GMOS South Long Slit basic configuration
+type GmosSouthLongSlitBasic {
+  # GMOS North Grating
+  grating: GmosSouthGrating!
+
+  # GMOS North Filter
+  filter: GmosSouthFilter
+
+  # GMOS North FPU
+  fpu: GmosSouthBuiltinFpu!
+}
+
+# GMOS X Binning
+enum GmosXBinning {
+  # GmosXBinning One
+  ONE
+
+  # GmosXBinning Two
+  TWO
+
+  # GmosXBinning Four
+  FOUR
+}
+
+# GMOS Y Binning
+enum GmosYBinning {
+  # GmosYBinning One
+  ONE
+
+  # GmosYBinning Two
+  TWO
+
+  # GmosYBinning Four
+  FOUR
+}
+
+# HII Region spectrum
+enum HiiRegionSpectrum {
+  # HiiRegionSpectrum OrionNebula
+  ORION_NEBULA
+}
+
+# Target right ascension coordinate in format 'HH:MM:SS.sss'
+scalar HmsString
+
+type HourAngleRange {
+  # Minimum Hour Angle (hours)
+  minHours: BigDecimal!
+
+  # Maximum Hour Angle (hours)
+  maxHours: BigDecimal!
+}
+
+# Image quality
+enum ImageQuality {
+  # ImageQuality PointOne
+  POINT_ONE
+
+  # ImageQuality PointTwo
+  POINT_TWO
+
+  # ImageQuality PointThree
+  POINT_THREE
+
+  # ImageQuality PointFour
+  POINT_FOUR
+
+  # ImageQuality PointSix
+  POINT_SIX
+
+  # ImageQuality PointEight
+  POINT_EIGHT
+
+  # ImageQuality OnePointZero
+  ONE_POINT_ZERO
+
+  # ImageQuality OnePointFive
+  ONE_POINT_FIVE
+
+  # ImageQuality TwoPointZero
+  TWO_POINT_ZERO
+}
+
+# Instant of time in ISO-8601 representation in format '2011-12-03T10:15:30Z'
+scalar Instant
+
+# Instrument
+enum InstrumentType {
+  # InstrumentType AcqCam
+  ACQ_CAM
+
+  # InstrumentType Bhros
+  BHROS
+
+  # InstrumentType Flamingos2
+  FLAMINGOS2
+
+  # InstrumentType Ghost
+  GHOST
+
+  # InstrumentType GmosNorth
+  GMOS_NORTH
+
+  # InstrumentType GmosSouth
+  GMOS_SOUTH
+
+  # InstrumentType Gnirs
+  GNIRS
+
+  # InstrumentType Gpi
+  GPI
+
+  # InstrumentType Gsaoi
+  GSAOI
+
+  # InstrumentType Michelle
+  MICHELLE
+
+  # InstrumentType Nici
+  NICI
+
+  # InstrumentType Nifs
+  NIFS
+
+  # InstrumentType Niri
+  NIRI
+
+  # InstrumentType Phoenix
+  PHOENIX
+
+  # InstrumentType Trecs
+  TRECS
+
+  # InstrumentType Visitor
+  VISITOR
+
+  # InstrumentType Scorpio
+  SCORPIO
+
+  # InstrumentType Alopeke
+  ALOPEKE
+
+  # InstrumentType Zorro
+  ZORRO
+}
+
+# An 'Int` in the range 0 to 100
+scalar IntPercent
+
+# Intensive program observing at Subaru
+type Intensive implements ProposalClass {
+  # Minimum percent of time requested for this semester that is required
+  minPercentTime: IntPercent!
+
+  # Minimum percent of total program time that is required
+  minPercentTotalTime: IntPercent!
+
+  # Estimated total program time
+  totalTime: NonNegDuration!
+}
+
+type ItcSuccess {
+  exposureTime: NonNegDuration!
+  exposures: NonNegInt!
+  signalToNoise: PosBigDecimal!
+}
+
+# Large program observing at Gemini
+type LargeProgram implements ProposalClass {
+  # Minimum percent of time requested for this semester that is required
+  minPercentTime: IntPercent!
+
+  # Minimum percent of total program time that is required
+  minPercentTotalTime: IntPercent!
+
+  # Estimated total program time
+  totalTime: NonNegDuration!
+}
+
+type LineFluxIntegrated {
+  value: PosBigDecimal!
+  units: LineFluxIntegratedUnits!
+}
+
+# Line flux integrated units
+enum LineFluxIntegratedUnits {
+  # W/m²
+  W_PER_M_SQUARED
+
+  # erg/s/cm²
+  ERG_PER_S_PER_CM_SQUARED
+}
+
+type LineFluxSurface {
+  value: PosBigDecimal!
+  units: LineFluxSurfaceUnits!
+}
+
+# Line flux surface units
+enum LineFluxSurfaceUnits {
+  # W/m²/arcsec²
+  W_PER_M_SQUARED_PER_ARCSEC_SQUARED
+
+  # erg/s/cm²/arcsec²
+  ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
+}
+
+# Manual observing sequence and instrument configuration
+interface ManualConfig {
+  # Instrument type
+  instrument: InstrumentType!
+
+  # Planned time for this configuration
+  plannedTime: PlannedTime!
+}
+
+# A String value that cannot be empty
+scalar NonEmptyString
+
+# A `BigDecimal` greater than or equal to 0
+scalar NonNegBigDecimal
+
+# Equivalent time amount in several unit options (e.g., 120 seconds or 2 minutes)
+type NonNegDuration {
+  # Duration in µs
+  microseconds: NonNegLong!
+
+  # Duration in ms
+  milliseconds: NonNegBigDecimal!
+
+  # Duration in seconds
+  seconds: NonNegBigDecimal!
+
+  # Duration in minutes
+  minutes: NonNegBigDecimal!
+
+  # Duration in hours
+  hours: NonNegBigDecimal!
+}
+
+# An `Int` in the range from 0 to 2147483647
+scalar NonNegInt
+
+# An `Long` in the range from 0 to 9223372036854775807
+scalar NonNegLong
+
+type Nonsidereal {
+  # Human readable designation that discriminates among ephemeris keys of the same type.
+  des: String!
+
+  # Nonsidereal target lookup type.
+  keyType: EphemerisKeyType!
+
+  # Synthesis of `keyType` and `des`
+  key: String!
+}
+
+# Observation operational/active status options
+enum ObsActiveStatus {
+  # ObsActiveStatus Active
+  ACTIVE
+
+  # ObsActiveStatus Inactive
+  INACTIVE
+}
+
+# Observation status options
+enum ObsStatus {
+  # ObsStatus New
+  NEW
+
+  # ObsStatus Included
+  INCLUDED
+
+  # ObsStatus Proposed
+  PROPOSED
+
+  # ObsStatus Approved
+  APPROVED
+
+  # ObsStatus ForReview
+  FOR_REVIEW
+
+  # ObsStatus Ready
+  READY
+
+  # ObsStatus Ongoing
+  ONGOING
+
+  # ObsStatus Observed
+  OBSERVED
+}
+
+type Observation {
+  # Observation ID
+  id: ObservationId!
+
+  # DELETED or PRESENT
+  existence: Existence!
+
+  # Observation title generated from id and targets
+  title: String!
+
+  # User-supplied observation-identifying detail information
+  subtitle: NonEmptyString
+
+  # Observation status
+  status: ObsStatus!
+
+  # Observation operational status
+  activeStatus: ObsActiveStatus!
+
+  # Reference time used by default for visualization and time-dependent calculations (e.g., average parallactic angle)
+  visualizationTime: Instant
+
+  # Position angle constraint, if any.
+  posAngleConstraint: PosAngleConstraint
+
+  # Observation planned time calculation.
+  plannedTime: PlannedTimeSummary!
+
+  # The program that contains this observation
+  program(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): Program!
+
+  # The observation's target(s)
+  targetEnvironment: TargetEnvironment!
+
+  # The constraint set for the observation
+  constraintSet: ConstraintSet!
+
+  # The top level science requirements
+  scienceRequirements(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ScienceRequirements!
+
+  # The science configuration
+  scienceMode(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ScienceMode
+
+  # ITC execution results
+  itc(
+    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    useCache: Boolean! = true
+  ): ItcSuccess
+
+  # Manual instrument configuration
+  manualConfig: ManualConfig
+
+  # Execution sequence and runtime artifacts
+  execution: Execution!
+}
+
+# ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`
+scalar ObservationId
+
+# The matching observation results, limited to a maximum of 1000 entries.
+type ObservationSelectResult {
+  # Matching observations up to the return size limit of 1000
+  matches: [Observation!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+type Parallax {
+  # Parallax in microarcseconds
+  microarcseconds: Long!
+
+  # Parallax in milliarcseconds
+  milliarcseconds: BigDecimal!
+}
+
+# Partner
+enum Partner {
+  # Partner ar
+  AR
+
+  # Partner br
+  BR
+
+  # Partner ca
+  CA
+
+  # Partner cl
+  CL
+
+  # Partner kr
+  KR
+
+  # Partner uh
+  UH
+
+  # Partner us
+  US
+}
+
+type PartnerSplit {
+  # Partner
+  partner: Partner!
+
+  # Percentage of observation time
+  percent: IntPercent!
+}
+
+# Planet spectrum
+enum PlanetSpectrum {
+  # PlanetSpectrum Mars
+  MARS
+
+  # PlanetSpectrum Jupiter
+  JUPITER
+
+  # PlanetSpectrum Saturn
+  SATURN
+
+  # PlanetSpectrum Uranus
+  URANUS
+
+  # PlanetSpectrum Neptune
+  NEPTUNE
+}
+
+# Planetary nebula spectrum
+enum PlanetaryNebulaSpectrum {
+  # PlanetaryNebulaSpectrum NGC7009
+  NGC7009
+
+  # PlanetaryNebulaSpectrum IC5117
+  IC5117
+}
+
+# Time estimates for executing this configuration
+type PlannedTime {
+  # Estimated setup time
+  setup: NonNegDuration!
+
+  # Estimated acquisition time for each atom
+  acquisition: [StepTime!]!
+
+  # Total estimated acquisition time
+  acquisitionTotal: StepTime!
+
+  # Estimated science time for each atom
+  science: [StepTime!]!
+
+  # Total estimated science time
+  scienceTotal: StepTime!
+
+  # Total planned time across acquisition and science
+  total: NonNegDuration!
+}
+
+type PlannedTimeSummary {
+  # The portion of planned time that will be charged
+  pi: NonNegDuration!
+
+  # The portion of planned time that will not be charged
+  uncharged: NonNegDuration!
+
+  # The total estimated execution time
+  execution: NonNegDuration!
+}
+
+# Poor Weather
+type PoorWeather implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# Constraints (if any) on the observation's position angle.
+type PosAngleConstraint {
+  # The position angle constraint type in use
+  constraint: PosAngleConstraintType!
+
+  # Describes the fixed position angle constraint, if set
+  angle: Angle
+}
+
+# Position angle constraint type
+enum PosAngleConstraintType {
+  # PosAngleConstraintType Fixed
+  FIXED
+
+  # PosAngleConstraintType AllowFlip
+  ALLOW_FLIP
+
+  # PosAngleConstraintType AverageParallactic
+  AVERAGE_PARALLACTIC
+}
+
+# A `BigDecimal` greater than 0
+scalar PosBigDecimal
+
+# An `Int` in the range from 1 to 2147483647
+scalar PosInt
+
+type Program {
+  # Program ID
+  id: ProgramId!
+
+  # DELETED or PRESENT
+  existence: Existence!
+
+  # Program name
+  name: NonEmptyString
+
+  # Program proposal
+  proposal: Proposal
+
+  # All observations associated with the program.
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Program planned time calculation.
+  plannedTime(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): PlannedTimeSummary!
+}
+
+# ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
+scalar ProgramId
+
+# The matching program results, limited to a maximum of 1000 entries.
+type ProgramSelectResult {
+  # Matching programs up to the return size limit of 1000
+  matches: [Program!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+type ProperMotion {
+  # Proper motion in RA
+  ra: ProperMotionRA!
+
+  # Proper motion in declination
+  dec: ProperMotionDeclination!
+}
+
+type ProperMotionDeclination {
+  # Proper motion in properMotion μas/year
+  microarcsecondsPerYear: Long!
+
+  # Proper motion in properMotion mas/year
+  milliarcsecondsPerYear: BigDecimal!
+}
+
+type ProperMotionRA {
+  # Proper motion in properMotion μas/year
+  microarcsecondsPerYear: Long!
+
+  # Proper motion in properMotion mas/year
+  milliarcsecondsPerYear: BigDecimal!
+}
+
+type Proposal {
+  # Proposal title
+  title: NonEmptyString
+
+  # Proposal class
+  proposalClass: ProposalClass!
+
+  # Proposal TAC category
+  category: TacCategory
+
+  # Target of Opportunity activation
+  toOActivation: ToOActivation
+
+  # Abstract
+  abstract: NonEmptyString
+
+  # Partner time allocations
+  partnerSplits: [PartnerSplit!]!
+}
+
+# Proposal Class interface
+interface ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# Proposal class type
+enum ProposalClassEnum {
+  # ProposalClassEnum Classical
+  CLASSICAL
+
+  # ProposalClassEnum DemoScience
+  DEMO_SCIENCE
+
+  # ProposalClassEnum DirectorsTime
+  DIRECTORS_TIME
+
+  # ProposalClassEnum Exchange
+  EXCHANGE
+
+  # ProposalClassEnum FastTurnaround
+  FAST_TURNAROUND
+
+  # ProposalClassEnum Intensive
+  INTENSIVE
+
+  # ProposalClassEnum LargeProgram
+  LARGE_PROGRAM
+
+  # ProposalClassEnum PoorWeather
+  POOR_WEATHER
+
+  # ProposalClassEnum Queue
+  QUEUE
+
+  # ProposalClassEnum SystemVerification
+  SYSTEM_VERIFICATION
+}
+
+# Quasar spectrum
+enum QuasarSpectrum {
+  # QuasarSpectrum QS0
+  QS0
+
+  # QuasarSpectrum QS02
+  QS02
+}
+
+type Query {
+  # All science targets (if any) for the given observation (or environment). Set `includeDeleted` to true to include any deleted targets in the asterism.
+  asterism(
+    # Observation ID
+    observationId: ObservationId!
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): [Target!]!
+
+  # Observations grouped by commonly held science asterisms
+  asterismGroup(
+    # Program ID
+    programId: ProgramId!
+
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): AsterismGroupSelectResult!
+
+  # Observations grouped by commonly held constraints
+  constraintSetGroup(
+    # Program ID
+    programId: ProgramId!
+
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ConstraintSetGroupSelectResult!
+
+  # Select the dataset associated with the given observation, step, and index
+  dataset(
+    # Observation ID
+    observationId: ObservationId!
+
+    # Step ID
+    stepId: StepId!
+
+    # Dataset index
+    index: PosInt!
+  ): Dataset
+
+  # Select all datasets associated with a step or observation
+  datasets(
+    # Filters the selection of datasets.
+    WHERE: WhereDataset
+
+    # Starts the result set at (or after if not existent) the given dataset id.
+    OFFSET: DatasetIdInput
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  # Selects the first `LIMIT` matching execution events based on the provided `WHERE` parameter, if any.
+  executionEvents(
+    # Filters the selection of execution events
+    WHERE: WhereExecutionEvent
+
+    # Starts the result set at (or after if not existent) the given execution event id.
+    OFFSET: ExecutionEventId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  # Returns the observation with the given id, if any.
+  observation(
+    # Observation ID
+    observationId: ObservationId!
+  ): Observation
+
+  # Selects the first `LIMIT` matching observations based on the provided `WHERE` parameter, if any.
+  observations(
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ObservationSelectResult!
+
+  # Returns the program with the given id, if any.
+  program(
+    # Program ID
+    programId: ProgramId!
+  ): Program
+
+  # Selects the first `LIMIT` matching programs based on the provided `WHERE` parameter, if any.
+  programs(
+    # Filters the selection of programs.
+    WHERE: WhereProgram
+
+    # Starts the result set at (or after if not existent) the given program id.
+    OFFSET: ProgramId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ProgramSelectResult!
+
+  # Observations grouped by commonly held science mode
+  scienceModeGroup(
+    # Program ID
+    programId: ProgramId!
+
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ScienceModeGroupSelectResult!
+
+  # Observations grouped by commonly held science requirements
+  scienceRequirementsGroup(
+    # Program ID
+    programId: ProgramId!
+
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): ScienceRequirementsGroupSelectResult!
+
+  # Retrieves the target with the given id, if it exists
+  target(
+    # Target ID
+    targetId: TargetId!
+  ): Target
+
+  # Target environment for the given observation (or environment id)
+  targetEnvironment(
+    # Observation ID
+    observationId: ObservationId!
+  ): TargetEnvironment
+
+  # Observations grouped by common target environment
+  targetEnvironmentGroup(
+    # Program ID
+    programId: ProgramId!
+
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): TargetEnvironmentGroupSelectResult!
+
+  # Observations grouped by commonly held targets
+  targetGroup(
+    # Program ID
+    programId: ProgramId!
+
+    # Filters the selection of observations.
+    WHERE: WhereObservation
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): TargetGroupSelectResult!
+
+  # Selects the first `LIMIT` matching targets based on the provided `WHERE` parameter, if any.
+  targets(
+    # Filters the selection of targets.
+    WHERE: WhereTarget
+
+    # Starts the result set at (or after if not existent) the given target id.
+    OFFSET: TargetId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): TargetSelectResult!
+}
+
+# Queue observing at Gemini
+type Queue implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+type RadialVelocity {
+  # Radial velocity in cm/s
+  centimetersPerSecond: Long!
+
+  # Radial velocity in m/s
+  metersPerSecond: BigDecimal!
+
+  # Radial velocity in km/s
+  kilometersPerSecond: BigDecimal!
+}
+
+type RightAscension {
+  # Right Ascension (RA) in HH:MM:SS.SSS format
+  hms: HmsString!
+
+  # Right Ascension (RA) in hours
+  hours: BigDecimal!
+
+  # Right Ascension (RA) in degrees
+  degrees: BigDecimal!
+
+  # Right Ascension (RA) in µas
+  microarcseconds: Long!
+}
+
+# Base science mode
+type ScienceMode {
+  # Instrument
+  instrument: InstrumentType!
+
+  # Mode type
+  mode: ConfigurationModeType!
+
+  # GMOS North Long Slit mode
+  gmosNorthLongSlit: GmosNorthLongSlit
+
+  # GMOS South Long Slit mode
+  gmosSouthLongSlit: GmosSouthLongSlit
+}
+
+type ScienceModeGroup {
+  # IDs of observations that use the same constraints
+  observationIds: [ObservationId!]!
+
+  # Observations associated with the common value
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Commonly held value across the observations
+  scienceMode: ScienceMode
+}
+
+# The matching scienceModeGroup results, limited to a maximum of 1000 entries.
+type ScienceModeGroupSelectResult {
+  # Matching scienceModeGroups up to the return size limit of 1000
+  matches: [ScienceModeGroup!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# Mode Spectroscopy/Imaging
+enum ScienceRequirementMode {
+  # ScienceRequirementMode Imaging
+  IMAGING
+
+  # ScienceRequirementMode Spectroscopy
+  SPECTROSCOPY
+}
+
+type ScienceRequirements {
+  # Science requirement mode
+  mode: ScienceRequirementMode!
+
+  # Spectroscopy requirements
+  spectroscopy: SpectroscopyScienceRequirements!
+}
+
+type ScienceRequirementsGroup {
+  # IDs of observations that use the same constraints
+  observationIds: [ObservationId!]!
+
+  # Observations associated with the common value
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Commonly held value across the observations
+  scienceRequirements: ScienceRequirements!
+}
+
+# The matching scienceRequirementsGroup results, limited to a maximum of 1000 entries.
+type ScienceRequirementsGroupSelectResult {
+  # Matching scienceRequirementsGroups up to the return size limit of 1000
+  matches: [ScienceRequirementsGroup!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# Sequence-level command
+enum SequenceCommand {
+  # SequenceCommand ABORT
+  ABORT
+
+  # SequenceCommand CONTINUE
+  CONTINUE
+
+  # SequenceCommand PAUSE
+  PAUSE
+
+  # SequenceCommand SLEW
+  SLEW
+
+  # SequenceCommand START
+  START
+
+  # SequenceCommand STOP
+  STOP
+}
+
+# Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
+type SequenceEvent implements ExecutionEvent {
+  # Identifies the observation to which the event refers
+  location: SequenceEventLocation!
+
+  # Sequence event data
+  payload: SequenceEventPayload!
+
+  # Event id
+  id: ExecutionEventId!
+
+  # Associated visit
+  visitId: VisitId!
+
+  # Observation whose execution produced this event
+  observation: Observation!
+
+  # Time at which this event was received
+  received: Instant!
+}
+
+# Sequence event location, i.e., to which observation the event refers.
+type SequenceEventLocation {
+  # Observation containing the sequence
+  observationId: ObservationId!
+}
+
+# Sequence event data
+type SequenceEventPayload {
+  # Sequence command
+  command: SequenceCommand!
+}
+
+# Type of sequence, acquisition or science
+enum SequenceType {
+  # SequenceType ACQUISITION
+  ACQUISITION
+
+  # SequenceType SCIENCE
+  SCIENCE
+}
+
+type Sidereal {
+  # Right ascension at epoch
+  ra: RightAscension!
+
+  # Declination at epoch
+  dec: Declination!
+
+  # Epoch, time of base observation
+  epoch: EpochString!
+
+  # Proper motion per year in right ascension and declination
+  properMotion: ProperMotion
+
+  # Radial velocity
+  radialVelocity: RadialVelocity
+
+  # Parallax
+  parallax: Parallax
+
+  # Catalog info, if any, describing from where the information in this target was obtained
+  catalogInfo: CatalogInfo
+}
+
+# Signal to noise exposure time mode
+type SignalToNoiseMode {
+  # Signal/Noise value
+  value: PosBigDecimal!
+}
+
+# Sky background
+enum SkyBackground {
+  # SkyBackground Darkest
+  DARKEST
+
+  # SkyBackground Dark
+  DARK
+
+  # SkyBackground Gray
+  GRAY
+
+  # SkyBackground Bright
+  BRIGHT
+}
+
+# Source profile, exactly one of the fields will be defined
+type SourceProfile {
+  # point source, integrated units
+  point: SpectralDefinitionIntegrated
+
+  # uniform source, surface units
+  uniform: SpectralDefinitionSurface
+
+  # gaussian source, integrated units
+  gaussian: GaussianSource
+}
+
+# Spectral definition integrated.  Exactly one of the fields will be defined.
+type SpectralDefinitionIntegrated {
+  # Band normalized spectral definition
+  bandNormalized: BandNormalizedIntegrated
+
+  # Emission lines spectral definition
+  emissionLines: EmissionLinesIntegrated
+}
+
+# Spectral definition surface.  Exactly one of the fields will be defined.
+type SpectralDefinitionSurface {
+  # Band normalized spectral definition
+  bandNormalized: BandNormalizedSurface
+
+  # Emission lines spectral definition
+  emissionLines: EmissionLinesSurface
+}
+
+# Spectroscopy capabilities Nod&Shuffle/Polarimetry/Corongraphy
+enum SpectroscopyCapabilities {
+  # SpectroscopyCapabilities NodAndShuffle
+  NOD_AND_SHUFFLE
+
+  # SpectroscopyCapabilities Polarimetry
+  POLARIMETRY
+
+  # SpectroscopyCapabilities Coronagraphy
+  CORONAGRAPHY
+}
+
+type SpectroscopyScienceRequirements {
+  # Requested central wavelength
+  wavelength: Wavelength
+
+  # Requested resolution
+  resolution: PosInt
+
+  # Requested signal to noise ratio
+  signalToNoise: PosBigDecimal
+
+  # Requested wavelength for the requested signal to noise
+  signalToNoiseAt: Wavelength
+
+  # Wavelength range
+  wavelengthCoverage: Wavelength
+
+  # Focal plane choice
+  focalPlane: FocalPlane
+
+  # Focal plane angle
+  focalPlaneAngle: FocalPlaneAngle
+
+  # Spectroscopy Capabilities
+  capabilities: SpectroscopyCapabilities
+}
+
+# Stellar library spectrum
+enum StellarLibrarySpectrum {
+  # StellarLibrarySpectrum O5V
+  O5_V
+
+  # StellarLibrarySpectrum O8III
+  O8_III
+
+  # StellarLibrarySpectrum B0V
+  B0_V
+
+  # StellarLibrarySpectrum B5_7V
+  B5_7_V
+
+  # StellarLibrarySpectrum B5III
+  B5_III
+
+  # StellarLibrarySpectrum B5I
+  B5_I
+
+  # StellarLibrarySpectrum A0V
+  A0_V
+
+  # StellarLibrarySpectrum A0III
+  A0_III
+
+  # StellarLibrarySpectrum A0I
+  A0_I
+
+  # StellarLibrarySpectrum A5V
+  A5_V
+
+  # StellarLibrarySpectrum A5III
+  A5_III
+
+  # StellarLibrarySpectrum F0V
+  F0_V
+
+  # StellarLibrarySpectrum F0III
+  F0_III
+
+  # StellarLibrarySpectrum F0I
+  F0_I
+
+  # StellarLibrarySpectrum F5V
+  F5_V
+
+  # StellarLibrarySpectrum F5V_w
+  F5_V_W
+
+  # StellarLibrarySpectrum F6V_r
+  F6_V_R
+
+  # StellarLibrarySpectrum F5III
+  F5_III
+
+  # StellarLibrarySpectrum F5I
+  F5_I
+
+  # StellarLibrarySpectrum G0V
+  G0_V
+
+  # StellarLibrarySpectrum G0V_w
+  G0_V_W
+
+  # StellarLibrarySpectrum G0V_r
+  G0_V_R
+
+  # StellarLibrarySpectrum G0III
+  G0_III
+
+  # StellarLibrarySpectrum G0I
+  G0_I
+
+  # StellarLibrarySpectrum G2V
+  G2_V
+
+  # StellarLibrarySpectrum G5V
+  G5_V
+
+  # StellarLibrarySpectrum G5V_w
+  G5_V_W
+
+  # StellarLibrarySpectrum G5V_r
+  G5_V_R
+
+  # StellarLibrarySpectrum G5III
+  G5_III
+
+  # StellarLibrarySpectrum G5III_w
+  G5_III_W
+
+  # StellarLibrarySpectrum G5III_r
+  G5_III_R
+
+  # StellarLibrarySpectrum G5I
+  G5_I
+
+  # StellarLibrarySpectrum K0V
+  K0_V
+
+  # StellarLibrarySpectrum K0V_r
+  K0_V_R
+
+  # StellarLibrarySpectrum K0III
+  K0_III
+
+  # StellarLibrarySpectrum K0III_w
+  K0_III_W
+
+  # StellarLibrarySpectrum K0III_r
+  K0_III_R
+
+  # StellarLibrarySpectrum K0_1II
+  K0_1_II
+
+  # StellarLibrarySpectrum K4V
+  K4_V
+
+  # StellarLibrarySpectrum K4III
+  K4_III
+
+  # StellarLibrarySpectrum K4III_w
+  K4_III_W
+
+  # StellarLibrarySpectrum K4III_r
+  K4_III_R
+
+  # StellarLibrarySpectrum K4I
+  K4_I
+
+  # StellarLibrarySpectrum M0V
+  M0_V
+
+  # StellarLibrarySpectrum M0III
+  M0_III
+
+  # StellarLibrarySpectrum M3V
+  M3_V
+
+  # StellarLibrarySpectrum M3III
+  M3_III
+
+  # StellarLibrarySpectrum M6V
+  M6_V
+
+  # StellarLibrarySpectrum M6III
+  M6_III
+
+  # StellarLibrarySpectrum M9III
+  M9_III
+}
+
+# Step-level events.  The execution of a single step will generate multiple events.
+type StepEvent implements ExecutionEvent {
+  # Identifies the step to which the event refers
+  location: StepEventLocation!
+
+  # Step event data including the stage of execution through which it is passing.
+  payload: StepEventPayload!
+
+  # Event id
+  id: ExecutionEventId!
+
+  # Associated visit
+  visitId: VisitId!
+
+  # Observation whose execution produced this event
+  observation: Observation!
+
+  # Time at which this event was received
+  received: Instant!
+}
+
+# Step event location, i.e., to which step the event refers
+type StepEventLocation {
+  # Observation containing the step
+  observationId: ObservationId!
+
+  # The step id itself
+  stepId: StepId!
+}
+
+# Step event data
+type StepEventPayload {
+  # Sequence type
+  sequenceType: SequenceType!
+
+  # Step execution stage
+  stepStage: StepStage!
+}
+
+# StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+scalar StepId
+
+# Execution stage or phase of an individual step
+enum StepStage {
+  # StepStage END_CONFIGURE
+  END_CONFIGURE
+
+  # StepStage END_OBSERVE
+  END_OBSERVE
+
+  # StepStage END_STEP
+  END_STEP
+
+  # StepStage START_CONFIGURE
+  START_CONFIGURE
+
+  # StepStage START_OBSERVE
+  START_OBSERVE
+
+  # StepStage START_STEP
+  START_STEP
+}
+
+# Time required for a step or steps, categorized according to use
+type StepTime {
+  # Time spent making configuration changes
+  configChange: NonNegDuration!
+
+  # Time spent collecting photons
+  exposure: NonNegDuration!
+
+  # Time spent reading out the detector
+  readout: NonNegDuration!
+
+  # Time spent writing the dataset file
+  write: NonNegDuration!
+
+  # Total time across all categories
+  total: NonNegDuration!
+}
+
+# System Verification
+type SystemVerification implements ProposalClass {
+  # Minimum percent of requested observation time that is required
+  minPercentTime: IntPercent!
+}
+
+# TAC Category
+enum TacCategory {
+  # TacCategory SmallBodies
+  SMALL_BODIES
+
+  # TacCategory PlanetaryAtmospheres
+  PLANETARY_ATMOSPHERES
+
+  # TacCategory PlanetarySurfaces
+  PLANETARY_SURFACES
+
+  # TacCategory SolarSystemOther
+  SOLAR_SYSTEM_OTHER
+
+  # TacCategory ExoplanetRadialVelocities
+  EXOPLANET_RADIAL_VELOCITIES
+
+  # TacCategory ExoplanetAtmospheresActivity
+  EXOPLANET_ATMOSPHERES_ACTIVITY
+
+  # TacCategory ExoplanetTransits
+  EXOPLANET_TRANSITS
+
+  # TacCategory ExoplanetHostStar
+  EXOPLANET_HOST_STAR
+
+  # TacCategory ExoplanetOther
+  EXOPLANET_OTHER
+
+  # TacCategory StellarAstrophysics
+  STELLAR_ASTROPHYSICS
+
+  # TacCategory StellarPopulations
+  STELLAR_POPULATIONS
+
+  # TacCategory StarFormation
+  STAR_FORMATION
+
+  # TacCategory GaseousAstrophysics
+  GASEOUS_ASTROPHYSICS
+
+  # TacCategory StellarRemnants
+  STELLAR_REMNANTS
+
+  # TacCategory GalacticOther
+  GALACTIC_OTHER
+
+  # TacCategory Cosmology
+  COSMOLOGY
+
+  # TacCategory ClustersOfGalaxies
+  CLUSTERS_OF_GALAXIES
+
+  # TacCategory HighZUniverse
+  HIGH_Z_UNIVERSE
+
+  # TacCategory LowZUniverse
+  LOW_Z_UNIVERSE
+
+  # TacCategory ActiveGalaxies
+  ACTIVE_GALAXIES
+
+  # TacCategory ExtragalacticOther
+  EXTRAGALACTIC_OTHER
+}
+
+# Target description
+type Target {
+  # Target ID
+  id: TargetId!
+
+  # DELETED or PRESENT
+  existence: Existence!
+
+  # Program that contains this target
+  program(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): Program!
+
+  # Target name.
+  name: NonEmptyString!
+
+  # source profile
+  sourceProfile: SourceProfile!
+
+  # Sidereal tracking information, if this is a sidereal target
+  sidereal: Sidereal
+
+  # Nonsidereal tracking information, if this is a nonsidereal target
+  nonsidereal: Nonsidereal
+}
+
+type TargetEnvironment {
+  # All the observation's science targets, if any
+  asterism(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): [Target!]!
+
+  # First, perhaps only, science target in the asterism
+  firstScienceTarget(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+  ): Target
+
+  # When set, overrides the default base position of the target group
+  explicitBase: Coordinates
+}
+
+type TargetEnvironmentGroup {
+  # IDs of observations that use the same constraints
+  observationIds: [ObservationId!]!
+
+  # Observations associated with the common value
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Commonly held value across the observations
+  targetEnvironment: TargetEnvironment!
+}
+
+# The matching targetEnvironmentGroup results, limited to a maximum of 1000 entries.
+type TargetEnvironmentGroupSelectResult {
+  # Matching targetEnvironmentGroups up to the return size limit of 1000
+  matches: [TargetEnvironmentGroup!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+type TargetGroup {
+  # IDs of observations that use the same constraints
+  observationIds: [ObservationId!]!
+
+  # Observations associated with the common value
+  observations(
+    # Set to true to include deleted values
+    includeDeleted: Boolean! = false
+
+    # Starts the result set at (or after if not existent) the given observation id.
+    OFFSET: ObservationId
+
+    # Limits the result to at most this number of matches (but never more than 1000).
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  # Commonly held value across the observations
+  target: Target!
+}
+
+# The matching targetGroup results, limited to a maximum of 1000 entries.
+type TargetGroupSelectResult {
+  # Matching targetGroups up to the return size limit of 1000
+  matches: [TargetGroup!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# TargetId id formatted as `t-[1-9a-f][0-9a-f]*`
+scalar TargetId
+
+# The matching target results, limited to a maximum of 1000 entries.
+type TargetSelectResult {
+  # Matching targets up to the return size limit of 1000
+  matches: [Target!]!
+
+  # `true` when there were additional matches that were not returned.
+  hasMore: Boolean!
+}
+
+# ToO Activation
+enum ToOActivation {
+  # ToOActivation None
+  NONE
+
+  # ToOActivation Standard
+  STANDARD
+
+  # ToOActivation Rapid
+  RAPID
+}
+
+# Un-normalized spectral energy distribution.  Exactly one of the definitions will be non-null.
+type UnnormalizedSed {
+  stellarLibrary: StellarLibrarySpectrum
+  coolStar: CoolStarTemperature
+  galaxy: GalaxySpectrum
+  planet: PlanetSpectrum
+  quasar: QuasarSpectrum
+  hiiRegion: HiiRegionSpectrum
+  planetaryNebula: PlanetaryNebulaSpectrum
+  powerLaw: BigDecimal
+  blackBodyTempK: PosInt
+  fluxDensities: [FluxDensityEntry!]
+}
+
+# VisitId id formatted as `v-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+scalar VisitId
+
+# Water vapor
+enum WaterVapor {
+  # WaterVapor VeryDry
+  VERY_DRY
+
+  # WaterVapor Dry
+  DRY
+
+  # WaterVapor Median
+  MEDIAN
+
+  # WaterVapor Wet
+  WET
+}
+
+type Wavelength {
+  # Wavelength in pm
+  picometers: PosInt!
+
+  # Wavelength in Å
+  angstroms: PosBigDecimal!
+
+  # Wavelength in nm
+  nanometers: PosBigDecimal!
+
+  # Wavelength in µm
+  micrometers: PosBigDecimal!
+}
+
+# Dataset filter options.  All specified items must match.
+input WhereDataset {
+  # Matches the dataset observation id.
+  observationId: WhereOrderObservationId
+
+  # Matches the dataset step id.
+  stepId: WhereEqStepId
+
+  # Matches the dataset index within the step.
+  index: WhereOrderDatasetIndex
+
+  # Matches the dataset file name.
+  filename: WhereString
+
+  # Matches the dataset QA state.
+  qaState: WhereOptionEqQaState
+}
+
+# DatasetEvent filter options.
+input WhereDatasetEvent {
+  # Matches on the step id.
+  stepId: WhereEqStepId
+
+  # Matches on the dataset index within the step.
+  index: WhereOrderDatasetIndex
+
+  # Matches on the dataset stage.
+  stage: WhereOrderDatasetStage
+
+  # Matches on the dataset filename.
+  filename: WhereOptionString
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".
+#
+input WhereEqPartner {
+  # Matches if the property is exactly the supplied value.
+  EQ: Partner
+
+  # Matches if the property is not the supplied value.
+  NEQ: Partner
+
+  # Matches if the property value is any of the supplied options.
+  IN: [Partner!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [Partner!]
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".
+#
+input WhereEqProposalClassType {
+  # Matches if the property is exactly the supplied value.
+  EQ: ProposalClassEnum
+
+  # Matches if the property is not the supplied value.
+  NEQ: ProposalClassEnum
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ProposalClassEnum!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ProposalClassEnum!]
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".
+#
+input WhereEqStepId {
+  # Matches if the property is exactly the supplied value.
+  EQ: StepId
+
+  # Matches if the property is not the supplied value.
+  NEQ: StepId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [StepId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [StepId!]
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".
+#
+input WhereEqToOActivation {
+  # Matches if the property is exactly the supplied value.
+  EQ: ToOActivation
+
+  # Matches if the property is not the supplied value.
+  NEQ: ToOActivation
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ToOActivation!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ToOActivation!]
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".
+#
+input WhereEqVisitId {
+  # Matches if the property is exactly the supplied value.
+  EQ: VisitId
+
+  # Matches if the property is not the supplied value.
+  NEQ: VisitId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [VisitId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [VisitId!]
+}
+
+# ExecutionEvent filter options.
+input WhereExecutionEvent {
+  # A list of nested execution event filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereExecutionEvent!]
+
+  # A list of nested execution event filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereExecutionEvent!]
+
+  # A nested execution event filter that must not match in order for the NOT itself to match.
+  NOT: WhereExecutionEvent
+
+  # Matches on the execution event id
+  id: WhereOrderExecutionEventId
+
+  # Matches on the visit id
+  visitId: WhereEqVisitId
+
+  # Matches on observation id
+  observationId: WhereOrderObservationId
+
+  # Matches on event reception time
+  received: WhereOrderInstant
+
+  # Matches sequence events only
+  sequenceEvent: WhereSequenceEvent
+
+  # Matches step events only
+  stepEvent: WhereStepEvent
+
+  # Matches dataset events only
+  datasetEvent: WhereDatasetEvent
+}
+
+# Observation filter options.  All specified items must match.
+input WhereObservation {
+  # A list of nested observation filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereObservation!]
+
+  # A list of nested observation filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereObservation!]
+
+  # A nested observation filter that must not match in order for the NOT itself to match.
+  NOT: WhereObservation
+
+  # Matches the observation id.
+  id: WhereOrderObservationId
+
+  # Matches the id of the program associated with this observation.
+  programId: WhereOrderProgramId
+
+  # Matches the subtitle of the observation.
+  subtitle: WhereOptionString
+
+  # Matches the observation status.
+  status: WhereOrderObsStatus
+
+  # Matches the observation active status.
+  activeStatus: WhereOrderObsActiveStatus
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".  Defining, `EQ`,
+# `NEQ` etc. implies `IS_NULL` is `false`.
+#
+input WhereOptionEqQaState {
+  # When `true`, matches if the QaState is not defined. When `false` matches if the QaState is defined.
+  IS_NULL: Boolean
+
+  # Matches if the property is exactly the supplied value.
+  EQ: DatasetQaState
+
+  # Matches if the property is not the supplied value.
+  NEQ: DatasetQaState
+
+  # Matches if the property value is any of the supplied options.
+  IN: [DatasetQaState!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [DatasetQaState!]
+}
+
+# Filters on equality (or not) of the property value and the supplied criteria.
+# All supplied criteria must match, but usually only one is selected.  E.g.
+# 'EQ = "Foo"' will match when the property value is "FOO".  Defining, `EQ`,
+# `NEQ` etc. implies `IS_NULL` is `false`.
+#
+input WhereOptionEqTacCategory {
+  # When `true`, matches if the TacCategory is not defined. When `false` matches if the TacCategory is defined.
+  IS_NULL: Boolean
+
+  # Matches if the property is exactly the supplied value.
+  EQ: TacCategory
+
+  # Matches if the property is not the supplied value.
+  NEQ: TacCategory
+
+  # Matches if the property value is any of the supplied options.
+  IN: [TacCategory!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [TacCategory!]
+}
+
+# String matching options.
+input WhereOptionString {
+  # When `true` the string must not be defined.  When `false` the string must be defined.
+  IS_NULL: Boolean
+  EQ: NonEmptyString
+  NEQ: NonEmptyString
+  IN: [NonEmptyString!]
+  NIN: [NonEmptyString!]
+
+  # Performs string matching with wildcard patterns.  The entire string must be matched.  Use % to match a sequence of any characters and _ to match any single character.
+  LIKE: NonEmptyString
+
+  # Performs string matching with wildcard patterns.  The entire string must not match.  Use % to match a sequence of any characters and _ to match any single character.
+  NLIKE: NonEmptyString
+
+  # Set to `true` (the default) for case sensitive matches, `false` to ignore case.
+  MATCH_CASE: Boolean = true
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderDatasetIndex {
+  # Matches if the property is exactly the supplied value.
+  EQ: PosInt
+
+  # Matches if the property is not the supplied value.
+  NEQ: PosInt
+
+  # Matches if the property value is any of the supplied options.
+  IN: [PosInt!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [PosInt!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: PosInt
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: PosInt
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: PosInt
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: PosInt
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderDatasetStage {
+  # Matches if the property is exactly the supplied value.
+  EQ: DatasetStage
+
+  # Matches if the property is not the supplied value.
+  NEQ: DatasetStage
+
+  # Matches if the property value is any of the supplied options.
+  IN: [DatasetStage!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [DatasetStage!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: DatasetStage
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: DatasetStage
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: DatasetStage
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: DatasetStage
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderExecutionEventId {
+  # Matches if the property is exactly the supplied value.
+  EQ: ExecutionEventId
+
+  # Matches if the property is not the supplied value.
+  NEQ: ExecutionEventId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ExecutionEventId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ExecutionEventId!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: ExecutionEventId
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: ExecutionEventId
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: ExecutionEventId
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: ExecutionEventId
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderInstant {
+  # Matches if the property is exactly the supplied value.
+  EQ: Instant
+
+  # Matches if the property is not the supplied value.
+  NEQ: Instant
+
+  # Matches if the property value is any of the supplied options.
+  IN: [Instant!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [Instant!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: Instant
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: Instant
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: Instant
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: Instant
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderInt {
+  # Matches if the property is exactly the supplied value.
+  EQ: Int
+
+  # Matches if the property is not the supplied value.
+  NEQ: Int
+
+  # Matches if the property value is any of the supplied options.
+  IN: [Int!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [Int!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: Int
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: Int
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: Int
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: Int
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderObsActiveStatus {
+  # Matches if the property is exactly the supplied value.
+  EQ: ObsActiveStatus
+
+  # Matches if the property is not the supplied value.
+  NEQ: ObsActiveStatus
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ObsActiveStatus!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ObsActiveStatus!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: ObsActiveStatus
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: ObsActiveStatus
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: ObsActiveStatus
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: ObsActiveStatus
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderObsStatus {
+  # Matches if the property is exactly the supplied value.
+  EQ: ObsStatus
+
+  # Matches if the property is not the supplied value.
+  NEQ: ObsStatus
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ObsStatus!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ObsStatus!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: ObsStatus
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: ObsStatus
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: ObsStatus
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: ObsStatus
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderObservationId {
+  # Matches if the property is exactly the supplied value.
+  EQ: ObservationId
+
+  # Matches if the property is not the supplied value.
+  NEQ: ObservationId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ObservationId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ObservationId!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: ObservationId
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: ObservationId
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: ObservationId
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: ObservationId
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderProgramId {
+  # Matches if the property is exactly the supplied value.
+  EQ: ProgramId
+
+  # Matches if the property is not the supplied value.
+  NEQ: ProgramId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [ProgramId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [ProgramId!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: ProgramId
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: ProgramId
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: ProgramId
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: ProgramId
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderSequenceCommand {
+  # Matches if the property is exactly the supplied value.
+  EQ: SequenceCommand
+
+  # Matches if the property is not the supplied value.
+  NEQ: SequenceCommand
+
+  # Matches if the property value is any of the supplied options.
+  IN: [SequenceCommand!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [SequenceCommand!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: SequenceCommand
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: SequenceCommand
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: SequenceCommand
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: SequenceCommand
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderSequenceType {
+  # Matches if the property is exactly the supplied value.
+  EQ: SequenceType
+
+  # Matches if the property is not the supplied value.
+  NEQ: SequenceType
+
+  # Matches if the property value is any of the supplied options.
+  IN: [SequenceType!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [SequenceType!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: SequenceType
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: SequenceType
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: SequenceType
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: SequenceType
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderStepStage {
+  # Matches if the property is exactly the supplied value.
+  EQ: StepStage
+
+  # Matches if the property is not the supplied value.
+  NEQ: StepStage
+
+  # Matches if the property value is any of the supplied options.
+  IN: [StepStage!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [StepStage!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: StepStage
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: StepStage
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: StepStage
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: StepStage
+}
+
+# Filters on equality or order comparisons of the property.  All supplied
+# criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+# for an integer property will match when the value is 3 or more.
+#
+input WhereOrderTargetId {
+  # Matches if the property is exactly the supplied value.
+  EQ: TargetId
+
+  # Matches if the property is not the supplied value.
+  NEQ: TargetId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [TargetId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [TargetId!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: TargetId
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: TargetId
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: TargetId
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: TargetId
+}
+
+# Program filter options.  All specified items must match.
+input WhereProgram {
+  # A list of nested program filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereProgram!]
+
+  # A list of nested program filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereProgram!]
+
+  # A nested program filter that must not match in order for the NOT itself to match.
+  NOT: WhereProgram
+
+  # Matches the program ID.
+  id: WhereOrderProgramId
+
+  # Matches the program name.
+  name: WhereOptionString
+
+  # Matches the proposal.
+  proposal: WhereProposal
+}
+
+# Proposal filter options.  All specified items must match.
+input WhereProposal {
+  # When `true`, matches if the proposal is not defined. When `false` matches if the proposal is defined.
+  IS_NULL: Boolean
+
+  # A list of nested proposal filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereProposal!]
+
+  # A list of nested proposal filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereProposal!]
+
+  # A nested proposal filter that must not match in order for the NOT itself to match.
+  NOT: WhereProposal
+
+  # Matches the proposal title.
+  title: WhereOptionString
+
+  # Matches the proposal class.
+  class: WhereProposalClass
+
+  # Matches the proposal TAC category.
+  category: WhereOptionEqTacCategory
+
+  # Matches the Target of Opportunity setting.
+  toOActivation: WhereEqToOActivation
+
+  # Matches the proposal abstract.
+  abstract: WhereOptionString
+
+  # Matches proposal partners.
+  partners: WhereProposalPartners
+}
+
+# Proposal class filter options.
+input WhereProposalClass {
+  # Proposal class type match.
+  type: WhereEqProposalClassType
+
+  # Minimum acceptable percentage match.
+  minPercent: WhereOrderInt
+}
+
+# Proposal partner entry filter options. The set of partners is scanned for a matching partner and percentage entry.
+input WhereProposalPartnerEntry {
+  # A list of nested partner entry filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereProposalPartnerEntry!]
+
+  # A list of nested partner entry filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereProposalPartnerEntry!]
+
+  # A nested partner entry filter that must not match in order for the NOT itself to match.
+  NOT: WhereProposalPartnerEntry
+
+  # Matches on partner equality
+  partner: WhereEqPartner
+
+  # Matches on partner percentage
+  percent: WhereOrderInt
+}
+
+# Proposal partners matching.  Use `MATCH` for detailed matching options, `EQ` to just match against a partners list, and/or `isJoint` for checking joint vs individual proposals
+input WhereProposalPartners {
+  # Detailed partner matching.  Use EQ instead of a simple exact match.
+  MATCH: WhereProposalPartnerEntry
+
+  # A simple exact match for the supplied partners. Use `MATCH` instead for more advanced options.
+  EQ: [Partner!]
+
+  # Matching based on whether the proposal is a joint (i.e., multi-partner) proposal.
+  isJoint: Boolean
+}
+
+# SequenceEvent filter options.
+input WhereSequenceEvent {
+  # Matches the sequence command type
+  command: WhereOrderSequenceCommand
+}
+
+# StepEvent filter options.
+input WhereStepEvent {
+  # Matches on the step id.
+  stepId: WhereEqStepId
+
+  # Matches on the sequence type
+  sequenceType: WhereOrderSequenceType
+
+  # Matches on the step stage
+  stage: WhereOrderStepStage
+}
+
+# String matching options.
+input WhereString {
+  EQ: NonEmptyString
+  NEQ: NonEmptyString
+  IN: [NonEmptyString!]
+  NIN: [NonEmptyString!]
+
+  # Performs string matching with wildcard patterns.  The entire string must be matched.  Use % to match a sequence of any characters and _ to match any single character.
+  LIKE: NonEmptyString
+
+  # Performs string matching with wildcard patterns.  The entire string must not match.  Use % to match a sequence of any characters and _ to match any single character.
+  NLIKE: NonEmptyString
+
+  # Set to `true` (the default) for case sensitive matches, `false` to ignore case.
+  MATCH_CASE: Boolean = true
+}
+
+# Target filter options.  All specified items must match.
+input WhereTarget {
+  # A list of nested target filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereTarget!]
+
+  # A list of nested target filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereTarget!]
+
+  # A nested target filter that must not match in order for the NOT itself to match.
+  NOT: WhereTarget
+
+  # Matches the target id.
+  id: WhereOrderTargetId
+
+  # Matches the id of the associated program.
+  programId: WhereOrderProgramId
+
+  # Matches the target name.
+  name: WhereString
+}
+
+type q {
+  # q offset in µas
+  microarcseconds: Long!
+
+  # q offset in mas
+  milliarcseconds: BigDecimal!
+
+  # q offset in arcsec
+  arcseconds: BigDecimal!
+}
+
+# The `BigDecimal` scalar type represents signed fractional values with arbitrary precision.
+scalar BigDecimal
+
+# The `Long` scalar type represents non-fractional signed whole numeric values. Long can represent values between -(2^63) and 2^63 - 1.
+scalar Long
