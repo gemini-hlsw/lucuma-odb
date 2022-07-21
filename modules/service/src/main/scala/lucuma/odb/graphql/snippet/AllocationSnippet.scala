@@ -63,8 +63,8 @@ object AllocationSnippet {
         ).mapN { (pid, p, d) =>
           pool.use(_.setAllocation(pid, p, d)).map[Result[Query]] {
             case NotAuthorized(user)      => Result.failure(s"User ${user.id} is not authorized to perform this action")
-            case PartnerNotFound(partner) => ???
-            case ProgramNotFound(pid)     => ???
+            case PartnerNotFound(_)       => ???
+            case ProgramNotFound(_)       => ???
             case Success                  =>
               Result(Unique(Filter(And(
                 Eql(UniquePath(List("programId")), Const(pid)),
