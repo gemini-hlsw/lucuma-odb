@@ -17,7 +17,6 @@ import edu.gemini.grackle.Query.Select
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import edu.gemini.grackle.syntax._
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.util._
 import lucuma.odb.util.Codecs._
