@@ -4,16 +4,12 @@
 package lucuma.odb.graphql.util
 
 import cats.syntax.all._
-import cats.syntax.all._
 import edu.gemini.grackle.EnumValue
 import edu.gemini.grackle.Query.Binding
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.Value
 import edu.gemini.grackle.Value._
-import io.circe.Decoder
 import io.circe.Json
-import io.circe.parser.parse
-import lucuma.core.enums.Band
 import lucuma.odb.data
 
 import java.time.Duration

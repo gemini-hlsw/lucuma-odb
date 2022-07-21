@@ -163,7 +163,7 @@ object TargetService {
       val insert =
         user match {
           case GuestUser(id)                => void"WHERE " |+| existsUserAsPi(pid, id)
-          case ServiceUser(id, name)        => void""
+          case ServiceUser(_, _)            => void""
           case StandardUser(id, role, _, _) =>
             role match {
               case Admin(_)        => void""

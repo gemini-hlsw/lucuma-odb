@@ -23,7 +23,6 @@ val testcontainersScalaVersion = "0.40.9"
 enablePlugins(NoPublishPlugin)
 
 ThisBuild / Test / fork := true
-ThisBuild / tlFatalWarnings := false // TODO!
 
 lazy val service = project
   .in(file("modules/service"))
