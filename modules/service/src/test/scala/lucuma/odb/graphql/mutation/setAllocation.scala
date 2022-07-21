@@ -58,10 +58,18 @@ trait SetAllocationOps { this: OdbSuite =>
           setAllocation(input: {
             programId: ${pid.asJson}
             partner:   ${partner.value.toUpperCase}
-            duration:  ${duration.asJson}
+            duration:  {
+              hours: "${duration.toHours}"
+            }
           }) {
             partner
-            duration
+            duration {
+              microseconds
+              milliseconds
+              seconds
+              minutes
+              hours
+            }
           }
         }
       """,
@@ -69,7 +77,13 @@ trait SetAllocationOps { this: OdbSuite =>
         {
           "setAllocation" : {
             "partner":  ${partner.asJson},
-            "duration": ${duration.asJson}
+            "duration": {
+              "microseconds": ${duration.toNanos / 1000L},
+              "milliseconds": ${duration.toMillis},
+              "seconds": ${duration.toSeconds},
+              "minutes": ${duration.toMinutes},
+              "hours": ${duration.toHours}
+            }
           }
         }
       """.asRight
