@@ -3208,6 +3208,13 @@ type FastTurnaround implements ProposalClass {
   minPercentTime: IntPercent!
 }
 
+# Metadata for `enum FilterType`
+type FilterTypeMeta {
+  tag:        FilterType!
+  shortName:  String!
+  longName:	  String!
+}
+
 # Fixed exposure time mode
 type FixedExposureMode {
   # Exposure count
@@ -4466,6 +4473,9 @@ type Query {
     # Limits the result to at most this number of matches (but never more than 1000).
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  # Metadata for `enum FilterType`
+  filterTypeMeta: [FilterTypeMeta!]!
 
   # Returns the observation with the given id, if any.
   observation(
