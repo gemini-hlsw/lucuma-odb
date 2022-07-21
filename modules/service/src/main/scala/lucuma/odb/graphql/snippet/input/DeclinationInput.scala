@@ -1,12 +1,15 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.math.Declination
-import edu.gemini.grackle.Result
 import cats.syntax.all._
-import lucuma.odb.graphql.snippet.binding.AngleBinding
+import edu.gemini.grackle.Result
 import lucuma.core.math.Angle
+import lucuma.core.math.Declination
+import lucuma.odb.graphql.snippet.binding.AngleBinding
+import lucuma.odb.graphql.util.Bindings._
 
 object DeclinationInput {
 

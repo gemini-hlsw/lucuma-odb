@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package mutation
 
@@ -10,6 +13,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.OdbSuite
+
 import java.time.Duration
 
 class setAllocation extends OdbSuite with CreateProgramOps with SetAllocationOps {

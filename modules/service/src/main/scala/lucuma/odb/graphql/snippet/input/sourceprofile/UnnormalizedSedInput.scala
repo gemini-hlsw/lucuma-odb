@@ -1,16 +1,19 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
 
-import lucuma.core.model.UnnormalizedSED
-import lucuma.odb.graphql.util.Bindings._
+import cats.data.NonEmptyMap
+import cats.syntax.all._
+import coulomb.Quantity
+import edu.gemini.grackle.Result
+import eu.timepit.refined.types.numeric
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums._
-import cats.syntax.all._
-import edu.gemini.grackle.Result
-import coulomb.Quantity
-import cats.data.NonEmptyMap
-import eu.timepit.refined.types.numeric
+import lucuma.core.model.UnnormalizedSED
+import lucuma.odb.graphql.util.Bindings._
 
 object UnnormalizedSedInput {
 

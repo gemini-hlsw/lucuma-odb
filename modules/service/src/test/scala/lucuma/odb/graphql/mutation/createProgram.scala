@@ -1,13 +1,16 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package mutation
 
-import io.circe.literal._
-import lucuma.odb.graphql.OdbSuite
-import cats.syntax.all._
-import lucuma.core.model.Partner
-import lucuma.core.model.User
 import cats.effect.IO
+import cats.syntax.all._
+import io.circe.literal._
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.graphql.OdbSuite
 
 class createProgram extends OdbSuite {
 

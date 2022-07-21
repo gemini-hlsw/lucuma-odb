@@ -1,14 +1,17 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 
 import lucuma.core.model.GuestUser
 import lucuma.core.model.OrcidId
 import lucuma.core.model.OrcidProfile
+import lucuma.core.model.Partner
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.core.util.Gid
-import lucuma.core.model.Partner
 
 object TestUsers {
 

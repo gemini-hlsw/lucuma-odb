@@ -1,9 +1,12 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.util
 
 import cats.syntax.all._
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Result
 
 trait MutationCompanionOps[F[_]] extends Mapping[F] {
