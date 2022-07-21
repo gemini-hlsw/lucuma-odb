@@ -23,7 +23,12 @@ object Bindings {
 
     final def validate(b: Binding): Result[A] =
       validate(b.value) match {
-        case Left(error)  => Result.failure(s"Argument '${b.name}' is invalid: $error")
+        case Left(error)  =>
+          // We want to compress the paths together and the easy way is to munge the string.
+          // I apologize, there is certainly a better way to do it but this works for now.
+          val msg = s"Argument '${b.name}' is invalid: $error"
+          val msg0 = msg.replaceAll("' is invalid: Argument '", ".")
+          Result.failure(msg0)
         case Right(value) => Result(value)
       }
 

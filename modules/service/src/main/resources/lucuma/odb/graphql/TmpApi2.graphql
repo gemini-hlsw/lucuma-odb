@@ -1900,6 +1900,26 @@ input ProgramPropertiesInput {
   existence: Existence
 }
 
+# The role a user a plays when assigned to a program.
+enum ProgramUserRole {
+  "Co-Investigator"             COI
+  "Observer (read-only access)" OBSERVER
+  "Staff/Partner Support"       SUPPORT
+}
+
+# The type of support role.
+enum ProgramUserSupportRoleType {
+  "Staff support"   STAFF
+  "Partner support" PARTNER
+}
+
+# An assignment of a user to a program.
+type ProgramUser {
+  role:   ProgramUserRole!
+  userId: UserId!
+  user:   User!
+}
+
 # Proper motion component, choose one of the available units
 input ProperMotionComponentInput {
   microarcsecondsPerYear: Long
@@ -4275,6 +4295,12 @@ type Program {
   # Program proposal
   proposal: Proposal
 
+  "Principal Investigator"
+  pi: User
+
+  "Users assigned to this science program"
+  users:   [ProgramUser!]!
+
   # All observations associated with the program.
   observations(
     # Set to true to include deleted values
@@ -5350,6 +5376,25 @@ type UnnormalizedSed {
   powerLaw: BigDecimal
   blackBodyTempK: PosInt
   fluxDensities: [FluxDensityEntry!]
+}
+
+scalar UserId
+
+enum UserType {
+  GUEST
+  STANDARD
+  SERVICE
+}
+
+type User {
+  id:              UserId!
+  type:            UserType!
+  serviceName:     String,
+  orcidId:         String,
+  orcidGivenName:  String,
+  orcidCreditName: String,
+  orcidFamilyName: String,
+  orcidEmail:      String,
 }
 
 # VisitId id formatted as `v-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`

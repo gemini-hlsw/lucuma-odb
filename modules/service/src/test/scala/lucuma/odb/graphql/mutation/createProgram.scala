@@ -11,9 +11,7 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
-import munit.IgnoreSuite
 
-@IgnoreSuite
 class createProgram extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(1, 101)
@@ -31,15 +29,23 @@ class createProgram extends OdbSuite {
       query =
         """
           mutation {
-            createProgram(input: { name: "" }) {
-              id
+            createProgram(
+              input: {
+                SET: {
+                  name: ""
+                }
+              }
+            ) {
+              program {
+                id
+              }
             }
           }
         """,
       expected =
         Left(
           List(
-            "Argument 'name' is invalid: string value must be non-empty."
+            "Argument 'input.SET.name' is invalid: string value must be non-empty."
           )
         ),
     )
@@ -51,8 +57,16 @@ class createProgram extends OdbSuite {
       query =
         s"""
           mutation {
-            createProgram(input: { name: null }) {
-              name
+            createProgram(
+              input: {
+                SET: {
+                  name: null
+                }
+              }
+            ) {
+              program {
+                name
+              }
             }
           }
         """,
@@ -60,7 +74,9 @@ class createProgram extends OdbSuite {
         json"""
           {
             "createProgram": {
-              "name": null
+              "program": {
+                "name": null
+              }
             }
           }
         """
@@ -76,10 +92,18 @@ class createProgram extends OdbSuite {
         query  =
           s"""
             mutation {
-              createProgram(input: { name: "$name" }) {
-                name
-                pi {
-                  id
+              createProgram(
+                input: {
+                  SET: {
+                    name: "$name"
+                  }
+                }
+              ) {
+                program {
+                  name
+                  pi {
+                    id
+                  }
                 }
               }
             }
@@ -88,9 +112,11 @@ class createProgram extends OdbSuite {
           json"""
             {
               "createProgram" : {
-                "name" : $name,
-                "pi" : {
-                    "id" : ${u.id}
+                "program": {
+                  "name" : $name,
+                  "pi" : {
+                      "id" : ${u.id}
+                  }
                 }
               }
             }
@@ -107,10 +133,18 @@ class createProgram extends OdbSuite {
       query  =
         s"""
           mutation {
-            createProgram(input: { name: "$name" }) {
-              name
-              pi {
-                id
+            createProgram(
+              input: {
+                SET: {
+                  name: "$name"
+                }
+              }
+            ) {
+              program {
+                name
+                pi {
+                  id
+                }
               }
             }
           }
@@ -119,8 +153,10 @@ class createProgram extends OdbSuite {
         json"""
           {
             "createProgram" : {
-              "name" : $name,
-              "pi" : null
+              "program": {
+                "name" : $name,
+                "pi" : null
+              }
             }
           }
         """
