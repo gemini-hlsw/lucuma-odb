@@ -15,7 +15,6 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.ScalarType
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value
-import edu.gemini.grackle.syntax._
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
