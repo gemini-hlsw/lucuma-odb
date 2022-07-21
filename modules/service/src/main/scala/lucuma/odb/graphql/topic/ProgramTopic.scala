@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.topic
 
 import cats.effect._
@@ -5,6 +8,12 @@ import cats.effect.std.Supervisor
 import cats.implicits._
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.model.Access.Admin
+import lucuma.core.model.Access.Guest
+import lucuma.core.model.Access.Ngo
+import lucuma.core.model.Access.Pi
+import lucuma.core.model.Access.Service
+import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
@@ -13,13 +22,6 @@ import org.typelevel.log4cats.Logger
 import skunk.Query
 import skunk._
 import skunk.implicits._
-
-import lucuma.core.model.Access.Admin
-import lucuma.core.model.Access.Guest
-import lucuma.core.model.Access.Ngo
-import lucuma.core.model.Access.Pi
-import lucuma.core.model.Access.Service
-import lucuma.core.model.Access.Staff
 
 object ProgramTopic {
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
@@ -6,12 +9,12 @@ import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.odb.util.Codecs._
+import natchez.Trace
 import skunk.Command
 import skunk.Session
 import skunk.codec.all._
 import skunk.implicits._
-import lucuma.odb.util.Codecs._
-import natchez.Trace
 
 trait UserService[F[_]] {
   def canonicalizeUser(u: User): F[Unit]

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb
@@ -12,8 +12,10 @@ import com.comcast.ip4s.Port
 import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
+import lucuma.core.model.User
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.service.UserService
+import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
@@ -27,10 +29,9 @@ import org.http4s.server._
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import skunk.{ Command => _, _ }
+import skunk.{Command => _, _}
+
 import scala.concurrent.duration._
-import lucuma.sso.client.SsoClient
-import lucuma.core.model.User
 
 object Main extends IOApp.Simple {
 

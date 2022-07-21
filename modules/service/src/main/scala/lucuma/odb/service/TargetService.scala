@@ -1,9 +1,13 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
+import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
@@ -21,9 +25,8 @@ import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Session
 import skunk.circe.codec.all._
-import skunk.implicits._
 import skunk.codec.all._
-import lucuma.core.model.EphemerisKey
+import skunk.implicits._
 
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse

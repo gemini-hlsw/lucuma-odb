@@ -1,25 +1,26 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
 
+import cats.data.OptionT
 import cats.effect._
 import cats.implicits._
+import cats.kernel.Order
 import edu.gemini.grackle.skunk.SkunkMonitor
+import lucuma.core.model.User
 import lucuma.graphql.routes.GrackleGraphQLService
+import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.{ Routes => LucumaGraphQLRoutes }
+import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
+import org.http4s.headers.Authorization
+import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import skunk.Session
-import org.http4s.server.websocket.WebSocketBuilder2
-import cats.data.OptionT
-import lucuma.core.model.User
-import cats.kernel.Order
-import org.http4s.headers.Authorization
-import lucuma.graphql.routes.GraphQLService
-import lucuma.odb.util.Cache
+
 import scala.concurrent.duration._
 
 object GraphQLRoutes {

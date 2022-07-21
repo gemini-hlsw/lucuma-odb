@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package mutation
 
@@ -9,9 +12,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.graphql.OdbSuite
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 

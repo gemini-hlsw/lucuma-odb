@@ -1,17 +1,21 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package mutation
 
-import lucuma.odb.graphql.OdbSuite
-import lucuma.core.model.Partner
 import cats.effect.IO
 import cats.syntax.all._
-import lucuma.core.model.User
-import lucuma.core.model.Program
 import io.circe.literal._
-import lucuma.odb.data.ProgramUserRole
 import io.circe.syntax._
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.OdbSuite
+
 import java.time.Duration
 
 class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {

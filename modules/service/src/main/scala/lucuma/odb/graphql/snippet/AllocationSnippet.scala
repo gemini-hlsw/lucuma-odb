@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
@@ -16,6 +19,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.snippet.input.DurationInput
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AllocationService.SetAllocationResponse.NotAuthorized
@@ -29,7 +33,6 @@ import skunk.codec.temporal.interval
 import java.time.Duration
 
 import Bindings._
-import lucuma.odb.graphql.snippet.input.DurationInput
 
 object AllocationSnippet {
 

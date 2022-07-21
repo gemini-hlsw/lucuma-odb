@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package snippet
 
@@ -14,12 +17,12 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value
 import edu.gemini.grackle.syntax._
 import lucuma.core.model.Program
-import lucuma.core.util.Gid
-import lucuma.odb.service.ProgramService
-import skunk.Session
-import lucuma.odb.graphql.util._
 import lucuma.core.model.User
+import lucuma.core.util.Gid
+import lucuma.odb.graphql.util._
+import lucuma.odb.service.ProgramService
 import natchez.Trace
+import skunk.Session
 
 object ProgramAdminSnippet {
 

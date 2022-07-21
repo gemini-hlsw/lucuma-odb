@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import cats.data.OptionT
 import cats.effect._
+import cats.effect.std.Supervisor
 import cats.implicits._
 import clue.ApolloWebSocketClient
 import clue.GraphQLOperation
@@ -18,28 +19,27 @@ import com.dimafeng.testcontainers.munit.TestContainerForAll
 import io.circe.Json
 import io.circe.literal._
 import lucuma.core.model.User
+import lucuma.core.util.Gid
 import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.sso.client.SsoClient
 import munit.CatsEffectSuite
+import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.headers.Authorization
 import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.{Uri => Http4sUri, _}
+import org.slf4j
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.utility.DockerImageName
+import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration._
-import org.slf4j
-import munit.internal.console.AnsiColors
-import lucuma.core.util.Gid
-import org.typelevel.ci.CIString
-import cats.effect.std.Supervisor
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
