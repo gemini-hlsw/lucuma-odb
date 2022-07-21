@@ -7,9 +7,7 @@ package query
 import cats.syntax.all._
 import io.circe.literal._
 import lucuma.odb.graphql.OdbSuite
-import munit.IgnoreSuite
 
-@IgnoreSuite
 class filterTypeMeta extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(1, 30)
