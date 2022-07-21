@@ -11,7 +11,9 @@ import io.circe.syntax._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
+import munit.IgnoreSuite
 
+@IgnoreSuite
 class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
