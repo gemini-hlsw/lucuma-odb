@@ -15,9 +15,11 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.OdbSuite
+import munit.IgnoreSuite
 
 import java.time.Duration
 
+@IgnoreSuite
 class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)

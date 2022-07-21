@@ -11,7 +11,9 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
+import munit.IgnoreSuite
 
+@IgnoreSuite
 class createProgram extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(1, 101)

@@ -15,7 +15,9 @@ import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.OdbSuite
+import munit.IgnoreSuite
 
+@IgnoreSuite
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
