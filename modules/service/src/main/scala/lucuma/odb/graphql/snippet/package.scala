@@ -6,13 +6,11 @@ import cats.syntax.all._
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
-import edu.gemini.grackle.Schema
 import edu.gemini.grackle.sql.FailedJoin
 import eu.timepit.refined.types.string
 import io.circe.Json
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
-import lucuma.core.math.BrightnessUnits
 import lucuma.core.math.Epoch
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -28,7 +26,6 @@ import lucuma.odb.graphql.util.Bindings._
 import org.tpolecat.typename._
 import skunk.Codec
 
-import scala.io.Source
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
