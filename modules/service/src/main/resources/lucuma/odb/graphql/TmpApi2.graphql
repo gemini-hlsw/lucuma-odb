@@ -1841,10 +1841,18 @@ input ParallaxInput {
   milliarcseconds: BigDecimal
 }
 
+# Metadata describing `enum Partner`
+type PartnerMeta {
+  tag:        Partner!
+  shortName:  String!
+  longName:	  String!
+  active:     Boolean!
+}
+
 # Partner time allocation: must be empty or sum to 100%
 input PartnerSplitsInput {
   # The partner field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  partner: partner
+  partner: Partner
 
   # The percent field must be either specified or skipped altogether.  It cannot be unset with a null value.
   percent: IntPercent
@@ -2459,30 +2467,6 @@ type p {
 
   # p offset in arcsec
   arcseconds: BigDecimal!
-}
-
-# Partner
-enum partner {
-  # partner ar
-  AR
-
-  # partner br
-  BR
-
-  # partner ca
-  CA
-
-  # partner cl
-  CL
-
-  # partner kr
-  KR
-
-  # partner uh
-  UH
-
-  # partner us
-  US
 }
 
 # TAC category
@@ -4171,30 +4155,6 @@ type Parallax {
   milliarcseconds: BigDecimal!
 }
 
-# Partner
-enum Partner {
-  # Partner ar
-  AR
-
-  # Partner br
-  BR
-
-  # Partner ca
-  CA
-
-  # Partner cl
-  CL
-
-  # Partner kr
-  KR
-
-  # Partner uh
-  UH
-
-  # Partner us
-  US
-}
-
 type PartnerSplit {
   # Partner
   partner: Partner!
@@ -4527,6 +4487,9 @@ type Query {
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
+
+  # Metadata for `enum Partner`
+  partnerMeta: [PartnerMeta!]!
 
   # Returns the program with the given id, if any.
   program(
