@@ -22,21 +22,7 @@ import edu.gemini.grackle.Path.UniquePath
 object PartnerSnippet {
 
   def apply[F[_]](m: SnippetMapping[F] with SkunkMapping[F]): m.Snippet = {
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, LeafMapping, col }
-
-    val schema =
-      schema"""
-        type Query {
-          partnerMeta: [PartnerMeta!]!
-        }
-        type PartnerMeta {
-          tag:        Partner!
-          shortName:  String!
-          longName:	  String!
-          active:     Boolean!
-          #sites:     [Site!]!
-        }
-      """
+    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, LeafMapping, col, schema }
 
     val QueryType        = schema.ref("Query")
     val PartnerType      = schema.ref("Partner")
@@ -79,7 +65,7 @@ object PartnerSnippet {
       }
     )
 
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 

@@ -3,70 +3,48 @@ package snippet
 
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
-import edu.gemini.grackle.syntax._
-import lucuma.odb.service.ProgramService
-import skunk.Session
-import lucuma.odb.graphql.util._
-import lucuma.core.model.User
-import natchez.Trace
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.util.Codecs._
-import skunk.codec.temporal.interval
-import lucuma.core.model.Partner
-import lucuma.odb.data.Tag
-import lucuma.core.model.Program
-import java.time.Duration
 import cats.syntax.all._
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
-import edu.gemini.grackle.Value
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value.ObjectValue
-import edu.gemini.grackle.Cursor.Env
-import Bindings._
+import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AllocationService.SetAllocationResponse.NotAuthorized
 import lucuma.odb.service.AllocationService.SetAllocationResponse.PartnerNotFound
 import lucuma.odb.service.AllocationService.SetAllocationResponse.ProgramNotFound
 import lucuma.odb.service.AllocationService.SetAllocationResponse.Success
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Path.UniquePath
+import lucuma.odb.util.Codecs._
+import skunk.Session
+import skunk.codec.temporal.interval
+
+import java.time.Duration
+
+import Bindings._
+import lucuma.odb.graphql.snippet.input.DurationInput
 
 object AllocationSnippet {
 
-  def apply[F[_]: MonadCancelThrow: Trace](
+  def apply[F[_]: MonadCancelThrow](
     m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
     sessionPool: Resource[F, Session[F]],
     user: User,
   ): m.Snippet = {
-    import m.{ ObjectMapping, Snippet, TableDef, SqlField, SqlRoot, Mutation, MutationCompanionOps, col }
+    import m.{ ObjectMapping, Snippet, TableDef, SqlField, SqlRoot, SqlObject, Mutation, MutationCompanionOps, CursorField, col, schema }
 
     val pool = sessionPool.map(AllocationService.fromSessionAndUser(_, user))
 
-    val schema =
-      schema"""
-
-        type Allocation {
-          partner: Partner!
-          duration: Duration!
-        }
-
-        input SetAllocationInput {
-          programId: ProgramId!
-          partner: Partner!
-          duration: Duration!
-        }
-
-        type Mutation {
-          "Set the allocation for a program from the specified partner."
-          setAllocation(input: SetAllocationInput!): Allocation!
-        }
-
-      """
-
     val AllocationType = schema.ref("Allocation")
     val MutationType   = schema.ref("Mutation")
+    val DurationType   = schema.ref("Duration")
 
     object Allocation extends TableDef("t_allocation") {
       val ProgramId = col("c_program_id", program_id)
@@ -100,7 +78,20 @@ object AllocationSnippet {
           fieldMappings = List(
             SqlField("programId", Allocation.ProgramId, key = true, hidden = true),
             SqlField("partner", Allocation.Partner, key = true),
-            SqlField("duration", Allocation.Duration),
+            SqlObject("duration"),
+          )
+        ),
+        ObjectMapping(
+          tpe = DurationType,
+          fieldMappings = List(
+            SqlField("programId", Allocation.ProgramId, key = true, hidden = true),
+            SqlField("partner", Allocation.Partner, key = true, hidden = true),
+            SqlField("data", Allocation.Duration, hidden = true),
+            CursorField[Long]("microseconds", c => c.fieldAs[Duration]("data").map(_.toMillis * 1000), List("data")),
+            CursorField[BigDecimal]("milliseconds", c => c.fieldAs[Duration]("data").map(d => BigDecimal(d.toMillis)), List("data")),
+            CursorField[BigDecimal]("seconds", c => c.fieldAs[Duration]("data").map(d => BigDecimal(d.toMillis) / BigDecimal(1000)), List("data")),
+            CursorField[BigDecimal]("minutes", c => c.fieldAs[Duration]("data").map(d => BigDecimal(d.toMillis) / BigDecimal(60 * 1000)), List("data")),
+            CursorField[BigDecimal]("hours", c => c.fieldAs[Duration]("data").map(d => BigDecimal(d.toMillis) / BigDecimal(60 * 60 * 1000)), List("data")),
           )
         ),
         ObjectMapping(
@@ -108,7 +99,7 @@ object AllocationSnippet {
           fieldMappings = List(
             SqlRoot("setAllocation", mutation = setAllocation)
           )
-        )
+        ),
       )
 
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
@@ -118,7 +109,7 @@ object AllocationSnippet {
           Query.Binding("input", ObjectValue(List(
             ProgramIdBinding("programId", rProgramId),
             TypedEnumBinding("partner", rPartner),
-            DurationBinding("duration", rDuration),
+            DurationInput.Binding("duration", rDuration),
           )))
         ), child) =>
           (rProgramId, rPartner, rDuration).mapN { (pid, enumValue, duration) =>
@@ -134,7 +125,7 @@ object AllocationSnippet {
       }
     )
 
-    Snippet(schema, typeMappings, elaborator)
+    Snippet(typeMappings, elaborator)
 
   }
 

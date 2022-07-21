@@ -208,26 +208,26 @@ input CoordinatesInput {
 
 # Observation creation parameters
 input CreateObservationInput {
-  observationId: ObservationId
+  # observationId: ObservationId
   programId: ProgramId!
   name: NonEmptyString
   status: ObsStatus
   activeStatus: ObsActiveStatus
-  targetEnvironment: TargetEnvironmentInput
-  constraintSet: ConstraintSetInput
-  scienceRequirements: ScienceRequirementsInput
-  scienceConfiguration: ScienceConfigurationInput
+  # targetEnvironment: TargetEnvironmentInput
+  # constraintSet: ConstraintSetInput
+  # scienceRequirements: ScienceRequirementsInput
+  # scienceConfiguration: ScienceConfigurationInput
 }
 
 # Program creation parameters
 input CreateProgramInput {
-  programId: ProgramId
+  # programId: ProgramId
   name: NonEmptyString
 }
 
 # Target creation parameters
 input CreateTargetInput {
-  targetId: TargetId
+  # targetId: TargetId
   name: NonEmptyString!
   sidereal: SiderealInput
   nonsidereal: NonsiderealInput
@@ -1052,7 +1052,81 @@ enum MosPreImaging {
   IS_NOT_MOS_PRE_IMAGING
 }
 
+scalar UserId
+
+enum UserType {
+  GUEST
+  STANDARD
+  SERVICE
+}
+
+type User {
+  id:              UserId!
+  type:            UserType!
+  serviceName:     String,
+  orcidId:         String,
+  orcidGivenName:  String,
+  orcidCreditName: String,
+  orcidFamilyName: String,
+  orcidEmail:      String,
+}
+
+type Allocation {
+  partner: Partner!
+  duration: Duration!
+}
+
+input SetAllocationInput {
+  programId: ProgramId!
+  partner: Partner!
+  duration: DurationInput!
+}
+
+"The role a user a plays when assigned to a program."
+enum ProgramUserRole {
+  "Co-Investigator"             COI
+  "Observer (read-only access)" OBSERVER
+  "Staff/Partner Support"       SUPPORT
+}
+
+"The type of support role."
+enum ProgramUserSupportRoleType {
+  "Staff support"   STAFF
+  "Partner support" PARTNER
+}
+
+"An assignment of a user to a program."
+type ProgramUser {
+  role:   ProgramUserRole!
+  userId: UserId!
+  user:   User!
+}
+
 type Mutation {
+
+  "Set the allocation for a program from the specified partner."
+  setAllocation(input: SetAllocationInput!): Allocation!
+
+  """
+  Link a user to a program. Any existing link will be replaced.
+  This operation is available only to Admin and Service users.
+  """
+  linkUser(input: LinkUserInput!): ProgramUser!
+
+  """
+  Unlink a user from a program. Returns true if the user was unlinked, false if no such link exists.
+  This operation is available only to Admin and Service users.
+  """
+  unlinkUser(
+
+    "The program to unlink the user from."
+    programId: ProgramId!
+
+    "The user to unlink."
+    userId: UserId!
+
+  ): Boolean!
+
   createProgram(
     # Program description
     input: CreateProgramInput!
@@ -1467,7 +1541,7 @@ type Subscription {
   programEdit(
     # Program ID
     programId: ProgramId
-  ): ProgramEdit!
+  ): Program! #ProgramEdit!
 }
 
 # Event sent when a new object is created or updated
@@ -2101,6 +2175,24 @@ type Duration {
 
   # Duration in hours
   hours: BigDecimal!
+}
+
+# Equivalent time amount in several unit options (exactly one must be specified)
+input DurationInput {
+  # Duration in µs
+  microseconds: Long
+
+  # Duration in ms
+  milliseconds: BigDecimal
+
+  # Duration in seconds
+  seconds: BigDecimal
+
+  # Duration in minutes
+  minutes: BigDecimal
+
+  # Duration in hours
+  hours: BigDecimal
 }
 
 # Either airmass range or elevation range
@@ -3182,6 +3274,27 @@ scalar PosBigDecimal
 # An `Int` in the range from 1 to `Int.MaxValue`
 scalar PosInt
 
+
+"Link user"
+input LinkUserInput {
+
+  "The program to add a user to."
+  programId: ProgramId!
+
+  "The user to be added."
+  userId: UserId!
+
+  "The role this user will play in the program."
+  role: ProgramUserRole!
+
+  "Must be specified if and only if 'role' is SUPPORT"
+  supportType: ProgramUserSupportRoleType
+
+  "Must be specified if and only if 'supportType' is PARTNER"
+  supportPartner: Partner
+
+}
+
 type Program {
   # Program ID
   id: ProgramId!
@@ -3191,6 +3304,12 @@ type Program {
 
   # Program name
   name: NonEmptyString
+
+  "Principal Investigator"
+  pi: User
+
+  "Users assigned to this science program"
+  users:   [ProgramUser!]!
 
   # All observations associated with the program (needs pagination).
   observations(
@@ -3271,7 +3390,26 @@ enum QuasarSpectrum {
   QS02
 }
 
+type FilterTypeMeta {
+  tag:        FilterType!
+  shortName:  String!
+  longName:	  String!
+}
+
+type PartnerMeta {
+  tag:        Partner!
+  shortName:  String!
+  longName:	  String!
+  active:     Boolean!
+  #sites:     [Site!]!
+}
+
 type Query {
+
+  partnerMeta: [PartnerMeta!]!
+
+  filterTypeMeta: [FilterTypeMeta!]!
+
   # Returns all observations associated with the given ids or program, or all observations if neither is specified.
   observations(
     # (Optional) listing of specific observations to retrieve
@@ -3387,7 +3525,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ProgramConnection!
+  ): [Program!]! #ProgramConnection!
 
   # Returns the program with the given id, if any.
   program(
