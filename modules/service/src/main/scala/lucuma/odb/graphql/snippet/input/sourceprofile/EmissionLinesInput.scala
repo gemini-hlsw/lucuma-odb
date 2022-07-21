@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
@@ -14,7 +17,8 @@ import lucuma.core.model.EmissionLine
 import lucuma.core.model.SpectralDefinition.EmissionLines
 import lucuma.odb.graphql.util.Bindings._
 
-import scala.collection.immutable.{ SortedMap, TreeMap }
+import scala.collection.immutable.SortedMap
+import scala.collection.immutable.TreeMap
 
 object EmissionLinesInput {
 

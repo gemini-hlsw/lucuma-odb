@@ -1,21 +1,24 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.util
 
-import edu.gemini.grackle.NamedType
-import edu.gemini.grackle.Schema
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.UnionType
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.InputObjectType
-import edu.gemini.grackle.InterfaceType
-import edu.gemini.grackle.ObjectType
-import edu.gemini.grackle.InputValue
-import edu.gemini.grackle.Type
-import edu.gemini.grackle.ListType
-import edu.gemini.grackle.NullableType
-import edu.gemini.grackle.Field
-import org.tpolecat.sourcepos.SourcePos
 import edu.gemini.grackle.Directive
+import edu.gemini.grackle.EnumType
+import edu.gemini.grackle.Field
+import edu.gemini.grackle.InputObjectType
+import edu.gemini.grackle.InputValue
+import edu.gemini.grackle.InterfaceType
+import edu.gemini.grackle.ListType
+import edu.gemini.grackle.NamedType
+import edu.gemini.grackle.NullableType
+import edu.gemini.grackle.ObjectType
+import edu.gemini.grackle.ScalarType
+import edu.gemini.grackle.Schema
+import edu.gemini.grackle.Type
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.UnionType
+import org.tpolecat.sourcepos.SourcePos
 
 object Remapper {
 

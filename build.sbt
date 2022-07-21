@@ -20,20 +20,15 @@ val slf4jVersion               = "1.7.36"
 val lucumaSsoVersion           = "0.1.13"
 val testcontainersScalaVersion = "0.40.9"
 
-inThisBuild(Seq(
-  homepage := Some(url("https://github.com/gemini-hlsw/lucuma-sso")),
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
-  testFrameworks += new TestFramework("munit.Framework"),
-  Test / fork := true,
-) ++ lucumaPublishSettings)
+enablePlugins(NoPublishPlugin)
 
-publish / skip := true
+ThisBuild / Test / fork := true
+ThisBuild / tlFatalWarnings := false // TODO!
 
 lazy val service = project
   .in(file("modules/service"))
   .enablePlugins(JavaAppPackaging)
   .settings(
-    publish / skip := true,
     name := "lucuma-odb-service",
     scalacOptions --= Seq("-Vtype-diffs"),
     scalacOptions ++= Seq("-Xcheckinit"),

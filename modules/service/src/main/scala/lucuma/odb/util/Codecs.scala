@@ -1,32 +1,35 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.util
 
 // Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-import lucuma.core.model._
-import lucuma.core.util.Gid
-import skunk._
-import skunk.data.Type
-import lucuma.core.enums.Site
-import skunk.codec.all._
-import skunk.data.Arr
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.util.Enumerated
-import lucuma.odb.data.Existence
-import lucuma.odb.data.UserType
-import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.Tag
-import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
-import lucuma.core.math.Angle
-import lucuma.core.math.RightAscension
-import lucuma.core.math.Declination
-import lucuma.core.math.Epoch
-import lucuma.core.math.RadialVelocity
 import lucuma.core.enums.CatalogName
 import lucuma.core.enums.EphemerisKeyType
+import lucuma.core.enums.Site
+import lucuma.core.math.Angle
+import lucuma.core.math.Declination
+import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
+import lucuma.core.math.RadialVelocity
+import lucuma.core.math.RightAscension
+import lucuma.core.model._
+import lucuma.core.util.Enumerated
+import lucuma.core.util.Gid
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.Tag
+import lucuma.odb.data.UserType
+import skunk._
+import skunk.codec.all._
+import skunk.data.Arr
+import skunk.data.Type
 
 // Codecs for some atomic types.
 trait Codecs {

@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.util
 
 import cats.effect._
@@ -5,11 +8,11 @@ import cats.effect.kernel.Ref
 import cats.effect.std.Supervisor
 import cats.implicits._
 import cats.kernel.Order
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.FiniteDuration
-import org.typelevel.log4cats.Logger
 
 trait Cache[F[_], K, V] {
   def get(k: K): F[Option[V]]

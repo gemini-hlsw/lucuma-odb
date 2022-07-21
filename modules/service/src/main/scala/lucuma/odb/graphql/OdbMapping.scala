@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -20,6 +20,7 @@ import lucuma.odb.graphql.util._
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
+
 import scala.io.Source
 
 object OdbMapping {

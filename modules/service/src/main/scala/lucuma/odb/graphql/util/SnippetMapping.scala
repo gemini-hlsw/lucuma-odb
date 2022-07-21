@@ -1,18 +1,22 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.util
 
 import cats.Semigroup
 import cats.syntax.all._
 import edu.gemini.grackle.Directive
-import edu.gemini.grackle.NamedType
-import edu.gemini.grackle.Schema
-import org.tpolecat.sourcepos.SourcePos
-import edu.gemini.grackle.ObjectType
 import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.QueryCompiler
-import edu.gemini.grackle.{Query, Type}
+import edu.gemini.grackle.NamedType
+import edu.gemini.grackle.ObjectType
+import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.Select
+import edu.gemini.grackle.QueryCompiler
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.Schema
+import edu.gemini.grackle.Type
 import edu.gemini.grackle.TypeRef
+import org.tpolecat.sourcepos.SourcePos
 
 trait SnippetMapping[F[_]] extends Mapping[F] {
 

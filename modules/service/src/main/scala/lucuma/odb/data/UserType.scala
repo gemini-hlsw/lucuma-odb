@@ -1,10 +1,13 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.data
 
-import lucuma.core.util.Enumerated
-import lucuma.core.model.User
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
+import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 
 
 sealed abstract class UserType(val tag: String) extends Product with Serializable
