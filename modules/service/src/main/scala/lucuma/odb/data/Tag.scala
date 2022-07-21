@@ -1,8 +1,11 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.data
 
+import cats.kernel.Order
 import io.circe._
 import lucuma.core.syntax.string._
-import cats.kernel.Order
 
 /**
  * A tag, for generic treatment of enumerated types. We assume they are stored in lowercase in the

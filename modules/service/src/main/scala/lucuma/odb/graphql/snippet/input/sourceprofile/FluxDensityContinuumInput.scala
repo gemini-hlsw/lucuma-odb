@@ -1,15 +1,18 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.snippet
 package input
 package sourceprofile
 
+import cats.syntax.all._
+import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Of
-import lucuma.odb.graphql.util.Bindings._
-import cats.syntax.all._
 import lucuma.core.math.dimensional.Units
-import edu.gemini.grackle.Result
+import lucuma.odb.graphql.util.Bindings._
 
 object FluxDensityContinuumInput {
 

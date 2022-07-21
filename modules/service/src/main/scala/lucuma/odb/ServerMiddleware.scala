@@ -1,24 +1,25 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb
 
-import natchez.Trace
 import cats._
-import org.http4s.HttpRoutes
-import cats.effect._
-import cats.implicits._
-import org.http4s.server.middleware.ErrorAction
-import org.typelevel.log4cats.Logger
-import org.http4s.server.middleware.CORS
-import natchez.http4s.NatchezMiddleware
-import scala.concurrent.duration._
-import lucuma.sso.client.SsoClient
-import lucuma.core.model.User
 import cats.data.Kleisli
 import cats.data.OptionT
-import scala.collection.immutable.TreeMap
+import cats.effect._
+import cats.implicits._
+import lucuma.core.model.User
 import lucuma.odb.service.UserService
+import lucuma.sso.client.SsoClient
+import natchez.Trace
+import natchez.http4s.NatchezMiddleware
+import org.http4s.HttpRoutes
+import org.http4s.server.middleware.CORS
+import org.http4s.server.middleware.ErrorAction
+import org.typelevel.log4cats.Logger
+
+import scala.collection.immutable.TreeMap
+import scala.concurrent.duration._
 
 
 /** A module of all the middlewares we apply to the server routes. */

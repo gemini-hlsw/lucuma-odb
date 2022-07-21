@@ -1,12 +1,15 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql.snippet
 package input
 
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.math.RightAscension
-import edu.gemini.grackle.Result
 import cats.syntax.all._
-import lucuma.odb.graphql.snippet.binding.HourAngleBinding
+import edu.gemini.grackle.Result
 import lucuma.core.math.HourAngle
+import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.snippet.binding.HourAngleBinding
+import lucuma.odb.graphql.util.Bindings._
 
 object RightAscensionInput {
 
