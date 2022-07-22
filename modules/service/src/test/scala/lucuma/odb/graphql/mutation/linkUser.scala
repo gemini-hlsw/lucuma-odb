@@ -80,7 +80,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
     }
   }
 
-  test("[coi] ngo user can add coi to program with time allocated by user's partner".ignore) {
+  test("[coi] ngo user can add coi to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
@@ -151,7 +151,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
     }
   }
 
-  test("[observer] ngo user can add observer to program with time allocated by user's partner".ignore) {
+  test("[observer] ngo user can add observer to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
@@ -197,7 +197,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
     }
   }
 
-  test("[staff support] ngo user can't add staff support to program with time allocated by user's partner".ignore) {
+  test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
