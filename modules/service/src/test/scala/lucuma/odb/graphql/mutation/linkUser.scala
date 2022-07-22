@@ -15,11 +15,9 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.OdbSuite
-import munit.IgnoreSuite
 
 import java.time.Duration
 
-@IgnoreSuite
 class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -82,7 +80,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
     }
   }
 
-  test("[coi] ngo user can add coi to program with time allocated by user's partner") {
+  test("[coi] ngo user can add coi to program with time allocated by user's partner".ignore) {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
@@ -153,7 +151,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
     }
   }
 
-  test("[observer] ngo user can add observer to program with time allocated by user's partner") {
+  test("[observer] ngo user can add observer to program with time allocated by user's partner".ignore) {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
@@ -199,7 +197,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
     }
   }
 
-  test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
+  test("[staff support] ngo user can't add staff support to program with time allocated by user's partner".ignore) {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
@@ -300,16 +298,20 @@ trait LinkUserOps { this: OdbSuite =>
             supportType: ${supportType.fold("null")(_.tag.toUpperCase)}
             supportPartner: ${partner.fold("null")(_.tag.toUpperCase)}
           }) {
-            role
-            userId
+            user {
+              role
+              userId
+            }
           }
         }
       """,
       expected = json"""
         {
           "linkUser" : {
-            "role" : $role,
-            "userId" : $uid
+            "user": {
+              "role" : $role,
+              "userId" : $uid
+            }
           }
         }
       """.asRight

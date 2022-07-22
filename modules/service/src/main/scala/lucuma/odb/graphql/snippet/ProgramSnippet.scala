@@ -56,6 +56,7 @@ object ProgramSnippet {
     val ProgramIdType           = schema.ref("ProgramId")
     val UserIdType              = schema.ref("UserId")
     val CreateProgramResultType = schema.ref("CreateProgramResult")
+    val LinkUserResultType      = schema.ref("LinkUserResult")
 
     // Column references for our mapping.
     object Program extends TableDef("t_program") {
@@ -196,6 +197,14 @@ object ProgramSnippet {
           fieldMappings = List(
             SqlField("id", Program.Id, key = true),
             SqlObject("program"),
+          )
+        ),
+        ObjectMapping(
+          tpe = LinkUserResultType,
+          fieldMappings = List(
+            SqlField("programId", ProgramUser.ProgramId, hidden = true, key = true),
+            SqlField("userId", ProgramUser.UserId, key = true),
+            SqlObject("user"),
           )
         ),
         ObjectMapping(
