@@ -1573,6 +1573,30 @@ input LineFluxSurfaceInput {
   units: LineFluxSurfaceUnits!
 }
 
+"Link user"
+input LinkUserInput {
+
+  "The program to add a user to."
+  programId: ProgramId!
+
+  "The user to be added."
+  userId: UserId!
+
+  "The role this user will play in the program."
+  role: ProgramUserRole!
+
+  "Must be specified if and only if 'role' is SUPPORT"
+  supportType: ProgramUserSupportRoleType
+
+  "Must be specified if and only if 'supportType' is PARTNER"
+  supportPartner: Partner
+
+}
+
+type LinkUserResult {
+  user: ProgramUser!
+}
+
 # MOS pre-imaging observation
 enum MosPreImaging {
   # MosPreImaging IsMosPreImaging
@@ -1668,6 +1692,12 @@ type Mutation {
     input: DeleteTargetsInput!
   ): DeleteTargetsResult!
 
+  """
+  Link a user to a program. Any existing link will be replaced.
+  This operation is available only to Admin and Service users.
+  """
+  linkUser(input: LinkUserInput!): LinkUserResult!
+
   # Record a new step
   recordGmosNorthStep(
     # GmosNorth step configuration parameters
@@ -1703,6 +1733,20 @@ type Mutation {
     # Parameters used to select observations for undelete
     input: UndeleteTargetsInput!
   ): UndeleteTargetsResult!
+
+  """
+  Unlink a user from a program.
+  This operation is available only to Admin and Service users.
+  """
+  unlinkUser(
+
+    "The program to unlink the user from."
+    programId: ProgramId!
+
+    "The user to unlink."
+    userId: UserId!
+
+  ): UnlinkUserResult!
 
   # Update asterisms, adding or deleting targets, in (potentially) multiple
   # observations at once.
@@ -5362,6 +5406,21 @@ enum ToOActivation {
 
   # ToOActivation Rapid
   RAPID
+}
+
+input UnlinkUserInput {
+
+    "The program to unlink the user from."
+    programId: ProgramId!
+
+    "The user to unlink."
+    userId: UserId!
+
+}
+
+type UnlinkUserResult {
+  "Returns true if the user was unlinked, false if no such link existed."
+  result: Boolean!
 }
 
 # Un-normalized spectral energy distribution.  Exactly one of the definitions will be non-null.

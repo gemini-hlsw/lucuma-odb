@@ -169,9 +169,10 @@ class createProgram extends OdbSuite {
 trait CreateProgramOps { this: OdbSuite =>
 
   def createProgramAs(user: User): IO[Program.Id] =
-    query(user, "mutation { createProgram(input: { name: null }) { id } }").flatMap { js =>
+    query(user, "mutation { createProgram(input: { SET: { name: null } }) { program { id } } }").flatMap { js =>
       js.hcursor
         .downField("createProgram")
+        .downField("program")
         .downField("id")
         .as[Program.Id]
         .leftMap(f => new RuntimeException(f.message))
