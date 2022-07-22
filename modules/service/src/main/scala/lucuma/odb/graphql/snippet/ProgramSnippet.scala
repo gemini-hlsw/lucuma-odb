@@ -24,6 +24,7 @@ import lucuma.core.model.Access._
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data._
+import lucuma.odb.graphql.snippet.input.CreateProgramInput
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ProgramService
@@ -31,7 +32,6 @@ import lucuma.odb.service.ProgramService.LinkUserResponse._
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk.Session
-import lucuma.odb.graphql.snippet.input.CreateProgramInput
 
 object ProgramSnippet {
 
