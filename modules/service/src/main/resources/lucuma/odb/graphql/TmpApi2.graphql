@@ -43,6 +43,12 @@ input AirMassRangeInput {
   max: PosBigDecimal
 }
 
+# Time allocation
+type Allocation {
+  partner: Partner!
+  duration: Duration!
+}
+
 # Create an angle from a signed value.  Choose exactly one of the available units.
 input AngleInput {
   microarcseconds: Long
@@ -1722,6 +1728,9 @@ type Mutation {
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
 
+  "Set the allocation for a program from the specified partner."
+  setAllocation(input: SetAllocationInput!): SetAllocationResult!
+
   # Undeletes all the observations identified by the `WHERE` field
   undeleteObservations(
     # Parameters used to select observations for undelete
@@ -2136,6 +2145,16 @@ input SequenceEventLocationInput {
 # SequenceEvent payload creation parameters
 input SequenceEventPayloadInput {
   command: SequenceCommand!
+}
+
+input SetAllocationInput {
+  programId: ProgramId!
+  partner: Partner!
+  duration: DurationInput!
+}
+
+type SetAllocationResult {
+  allocation: Allocation!
 }
 
 # Sidereal target edit parameters
@@ -3129,6 +3148,42 @@ type DirectorsTime implements ProposalClass {
 
 # Target declination coordinate in format '[+/-]DD:MM:SS.sss'
 scalar DmsString
+
+# Equivalent time amount in several unit options (e.g., 120 seconds or 2 minutes)
+type Duration {
+  # Duration in µs
+  microseconds: Long!
+
+  # Duration in ms
+  milliseconds: BigDecimal!
+
+  # Duration in seconds
+  seconds: BigDecimal!
+
+  # Duration in minutes
+  minutes: BigDecimal!
+
+  # Duration in hours
+  hours: BigDecimal!
+}
+
+# Equivalent time amount in several unit options (exactly one must be specified)
+input DurationInput {
+  # Duration in µs
+  microseconds: Long
+
+  # Duration in ms
+  milliseconds: BigDecimal
+
+  # Duration in seconds
+  seconds: BigDecimal
+
+  # Duration in minutes
+  minutes: BigDecimal
+
+  # Duration in hours
+  hours: BigDecimal
+}
 
 # Either air mass range or elevation range
 type ElevationRange {
