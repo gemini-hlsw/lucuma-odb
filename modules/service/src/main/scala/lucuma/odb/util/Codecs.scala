@@ -6,10 +6,9 @@ package lucuma.odb.util
 // Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
+import cats.syntax.bifunctor._
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.CatalogName
-import lucuma.core.enums.EphemerisKeyType
-import lucuma.core.enums.Site
+import lucuma.core.enums.{CatalogName, CloudExtinction, EphemerisKeyType, ImageQuality, Site, SkyBackground, WaterVapor}
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
@@ -17,6 +16,8 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.model._
+import lucuma.core.model.ElevationRange.AirMass.DecimalValue
+import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.Existence
@@ -99,7 +100,7 @@ trait Codecs {
 
   val declination: Codec[Declination] =
     angle_µas.eimap(
-      a => Declination.fromAngle.getOption(a).toRight(s"Invalied declination: $a"))(
+      a => Declination.fromAngle.getOption(a).toRight(s"Invalid declination: $a"))(
       Declination.fromAngle.reverseGet
     )
 
@@ -126,6 +127,28 @@ trait Codecs {
       a => Parallax.fromMicroarcseconds(a.toMicroarcseconds))(
       p => Angle.fromMicroarcseconds(p.μas.value.value)
     )
+
+  val cloud_extinction: Codec[CloudExtinction] =
+    enumerated(Type("e_cloud_extinction"))
+
+  val image_quality: Codec[ImageQuality] =
+    enumerated(Type("e_image_quality"))
+
+  val sky_background: Codec[SkyBackground] =
+    enumerated(Type("e_sky_background"))
+
+  val water_vapor: Codec[WaterVapor] =
+    enumerated(Type("e_water_vapor"))
+
+  val air_mass_range_value: Codec[DecimalValue] =
+    numeric.eimap(
+      bd => DecimalValue.from(bd).leftMap(m => s"Invalid air mass range value: $bd: $m")
+    )(_.value)
+
+  val hour_angle_range_value: Codec[DecimalHour] =
+    numeric.eimap(
+      bd => DecimalHour.from(bd).leftMap(m => s"Invalid hour angle range value: $bd: $m")
+    )(_.value)
 
 }
 
