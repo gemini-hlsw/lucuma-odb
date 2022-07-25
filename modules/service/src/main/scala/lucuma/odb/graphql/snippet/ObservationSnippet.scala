@@ -18,6 +18,10 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value._
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.{Encoder, Json}
+import lucuma.core.enums.{CloudExtinction, ImageQuality, SkyBackground, WaterVapor}
+import lucuma.core.model.ElevationRange.AirMass.DecimalValue
+import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -55,6 +59,15 @@ object ObservationSnippet {
     val ObsStatusType       = schema.ref("ObsStatus")
     val ObsActiveStatusType = schema.ref("ObsActiveStatus")
 
+    val ConstraintSetType   = schema.ref("ConstraintSet")
+    val CloudExtinctionType = schema.ref("CloudExtinction")
+    val ImageQualityType    = schema.ref("ImageQuality")
+    val SkyBackgroundType   = schema.ref("SkyBackground")
+    val WaterVaporType      = schema.ref("WaterVapor")
+    val ElevationRangeType  = schema.ref("ElevationRange")
+    val AirMassRangeType    = schema.ref("AirMassRange")
+    val HourAngleRangeType  = schema.ref("HourAngleRange")
+
     val pool = dbPool.map { s =>
       Services[F](
         ObservationService.fromUserAndSession(user, s),
@@ -83,6 +96,19 @@ object ObservationSnippet {
       val ActiveStatus: m.ColumnRef = col("c_active_status", obs_active_status)
     }
 
+    object ConstraintSetTable extends TableDef("t_constraint_set") {
+      val ObservationId: m.ColumnRef   = col("c_observation_id", observation_id)
+      val CloudExtinction: m.ColumnRef = col("c_cloud_extinction", cloud_extinction)
+      val ImageQuality: m.ColumnRef    = col("c_image_quality", image_quality)
+      val SkyBackground: m.ColumnRef   = col("c_sky_background", sky_background)
+      val WaterVapor: m.ColumnRef      = col("c_water_vapor", water_vapor)
+
+      val AirMassMin: m.ColumnRef      = col("c_air_mass_min", air_mass_range_value)
+      val AirMassMax: m.ColumnRef      = col("c_air_mass_max", air_mass_range_value)
+      val HourAngleMin: m.ColumnRef    = col("c_hour_angle_min", hour_angle_range_value)
+      val HourAngleMax: m.ColumnRef    = col("c_hour_angle_max", hour_angle_range_value)
+    }
+
     // Column references for our mapping.
     object ProgramTable extends TableDef("t_program") {
       val Id: m.ColumnRef = col("c_program_id", program_id)
@@ -109,6 +135,12 @@ object ObservationSnippet {
         }
       }
 
+    implicit val EncoderDecimalValue: Encoder[DecimalValue] =
+      (a: DecimalValue) => Json.fromBigDecimal(a.value)
+
+    implicit val EncoderDecimalHour: Encoder[DecimalHour] =
+      (a: DecimalHour) => Json.fromBigDecimal(a.value)
+
     val typeMappings =
       List(
         ObjectMapping(
@@ -124,6 +156,38 @@ object ObservationSnippet {
           ),
         ),
         ObjectMapping(
+          tpe = ConstraintSetType,
+          fieldMappings = List(
+            SqlField("observationId",   ConstraintSetTable.ObservationId, key = true),
+            SqlField("cloudExtinction", ConstraintSetTable.CloudExtinction),
+            SqlField("imageQuality",    ConstraintSetTable.ImageQuality),
+            SqlField("skyBackground",   ConstraintSetTable.SkyBackground),
+            SqlField("waterVapor",      ConstraintSetTable.WaterVapor),
+            SqlObject("elevationRange")
+          )
+        ),
+        ObjectMapping(
+          tpe = ElevationRangeType,
+          fieldMappings = List(
+            SqlObject("airMassRange"),
+            SqlObject("hourAngleRange")
+          )
+        ),
+        ObjectMapping(
+          tpe = AirMassRangeType,
+          fieldMappings = List(
+            SqlField("min", ConstraintSetTable.AirMassMin),
+            SqlField("max", ConstraintSetTable.AirMassMax),
+          )
+        ),
+        ObjectMapping(
+          tpe = HourAngleRangeType,
+          fieldMappings = List(
+            SqlField("minHours", ConstraintSetTable.HourAngleMin),
+            SqlField("maxHours", ConstraintSetTable.HourAngleMax)
+          )
+        ),
+        ObjectMapping(
           tpe = MutationType,
           fieldMappings = List(
             SqlRoot("createObservation", mutation = insertObservation),
@@ -132,6 +196,12 @@ object ObservationSnippet {
         LeafMapping[Observation.Id](ObservationIdType),
         LeafMapping[ObsStatus](ObsStatusType),
         LeafMapping[ObsActiveStatus](ObsActiveStatusType),
+        LeafMapping[CloudExtinction](CloudExtinctionType),
+        LeafMapping[ImageQuality](ImageQualityType),
+        LeafMapping[SkyBackground](SkyBackgroundType),
+        LeafMapping[WaterVapor](WaterVaporType),
+        LeafMapping[DecimalValue](AirMassRangeType),
+        LeafMapping[DecimalHour](HourAngleRangeType)
       )
 
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
