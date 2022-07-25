@@ -12,6 +12,7 @@ import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.model.{ConstraintSet, ElevationRange}
 import lucuma.core.optics.syntax.lens._
+import lucuma.odb.graphql.snippet.input.ConstraintSetInput.NominalConstraints
 import lucuma.odb.graphql.util.Bindings._
 
 final case class ConstraintSetInput(
@@ -24,12 +25,12 @@ final case class ConstraintSetInput(
 
   def create: Result[ConstraintSet] = {
     // TODO: default this (as below) or fail when missing?
-    val ce = cloudExtinction.getOrElse(CloudExtinction.ThreePointZero)
-    val iq = imageQuality.getOrElse(ImageQuality.TwoPointZero)
-    val sb = skyBackground.getOrElse(SkyBackground.Bright)
-    val wv = waterVapor.getOrElse(WaterVapor.Wet)
+    val ce = cloudExtinction.getOrElse(NominalConstraints.cloudExtinction)
+    val iq = imageQuality.getOrElse(NominalConstraints.imageQuality)
+    val sb = skyBackground.getOrElse(NominalConstraints.skyBackground)
+    val wv = waterVapor.getOrElse(NominalConstraints.waterVapor)
 
-    elevationRange.fold(Result(ElevationRange.AirMass.Default: ElevationRange))(_.create).map { er =>
+    elevationRange.fold(Result(NominalConstraints.elevationRange))(_.create).map { er =>
       ConstraintSet(iq, ce, sb, wv, er)
     }
   }
@@ -48,6 +49,17 @@ final case class ConstraintSetInput(
 }
 
 object ConstraintSetInput {
+
+  // TODO: figure out what the values should actually be and move to
+  // TODO: ConstraintSet companion in core?
+  val NominalConstraints: ConstraintSet =
+    ConstraintSet(
+      cloudExtinction = CloudExtinction.ThreePointZero,
+      imageQuality    = ImageQuality.TwoPointZero,
+      skyBackground   = SkyBackground.Bright,
+      waterVapor      = WaterVapor.Wet,
+      elevationRange  = ElevationRange.AirMass.Default
+    )
 
   val CloudExtinctionBinding: Matcher[CloudExtinction] =
     enumeratedBinding[CloudExtinction]

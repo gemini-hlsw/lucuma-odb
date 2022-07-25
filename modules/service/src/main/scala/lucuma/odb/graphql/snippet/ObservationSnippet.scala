@@ -28,6 +28,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.graphql.snippet.input.ConstraintSetInput
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.{ConstraintSetService, ObservationService}
 import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
@@ -169,8 +170,8 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = ElevationRangeType,
           fieldMappings = List(
-            SqlObject("airMassRange"),
-            SqlObject("hourAngleRange")
+            SqlObject("airMass"),
+            SqlObject("hourAngle")
           )
         ),
         ObjectMapping(
@@ -212,9 +213,10 @@ object ObservationSnippet {
             NonEmptyStringBinding.Option("name", rName),
             ObsStatusBinding.Option("status", rStatus),
             ObsActiveStatusBinding.Option("activeStatus", rActiveStatus),
+            ConstraintSetInput.CreateBinding.Option("constraintSet", rConstraintSet)
           )))
         ), child) =>
-          (rPid, rName, rStatus, rActiveStatus).parMapN { (pid, name, status, activeStatus) =>
+          (rPid, rName, rStatus, rActiveStatus, rConstraintSet).parMapN { (pid, name, status, activeStatus, constraintSet) =>
             Environment(
               Env(
                 "programId"       -> pid,
@@ -222,6 +224,7 @@ object ObservationSnippet {
                 "existence"       -> Existence.Present,
                 "obsStatus"       -> status.getOrElse(ObsStatus.Default),
                 "obsActiveStatus" -> activeStatus.getOrElse(ObsActiveStatus.Default),
+                "constraintSet"   -> constraintSet.getOrElse(ConstraintSetInput.NominalConstraints)
               ),
               Select("createObservation", Nil, child)
             )

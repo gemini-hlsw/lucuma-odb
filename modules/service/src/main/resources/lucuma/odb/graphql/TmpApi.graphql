@@ -184,11 +184,11 @@ input CatalogInfoInput {
 
 # Constraint set creation and editing parameters
 input ConstraintSetInput {
-  # The imageQuality field is required when creating a new instance of ConstraintSet, but optional when editing
-  imageQuality: ImageQuality
-
   # The cloudExtinction field is required when creating a new instance of ConstraintSet, but optional when editing
   cloudExtinction: CloudExtinction
+
+  # The imageQuality field is required when creating a new instance of ConstraintSet, but optional when editing
+  imageQuality: ImageQuality
 
   # The skyBackground field is required when creating a new instance of ConstraintSet, but optional when editing
   skyBackground: SkyBackground
@@ -214,7 +214,7 @@ input CreateObservationInput {
   status: ObsStatus
   activeStatus: ObsActiveStatus
   # targetEnvironment: TargetEnvironmentInput
-  # constraintSet: ConstraintSetInput
+  constraintSet: ConstraintSetInput
   # scienceRequirements: ScienceRequirementsInput
   # scienceConfiguration: ScienceConfigurationInput
 }
@@ -1937,11 +1937,11 @@ enum ConfigurationModeType {
 }
 
 type ConstraintSet {
-  # Image quality
-  imageQuality: ImageQuality!
-
   # Cloud extinction
   cloudExtinction: CloudExtinction!
+
+  # Image quality
+  imageQuality: ImageQuality!
 
   # Sky background
   skyBackground: SkyBackground!
@@ -2198,10 +2198,10 @@ input DurationInput {
 # Either air mass range or elevation range
 type ElevationRange {
   # AirMassRange if elevation range is an air mass range
-  airMassRange: AirMassRange
+  airMass: AirMassRange
 
   # HourAngleRange if elevation range is an hour angle range
-  hourAngleRange: HourAngleRange
+  hourAngle: HourAngleRange
 }
 
 type EmissionLineIntegrated {
