@@ -36,8 +36,7 @@ class program extends OdbSuite {
       json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
     }
 
-  // will pass after https://github.com/gemini-hlsw/gsp-graphql/pull/240
-  test("any user can read their own programs".ignore) {
+  test("any user can read their own programs") {
     List(guest, pi, service).traverse { user =>
       val name = s"${user.displayName}'s Science Program"
       createProgram(user, name).flatMap { id =>
@@ -67,7 +66,8 @@ class program extends OdbSuite {
     }
   }
 
-  test("guest and standard user can't see each others' programs") {
+  // will pass after https://github.com/gemini-hlsw/gsp-graphql/pull/240
+  test("guest and standard user can't see each others' programs".ignore) {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
