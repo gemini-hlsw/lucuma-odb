@@ -227,15 +227,13 @@ object ProgramSnippet {
 
         case Select("program", List(
           ProgramIdBinding("programId", rPid),
-          BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
-          (rPid, rIncludeDeleted).parMapN { (pid, includeDeleted) =>
+          rPid.map { pid =>
             Select("program", Nil,
               Unique(
                 Filter(
                   And(
                     Predicates.hasProgramId(pid),
-                    Predicates.includeDeleted(includeDeleted),
                     Predicates.isVisibleTo(user),
                   ),
                   child
