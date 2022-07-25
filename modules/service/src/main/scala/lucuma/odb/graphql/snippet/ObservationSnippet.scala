@@ -15,15 +15,14 @@ import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.Value._
 import edu.gemini.grackle.skunk.SkunkMapping
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.graphql.snippet.input.CreateObservationInput
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
@@ -49,6 +48,7 @@ object ObservationSnippet {
     val ObservationIdType = schema.ref("ObservationId")
     val ObsStatusType     = schema.ref("ObsStatus")
     val ObsActiveStatusType = schema.ref("ObsActiveStatus")
+    val CreateObservationResultType = schema.ref("CreateObservationResult")
 
     val pool = dbPool.map(ObservationService.fromUserAndSession(user, _))
 
@@ -83,15 +83,9 @@ object ObservationSnippet {
 
     val insertObservation: Mutation =
       Mutation.simple { (child, env) =>
-        (
-          env.getR[Program.Id]("programId"),
-          env.getR[Option[NonEmptyString]]("name"),
-          env.getR[Existence]("existence"),
-          env.getR[ObsStatus]("obsStatus"),
-          env.getR[ObsActiveStatus]("obsActiveStatus"),
-        ).parTupled.flatTraverse { case (pid, name, existence, os, as) =>
+        env.getR[CreateObservationInput]("input").flatTraverse { input =>
           pool.use { svc =>
-            svc.insertObservation(pid, name, existence, os, as).map {
+            svc.insertObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
               case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
               case Success(id)         => uniqueObservationNoFiltering(id, child)
             }
@@ -107,7 +101,7 @@ object ObservationSnippet {
             SqlField("id", ObservationTable.Id, key = true),
             SqlField("programId", ObservationTable.ProgramId, hidden=true),
             SqlField("existence", ObservationTable.Existence, hidden = true),
-            SqlField("name", ObservationTable.Name),
+            SqlField("subtitle", ObservationTable.Name),
             SqlField("status", ObservationTable.Status),
             SqlField("activeStatus", ObservationTable.ActiveStatus),
             SqlObject("program", Join(ObservationTable.ProgramId, ProgramTable.Id)),
@@ -119,6 +113,13 @@ object ObservationSnippet {
             SqlRoot("createObservation", mutation = insertObservation),
           )
         ),
+        ObjectMapping(
+          tpe = CreateObservationResultType,
+          fieldMappings = List(
+            SqlField("id", ObservationTable.Id, key = true, hidden = true),
+            SqlObject("observation"),
+          )
+        ),
         LeafMapping[Observation.Id](ObservationIdType),
         LeafMapping[ObsStatus](ObsStatusType),
         LeafMapping[ObsActiveStatus](ObsActiveStatusType),
@@ -126,25 +127,9 @@ object ObservationSnippet {
 
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
       MutationType -> {
-        case Select("createObservation", List(
-          Binding("input", ObjectValue(List(
-            ProgramIdBinding("programId", rPid),
-            NonEmptyStringBinding.Option("name", rName),
-            ObsStatusBinding.Option("status", rStatus),
-            ObsActiveStatusBinding.Option("activeStatus", rActiveStatus),
-          )))
-        ), child) =>
-          (rPid, rName, rStatus, rActiveStatus).parMapN { (pid, name, status, activeStatus) =>
-            Environment(
-              Env(
-                "programId"       -> pid,
-                "name"            -> name,
-                "existence"       -> Existence.Present,
-                "obsStatus"       -> status.getOrElse(ObsStatus.Default),
-                "obsActiveStatus" -> activeStatus.getOrElse(ObsActiveStatus.Default),
-              ),
-              Select("createObservation", Nil, child)
-            )
+        case Select("createObservation", List(CreateObservationInput.Binding("input", rInput)), child) =>
+          rInput.map { input =>
+            Environment(Env("input" -> input), Select("createObservation", Nil, child))
           }
       },
     )

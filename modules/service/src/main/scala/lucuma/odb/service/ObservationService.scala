@@ -19,16 +19,14 @@ import lucuma.odb.data.Tag
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.implicits._
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 
 trait ObservationService[F[_]] {
   import ObservationService._
 
   def insertObservation(
     programId:   Program.Id,
-    name:        Option[NonEmptyString] = NonEmptyString.unapply("Untitled Observation"),
-    existence:   Existence              = Existence.Present,
-    status:      ObsStatus              = ObsStatus.New,
-    activeState: ObsActiveStatus        = ObsActiveStatus.Active,
+    SET:         ObservationPropertiesInput,
   ): F[InsertObservationResponse]
 
 }
@@ -48,12 +46,9 @@ object ObservationService {
 
       def insertObservation(
         programId:   Program.Id,
-        name:        Option[NonEmptyString],
-        existence:   Existence,
-        status:      ObsStatus,
-        activeState: ObsActiveStatus
+        SET:         ObservationPropertiesInput,
       ): F[InsertObservationResponse] = {
-        val af = Statements.insertObservationAs(user, programId, name, existence, status, activeState)
+        val af = Statements.insertObservationAs(user, programId, SET.subtitle, SET.existence.getOrElse(Existence.Default), SET.status.getOrElse(ObsStatus.Default), SET.activeStatus.getOrElse(ObsActiveStatus.Default))
         session.prepare(af.fragment.query(observation_id)).use { pq =>
           pq.option(af.argument).map {
             case Some(oid) => Success(oid)
