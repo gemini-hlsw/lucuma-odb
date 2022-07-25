@@ -11,7 +11,7 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.graphql.routes.GraphQLService
-import lucuma.graphql.routes.{ Routes => LucumaGraphQLRoutes }
+import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
