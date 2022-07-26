@@ -129,16 +129,16 @@ trait Codecs {
     )
 
   val cloud_extinction: Codec[CloudExtinction] =
-    enumerated(Type("e_cloud_extinction"))
+    enumerated[CloudExtinction](Type.varchar)
 
   val image_quality: Codec[ImageQuality] =
-    enumerated(Type("e_image_quality"))
+    enumerated[ImageQuality](Type.varchar)
 
   val sky_background: Codec[SkyBackground] =
-    enumerated(Type("e_sky_background"))
+    enumerated[SkyBackground](Type.varchar)
 
   val water_vapor: Codec[WaterVapor] =
-    enumerated(Type("e_water_vapor"))
+    enumerated[WaterVapor](Type.varchar)
 
   val air_mass_range_value: Codec[DecimalValue] =
     numeric.eimap(
