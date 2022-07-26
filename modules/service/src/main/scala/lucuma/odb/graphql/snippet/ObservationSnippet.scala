@@ -22,26 +22,19 @@ import io.circe.{Encoder, Json}
 import lucuma.core.enums.{CloudExtinction, ImageQuality, SkyBackground, WaterVapor}
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.core.model.User
+import lucuma.core.model.{ConstraintSet, Observation, Program, User}
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
 import lucuma.odb.graphql.util._
-import lucuma.odb.service.{ConstraintSetService, ObservationService}
+import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
 import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
 import lucuma.odb.util.Codecs._
 import skunk.Session
 
 object ObservationSnippet {
-
-  final case class Services[F[_]](
-    obs: ObservationService[F],
-    cs:  ConstraintSetService[F]
-  )
 
   def apply[F[_]: MonadCancelThrow](
     m:      SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
@@ -69,12 +62,7 @@ object ObservationSnippet {
     val AirMassRangeType    = schema.ref("AirMassRange")
     val HourAngleRangeType  = schema.ref("HourAngleRange")
 
-    val pool = dbPool.map { s =>
-      Services[F](
-        ObservationService.fromUserAndSession(user, s),
-        ConstraintSetService.fromSession(user, s)
-      )
-    }
+    val pool = dbPool.map(ObservationService.fromUserAndSession(user, _))
 
     object Predicates {
 
@@ -88,26 +76,22 @@ object ObservationSnippet {
 
     // Column references for our mapping.
     object ObservationTable extends TableDef("t_observation") {
-      val ProgramId: m.ColumnRef    = col("c_program_id", program_id)
-      val Id: m.ColumnRef           = col("c_observation_id", observation_id)
-      val Existence: m.ColumnRef    = col("c_existence", existence)
-      val Name: m.ColumnRef         = col("c_name", text_nonempty.opt)
+      val ProgramId: m.ColumnRef    = col("c_program_id",          program_id)
+      val Id: m.ColumnRef           = col("c_observation_id",      observation_id)
+      val Existence: m.ColumnRef    = col("c_existence",           existence)
+      val Name: m.ColumnRef         = col("c_name",                text_nonempty.opt)
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
-      val Status: m.ColumnRef       = col("c_status", obs_status)
-      val ActiveStatus: m.ColumnRef = col("c_active_status", obs_active_status)
-    }
+      val Status: m.ColumnRef       = col("c_status",              obs_status)
+      val ActiveStatus: m.ColumnRef = col("c_active_status",       obs_active_status)
 
-    object ConstraintSetTable extends TableDef("t_constraint_set") {
-      val ObservationId: m.ColumnRef   = col("c_observation_id", observation_id)
-      val CloudExtinction: m.ColumnRef = col("c_cloud_extinction", cloud_extinction)
-      val ImageQuality: m.ColumnRef    = col("c_image_quality", image_quality)
-      val SkyBackground: m.ColumnRef   = col("c_sky_background", sky_background)
-      val WaterVapor: m.ColumnRef      = col("c_water_vapor", water_vapor)
-
-      val AirMassMin: m.ColumnRef      = col("c_air_mass_min", air_mass_range_value)
-      val AirMassMax: m.ColumnRef      = col("c_air_mass_max", air_mass_range_value)
-      val HourAngleMin: m.ColumnRef    = col("c_hour_angle_min", hour_angle_range_value)
-      val HourAngleMax: m.ColumnRef    = col("c_hour_angle_max", hour_angle_range_value)
+      val CloudExtinction: m.ColumnRef = col("c_cloud_extinction", tag)
+      val ImageQuality: m.ColumnRef    = col("c_image_quality",    tag)
+      val SkyBackground: m.ColumnRef   = col("c_sky_background",   tag)
+      val WaterVapor: m.ColumnRef      = col("c_water_vapor",      tag)
+      val AirMassMin: m.ColumnRef      = col("c_air_mass_min",     air_mass_range_value)
+      val AirMassMax: m.ColumnRef      = col("c_air_mass_max",     air_mass_range_value)
+      val HourAngleMin: m.ColumnRef    = col("c_hour_angle_min",   hour_angle_range_value)
+      val HourAngleMax: m.ColumnRef    = col("c_hour_angle_max",   hour_angle_range_value)
     }
 
     // Column references for our mapping.
@@ -126,9 +110,10 @@ object ObservationSnippet {
           env.getR[Existence]("existence"),
           env.getR[ObsStatus]("obsStatus"),
           env.getR[ObsActiveStatus]("obsActiveStatus"),
-        ).parTupled.flatTraverse { case (pid, name, existence, os, as) =>
+          env.getR[ConstraintSet]("constraintSet")
+        ).parTupled.flatTraverse { case (pid, name, existence, os, as, cs) =>
           pool.use { svc =>
-            svc.obs.insertObservation(pid, name, existence, os, as).map {
+            svc.insertObservation(pid, name, existence, os, as, cs).map {
               case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
               case Success(id)         => uniqueObservationNoFiltering(id, child)
             }
@@ -153,17 +138,17 @@ object ObservationSnippet {
             SqlField("name", ObservationTable.Name),
             SqlField("status", ObservationTable.Status),
             SqlField("activeStatus", ObservationTable.ActiveStatus),
+            SqlObject("constraintSet"),
             SqlObject("program", Join(ObservationTable.ProgramId, ProgramTable.Id)),
           ),
         ),
         ObjectMapping(
           tpe = ConstraintSetType,
           fieldMappings = List(
-            SqlField("observationId",   ConstraintSetTable.ObservationId, key = true),
-            SqlField("cloudExtinction", ConstraintSetTable.CloudExtinction),
-            SqlField("imageQuality",    ConstraintSetTable.ImageQuality),
-            SqlField("skyBackground",   ConstraintSetTable.SkyBackground),
-            SqlField("waterVapor",      ConstraintSetTable.WaterVapor),
+            SqlField("cloudExtinction", ObservationTable.CloudExtinction),
+            SqlField("imageQuality",    ObservationTable.ImageQuality),
+            SqlField("skyBackground",   ObservationTable.SkyBackground),
+            SqlField("waterVapor",      ObservationTable.WaterVapor),
             SqlObject("elevationRange")
           )
         ),
@@ -177,15 +162,15 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = AirMassRangeType,
           fieldMappings = List(
-            SqlField("min", ConstraintSetTable.AirMassMin),
-            SqlField("max", ConstraintSetTable.AirMassMax),
+            SqlField("min", ObservationTable.AirMassMin),
+            SqlField("max", ObservationTable.AirMassMax),
           )
         ),
         ObjectMapping(
           tpe = HourAngleRangeType,
           fieldMappings = List(
-            SqlField("minHours", ConstraintSetTable.HourAngleMin),
-            SqlField("maxHours", ConstraintSetTable.HourAngleMax)
+            SqlField("minHours", ObservationTable.HourAngleMin),
+            SqlField("maxHours", ObservationTable.HourAngleMax)
           )
         ),
         ObjectMapping(
