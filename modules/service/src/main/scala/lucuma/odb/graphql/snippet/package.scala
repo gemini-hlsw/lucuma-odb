@@ -3,7 +3,10 @@
 
 package lucuma.odb.graphql
 import cats.syntax.all._
-import edu.gemini.grackle.{Cursor, Predicate, Result, Value}
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Value
 import edu.gemini.grackle.sql.FailedJoin
 import eu.timepit.refined.types.string
 import io.circe.Json
