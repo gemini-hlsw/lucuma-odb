@@ -75,7 +75,7 @@ object ObservationSnippet {
     }
 
     // Column references for our mapping.
-    object ObservationTable extends TableDef("t_observation") {
+    object ObservationView extends TableDef("v_observation") {
       val ProgramId: m.ColumnRef    = col("c_program_id",          program_id)
       val Id: m.ColumnRef           = col("c_observation_id",      observation_id)
       val Existence: m.ColumnRef    = col("c_existence",           existence)
@@ -83,15 +83,24 @@ object ObservationSnippet {
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
       val Status: m.ColumnRef       = col("c_status",              obs_status)
       val ActiveStatus: m.ColumnRef = col("c_active_status",       obs_active_status)
-
-      val CloudExtinction: m.ColumnRef = col("c_cloud_extinction", tag)
-      val ImageQuality: m.ColumnRef    = col("c_image_quality",    tag)
-      val SkyBackground: m.ColumnRef   = col("c_sky_background",   tag)
-      val WaterVapor: m.ColumnRef      = col("c_water_vapor",      tag)
-      val AirMassMin: m.ColumnRef      = col("c_air_mass_min",     air_mass_range_value)
-      val AirMassMax: m.ColumnRef      = col("c_air_mass_max",     air_mass_range_value)
-      val HourAngleMin: m.ColumnRef    = col("c_hour_angle_min",   hour_angle_range_value)
-      val HourAngleMax: m.ColumnRef    = col("c_hour_angle_max",   hour_angle_range_value)
+      object ConstraintSet {
+        val CloudExtinction: m.ColumnRef = col("c_cloud_extinction", cloud_extinction.embedded)
+        val ImageQuality: m.ColumnRef    = col("c_image_quality",    image_quality.embedded)
+        val SkyBackground: m.ColumnRef   = col("c_sky_background",   sky_background.embedded)
+        val WaterVapor: m.ColumnRef      = col("c_water_vapor",      water_vapor.embedded)
+        object ElevationRange {
+          object AirMassRange {
+            val SyntheticId: m.ColumnRef = col("c_air_mass_id",  observation_id.embedded)
+            val AirMassMin: m.ColumnRef  = col("c_air_mass_min", air_mass_range_value.embedded)
+            val AirMassMax: m.ColumnRef  = col("c_air_mass_max", air_mass_range_value.embedded)
+          }
+          object HourAngleRange {
+            val SyntheticId: m.ColumnRef  = col("c_hour_angle_id",  observation_id.embedded)
+            val HourAngleMin: m.ColumnRef = col("c_hour_angle_min", hour_angle_range_value.embedded)
+            val HourAngleMax: m.ColumnRef = col("c_hour_angle_max", hour_angle_range_value.embedded)
+          }
+        }
+      }
     }
 
     // Column references for our mapping.
@@ -121,40 +130,36 @@ object ObservationSnippet {
         }
       }
 
-    implicit val EncoderDecimalValue: Encoder[DecimalValue] =
-      (a: DecimalValue) => Json.fromBigDecimal(a.value)
-
-    implicit val EncoderDecimalHour: Encoder[DecimalHour] =
-      (a: DecimalHour) => Json.fromBigDecimal(a.value)
-
     val typeMappings =
       List(
         ObjectMapping(
           tpe = ObservationType,
           fieldMappings = List(
-            SqlField("id", ObservationTable.Id, key = true),
-            SqlField("programId", ObservationTable.ProgramId, hidden=true),
-            SqlField("existence", ObservationTable.Existence, hidden = true),
-            SqlField("name", ObservationTable.Name),
-            SqlField("status", ObservationTable.Status),
-            SqlField("activeStatus", ObservationTable.ActiveStatus),
+            SqlField("id", ObservationView.Id, key = true),
+            SqlField("programId", ObservationView.ProgramId, hidden=true),
+            SqlField("existence", ObservationView.Existence, hidden = true),
+            SqlField("name", ObservationView.Name),
+            SqlField("status", ObservationView.Status),
+            SqlField("activeStatus", ObservationView.ActiveStatus),
             SqlObject("constraintSet"),
-            SqlObject("program", Join(ObservationTable.ProgramId, ProgramTable.Id)),
+            SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
           ),
         ),
         ObjectMapping(
           tpe = ConstraintSetType,
           fieldMappings = List(
-            SqlField("cloudExtinction", ObservationTable.CloudExtinction),
-            SqlField("imageQuality",    ObservationTable.ImageQuality),
-            SqlField("skyBackground",   ObservationTable.SkyBackground),
-            SqlField("waterVapor",      ObservationTable.WaterVapor),
+            SqlField("id", ObservationView.Id, key = true, hidden = true),
+            SqlField("cloudExtinction", ObservationView.ConstraintSet.CloudExtinction),
+            SqlField("imageQuality",    ObservationView.ConstraintSet.ImageQuality),
+            SqlField("skyBackground",   ObservationView.ConstraintSet.SkyBackground),
+            SqlField("waterVapor",      ObservationView.ConstraintSet.WaterVapor),
             SqlObject("elevationRange")
           )
         ),
         ObjectMapping(
           tpe = ElevationRangeType,
           fieldMappings = List(
+            SqlField("id", ObservationView.Id, key = true, hidden = true),
             SqlObject("airMass"),
             SqlObject("hourAngle")
           )
@@ -162,15 +167,17 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = AirMassRangeType,
           fieldMappings = List(
-            SqlField("min", ObservationTable.AirMassMin),
-            SqlField("max", ObservationTable.AirMassMax),
+            SqlField("synthetic_id", ObservationView.ConstraintSet.ElevationRange.AirMassRange.SyntheticId, key = true, hidden = true),
+            SqlField("min", ObservationView.ConstraintSet.ElevationRange.AirMassRange.AirMassMin),
+            SqlField("max", ObservationView.ConstraintSet.ElevationRange.AirMassRange.AirMassMax)
           )
         ),
         ObjectMapping(
           tpe = HourAngleRangeType,
           fieldMappings = List(
-            SqlField("minHours", ObservationTable.HourAngleMin),
-            SqlField("maxHours", ObservationTable.HourAngleMax)
+            SqlField("synthetic_id", ObservationView.ConstraintSet.ElevationRange.HourAngleRange.SyntheticId, key = true, hidden = true),
+            SqlField("minHours", ObservationView.ConstraintSet.ElevationRange.HourAngleRange.HourAngleMin),
+            SqlField("maxHours", ObservationView.ConstraintSet.ElevationRange.HourAngleRange.HourAngleMax)
           )
         ),
         ObjectMapping(
@@ -185,9 +192,7 @@ object ObservationSnippet {
         LeafMapping[CloudExtinction](CloudExtinctionType),
         LeafMapping[ImageQuality](ImageQualityType),
         LeafMapping[SkyBackground](SkyBackgroundType),
-        LeafMapping[WaterVapor](WaterVaporType),
-        LeafMapping[DecimalValue](AirMassRangeType),
-        LeafMapping[DecimalHour](HourAngleRangeType)
+        LeafMapping[WaterVapor](WaterVaporType)
       )
 
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](

@@ -5,9 +5,9 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.{CloudExtinction, ImageQuality, SkyBackground, WaterVapor}
-import lucuma.core.model.ElevationRange.{AirMass, HourAngle}
 import lucuma.core.model.{ConstraintSet, ElevationRange, GuestRole, Observation, Program, ServiceRole, User}
 import lucuma.core.model.StandardRole._
 import lucuma.odb.data.Existence
@@ -84,10 +84,10 @@ object ObservationService {
            constraintSet.imageQuality    ~
            constraintSet.skyBackground   ~
            constraintSet.waterVapor      ~
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(_.min)        ~
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(_.max)        ~
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours) ~
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours)
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.value)) ~  // TODO: fix in core
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.value)) ~
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.value)                           ~
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)
         )
 
       val where: AppliedFragment =
@@ -109,19 +109,19 @@ object ObservationService {
     }
 
     val InsertObservation: Fragment[
-      Program.Id                    ~
-      Option[NonEmptyString]        ~
-      Existence                     ~
-      ObsStatus                     ~
-      ObsActiveStatus               ~
-      CloudExtinction               ~
-      ImageQuality                  ~
-      SkyBackground                 ~
-      WaterVapor                    ~
-      Option[AirMass.DecimalValue]  ~
-      Option[AirMass.DecimalValue]  ~
-      Option[HourAngle.DecimalHour] ~
-      Option[HourAngle.DecimalHour]
+      Program.Id             ~
+      Option[NonEmptyString] ~
+      Existence              ~
+      ObsStatus              ~
+      ObsActiveStatus        ~
+      CloudExtinction        ~
+      ImageQuality           ~
+      SkyBackground          ~
+      WaterVapor             ~
+      Option[PosBigDecimal]  ~
+      Option[PosBigDecimal]  ~
+      Option[BigDecimal]     ~
+      Option[BigDecimal]
     ] =
       sql"""
         INSERT INTO t_observation (
