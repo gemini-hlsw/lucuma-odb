@@ -18,16 +18,14 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value._
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
-import io.circe.{Encoder, Json}
 import lucuma.core.enums.{CloudExtinction, ImageQuality, SkyBackground, WaterVapor}
-import lucuma.core.model.ElevationRange.AirMass.DecimalValue
-import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.model.{ConstraintSet, Observation, Program, User}
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
 import lucuma.odb.graphql.util._
+import lucuma.odb.graphql.util.Bindings.BooleanBinding
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
 import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
@@ -45,9 +43,8 @@ object ObservationSnippet {
     import m.{ TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col, schema }
 
     // The types that we're going to map.
-    // val QueryType         = schema.ref("Query")
+    val QueryType           = schema.ref("Query")
     val MutationType        = schema.ref("Mutation")
-    // val SubscriptionType  = schema.ref("Subscription")
     val ObservationType     = schema.ref("Observation")
     val ObservationIdType   = schema.ref("ObservationId")
     val ObsStatusType       = schema.ref("ObsStatus")
@@ -64,14 +61,27 @@ object ObservationSnippet {
 
     val pool = dbPool.map(ObservationService.fromUserAndSession(user, _))
 
+    // TODO: Can we share the common predicates somewhere?
     object Predicates {
 
-//      def includeDeleted(b: Boolean): Predicate =
-//        if (b) True else Eql(UniquePath(List("existence")), Const[Existence](Existence.Present))
+      def includeDeleted(b: Boolean): Predicate =
+        if (b) True else Eql(UniquePath(List("existence")), Const[Existence](Existence.Present))
 
       def hasObservationId(oid: Observation.Id): Predicate =
         Eql(UniquePath(List("id")), Const(oid))
 
+      /* TBD
+      def isVisibleTo(user: model.User): Predicate =
+        user.role.access match {
+          case Guest | Pi =>
+            Or(
+              Contains(ListPath(List("users", "userId")), Const(user.id)), // user is linked, or
+              Eql(UniquePath(List("piUserId")), Const(user.id))            // user is the PI
+            )
+          case Ngo => ???
+          case Staff | Admin | Service => True
+        }
+      */
     }
 
     // Column references for our mapping.
@@ -142,7 +152,7 @@ object ObservationSnippet {
             SqlField("status", ObservationView.Status),
             SqlField("activeStatus", ObservationView.ActiveStatus),
             SqlObject("constraintSet"),
-            SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
+            SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
           ),
         ),
         ObjectMapping(
@@ -186,6 +196,12 @@ object ObservationSnippet {
             SqlRoot("createObservation", mutation = insertObservation),
           )
         ),
+        ObjectMapping(
+          tpe = QueryType,
+          fieldMappings = List(
+            SqlRoot("observation")
+          )
+        ),
         LeafMapping[Observation.Id](ObservationIdType),
         LeafMapping[ObsStatus](ObsStatusType),
         LeafMapping[ObsActiveStatus](ObsActiveStatusType),
@@ -196,6 +212,27 @@ object ObservationSnippet {
       )
 
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
+      QueryType -> {
+        case Select("observation", List(
+          ObservationIdBinding("observationId", rOid),
+          BooleanBinding("includeDeleted", rIncludeDeleted)
+        ), child) =>
+          (rOid, rIncludeDeleted).parMapN { (oid, includeDeleted) =>
+            Select("observation", Nil,
+              Unique(
+                Filter(
+                  And(
+                    Predicates.hasObservationId(oid),
+                    Predicates.includeDeleted(includeDeleted)
+//                    Predicates.isVisibleTo(user)   // TBD
+                  ),
+                  child
+                )
+              )
+            )
+          }
+      },
+
       MutationType -> {
         case Select("createObservation", List(
           Binding("input", ObjectValue(List(
