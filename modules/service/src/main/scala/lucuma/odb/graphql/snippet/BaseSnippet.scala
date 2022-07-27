@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package snippet
 
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.refined._
 import lucuma.odb.data.Existence
@@ -18,12 +19,14 @@ object BaseSnippet {
     val NonEmptyStringType = schema.ref("NonEmptyString")
     val ExistenceType = schema.ref("Existence")
     val BigDecimalType = schema.ref("BigDecimal")
+    val PosBigDecimalType = schema.ref("PosBigDecimal")
 
     val typeMappings =
       List(
         LeafMapping[NonEmptyString](NonEmptyStringType),
         LeafMapping[Existence](ExistenceType),
         LeafMapping[BigDecimal](BigDecimalType),
+        LeafMapping[PosBigDecimal](PosBigDecimalType)
       )
 
       Snippet(typeMappings)
