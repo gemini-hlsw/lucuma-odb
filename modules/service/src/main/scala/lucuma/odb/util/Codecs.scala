@@ -6,10 +6,15 @@ package lucuma.odb.util
 // Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CatalogName
+import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
+import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
+import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
@@ -36,6 +41,9 @@ trait Codecs {
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
+
+  val pos_big_decimal: Codec[PosBigDecimal] =
+    numeric.eimap(PosBigDecimal.from)(_.value)
 
   val orcid_id: Codec[OrcidId] =
     Codec.simple[OrcidId](
@@ -99,7 +107,7 @@ trait Codecs {
 
   val declination: Codec[Declination] =
     angle_µas.eimap(
-      a => Declination.fromAngle.getOption(a).toRight(s"Invalied declination: $a"))(
+      a => Declination.fromAngle.getOption(a).toRight(s"Invalid declination: $a"))(
       Declination.fromAngle.reverseGet
     )
 
@@ -126,6 +134,24 @@ trait Codecs {
       a => Parallax.fromMicroarcseconds(a.toMicroarcseconds))(
       p => Angle.fromMicroarcseconds(p.μas.value.value)
     )
+
+  val cloud_extinction: Codec[CloudExtinction] =
+    enumerated[CloudExtinction](Type.varchar)
+
+  val image_quality: Codec[ImageQuality] =
+    enumerated[ImageQuality](Type.varchar)
+
+  val sky_background: Codec[SkyBackground] =
+    enumerated[SkyBackground](Type.varchar)
+
+  val water_vapor: Codec[WaterVapor] =
+    enumerated[WaterVapor](Type.varchar)
+
+  val air_mass_range_value: Codec[PosBigDecimal] =
+    numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
+
+  val hour_angle_range_value: Codec[BigDecimal] =
+    numeric(3, 2)
 
 }
 

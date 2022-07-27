@@ -7,11 +7,13 @@ import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.sql.FailedJoin
+import eu.timepit.refined.types.numeric
 import eu.timepit.refined.types.string
 import io.circe.Json
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
 import lucuma.core.math.Epoch
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
@@ -55,10 +57,16 @@ package object snippet {
 
   }
 
-  val ProgramIdBinding =
+  def gidBinding[A: Gid](name: String): Matcher[A] =
     StringBinding.emap { s =>
-      Gid[Program.Id].fromString.getOption(s).toRight(s"'$s' is not a valid Program.Id")
+      Gid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
     }
+
+  val ProgramIdBinding: Matcher[Program.Id] =
+    gidBinding[Program.Id]("program")
+
+  val ObservationIdBinding: Matcher[Observation.Id] =
+    gidBinding[Observation.Id]("observation")
 
   val UserIdBinding =
     StringBinding.emap { s =>
@@ -113,6 +121,11 @@ package object snippet {
     StringBinding.emap { s =>
       try Right(BigDecimal(s))
       catch { case NonFatal(e) => Left(s"Invalid BigDecimal: $s: ${e.getMessage}") }
+    }
+
+  val PosBigDecimalBinding: Matcher[numeric.PosBigDecimal] =
+    BigDecimalBinding.emap { s =>
+      numeric.PosBigDecimal.from(s).leftMap(m => s"Invalid PosBigDecimal: $s: $m")
     }
 
   val DmsBinding: Matcher[Angle] =
