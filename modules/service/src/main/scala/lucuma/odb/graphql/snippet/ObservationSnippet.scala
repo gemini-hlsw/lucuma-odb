@@ -18,14 +18,20 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Value._
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.{CloudExtinction, ImageQuality, SkyBackground, WaterVapor}
-import lucuma.core.model.{ConstraintSet, Observation, Program, User}
+import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.WaterVapor
+import lucuma.core.model.ConstraintSet
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
-import lucuma.odb.graphql.util._
 import lucuma.odb.graphql.util.Bindings.BooleanBinding
+import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
 import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
