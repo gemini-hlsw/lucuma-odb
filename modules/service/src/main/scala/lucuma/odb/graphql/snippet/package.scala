@@ -13,8 +13,7 @@ import io.circe.Json
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
 import lucuma.core.math.Epoch
-import lucuma.core.model.Program
-import lucuma.core.model.User
+import lucuma.core.model.{Observation, Program, User}
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.Existence
@@ -56,10 +55,16 @@ package object snippet {
 
   }
 
-  val ProgramIdBinding =
+  def gidBinding[A: Gid](name: String): Matcher[A] =
     StringBinding.emap { s =>
-      Gid[Program.Id].fromString.getOption(s).toRight(s"'$s' is not a valid Program.Id")
+      Gid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
     }
+
+  val ProgramIdBinding: Matcher[Program.Id] =
+    gidBinding[Program.Id]("program")
+
+  val ObservationIdBinding: Matcher[Observation.Id] =
+    gidBinding[Observation.Id]("observation")
 
   val UserIdBinding =
     StringBinding.emap { s =>
