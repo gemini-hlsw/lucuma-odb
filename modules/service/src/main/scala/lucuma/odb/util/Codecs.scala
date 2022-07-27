@@ -8,7 +8,13 @@ package lucuma.odb.util
 
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.{CatalogName, CloudExtinction, EphemerisKeyType, ImageQuality, Site, SkyBackground, WaterVapor}
+import lucuma.core.enums.CatalogName
+import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.EphemerisKeyType
+import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.Site
+import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch

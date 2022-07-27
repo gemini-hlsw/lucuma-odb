@@ -10,7 +10,8 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.model.{ConstraintSet, ElevationRange}
+import lucuma.core.model.ConstraintSet
+import lucuma.core.model.ElevationRange
 import lucuma.core.optics.syntax.lens._
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput.NominalConstraints
 import lucuma.odb.graphql.util.Bindings._

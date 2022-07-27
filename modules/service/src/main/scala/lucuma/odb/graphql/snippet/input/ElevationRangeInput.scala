@@ -7,7 +7,8 @@ package input
 import cats.syntax.parallel._
 import edu.gemini.grackle.Result
 import lucuma.core.model.ElevationRange
-import lucuma.core.model.ElevationRange.{AirMass, HourAngle}
+import lucuma.core.model.ElevationRange.AirMass
+import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.odb.graphql.util.Bindings._
 
 final case class ElevationRangeInput(

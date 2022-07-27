@@ -13,7 +13,9 @@ import io.circe.Json
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
 import lucuma.core.math.Epoch
-import lucuma.core.model.{Observation, Program, User}
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.Existence

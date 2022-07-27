@@ -145,7 +145,7 @@ object Main extends IOApp.Simple {
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
       _  <- Resource.eval(banner[F](c))
-//      _  <- Resource.eval(migrateDatabase[F](c.database))
+      _  <- Resource.eval(migrateDatabase[F](c.database))
       ep <- entryPointResource(c)
       ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
