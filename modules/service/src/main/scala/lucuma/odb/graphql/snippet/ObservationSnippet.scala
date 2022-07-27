@@ -46,7 +46,7 @@ object ObservationSnippet {
     user:   User
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col, schema }
+    import m.{ ColumnRef, TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col, schema }
 
     // The types that we're going to map.
     val QueryType           = schema.ref("Query")
@@ -92,28 +92,28 @@ object ObservationSnippet {
 
     // Column references for our mapping.
     object ObservationView extends TableDef("v_observation") {
-      val ProgramId: m.ColumnRef    = col("c_program_id",          program_id)
-      val Id: m.ColumnRef           = col("c_observation_id",      observation_id)
-      val Existence: m.ColumnRef    = col("c_existence",           existence)
-      val Name: m.ColumnRef         = col("c_name",                text_nonempty.opt)
+      val ProgramId: ColumnRef    = col("c_program_id",          program_id)
+      val Id: ColumnRef           = col("c_observation_id",      observation_id)
+      val Existence: ColumnRef    = col("c_existence",           existence)
+      val Name: ColumnRef         = col("c_name",                text_nonempty.opt)
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
-      val Status: m.ColumnRef       = col("c_status",              obs_status)
-      val ActiveStatus: m.ColumnRef = col("c_active_status",       obs_active_status)
+      val Status: ColumnRef       = col("c_status",              obs_status)
+      val ActiveStatus: ColumnRef = col("c_active_status",       obs_active_status)
       object ConstraintSet {
-        val CloudExtinction: m.ColumnRef = col("c_cloud_extinction", cloud_extinction.embedded)
-        val ImageQuality: m.ColumnRef    = col("c_image_quality",    image_quality.embedded)
-        val SkyBackground: m.ColumnRef   = col("c_sky_background",   sky_background.embedded)
-        val WaterVapor: m.ColumnRef      = col("c_water_vapor",      water_vapor.embedded)
+        val CloudExtinction: ColumnRef = col("c_cloud_extinction", cloud_extinction.embedded)
+        val ImageQuality: ColumnRef    = col("c_image_quality",    image_quality.embedded)
+        val SkyBackground: ColumnRef   = col("c_sky_background",   sky_background.embedded)
+        val WaterVapor: ColumnRef      = col("c_water_vapor",      water_vapor.embedded)
         object ElevationRange {
           object AirMassRange {
-            val SyntheticId: m.ColumnRef = col("c_air_mass_id",  observation_id.embedded)
-            val AirMassMin: m.ColumnRef  = col("c_air_mass_min", air_mass_range_value.embedded)
-            val AirMassMax: m.ColumnRef  = col("c_air_mass_max", air_mass_range_value.embedded)
+            val SyntheticId: ColumnRef = col("c_air_mass_id",  observation_id.embedded)
+            val AirMassMin: ColumnRef  = col("c_air_mass_min", air_mass_range_value.embedded)
+            val AirMassMax: ColumnRef  = col("c_air_mass_max", air_mass_range_value.embedded)
           }
           object HourAngleRange {
-            val SyntheticId: m.ColumnRef  = col("c_hour_angle_id",  observation_id.embedded)
-            val HourAngleMin: m.ColumnRef = col("c_hour_angle_min", hour_angle_range_value.embedded)
-            val HourAngleMax: m.ColumnRef = col("c_hour_angle_max", hour_angle_range_value.embedded)
+            val SyntheticId: ColumnRef  = col("c_hour_angle_id",  observation_id.embedded)
+            val HourAngleMin: ColumnRef = col("c_hour_angle_min", hour_angle_range_value.embedded)
+            val HourAngleMax: ColumnRef = col("c_hour_angle_max", hour_angle_range_value.embedded)
           }
         }
       }
@@ -121,7 +121,7 @@ object ObservationSnippet {
 
     // Column references for our mapping.
     object ProgramTable extends TableDef("t_program") {
-      val Id: m.ColumnRef = col("c_program_id", program_id)
+      val Id: ColumnRef = col("c_program_id", program_id)
     }
 
     def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Result[Query] =
