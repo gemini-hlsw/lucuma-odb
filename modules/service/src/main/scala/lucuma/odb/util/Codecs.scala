@@ -6,7 +6,7 @@ package lucuma.odb.util
 // Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-import cats.syntax.bifunctor._
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.{CatalogName, CloudExtinction, EphemerisKeyType, ImageQuality, Site, SkyBackground, WaterVapor}
 import lucuma.core.math.Angle
@@ -16,8 +16,6 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.model._
-import lucuma.core.model.ElevationRange.AirMass.DecimalValue
-import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.Existence
@@ -37,6 +35,9 @@ trait Codecs {
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
+
+  val pos_big_decimal: Codec[PosBigDecimal] =
+    numeric.eimap(PosBigDecimal.from)(_.value)
 
   val orcid_id: Codec[OrcidId] =
     Codec.simple[OrcidId](
@@ -140,15 +141,11 @@ trait Codecs {
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)
 
-  val air_mass_range_value: Codec[DecimalValue] =
-    numeric.eimap(
-      bd => DecimalValue.from(bd).leftMap(m => s"Invalid air mass range value: $bd: $m")
-    )(_.value)
+  val air_mass_range_value: Codec[PosBigDecimal] =
+    numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
 
-  val hour_angle_range_value: Codec[DecimalHour] =
-    numeric.eimap(
-      bd => DecimalHour.from(bd).leftMap(m => s"Invalid hour angle range value: $bd: $m")
-    )(_.value)
+  val hour_angle_range_value: Codec[BigDecimal] =
+    numeric(3, 2)
 
 }
 
