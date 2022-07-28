@@ -1,6 +1,8 @@
 *.class
 *.log
 
+.sbtopts
+
 # these are moved into the doc project by the build
 modules/docs/src/main/tut/changelog.md
 modules/docs/src/main/tut/license.md
@@ -52,3 +54,6 @@ metals.sbt
 
 # Schemaspy
 schemaspy/out
+
+# vim
+*.swp

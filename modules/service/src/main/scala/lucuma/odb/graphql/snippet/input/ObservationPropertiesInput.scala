@@ -7,6 +7,7 @@ package input
 
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.model.ConstraintSet
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
@@ -19,7 +20,7 @@ case class ObservationPropertiesInput(
   // visualizationTime: Option[Instant],
   // posAngleConstraint: OptionpPosAngleConstraintInput],
   // targetEnvironment: Option[TargetEnvironmentInput],
-  // constraintSet: Option[ConstraintSetInput],
+  constraintSet: Option[ConstraintSet],
   // scienceRequirements: Option[ScienceRequirementsInput],
   // scienceMode: Option[ScienceModeInput],
   existence: Option[Existence],
@@ -33,6 +34,7 @@ object ObservationPropertiesInput {
       status = Some(ObsStatus.New),
       activeStatus = Some(ObsActiveStatus.Active),
       existence = Some(Existence.Present),
+      constraintSet = Some(ConstraintSetInput.NominalConstraints)
     )
 
   val CreateBinding: Matcher[ObservationPropertiesInput] =
@@ -44,12 +46,12 @@ object ObservationPropertiesInput {
         ("visualizationTime", _),     // ignore for now
         ("posAngleConstraint", _),    // ignore for now
         ("targetEnvironment", _),     // ignore for now
-        ("constraintSet", _),         // ignore for now
+        ConstraintSetInput.CreateBinding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rSubtitle, rObsStatus, rObsActiveStatus, rExistence).parMapN(apply)
+        (rSubtitle, rObsStatus, rObsActiveStatus, rConstraintSet, rExistence).parMapN(apply)
     }
 
 }
