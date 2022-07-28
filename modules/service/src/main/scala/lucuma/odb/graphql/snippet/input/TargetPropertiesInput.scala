@@ -8,10 +8,10 @@ import cats.syntax.all._
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.EphemerisKey
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.core.model.SourceProfile
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.snippet.input.sourceprofile.SourceProfileInput
-import lucuma.core.model.SourceProfile
+import lucuma.odb.graphql.util.Bindings._
 
 final case class TargetPropertiesInput(
   name: NonEmptyString,

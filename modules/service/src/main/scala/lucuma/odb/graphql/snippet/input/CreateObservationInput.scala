@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package snippet
 package input
 
+import cats.syntax.all._
 import lucuma.core.model.Program
 import lucuma.odb.graphql.util.Bindings._
-import cats.syntax.all._
 
 case class CreateObservationInput(
   programId: Program.Id,

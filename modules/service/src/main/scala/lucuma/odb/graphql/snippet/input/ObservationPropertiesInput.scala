@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 package snippet
 package input
 
+import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.data.Existence
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ObsActiveStatus
-import cats.syntax.all._
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.graphql.util.Bindings._
 
 case class ObservationPropertiesInput(
   subtitle: Option[NonEmptyString],

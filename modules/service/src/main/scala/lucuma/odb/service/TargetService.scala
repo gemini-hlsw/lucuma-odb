@@ -19,15 +19,15 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.snippet.input.TargetPropertiesInput
+import lucuma.odb.graphql.instances.SourceProfileEncoder
 import lucuma.odb.graphql.snippet.input.SiderealInput
+import lucuma.odb.graphql.snippet.input.TargetPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Session
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
-import lucuma.odb.graphql.instances.SourceProfileEncoder
 
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse
