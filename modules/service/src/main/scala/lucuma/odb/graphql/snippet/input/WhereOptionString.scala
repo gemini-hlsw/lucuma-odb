@@ -30,13 +30,13 @@ object WhereOptionString {
       ) =>
         (rIsNull, rEq, rNeq, rIn, rNin, rLike, rNlike, rMatchCase).mapN {
           (isNull, eq, neq, in, nin, _, _, _) =>
-          List(
+          and(List(
             isNull.map(IsNull(path, _)),
             eq.map(a => Eql(path, Const(a.some))),
             neq.map(a => NEql(path, Const(a.some))),
             in.map(as => In(path, as.map(_.some))),
             nin.map(as => Not(In(path, as.map(a => a.some)))),
-          ).flatten.reduceRightOption(And(_, _)).getOrElse(True)
+          ).flatten)
         }
     }
 
