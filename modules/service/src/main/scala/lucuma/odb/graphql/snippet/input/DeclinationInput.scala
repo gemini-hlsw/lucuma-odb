@@ -19,11 +19,9 @@ object DeclinationInput {
         AngleBinding.Microarcseconds.Option("microarcseconds", rMicroarcseconds),
         AngleBinding.Degrees.Option("degrees", rDegrees),
         AngleBinding.Dms.Option("dms", rDms),
-        DeclinationLongInput.Binding.Option("fromLong", rFromLong),
-        DeclinationDecimalInput.Binding.Option("fromDecimal", rFromDecimal),
-      ) => (rMicroarcseconds, rDegrees, rDms, rFromLong, rFromDecimal).parTupled.flatMap {
-        case (microarcseconds, degrees, hms, fromLong, fromDecimal) =>
-          List(microarcseconds, degrees, hms, fromLong, fromDecimal).flatten match {
+      ) => (rMicroarcseconds, rDegrees, rDms).parTupled.flatMap {
+        case (microarcseconds, degrees, hms) =>
+          List(microarcseconds, degrees, hms).flatten match {
             case List(a) =>
               Result.fromOption(Declination.fromAngle.getOption(a), s"Invalid declination: ${Angle.fromStringDMS.reverseGet(a)}")
             case as => Result.failure(s"Expected exactly one declination format; found ${as.length}.")
@@ -32,24 +30,3 @@ object DeclinationInput {
     }
 
 }
-
-object DeclinationLongInput {
-
-  val Binding: Matcher[Angle] =
-    LongInput("DeclinationUnits") {
-      case (value, "MICROARCSECONDS") => Result(Angle.fromMicroarcseconds(value))
-      case (value, "DEGREES") => Result(Angle.fromDoubleDegrees(value.toDouble))
-    }
-
-  }
-
-object DeclinationDecimalInput {
-
-  val Binding: Matcher[Angle] =
-    DecimalInput("DeclinationUnits") {
-      case (value, "MICROARCSECONDS") => Result(Angle.fromMicroarcseconds(value.toLong))
-      case (value, "DEGREES") => Result(Angle.fromDoubleDegrees(value.toDouble))
-    }
-
-}
-

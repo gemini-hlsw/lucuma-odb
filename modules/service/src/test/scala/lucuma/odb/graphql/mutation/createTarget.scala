@@ -11,9 +11,7 @@ import io.circe.syntax._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
-import munit.IgnoreSuite
 
-@IgnoreSuite
 class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -36,145 +34,114 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
         s"""
           mutation {
             createTarget(
-              programId: ${pid.asJson}
               input: {
-                name: "Crunchy Target"
-                sidereal: {
-                  ra: {
-                    degrees: "12.345"
-                  }
-                  dec: {
-                    degrees: "45.678"
-                  }
-                  epoch: "J2000.000"
-                  properMotion: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Crunchy Target"
+                  sidereal: {
                     ra: {
-                      milliarcsecondsPerYear: "12.345"
+                      degrees: "12.345"
                     }
                     dec: {
-                      milliarcsecondsPerYear: "-7.0"
+                      degrees: "45.678"
                     }
-                  }
-                  radialVelocity: {
-                    fromDecimal: {
-                      value: "78.91"
-                      units: CENTIMETERS_PER_SECOND
-                    }
-                  }
-                  parallax: {
-                    microarcseconds: "123456"
-                  }
-                }
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        stellarLibrary: B5_III
+                    epoch: "J2000.000"
+                    properMotion: {
+                      ra: {
+                        milliarcsecondsPerYear: "12.345"
+                      }
+                      dec: {
+                        milliarcsecondsPerYear: "-7.0"
                       }
                     }
-                    emissionLines: {
-                      lines: [
-                        {
-                          wavelength: {
-                            angstroms: "20"
-                          }
-                          lineWidth: "1.2"
-                          lineFlux: {
-                            value: "42"
-                            units: ERG_PER_S_PER_CM_SQUARED
-                          }
+                    radialVelocity: {
+                      centimetersPerSecond: "78"
+                    }
+                    parallax: {
+                      microarcseconds: "123456"
+                    }
+                  }
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
                         }
-                      ]
-                      fluxDensityContinuum: {
-                        value: "42"
-                        units: W_PER_M_SQUARED_PER_UM
+                        brightnesses: []
                       }
                     }
                   }
                 }
               }
-            ) $FullTargetGraph
+            ) {
+              target $FullTargetGraph
+            }
           }
         """).flatMap { js =>
           val expected = json"""
             {
               "createTarget": {
-                "existence": "PRESENT",
-                "name": "Crunchy Target",
-                "program": {
-                  "id": ${pid}
-                },
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "sed": {
-                        "stellarLibrary": "B5_III",
-                        "coolStar": null,
-                        "galaxy": null,
-                        "planet": null,
-                        "quasar": null,
-                        "hiiRegion": null,
-                        "planetaryNebula": null,
-                        "powerLaw": null,
-                        "blackBodyTempK": null,
-                        "fluxDensities": null
-                      }
-                    },
-                    "emissionLines": {
-                      "lines": [
-                        {
-                          "wavelength": {
-                            "angstroms": "20"
-                          },
-                          "lineWidth": "1.2",
-                          "lineFlux": {
-                            "value": "42",
-                            "units": "ERG_PER_S_PER_CM_SQUARED"
-                          }
+                "target": {
+                  "existence": "PRESENT",
+                  "name": "Crunchy Target",
+                  "program": {
+                    "id": ${pid}
+                  },
+                  "sourceProfile": {
+                    "point" : {
+                      "bandNormalized" : {
+                        "sed" : {
+                          "stellarLibrary" : "B5_III",
+                          "coolStar" : null,
+                          "galaxy" : null,
+                          "planet" : null,
+                          "quasar" : null,
+                          "hiiRegion" : null,
+                          "planetaryNebula" : null,
+                          "powerLaw" : null,
+                          "blackBodyTempK" : null,
+                          "fluxDensities" : null
                         }
-                      ],
-                      "fluxDensityContinuum": {
-                        "value": "42",
-                        "units": "W_PER_M_SQUARED_PER_UM"
-                      }
+                      },
+                      "emissionLines" : null
                     }
-                  }
-                },
-                "sidereal": {
-                  "ra": {
-                    "hms": "00:49:22.800000",
-                    "hours": 0.823,
-                    "degrees": 12.345,
-                    "microarcseconds": 44442000000
                   },
-                  "dec": {
-                    "dms": "+45:40:40.800000",
-                    "degrees": 45.678,
-                    "microarcseconds": 164440800000
-                  },
-                  "epoch": "J2000.000",
-                  "properMotion": {
+                  "sidereal": {
                     "ra": {
-                      "microarcsecondsPerYear": 12345,
-                      "milliarcsecondsPerYear": 12.345
+                      "hms": "00:49:22.800000",
+                      "hours": 0.823,
+                      "degrees": 12.345,
+                      "microarcseconds": 44442000000
                     },
                     "dec": {
-                      "microarcsecondsPerYear": 1295999993000,
-                      "milliarcsecondsPerYear": 1295999993
-                    }
+                      "dms": "+45:40:40.800000",
+                      "degrees": 45.678,
+                      "microarcseconds": 164440800000
+                    },
+                    "epoch": "J2000.000",
+                    "properMotion": {
+                      "ra": {
+                        "microarcsecondsPerYear": 12345,
+                        "milliarcsecondsPerYear": 12.345
+                      },
+                      "dec": {
+                        "microarcsecondsPerYear": -7000,
+                        "milliarcsecondsPerYear": -7.000
+                      }
+                    },
+                    "radialVelocity": {
+                      "centimetersPerSecond" : 78,
+                      "metersPerSecond" : 0.78,
+                      "kilometersPerSecond" : 0.00078
+                    },
+                    "parallax": {
+                      "microarcseconds": 123456,
+                      "milliarcseconds": 123.456
+                    },
+                    "catalogInfo": null
                   },
-                  "radialVelocity": {
-                    "centimetersPerSecond": 0,
-                    "metersPerSecond": 0.7891,
-                    "kilometersPerSecond": 0.0007891
-                  },
-                  "parallax": {
-                    "microarcseconds": 123456,
-                    "milliarcseconds": 123.456
-                  },
-                  "catalogInfo": null
-                },
-                "nonsidereal": null
+                  "nonsidereal": null
+                }
               }
             }
           """
@@ -189,93 +156,65 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
         s"""
           mutation {
             createTarget(
-              programId: ${pid.asJson}
               input: {
-                name: "Crunchy Planet"
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        stellarLibrary: B5_III
-                      }
-                    }
-                    emissionLines: {
-                      lines: [
-                        {
-                          wavelength: {
-                            angstroms: "20"
-                          }
-                          lineWidth: "1.2"
-                          lineFlux: {
-                            value: "42"
-                            units: ERG_PER_S_PER_CM_SQUARED
-                          }
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Crunchy Planet"
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
                         }
-                      ]
-                      fluxDensityContinuum: {
-                        value: "42"
-                        units: W_PER_M_SQUARED_PER_UM
+                        brightnesses: []
                       }
                     }
                   }
-                }
-                nonsidereal: {
-                  des: "foo"
-                  keyType: COMET
+                  nonsidereal: {
+                    des: "foo"
+                    keyType: COMET
+                  }
                 }
               }
-            ) $FullTargetGraph
+            ) {
+              target $FullTargetGraph
+            }
           }
         """).flatMap { js =>
           val expected = json"""
             {
               "createTarget" : {
-                "existence" : "PRESENT",
-                "name" : "Crunchy Planet",
-                "program" : {
-                  "id" : $pid
-                },
-                "sourceProfile" : {
-                  "point" : {
-                    "bandNormalized" : {
-                      "sed" : {
-                        "stellarLibrary" : "B5_III",
-                        "coolStar" : null,
-                        "galaxy" : null,
-                        "planet" : null,
-                        "quasar" : null,
-                        "hiiRegion" : null,
-                        "planetaryNebula" : null,
-                        "powerLaw" : null,
-                        "blackBodyTempK" : null,
-                        "fluxDensities" : null
-                      }
-                    },
-                    "emissionLines" : {
-                      "lines" : [
-                        {
-                          "wavelength" : {
-                            "angstroms" : "20"
-                          },
-                          "lineWidth" : "1.2",
-                          "lineFlux" : {
-                            "value" : "42",
-                            "units" : "ERG_PER_S_PER_CM_SQUARED"
-                          }
+                "target" : {
+                  "existence" : "PRESENT",
+                  "name" : "Crunchy Planet",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "sourceProfile" : {
+                    "point" : {
+                      "bandNormalized" : {
+                        "sed" : {
+                          "stellarLibrary" : "B5_III",
+                          "coolStar" : null,
+                          "galaxy" : null,
+                          "planet" : null,
+                          "quasar" : null,
+                          "hiiRegion" : null,
+                          "planetaryNebula" : null,
+                          "powerLaw" : null,
+                          "blackBodyTempK" : null,
+                          "fluxDensities" : null
                         }
-                      ],
-                      "fluxDensityContinuum" : {
-                        "value" : "42",
-                        "units" : "W_PER_M_SQUARED_PER_UM"
-                      }
+                      },
+                      "emissionLines" : null
                     }
+                  },
+                  "sidereal" : null,
+                  "nonsidereal" : {
+                    "des" : "foo",
+                    "keyType" : "COMET",
+                    "key" : "Comet_foo"
                   }
-                },
-                "sidereal" : null,
-                "nonsidereal" : {
-                  "des" : "foo",
-                  "keyType" : "COMET",
-                  "key" : "Comet_foo"
                 }
               }
             }

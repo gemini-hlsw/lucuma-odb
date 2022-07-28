@@ -47,13 +47,10 @@ object BandNormalizedInput {
       case List(
         UnnormalizedSedInput.Binding.Option("sed", rSed),
         brightnesses.Option("brightnesses", rBrightnesses),
-        brightnesses.Option("editBrightnesses", rEditBrightnesses),
-        BandBinding.List.Option("deleteBrightnesses", rDeleteBrightnesses),
       ) =>
-        (rSed, rBrightnesses, rEditBrightnesses, rDeleteBrightnesses).parTupled.flatMap {
-          case (Some(sed), Some(brightnesses), None, None) => Result(BandNormalized(sed, brightnesses))
-          case (Some(sed), Some(brightnesses), _, _)       => Result.warning("editBrightness and deleteBrightness are ignored on creation.", BandNormalized(sed, brightnesses))
-          case _                                           => Result.failure("Both sed and brightness are required.")
+        (rSed, rBrightnesses).parTupled.flatMap {
+          case (Some(sed), Some(brightnesses)) => Result(BandNormalized(sed, brightnesses))
+          case _                               => Result.failure("Both sed and brightness are required.")
         }
     }
 
@@ -64,17 +61,13 @@ object BandNormalizedInput {
       case List(
         UnnormalizedSedInput.Binding.Option("sed", rSed),
         brightnesses.Option("brightnesses", rBrightnesses),
-        brightnesses.Option("editBrightnesses", rEditBrightnesses),
-        BandBinding.List.Option("deleteBrightnesses", rDeleteBrightnesses),
       ) =>
-        (rSed, rBrightnesses, rEditBrightnesses, rDeleteBrightnesses).parTupled.flatMap {
-          case (sed, brightnesses, editBrightness, deleteBrightness) =>
+        (rSed, rBrightnesses).parTupled.flatMap {
+          case (sed, brightnesses) =>
             Result { a0 =>
               val a1 = sed.foldLeft(a0)((a, b) => a.copy(sed = b))
               val a2 = brightnesses.foldLeft(a1)((a, b) => a.copy(brightnesses = b))
-              val a3 = editBrightness.foldLeft(a2)((a, b) => a.copy(brightnesses = a.brightnesses ++ b))
-              val a4 = deleteBrightness.foldLeft(a3)((a, b) => a.copy(brightnesses = a.brightnesses -- b))
-              Result(a4)
+              Result(a2)
             }
         }
     }
