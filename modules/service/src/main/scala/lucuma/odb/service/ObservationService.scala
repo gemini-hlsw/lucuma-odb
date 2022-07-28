@@ -16,10 +16,10 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.implicits._
-import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 
 trait ObservationService[F[_]] {
   import ObservationService._

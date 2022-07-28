@@ -29,6 +29,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.snippet.input.CreateTargetInput
 import lucuma.odb.graphql.snippet.input.TargetPropertiesInput
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.TargetService
@@ -39,7 +40,6 @@ import skunk.codec.all._
 
 import java.math.MathContext
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.snippet.input.CreateTargetInput
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
