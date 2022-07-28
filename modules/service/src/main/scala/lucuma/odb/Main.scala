@@ -27,13 +27,13 @@ import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.implicits._
 import org.http4s.server._
 import org.http4s.server.websocket.WebSocketBuilder2
-import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.{Logger, SelfAwareStructuredLogger}
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command => _, _}
 
 import scala.concurrent.duration._
 
-object Main extends IOApp.Simple {
+object Main extends IOApp {
 
   // TODO: put this in the config
   val MaxConnections = 10
@@ -141,24 +141,31 @@ object Main extends IOApp.Simple {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Console]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Logger: Console](skipMigration: Boolean): Resource[F, ExitCode] =
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
       _  <- Resource.eval(banner[F](c))
-//      _  <- Resource.eval(migrateDatabase[F](c.database))
+      _  <- Applicative[Resource[F, *]].unlessA(skipMigration)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
       ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Logger: Console]: F[ExitCode] =
-    server.use(_ => Concurrent[F].never[ExitCode])
+  def runF[F[_]: Async: Logger: Console](skipMigration: Boolean): F[ExitCode] =
+    server(skipMigration).use(_ => Concurrent[F].never[ExitCode])
 
   /** Our actual entry point. */
-  def run: IO[Unit] = {
-    implicit val log = Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
-    runF[IO].void
+  def run(args: List[String]): IO[ExitCode] = {
+    implicit val log: SelfAwareStructuredLogger[IO] =
+      Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
+
+    val skipMigration = args.contains("-skip-migration")
+
+    for {
+      _ <- IO.whenA(skipMigration)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
+      e <- runF[IO](skipMigration)
+    } yield e
   }
 
 }
