@@ -24,6 +24,7 @@ import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.implicits._
@@ -32,12 +33,8 @@ trait ObservationService[F[_]] {
   import ObservationService._
 
   def insertObservation(
-    programId:     Program.Id,
-    name:          Option[NonEmptyString] = NonEmptyString.unapply("Untitled Observation"),
-    existence:     Existence              = Existence.Present,
-    status:        ObsStatus              = ObsStatus.New,
-    activeState:   ObsActiveStatus        = ObsActiveStatus.Active,
-    constraintSet: ConstraintSet          = ConstraintSetInput.NominalConstraints
+    programId:   Program.Id,
+    SET:         ObservationPropertiesInput,
   ): F[InsertObservationResponse]
 
 }
@@ -53,18 +50,26 @@ object ObservationService {
   import InsertObservationResponse._
 
   def fromUserAndSession[F[_]: MonadCancelThrow](user: User, session: Session[F]): ObservationService[F] =
-    (programId:     Program.Id,
-     name:          Option[NonEmptyString],
-     existence:     Existence,
-     status:        ObsStatus,
-     activeState:   ObsActiveStatus,
-     constraintSet: ConstraintSet
-    ) => {
-      val af = Statements.insertObservationAs(user, programId, name, existence, status, activeState, constraintSet)
-      session.prepare(af.fragment.query(observation_id)).use { pq =>
-        pq.option(af.argument).map {
-          case Some(oid) => Success(oid)
-          case None      => NotAuthorized(user)
+    new ObservationService[F] {
+
+      def insertObservation(
+        programId:   Program.Id,
+        SET:         ObservationPropertiesInput,
+      ): F[InsertObservationResponse] = {
+        val af = Statements.insertObservationAs(
+          user,
+          programId,
+          SET.subtitle,
+          SET.existence.getOrElse(Existence.Default),
+          SET.status.getOrElse(ObsStatus.Default),
+          SET.activeStatus.getOrElse(ObsActiveStatus.Default),
+          SET.constraintSet.getOrElse(ConstraintSetInput.NominalConstraints),
+        )
+        session.prepare(af.fragment.query(observation_id)).use { pq =>
+          pq.option(af.argument).map {
+            case Some(oid) => Success(oid)
+            case None      => NotAuthorized(user)
+          }
         }
       }
     }

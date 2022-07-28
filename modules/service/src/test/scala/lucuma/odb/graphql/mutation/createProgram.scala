@@ -29,15 +29,23 @@ class createProgram extends OdbSuite {
       query =
         """
           mutation {
-            createProgram(input: { name: "" }) {
-              id
+            createProgram(
+              input: {
+                SET: {
+                  name: ""
+                }
+              }
+            ) {
+              program {
+                id
+              }
             }
           }
         """,
       expected =
         Left(
           List(
-            "Argument 'name' is invalid: string value must be non-empty."
+            "Argument 'input.SET.name' is invalid: string value must be non-empty."
           )
         ),
     )
@@ -49,8 +57,16 @@ class createProgram extends OdbSuite {
       query =
         s"""
           mutation {
-            createProgram(input: { name: null }) {
-              name
+            createProgram(
+              input: {
+                SET: {
+                  name: null
+                }
+              }
+            ) {
+              program {
+                name
+              }
             }
           }
         """,
@@ -58,7 +74,9 @@ class createProgram extends OdbSuite {
         json"""
           {
             "createProgram": {
-              "name": null
+              "program": {
+                "name": null
+              }
             }
           }
         """
@@ -74,10 +92,18 @@ class createProgram extends OdbSuite {
         query  =
           s"""
             mutation {
-              createProgram(input: { name: "$name" }) {
-                name
-                pi {
-                  id
+              createProgram(
+                input: {
+                  SET: {
+                    name: "$name"
+                  }
+                }
+              ) {
+                program {
+                  name
+                  pi {
+                    id
+                  }
                 }
               }
             }
@@ -86,9 +112,11 @@ class createProgram extends OdbSuite {
           json"""
             {
               "createProgram" : {
-                "name" : $name,
-                "pi" : {
-                    "id" : ${u.id}
+                "program": {
+                  "name" : $name,
+                  "pi" : {
+                      "id" : ${u.id}
+                  }
                 }
               }
             }
@@ -105,10 +133,18 @@ class createProgram extends OdbSuite {
       query  =
         s"""
           mutation {
-            createProgram(input: { name: "$name" }) {
-              name
-              pi {
-                id
+            createProgram(
+              input: {
+                SET: {
+                  name: "$name"
+                }
+              }
+            ) {
+              program {
+                name
+                pi {
+                  id
+                }
               }
             }
           }
@@ -117,8 +153,10 @@ class createProgram extends OdbSuite {
         json"""
           {
             "createProgram" : {
-              "name" : $name,
-              "pi" : null
+              "program": {
+                "name" : $name,
+                "pi" : null
+              }
             }
           }
         """
@@ -131,9 +169,10 @@ class createProgram extends OdbSuite {
 trait CreateProgramOps { this: OdbSuite =>
 
   def createProgramAs(user: User): IO[Program.Id] =
-    query(user, "mutation { createProgram(input: { name: null }) { id } }").flatMap { js =>
+    query(user, "mutation { createProgram(input: { SET: { name: null } }) { program { id } } }").flatMap { js =>
       js.hcursor
         .downField("createProgram")
+        .downField("program")
         .downField("id")
         .as[Program.Id]
         .leftMap(f => new RuntimeException(f.message))

@@ -77,8 +77,8 @@ object ConstraintSetInput {
   val SimpleBinding: Matcher[ConstraintSetInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        CloudExtinctionBinding.Option("cloudExtinction", rCloud),
         ImageQualityBinding.Option("imageQuality", rImage),
+        CloudExtinctionBinding.Option("cloudExtinction", rCloud),
         SkyBackgroundBinding.Option("skyBackground", rSky),
         WaterVaporBinding.Option("waterVapor", rWater),
         ElevationRangeInput.SimpleBinding.Option("elevationRange", rElevation)

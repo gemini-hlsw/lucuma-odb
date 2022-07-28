@@ -19,8 +19,9 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.snippet.input.CreateTargetInput
+import lucuma.odb.graphql.instances.SourceProfileEncoder
 import lucuma.odb.graphql.snippet.input.SiderealInput
+import lucuma.odb.graphql.snippet.input.TargetPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Session
@@ -30,7 +31,7 @@ import skunk.implicits._
 
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse
-  def createTarget(pid: Program.Id, input: CreateTargetInput): F[CreateTargetResponse]
+  def createTarget(pid: Program.Id, input: TargetPropertiesInput): F[CreateTargetResponse]
 }
 
 object TargetService {
@@ -47,11 +48,11 @@ object TargetService {
       new TargetService[F] {
         import Statements._
 
-        override def createTarget(pid: Program.Id, input: CreateTargetInput): F[CreateTargetResponse] = {
+        override def createTarget(pid: Program.Id, input: TargetPropertiesInput): F[CreateTargetResponse] = {
           val insert: AppliedFragment =
             input.tracking match {
-              case Left(s) => insertSiderealFragment(pid, input.name, s, input.sourceProfile)
-              case Right(n) => insertNonsiderealFragment(pid, input.name, n, input.sourceProfile)
+              case Left(s) => insertSiderealFragment(pid, input.name, s, SourceProfileEncoder.EncoderSourceProfile(input.sourceProfile))
+              case Right(n) => insertNonsiderealFragment(pid, input.name, n, SourceProfileEncoder.EncoderSourceProfile(input.sourceProfile))
             }
           val where = whereFragment(pid, u)
           val appl  = insert |+| void" " |+| where

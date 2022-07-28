@@ -43,6 +43,12 @@ input AirMassRangeInput {
   max: PosBigDecimal
 }
 
+# Time allocation
+type Allocation {
+  partner: Partner!
+  duration: Duration!
+}
+
 # Create an angle from a signed value.  Choose exactly one of the available units.
 input AngleInput {
   microarcseconds: Long
@@ -228,7 +234,7 @@ type CreateProgramResult {
 # Target creation parameters
 input CreateTargetInput {
   programId: ProgramId!
-  SET: TargetPropertiesInput
+  SET: TargetPropertiesInput!
 }
 
 # The result of creating a new target.
@@ -1573,6 +1579,30 @@ input LineFluxSurfaceInput {
   units: LineFluxSurfaceUnits!
 }
 
+"Link user"
+input LinkUserInput {
+
+  "The program to add a user to."
+  programId: ProgramId!
+
+  "The user to be added."
+  userId: UserId!
+
+  "The role this user will play in the program."
+  role: ProgramUserRole!
+
+  "Must be specified if and only if 'role' is SUPPORT"
+  supportType: ProgramUserSupportRoleType
+
+  "Must be specified if and only if 'supportType' is PARTNER"
+  supportPartner: Partner
+
+}
+
+type LinkUserResult {
+  user: ProgramUser!
+}
+
 # MOS pre-imaging observation
 enum MosPreImaging {
   # MosPreImaging IsMosPreImaging
@@ -1668,6 +1698,12 @@ type Mutation {
     input: DeleteTargetsInput!
   ): DeleteTargetsResult!
 
+  """
+  Link a user to a program. Any existing link will be replaced.
+  This operation is available only to Admin and Service users.
+  """
+  linkUser(input: LinkUserInput!): LinkUserResult!
+
   # Record a new step
   recordGmosNorthStep(
     # GmosNorth step configuration parameters
@@ -1692,6 +1728,9 @@ type Mutation {
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
 
+  "Set the allocation for a program from the specified partner."
+  setAllocation(input: SetAllocationInput!): SetAllocationResult!
+
   # Undeletes all the observations identified by the `WHERE` field
   undeleteObservations(
     # Parameters used to select observations for undelete
@@ -1703,6 +1742,20 @@ type Mutation {
     # Parameters used to select observations for undelete
     input: UndeleteTargetsInput!
   ): UndeleteTargetsResult!
+
+  """
+  Unlink a user from a program.
+  This operation is available only to Admin and Service users.
+  """
+  unlinkUser(
+
+    "The program to unlink the user from."
+    programId: ProgramId!
+
+    "The user to unlink."
+    userId: UserId!
+
+  ): UnlinkUserResult!
 
   # Update asterisms, adding or deleting targets, in (potentially) multiple
   # observations at once.
@@ -1841,10 +1894,18 @@ input ParallaxInput {
   milliarcseconds: BigDecimal
 }
 
+# Metadata describing `enum Partner`
+type PartnerMeta {
+  tag:        Partner!
+  shortName:  String!
+  longName:	  String!
+  active:     Boolean!
+}
+
 # Partner time allocation: must be empty or sum to 100%
 input PartnerSplitsInput {
   # The partner field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  partner: partner
+  partner: Partner
 
   # The percent field must be either specified or skipped altogether.  It cannot be unset with a null value.
   percent: IntPercent
@@ -1890,6 +1951,26 @@ input ProgramPropertiesInput {
 
   # Whether the program is considered deleted (defaults to PRESENT) but may be edited
   existence: Existence
+}
+
+# The role a user a plays when assigned to a program.
+enum ProgramUserRole {
+  "Co-Investigator"             COI
+  "Observer (read-only access)" OBSERVER
+  "Staff/Partner Support"       SUPPORT
+}
+
+# The type of support role.
+enum ProgramUserSupportRoleType {
+  "Staff support"   STAFF
+  "Partner support" PARTNER
+}
+
+# An assignment of a user to a program.
+type ProgramUser {
+  role:   ProgramUserRole!
+  userId: UserId!
+  user:   User!
 }
 
 # Proper motion component, choose one of the available units
@@ -2064,6 +2145,16 @@ input SequenceEventLocationInput {
 # SequenceEvent payload creation parameters
 input SequenceEventPayloadInput {
   command: SequenceCommand!
+}
+
+input SetAllocationInput {
+  programId: ProgramId!
+  partner: Partner!
+  duration: DurationInput!
+}
+
+type SetAllocationResult {
+  allocation: Allocation!
 }
 
 # Sidereal target edit parameters
@@ -2459,30 +2550,6 @@ type p {
 
   # p offset in arcsec
   arcseconds: BigDecimal!
-}
-
-# Partner
-enum partner {
-  # partner ar
-  AR
-
-  # partner br
-  BR
-
-  # partner ca
-  CA
-
-  # partner cl
-  CL
-
-  # partner kr
-  KR
-
-  # partner uh
-  UH
-
-  # partner us
-  US
 }
 
 # TAC category
@@ -3082,6 +3149,42 @@ type DirectorsTime implements ProposalClass {
 # Target declination coordinate in format '[+/-]DD:MM:SS.sss'
 scalar DmsString
 
+# Equivalent time amount in several unit options (e.g., 120 seconds or 2 minutes)
+type Duration {
+  # Duration in µs
+  microseconds: Long!
+
+  # Duration in ms
+  milliseconds: BigDecimal!
+
+  # Duration in seconds
+  seconds: BigDecimal!
+
+  # Duration in minutes
+  minutes: BigDecimal!
+
+  # Duration in hours
+  hours: BigDecimal!
+}
+
+# Equivalent time amount in several unit options (exactly one must be specified)
+input DurationInput {
+  # Duration in µs
+  microseconds: Long
+
+  # Duration in ms
+  milliseconds: BigDecimal
+
+  # Duration in seconds
+  seconds: BigDecimal
+
+  # Duration in minutes
+  minutes: BigDecimal
+
+  # Duration in hours
+  hours: BigDecimal
+}
+
 # Either air mass range or elevation range
 type ElevationRange {
   # AirMass range if elevation range is an Airmass range
@@ -3222,6 +3325,13 @@ type ExposureTimeMode {
 type FastTurnaround implements ProposalClass {
   # Minimum percent of requested observation time that is required
   minPercentTime: IntPercent!
+}
+
+# Metadata for `enum FilterType`
+type FilterTypeMeta {
+  tag:        FilterType!
+  shortName:  String!
+  longName:	  String!
 }
 
 # Fixed exposure time mode
@@ -4171,30 +4281,6 @@ type Parallax {
   milliarcseconds: BigDecimal!
 }
 
-# Partner
-enum Partner {
-  # Partner ar
-  AR
-
-  # Partner br
-  BR
-
-  # Partner ca
-  CA
-
-  # Partner cl
-  CL
-
-  # Partner kr
-  KR
-
-  # Partner uh
-  UH
-
-  # Partner us
-  US
-}
-
 type PartnerSplit {
   # Partner
   partner: Partner!
@@ -4307,6 +4393,12 @@ type Program {
 
   # Program proposal
   proposal: Proposal
+
+  "Principal Investigator"
+  pi: User
+
+  "Users assigned to this science program"
+  users:   [ProgramUser!]!
 
   # All observations associated with the program.
   observations(
@@ -4507,6 +4599,9 @@ type Query {
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
 
+  # Metadata for `enum FilterType`
+  filterTypeMeta: [FilterTypeMeta!]!
+
   # Returns the observation with the given id, if any.
   observation(
     # Observation ID
@@ -4527,6 +4622,9 @@ type Query {
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
+
+  # Metadata for `enum Partner`
+  partnerMeta: [PartnerMeta!]!
 
   # Returns the program with the given id, if any.
   program(
@@ -5365,6 +5463,21 @@ enum ToOActivation {
   RAPID
 }
 
+input UnlinkUserInput {
+
+    "The program to unlink the user from."
+    programId: ProgramId!
+
+    "The user to unlink."
+    userId: UserId!
+
+}
+
+type UnlinkUserResult {
+  "Returns true if the user was unlinked, false if no such link existed."
+  result: Boolean!
+}
+
 # Un-normalized spectral energy distribution.  Exactly one of the definitions will be non-null.
 type UnnormalizedSed {
   stellarLibrary: StellarLibrarySpectrum
@@ -5377,6 +5490,25 @@ type UnnormalizedSed {
   powerLaw: BigDecimal
   blackBodyTempK: PosInt
   fluxDensities: [FluxDensityEntry!]
+}
+
+scalar UserId
+
+enum UserType {
+  GUEST
+  STANDARD
+  SERVICE
+}
+
+type User {
+  id:              UserId!
+  type:            UserType!
+  serviceName:     String,
+  orcidId:         String,
+  orcidGivenName:  String,
+  orcidCreditName: String,
+  orcidFamilyName: String,
+  orcidEmail:      String,
 }
 
 # VisitId id formatted as `v-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
