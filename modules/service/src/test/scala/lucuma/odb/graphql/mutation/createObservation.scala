@@ -8,13 +8,13 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
+import lucuma.core.enums.CloudExtinction
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
-import lucuma.odb.graphql.OdbSuite
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
@@ -228,6 +228,115 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
       }
     }
   }
+
+  test("[general] created observation should have specified cloud extinction") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                constraintSet: {
+                  cloudExtinction: ONE_POINT_FIVE
+                }
+              }
+            }) {
+              observation {
+                constraintSet {
+                  cloudExtinction
+                }
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("constraintSet")
+          .downField("cloudExtinction")
+          .as[CloudExtinction]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, CloudExtinction.OnePointFive)
+      }
+    }
+  }
+
+  test("[general] created observation can default cloud extinction") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                constraintSet {
+                  cloudExtinction
+                }
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("constraintSet")
+          .downField("cloudExtinction")
+          .as[CloudExtinction]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, CloudExtinction.ThreePointZero)
+      }
+    }
+  }
+
+    test("[general] created observation should have specified air mass") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                constraintSet: {
+                  elevationRange: {
+                    airMass: {
+                      min: "1.2"
+                      max: "1.3"
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                constraintSet {
+                  elevationRange {
+                    airMass {
+                      min
+                    }
+                  }
+                }
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("constraintSet")
+          .downField("elevationRange")
+          .downField("airMass")
+          .downField("min")
+          .as[BigDecimal]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, BigDecimal("1.2"))
+      }
+    }
+  }
+
 
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>
