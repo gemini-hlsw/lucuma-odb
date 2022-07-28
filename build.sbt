@@ -8,7 +8,8 @@ val grackleVersion             = "0.3.0"
 val http4sBlazeVersion         = "0.23.12"
 val http4sEmberVersion         = "0.23.14"
 val jwtVersion                 = "5.0.0"
-val log4catsVersion            = "2.1.1"
+val logbackVersion             = "1.2.11"
+val log4catsVersion            = "2.4.0"
 val lucumaGraphQLRoutesVersion = "0.5.0"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -16,7 +17,6 @@ val natchezHttp4sVersion       = "0.3.2"
 val natchezVersion             = "0.1.6"
 val postgresVersion            = "42.4.0"
 val skunkVersion               = "0.3.1"
-val slf4jVersion               = "1.7.36"
 val lucumaSsoVersion           = "0.1.13"
 val testcontainersScalaVersion = "0.40.9"
 
@@ -32,6 +32,7 @@ lazy val service = project
     scalacOptions --= Seq("-Vtype-diffs"),
     scalacOptions ++= Seq("-Xcheckinit"),
     libraryDependencies ++= Seq(
+      "ch.qos.logback" %  "logback-classic"                 % logbackVersion,
       "com.monovore"   %% "decline-effect"                  % declineVersion,
       "com.monovore"   %% "decline"                         % declineVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
@@ -44,7 +45,6 @@ lazy val service = project
       "org.http4s"     %% "http4s-blaze-server"             % http4sBlazeVersion,
       "org.http4s"     %% "http4s-ember-client"             % http4sEmberVersion,
       "org.postgresql" %  "postgresql"                      % postgresVersion,
-      "org.slf4j"      %  "slf4j-simple"                    % slf4jVersion,
       "org.tpolecat"   %% "natchez-honeycomb"               % natchezVersion,
       "org.tpolecat"   %% "natchez-http4s"                  % natchezHttp4sVersion,
       "org.tpolecat"   %% "natchez-log"                     % natchezVersion,
@@ -54,7 +54,10 @@ lazy val service = project
       "edu.gemini"     %% "clue-http4s-jdk-client"          % clueVersion                % Test,
       "io.circe"       %% "circe-literal"                   % circeVersion               % Test,
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+      "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
     ),
+    reStart / envVars += "PORT" -> "8082",
+    reStartArgs       += "-skip-migration"
   )
 
