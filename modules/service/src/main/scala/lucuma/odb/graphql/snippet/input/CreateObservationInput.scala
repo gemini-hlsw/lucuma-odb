@@ -9,20 +9,20 @@ import cats.syntax.all._
 import lucuma.core.model.Program
 import lucuma.odb.graphql.util.Bindings._
 
-case class CreateTargetInput(
+case class CreateObservationInput(
   programId: Program.Id,
-  SET: TargetPropertiesInput,
+  SET: Option[ObservationPropertiesInput]
 )
 
-object CreateTargetInput {
+object CreateObservationInput {
 
-  val Binding: Matcher[CreateTargetInput] =
+  val Binding: Matcher[CreateObservationInput] =
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rProgramId),
-        TargetPropertiesInput.Binding("SET", rSET),
+        ObservationPropertiesInput.CreateBinding.Option("SET", rSET),
       ) =>
-        (rProgramId, rSET).parMapN(CreateTargetInput(_, _))
+        (rProgramId, rSET).parMapN(apply)
     }
 
 }

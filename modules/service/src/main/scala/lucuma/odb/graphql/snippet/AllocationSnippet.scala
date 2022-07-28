@@ -45,9 +45,10 @@ object AllocationSnippet {
 
     val pool = sessionPool.map(AllocationService.fromSessionAndUser(_, user))
 
-    val AllocationType = schema.ref("Allocation")
-    val MutationType   = schema.ref("Mutation")
-    val DurationType   = schema.ref("Duration")
+    val AllocationType          = schema.ref("Allocation")
+    val MutationType            = schema.ref("Mutation")
+    val DurationType            = schema.ref("Duration")
+    val SetAllocationResultType = schema.ref("SetAllocationResult")
 
     object Allocation extends TableDef("t_allocation") {
       val ProgramId = col("c_program_id", program_id)
@@ -76,6 +77,14 @@ object AllocationSnippet {
 
     val typeMappings =
       List(
+        ObjectMapping(
+          tpe = SetAllocationResultType,
+          fieldMappings = List(
+            SqlField("programId", Allocation.ProgramId, key = true, hidden = true),
+            SqlField("partner", Allocation.Partner, key = true),
+            SqlObject("allocation"),
+          )
+        ),
         ObjectMapping(
           tpe = AllocationType,
           fieldMappings = List(

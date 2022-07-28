@@ -298,16 +298,20 @@ trait LinkUserOps { this: OdbSuite =>
             supportType: ${supportType.fold("null")(_.tag.toUpperCase)}
             supportPartner: ${partner.fold("null")(_.tag.toUpperCase)}
           }) {
-            role
-            userId
+            user {
+              role
+              userId
+            }
           }
         }
       """,
       expected = json"""
         {
           "linkUser" : {
-            "role" : $role,
-            "userId" : $uid
+            "user": {
+              "role" : $role,
+              "userId" : $uid
+            }
           }
         }
       """.asRight

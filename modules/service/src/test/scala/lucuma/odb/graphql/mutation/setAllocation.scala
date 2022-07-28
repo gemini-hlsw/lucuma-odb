@@ -66,13 +66,15 @@ trait SetAllocationOps { this: OdbSuite =>
               hours: "${duration.toHours}"
             }
           }) {
-            partner
-            duration {
-              microseconds
-              milliseconds
-              seconds
-              minutes
-              hours
+            allocation {
+              partner
+              duration {
+                microseconds
+                milliseconds
+                seconds
+                minutes
+                hours
+              }
             }
           }
         }
@@ -80,13 +82,15 @@ trait SetAllocationOps { this: OdbSuite =>
       expected = json"""
         {
           "setAllocation" : {
-            "partner":  ${partner.asJson},
-            "duration": {
-              "microseconds": ${duration.toNanos / 1000L},
-              "milliseconds": ${duration.toMillis},
-              "seconds": ${duration.toSeconds},
-              "minutes": ${duration.toMinutes},
-              "hours": ${duration.toHours}
+            "allocation" : {
+              "partner":  ${partner.asJson},
+              "duration": {
+                "microseconds": ${duration.toNanos / 1000L},
+                "milliseconds": ${duration.toMillis},
+                "seconds": ${duration.toSeconds},
+                "minutes": ${duration.toMinutes},
+                "hours": ${duration.toHours}
+              }
             }
           }
         }

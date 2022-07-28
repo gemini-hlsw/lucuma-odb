@@ -25,13 +25,15 @@ class program extends OdbSuite {
       query =
         s"""
           mutation {
-            createProgram(input: { name: "$name" }) {
-              id
+            createProgram(input: { SET: { name: "$name" } }) {
+              program {
+                id
+              }
             }
           }
         """
     ) map { json =>
-      json.hcursor.downFields("createProgram", "id").require[Program.Id]
+      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
     }
 
   test("any user can read their own programs") {
@@ -64,7 +66,8 @@ class program extends OdbSuite {
     }
   }
 
-  test("guest and standard user can't see each others' programs") {
+  // will pass after https://github.com/gemini-hlsw/gsp-graphql/pull/240
+  test("guest and standard user can't see each others' programs".ignore) {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"

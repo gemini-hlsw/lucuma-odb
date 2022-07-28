@@ -60,7 +60,7 @@ object OdbMapping {
           with ComputeMapping[F]
           with MutationCompanionOps[F] {
 
-          val schema = unsafeLoadSchema("TmpApi.graphql") |+| enums
+          val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
           val snippet: Snippet =
             NonEmptyList.of(

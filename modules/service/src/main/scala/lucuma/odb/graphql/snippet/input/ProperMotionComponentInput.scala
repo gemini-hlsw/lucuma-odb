@@ -28,14 +28,12 @@ object ProperMotionComponentInput {
       case List(
         LongBinding.Option("microarcsecondsPerYear", rMicroarcsecondsPerYear),
         BigDecimalBinding.Option("milliarcsecondsPerYear", rMilliarcsecondsPerYear),
-        ProperMotionComponentLongInput.Binding.Option("fromLong", rFromLong),
-        ProperMotionComponentDecimalInput.Binding.Option("fromDecimal", rFromDecimal),
-      ) =>
+     ) =>
         val rMicroarcsecondsPerYearʹ = Nested(rMicroarcsecondsPerYear).map(_.withUnit[MicroArcSecondPerYear]).value
         val rMilliarcsecondsPerYearʹ = Nested(rMilliarcsecondsPerYear).map(n => (n * 1000).toLong.withUnit[MicroArcSecondPerYear]).value
-        (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ, rFromLong, rFromDecimal).parTupled.flatMap {
-          case (microarcsecondsPerYear, milliarcsecondsPerYear, fomLong, fromDecimal) =>
-            List(microarcsecondsPerYear, milliarcsecondsPerYear, fomLong, fromDecimal).flatten match {
+        (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ).parTupled.flatMap {
+          case (microarcsecondsPerYear, milliarcsecondsPerYear) =>
+            List(microarcsecondsPerYear, milliarcsecondsPerYear).flatten match {
               case List(a) => Result(ProperMotion.AngularVelocityComponent(a))
               case as => Result.failure(s"Expected exactly one proper motion component format; found ${as.length}.")
             }
@@ -43,24 +41,3 @@ object ProperMotionComponentInput {
     }
 
 }
-
-object ProperMotionComponentLongInput {
-
-  def Binding[A]: Matcher[Quantity[Long, MicroArcSecondPerYear]] =
-    LongInput("ProperMotionComponentUnits") {
-      case (value, "MICROARCSECONDS_PER_YEAR") => Result(value.withUnit)
-      case (value, "MILLIARCSECONDS_PER_YEAR") => Result((value * 1000L).withUnit)
-    }
-
-}
-
-object ProperMotionComponentDecimalInput {
-
-  def Binding[A]: Matcher[Quantity[Long, MicroArcSecondPerYear]] =
-    DecimalInput("ProperMotionComponentUnits") {
-      case (value, "MICROARCSECONDS_PER_YEAR") => Result(value.toLong.withUnit)
-      case (value, "MILLIARCSECONDS_PER_YEAR") => Result((value.toLong * 1000L).withUnit)
-    }
-
-}
-

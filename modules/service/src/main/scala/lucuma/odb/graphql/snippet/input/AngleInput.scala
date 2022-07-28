@@ -39,8 +39,6 @@ object AngleInput {
   val Hours           = BigDecimalBinding.map(_.toDouble).map(getHours)
   val DMS             = StringBinding.emap(getDMS)
   val HMS             = StringBinding.emap(getHMS)
-  val FromLong        = LongInput("Angle")(decimalInputHandler compose { case (v, s) => (BigDecimal(v), s) })
-  val FromDecimal     = DecimalInput("Angle")(decimalInputHandler)
 
 
   def decimalInputHandler: PartialFunction[(BigDecimal, String), Result[Angle]] = {
@@ -59,7 +57,7 @@ object AngleInput {
   def oneOrFail(all: Option[Angle]*): Result[Angle] =
     all.toList.flatten match {
       case List(w) => Result(w)
-      case _       => Result.failure("Expected exactly one of microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms, fromLong, fromDecimal.")
+      case _       => Result.failure("Expected exactly one of microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms.")
     }
 
   val Binding: Matcher[Angle] =
@@ -77,12 +75,10 @@ object AngleInput {
         Hours.Option("hours", rHours),
         DMS.Option("dms", rDMS),
         HMS.Option("hms", rHMS),
-        FromLong.Option("fromlong", rFromLong),
-        FromDecimal.Option("fromdecimal", rFromDecimal),
       ) =>
-        (rMicroarcseconds, rMicroseconds, rMilliarcseconds, rMilliseconds, rArcSeconds, rSeconds, rArcMinutes, rMinutes, rDegrees, rHours, rDMS, rHMS, rFromLong, rFromDecimal).parTupled.flatMap {
-          case (microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms, fromLong, fromDecimal) =>
-            oneOrFail(microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms, fromLong, fromDecimal)
+        (rMicroarcseconds, rMicroseconds, rMilliarcseconds, rMilliseconds, rArcSeconds, rSeconds, rArcMinutes, rMinutes, rDegrees, rHours, rDMS, rHMS).parTupled.flatMap {
+          case (microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms) =>
+            oneOrFail(microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms)
         }
     }
 }

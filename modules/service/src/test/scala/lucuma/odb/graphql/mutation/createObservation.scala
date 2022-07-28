@@ -40,14 +40,17 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
             createObservation(input: {
               programId: ${pid.asJson}
             }) {
-              program {
-                id
+              observation {
+                program {
+                  id
+                }
               }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("program")
           .downField("id")
           .as[Program.Id]
@@ -58,17 +61,21 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] name can't be empty") {
+  test("[general] subtitle can't be empty") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL("Argument 'name' is invalid: string value must be non-empty.") {
+      interceptGraphQL("Argument 'input.SET.subtitle' is invalid: string value must be non-empty.") {
         query(pi,
           s"""
             mutation {
               createObservation(input: {
                 programId: ${pid.asJson}
-                name: ""
+                SET: {
+                  subtitle: ""
+                }
               }) {
-                name
+                observation {
+                  subtitle
+                }
               }
             }
             """
@@ -77,7 +84,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] created observation should specified program as parent") {
+  test("[general] created observation should have specified program as parent") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
         s"""
@@ -85,14 +92,17 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
             createObservation(input: {
               programId: ${pid.asJson}
             }) {
-              program {
-                id
+              observation {
+                program {
+                  id
+                }
               }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("program")
           .downField("id")
           .as[Program.Id]
@@ -103,22 +113,27 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] created observation should have specified name (non-null)") {
+  test("[general] created observation should have specified subtitle (non-null)") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
         s"""
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              name: "crunchy frog"
+              SET: {
+                subtitle: "crunchy frog"
+              }
             }) {
-              name
+              observation {
+                subtitle
+              }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
-          .downField("name")
+          .downField("observation")
+          .downField("subtitle")
           .as[String]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
@@ -127,22 +142,27 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] created observation should have specified name (null)") {
+  test("[general] created observation should have specified subtitle (null)") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
         s"""
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              name: null
+              SET: {
+                subtitle: null
+              }
             }) {
-              name
+              observation {
+                subtitle
+              }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
-          .downField("name")
+          .downField("observation")
+          .downField("subtitle")
           .as[Option[String]]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
@@ -158,14 +178,19 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              status: FOR_REVIEW
+              SET: {
+                status: FOR_REVIEW
+              }
             }) {
-              status
+              observation {
+                status
+              }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("status")
           .as[ObsStatus]
           .leftMap(f => new RuntimeException(f.message))
@@ -182,14 +207,19 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              activeStatus: INACTIVE
+              SET: {
+                activeStatus: INACTIVE
+              }
             }) {
-              activeStatus
+              observation {
+                activeStatus
+              }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("activeStatus")
           .as[ObsActiveStatus]
           .leftMap(f => new RuntimeException(f.message))
@@ -206,18 +236,23 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              constraintSet: {
-                cloudExtinction: ONE_POINT_FIVE
+              SET: {
+                constraintSet: {
+                  cloudExtinction: ONE_POINT_FIVE
+                }
               }
             }) {
-              constraintSet {
-                cloudExtinction
+              observation {
+                constraintSet {
+                  cloudExtinction
+                }
               }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("constraintSet")
           .downField("cloudExtinction")
           .as[CloudExtinction]
@@ -236,14 +271,17 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
             createObservation(input: {
               programId: ${pid.asJson}
             }) {
-              constraintSet {
-                cloudExtinction
+              observation {
+                constraintSet {
+                  cloudExtinction
+                }
               }
             }
           }
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("constraintSet")
           .downField("cloudExtinction")
           .as[CloudExtinction]
@@ -261,19 +299,23 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              constraintSet: {
-                elevationRange: {
-                  airMass: {
-                    min: "1.2"
-                    max: "1.3"
+              SET: {
+                constraintSet: {
+                  elevationRange: {
+                    airMass: {
+                      min: "1.2"
+                      max: "1.3"
+                    }
                   }
                 }
               }
             }) {
-              constraintSet {
-                elevationRange {
-                  airMass {
-                    min
+              observation {
+                constraintSet {
+                  elevationRange {
+                    airMass {
+                      min
+                    }
                   }
                 }
               }
@@ -282,6 +324,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           """).flatMap { js =>
         val get = js.hcursor
           .downField("createObservation")
+          .downField("observation")
           .downField("constraintSet")
           .downField("elevationRange")
           .downField("airMass")
@@ -319,9 +362,10 @@ trait CreateObservationOps { this: OdbSuite =>
     user: User,
     pid: Program.Id,
   ): IO[Observation.Id] =
-    query(user, s"mutation { createObservation(input: { programId: ${pid.asJson} }) { id } }").flatMap { js =>
+    query(user, s"mutation { createObservation(input: { programId: ${pid.asJson} }) { observation { id } } }").flatMap { js =>
       js.hcursor
         .downField("createObservation")
+        .downField("observation")
         .downField("id")
         .as[Observation.Id]
         .leftMap(f => new RuntimeException(f.message))
