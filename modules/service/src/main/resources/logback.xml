@@ -1,0 +1,23 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>[%highlight(%-5level)] %cyan(%logger) - %msg %n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Suppress reporting of https://github.com/http4s/http4s/issues/2835 -->
+  <logger name="org.http4s.blaze" level="OFF" />
+  <logger name="org.http4s.blazecore.IdleTimeoutStage" level="OFF" />
+  <logger name="org.http4s.blazecore.websocket.Http4sWSStage" level="OFF" />
+
+  <logger name="lucuma-odb" level="INFO" />
+  <logger name="lucuma-odb-container" level="DEBUG" />
+  <logger name="org.http4s.server.middleware.Logger" level="WARN" />
+  <logger name="org.testcontainers" level="WARN" />
+
+  <logger name="lucuma.odb.Main" level="INFO"/>
+
+  <root level="WARN">
+    <appender-ref ref="STDOUT" />
+  </root>
+</configuration>
