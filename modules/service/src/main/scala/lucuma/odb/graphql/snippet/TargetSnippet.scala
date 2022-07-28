@@ -29,7 +29,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
-import lucuma.odb.graphql.snippet.input.CreateTargetInput
+import lucuma.odb.graphql.snippet.input.TargetPropertiesInput
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.TargetService
 import lucuma.odb.util.Codecs._
@@ -39,6 +39,7 @@ import skunk.codec.all._
 
 import java.math.MathContext
 import scala.reflect.ClassTag
+import lucuma.odb.graphql.snippet.input.CreateTargetInput
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
@@ -80,6 +81,7 @@ object TargetSnippet {
     val TargetIdType                = schema.ref("TargetId")
     val EpochStringType             = schema.ref("EpochString")
     val EphemerisKeyTypeType        = schema.ref("EphemerisKeyType")
+    val CreateTargetResultType      = schema.ref("CreateTargetResult")
 
     val servicePool: Resource[F, TargetService[F]] =
       sessionPool.map(TargetService.fromSession(_, user))
@@ -143,7 +145,7 @@ object TargetSnippet {
     val createTarget: Mutation =
       Mutation.simple { (child, env) =>
         (env.getR[Program.Id]("pid"),
-         env.getR[CreateTargetInput]("input")
+         env.getR[TargetPropertiesInput]("input")
         ).parTupled.flatTraverse { case (pid, input) =>
           servicePool.use { ts =>
             ts.createTarget(pid, input).map {
@@ -181,6 +183,13 @@ object TargetSnippet {
           SqlJson("sourceProfile", TargetView.SourceProfile),
           SqlObject("sidereal"),
           SqlObject("nonsidereal"),
+        ),
+      ),
+      ObjectMapping(
+        tpe = CreateTargetResultType,
+        fieldMappings = List(
+          SqlField("id", TargetView.Id, key = true),
+          SqlObject("target"),
         ),
       ),
       ObjectMapping(
@@ -230,8 +239,8 @@ object TargetSnippet {
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
           SqlField("value", TargetView.Sidereal.ProperMotion.Ra, hidden = true),
-          FieldRef[Angle]("value").as("microarcsecondsPerYear", _.toMicroarcseconds),
-          FieldRef[Angle]("value").as("milliarcsecondsPerYear", a => BigDecimal(a.toMicroarcseconds) / BigDecimal(1000)),
+          FieldRef[Angle]("value").as("microarcsecondsPerYear", Angle.signedMicroarcseconds.get),
+          FieldRef[Angle]("value").as("milliarcsecondsPerYear", Angle.signedDecimalMilliarcseconds.get),
         )
       ),
       ObjectMapping(
@@ -239,8 +248,8 @@ object TargetSnippet {
         fieldMappings = List(
           SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
           SqlField("value", TargetView.Sidereal.ProperMotion.Dec, hidden = true),
-          FieldRef[Angle]("value").as("microarcsecondsPerYear", _.toMicroarcseconds),
-          FieldRef[Angle]("value").as("milliarcsecondsPerYear", a => BigDecimal(a.toMicroarcseconds) / BigDecimal(1000)),
+          FieldRef[Angle]("value").as("microarcsecondsPerYear", Angle.signedMicroarcseconds.get),
+          FieldRef[Angle]("value").as("milliarcsecondsPerYear", Angle.signedDecimalMilliarcseconds.get),
         )
       ),
       ObjectMapping(
@@ -250,7 +259,7 @@ object TargetSnippet {
           SqlField("value", TargetView.Sidereal.RadialVelocity.Value, hidden = true),
           FieldRef[RadialVelocity]("value").as("metersPerSecond", _.rv.value),
           FieldRef[RadialVelocity]("value").as("kilometersPerSecond", _.rv.value / BigDecimal(1000)),
-          FieldRef[RadialVelocity]("value").as("centimetersPerSecond", _.rv.value.toLong * 100L),
+          FieldRef[RadialVelocity]("value").as("centimetersPerSecond", v => (v.rv.value * BigDecimal(100)).toLong),
         )
       ),
       ObjectMapping(
@@ -297,12 +306,11 @@ object TargetSnippet {
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
       MutationType -> {
         case Select("createTarget", List(
-          ProgramIdBinding("programId", rPid),
           CreateTargetInput.Binding("input", rInput),
         ), child) =>
-          (rPid, rInput).parMapN { (pid, input) =>
+          rInput.map { input =>
             Environment(
-              Env("pid" -> pid, "input" -> input),
+              Env("pid" -> input.programId, "input" -> input.SET),
               Select("createTarget", Nil, child)
             )
           }

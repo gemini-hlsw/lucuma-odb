@@ -234,7 +234,7 @@ type CreateProgramResult {
 # Target creation parameters
 input CreateTargetInput {
   programId: ProgramId!
-  SET: TargetPropertiesInput
+  SET: TargetPropertiesInput!
 }
 
 # The result of creating a new target.
