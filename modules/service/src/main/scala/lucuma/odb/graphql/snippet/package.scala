@@ -7,8 +7,8 @@ import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.sql.FailedJoin
-import eu.timepit.refined.types.numeric
-import eu.timepit.refined.types.string
+import eu.timepit.refined.types.numeric.{ NonNegInt, PosBigDecimal }
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
@@ -89,14 +89,17 @@ package object snippet {
 
   val NonEmptyStringBinding =
     StringBinding.emap { s =>
-      string.NonEmptyString.unapply(s).toRight("string value must be non-empty.")
+      NonEmptyString.unapply(s).toRight("string value must be non-empty.")
     }
+
+  val NonNegIntBinding =
+    IntBinding.emap(NonNegInt.from)
 
   val TagBinding =
     TypedEnumBinding.map(v => Tag(v.name.toLowerCase))
 
   implicit class AndCompanionOps(val self: Predicate.And.type) extends AnyVal {
-    def apply(preds: Predicate*): Predicate =
+    def all(preds: Predicate*): Predicate =
       Predicate.and(preds.toList)
   }
 
@@ -123,9 +126,9 @@ package object snippet {
       catch { case NonFatal(e) => Left(s"Invalid BigDecimal: $s: ${e.getMessage}") }
     }
 
-  val PosBigDecimalBinding: Matcher[numeric.PosBigDecimal] =
+  val PosBigDecimalBinding: Matcher[PosBigDecimal] =
     BigDecimalBinding.emap { s =>
-      numeric.PosBigDecimal.from(s).leftMap(m => s"Invalid PosBigDecimal: $s: $m")
+      PosBigDecimal.from(s).leftMap(m => s"Invalid PosBigDecimal: $s: $m")
     }
 
   val DmsBinding: Matcher[Angle] =

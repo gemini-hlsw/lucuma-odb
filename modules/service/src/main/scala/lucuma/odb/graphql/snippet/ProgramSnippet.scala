@@ -32,6 +32,7 @@ import lucuma.odb.service.ProgramService.LinkUserResponse._
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk.Session
+import lucuma.odb.graphql.snippet.input.WhereProgram
 
 object ProgramSnippet {
 
@@ -47,16 +48,17 @@ object ProgramSnippet {
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
     // The types that we're going to map.
-    val QueryType               = schema.ref("Query")
-    val MutationType            = schema.ref("Mutation")
-    val SubscriptionType        = schema.ref("Subscription")
-    val ProgramType             = schema.ref("Program")
-    val ProgramUserType         = schema.ref("ProgramUser")
-    val ProgramUserRoleType     = schema.ref("ProgramUserRole")
-    val ProgramIdType           = schema.ref("ProgramId")
-    val UserIdType              = schema.ref("UserId")
-    val CreateProgramResultType = schema.ref("CreateProgramResult")
-    val LinkUserResultType      = schema.ref("LinkUserResult")
+    val QueryType                = schema.ref("Query")
+    val MutationType             = schema.ref("Mutation")
+    val SubscriptionType         = schema.ref("Subscription")
+    val ProgramType              = schema.ref("Program")
+    val ProgramUserType          = schema.ref("ProgramUser")
+    val ProgramUserRoleType      = schema.ref("ProgramUserRole")
+    val ProgramIdType            = schema.ref("ProgramId")
+    val UserIdType               = schema.ref("UserId")
+    val CreateProgramResultType  = schema.ref("CreateProgramResult")
+    val LinkUserResultType       = schema.ref("LinkUserResult")
+    val ProgramSelectResultType  = schema.ref("ProgramSelectResult")
 
     // Column references for our mapping.
     object Program extends TableDef("t_program") {
@@ -243,20 +245,25 @@ object ProgramSnippet {
           }
 
         case Select("programs", List(
-          ProgramIdBinding.List.Option("programIds", rOptPids),
-          IntBinding.Nullable("first", rOptFirst),
-          StringBinding.Nullable("after", rOptCursor),
+          WhereProgram.Binding.Option("WHERE", rWHERE),
+          ProgramIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
           BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
-          (rOptPids, rOptFirst, rOptCursor, rIncludeDeleted).parMapN { (optPids, _, _, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
             Select("programs", Nil,
               Filter(
-                And(
-                  Predicates.hasProgramId(optPids),
+                And.all(
+                  OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
                   Predicates.includeDeleted(includeDeleted),
-                  Predicates.isVisibleTo(user)
+                  Predicates.isVisibleTo(user),
+                  WHERE.getOrElse(True)
                 ),
                 child
+                // Limit(
+                //   LIMIT.foldLeft(1000)(_ min _.value),
+                //   child
+                // )
               )
             )
           }

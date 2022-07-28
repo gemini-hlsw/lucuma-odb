@@ -22,6 +22,9 @@ import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 
 import scala.io.Source
+import _root_.skunk.AppliedFragment
+import com.github.vertical_blank.sqlformatter.SqlFormatter
+import scala.io.AnsiColor
 
 object OdbMapping {
 
@@ -76,6 +79,20 @@ object OdbMapping {
 
           val typeMappings = snippet.typeMappings
           override val selectElaborator = snippet.selectElaborator
+
+          override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, (_root_.skunk.Codec[_], Boolean))]): F[Vector[Array[Any]]] = {
+            // print out the query, for now
+            val formatted = SqlFormatter.format(fragment.fragment.sql)
+            val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
+            Sync[F].delay {
+              println()
+              cleanedUp.linesIterator.foreach { s =>
+                println(s"${AnsiColor.GREEN}$s${AnsiColor.RESET}")
+              }
+              println()
+            } *>
+            super.fetch(fragment, codecs)
+          }
 
         }
         // m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
