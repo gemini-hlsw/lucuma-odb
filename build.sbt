@@ -57,6 +57,7 @@ lazy val service = project
       "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
     ),
-    reStart / envVars += "PORT" -> "8082"
+    reStart / envVars += "PORT" -> "8082",
+    reStartArgs       += "-skip-migration"
   )
 
