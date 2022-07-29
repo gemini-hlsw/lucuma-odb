@@ -7,7 +7,8 @@ import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.sql.FailedJoin
-import eu.timepit.refined.types.numeric.{ NonNegInt, PosBigDecimal }
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import lucuma.core.enums.Band
