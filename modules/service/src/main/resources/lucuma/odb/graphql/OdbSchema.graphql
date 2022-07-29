@@ -4141,6 +4141,9 @@ type NonNegDuration {
 
   # Duration in hours
   hours: NonNegBigDecimal!
+
+  # Duration as an ISO-8601 string
+  iso: String!
 }
 
 # An `Int` in the range from 0 to 2147483647
@@ -4413,10 +4416,7 @@ type Program {
   ): ObservationSelectResult!
 
   # Program planned time calculation.
-  plannedTime(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): PlannedTimeSummary!
+  plannedTime: PlannedTimeSummary!
 }
 
 # ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`

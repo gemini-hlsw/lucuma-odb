@@ -3,12 +3,14 @@
 
 package lucuma.odb.graphql
 
+import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
+import com.github.vertical_blank.sqlformatter.SqlFormatter
 import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
@@ -21,10 +23,8 @@ import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 
-import scala.io.Source
-import _root_.skunk.AppliedFragment
-import com.github.vertical_blank.sqlformatter.SqlFormatter
 import scala.io.AnsiColor
+import scala.io.Source
 
 object OdbMapping {
 
