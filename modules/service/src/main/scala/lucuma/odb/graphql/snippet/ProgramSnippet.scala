@@ -85,6 +85,9 @@ object ProgramSnippet {
     object User extends TableDef("t_user") {
       val Id = col("c_user_id", user_id)
     }
+    object ObservationView extends TableDef("v_observation") {
+      val ProgramId: ColumnRef    = col("c_program_id",          program_id)
+    }
 
     // Predicates we use our elaborator.
     object Predicates {
@@ -202,7 +205,8 @@ object ProgramSnippet {
             SqlField("piUserId", Program.PiUserId, hidden = true),
             SqlObject("pi", Join(Program.PiUserId, User.Id)),
             SqlObject("users", Join(Program.Id, ProgramUser.ProgramId)),
-            SqlObject("plannedTime")
+            SqlObject("plannedTime"),
+            SqlObject("observations", Join(Program.Id, ObservationView.ProgramId)),
           ),
         ),
         ObjectMapping(
@@ -313,6 +317,25 @@ object ProgramSnippet {
                 //   LIMIT.foldLeft(1000)(_ min _.value),
                 //   child
                 // )
+              )
+            )
+          }
+
+      },
+      ProgramType -> {
+
+        case Select("observations", List(
+          BooleanBinding("includeDeleted", rIncludeDeleted),
+          ObservationIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
+        ), child) =>
+          (rIncludeDeleted, rOFFSET, rLIMIT).parMapN { (includeDeleted, OFFSET, _) =>
+            Select("observations", Nil,
+              Filter(and(List(
+                if (includeDeleted) True else Eql[Existence](UniquePath(List("existence")), Const(Existence.Present)),
+                OFFSET.fold[Predicate](True)(o => GtEql[model.Observation.Id](UniquePath(List("id")), Const(o))),
+              )),
+              child
               )
             )
           }
