@@ -4413,7 +4413,7 @@ type Program {
 
     # Limits the result to at most this number of matches (but never more than 1000).
     LIMIT: NonNegInt
-  ): ObservationSelectResult!
+  ): [Observation!]! # ObservationSelectResult!
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
