@@ -1773,7 +1773,10 @@ type Mutation {
   updateObservations(
     # Parameters for editing existing observations.
     input: UpdateObservationsInput!
-  ): UpdateObservationsResult!
+  ): [Observation!]!
+#  TODO: UpdateObservationsResult
+#  ): UpdateObservationsResult!
+
   updatePrograms(
     # Parameters for updating existing programs.
     input: UpdateProgramsInput!
@@ -2467,7 +2470,10 @@ input UpdateObservationsInput {
   SET: ObservationPropertiesInput!
 
   # Filters the observations to be updated according to those that match the given constraints.
-  WHERE: WhereObservation
+  # WHERE: WhereObservation
+
+  # Temporary -- to be replaced with WhereObservation matching
+  WHERE: [ObservationId!]
 
   # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
   LIMIT: NonNegInt
@@ -2482,7 +2488,8 @@ type UpdateObservationsResult {
   observations: [Observation!]!
 
   # `true` when there were additional edits that were not returned.
-  hasMore: Boolean!
+  # Removed for now
+  # hasMore: Boolean!
 }
 
 # Program selection and update description.  Use `SET` to specify the changes, `WHERE` to select the programs to update, and `LIMIT` to control the size of the return value.

@@ -9,7 +9,7 @@ import cats.syntax.all._
 import lucuma.core.model.Program
 import lucuma.odb.graphql.util.Bindings._
 
-case class CreateObservationInput(
+final case class CreateObservationInput(
   programId: Program.Id,
   SET: Option[ObservationPropertiesInput]
 )

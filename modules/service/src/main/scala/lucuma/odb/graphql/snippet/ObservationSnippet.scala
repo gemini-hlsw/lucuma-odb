@@ -9,12 +9,9 @@ import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.UniquePath
-import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.{ListType, Predicate, Query, Result, TypeRef}
 import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
@@ -25,13 +22,12 @@ import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
-import lucuma.odb.graphql.snippet.input.CreateObservationInput
-import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.snippet.input.{CreateObservationInput, ObservationPropertiesInput, UpdateObservationsInput}
 import lucuma.odb.graphql.util.Bindings.BooleanBinding
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService
-import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
-import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
+import lucuma.odb.service.ObservationService.CreateObservationResponse.NotAuthorized
+import lucuma.odb.service.ObservationService.CreateObservationResponse.Success
 import lucuma.odb.util.Codecs._
 import skunk.Session
 
@@ -52,7 +48,8 @@ object ObservationSnippet {
     val ObservationIdType   = schema.ref("ObservationId")
     val ObsStatusType       = schema.ref("ObsStatus")
     val ObsActiveStatusType = schema.ref("ObsActiveStatus")
-    val CreateObservationResultType = schema.ref("CreateObservationResult")
+    val CreateObservationResultType  = schema.ref("CreateObservationResult")
+//    val UpdateObservationsResultType = schema.ref("UpdateObservationsResult")
 
     val ConstraintSetType   = schema.ref("ConstraintSet")
     val CloudExtinctionType = schema.ref("CloudExtinction")
@@ -125,14 +122,23 @@ object ObservationSnippet {
     def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Result[Query] =
       Result(Unique(Filter(Predicates.hasObservationId(id), child)))
 
-    val insertObservation: Mutation =
+    val createObservation: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[CreateObservationInput]("input").flatTraverse { input =>
           pool.use { svc =>
-            svc.insertObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
+            svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
               case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
               case Success(id)         => uniqueObservationNoFiltering(id, child)
             }
+          }
+        }
+      }
+
+    val updateObservation: Mutation =
+      Mutation.simple { (child, env) =>
+        env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
+          pool.use { svc =>
+            ???
           }
         }
       }
@@ -190,7 +196,7 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = MutationType,
           fieldMappings = List(
-            SqlRoot("createObservation", mutation = insertObservation),
+            SqlRoot("createObservation", mutation = createObservation),
           )
         ),
         ObjectMapping(
@@ -200,6 +206,18 @@ object ObservationSnippet {
             SqlObject("observation"),
           )
         ),
+        ObjectMapping(
+          tpe = ListType(ObservationType),
+          fieldMappings = List(
+            SqlRoot("updateObservation", mutation = updateObservation)
+          )
+        ),
+//        ObjectMapping(
+//          tpe = UpdateObservationsResultType,
+//          fieldMappings = List(
+//            SqlField("matches", )
+//          )
+//        ),
         ObjectMapping(
           tpe = QueryType,
           fieldMappings = List(
@@ -242,7 +260,12 @@ object ObservationSnippet {
           rInput.map { input =>
             Environment(Env("input" -> input), Select("createObservation", Nil, child))
           }
-      },
+
+        case Select("updateObservation", List(UpdateObservationsInput.Binding("input", rInput)), child) =>
+          rInput.map { input =>
+            Environment(Env("input" -> input), Select("updateObservation", Nil, child))
+          }
+      }
     )
 
     // Done.

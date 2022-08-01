@@ -88,12 +88,12 @@ package object snippet {
   val ProgramUserSupportRoleTypeBinding =
     enumeratedBinding[ProgramUserSupportType]
 
-  val NonEmptyStringBinding =
+  val NonEmptyStringBinding: Matcher[NonEmptyString] =
     StringBinding.emap { s =>
       NonEmptyString.unapply(s).toRight("string value must be non-empty.")
     }
 
-  val NonNegIntBinding =
+  val NonNegIntBinding: Matcher[NonNegInt] =
     IntBinding.emap(NonNegInt.from)
 
   val TagBinding =

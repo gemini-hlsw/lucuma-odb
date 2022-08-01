@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -11,18 +12,10 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.model.ConstraintSet
-import lucuma.core.model.ElevationRange
-import lucuma.core.model.GuestRole
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.core.model.ServiceRole
+import lucuma.core.model.{ConstraintSet, ElevationRange, GuestRole, Observation, Program, ServiceRole, User, nonNegDurationValidate}
 import lucuma.core.model.StandardRole._
-import lucuma.core.model.User
-import lucuma.odb.data.Existence
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
-import lucuma.odb.data.Tag
+import lucuma.odb.data.Nullable.{Absent, NonNull}
+import lucuma.odb.data.{Existence, Nullable, ObsActiveStatus, ObsStatus, Tag}
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
 import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs._
@@ -32,34 +25,46 @@ import skunk.implicits._
 trait ObservationService[F[_]] {
   import ObservationService._
 
-  def insertObservation(
+  def createObservation(
     programId:   Program.Id,
     SET:         ObservationPropertiesInput,
-  ): F[InsertObservationResponse]
+  ): F[CreateObservationResponse]
+
+  def updateObservation(
+    observationId: Observation.Id,
+    SET:           ObservationPropertiesInput
+  ): F[UpdateObservationResponse]
 
 }
 
 
 object ObservationService {
 
-  sealed trait InsertObservationResponse
-  object InsertObservationResponse {
-    case class NotAuthorized(user: User)   extends InsertObservationResponse
-    case class Success(id: Observation.Id) extends InsertObservationResponse
+  sealed trait CreateObservationResponse
+  object CreateObservationResponse {
+    final case class NotAuthorized(user: User)   extends CreateObservationResponse
+    final case class Success(id: Observation.Id) extends CreateObservationResponse
   }
-  import InsertObservationResponse._
+
+  sealed trait UpdateObservationResponse
+  object UpdateObservationResponse {
+    final case class NotAuthorized(user: User)   extends UpdateObservationResponse
+    final case class Success(id: Observation.Id) extends UpdateObservationResponse
+  }
 
   def fromUserAndSession[F[_]: MonadCancelThrow](user: User, session: Session[F]): ObservationService[F] =
     new ObservationService[F] {
 
-      def insertObservation(
+      def createObservation(
         programId:   Program.Id,
         SET:         ObservationPropertiesInput,
-      ): F[InsertObservationResponse] = {
+      ): F[CreateObservationResponse] = {
+        import CreateObservationResponse._
+
         val af = Statements.insertObservationAs(
           user,
           programId,
-          SET.subtitle,
+          SET.subtitle.toOption,
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.Default),
           SET.activeStatus.getOrElse(ObsActiveStatus.Default),
@@ -72,7 +77,19 @@ object ObservationService {
           }
         }
       }
+
+      def updateObservation(
+        observationId: Observation.Id,
+        SET:           ObservationPropertiesInput
+      ): F[UpdateObservationResponse] = {
+
+        import UpdateObservationResponse._
+
+        ???
+      }
+
     }
+
 
   object Statements {
     import ProgramService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
@@ -169,6 +186,56 @@ object ObservationService {
           ${hour_angle_range_value.opt}
       """
 
+  }
+
+  def updateObservation(
+    observationId: Observation.Id,
+    programId:     Program.Id,
+    name:          Nullable[NonEmptyString],
+    ex:            Option[Existence],
+    status:        Option[ObsStatus],
+    activeState:   Option[ObsActiveStatus],
+    constraintSet: Option[ConstraintSet],
+    user:          User
+  ): Option[AppliedFragment] = {
+
+    val base = void"update t_observation set "
+
+    val upExistence = sql"c_existence = $existence"
+    val upName      = sql"c_name = ${text_nonempty.opt}"
+
+    val ups: List[AppliedFragment] =
+      List(
+        ex.map(upExistence),
+        name match {
+          case Nullable.Null  => Some(upName(None))
+          case Absent         => None
+          case NonNull(value) => Some(upName(Some(value)))
+        }
+      ).flatten
+
+    NonEmptyList.fromList(ups).map { nel =>
+      val up = nel.intercalate(void", ")
+
+      import lucuma.core.model.Access._
+
+      val where = user.role.access match {
+
+        case Service | Admin | Staff =>
+          sql"""
+            where c_observation_id = $observation_id
+          """.apply(observationId)
+
+        case Ngo => ??? // TODO
+
+        case Guest | Pi =>
+          sql"""
+            where c_observation_id = $observation_id
+          """
+      }
+      ???
+    }
+    ???
   }
 
 }
