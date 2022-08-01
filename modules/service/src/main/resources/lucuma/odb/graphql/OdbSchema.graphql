@@ -4141,6 +4141,9 @@ type NonNegDuration {
 
   # Duration in hours
   hours: NonNegBigDecimal!
+
+  # Duration as an ISO-8601 string
+  iso: String!
 }
 
 # An `Int` in the range from 0 to 2147483647
@@ -4410,13 +4413,10 @@ type Program {
 
     # Limits the result to at most this number of matches (but never more than 1000).
     LIMIT: NonNegInt
-  ): ObservationSelectResult!
+  ): [Observation!]! # ObservationSelectResult!
 
   # Program planned time calculation.
-  plannedTime(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): PlannedTimeSummary!
+  plannedTime: PlannedTimeSummary!
 }
 
 # ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
@@ -4645,7 +4645,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ProgramSelectResult!
+  ): [Program!]! #ProgramSelectResult!
 
   # Observations grouped by commonly held science mode
   scienceModeGroup(

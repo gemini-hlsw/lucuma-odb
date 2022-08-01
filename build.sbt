@@ -4,7 +4,7 @@ val clueVersion                = "0.20.3"
 val declineVersion             = "2.3.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.0.4"
-val grackleVersion             = "0.3.0"
+val grackleVersion             = "0.3.2"
 val http4sBlazeVersion         = "0.23.12"
 val http4sEmberVersion         = "0.23.14"
 val jwtVersion                 = "5.0.0"
@@ -56,6 +56,7 @@ lazy val service = project
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
       "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
+      "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs       += "-skip-migration"

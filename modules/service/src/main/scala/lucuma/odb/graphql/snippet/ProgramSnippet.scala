@@ -19,12 +19,14 @@ import edu.gemini.grackle.Value._
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
+import io.circe.Encoder
 import lucuma.core.model
 import lucuma.core.model.Access._
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data._
 import lucuma.odb.graphql.snippet.input.CreateProgramInput
+import lucuma.odb.graphql.snippet.input.WhereProgram
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ProgramService
@@ -32,6 +34,9 @@ import lucuma.odb.service.ProgramService.LinkUserResponse._
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk.Session
+import skunk.codec.all._
+
+import java.time.Duration
 
 object ProgramSnippet {
 
@@ -42,21 +47,23 @@ object ProgramSnippet {
     topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
-    import m.{ TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
+    import m.{ ColumnRef, CursorField, PrefixedMapping, TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
     // The types that we're going to map.
-    val QueryType               = schema.ref("Query")
-    val MutationType            = schema.ref("Mutation")
-    val SubscriptionType        = schema.ref("Subscription")
-    val ProgramType             = schema.ref("Program")
-    val ProgramUserType         = schema.ref("ProgramUser")
-    val ProgramUserRoleType     = schema.ref("ProgramUserRole")
-    val ProgramIdType           = schema.ref("ProgramId")
-    val UserIdType              = schema.ref("UserId")
-    val CreateProgramResultType = schema.ref("CreateProgramResult")
-    val LinkUserResultType      = schema.ref("LinkUserResult")
+    val QueryType                = schema.ref("Query")
+    val MutationType             = schema.ref("Mutation")
+    val SubscriptionType         = schema.ref("Subscription")
+    val ProgramType              = schema.ref("Program")
+    val ProgramUserType          = schema.ref("ProgramUser")
+    val ProgramUserRoleType      = schema.ref("ProgramUserRole")
+    val ProgramIdType            = schema.ref("ProgramId")
+    val UserIdType               = schema.ref("UserId")
+    val CreateProgramResultType  = schema.ref("CreateProgramResult")
+    val LinkUserResultType       = schema.ref("LinkUserResult")
+    val PlannedTimeSummaryType   = schema.ref("PlannedTimeSummary")
+    val NonNegDurationType       = schema.ref("NonNegDuration")
 
     // Column references for our mapping.
     object Program extends TableDef("t_program") {
@@ -64,6 +71,11 @@ object ProgramSnippet {
       val PiUserId  = col("c_pi_user_id", user_id)
       val Existence = col("c_existence", existence)
       val Name      = col("c_name", text_nonempty.opt)
+      object PlannedTime {
+        val Pi        = col("c_pts_pi", interval)
+        val Uncharged = col("c_pts_uncharged", interval)
+        val Execution   = col("c_pts_execution", interval)
+      }
     }
     object ProgramUser extends TableDef("t_program_user") {
       val ProgramId = col("c_program_id", program_id)
@@ -72,6 +84,9 @@ object ProgramSnippet {
     }
     object User extends TableDef("t_user") {
       val Id = col("c_user_id", user_id)
+    }
+    object ObservationView extends TableDef("v_observation") {
+      val ProgramId: ColumnRef    = col("c_program_id",          program_id)
     }
 
     // Predicates we use our elaborator.
@@ -190,8 +205,48 @@ object ProgramSnippet {
             SqlField("piUserId", Program.PiUserId, hidden = true),
             SqlObject("pi", Join(Program.PiUserId, User.Id)),
             SqlObject("users", Join(Program.Id, ProgramUser.ProgramId)),
+            SqlObject("plannedTime"),
+            SqlObject("observations", Join(Program.Id, ObservationView.ProgramId)),
           ),
         ),
+        ObjectMapping(
+          tpe = PlannedTimeSummaryType,
+          fieldMappings = List(
+            SqlField("id", Program.Id, key = true, hidden = true),
+            SqlObject("pi"),
+            SqlObject("execution"),
+            SqlObject("uncharged"),
+          ),
+        ), {
+
+        def valueAs[A: Encoder](name: String)(f: Duration => A): CursorField[A] =
+            CursorField[A](name, c => c.fieldAs[Duration]("value").map(f), List("value"))
+
+        def nonNegDurationMapping(col: ColumnRef): ObjectMapping =
+          ObjectMapping(
+            tpe = NonNegDurationType,
+            fieldMappings = List(
+              SqlField("id", Program.Id, key = true, hidden = true),
+              SqlField("value", col, hidden = true),
+              valueAs("microseconds")(d => d.toMillis * 1000L),
+              valueAs("milliseconds")(d => BigDecimal(d.toMillis)),
+              valueAs("seconds")(d => BigDecimal(d.toMillis) / BigDecimal(1000)),
+              valueAs("minutes")(d => BigDecimal(d.toMillis) / BigDecimal(1000 * 60)),
+              valueAs("hours")(d => BigDecimal(d.toMillis) / BigDecimal(1000 * 60 * 60)),
+              valueAs("iso")(d => d.toString),
+            ),
+          )
+
+        PrefixedMapping(
+          tpe = NonNegDurationType,
+          mappings = List(
+            List("plannedTime", "pi")        -> nonNegDurationMapping(Program.PlannedTime.Pi),
+            List("plannedTime", "uncharged") -> nonNegDurationMapping(Program.PlannedTime.Uncharged),
+            List("plannedTime", "execution") -> nonNegDurationMapping(Program.PlannedTime.Execution),
+          ),
+        )
+
+        },
         ObjectMapping(
           tpe = CreateProgramResultType,
           fieldMappings = List(
@@ -243,20 +298,44 @@ object ProgramSnippet {
           }
 
         case Select("programs", List(
-          ProgramIdBinding.List.Option("programIds", rOptPids),
-          IntBinding.Nullable("first", rOptFirst),
-          StringBinding.Nullable("after", rOptCursor),
+          WhereProgram.Binding.Option("WHERE", rWHERE),
+          ProgramIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
           BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
-          (rOptPids, rOptFirst, rOptCursor, rIncludeDeleted).parMapN { (optPids, _, _, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, _, includeDeleted) =>
             Select("programs", Nil,
               Filter(
-                And(
-                  Predicates.hasProgramId(optPids),
+                And.all(
+                  OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
                   Predicates.includeDeleted(includeDeleted),
-                  Predicates.isVisibleTo(user)
+                  Predicates.isVisibleTo(user),
+                  WHERE.getOrElse(True)
                 ),
                 child
+                // Limit(
+                //   LIMIT.foldLeft(1000)(_ min _.value),
+                //   child
+                // )
+              )
+            )
+          }
+
+      },
+      ProgramType -> {
+
+        case Select("observations", List(
+          BooleanBinding("includeDeleted", rIncludeDeleted),
+          ObservationIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
+        ), child) =>
+          (rIncludeDeleted, rOFFSET, rLIMIT).parMapN { (includeDeleted, OFFSET, _) =>
+            Select("observations", Nil,
+              Filter(and(List(
+                if (includeDeleted) True else Eql[Existence](UniquePath(List("existence")), Const(Existence.Present)),
+                OFFSET.fold[Predicate](True)(o => GtEql[model.Observation.Id](UniquePath(List("id")), Const(o))),
+              )),
+              child
               )
             )
           }

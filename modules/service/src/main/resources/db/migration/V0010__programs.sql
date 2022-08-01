@@ -28,6 +28,11 @@ create table t_program (
 
   c_name        text         check (c_name is null or length(c_name) > 0),
 
+  -- planned time summary
+  c_pts_pi        interval not null default '0h',
+  c_pts_uncharged interval not null default '0h',
+  c_pts_execution interval not null default '0h',
+
   -- We link back to the user table thus.
   FOREIGN KEY (c_pi_user_id, c_pi_user_type)
   REFERENCES t_user (c_user_id, c_user_type)
