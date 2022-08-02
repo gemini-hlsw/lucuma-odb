@@ -162,6 +162,10 @@ object ObservationSnippet {
         }
       }
 
+    // TODO: This seems closer to what we want than the one-by-one approach
+    // TODO: above.  I just don't see how to figure out which ids were selected
+    // TODO: by the WHERE clause and updated
+    /*
     val updateObservationsAllAtOnce: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
@@ -176,6 +180,7 @@ object ObservationSnippet {
           }
         }
       }
+    */
 
     val typeMappings =
       List(
