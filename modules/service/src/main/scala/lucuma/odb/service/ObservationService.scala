@@ -12,14 +12,16 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.model.{ConstraintSet, ElevationRange, GuestRole, Observation, Program, ServiceRole, User, nonNegDurationValidate}
+import lucuma.core.model.{ConstraintSet, ElevationRange, GuestRole, Observation, Program, ServiceRole, User}
 import lucuma.core.model.StandardRole._
 import lucuma.odb.data.Nullable.{Absent, NonNull}
-import lucuma.odb.data.{Existence, Nullable, ObsActiveStatus, ObsStatus, Tag}
+import lucuma.odb.data.{Existence, Nullable, ObsActiveStatus, ObsStatus, Tag, UpdateResult}
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
 import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs._
+import natchez.Trace
 import skunk._
+import skunk.data.Completion
 import skunk.implicits._
 
 trait ObservationService[F[_]] {
@@ -28,38 +30,44 @@ trait ObservationService[F[_]] {
   def createObservation(
     programId:   Program.Id,
     SET:         ObservationPropertiesInput,
-  ): F[CreateObservationResponse]
+  ): F[CreateResult]
 
   def updateObservation(
     observationId: Observation.Id,
     SET:           ObservationPropertiesInput
-  ): F[UpdateObservationResponse]
+  ): F[UpdateResult[Observation.Id]]
+
+  def updateObservations(
+    WHERE: List[Observation.Id],
+    SET:   ObservationPropertiesInput
+  ): F[UpdateResult[List[Observation.Id]]]
 
 }
 
 
 object ObservationService {
 
-  sealed trait CreateObservationResponse
-  object CreateObservationResponse {
-    final case class NotAuthorized(user: User)   extends CreateObservationResponse
-    final case class Success(id: Observation.Id) extends CreateObservationResponse
+  sealed trait CreateResult
+  object CreateResult {
+    final case class NotAuthorized(user: User)   extends CreateResult
+    final case class Success(id: Observation.Id) extends CreateResult
   }
 
-  sealed trait UpdateObservationResponse
-  object UpdateObservationResponse {
-    final case class NotAuthorized(user: User)   extends UpdateObservationResponse
-    final case class Success(id: Observation.Id) extends UpdateObservationResponse
-  }
-
-  def fromUserAndSession[F[_]: MonadCancelThrow](user: User, session: Session[F]): ObservationService[F] =
+  def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](
+    session: Session[F],
+    user:    User
+  ): ObservationService[F] =
     new ObservationService[F] {
 
-      def createObservation(
+      def fail[A](msg: String): F[A] =
+        MonadCancelThrow[F].raiseError(new RuntimeException(msg))
+
+      // TODO: trace
+      override def createObservation(
         programId:   Program.Id,
         SET:         ObservationPropertiesInput,
-      ): F[CreateObservationResponse] = {
-        import CreateObservationResponse._
+      ): F[CreateResult] = {
+        import CreateResult._
 
         val af = Statements.insertObservationAs(
           user,
@@ -78,15 +86,37 @@ object ObservationService {
         }
       }
 
-      def updateObservation(
+      override def updateObservation(
         observationId: Observation.Id,
         SET:           ObservationPropertiesInput
-      ): F[UpdateObservationResponse] = {
+      ): F[UpdateResult[Observation.Id]] =
+        Trace[F].span("updateObservation") {
+          Statements.updateObservation(observationId, SET.subtitle, SET.existence, SET.status, SET.activeStatus, SET.constraintSet, user) match {
+            case None     => UpdateResult.NothingToBeDone.pure[F].widen
+            case Some(af) =>
+              session.prepare(af.fragment.command).use(_.execute(af.argument)).flatMap {
+                case Completion.Update(0) => UpdateResult.NoSuchObject.pure[F].widen
+                case Completion.Update(1) => UpdateResult.Success(observationId).pure[F].widen
+                case other                => fail(s"Expected `Update(0)` or `Update(1)`, found $other")
+              }
+          }
+        }
 
-        import UpdateObservationResponse._
-
-        ???
-      }
+      override def updateObservations(
+        WHERE: List[Observation.Id],
+        SET:   ObservationPropertiesInput
+      ): F[UpdateResult[List[Observation.Id]]] =
+        Trace[F].span("updateObservations") {
+          Statements.updateObservations(WHERE, SET.subtitle, SET.existence, SET.status, SET.activeStatus, SET.constraintSet, user) match {
+            case None     => UpdateResult.NothingToBeDone.pure[F].widen
+            case Some(af) =>
+              session.prepare(af.fragment.command).use(_.execute(af.argument)).flatMap {
+                case Completion.Update(0) => UpdateResult.NoSuchObject.pure[F].widen
+                case Completion.Update(_) => UpdateResult.Success(WHERE).pure[F].widen  // TODO: how do we know what was actually updated?
+                case other                => fail(s"Expected `Update(0)` or `Update(n)`, found $other")
+              }
+          }
+        }
 
     }
 
@@ -186,56 +216,170 @@ object ObservationService {
           ${hour_angle_range_value.opt}
       """
 
-  }
+    def updateObservation(
+      observationId: Observation.Id,
+      subtitle:      Nullable[NonEmptyString],
+      ex:            Option[Existence],
+      status:        Option[ObsStatus],
+      activeState:   Option[ObsActiveStatus],
+      constraintSet: Option[ConstraintSet],
+      user:          User
+    ): Option[AppliedFragment] = {
 
-  def updateObservation(
-    observationId: Observation.Id,
-    programId:     Program.Id,
-    name:          Nullable[NonEmptyString],
-    ex:            Option[Existence],
-    status:        Option[ObsStatus],
-    activeState:   Option[ObsActiveStatus],
-    constraintSet: Option[ConstraintSet],
-    user:          User
-  ): Option[AppliedFragment] = {
+      val base = void"update t_observation set "
 
-    val base = void"update t_observation set "
+      val upExistence = sql"c_existence = $existence"
+      val upSubtitle  = sql"c_name = ${text_nonempty.opt}"  // TODO: rename to c_subtitle?
+      val upStatus    = sql"c_status = $obs_status"
+      val upActive    = sql"c_active_status = $obs_active_status"
 
-    val upExistence = sql"c_existence = $existence"
-    val upName      = sql"c_name = ${text_nonempty.opt}"
+      val upCloud     = sql"c_cloud_extinction = $cloud_extinction"
+      val upImage     = sql"c_image_quality = $image_quality"
+      val upSky       = sql"c_sky_background = $sky_background"
+      val upWater     = sql"c_water_vapor = $water_vapor"
 
-    val ups: List[AppliedFragment] =
-      List(
-        ex.map(upExistence),
-        name match {
-          case Nullable.Null  => Some(upName(None))
-          case Absent         => None
-          case NonNull(value) => Some(upName(Some(value)))
+      val ups: List[AppliedFragment] =
+        List(
+          ex.map(upExistence),
+          subtitle match {
+            case Nullable.Null  => Some(upSubtitle(None))
+            case Absent         => None
+            case NonNull(value) => Some(upSubtitle(Some(value)))
+          },
+          status.map(upStatus),
+          activeState.map(upActive),
+          constraintSet.toList.flatMap { cs =>
+            List(
+              upCloud(cs.cloudExtinction),
+              upImage(cs.imageQuality),
+              upSky(cs.skyBackground),
+              upWater(cs.waterVapor)
+            )
+          }
+        ).flatten
+
+      NonEmptyList.fromList(ups).map { nel =>
+        val up = nel.intercalate(void", ")
+
+        import lucuma.core.model.Access._
+
+        val where = user.role.access match {
+
+          case Service | Admin | Staff =>
+            sql"""
+              where c_observation_id = $observation_id
+            """.apply(observationId)
+
+          case Ngo => ??? // TODO
+
+          case Guest | Pi =>
+            sql"""
+              from t_program
+              where c_observation_id = $observation_id
+              and t_observation.c_program_id = t_program.c_program_id
+              and (
+                t_program.c_pi_user_id = $user_id
+                or
+                exists(
+                  select u.c_role
+                  from   t_program_user u
+                  where  u.c_program_id = t_observation.c_program_id
+                  and    u.c_user_id    = $user_id
+                  and    u.c_role       = 'coi'
+                )
+              )
+            """.apply(observationId ~ user.id ~ user.id)
         }
-      ).flatten
 
-    NonEmptyList.fromList(ups).map { nel =>
-      val up = nel.intercalate(void", ")
+        base |+| up |+| where
 
-      import lucuma.core.model.Access._
-
-      val where = user.role.access match {
-
-        case Service | Admin | Staff =>
-          sql"""
-            where c_observation_id = $observation_id
-          """.apply(observationId)
-
-        case Ngo => ??? // TODO
-
-        case Guest | Pi =>
-          sql"""
-            where c_observation_id = $observation_id
-          """
       }
-      ???
     }
-    ???
+
+    def updateObservations(
+      WHERE:         List[Observation.Id],
+      subtitle:      Nullable[NonEmptyString],
+      ex:            Option[Existence],
+      status:        Option[ObsStatus],
+      activeState:   Option[ObsActiveStatus],
+      constraintSet: Option[ConstraintSet],
+      user:          User
+    ): Option[AppliedFragment] = {
+
+      val base = void"update t_observation set "
+
+      val upExistence = sql"c_existence = $existence"
+      val upSubtitle  = sql"c_name = ${text_nonempty.opt}"  // TODO: rename to c_subtitle?
+      val upStatus    = sql"c_status = $obs_status"
+      val upActive    = sql"c_active_status = $obs_active_status"
+
+      val upCloud     = sql"c_cloud_extinction = $cloud_extinction"
+      val upImage     = sql"c_image_quality = $image_quality"
+      val upSky       = sql"c_sky_background = $sky_background"
+      val upWater     = sql"c_water_vapor = $water_vapor"
+
+      val ups: List[AppliedFragment] =
+        List(
+          ex.map(upExistence),
+          subtitle match {
+            case Nullable.Null  => Some(upSubtitle(None))
+            case Absent         => None
+            case NonNull(value) => Some(upSubtitle(Some(value)))
+          },
+          status.map(upStatus),
+          activeState.map(upActive),
+          constraintSet.toList.flatMap { cs =>
+            List(
+              upCloud(cs.cloudExtinction),
+              upImage(cs.imageQuality),
+              upSky(cs.skyBackground),
+              upWater(cs.waterVapor)
+            )
+          }
+        ).flatten
+
+      for {
+        _   <- WHERE.headOption
+        nel <- NonEmptyList.fromList(ups)
+      } yield {
+        val up = nel.intercalate(void", ")
+
+        import lucuma.core.model.Access._
+
+        val where = user.role.access match {
+
+          case Service | Admin | Staff =>
+            sql"""
+              where c_observation_id in ( ${observation_id.list(WHERE)} )
+            """.apply(WHERE)
+
+          case Ngo => ??? // TODO
+
+          case Guest | Pi =>
+            sql"""
+              from t_program
+              where c_observation_id in ( ${observation_id.list(WHERE.size)} )
+              and t_observation.c_program_id = t_program.c_program_id
+              and (
+                t_program.c_pi_user_id = $user_id
+                or
+                exists(
+                  select u.c_role
+                  from   t_program_user u
+                  where  u.c_program_id = t_observation.c_program_id
+                  and    u.c_user_id    = $user_id
+                  and    u.c_role       = 'coi'
+                )
+              )
+            """.apply(WHERE ~ user.id ~ user.id)
+        }
+
+        base |+| up |+| where
+
+      }
+    }
+
   }
+
 
 }

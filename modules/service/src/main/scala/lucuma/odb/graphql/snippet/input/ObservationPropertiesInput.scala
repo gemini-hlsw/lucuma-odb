@@ -11,7 +11,7 @@ import lucuma.core.model.ConstraintSet
 import lucuma.odb.data.{Existence, Nullable, ObsActiveStatus, ObsStatus}
 import lucuma.odb.graphql.util.Bindings._
 
-case class ObservationPropertiesInput(
+final case class ObservationPropertiesInput(
   subtitle:      Nullable[NonEmptyString],
   status:        Option[ObsStatus],
   activeStatus:  Option[ObsActiveStatus],
