@@ -79,29 +79,27 @@ object ObservationService {
       def fail[A](msg: String): F[A] =
         MonadCancelThrow[F].raiseError(new RuntimeException(msg))
 
-      // TODO: trace
       override def createObservation(
         programId:   Program.Id,
         SET:         ObservationPropertiesInput,
-      ): F[CreateResult] = {
-        import CreateResult._
-
-        val af = Statements.insertObservationAs(
-          user,
-          programId,
-          SET.subtitle.toOption,
-          SET.existence.getOrElse(Existence.Default),
-          SET.status.getOrElse(ObsStatus.Default),
-          SET.activeStatus.getOrElse(ObsActiveStatus.Default),
-          SET.constraintSet.getOrElse(ConstraintSetInput.NominalConstraints),
-        )
-        session.prepare(af.fragment.query(observation_id)).use { pq =>
-          pq.option(af.argument).map {
-            case Some(oid) => Success(oid)
-            case None      => NotAuthorized(user)
+      ): F[CreateResult] =
+        Trace[F].span("createObservation") {
+          val af = Statements.insertObservationAs(
+            user,
+            programId,
+            SET.subtitle.toOption,
+            SET.existence.getOrElse(Existence.Default),
+            SET.status.getOrElse(ObsStatus.Default),
+            SET.activeStatus.getOrElse(ObsActiveStatus.Default),
+            SET.constraintSet.getOrElse(ConstraintSetInput.NominalConstraints),
+          )
+          session.prepare(af.fragment.query(observation_id)).use { pq =>
+            pq.option(af.argument).map {
+              case Some(oid) => CreateResult.Success(oid)
+              case None      => CreateResult.NotAuthorized(user)
+            }
           }
         }
-      }
 
       override def updateObservation(
         observationId: Observation.Id,
