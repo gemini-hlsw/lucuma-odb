@@ -19,6 +19,9 @@ import lucuma.odb.graphql.util.Bindings.ObjectFieldsBinding
 
 object WhereOrder {
 
+  def SimpleBinding[A: Order](name: String, binding: Matcher[A]): Matcher[Predicate] =
+    Binding[A](UniquePath[A](List(name)), binding)
+
   def Binding[A: Order](path: UniquePath[A], binding: Matcher[A]): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -47,12 +50,21 @@ object WhereOrder {
     }
 
   val ObservationId: Matcher[Predicate] =
-    Binding(UniquePath[Observation.Id](List("id")), ObservationIdBinding)
+    ObservationIdWithPath("id")
+
+  def ObservationIdWithPath(head: String, tail: String*): Matcher[Predicate] =
+    Binding(UniquePath[Observation.Id](head :: tail.toList), ObservationIdBinding)
 
   val ProgramId: Matcher[Predicate] =
-    Binding(UniquePath[Program.Id](List("id")), ProgramIdBinding)
+    ProgramIdWithPath("id")
+
+  def ProgramIdWithPath(head: String, tail: String*): Matcher[Predicate] =
+    Binding(UniquePath[Program.Id](head :: tail.toList), ProgramIdBinding)
 
   val TargetId: Matcher[Predicate] =
-    Binding(UniquePath[Target.Id](List("id")), TargetIdBinding)
+    TargetIdWithPath("id")
+
+  def TargetIdWithPath(head: String, tail: String*): Matcher[Predicate] =
+    Binding(UniquePath[Target.Id](head :: tail.toList), TargetIdBinding)
 
 }
