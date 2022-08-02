@@ -4628,7 +4628,8 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ObservationSelectResult!
+  ): [Observation!]!
+   #ObservationSelectResult!
 
   # Metadata for `enum Partner`
   partnerMeta: [PartnerMeta!]!

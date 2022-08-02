@@ -29,9 +29,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.UpdateResult
-import lucuma.odb.graphql.snippet.input.CreateObservationInput
-import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
-import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
+import lucuma.odb.graphql.snippet.input.{CreateObservationInput, ObservationPropertiesInput, UpdateObservationsInput, WhereObservation}
 import lucuma.odb.graphql.util.Bindings.BooleanBinding
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService
@@ -260,7 +258,8 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = QueryType,
           fieldMappings = List(
-            SqlRoot("observation")
+            SqlRoot("observation"),
+            SqlRoot("observations")
           )
         ),
         LeafMapping[Observation.Id](ObservationIdType),
@@ -275,23 +274,46 @@ object ObservationSnippet {
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
       QueryType -> {
         case Select("observation", List(
-          ObservationIdBinding("observationId", rOid),
-          BooleanBinding("includeDeleted", rIncludeDeleted)
+          ObservationIdBinding("observationId", rOid)
         ), child) =>
-          (rOid, rIncludeDeleted).parMapN { (oid, includeDeleted) =>
+          rOid.map { oid =>
             Select("observation", Nil,
               Unique(
                 Filter(
-                  And(
+//                  And(
                     Predicates.hasObservationId(oid),
-                    Predicates.includeDeleted(includeDeleted)
-//                    Predicates.isVisibleTo(user)   // TBD
-                  ),
+                    // TODO: Predicates.isVisibleTo(user)
+//                  ),
                   child
                 )
               )
             )
           }
+
+        case Select("observations", List(
+          WhereObservation.Binding.Option("WHERE", rWHERE),
+          ObservationIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
+          BooleanBinding("includeDeleted", rIncludeDeleted)
+        ), child) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, _, includeDeleted) =>
+            Select("observations", Nil,
+              Filter(
+                And.all(
+                  OFFSET.map(oid => GtEql(UniquePath(List("id")), Const(oid))).getOrElse(True),
+                  Predicates.includeDeleted(includeDeleted),
+                  // TODO: Predicates.isVisibleTo(user)
+                  WHERE.getOrElse(True)
+                ),
+                child
+                // Limit(
+                //    LIMIT.foldLeft(1000)(_ min _.value),
+                //   child
+                // )
+              )
+            )
+          }
+
       },
 
       MutationType -> {
