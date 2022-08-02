@@ -17,7 +17,7 @@ val natchezHttp4sVersion       = "0.3.2"
 val natchezVersion             = "0.1.6"
 val postgresVersion            = "42.4.0"
 val skunkVersion               = "0.3.1"
-val lucumaSsoVersion           = "0.1.13"
+val lucumaSsoVersion           = "0.1.14"
 val testcontainersScalaVersion = "0.40.10"
 
 enablePlugins(NoPublishPlugin)
