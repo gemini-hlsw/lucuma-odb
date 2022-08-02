@@ -92,7 +92,7 @@ object ObservationSnippet {
       val ProgramId: ColumnRef    = col("c_program_id",          program_id)
       val Id: ColumnRef           = col("c_observation_id",      observation_id)
       val Existence: ColumnRef    = col("c_existence",           existence)
-      val Name: ColumnRef         = col("c_name",                text_nonempty.opt)
+      val Subtitle: ColumnRef     = col("c_subtitle",            text_nonempty.opt)
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
       val Status: ColumnRef       = col("c_status",              obs_status)
       val ActiveStatus: ColumnRef = col("c_active_status",       obs_active_status)
@@ -190,7 +190,7 @@ object ObservationSnippet {
             SqlField("id", ObservationView.Id, key = true),
             SqlField("programId", ObservationView.ProgramId, hidden=true),
             SqlField("existence", ObservationView.Existence, hidden = true),
-            SqlField("subtitle", ObservationView.Name),
+            SqlField("subtitle", ObservationView.Subtitle),
             SqlField("status", ObservationView.Status),
             SqlField("activeStatus", ObservationView.ActiveStatus),
             SqlObject("constraintSet"),
