@@ -12,10 +12,22 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.model.{ConstraintSet, ElevationRange, GuestRole, Observation, Program, ServiceRole, User}
+import lucuma.core.model.ConstraintSet
+import lucuma.core.model.ElevationRange
+import lucuma.core.model.GuestRole
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole._
-import lucuma.odb.data.Nullable.{Absent, NonNull}
-import lucuma.odb.data.{Existence, Nullable, ObsActiveStatus, ObsStatus, Tag, UpdateResult}
+import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.Nullable.Absent
+import lucuma.odb.data.Nullable.NonNull
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.Tag
+import lucuma.odb.data.UpdateResult
 import lucuma.odb.graphql.snippet.input.ConstraintSetInput
 import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs._

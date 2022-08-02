@@ -8,7 +8,10 @@ package input
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.ConstraintSet
-import lucuma.odb.data.{Existence, Nullable, ObsActiveStatus, ObsStatus}
+import lucuma.odb.data.Existence
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.util.Bindings._
 
 final case class ObservationPropertiesInput(
