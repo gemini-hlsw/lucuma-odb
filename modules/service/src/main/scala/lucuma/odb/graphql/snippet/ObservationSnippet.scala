@@ -4,23 +4,34 @@
 package lucuma.odb.graphql
 package snippet
 
-import cats.data.{NonEmptyChain, NonEmptySet}
+import cats.data.NonEmptyChain
+import cats.data.NonEmptySet
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.UniquePath
-import edu.gemini.grackle.{Predicate, Problem, Query, Result, TypeRef}
+import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
+import edu.gemini.grackle.Problem
+import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.model.{Observation, User}
-import lucuma.odb.data.{Existence, ObsActiveStatus, ObsStatus, UpdateResult}
-import lucuma.odb.graphql.snippet.input.{CreateObservationInput, ObservationPropertiesInput, UpdateObservationsInput}
+import lucuma.core.model.Observation
+import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.UpdateResult
+import lucuma.odb.graphql.snippet.input.CreateObservationInput
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
 import lucuma.odb.graphql.util.Bindings.BooleanBinding
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService

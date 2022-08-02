@@ -8,9 +8,14 @@ import cats.syntax.parallel._
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import lucuma.core.model.{Observation, Program, Target}
-import lucuma.odb.graphql.snippet.{ObservationIdBinding, ProgramIdBinding, TargetIdBinding}
-import lucuma.odb.graphql.util.Bindings.{Matcher, ObjectFieldsBinding}
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.odb.graphql.snippet.ObservationIdBinding
+import lucuma.odb.graphql.snippet.ProgramIdBinding
+import lucuma.odb.graphql.snippet.TargetIdBinding
+import lucuma.odb.graphql.util.Bindings.Matcher
+import lucuma.odb.graphql.util.Bindings.ObjectFieldsBinding
 
 object WhereOrder {
 
