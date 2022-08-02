@@ -132,7 +132,7 @@ object ObservationService {
     def insertObservationAs(
       user:          User,
       programId:     Program.Id,
-      name:          Option[NonEmptyString],
+      subtitle:      Option[NonEmptyString],
       existence:     Existence,
       status:        ObsStatus,
       activeState:   ObsActiveStatus,
@@ -142,7 +142,7 @@ object ObservationService {
       val insert: AppliedFragment =
         InsertObservation.apply(
           programId    ~
-           name        ~
+           subtitle    ~
            existence   ~
            status      ~
            activeState ~
@@ -192,7 +192,7 @@ object ObservationService {
       sql"""
         INSERT INTO t_observation (
           c_program_id,
-          c_name,
+          c_subtitle,
           c_existence,
           c_status,
           c_active_status,
@@ -234,7 +234,7 @@ object ObservationService {
       val base = void"update t_observation o set "
 
       val upExistence = sql"c_existence = $existence"
-      val upSubtitle  = sql"c_name = ${text_nonempty.opt}"  // TODO: rename to c_subtitle?
+      val upSubtitle  = sql"c_subtitle = ${text_nonempty.opt}"
       val upStatus    = sql"c_status = $obs_status"
       val upActive    = sql"c_active_status = $obs_active_status"
 
