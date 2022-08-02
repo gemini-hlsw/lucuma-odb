@@ -32,6 +32,11 @@ trait ObservationService[F[_]] {
     SET:         ObservationPropertiesInput,
   ): F[CreateResult]
 
+  // TODO: there is a single-observation update version and a multi-observation
+  // TODO: version.  don't intend to keep both.  i'm not sure how to write
+  // TODO: the multi-observation version such that it is clear what the query
+  // TODO: result was
+
   def updateObservation(
     observationId: Observation.Id,
     SET:           ObservationPropertiesInput
@@ -226,7 +231,7 @@ object ObservationService {
       user:          User
     ): Option[AppliedFragment] = {
 
-      val base = void"update t_observation set "
+      val base = void"update t_observation o set "
 
       val upExistence = sql"c_existence = $existence"
       val upSubtitle  = sql"c_name = ${text_nonempty.opt}"  // TODO: rename to c_subtitle?
@@ -267,23 +272,23 @@ object ObservationService {
 
           case Service | Admin | Staff =>
             sql"""
-              where c_observation_id = $observation_id
+              where o.c_observation_id = $observation_id
             """.apply(observationId)
 
           case Ngo => ??? // TODO
 
           case Guest | Pi =>
             sql"""
-              from t_program
-              where c_observation_id = $observation_id
-              and t_observation.c_program_id = t_program.c_program_id
+              from t_program p
+              where o.c_observation_id = $observation_id
+              and o.c_program_id = p.c_program_id
               and (
-                t_program.c_pi_user_id = $user_id
+                p.c_pi_user_id = $user_id
                 or
                 exists(
                   select u.c_role
                   from   t_program_user u
-                  where  u.c_program_id = t_observation.c_program_id
+                  where  u.c_program_id = o.c_program_id
                   and    u.c_user_id    = $user_id
                   and    u.c_role       = 'coi'
                 )
@@ -296,6 +301,8 @@ object ObservationService {
       }
     }
 
+    // TODO: switch to this version and delete the single obs update or else
+    // TODO: keep single obs update and delete this one
     def updateObservations(
       WHERE:         List[Observation.Id],
       subtitle:      Nullable[NonEmptyString],
@@ -306,7 +313,7 @@ object ObservationService {
       user:          User
     ): Option[AppliedFragment] = {
 
-      val base = void"update t_observation set "
+      val base = void"update t_observation o set "
 
       val upExistence = sql"c_existence = $existence"
       val upSubtitle  = sql"c_name = ${text_nonempty.opt}"  // TODO: rename to c_subtitle?
@@ -350,23 +357,23 @@ object ObservationService {
 
           case Service | Admin | Staff =>
             sql"""
-              where c_observation_id in ( ${observation_id.list(WHERE)} )
+              where o.c_observation_id in ( ${observation_id.list(WHERE)} )
             """.apply(WHERE)
 
           case Ngo => ??? // TODO
 
           case Guest | Pi =>
             sql"""
-              from t_program
-              where c_observation_id in ( ${observation_id.list(WHERE.size)} )
-              and t_observation.c_program_id = t_program.c_program_id
+              from t_program p
+              where o.c_observation_id in ( ${observation_id.list(WHERE.size)} )
+              and o.c_program_id = p.c_program_id
               and (
-                t_program.c_pi_user_id = $user_id
+                p.c_pi_user_id = $user_id
                 or
                 exists(
                   select u.c_role
                   from   t_program_user u
-                  where  u.c_program_id = t_observation.c_program_id
+                  where  u.c_program_id = o.c_program_id
                   and    u.c_user_id    = $user_id
                   and    u.c_role       = 'coi'
                 )
