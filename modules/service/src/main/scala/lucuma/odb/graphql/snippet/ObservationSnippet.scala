@@ -8,7 +8,7 @@ import cats.effect.Sync
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path.{ListPath, UniquePath}
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -20,6 +20,7 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.model.Access._
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
@@ -81,19 +82,16 @@ object ObservationSnippet {
       def inObservationIds(oids: List[Observation.Id]): Predicate =
         In(UniquePath(List("id")), oids)
 
-
-      /* TBD
-      def isVisibleTo(user: model.User): Predicate =
+      def isVisibleTo(user: User): Predicate =
         user.role.access match {
           case Guest | Pi =>
             Or(
-              Contains(ListPath(List("users", "userId")), Const(user.id)), // user is linked, or
-              Eql(UniquePath(List("piUserId")), Const(user.id))            // user is the PI
+              Contains(ListPath(List("program", "users", "userId")), Const(user.id)), // user is linked, or
+              Eql(UniquePath(List("program", "piUserId")), Const(user.id))            // user is the PI
             )
           case Ngo => ???
           case Staff | Admin | Service => True
         }
-      */
     }
 
     // Column references for our mapping.
@@ -277,10 +275,10 @@ object ObservationSnippet {
             Select("observation", Nil,
               Unique(
                 Filter(
-//                  And(
+                  And(
                     Predicates.hasObservationId(oid),
-                    // TODO: Predicates.isVisibleTo(user)
-//                  ),
+                    Predicates.isVisibleTo(user)
+                  ),
                   child
                 )
               )
@@ -299,7 +297,7 @@ object ObservationSnippet {
                 And.all(
                   OFFSET.map(oid => GtEql(UniquePath(List("id")), Const(oid))).getOrElse(True),
                   Predicates.includeDeleted(includeDeleted),
-                  // TODO: Predicates.isVisibleTo(user)
+                  Predicates.isVisibleTo(user),
                   WHERE.getOrElse(True)
                 ),
                 child
