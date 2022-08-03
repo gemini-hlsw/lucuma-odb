@@ -29,7 +29,10 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.UpdateResult
-import lucuma.odb.graphql.snippet.input.{CreateObservationInput, ObservationPropertiesInput, UpdateObservationsInput, WhereObservation}
+import lucuma.odb.graphql.snippet.input.CreateObservationInput
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
+import lucuma.odb.graphql.snippet.input.WhereObservation
 import lucuma.odb.graphql.util.Bindings.BooleanBinding
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService
