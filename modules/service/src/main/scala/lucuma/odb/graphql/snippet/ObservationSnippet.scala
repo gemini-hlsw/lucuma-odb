@@ -4,16 +4,13 @@
 package lucuma.odb.graphql
 package snippet
 
-import cats.data.NonEmptyChain
-import cats.data.NonEmptySet
-import cats.effect.MonadCancelThrow
+import cats.effect.Sync
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Problem
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
@@ -44,7 +41,7 @@ import skunk.Session
 
 object ObservationSnippet {
 
-  def apply[F[_]: MonadCancelThrow: Trace](
+  def apply[F[_]: Sync: Trace](
     m:      SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
     dbPool: Resource[F, Session[F]],
     user:   User
@@ -151,6 +148,7 @@ object ObservationSnippet {
         }
       }
 
+    /*
     val updateObservationsOneByOne: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
@@ -173,12 +171,10 @@ object ObservationSnippet {
           }
         }
       }
+     */
 
-    // TODO: This seems closer to what we want than the one-by-one approach
-    // TODO: above.  I just don't see how to figure out which ids were selected
-    // TODO: by the WHERE clause and updated
-    /*
-    val updateObservationsAllAtOnce: Mutation =
+    // TODO: This seems closer to what we want than the one-by-one approach above?
+    val updateObservations: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
           pool.use { svc =>
@@ -192,7 +188,6 @@ object ObservationSnippet {
           }
         }
       }
-    */
 
     val typeMappings =
       List(
@@ -248,7 +243,7 @@ object ObservationSnippet {
           tpe = MutationType,
           fieldMappings = List(
             SqlRoot("createObservation", mutation = createObservation),
-            SqlRoot("updateObservations", mutation = updateObservationsOneByOne)
+            SqlRoot("updateObservations", mutation = updateObservations)
           )
         ),
         ObjectMapping(
