@@ -2488,8 +2488,7 @@ type UpdateObservationsResult {
   observations: [Observation!]!
 
   # `true` when there were additional edits that were not returned.
-  # Removed for now
-  # hasMore: Boolean!
+  hasMore: Boolean!
 }
 
 # Program selection and update description.  Use `SET` to specify the changes, `WHERE` to select the programs to update, and `LIMIT` to control the size of the return value.
