@@ -8,7 +8,8 @@ import cats.effect.Sync
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Path.{ListPath, UniquePath}
+import edu.gemini.grackle.Path.ListPath
+import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
