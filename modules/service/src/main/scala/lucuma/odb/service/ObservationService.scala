@@ -33,7 +33,6 @@ import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
-//import skunk.data.Completion
 import skunk.implicits._
 
 trait ObservationService[F[_]] {
