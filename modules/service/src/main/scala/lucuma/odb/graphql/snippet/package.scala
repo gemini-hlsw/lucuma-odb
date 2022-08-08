@@ -6,6 +6,7 @@ import cats.syntax.all._
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.Value
 import edu.gemini.grackle.sql.FailedJoin
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -115,17 +116,26 @@ package object snippet {
       Epoch.fromString.getOption(s).toRight(s"Invalid epoch: $s")
     }
 
-  val LongBinding: Matcher[Long] =
-    StringBinding.emap { s =>
-      try Right(s.toLong)
-      catch { case NonFatal(e) => Left(s"Invalid Long: $s: ${e.getMessage}") }
-    }
+  val LongBinding: Matcher[Long] = {
+    case Value.IntValue(v)     => v.toLong.asRight
+    case Value.StringValue(v)  =>
+      try v.toLong.asRight
+      catch { case NonFatal(e) => s"Invalid Long: $v: ${e.getMessage}".asLeft }
+    case Value.NullValue       => s"cannot be null".asLeft
+    case Value.AbsentValue     => s"cannot be absent".asLeft
+    case other                 => s"Expected Long, got $other".asLeft
+  }
 
-  val BigDecimalBinding: Matcher[BigDecimal] =
-    StringBinding.emap { s =>
-      try Right(BigDecimal(s))
-      catch { case NonFatal(e) => Left(s"Invalid BigDecimal: $s: ${e.getMessage}") }
-    }
+  val BigDecimalBinding: Matcher[BigDecimal] = {
+    case Value.IntValue(v)     => BigDecimal(v).asRight
+    case Value.FloatValue(v)   => BigDecimal(v).asRight
+    case Value.StringValue(v)  =>
+      try BigDecimal(v).asRight
+      catch { case NonFatal(e) => s"Invalid BigDecimal: $v: ${e.getMessage}".asLeft }
+    case Value.NullValue       => s"cannot be null".asLeft
+    case Value.AbsentValue     => s"cannot be absent".asLeft
+    case other                 => s"Expected BigDecimal, got $other".asLeft
+  }
 
   val PosBigDecimalBinding: Matcher[PosBigDecimal] =
     BigDecimalBinding.emap { s =>
