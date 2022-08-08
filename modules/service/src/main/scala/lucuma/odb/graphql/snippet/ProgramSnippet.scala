@@ -131,20 +131,6 @@ object ProgramSnippet {
         } getOrElse Result.failure(s"Implementation error: expected 'name' in $env.").pure[F].widen
       }
 
-    def updateProgram: Mutation =
-      Mutation.simple { (child, env) =>
-        ( env.get[model.Program.Id]("programId"),
-          env.get[Option[Existence]]("existence"),   // null/absent means don't update
-          env.get[Nullable[NonEmptyString]]("name"), // null means update to null, absent means don't update
-        ).mapN { (programId, existence, name) =>
-          pool.use(_.updateProgram(programId, existence, name)).map {
-            case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
-            case UpdateResult.NoSuchObject    => Result.failure(s"Program $programId does not exist or is not editable by user ${user.id}.")
-            case UpdateResult.Success(id)     => uniqueProgramNoFiltering(id, child)
-          }
-        } getOrElse Result.failure(s"Implementation error: expected 'programId', 'existence', and 'name' in $env.").pure[F].widen
-      }
-
     def linkUser: Mutation =
       Mutation.simple { (child, env) =>
         env.get[ProgramService.LinkUserRequest]("req").map { req =>
@@ -186,7 +172,6 @@ object ProgramSnippet {
           tpe = MutationType,
           fieldMappings = List(
             SqlRoot("createProgram", mutation = createProgram),
-            SqlRoot("updateProgram", mutation = updateProgram),
             SqlRoot("linkUser", mutation = linkUser),
           )
         ),
@@ -349,24 +334,6 @@ object ProgramSnippet {
             Environment(
               Env("name" -> input.SET.name),
               Select("createProgram", Nil, child)
-            )
-          }
-
-        case Select("updateProgram", List(
-          Binding("input", ObjectValue(List(
-            ProgramIdBinding("programId", rProgramId),
-            ExistenceBinding.Option("existence", rExistence),
-            NonEmptyStringBinding.Nullable("name", rName),
-          )))
-        ), child) =>
-          (rProgramId, rExistence, rName).mapN { (pid, ex, name) =>
-            Environment(
-              Env(
-                "programId" -> pid,
-                "existence" -> ex,
-                "name"      -> name,
-              ),
-              Select("updateProgram", Nil, child)
             )
           }
 
