@@ -49,7 +49,7 @@ object OdbMapping {
     finally src.close()
   }
 
-  def apply[F[_]: Sync: Trace](
+  def apply[F[_]: Sync: Trace: Logger](
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user:     User,
@@ -81,15 +81,11 @@ object OdbMapping {
           override val selectElaborator = snippet.selectElaborator
 
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, (_root_.skunk.Codec[_], Boolean))]): F[Vector[Array[Any]]] = {
-            // print out the query, for now
-            val formatted = SqlFormatter.format(fragment.fragment.sql)
-            val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
-            Sync[F].delay {
-              println()
-              cleanedUp.linesIterator.foreach { s =>
-                println(s"${AnsiColor.GREEN}$s${AnsiColor.RESET}")
-              }
-              println()
+            Logger[F].info {
+              val formatted = SqlFormatter.format(fragment.fragment.sql)
+              val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
+              val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
+              s"\n\n$colored\n\n"
             } *>
             super.fetch(fragment, codecs)
           }

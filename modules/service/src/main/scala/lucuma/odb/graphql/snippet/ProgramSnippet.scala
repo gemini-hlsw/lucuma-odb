@@ -303,20 +303,19 @@ object ProgramSnippet {
           NonNegIntBinding.Option("LIMIT", rLIMIT),
           BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, _, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
             Select("programs", Nil,
-              Filter(
-                And.all(
-                  OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
-                  Predicates.includeDeleted(includeDeleted),
-                  Predicates.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                ),
-                child
-                // Limit(
-                //   LIMIT.foldLeft(1000)(_ min _.value),
-                //   child
-                // )
+              Limit(
+                LIMIT.foldLeft(1000)(_ min _.value),
+                Filter(
+                  And.all(
+                    OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
+                    Predicates.includeDeleted(includeDeleted),
+                    Predicates.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ),
+                  child
+                )
               )
             )
           }
