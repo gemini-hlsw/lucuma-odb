@@ -4,10 +4,11 @@
 package lucuma.odb.graphql
 package snippet
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Sync
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.ListPath
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
@@ -20,24 +21,29 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.model.Access._
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.UpdateResult
 import lucuma.odb.graphql.snippet.input.CreateObservationInput
 import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
+import lucuma.odb.graphql.snippet.input.WhereObservation
 import lucuma.odb.graphql.util.Bindings.BooleanBinding
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.ObservationService
-import lucuma.odb.service.ObservationService.InsertObservationResponse.NotAuthorized
-import lucuma.odb.service.ObservationService.InsertObservationResponse.Success
+import lucuma.odb.service.ObservationService.CreateResult.NotAuthorized
+import lucuma.odb.service.ObservationService.CreateResult.Success
 import lucuma.odb.util.Codecs._
+import natchez.Trace
 import skunk.Session
 
 object ObservationSnippet {
 
-  def apply[F[_]: MonadCancelThrow](
+  def apply[F[_]: Sync: Trace](
     m:      SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
     dbPool: Resource[F, Session[F]],
     user:   User
@@ -52,7 +58,7 @@ object ObservationSnippet {
     val ObservationIdType   = schema.ref("ObservationId")
     val ObsStatusType       = schema.ref("ObsStatus")
     val ObsActiveStatusType = schema.ref("ObsActiveStatus")
-    val CreateObservationResultType = schema.ref("CreateObservationResult")
+    val CreateObservationResultType  = schema.ref("CreateObservationResult")
 
     val ConstraintSetType   = schema.ref("ConstraintSet")
     val CloudExtinctionType = schema.ref("CloudExtinction")
@@ -63,7 +69,7 @@ object ObservationSnippet {
     val AirMassRangeType    = schema.ref("AirMassRange")
     val HourAngleRangeType  = schema.ref("HourAngleRange")
 
-    val pool = dbPool.map(ObservationService.fromUserAndSession(user, _))
+    val pool = dbPool.map(ObservationService.fromSessionAndUser(_, user))
 
     // TODO: Can we share the common predicates somewhere?
     object Predicates {
@@ -74,18 +80,19 @@ object ObservationSnippet {
       def hasObservationId(oid: Observation.Id): Predicate =
         Eql(UniquePath(List("id")), Const(oid))
 
-      /* TBD
-      def isVisibleTo(user: model.User): Predicate =
+      def inObservationIds(oids: List[Observation.Id]): Predicate =
+        In(UniquePath(List("id")), oids)
+
+      def isVisibleTo(user: User): Predicate =
         user.role.access match {
           case Guest | Pi =>
             Or(
-              Contains(ListPath(List("users", "userId")), Const(user.id)), // user is linked, or
-              Eql(UniquePath(List("piUserId")), Const(user.id))            // user is the PI
+              Contains(ListPath(List("program", "users", "userId")), Const(user.id)), // user is linked, or
+              Eql(UniquePath(List("program", "piUserId")), Const(user.id))            // user is the PI
             )
           case Ngo => ???
           case Staff | Admin | Service => True
         }
-      */
     }
 
     // Column references for our mapping.
@@ -93,7 +100,7 @@ object ObservationSnippet {
       val ProgramId: ColumnRef    = col("c_program_id",          program_id)
       val Id: ColumnRef           = col("c_observation_id",      observation_id)
       val Existence: ColumnRef    = col("c_existence",           existence)
-      val Name: ColumnRef         = col("c_name",                text_nonempty.opt)
+      val Subtitle: ColumnRef     = col("c_subtitle",            text_nonempty.opt)
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
       val Status: ColumnRef       = col("c_status",              obs_status)
       val ActiveStatus: ColumnRef = col("c_active_status",       obs_active_status)
@@ -122,17 +129,60 @@ object ObservationSnippet {
       val Id: ColumnRef = col("c_program_id", program_id)
     }
 
-    def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Result[Query] =
-      Result(Unique(Filter(Predicates.hasObservationId(id), child)))
+    def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Query =
+      Unique(Filter(Predicates.hasObservationId(id), child))
 
-    val insertObservation: Mutation =
+    def observationListNoFiltering(ids: List[Observation.Id], child: Query): Query =
+      Filter(Predicates.inObservationIds(ids), child)
+
+    val createObservation: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[CreateObservationInput]("input").flatTraverse { input =>
           pool.use { svc =>
-            svc.insertObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
+            svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
               case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
-              case Success(id)         => uniqueObservationNoFiltering(id, child)
+              case Success(id)         => Result(uniqueObservationNoFiltering(id, child))
             }
+          }
+        }
+      }
+
+    // TODO: probably delete
+//    val updateObservationsOneByOne: Mutation =
+//      Mutation.simple { (child, env) =>
+//        env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
+//          pool.use { svc =>
+//
+//            val updateResults: F[List[(Observation.Id, UpdateResult[Observation.Id])]] =
+//              input.WHERE.toList.flatten.traverse { oid =>
+//                svc.updateObservation(oid, input.SET).tupleLeft(oid)
+//              }
+//
+//            updateResults.map { lst =>
+//              lst.foldLeft(List.empty[Observation.Id].rightIor[String].toIorNes) {
+//                case (ior, (_, UpdateResult.NothingToBeDone)) => ior.addLeft(NonEmptySet.one("No updates specified."))
+//                case (ior, (oid, UpdateResult.NoSuchObject )) => ior.addLeft(NonEmptySet.one(s"Observation $oid does not exist or is not editable by user ${user.id}."))
+//                case (ior, (_,   UpdateResult.Success(oid) )) => ior.addRight(List(oid))
+//              }.bimap(
+//                ms  => NonEmptyChain.fromNonEmptyList(ms.toNonEmptyList.map(m => Problem(m))),
+//                oids => observationListNoFiltering(oids, child))
+//            }
+//          }
+//        }
+//      }
+
+    // TODO: This seems closer to what we want than the one-by-one approach above?
+    val updateObservations: Mutation =
+      Mutation.simple { (child, env) =>
+        env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
+          pool.use { svc =>
+            svc
+              .updateObservations(input.WHERE.toList.flatten, input.SET)
+              .map {
+                case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
+                case UpdateResult.NoSuchObject    => Result.failure(s"No matching editable observations for user ${user.id}")
+                case UpdateResult.Success(ids)    => Result(observationListNoFiltering(ids, child))
+              }
           }
         }
       }
@@ -145,7 +195,7 @@ object ObservationSnippet {
             SqlField("id", ObservationView.Id, key = true),
             SqlField("programId", ObservationView.ProgramId, hidden=true),
             SqlField("existence", ObservationView.Existence, hidden = true),
-            SqlField("subtitle", ObservationView.Name),
+            SqlField("subtitle", ObservationView.Subtitle),
             SqlField("status", ObservationView.Status),
             SqlField("activeStatus", ObservationView.ActiveStatus),
             SqlObject("constraintSet"),
@@ -190,7 +240,8 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = MutationType,
           fieldMappings = List(
-            SqlRoot("createObservation", mutation = insertObservation),
+            SqlRoot("createObservation", mutation = createObservation),
+            SqlRoot("updateObservations", mutation = updateObservations)
           )
         ),
         ObjectMapping(
@@ -203,7 +254,8 @@ object ObservationSnippet {
         ObjectMapping(
           tpe = QueryType,
           fieldMappings = List(
-            SqlRoot("observation")
+            SqlRoot("observation"),
+            SqlRoot("observations")
           )
         ),
         LeafMapping[Observation.Id](ObservationIdType),
@@ -218,23 +270,45 @@ object ObservationSnippet {
     val elaborator = Map[TypeRef, PartialFunction[Select, Result[Query]]](
       QueryType -> {
         case Select("observation", List(
-          ObservationIdBinding("observationId", rOid),
-          BooleanBinding("includeDeleted", rIncludeDeleted)
+          ObservationIdBinding("observationId", rOid)
         ), child) =>
-          (rOid, rIncludeDeleted).parMapN { (oid, includeDeleted) =>
+          rOid.map { oid =>
             Select("observation", Nil,
               Unique(
                 Filter(
                   And(
                     Predicates.hasObservationId(oid),
-                    Predicates.includeDeleted(includeDeleted)
-//                    Predicates.isVisibleTo(user)   // TBD
+                    Predicates.isVisibleTo(user)
                   ),
                   child
                 )
               )
             )
           }
+
+        case Select("observations", List(
+          WhereObservation.Binding.Option("WHERE", rWHERE),
+          ObservationIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
+          BooleanBinding("includeDeleted", rIncludeDeleted)
+        ), child) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            Select("observations", Nil,
+              Limit(
+                LIMIT.foldLeft(1000)(_ min _.value),  // TODO: we need a common place for the max limit
+                Filter(
+                  And.all(
+                    OFFSET.map(oid => GtEql(UniquePath(List("id")), Const(oid))).getOrElse(True),
+                    Predicates.includeDeleted(includeDeleted),
+                    Predicates.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ),
+                  child
+                )
+              )
+            )
+          }
+
       },
 
       MutationType -> {
@@ -242,7 +316,12 @@ object ObservationSnippet {
           rInput.map { input =>
             Environment(Env("input" -> input), Select("createObservation", Nil, child))
           }
-      },
+
+        case Select("updateObservations", List(UpdateObservationsInput.Binding("input", rInput)), child) =>
+          rInput.map { input =>
+            Environment(Env("input" -> input), Select("updateObservations", Nil, child))
+          }
+      }
     )
 
     // Done.
