@@ -147,31 +147,6 @@ object ObservationSnippet {
         }
       }
 
-    // TODO: probably delete
-//    val updateObservationsOneByOne: Mutation =
-//      Mutation.simple { (child, env) =>
-//        env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
-//          pool.use { svc =>
-//
-//            val updateResults: F[List[(Observation.Id, UpdateResult[Observation.Id])]] =
-//              input.WHERE.toList.flatten.traverse { oid =>
-//                svc.updateObservation(oid, input.SET).tupleLeft(oid)
-//              }
-//
-//            updateResults.map { lst =>
-//              lst.foldLeft(List.empty[Observation.Id].rightIor[String].toIorNes) {
-//                case (ior, (_, UpdateResult.NothingToBeDone)) => ior.addLeft(NonEmptySet.one("No updates specified."))
-//                case (ior, (oid, UpdateResult.NoSuchObject )) => ior.addLeft(NonEmptySet.one(s"Observation $oid does not exist or is not editable by user ${user.id}."))
-//                case (ior, (_,   UpdateResult.Success(oid) )) => ior.addRight(List(oid))
-//              }.bimap(
-//                ms  => NonEmptyChain.fromNonEmptyList(ms.toNonEmptyList.map(m => Problem(m))),
-//                oids => observationListNoFiltering(oids, child))
-//            }
-//          }
-//        }
-//      }
-
-    // TODO: This seems closer to what we want than the one-by-one approach above?
     val updateObservations: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
