@@ -17,6 +17,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -64,11 +65,14 @@ package object snippet {
       Gid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
     }
 
+  val ObservationIdBinding: Matcher[Observation.Id] =
+    gidBinding[Observation.Id]("observation")
+
   val ProgramIdBinding: Matcher[Program.Id] =
     gidBinding[Program.Id]("program")
 
-  val ObservationIdBinding: Matcher[Observation.Id] =
-    gidBinding[Observation.Id]("observation")
+  val TargetIdBinding: Matcher[Target.Id] =
+    gidBinding[Target.Id]("target")
 
   val UserIdBinding =
     StringBinding.emap { s =>
@@ -89,12 +93,12 @@ package object snippet {
   val ProgramUserSupportRoleTypeBinding =
     enumeratedBinding[ProgramUserSupportType]
 
-  val NonEmptyStringBinding =
+  val NonEmptyStringBinding: Matcher[NonEmptyString] =
     StringBinding.emap { s =>
       NonEmptyString.unapply(s).toRight("string value must be non-empty.")
     }
 
-  val NonNegIntBinding =
+  val NonNegIntBinding: Matcher[NonNegInt] =
     IntBinding.emap(NonNegInt.from)
 
   val TagBinding =
