@@ -1773,7 +1773,10 @@ type Mutation {
   updateObservations(
     # Parameters for editing existing observations.
     input: UpdateObservationsInput!
-  ): UpdateObservationsResult!
+  ): [Observation!]!
+#  TODO: UpdateObservationsResult
+#  ): UpdateObservationsResult!
+
   updatePrograms(
     # Parameters for updating existing programs.
     input: UpdateProgramsInput!
@@ -2467,7 +2470,10 @@ input UpdateObservationsInput {
   SET: ObservationPropertiesInput!
 
   # Filters the observations to be updated according to those that match the given constraints.
-  WHERE: WhereObservation
+  # WHERE: WhereObservation
+
+  # Temporary -- to be replaced with WhereObservation matching
+  WHERE: [ObservationId!]
 
   # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
   LIMIT: NonNegInt
@@ -4621,7 +4627,8 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ObservationSelectResult!
+  ): [Observation!]!
+   #ObservationSelectResult!
 
   # Metadata for `enum Partner`
   partnerMeta: [PartnerMeta!]!

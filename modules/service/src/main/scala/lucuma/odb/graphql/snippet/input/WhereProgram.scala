@@ -21,7 +21,7 @@ object WhereProgram {
         WhereProgram.Binding.List.Option("AND", rAND),
         WhereProgram.Binding.List.Option("OR", rOR),
         WhereProgram.Binding.Option("NOT", rNOT),
-        WhereOrderProgramId.Binding.Option("id", rId),
+        WhereOrder.ProgramId.Option("id", rId),
         NameBinding.Option("name", rName),
         ("proposal", _), // ignore for now
       ) =>
