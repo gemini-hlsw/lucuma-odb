@@ -19,14 +19,20 @@ object BaseSnippet {
     val NonEmptyStringType = schema.ref("NonEmptyString")
     val ExistenceType = schema.ref("Existence")
     val BigDecimalType = schema.ref("BigDecimal")
+    val LongType = schema.ref("Long")
     val PosBigDecimalType = schema.ref("PosBigDecimal")
+    val HmsStringType = schema.ref("HmsString")
+    val DmsStringType = schema.ref("DmsString")
 
     val typeMappings =
       List(
         LeafMapping[NonEmptyString](NonEmptyStringType),
         LeafMapping[Existence](ExistenceType),
         LeafMapping[BigDecimal](BigDecimalType),
-        LeafMapping[PosBigDecimal](PosBigDecimalType)
+        LeafMapping[PosBigDecimal](PosBigDecimalType),
+        LeafMapping[Long](LongType),
+        LeafMapping[String](HmsStringType),
+        LeafMapping[String](DmsStringType),
       )
 
       Snippet(typeMappings)
