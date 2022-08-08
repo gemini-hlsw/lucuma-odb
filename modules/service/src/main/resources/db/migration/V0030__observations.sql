@@ -100,6 +100,16 @@ create table t_observation (
   c_instrument       d_tag               null        references t_instrument(c_tag),
   c_status           e_obs_status        not null    default 'new',
   c_active_status    e_obs_active_status not null    default 'active',
+
+  -- target environment
+  c_explicit_ra      d_angle_µas         null default null,
+  c_explicit_dec     d_angle_µas         null default null,
+
+  -- both explicit coordinates are defined or neither are defined
+  constraint explicit_base_neither_or_both
+  check (num_nulls(c_explicit_ra, c_explicit_dec) <> 1),
+
+  -- observing conditions (aka "observing constraints")
   c_cloud_extinction d_tag               not null    references t_cloud_extinction(c_tag),
   c_image_quality    d_tag               not null    references t_image_quality(c_tag),
   c_sky_background   d_tag               not null    references t_sky_background(c_tag),
@@ -121,12 +131,14 @@ create table t_observation (
   constraint one_elevation_range
   check (num_nulls(c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max) = 2),
 
-  unique (c_observation_id, c_instrument)
+  unique (c_observation_id, c_instrument),
+  unique (c_program_id, c_observation_id)
 );
 comment on table t_observation is 'Observations.';
 
 create view v_observation as
   select *,
+  case when c_explicit_ra    is not null then c_observation_id end as c_explicit_base_id,
   case when c_air_mass_min   is not null then c_observation_id end as c_air_mass_id,
   case when c_hour_angle_min is not null then c_observation_id end as c_hour_angle_id
   from t_observation
