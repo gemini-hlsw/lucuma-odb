@@ -10,10 +10,10 @@ import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Term
+import edu.gemini.grackle.sql.Like
 import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.graphql.util.Bindings._
-import edu.gemini.grackle.sql.Like
 
 object WhereOptionString {
 
