@@ -43,12 +43,6 @@ trait ObservationService[F[_]] {
     SET:         ObservationPropertiesInput,
   ): F[CreateResult]
 
-  // TODO: probably delete
-//  def updateObservation(
-//    observationId: Observation.Id,
-//    SET:           ObservationPropertiesInput
-//  ): F[UpdateResult[Observation.Id]]
-
   def updateObservations(
     WHERE: List[Observation.Id],
     SET:   ObservationPropertiesInput
@@ -71,9 +65,6 @@ object ObservationService {
   ): ObservationService[F] =
     new ObservationService[F] {
 
-//      def fail[A](msg: String): F[A] =
-//        MonadCancelThrow[F].raiseError(new RuntimeException(msg))
-
       override def createObservation(
         programId:   Program.Id,
         SET:         ObservationPropertiesInput,
@@ -95,23 +86,6 @@ object ObservationService {
             }
           }
         }
-
-      // TODO: probably delete
-//      override def updateObservation(
-//        observationId: Observation.Id,
-//        SET:           ObservationPropertiesInput
-//      ): F[UpdateResult[Observation.Id]] =
-//        Trace[F].span("updateObservation") {
-//          Statements.updateObservation(observationId, SET.subtitle, SET.existence, SET.status, SET.activeStatus, SET.constraintSet, user) match {
-//            case None     => UpdateResult.NothingToBeDone.pure[F].widen
-//            case Some(af) =>
-//              session.prepare(af.fragment.command).use(_.execute(af.argument)).flatMap {
-//                case Completion.Update(0) => UpdateResult.NoSuchObject.pure[F].widen
-//                case Completion.Update(1) => UpdateResult.Success(observationId).pure[F].widen
-//                case other                => fail(s"Expected `Update(0)` or `Update(1)`, found $other")
-//              }
-//          }
-//        }
 
       override def updateObservations(
         WHERE: List[Observation.Id],
@@ -228,87 +202,6 @@ object ObservationService {
           ${hour_angle_range_value.opt},
           ${hour_angle_range_value.opt}
       """
-
-    // TODO: Probably delete
-//    def updateObservation(
-//      observationId: Observation.Id,
-//      subtitle:      Nullable[NonEmptyString],
-//      ex:            Option[Existence],
-//      status:        Option[ObsStatus],
-//      activeState:   Option[ObsActiveStatus],
-//      constraintSet: Option[ConstraintSet],
-//      user:          User
-//    ): Option[AppliedFragment] = {
-//
-//      val base = void"update t_observation o set "
-//
-//      val upExistence = sql"c_existence = $existence"
-//      val upSubtitle  = sql"c_subtitle = ${text_nonempty.opt}"
-//      val upStatus    = sql"c_status = $obs_status"
-//      val upActive    = sql"c_active_status = $obs_active_status"
-//
-//      val upCloud     = sql"c_cloud_extinction = $cloud_extinction"
-//      val upImage     = sql"c_image_quality = $image_quality"
-//      val upSky       = sql"c_sky_background = $sky_background"
-//      val upWater     = sql"c_water_vapor = $water_vapor"
-//
-//      val ups: List[AppliedFragment] =
-//        List(
-//          ex.map(upExistence),
-//          subtitle match {
-//            case Nullable.Null  => Some(upSubtitle(None))
-//            case Absent         => None
-//            case NonNull(value) => Some(upSubtitle(Some(value)))
-//          },
-//          status.map(upStatus),
-//          activeState.map(upActive),
-//          constraintSet.toList.flatMap { cs =>
-//            List(
-//              upCloud(cs.cloudExtinction),
-//              upImage(cs.imageQuality),
-//              upSky(cs.skyBackground),
-//              upWater(cs.waterVapor)
-//            )
-//          }
-//        ).flatten
-//
-//      NonEmptyList.fromList(ups).map { nel =>
-//        val up = nel.intercalate(void", ")
-//
-//        import lucuma.core.model.Access._
-//
-//        val where = user.role.access match {
-//
-//          case Service | Admin | Staff =>
-//            sql"""
-//              where o.c_observation_id = $observation_id
-//            """.apply(observationId)
-//
-//          case Ngo => ??? // TODO
-//
-//          case Guest | Pi =>
-//            sql"""
-//              from t_program p
-//              where o.c_observation_id = $observation_id
-//              and o.c_program_id = p.c_program_id
-//              and (
-//                p.c_pi_user_id = $user_id
-//                or
-//                exists(
-//                  select u.c_role
-//                  from   t_program_user u
-//                  where  u.c_program_id = o.c_program_id
-//                  and    u.c_user_id    = $user_id
-//                  and    u.c_role       = 'coi'
-//                )
-//              )
-//            """.apply(observationId ~ user.id ~ user.id)
-//        }
-//
-//        base |+| up |+| where
-//
-//      }
-//    }
 
     def updateObservations(
       WHERE:         List[Observation.Id],

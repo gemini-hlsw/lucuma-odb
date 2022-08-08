@@ -102,8 +102,8 @@ create table t_observation (
   c_active_status    e_obs_active_status not null    default 'active',
 
   -- target environment
-  c_explicit_ra      d_angle_µas         null default null,
-  c_explicit_dec     d_angle_µas         null default null,
+  c_explicit_ra      d_angle_µas         null        default null,
+  c_explicit_dec     d_angle_µas         null        default null,
 
   -- both explicit coordinates are defined or neither are defined
   constraint explicit_base_neither_or_both
