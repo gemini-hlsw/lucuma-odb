@@ -66,8 +66,7 @@ class program extends OdbSuite {
     }
   }
 
-  // will pass after https://github.com/gemini-hlsw/gsp-graphql/pull/240
-  test("guest and standard user can't see each others' programs".ignore) {
+  test("guest and standard user can't see each others' programs") {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
