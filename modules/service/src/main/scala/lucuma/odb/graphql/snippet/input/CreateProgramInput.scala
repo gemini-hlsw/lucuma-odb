@@ -4,9 +4,6 @@
 package lucuma.odb.graphql.snippet
 package input
 
-import cats.syntax.all._
-import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.odb.data.Existence
 import lucuma.odb.graphql.util.Bindings._
 
 case class CreateProgramInput(
@@ -22,30 +19,5 @@ object CreateProgramInput {
     }
 }
 
-case class ProgramPropertiesInput(
-  name: Option[NonEmptyString],
-  // TODO: Proposal
-  existence: Existence
-)
 
-object ProgramPropertiesInput {
 
-  val Default: ProgramPropertiesInput =
-    ProgramPropertiesInput(None, Existence.Present)
-
-  val Binding: Matcher[ProgramPropertiesInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        NonEmptyStringBinding.Option("name", rName),
-        ("proposal", _), // ignored
-        ExistenceBinding.Option("existence", rExistence),
-      ) =>
-        (rName, rExistence).parMapN { (on, oe) =>
-          ProgramPropertiesInput(on, oe.getOrElse(Existence.Present))
-       }
-      case x =>
-        println("? " + x)
-        throw new Error("huh?")
-    }
-
-}
