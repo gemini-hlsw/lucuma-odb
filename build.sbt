@@ -31,8 +31,6 @@ lazy val service = project
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
-    scalacOptions --= Seq("-Vtype-diffs"),
-    scalacOptions ++= Seq("-Xcheckinit"),
     libraryDependencies ++= Seq(
       "ch.qos.logback" %  "logback-classic"                 % logbackVersion,
       "com.monovore"   %% "decline-effect"                  % declineVersion,
