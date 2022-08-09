@@ -17,10 +17,12 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import io.circe.Encoder
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.math.{Declination, RightAscension}
 import lucuma.core.model.Access._
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -41,6 +43,8 @@ import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk.Session
 
+import scala.reflect.ClassTag
+
 object ObservationSnippet {
 
   def apply[F[_]: Sync: Trace](
@@ -49,25 +53,44 @@ object ObservationSnippet {
     user:   User
   ): m.Snippet = {
 
-    import m.{ ColumnRef, TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col, schema }
+    import m.ColumnRef
+    import m.CursorField
+    import m.Join
+    import m.LeafMapping
+    import m.Mutation
+    import m.MutationCompanionOps
+    import m.ObjectMapping
+    import m.Snippet
+    import m.SqlField
+    import m.SqlObject
+    import m.SqlRoot
+    import m.TableDef
+    import m.col
+    import m.schema
 
     // The types that we're going to map.
-    val QueryType           = schema.ref("Query")
-    val MutationType        = schema.ref("Mutation")
-    val ObservationType     = schema.ref("Observation")
-    val ObservationIdType   = schema.ref("ObservationId")
-    val ObsStatusType       = schema.ref("ObsStatus")
-    val ObsActiveStatusType = schema.ref("ObsActiveStatus")
-    val CreateObservationResultType  = schema.ref("CreateObservationResult")
+    val QueryType             = schema.ref("Query")
+    val MutationType          = schema.ref("Mutation")
+    val ObservationType       = schema.ref("Observation")
+    val ObservationIdType     = schema.ref("ObservationId")
+    val ObsStatusType         = schema.ref("ObsStatus")
+    val ObsActiveStatusType   = schema.ref("ObsActiveStatus")
 
-    val ConstraintSetType   = schema.ref("ConstraintSet")
-    val CloudExtinctionType = schema.ref("CloudExtinction")
-    val ImageQualityType    = schema.ref("ImageQuality")
-    val SkyBackgroundType   = schema.ref("SkyBackground")
-    val WaterVaporType      = schema.ref("WaterVapor")
-    val ElevationRangeType  = schema.ref("ElevationRange")
-    val AirMassRangeType    = schema.ref("AirMassRange")
-    val HourAngleRangeType  = schema.ref("HourAngleRange")
+    val TargetEnvironmentType = schema.ref("TargetEnvironment")
+    val CoordinatesType       = schema.ref("Coordinates")
+    val RightAscensionType    = schema.ref("RightAscension")
+    val DeclinationType       = schema.ref("Declination")
+
+    val ConstraintSetType     = schema.ref("ConstraintSet")
+    val CloudExtinctionType   = schema.ref("CloudExtinction")
+    val ImageQualityType      = schema.ref("ImageQuality")
+    val SkyBackgroundType     = schema.ref("SkyBackground")
+    val WaterVaporType        = schema.ref("WaterVapor")
+    val ElevationRangeType    = schema.ref("ElevationRange")
+    val AirMassRangeType      = schema.ref("AirMassRange")
+    val HourAngleRangeType    = schema.ref("HourAngleRange")
+
+    val CreateObservationResultType  = schema.ref("CreateObservationResult")
 
     val pool = dbPool.map(ObservationService.fromSessionAndUser(_, user))
 
@@ -104,6 +127,15 @@ object ObservationSnippet {
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
       val Status: ColumnRef       = col("c_status",              obs_status)
       val ActiveStatus: ColumnRef = col("c_active_status",       obs_active_status)
+
+      object TargetEnvironment {
+        object Coordinates {
+          val SyntheticId: ColumnRef = col("c_explicit_base_id",  observation_id.embedded)
+          val Ra: ColumnRef          = col("c_explicit_ra",       right_ascension.embedded)
+          val Dec: ColumnRef         = col("c_explicit_dec",      declination.embedded)
+        }
+      }
+
       object ConstraintSet {
         val CloudExtinction: ColumnRef = col("c_cloud_extinction", cloud_extinction.embedded)
         val ImageQuality: ColumnRef    = col("c_image_quality",    image_quality.embedded)
@@ -128,6 +160,13 @@ object ObservationSnippet {
     object ProgramTable extends TableDef("t_program") {
       val Id: ColumnRef = col("c_program_id", program_id)
     }
+
+    // TBD
+//    object AsterismTargetTable extends TableDef("t_asterism_target") {
+//      val ProgramId: ColumnRef     = col("c_program_id",     program_id)
+//      val ObservationId: ColumnRef = col("c_observation_id", observation_id)
+//      val TargetId: ColumnRef      = col("c_target_id",      target_id)
+//    }
 
     def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Query =
       Unique(Filter(Predicates.hasObservationId(id), child))
@@ -162,6 +201,16 @@ object ObservationSnippet {
         }
       }
 
+    // TODO: this is just stolen from TargetSnippet.  Does it need to go into
+    // TODO: edu.gemini.grackle.Mapping?
+    object FieldRef {
+      def apply[A](underlyingField: String) = new Partial[A](underlyingField)
+      class Partial[A](underlyingField: String) {
+        def as[B: Encoder](field: String, f: A => B)(implicit ev: ClassTag[A]): CursorField[B] =
+          CursorField(field, c => c.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
+      }
+    }
+
     val typeMappings =
       List(
         ObjectMapping(
@@ -173,8 +222,46 @@ object ObservationSnippet {
             SqlField("subtitle", ObservationView.Subtitle),
             SqlField("status", ObservationView.Status),
             SqlField("activeStatus", ObservationView.ActiveStatus),
+            SqlObject("targetEnvironment"),
             SqlObject("constraintSet"),
             SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
+          ),
+        ),
+        ObjectMapping(
+          tpe = TargetEnvironmentType,
+          fieldMappings = List(
+            SqlField("id", ObservationView.Id, key = true, hidden = true),
+            SqlObject("explicitBase")
+          )
+        ),
+        ObjectMapping(
+          tpe = CoordinatesType,
+          fieldMappings = List(
+            SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
+            SqlObject("ra"),
+            SqlObject("dec")
+          )
+        ),
+        // TODO: these are essentially the same as the TargetSnippet version
+        ObjectMapping(
+          tpe = RightAscensionType,
+          fieldMappings = List(
+            SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
+            SqlField("value", ObservationView.TargetEnvironment.Coordinates.Ra, hidden = true),
+            FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),
+            FieldRef[RightAscension]("value").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
+            FieldRef[RightAscension]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+            FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
+          ),
+        ),
+        ObjectMapping(
+          tpe = DeclinationType,
+          fieldMappings = List(
+            SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
+            SqlField("value", ObservationView.TargetEnvironment.Coordinates.Dec, hidden = true),
+            FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
+            FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+            FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
           ),
         ),
         ObjectMapping(
