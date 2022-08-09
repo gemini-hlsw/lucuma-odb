@@ -13,13 +13,13 @@ import lucuma.odb.graphql.util.Bindings._
 case class ProgramPropertiesInput(
   name: Option[NonEmptyString],
   // TODO: Proposal
-  existence: Existence
+  existence: Option[Existence]
 )
 
 object ProgramPropertiesInput {
 
   val Default: ProgramPropertiesInput =
-    ProgramPropertiesInput(None, Existence.Present)
+    ProgramPropertiesInput(None, None)
 
   val Binding: Matcher[ProgramPropertiesInput] =
     ObjectFieldsBinding.rmap {
@@ -29,7 +29,7 @@ object ProgramPropertiesInput {
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rName, rExistence).parMapN { (on, oe) =>
-          ProgramPropertiesInput(on, oe.getOrElse(Existence.Present))
+          ProgramPropertiesInput(on, oe)
        }
     }
 
