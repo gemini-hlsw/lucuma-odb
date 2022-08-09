@@ -14,7 +14,7 @@ import lucuma.odb.graphql.util._
 object BaseSnippet {
 
   def apply[F[_]](m: SnippetMapping[F]): m.Snippet = {
-    import m.{ Snippet, LeafMapping, schema }
+    import m.{ Snippet, TypeMapping, LeafMapping, schema }
 
     val NonEmptyStringType = schema.ref("NonEmptyString")
     val ExistenceType = schema.ref("Existence")
@@ -35,8 +35,8 @@ object BaseSnippet {
         LeafMapping[String](DmsStringType),
       )
 
-      Snippet(typeMappings)
+    Snippet(typeMappings)
 
-    }
+  }
 
 }

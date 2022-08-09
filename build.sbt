@@ -17,20 +17,20 @@ val natchezHttp4sVersion       = "0.3.2"
 val natchezVersion             = "0.1.6"
 val postgresVersion            = "42.4.1"
 val skunkVersion               = "0.3.1"
-val lucumaSsoVersion           = "0.1.14"
+val lucumaSsoVersion           = "0.3.0"
 val testcontainersScalaVersion = "0.40.10"
 
 enablePlugins(NoPublishPlugin)
 
 ThisBuild / Test / fork := true
+ThisBuild / scalaVersion       := "3.1.3"
+ThisBuild / crossScalaVersions := Seq("3.1.3")
 
 lazy val service = project
   .in(file("modules/service"))
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
-    scalacOptions --= Seq("-Vtype-diffs"),
-    scalacOptions ++= Seq("-Xcheckinit"),
     libraryDependencies ++= Seq(
       "ch.qos.logback" %  "logback-classic"                 % logbackVersion,
       "com.monovore"   %% "decline-effect"                  % declineVersion,
