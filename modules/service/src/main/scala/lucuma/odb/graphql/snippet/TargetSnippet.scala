@@ -82,8 +82,8 @@ object TargetSnippet {
       sessionPool.map(TargetService.fromSession(_, user))
 
     object TargetView extends TableDef("v_target") {
-      val Id            = col("c_program_id", program_id)
-      val TargetId      = col("c_target_id", target_id)
+      val ProgramId     = col("c_program_id", program_id)
+      val Id            = col("c_target_id", target_id)
       val Name          = col("c_name", text_nonempty)
       val Existence     = col("c_existence", existence)
       val SourceProfile = col("c_source_profile", jsonb)
@@ -129,8 +129,8 @@ object TargetSnippet {
       def includeDeleted(b: Boolean): Predicate =
         if (b) True else Eql(UniquePath(List("existence")), Const[Existence](Existence.Present))
 
-      def hasTargetId(oid: Target.Id): Predicate =
-        Eql(UniquePath(List("id")), Const(oid))
+      def hasTargetId(tid: Target.Id): Predicate =
+        Eql(UniquePath(List("id")), Const(tid))
 
     }
 
@@ -166,7 +166,7 @@ object TargetSnippet {
           SqlField("id", TargetView.Id, key = true),
           SqlField("existence", TargetView.Existence),
           SqlField("name", TargetView.Name),
-          SqlObject("program", Join(TargetView.Id, ProgramTable.Id)),
+          SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
           SqlJson("sourceProfile", TargetView.SourceProfile),
           SqlObject("sidereal"),
           SqlObject("nonsidereal"),
