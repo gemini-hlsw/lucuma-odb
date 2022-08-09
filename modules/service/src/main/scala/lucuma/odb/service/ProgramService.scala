@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
@@ -14,14 +15,13 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.odb.data._
+import lucuma.odb.graphql.snippet.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
 import skunk.syntax.all._
-import lucuma.odb.graphql.snippet.input.ProgramPropertiesInput
-import cats.data.NonEmptyList
 
 trait ProgramService[F[_]] {
 
