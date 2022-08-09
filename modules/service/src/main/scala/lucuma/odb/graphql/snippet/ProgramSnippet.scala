@@ -7,7 +7,6 @@ package snippet
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
-import com.github.vertical_blank.sqlformatter.SqlFormatter
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path._
