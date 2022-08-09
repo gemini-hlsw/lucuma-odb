@@ -26,6 +26,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data._
 import lucuma.odb.graphql.snippet.input.CreateProgramInput
+import lucuma.odb.graphql.snippet.input.UpdateProgramsInput
 import lucuma.odb.graphql.snippet.input.WhereProgram
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.graphql.util._
@@ -35,8 +36,11 @@ import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk.Session
 import skunk.codec.all._
+import com.github.vertical_blank.sqlformatter.SqlFormatter
 
 import java.time.Duration
+import edu.gemini.grackle.Cursor
+import skunk.AppliedFragment
 
 object ProgramSnippet {
 
@@ -47,7 +51,7 @@ object ProgramSnippet {
     topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
-    import m.{ ColumnRef, CursorField, PrefixedMapping, TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
+    import m.{ MappedQuery, ColumnRef, CursorField, PrefixedMapping, TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
@@ -115,6 +119,9 @@ object ProgramSnippet {
           case Staff | Admin | Service => True
         }
 
+      def isWritableBy(user: model.User): Predicate =
+        isVisibleTo(user) // this is true for now
+
     }
 
     /**
@@ -129,6 +136,32 @@ object ProgramSnippet {
         env.get[Option[NonEmptyString]]("name").map { name =>
           pool.use(_.insertProgram(name)).map(uniqueProgramNoFiltering(_, child))
         } getOrElse Result.failure(s"Implementation error: expected 'name' in $env.").pure[F].widen
+      }
+
+    def updatePrograms: Mutation =
+      Mutation.simple { (child, env) =>
+        env.getR[UpdateProgramsInput]("input").flatTraverse { input =>
+
+          // Our predicate for selecting programs to update
+          val filterPredicate = and(List(
+            Predicates.isWritableBy(user),
+            Predicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True),
+          ))
+
+          // An applied fragment that selects all program ids that satisfy `filterPredicate`
+          val idSelect: Result[AppliedFragment] =
+            Result.fromOption(
+             MappedQuery(Filter(filterPredicate, Select("id", Nil, Query.Empty)), Cursor.Context(ProgramType)).map(_.fragment),
+              "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
+            )
+
+          // Update the specified programs and then return a query for the same set of programs.
+          idSelect.traverse { which =>
+            pool.use(_.updatePrograms(input.SET, which)).as(Filter(filterPredicate, child))
+          }
+
+        }
       }
 
     def linkUser: Mutation =
@@ -172,6 +205,7 @@ object ProgramSnippet {
           tpe = MutationType,
           fieldMappings = List(
             SqlRoot("createProgram", mutation = createProgram),
+            SqlRoot("updatePrograms", mutation = updatePrograms),
             SqlRoot("linkUser", mutation = linkUser),
           )
         ),
@@ -334,6 +368,16 @@ object ProgramSnippet {
             Environment(
               Env("name" -> input.SET.name),
               Select("createProgram", Nil, child)
+            )
+          }
+
+        case Select("updatePrograms", List(
+          UpdateProgramsInput.Binding("input", rInput)
+        ), child) =>
+          rInput.map { input =>
+            Environment(
+              Env("input" -> input),
+              Select("updatePrograms", Nil, child)
             )
           }
 
