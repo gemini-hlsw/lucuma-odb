@@ -43,7 +43,7 @@ object WhereObservation {
           and(List(
             AND.map(and),
             OR.map(or),
-            NOT.map(Not),
+            NOT.map(Not(_)),
             id,
             pid,
             subtitle,

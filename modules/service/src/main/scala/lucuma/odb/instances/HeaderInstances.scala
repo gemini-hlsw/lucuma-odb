@@ -8,7 +8,7 @@ import org.http4s.Header
 
 trait HeaderInstances {
 
-  implicit def orderHeader[A](implicit ev: Header[A, _]): Order[A] =
+  implicit def orderHeader[A, B <: Header.Type](implicit ev: Header[A, B]): Order[A] =
     Order.by(ev.value)
 
 }

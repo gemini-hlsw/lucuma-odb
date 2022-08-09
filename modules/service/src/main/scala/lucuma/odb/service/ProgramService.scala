@@ -128,12 +128,12 @@ object ProgramService {
         }
       }
 
-    def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] =
-      Statements.updatePrograms(props, where).traverse { af =>
-        s.prepare(af.fragment.command).use(_.execute(af.argument))
-      } .void
+      def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] =
+        Statements.updatePrograms(props, where).traverse { af =>
+          s.prepare(af.fragment.command).use(_.execute(af.argument))
+        } .void
 
-  }
+    }
 
 
   object Statements {

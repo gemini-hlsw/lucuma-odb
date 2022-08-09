@@ -50,18 +50,18 @@ object OdbMapping {
   }
 
   def apply[F[_]: Sync: Trace: Logger](
-    pool:     Resource[F, Session[F]],
+    database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user:     User,
     topics:   Topics[F],
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
-      pool.use(enumSchema(_)).map { enums =>
+      database.use(enumSchema(_)).map { enums =>
         val m: Mapping[F] =
-           new SkunkMapping[F](pool, monitor)
-          with SnippetMapping[F]
-          with ComputeMapping[F]
-          with MutationCompanionOps[F] {
+          new SkunkMapping[F](database, monitor)
+            with SnippetMapping[F]
+            with ComputeMapping[F]
+            with MutationCompanionOps[F] {
 
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
@@ -71,16 +71,16 @@ object OdbMapping {
               FilterTypeSnippet(this),
               PartnerSnippet(this),
               UserSnippet(this),
-              ProgramSnippet(this, pool, user, topics),
-              AllocationSnippet(this, pool, user),
-              ObservationSnippet(this, pool, user),
-              TargetSnippet(this, pool, user),
+              ProgramSnippet(this, database, user, topics),
+              AllocationSnippet(this, database, user),
+              ObservationSnippet(this, database, user),
+              TargetSnippet(this, database, user),
             ).reduce
 
           val typeMappings = snippet.typeMappings
           override val selectElaborator = snippet.selectElaborator
 
-          override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, (_root_.skunk.Codec[_], Boolean))]): F[Vector[Array[Any]]] = {
+          override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42

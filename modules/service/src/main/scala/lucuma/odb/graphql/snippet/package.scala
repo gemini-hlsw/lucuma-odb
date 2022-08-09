@@ -36,13 +36,13 @@ import scala.util.control.NonFatal
 
 package object snippet {
 
-    implicit class EnvOps(self: Cursor.Env) {
-      def getR[A: ClassTag: TypeName](name: String): Result[A] =
-        self.get[A](name) match {
-          case None        => Result.failure(s"Key '$name' of type ${typeName[A]} was not found in $self")
-          case Some(value) => Result(value)
-        }
-    }
+  implicit class EnvOps(self: Cursor.Env) {
+    def getR[A: ClassTag: TypeName](name: String): Result[A] =
+      self.get[A](name) match {
+        case None        => Result.failure(s"Key '$name' of type ${typeName[A]} was not found in $self")
+        case Some(value) => Result(value)
+      }
+  }
 
   implicit class ResultCompanionOps(self: Result.type) {
 
