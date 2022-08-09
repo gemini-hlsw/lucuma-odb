@@ -14,15 +14,13 @@ import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
-import lucuma.odb.data.Nullable.Absent
-import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data._
+import lucuma.odb.graphql.snippet.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
-import skunk.data.Completion
 import skunk.syntax.all._
 
 trait ProgramService[F[_]] {
@@ -33,21 +31,14 @@ trait ProgramService[F[_]] {
    */
   def insertProgram(name: Option[NonEmptyString]): F[Program.Id]
 
-  /** Update a program, where `userId` is the current user. */
-  def updateProgram(
-    programId: Program.Id,
-    ex: Option[Existence],
-    name: Nullable[NonEmptyString],
-  ): F[UpdateResult[Program.Id]]
-
-  /** Delete a program with the given id, returning true if deleted, false if not found. */
-  def deleteProgram(programId: Program.Id): F[Boolean]
-
   /**
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
    * if the user was not authorized to perform the action.
    */
   def linkUser(req: ProgramService.LinkUserRequest): F[ProgramService.LinkUserResponse]
+
+  /** Update the properies for programs with ids given by the supplied fragment. */
+  def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): F[Unit]
 
 }
 
@@ -108,40 +99,10 @@ object ProgramService {
   def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
 
-      def fail[A](msg: String): F[A] =
-        MonadCancelThrow[F].raiseError(new RuntimeException(msg))
-
       def insertProgram(name: Option[NonEmptyString]): F[Program.Id] =
         Trace[F].span("insertProgram") {
           s.prepare(Statements.InsertProgram).use(ps => ps.unique(name ~ user))
         }
-
-      def updateProgram(
-        programId: Program.Id,
-        ex:        Option[Existence],
-        name:      Nullable[NonEmptyString],
-      ): F[UpdateResult[Program.Id]] =
-        Trace[F].span("updateProgram") {
-          Statements.updateProgram(programId, ex, name, user) match {
-            case None => UpdateResult.NothingToBeDone.pure[F].widen
-            case Some(af) =>
-              s.prepare(af.fragment.command).use(_.execute(af.argument)).flatMap {
-                case Completion.Update(0) => UpdateResult.NoSuchObject.pure[F].widen
-                case Completion.Update(1) => UpdateResult.Success(programId).pure[F].widen
-                case other => fail(s"Expected `Update(0)` or `Update(1)`, found $other.")
-              }
-          }
-        }
-
-      def deleteProgram(programId: Program.Id): F[Boolean] =
-        Trace[F].span("deleteProgram") {
-          s.prepare(Statements.DeleteProgram).use(pc => pc.execute(programId))
-            .flatMap {
-              case Completion.Delete(0) => false.pure[F]
-              case Completion.Delete(1) => true.pure[F]
-              case other => fail(s"Expected `Delete(0)` or `Delete(1)`, found $other.")
-            }
-          }
 
       def linkUser(req: ProgramService.LinkUserRequest): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
@@ -167,10 +128,30 @@ object ProgramService {
         }
       }
 
+    def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] =
+      Statements.updatePrograms(props, where).traverse { af =>
+        s.prepare(af.fragment.command).use(_.execute(af.argument))
+      } .void
+
   }
 
 
   object Statements {
+
+    def updates(SET: ProgramPropertiesInput): Option[NonEmptyList[AppliedFragment]] =
+      NonEmptyList.fromList(
+        List(
+          SET.existence.map(e => sql"c_existence = $existence".apply(e)),
+          SET.name.map(s => sql"c_name = $text_nonempty".apply(s)),
+        ).flatten
+      )
+
+    def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): Option[AppliedFragment] =
+      updates(SET).map { us =>
+        void"UPDATE t_program " |+|
+        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+        void"WHERE t_program.c_program_id IN (" |+| which |+| void")"
+      }
 
     def existsUserAsPi(
       programId: Program.Id,
@@ -196,66 +177,6 @@ object ProgramService {
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=$tag and c_duration > 'PT')
         """.apply(programId ~ partner)
 
-    def updateProgram(
-      programId: Program.Id,
-      ex: Option[Existence],
-      name: Nullable[NonEmptyString],
-      user: User
-    ): Option[AppliedFragment] = {
-
-      val base = void"update t_program set "
-
-      val upExistence = sql"c_existence = $existence"
-      val upName      = sql"c_name = ${text_nonempty.opt}"
-
-      val ups: List[AppliedFragment] =
-        List(
-          ex.map(upExistence),
-          name match {
-            case Nullable.Null => Some(upName(None))
-            case Absent => None
-            case NonNull(value) => Some(upName(Some(value)))
-          }
-        ).flatten
-
-      NonEmptyList.fromList(ups).map { nel =>
-
-        val up = nel.intercalate(void", ")
-
-        import lucuma.core.model.Access._
-
-        val where = user.role.access match {
-
-          case Service | Admin | Staff =>
-            sql"""
-              where p.c_program_id = $program_id
-            """.apply(programId)
-
-          case Ngo     => ??? // TODO
-
-          case Guest | Pi =>
-            sql"""
-              where c_program_id = $program_id
-              and (
-                c_pi_user_id = $user_id
-                or
-                exists(
-                  select c_role
-                  from   t_program_user
-                  where  c_program_id = $program_id
-                  and    c_user_id = $user_id
-                  and    c_role = 'coi'
-                )
-              )
-            """.apply(programId ~ user.id ~ programId ~ user.id)
-
-        }
-
-        base |+| up |+| where
-
-      }
-    }
-
     /** Insert a program, making the passed user PI if it's a non-service user. */
     val InsertProgram: Query[Option[NonEmptyString] ~ User, Program.Id] =
       sql"""
@@ -267,13 +188,6 @@ object ProgramService {
             case oNes ~ ServiceUser(_, _) => oNes ~ None
             case oNes ~ nonServiceUser    => oNes ~ Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser))
          }
-
-
-    val DeleteProgram: Command[Program.Id] =
-      sql"""
-        DELETE FROM t_program
-        WHERE c_program_id = $program_id
-      """.command
 
     /** Link a user to a program, without any access checking. */
     val LinkUser: Fragment[Program.Id ~ User.Id ~ ProgramUserRole ~ Option[ProgramUserSupportType] ~ Option[Tag]] =

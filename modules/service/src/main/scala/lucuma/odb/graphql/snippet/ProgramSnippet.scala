@@ -7,6 +7,7 @@ package snippet
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path._
 import edu.gemini.grackle.Predicate
@@ -26,6 +27,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data._
 import lucuma.odb.graphql.snippet.input.CreateProgramInput
+import lucuma.odb.graphql.snippet.input.UpdateProgramsInput
 import lucuma.odb.graphql.snippet.input.WhereProgram
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.graphql.util._
@@ -33,6 +35,7 @@ import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProgramService.LinkUserResponse._
 import lucuma.odb.util.Codecs._
 import natchez.Trace
+import skunk.AppliedFragment
 import skunk.Session
 import skunk.codec.all._
 
@@ -47,7 +50,7 @@ object ProgramSnippet {
     topics: OdbMapping.Topics[F],
   ): m.Snippet = {
 
-    import m.{ ColumnRef, CursorField, PrefixedMapping, TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
+    import m.{ MappedQuery, ColumnRef, CursorField, PrefixedMapping, TableDef, ObjectMapping, Snippet, SqlRoot, SqlField, SqlObject, Join, Mutation, LeafMapping, MutationCompanionOps, col, schema }
 
     val pool = sessionPool.map(ProgramService.fromSessionAndUser(_, user))
 
@@ -115,6 +118,9 @@ object ProgramSnippet {
           case Staff | Admin | Service => True
         }
 
+      def isWritableBy(user: model.User): Predicate =
+        isVisibleTo(user) // this is true for now
+
     }
 
     /**
@@ -131,18 +137,30 @@ object ProgramSnippet {
         } getOrElse Result.failure(s"Implementation error: expected 'name' in $env.").pure[F].widen
       }
 
-    def updateProgram: Mutation =
+    def updatePrograms: Mutation =
       Mutation.simple { (child, env) =>
-        ( env.get[model.Program.Id]("programId"),
-          env.get[Option[Existence]]("existence"),   // null/absent means don't update
-          env.get[Nullable[NonEmptyString]]("name"), // null means update to null, absent means don't update
-        ).mapN { (programId, existence, name) =>
-          pool.use(_.updateProgram(programId, existence, name)).map {
-            case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
-            case UpdateResult.NoSuchObject    => Result.failure(s"Program $programId does not exist or is not editable by user ${user.id}.")
-            case UpdateResult.Success(id)     => uniqueProgramNoFiltering(id, child)
+        env.getR[UpdateProgramsInput]("input").flatTraverse { input =>
+
+          // Our predicate for selecting programs to update
+          val filterPredicate = and(List(
+            Predicates.isWritableBy(user),
+            Predicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True),
+          ))
+
+          // An applied fragment that selects all program ids that satisfy `filterPredicate`
+          val idSelect: Result[AppliedFragment] =
+            Result.fromOption(
+             MappedQuery(Filter(filterPredicate, Select("id", Nil, Query.Empty)), Cursor.Context(ProgramType)).map(_.fragment),
+              "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
+            )
+
+          // Update the specified programs and then return a query for the same set of programs.
+          idSelect.traverse { which =>
+            pool.use(_.updatePrograms(input.SET, which)).as(Filter(filterPredicate, child))
           }
-        } getOrElse Result.failure(s"Implementation error: expected 'programId', 'existence', and 'name' in $env.").pure[F].widen
+
+        }
       }
 
     def linkUser: Mutation =
@@ -186,7 +204,7 @@ object ProgramSnippet {
           tpe = MutationType,
           fieldMappings = List(
             SqlRoot("createProgram", mutation = createProgram),
-            SqlRoot("updateProgram", mutation = updateProgram),
+            SqlRoot("updatePrograms", mutation = updatePrograms),
             SqlRoot("linkUser", mutation = linkUser),
           )
         ),
@@ -352,21 +370,13 @@ object ProgramSnippet {
             )
           }
 
-        case Select("updateProgram", List(
-          Binding("input", ObjectValue(List(
-            ProgramIdBinding("programId", rProgramId),
-            ExistenceBinding.Option("existence", rExistence),
-            NonEmptyStringBinding.Nullable("name", rName),
-          )))
+        case Select("updatePrograms", List(
+          UpdateProgramsInput.Binding("input", rInput)
         ), child) =>
-          (rProgramId, rExistence, rName).mapN { (pid, ex, name) =>
+          rInput.map { input =>
             Environment(
-              Env(
-                "programId" -> pid,
-                "existence" -> ex,
-                "name"      -> name,
-              ),
-              Select("updateProgram", Nil, child)
+              Env("input" -> input),
+              Select("updatePrograms", Nil, child)
             )
           }
 
