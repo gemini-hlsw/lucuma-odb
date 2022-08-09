@@ -7,22 +7,26 @@ import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Applicative
 import cats.data.NonEmptyList
-import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
+import cats.effect.std.Supervisor
+import cats.Monoid
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
 import edu.gemini.grackle._
+import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
+import lucuma.odb.graphql.snippet.elaborator.Query_programs
+import lucuma.odb.graphql.snippet.mapping._
+import lucuma.odb.graphql.snippet.mapping.ProgramUserMapping
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
-
 import scala.io.AnsiColor
 import scala.io.Source
 
@@ -49,6 +53,9 @@ object OdbMapping {
     finally src.close()
   }
 
+  private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
+    Monoid.instance(PartialFunction.empty, _ orElse _)
+
   def apply[F[_]: Sync: Trace: Logger](
     database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
@@ -57,30 +64,35 @@ object OdbMapping {
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
       database.use(enumSchema(_)).map { enums =>
-        val m: Mapping[F] =
-          new SkunkMapping[F](database, monitor)
-            with SnippetMapping[F]
-            with ComputeMapping[F]
-            with MappingExtras[F]
-            with MutationCompanionOps[F] {
+        new SkunkMapping[F](database, monitor)
+          with LeafMappings[F]
+          with NonNegDurationMapping[F]
+          with PlannedTimeSummaryMapping[F]
+          with ProgramMapping[F]
+          with ProgramUserMapping[F]
+          with Query_programs[F]
+          with SnippetMapping
+          with UserMapping[F]
+        {
 
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
-          val snippet: Snippet =
-            NonEmptyList.of(
-              BaseSnippet(this),
-              FilterTypeSnippet(this),
-              PartnerSnippet(this),
-              UserSnippet(this),
-              ProgramSnippet(this, database, user, topics),
-              AllocationSnippet(this, database, user),
-              SharedTargetSnippet(this),
-              ObservationSnippet(this, database, user),
-              TargetSnippet(this, database, user)
-            ).reduce
+          val typeMappings: List[TypeMapping] =
+            List(
+              NonNegDurationMapping,
+              PlannedTimeSummaryMapping,
+              ProgramMapping,
+              ProgramUserMapping,
+              QueryMapping,
+              UserMapping,
+            ) ++ LeafMappings
 
-          val typeMappings = snippet.typeMappings
-          override val selectElaborator = snippet.selectElaborator
+          override val selectElaborator: SelectElaborator =
+            SelectElaborator(
+              List(
+                Query_programs(user)
+              ).foldMap((r, f) => Map(r -> f))
+            )
 
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
@@ -93,8 +105,6 @@ object OdbMapping {
           }
 
         }
-        // m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
-        m
       }
     }
 
