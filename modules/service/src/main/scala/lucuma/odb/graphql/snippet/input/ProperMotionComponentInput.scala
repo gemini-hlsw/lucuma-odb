@@ -7,6 +7,7 @@ package input
 import cats.data.Nested
 import cats.syntax.all._
 import coulomb._
+import coulomb.syntax.withUnit
 import edu.gemini.grackle.Result
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
