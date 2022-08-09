@@ -7,6 +7,8 @@ package snippet
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Resource
 import cats.syntax.all._
+import com.github.vertical_blank.sqlformatter.SqlFormatter
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path._
 import edu.gemini.grackle.Predicate
@@ -34,13 +36,11 @@ import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProgramService.LinkUserResponse._
 import lucuma.odb.util.Codecs._
 import natchez.Trace
+import skunk.AppliedFragment
 import skunk.Session
 import skunk.codec.all._
-import com.github.vertical_blank.sqlformatter.SqlFormatter
 
 import java.time.Duration
-import edu.gemini.grackle.Cursor
-import skunk.AppliedFragment
 
 object ProgramSnippet {
 
