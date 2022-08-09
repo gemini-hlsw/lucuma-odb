@@ -17,12 +17,10 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import io.circe.Encoder
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.math.{Declination, RightAscension}
 import lucuma.core.model.Access._
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -43,8 +41,6 @@ import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk.Session
 
-import scala.reflect.ClassTag
-
 object ObservationSnippet {
 
   def apply[F[_]: Sync: Trace](
@@ -54,7 +50,6 @@ object ObservationSnippet {
   ): m.Snippet = {
 
     import m.ColumnRef
-    import m.CursorField
     import m.Join
     import m.LeafMapping
     import m.Mutation
@@ -78,8 +73,6 @@ object ObservationSnippet {
 
     val TargetEnvironmentType = schema.ref("TargetEnvironment")
     val CoordinatesType       = schema.ref("Coordinates")
-    val RightAscensionType    = schema.ref("RightAscension")
-    val DeclinationType       = schema.ref("Declination")
 
     val ConstraintSetType     = schema.ref("ConstraintSet")
     val CloudExtinctionType   = schema.ref("CloudExtinction")
@@ -131,8 +124,6 @@ object ObservationSnippet {
       object TargetEnvironment {
         object Coordinates {
           val SyntheticId: ColumnRef = col("c_explicit_base_id",  observation_id.embedded)
-          val Ra: ColumnRef          = col("c_explicit_ra",       right_ascension.embedded)
-          val Dec: ColumnRef         = col("c_explicit_dec",      declination.embedded)
         }
       }
 
@@ -201,16 +192,6 @@ object ObservationSnippet {
         }
       }
 
-    // TODO: this is just stolen from TargetSnippet.  Does it need to go into
-    // TODO: edu.gemini.grackle.Mapping?
-    object FieldRef {
-      def apply[A](underlyingField: String) = new Partial[A](underlyingField)
-      class Partial[A](underlyingField: String) {
-        def as[B: Encoder](field: String, f: A => B)(implicit ev: ClassTag[A]): CursorField[B] =
-          CursorField(field, c => c.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
-      }
-    }
-
     val typeMappings =
       List(
         ObjectMapping(
@@ -241,28 +222,6 @@ object ObservationSnippet {
             SqlObject("ra"),
             SqlObject("dec")
           )
-        ),
-        // TODO: these are essentially the same as the TargetSnippet version
-        ObjectMapping(
-          tpe = RightAscensionType,
-          fieldMappings = List(
-            SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
-            SqlField("value", ObservationView.TargetEnvironment.Coordinates.Ra, hidden = true),
-            FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),
-            FieldRef[RightAscension]("value").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
-            FieldRef[RightAscension]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-            FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
-          ),
-        ),
-        ObjectMapping(
-          tpe = DeclinationType,
-          fieldMappings = List(
-            SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
-            SqlField("value", ObservationView.TargetEnvironment.Coordinates.Dec, hidden = true),
-            FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
-            FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-            FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
-          ),
         ),
         ObjectMapping(
           tpe = ConstraintSetType,
