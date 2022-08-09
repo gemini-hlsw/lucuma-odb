@@ -88,15 +88,15 @@ object SharedTargetSnippet {
         PrefixedMapping(
           tpe = RightAscensionType,
           mappings = List(
-            List("explicitBase", "ra") -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
-            List("sidereal",     "ra") -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra)
+            List("observation", "explicitBase", "ra") -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
+            List("target",      "sidereal",     "ra") -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra)
           )
         ),
         PrefixedMapping(
           tpe = DeclinationType,
           mappings = List(
-            List("explicitBase", "dec") -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
-            List("sidereal",     "dec") -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec)
+            List("observation", "explicitBase", "dec") -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
+            List("target",      "sidereal",     "dec") -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec)
           )
         )
       )
