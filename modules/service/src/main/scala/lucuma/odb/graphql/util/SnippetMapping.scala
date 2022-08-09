@@ -45,7 +45,7 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
   private implicit val SemigroupTypeMapping: Semigroup[TypeMapping] = (a, b) =>
     (a, b) match {
       case (a: ObjectMapping, b: ObjectMapping) => a |+| b
-      case (a: LeafMapping[_], _: LeafMapping[_]) => a
+      case (a: LeafMapping[x], _: LeafMapping[y]) => a
       case (a, b) => sys.error(s"Can't combine $a and $b")
     }
 
