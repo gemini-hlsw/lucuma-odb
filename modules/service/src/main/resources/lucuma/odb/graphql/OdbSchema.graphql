@@ -4234,10 +4234,7 @@ type Observation {
   plannedTime: PlannedTimeSummary!
 
   # The program that contains this observation
-  program(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): Program!
+  program: Program!
 
   # The observation's target(s)
   targetEnvironment: TargetEnvironment!
