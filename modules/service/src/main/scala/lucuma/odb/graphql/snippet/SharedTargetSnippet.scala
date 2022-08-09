@@ -5,9 +5,14 @@ package lucuma.odb.graphql
 package snippet
 
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.core.math.{Declination, RightAscension}
-import lucuma.odb.graphql.util.{MappingExtras, SnippetMapping}
-import lucuma.odb.util.Codecs.{declination, observation_id, right_ascension, target_id}
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.graphql.util.SnippetMapping
+import lucuma.odb.util.Codecs.declination
+import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.right_ascension
+import lucuma.odb.util.Codecs.target_id
 
 object SharedTargetSnippet {
 
