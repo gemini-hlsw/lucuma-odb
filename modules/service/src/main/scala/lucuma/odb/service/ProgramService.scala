@@ -99,9 +99,6 @@ object ProgramService {
   def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
 
-      // def fail[A](msg: String): F[A] =
-      //   MonadCancelThrow[F].raiseError(new RuntimeException(msg))
-
       def insertProgram(name: Option[NonEmptyString]): F[Program.Id] =
         Trace[F].span("insertProgram") {
           s.prepare(Statements.InsertProgram).use(ps => ps.unique(name ~ user))
@@ -131,31 +128,30 @@ object ProgramService {
         }
       }
 
-    def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] = {
-      val af = Statements.updatePrograms(props, where)
-      s.prepare(af.fragment.command).use(_.execute(af.argument).void)
-    }
+    def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] =
+      Statements.updatePrograms(props, where).traverse { af =>
+        s.prepare(af.fragment.command).use(_.execute(af.argument))
+      } .void
 
   }
 
 
   object Statements {
 
-    def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): AppliedFragment = {
+    def updates(SET: ProgramPropertiesInput): Option[NonEmptyList[AppliedFragment]] =
+      NonEmptyList.fromList(
+        List(
+          SET.existence.map(e => sql"c_existence = $existence".apply(e)),
+          SET.name.map(s => sql"c_name = $text_nonempty".apply(s)),
+        ).flatten
+      )
 
-      val updates: NonEmptyList[AppliedFragment] =
-        NonEmptyList(
-          sql"c_existence = $existence".apply(SET.existence),
-          List(
-            SET.name.map(s => sql"c_name = $text_nonempty".apply(s)),
-            // TODO: presumably there will be more optional updates
-          ).flatten
-        )
-
-      void"UPDATE t_program SET " |+| updates.intercalate(void", ") |+| void" WHERE t_program.c_program_id IN (" |+| which |+| void")"
-
-    }
-
+    def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): Option[AppliedFragment] =
+      updates(SET).map { us =>
+        void"UPDATE t_program " |+|
+        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+        void"WHERE t_program.c_program_id IN (" |+| which |+| void")"
+      }
 
     def existsUserAsPi(
       programId: Program.Id,
