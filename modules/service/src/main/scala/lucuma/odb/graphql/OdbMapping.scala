@@ -65,9 +65,9 @@ object OdbMapping {
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
         new SkunkMapping[F](database, monitor) with SnippetMapping
-          // mappings
           with CreateProgramResultMapping[F]
           with LeafMappings[F]
+          with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonNegDurationMapping[F]
           with PlannedTimeSummaryMapping[F]
@@ -90,6 +90,7 @@ object OdbMapping {
           val typeMappings: List[TypeMapping] =
             List(
               CreateProgramResultMapping,
+              LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
               PlannedTimeSummaryMapping,
