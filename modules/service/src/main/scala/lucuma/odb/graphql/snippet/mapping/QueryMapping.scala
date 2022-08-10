@@ -5,13 +5,7 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table._
-
 import edu.gemini.grackle.sql.SqlMapping
-import com.sourcegraph.semanticdb_javac.Semanticdb.TypeRef
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.Select
-import edu.gemini.grackle.Result
 
 trait QueryMapping[F[_]] { this: SqlMapping[F] =>
 
@@ -21,6 +15,7 @@ trait QueryMapping[F[_]] { this: SqlMapping[F] =>
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
+        SqlRoot("program"),
         SqlRoot("programs"),
       )
     )
