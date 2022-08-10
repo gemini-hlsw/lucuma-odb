@@ -20,7 +20,6 @@ import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
-import lucuma.odb.graphql.snippet.elaborator._
 import lucuma.odb.graphql.snippet.mapping._
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
@@ -74,13 +73,8 @@ object OdbMapping {
           with PlannedTimeSummaryMapping[F]
           with ProgramMapping[F]
           with ProgramUserMapping[F]
+          with QueryMapping[F]
           with UserMapping[F]
-          // elaborators
-          with MutationCreateProgramElaborator[F]
-          with MutationUpdateProgramsElaborator[F]
-          with ProgramObservationsElaborator[F]
-          with QueryProgramElaborator[F]
-          with QueryProgramsElaborator[F]
         {
 
           // Our schema
@@ -109,12 +103,10 @@ object OdbMapping {
           override val selectElaborator: SelectElaborator =
             SelectElaborator(
               List(
-                MutationCreateProgramElaborator,
-                MutationUpdateProgramsElaborator,
-                ProgramObservationsElaborator,
-                QueryProgramElaborator,
-                QueryProgramsElaborator,
-              ).foldMap((r, f) => Map(r -> f))
+                MutationElaborator,
+                ProgramElaborator,
+                QueryElaborator,
+              ).combineAll
             )
 
           // Overide `fetch` to log the query. This is optional.
