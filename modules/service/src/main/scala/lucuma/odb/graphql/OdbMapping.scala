@@ -78,6 +78,7 @@ object OdbMapping {
           // elaborators
           with MutationCreateProgramElaborator[F]
           with MutationUpdateProgramsElaborator[F]
+          with ProgramObservationsElaborator[F]
           with QueryProgramElaborator[F]
           with QueryProgramsElaborator[F]
         {
@@ -110,6 +111,7 @@ object OdbMapping {
               List(
                 MutationCreateProgramElaborator,
                 MutationUpdateProgramsElaborator,
+                ProgramObservationsElaborator,
                 QueryProgramElaborator,
                 QueryProgramsElaborator,
               ).foldMap((r, f) => Map(r -> f))
