@@ -20,11 +20,13 @@ import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.TypeRef
 import lucuma.core.model.User
 
-trait Query_programs[F[_]]
+trait QueryProgramsElaborator[F[_]]
   extends QueryMapping[F]
      with ProgramPredicates[F] { self: SkunkMapping[F] =>
 
-  def Query_programs(user: User): (TypeRef, PartialFunction[Select, Result[Query]]) =
+  def user: User
+
+  def QueryProgramsElaborator: (TypeRef, PartialFunction[Select, Result[Query]]) =
     QueryType -> {
       case Select("programs", List(
         WhereProgram.Binding.Option("WHERE", rWHERE),

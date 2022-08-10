@@ -1973,7 +1973,7 @@ enum ProgramUserSupportRoleType {
 type ProgramUser {
   role:   ProgramUserRole!
   userId: UserId!
-  user:   User!
+  user:   User
 }
 
 # Proper motion component, choose one of the available units

@@ -16,14 +16,15 @@ import edu.gemini.grackle._
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
+import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
-import lucuma.odb.graphql.snippet.elaborator.Query_programs
+import lucuma.odb.graphql.snippet.elaborator._
 import lucuma.odb.graphql.snippet.mapping._
-import lucuma.odb.graphql.snippet.mapping.ProgramUserMapping
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
+import lucuma.odb.service.ProgramService
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
@@ -59,26 +60,42 @@ object OdbMapping {
   def apply[F[_]: Sync: Trace: Logger](
     database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
-    user:     User,
+    user0:     User,
     topics:   Topics[F],
   ):  F[Mapping[F]] =
-    Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
+    Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
-        new SkunkMapping[F](database, monitor)
+        new SkunkMapping[F](database, monitor) with SnippetMapping
+          // mappings
+          with CreateProgramResultMapping[F]
           with LeafMappings[F]
+          with MutationMapping[F]
           with NonNegDurationMapping[F]
           with PlannedTimeSummaryMapping[F]
           with ProgramMapping[F]
           with ProgramUserMapping[F]
-          with Query_programs[F]
-          with SnippetMapping
           with UserMapping[F]
+          // elaborators
+          with MutationCreateProgramElaborator[F]
+          with MutationUpdateProgramsElaborator[F]
+          with QueryProgramElaborator[F]
+          with QueryProgramsElaborator[F]
         {
 
+          // Our schema
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
+          // Current user (needed by some mixins)
+          val user = user0
+
+          // Our services
+          lazy val programService = pool.map(ProgramService.fromSessionAndUser(_, user))
+
+          // Our combined type mappings
           val typeMappings: List[TypeMapping] =
             List(
+              CreateProgramResultMapping,
+              MutationMapping,
               NonNegDurationMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
@@ -87,13 +104,18 @@ object OdbMapping {
               UserMapping,
             ) ++ LeafMappings
 
+          // Our combined select elaborator
           override val selectElaborator: SelectElaborator =
             SelectElaborator(
               List(
-                Query_programs(user)
+                MutationCreateProgramElaborator,
+                MutationUpdateProgramsElaborator,
+                QueryProgramElaborator,
+                QueryProgramsElaborator,
               ).foldMap((r, f) => Map(r -> f))
             )
 
+          // Overide `fetch` to log the query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
