@@ -2470,10 +2470,7 @@ input UpdateObservationsInput {
   SET: ObservationPropertiesInput!
 
   # Filters the observations to be updated according to those that match the given constraints.
-  # WHERE: WhereObservation
-
-  # Temporary -- to be replaced with WhereObservation matching
-  WHERE: [ObservationId!]
+  WHERE: WhereObservation
 
   # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
   LIMIT: NonNegInt

@@ -7,6 +7,7 @@ package snippet
 import cats.effect.Sync
 import cats.effect.kernel.Resource
 import cats.syntax.all._
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.ListPath
 import edu.gemini.grackle.Path.UniquePath
@@ -39,6 +40,7 @@ import lucuma.odb.service.ObservationService.CreateResult.NotAuthorized
 import lucuma.odb.service.ObservationService.CreateResult.Success
 import lucuma.odb.util.Codecs._
 import natchez.Trace
+import skunk.AppliedFragment
 import skunk.Session
 
 object ObservationSnippet {
@@ -52,6 +54,7 @@ object ObservationSnippet {
     import m.ColumnRef
     import m.Join
     import m.LeafMapping
+    import m.MappedQuery
     import m.Mutation
     import m.MutationCompanionOps
     import m.ObjectMapping
@@ -109,6 +112,10 @@ object ObservationSnippet {
           case Ngo => ???
           case Staff | Admin | Service => True
         }
+
+      def isWritableBy(user: User): Predicate =
+        isVisibleTo(user)
+
     }
 
     // Column references for our mapping.
@@ -180,14 +187,31 @@ object ObservationSnippet {
     val updateObservations: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
-          pool.use { svc =>
-            svc
-              .updateObservations(input.WHERE.toList.flatten, input.SET)
-              .map {
-                case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
-                case UpdateResult.NoSuchObject    => Result.failure(s"No matching editable observations for user ${user.id}")
-                case UpdateResult.Success(ids)    => Result(observationListNoFiltering(ids, child))
-              }
+
+          // Predicate for selecting programs to update
+          val filterPredicate: Predicate = and(List(
+            Predicates.isWritableBy(user),
+            Predicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True)
+          ))
+
+          // An applied fragment that selects all program ids that satisfy
+          // `filterPredicate`
+          val idSelect: Result[AppliedFragment] =
+            Result.fromOption(
+              MappedQuery(
+                Filter(filterPredicate, Select("id", Nil, Query.Empty)),
+                Cursor.Context(ObservationType)
+              ).map(_.fragment),
+              "Could not construct a subquery for the provided WHERE condition."
+            )
+
+          idSelect.traverse { which =>
+            pool.use { svc =>
+              svc
+                .updateObservations(input.SET, which)
+                .as(Filter(filterPredicate, child))
+            }
           }
         }
       }
