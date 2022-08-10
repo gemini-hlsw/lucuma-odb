@@ -5,9 +5,25 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import edu.gemini.grackle.sql.SqlMapping
+import lucuma.odb.instances.given
+import lucuma.core.model.User
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query._
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Predicate._
+import lucuma.odb.graphql.snippet.predicates.ProgramPredicates
+import scala.reflect.ClassTag
+import lucuma.odb.graphql.util.Bindings._
+import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.TypeRef
+import lucuma.odb.graphql.snippet.input.WhereProgram
+import cats.syntax.all._
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.skunk.SkunkMapping
 
-trait QueryMapping[F[_]] { this: SqlMapping[F] =>
+trait QueryMapping[F[_]]
+  extends ProgramPredicates[F]
+{ this: SkunkMapping[F] =>
 
   lazy val QueryType = schema.ref("Query")
 
@@ -19,5 +35,55 @@ trait QueryMapping[F[_]] { this: SqlMapping[F] =>
         SqlRoot("programs"),
       )
     )
+
+  lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
+    List(
+      Program,
+      Programs
+    ).foldMap(pf => Map(QueryType -> pf))
+
+  def user: User
+
+  private val Program: PartialFunction[Select, Result[Query]] =
+    case Select("program", List(
+      ProgramIdBinding("programId", rPid),
+    ), child) =>
+      rPid.map { pid =>
+        Select("program", Nil,
+          Unique(
+            Filter(
+              And(
+                ProgramPredicates.hasProgramId(pid),
+                ProgramPredicates.isVisibleTo(user),
+              ),
+              child
+            )
+          )
+        )
+      }
+
+  private val Programs: PartialFunction[Select, Result[Query]] =
+    case Select("programs", List(
+      WhereProgram.Binding.Option("WHERE", rWHERE),
+      ProgramIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    ), child) =>
+      (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+        Select("programs", Nil,
+          Limit(
+            LIMIT.foldLeft(1000)(_ min _.value),
+            Filter(
+              And.all(
+                OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
+                ProgramPredicates.includeDeleted(includeDeleted),
+                ProgramPredicates.isVisibleTo(user),
+                WHERE.getOrElse(True)
+              ),
+              child
+            )
+          )
+        )
+      }
 
 }

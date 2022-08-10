@@ -21,12 +21,16 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import util.Bindings._
+import edu.gemini.grackle.Predicate
+import lucuma.core.model.Observation
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
      with ProgramUserTable[F]
      with ObservationView[F] { this: SkunkMapping[F] =>
+
+  def user: User
 
   lazy val ProgramType = schema.ref("Program")
 
@@ -43,6 +47,27 @@ trait ProgramMapping[F[_]]
         SqlObject("plannedTime"),
         SqlObject("observations", Join(ProgramTable.Id, ObservationView.ProgramId)),
       ),
+    )
+
+  lazy val ProgramElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
+    Map(
+      ProgramType -> {
+        case Select("observations", List(
+          BooleanBinding("includeDeleted", rIncludeDeleted),
+          ObservationIdBinding.Option("OFFSET", rOFFSET),
+          NonNegIntBinding.Option("LIMIT", rLIMIT),
+        ), child) =>
+          (rIncludeDeleted, rOFFSET, rLIMIT).parMapN { (includeDeleted, OFFSET, _) =>
+            Select("observations", Nil,
+              Filter(and(List(
+                if (includeDeleted) True else Eql[Existence](UniquePath(List("existence")), Const(Existence.Present)),
+                OFFSET.fold[Predicate](True)(o => GtEql[Observation.Id](UniquePath(List("id")), Const(o))),
+              )),
+              child
+              )
+            )
+          }
+      }
     )
 
 }
