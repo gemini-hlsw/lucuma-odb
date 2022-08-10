@@ -40,6 +40,7 @@ import skunk.Session
 import skunk.codec.all._
 
 import java.time.Duration
+import lucuma.odb.graphql.snippet.input.LinkUserInput
 
 object ProgramSnippet {
 
@@ -381,22 +382,11 @@ object ProgramSnippet {
           }
 
         case Select("linkUser", List(
-          Binding("input", ObjectValue(List(
-            ProgramIdBinding("programId", rProgramId),
-            UserIdBinding("userId", rUserId),
-            ProgramUserRoleBinding("role", rRole),
-            ProgramUserSupportRoleTypeBinding.Option("supportType", rSupportType),
-            TagBinding.Option("supportPartner", rPartner),
-          )))
+          LinkUserInput.Binding("input", rInput)
         ), child) =>
-          (rProgramId, rUserId, rRole, rSupportType, rPartner).mapN { (pid, uid, role, tpe, tag) =>
-            ProgramService.LinkUserRequest.validate(pid, uid, role, tpe, tag) match {
-              case Left(err)  => Result.failure(err)
-              case Right(req) => Result(req)
-            }
-          } .flatten.map { req =>
+          rInput.map { input =>
             Environment(
-              Env("req" -> req),
+              Env("req" -> input),
               Select("linkUser", Nil, child)
             )
           }

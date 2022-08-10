@@ -28,6 +28,8 @@ import lucuma.odb.service.ProgramService
 import skunk.AppliedFragment
 import scala.reflect.ClassTag
 import lucuma.odb.graphql.util.Bindings.Matcher
+import lucuma.odb.graphql.snippet.input.LinkUserInput
+import edu.gemini.grackle.Path.UniquePath
 
 trait MutationMapping[F[_]: MonadCancelThrow]
   extends ProgramPredicates[F]
@@ -41,6 +43,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       tpe = MutationType,
       fieldMappings = List(
         CreateProgram.FieldMapping,
+        LinkUser.FieldMapping,
         UpdatePrograms.FieldMapping,
       )
     )
@@ -48,7 +51,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
       CreateProgram.Elaborator,
-      UpdatePrograms.Elaborator
+      LinkUser.Elaborator,
+      UpdatePrograms.Elaborator,
     ).foldMap(pf => Map(MutationType -> pf))
 
   // Resources needed by mutations
@@ -76,6 +80,21 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       programService.use(_.insertProgram(input.SET.name)).map { id =>
         Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
+      }
+    }
+
+  private val LinkUser =
+    MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>
+      import lucuma.odb.service.ProgramService.LinkUserResponse._
+      programService.use(_.linkUser(input)).map[Result[Query]] {
+        case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
+        case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
+        case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
+        case Success(pid, uid)       =>
+          Result(Unique(Filter(And(
+            Eql(UniquePath(List("programId")), Const(pid)),
+            Eql(UniquePath(List("userId")), Const(uid)),
+          ), child)))
       }
     }
 

@@ -15,6 +15,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.UserType
+import lucuma.odb.data.ProgramUserRole
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 
@@ -28,6 +29,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val NonNegLongType       = schema.ref("NonNegLong")
   lazy val PosBigDecimalType    = schema.ref("PosBigDecimal")
   lazy val ProgramIdType        = schema.ref("ProgramId")
+  lazy val ProgramUserRoleType  = schema.ref("ProgramUserRole")
   lazy val UserIdType           = schema.ref("UserId")
   lazy val UserTypeType         = schema.ref("UserType")
 
@@ -41,6 +43,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[NonNegLong](NonNegLongType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[Program.Id](ProgramIdType),
+      LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
       LeafMapping[User.Id](UserIdType),
