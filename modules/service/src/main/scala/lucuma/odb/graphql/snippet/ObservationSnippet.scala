@@ -210,7 +210,9 @@ object ObservationSnippet {
             pool.use { svc =>
               svc
                 .updateObservations(input.SET, which)
-                .as(Filter(filterPredicate, child))
+                .map { lst =>
+                  Filter(Predicates.inObservationIds(lst), child)
+                }
             }
           }
         }

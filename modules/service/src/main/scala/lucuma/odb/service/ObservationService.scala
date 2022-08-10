@@ -47,7 +47,7 @@ trait ObservationService[F[_]] {
   def updateObservations(
     SET:   ObservationPropertiesInput,
     which: AppliedFragment
-  ): F[Unit]
+  ): F[List[Observation.Id]]
 
 }
 
@@ -91,10 +91,12 @@ object ObservationService {
       override def updateObservations(
         SET:   ObservationPropertiesInput,
         which: AppliedFragment
-      ): F[Unit] =
+      ): F[List[Observation.Id]] =
         Statements.updateObservations(SET, which).traverse { af =>
-          session.prepare(af.fragment.command).use(_.execute(af.argument))
-        }.void
+          session.prepare(af.fragment.query(observation_id)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList
+          }
+        }.map(_.toList.flatten)
 
     }
 
@@ -235,7 +237,8 @@ object ObservationService {
       updates(SET).map { us =>
         void"UPDATE t_observation " |+|
         void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE t_observation.c_observation_id IN (" |+| which |+| void")"
+        void"WHERE t_observation.c_observation_id IN (" |+| which |+| void")" |+|
+        void"RETURNING t_observation.c_observation_id"
       }
 
   }
