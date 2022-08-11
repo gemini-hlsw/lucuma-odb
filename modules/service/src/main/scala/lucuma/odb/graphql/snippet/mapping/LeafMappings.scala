@@ -29,6 +29,7 @@ import lucuma.core.model.Target
 import io.circe.Encoder
 import lucuma.core.math.Epoch
 import io.circe.Json
+import lucuma.odb.data.Tag
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 
@@ -78,7 +79,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[ObsStatus](ObsStatusType),
-      LeafMapping[Partner](PartnerType),
+      LeafMapping[Tag](PartnerType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),

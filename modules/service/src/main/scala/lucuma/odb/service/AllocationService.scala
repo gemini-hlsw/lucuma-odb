@@ -51,10 +51,10 @@ object AllocationService {
 
   object Statements {
 
-    val SetAllocation: Fragment[Program.Id ~ Partner ~ Duration] =
+    val SetAllocation: Fragment[Program.Id ~ Tag ~ Duration] =
         sql"""
           INSERT INTO t_allocation (c_program_id, c_partner, c_duration)
-          VALUES ($program_id, $partner, $interval)
+          VALUES ($program_id, $tag, $interval)
           ON CONFLICT (c_program_id, c_partner) DO UPDATE
           SET c_duration = $interval
         """.contramap { case p ~ t ~ d => p ~ t ~ d ~ d }

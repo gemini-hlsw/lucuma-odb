@@ -152,9 +152,6 @@ package object snippet {
       Angle.fromStringDMS.getOption(s).toRight(s"Invalid angle: $s")
     }
 
-  val PartnerBinding: Matcher[Partner] =
-    enumeratedBinding
-
   implicit class CodecOps[A](self: Codec[A]) {
     def embedded: Codec[Any] =
       self.opt.imap(_.getOrElse(FailedJoin))(x => Some(x.asInstanceOf[A])) // whee

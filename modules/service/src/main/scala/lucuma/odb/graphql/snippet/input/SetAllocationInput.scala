@@ -11,10 +11,11 @@ import lucuma.core.model.Partner
 import lucuma.core.model.NonNegDuration
 import lucuma.odb.graphql.util.Bindings._
 import edu.gemini.grackle.Result
+import lucuma.odb.data.Tag
 
 case class SetAllocationInput(
   programId: Program.Id,
-  partner: Partner,
+  partner: Tag,
   duration: NonNegDuration,
 )
 
@@ -24,7 +25,7 @@ object SetAllocationInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rProgramId),
-        PartnerBinding("partner", rPartner),
+        TagBinding("partner", rPartner),
         NonNegDurationInput.Binding("duration", rDuration),
       ) =>
         (rProgramId, rPartner, rDuration).mapN(apply)
