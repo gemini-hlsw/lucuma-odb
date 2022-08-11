@@ -29,6 +29,7 @@ import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import scala.io.AnsiColor
 import scala.io.Source
+import lucuma.odb.service.AllocationService
 
 object OdbMapping {
 
@@ -65,6 +66,7 @@ object OdbMapping {
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
         new SkunkMapping[F](database, monitor) with SnippetMapping
+          with AllocationMapping[F]
           with CreateProgramResultMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
@@ -74,6 +76,7 @@ object OdbMapping {
           with ProgramMapping[F]
           with ProgramUserMapping[F]
           with QueryMapping[F]
+          with SetAllocationResultMapping[F]
           with UserMapping[F]
         {
 
@@ -84,11 +87,13 @@ object OdbMapping {
           val user = user0
 
           // Our services
-          lazy val programService = pool.map(ProgramService.fromSessionAndUser(_, user))
+          val allocationService = pool.map(AllocationService.fromSessionAndUser(_, user))
+          val programService    = pool.map(ProgramService.fromSessionAndUser(_, user))
 
           // Our combined type mappings
           val typeMappings: List[TypeMapping] =
             List(
+              AllocationMapping,
               CreateProgramResultMapping,
               LinkUserResultMapping,
               MutationMapping,
@@ -97,6 +102,7 @@ object OdbMapping {
               ProgramMapping,
               ProgramUserMapping,
               QueryMapping,
+              SetAllocationResultMapping,
               UserMapping,
             ) ++ LeafMappings
 

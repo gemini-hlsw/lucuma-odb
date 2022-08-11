@@ -30,6 +30,9 @@ import scala.reflect.ClassTag
 import lucuma.odb.graphql.util.Bindings.Matcher
 import lucuma.odb.graphql.snippet.input.LinkUserInput
 import edu.gemini.grackle.Path.UniquePath
+import lucuma.odb.graphql.snippet.input.SetAllocationInput
+import lucuma.odb.service.AllocationService
+import org.tpolecat.typename.TypeName
 
 trait MutationMapping[F[_]: MonadCancelThrow]
   extends ProgramPredicates[F]
@@ -38,24 +41,22 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   lazy val MutationType = schema.ref("Mutation")
 
-  lazy val MutationMapping =
-    ObjectMapping(
-      tpe = MutationType,
-      fieldMappings = List(
-        CreateProgram.FieldMapping,
-        LinkUser.FieldMapping,
-        UpdatePrograms.FieldMapping,
-      )
+  private lazy val mutationFields: List[MutationField] =
+    List(
+      CreateProgram,
+      LinkUser,
+      SetAllocation,
+      UpdatePrograms,
     )
 
+  lazy val MutationMapping =
+    ObjectMapping(tpe = MutationType, fieldMappings = mutationFields.map(_.FieldMapping))
+
   lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    List(
-      CreateProgram.Elaborator,
-      LinkUser.Elaborator,
-      UpdatePrograms.Elaborator,
-    ).foldMap(pf => Map(MutationType -> pf))
+    mutationFields.foldMap(mf => Map(MutationType -> mf.Elaborator))
 
   // Resources needed by mutations
+  def allocationService: Resource[F, AllocationService[F]]
   def programService: Resource[F, ProgramService[F]]
   def user: User
 
@@ -65,7 +66,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     def FieldMapping: SqlRoot
   }
   private object MutationField {
-    def apply[I: ClassTag](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
+    def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
       new MutationField {
         val FieldMapping = SqlRoot(fieldName, mutation = Mutation.simple((child, env) => env.getR[I]("input").flatTraverse(f(_, child))))
         val Elaborator =
@@ -94,6 +95,21 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           Result(Unique(Filter(And(
             Eql(UniquePath(List("programId")), Const(pid)),
             Eql(UniquePath(List("userId")), Const(uid)),
+          ), child)))
+      }
+    }
+
+  private val SetAllocation =
+    MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
+      import AllocationService.SetAllocationResponse._
+      allocationService.use(_.setAllocation(input)).map[Result[Query]] {
+        case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
+        case PartnerNotFound(_)  => ???
+        case ProgramNotFound(_)  => ???
+        case Success             =>
+          Result(Unique(Filter(And(
+            Eql(UniquePath(List("programId")), Const(input.programId)),
+            Eql(UniquePath(List("partner")), Const(input.partner)),
           ), child)))
       }
     }

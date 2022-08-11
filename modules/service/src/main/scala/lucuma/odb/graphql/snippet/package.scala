@@ -33,6 +33,7 @@ import skunk.Codec
 
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
+import lucuma.core.model.Partner
 
 package object snippet {
 
@@ -150,6 +151,9 @@ package object snippet {
     StringBinding.emap { s =>
       Angle.fromStringDMS.getOption(s).toRight(s"Invalid angle: $s")
     }
+
+  val PartnerBinding: Matcher[Partner] =
+    enumeratedBinding
 
   implicit class CodecOps[A](self: Codec[A]) {
     def embedded: Codec[Any] =

@@ -46,7 +46,7 @@ input AirMassRangeInput {
 # Time allocation
 type Allocation {
   partner: Partner!
-  duration: Duration!
+  duration: NonNegDuration!
 }
 
 # Create an angle from a signed value.  Choose exactly one of the available units.
