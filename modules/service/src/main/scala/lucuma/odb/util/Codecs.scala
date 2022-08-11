@@ -88,7 +88,7 @@ trait Codecs {
     enumerated(Type("e_existence"))
 
   val tag: Codec[Tag] =
-    varchar.gimap
+    varchar.imap(Tag(_))(_.value)
 
   val obs_status: Codec[ObsStatus] =
     enumerated(Type("e_obs_status"))
@@ -152,6 +152,9 @@ trait Codecs {
 
   val hour_angle_range_value: Codec[BigDecimal] =
     numeric(3, 2)
+
+  val partner: Codec[Partner] =
+    enumerated(Type.varchar)
 
 }
 

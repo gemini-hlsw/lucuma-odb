@@ -216,20 +216,20 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             .fold(req.apply)(req.apply) // awkward API
             .flatMap { sub =>
               for {
-                _   <- log.debug("*** ----- about to start stream fiber")
+                _   <- log.info("*** ----- about to start stream fiber")
                 fib <- sup.supervise(sub.stream.compile.toList)
-                _   <- log.debug("*** ----- pausing a bit")
+                _   <- log.info("*** ----- pausing a bit")
                 _   <- IO.sleep(200.millis)
-                _   <- log.debug("*** ----- running mutations")
+                _   <- log.info("*** ----- running mutations")
                 _   <- mutations.fold(_.traverse_ { case (query, vars) =>
                         val req = conn.request(Operation(query))
                         vars.fold(req.apply)(req.apply)
                       }, identity)
-                _   <- log.debug("*** ----- pausing a bit")
+                _   <- log.info("*** ----- pausing a bit")
                 _   <- IO.sleep(200.millis)
-                _   <- log.debug("*** ----- stopping subscription")
+                _   <- log.info("*** ----- stopping subscription")
                 _   <- sub.stop()
-                _   <- log.debug("*** ----- joining fiber")
+                _   <- log.info("*** ----- joining fiber")
                 obt <- fib.joinWithNever
               } yield assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
             }

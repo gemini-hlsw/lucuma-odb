@@ -46,7 +46,7 @@ input AirMassRangeInput {
 # Time allocation
 type Allocation {
   partner: Partner!
-  duration: Duration!
+  duration: NonNegDuration!
 }
 
 # Create an angle from a signed value.  Choose exactly one of the available units.
@@ -1935,7 +1935,7 @@ input PosAngleConstraintInput {
 scalar PosLong
 
 # Event sent when a new object is created or updated
-type ProgramEdit implements Event {
+type ProgramEdit { #implements Event {
   # Type of edit
   editType: EditType!
 
@@ -1973,7 +1973,7 @@ enum ProgramUserSupportRoleType {
 type ProgramUser {
   role:   ProgramUserRole!
   userId: UserId!
-  user:   User!
+  user:   User
 }
 
 # Proper motion component, choose one of the available units
@@ -2318,8 +2318,7 @@ type Subscription {
   # that program.
   #
   programEdit(
-    # Program ID
-    programId: ProgramId
+    input: ProgramEditInput
   ): ProgramEdit!
 
   #
@@ -2336,6 +2335,10 @@ type Subscription {
     # Program ID
     programId: ProgramId
   ): TargetEdit!
+}
+
+input ProgramEditInput {
+  programId: ProgramId
 }
 
 # System verification

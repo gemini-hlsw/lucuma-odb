@@ -9,9 +9,11 @@ import cats.syntax.all._
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.snippet.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.codec.temporal.interval
@@ -20,7 +22,7 @@ import skunk.implicits._
 import java.time.Duration
 
 trait AllocationService[F[_]] {
-  def setAllocation(pid: Program.Id, partner: Tag, duration: Duration): F[AllocationService.SetAllocationResponse]
+  def setAllocation(input: SetAllocationInput): F[AllocationService.SetAllocationResponse]
 }
 
 object AllocationService {
@@ -36,11 +38,11 @@ object AllocationService {
   def fromSessionAndUser[F[_]: MonadCancelThrow](s: Session[F], user: User): AllocationService[F] =
     new AllocationService[F] {
 
-      def setAllocation(pid: Program.Id, partner: Tag, duration: Duration): F[SetAllocationResponse] =
+      def setAllocation(input: SetAllocationInput): F[SetAllocationResponse] =
         user.role.access match {
           case Staff | Admin | Service =>
             s.prepare(Statements.SetAllocation.command).use { ps =>
-              ps.execute(pid ~ partner ~ duration).as(SetAllocationResponse.Success)
+              ps.execute(input.programId ~ input.partner ~ input.duration.value).as(SetAllocationResponse.Success)
             }
           case _ => Applicative[F].pure(SetAllocationResponse.NotAuthorized(user))
         }
