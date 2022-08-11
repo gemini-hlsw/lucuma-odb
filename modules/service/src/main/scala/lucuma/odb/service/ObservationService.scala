@@ -92,11 +92,11 @@ object ObservationService {
         SET:   ObservationPropertiesInput,
         which: AppliedFragment
       ): F[List[Observation.Id]] =
-        Statements.updateObservations(SET, which).traverse { af =>
+        Statements.updateObservations(SET, which).toList.flatTraverse { af =>
           session.prepare(af.fragment.query(observation_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList
           }
-        }.map(_.toList.flatten)
+        }
 
     }
 
