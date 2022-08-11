@@ -1935,7 +1935,7 @@ input PosAngleConstraintInput {
 scalar PosLong
 
 # Event sent when a new object is created or updated
-type ProgramEdit implements Event {
+type ProgramEdit { #implements Event {
   # Type of edit
   editType: EditType!
 
@@ -2318,8 +2318,7 @@ type Subscription {
   # that program.
   #
   programEdit(
-    # Program ID
-    programId: ProgramId
+    input: ProgramEditInput
   ): ProgramEdit!
 
   #
@@ -2336,6 +2335,10 @@ type Subscription {
     # Program ID
     programId: ProgramId
   ): TargetEdit!
+}
+
+input ProgramEditInput {
+  programId: ProgramId
 }
 
 # System verification

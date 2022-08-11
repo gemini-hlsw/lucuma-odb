@@ -11,8 +11,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
 import munit.IgnoreSuite
+import scala.concurrent.duration._
 
-@IgnoreSuite
 class programEdits extends OdbSuite {
 
   object Group1 {
@@ -34,18 +34,21 @@ class programEdits extends OdbSuite {
     )
 
   def createProgram(user: User, name: String): IO[Program.Id] =
+    IO.sleep(500.millis) >> // try to behave nicely on weak CI machines
     query(
       user = user,
       query =
         s"""
           mutation {
-            createProgram(input: { name: "$name" }) {
-              id
+            createProgram(input: { SET: { name: "$name" } }) {
+              program {
+                id
+              }
             }
           }
         """
     ) map { json =>
-      json.hcursor.downFields("createProgram", "id").require[Program.Id]
+      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
     }
 
   test("trigger for my own new programs") {
@@ -57,7 +60,9 @@ class programEdits extends OdbSuite {
           """
             subscription {
               programEdit {
-                name
+                value {
+                  name
+                }
               }
             }
           """,
@@ -68,8 +73,8 @@ class programEdits extends OdbSuite {
           ),
         expected =
           List(
-            json"""{ "programEdit": { "name": "foo" } }""",
-            json"""{ "programEdit": { "name": "bar" } }""",
+            json"""{ "programEdit": { "value": { "name": "foo" } } }""",
+            json"""{ "programEdit": { "value": { "name": "bar" } } }""",
           )
       )
     }
@@ -83,7 +88,9 @@ class programEdits extends OdbSuite {
         """
           subscription {
             programEdit {
-              name
+              value {
+                name
+              }
             }
           }
         """,
@@ -95,7 +102,7 @@ class programEdits extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "name": "foo" } }""",
+          json"""{ "programEdit": { "value": { "name": "foo" } } }""",
         )
     )
   }
@@ -108,7 +115,9 @@ class programEdits extends OdbSuite {
         """
           subscription {
             programEdit {
-              name
+              value {
+                name
+              }
             }
           }
         """,
@@ -120,7 +129,7 @@ class programEdits extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "name": "bar" } }""",
+          json"""{ "programEdit": { "value": { "name": "bar" } } }""",
         )
     )
   }
@@ -133,7 +142,9 @@ class programEdits extends OdbSuite {
         """
           subscription {
             programEdit {
-              name
+              value {
+                name
+              }
             }
           }
         """,
@@ -145,9 +156,9 @@ class programEdits extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "name": "foo" } }""",
-          json"""{ "programEdit": { "name": "bar" } }""",
-          json"""{ "programEdit": { "name": "baz" } }""",
+          json"""{ "programEdit": { "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "value": { "name": "baz" } } }""",
         )
     )
   }

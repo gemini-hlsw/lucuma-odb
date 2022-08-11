@@ -30,6 +30,7 @@ import org.typelevel.log4cats.Logger
 import scala.io.AnsiColor
 import scala.io.Source
 import lucuma.odb.service.AllocationService
+import org.checkerframework.checker.units.qual.s
 
 object OdbMapping {
 
@@ -61,7 +62,7 @@ object OdbMapping {
     database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user0:     User,
-    topics:   Topics[F],
+    topics0:   Topics[F],
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
@@ -73,20 +74,21 @@ object OdbMapping {
           with MutationMapping[F]
           with NonNegDurationMapping[F]
           with PlannedTimeSummaryMapping[F]
+          with ProgramEditMapping[F]
           with ProgramMapping[F]
           with ProgramUserMapping[F]
           with QueryMapping[F]
           with SetAllocationResultMapping[F]
+          with SubscriptionMapping[F]
           with UserMapping[F]
         {
 
           // Our schema
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
-          // Current user (needed by some mixins)
+          // Our services and resources needed by various mappings.
           val user = user0
-
-          // Our services
+          val topics = topics0
           val allocationService = pool.map(AllocationService.fromSessionAndUser(_, user))
           val programService    = pool.map(ProgramService.fromSessionAndUser(_, user))
 
@@ -100,9 +102,11 @@ object OdbMapping {
               NonNegDurationMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
+              ProgramEditMapping,
               ProgramUserMapping,
               QueryMapping,
               SetAllocationResultMapping,
+              SubscriptionMapping,
               UserMapping,
             ) ++ LeafMappings
 
@@ -112,6 +116,7 @@ object OdbMapping {
               List(
                 MutationElaborator,
                 ProgramElaborator,
+                SubscriptionElaborator,
                 QueryElaborator,
               ).combineAll
             )
