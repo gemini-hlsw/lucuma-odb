@@ -87,8 +87,9 @@ create table t_target (
   ),
 
   -- source profile is just a blob. we'll see how this works
-  c_source_profile jsonb not null
+  c_source_profile jsonb not null,
 
+  unique (c_program_id, c_target_id)
 );
 
 

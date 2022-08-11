@@ -20,11 +20,9 @@ import io.circe.Encoder
 import io.circe.Json
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.math.Angle
-import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
-import lucuma.core.math.RightAscension
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -39,18 +37,17 @@ import skunk.circe.codec.json.jsonb
 import skunk.codec.all._
 
 import java.math.MathContext
-import scala.reflect.ClassTag
 
 object TargetSnippet {
   import TargetService.CreateTargetResponse._
 
   def apply[F[_]: MonadCancelThrow](
-    m: SnippetMapping[F] with SkunkMapping[F] with MutationCompanionOps[F],
+    m: SnippetMapping[F] with SkunkMapping[F] with MappingExtras[F] with MutationCompanionOps[F],
     sessionPool: Resource[F, Session[F]],
     user: User,
   ): m.Snippet = {
 
-    import m.CursorField
+    import m.FieldRef
     import m.Join
     import m.Mutation
     import m.MutationCompanionOps
@@ -71,8 +68,6 @@ object TargetSnippet {
     val SiderealType                = schema.ref("Sidereal")
     val NonsiderealType             = schema.ref("Nonsidereal")
     val CatalogInfoType             = schema.ref("CatalogInfo")
-    val RightAscensionType          = schema.ref("RightAscension")
-    val DeclinationType             = schema.ref("Declination")
     val ProperMotionType            = schema.ref("ProperMotion")
     val ProperMotionDeclinationType = schema.ref("ProperMotionDeclination")
     val ProperMotionRAType          = schema.ref("ProperMotionRA")
@@ -87,8 +82,8 @@ object TargetSnippet {
       sessionPool.map(TargetService.fromSession(_, user))
 
     object TargetView extends TableDef("v_target") {
-      val Id            = col("c_program_id", program_id)
-      val TargetId      = col("c_target_id", target_id)
+      val ProgramId     = col("c_program_id", program_id)
+      val Id            = col("c_target_id", target_id)
       val Name          = col("c_name", text_nonempty)
       val Existence     = col("c_existence", existence)
       val SourceProfile = col("c_source_profile", jsonb)
@@ -134,8 +129,8 @@ object TargetSnippet {
       def includeDeleted(b: Boolean): Predicate =
         if (b) True else Eql(UniquePath(List("existence")), Const[Existence](Existence.Present))
 
-      def hasTargetId(oid: Target.Id): Predicate =
-        Eql(UniquePath(List("id")), Const(oid))
+      def hasTargetId(tid: Target.Id): Predicate =
+        Eql(UniquePath(List("id")), Const(tid))
 
     }
 
@@ -161,14 +156,6 @@ object TargetSnippet {
     implicit val EncoderEpoch: Encoder[Epoch] =
       e => Json.fromString(Epoch.fromString.reverseGet(e))
 
-    object FieldRef {
-      def apply[A](underlyingField: String) = new Partial[A](underlyingField)
-      class Partial[A](underlyingField: String) {
-        def as[B: Encoder](field: String, f: A => B)(implicit ev: ClassTag[A]): CursorField[B] =
-          CursorField(field, c => c.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
-      }
-    }
-
     val typeMappings = List(
       LeafMapping[Target.Id](TargetIdType),
       LeafMapping[Epoch](EpochStringType),
@@ -179,7 +166,7 @@ object TargetSnippet {
           SqlField("id", TargetView.Id, key = true),
           SqlField("existence", TargetView.Existence),
           SqlField("name", TargetView.Name),
-          SqlObject("program", Join(TargetView.Id, ProgramTable.Id)),
+          SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
           SqlJson("sourceProfile", TargetView.SourceProfile),
           SqlObject("sidereal"),
           SqlObject("nonsidereal"),
@@ -203,27 +190,6 @@ object TargetSnippet {
           SqlObject("radialVelocity"),
           SqlObject("parallax"),
           SqlObject("catalogInfo"),
-        ),
-      ),
-      ObjectMapping(
-        tpe = RightAscensionType,
-        fieldMappings = List(
-          SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-          SqlField("value", TargetView.Sidereal.Ra, hidden = true),
-          FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),
-          FieldRef[RightAscension]("value").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
-          FieldRef[RightAscension]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-          FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
-        ),
-      ),
-      ObjectMapping(
-        tpe = DeclinationType,
-        fieldMappings = List(
-          SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-          SqlField("value", TargetView.Sidereal.Dec, hidden = true),
-          FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
-          FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-          FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
         ),
       ),
       ObjectMapping(

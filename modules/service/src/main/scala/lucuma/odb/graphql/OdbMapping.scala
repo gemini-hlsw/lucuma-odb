@@ -61,6 +61,7 @@ object OdbMapping {
           new SkunkMapping[F](database, monitor)
             with SnippetMapping[F]
             with ComputeMapping[F]
+            with MappingExtras[F]
             with MutationCompanionOps[F] {
 
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
@@ -73,8 +74,9 @@ object OdbMapping {
               UserSnippet(this),
               ProgramSnippet(this, database, user, topics),
               AllocationSnippet(this, database, user),
+              SharedTargetSnippet(this),
               ObservationSnippet(this, database, user),
-              TargetSnippet(this, database, user),
+              TargetSnippet(this, database, user)
             ).reduce
 
           val typeMappings = snippet.typeMappings

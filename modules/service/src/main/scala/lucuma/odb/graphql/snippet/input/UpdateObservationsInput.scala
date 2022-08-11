@@ -5,15 +5,16 @@ package lucuma.odb.graphql
 package snippet
 package input
 
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
+import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.util.Bindings.*
 
 final case class UpdateObservationsInput(
   SET:            ObservationPropertiesInput,
-  WHERE:          Option[List[Observation.Id]], // temporary, replace with WHERE clause
-  LIMIT:          Option[NonNegInt] ,
+  WHERE:          Option[Predicate],
+  LIMIT:          Option[NonNegInt],
   includeDeleted: Option[Boolean]
 )
 
@@ -23,7 +24,7 @@ object UpdateObservationsInput {
     ObjectFieldsBinding.rmap {
       case List(
         ObservationPropertiesInput.EditBinding("SET", rSET),
-        ObservationIdBinding.List.Option("WHERE", rWHERE),
+        WhereObservation.Binding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
