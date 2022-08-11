@@ -4,22 +4,24 @@
 package lucuma.odb.graphql.snippet
 package mapping
 
-import edu.gemini.grackle.sql.SqlMapping
-import lucuma.core.math.RightAscension
-import io.circe
-import scala.reflect.ClassTag
+import cats.effect.kernel.Resource
+import cats.effect.kernel.Sync
 import cats.syntax.all._
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.util.Codecs._
-import skunk.codec.all._
-import skunk.circe.codec.all._
-import cats.effect.kernel.Sync
-import cats.effect.kernel.Resource
 import edu.gemini.grackle.skunk.SkunkMonitor
-import skunk.Session
-import table.TargetView
-import lucuma.odb.graphql.util.MappingExtras
+import edu.gemini.grackle.sql.SqlMapping
+import io.circe
+import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.snippet.table.ObservationView
+import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.util.Codecs._
+import skunk.Session
+import skunk.circe.codec.all._
+import skunk.codec.all._
+
+import scala.reflect.ClassTag
+
+import table.TargetView
 
 trait RightAscensionMapping[F[_]]
   extends ObservationView[F]

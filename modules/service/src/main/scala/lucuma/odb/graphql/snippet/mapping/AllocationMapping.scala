@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table.AllocationTable
-
 import edu.gemini.grackle.skunk.SkunkMapping
+
+import table.AllocationTable
 
 trait AllocationMapping[F[_]]
   extends AllocationTable[F] { this: SkunkMapping[F] =>

@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table.ProgramTable
-
 import edu.gemini.grackle.skunk.SkunkMapping
+
+import table.ProgramTable
 
 trait CreateProgramResultMapping[F[_]]
   extends ProgramTable[F] { this: SkunkMapping[F] =>

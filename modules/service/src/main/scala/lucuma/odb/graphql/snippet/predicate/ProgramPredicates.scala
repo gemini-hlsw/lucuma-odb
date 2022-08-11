@@ -5,8 +5,6 @@ package lucuma.odb.graphql
 package snippet
 package predicates
 
-import mapping.ProgramMapping
-
 import edu.gemini.grackle.Path.ListPath
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
@@ -16,6 +14,8 @@ import lucuma.core.model.Access._
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+
+import mapping.ProgramMapping
 
 trait ProgramPredicates[F[_]] extends ProgramMapping[F] { this: SkunkMapping[F] =>
 

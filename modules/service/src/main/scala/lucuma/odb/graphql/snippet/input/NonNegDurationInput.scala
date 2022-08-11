@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.snippet.input
 
-import lucuma.core.model.NonNegDuration
 import edu.gemini.grackle.Result
+import lucuma.core.model.NonNegDuration
 
 object NonNegDurationInput {
 

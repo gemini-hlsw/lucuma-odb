@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
+import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.math.RadialVelocity
+import lucuma.odb.graphql.util.MappingExtras
+
 import table.TargetView
 import table.ProgramTable
-
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.util.MappingExtras
-import lucuma.core.math.RadialVelocity
 
 trait RadialVelocityMapping[F[_]]
   extends ProgramTable[F]

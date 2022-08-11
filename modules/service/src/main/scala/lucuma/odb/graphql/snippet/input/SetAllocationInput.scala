@@ -6,12 +6,12 @@ package snippet
 package input
 
 import cats.syntax.all._
-import lucuma.core.model.Program
-import lucuma.core.model.Partner
-import lucuma.core.model.NonNegDuration
-import lucuma.odb.graphql.util.Bindings._
 import edu.gemini.grackle.Result
+import lucuma.core.model.NonNegDuration
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.util.Bindings._
 
 case class SetAllocationInput(
   programId: Program.Id,

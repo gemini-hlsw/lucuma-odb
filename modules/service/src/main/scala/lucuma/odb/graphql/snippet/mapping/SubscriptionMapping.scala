@@ -7,6 +7,8 @@ package mapping
 
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
@@ -22,10 +24,8 @@ import lucuma.odb.graphql.util.Bindings.Matcher
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
-import edu.gemini.grackle.Predicate._
 
 import scala.reflect.ClassTag
-import edu.gemini.grackle.Path.UniquePath
 
 trait SubscriptionMapping[F[_]]
   extends MutationCompanionOps[F]

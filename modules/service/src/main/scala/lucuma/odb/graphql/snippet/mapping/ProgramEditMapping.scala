@@ -5,11 +5,12 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table.ProgramTable
-
-import edu.gemini.grackle.skunk.SkunkMapping
-import java.util.concurrent.atomic.AtomicLong
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.skunk.SkunkMapping
+
+import java.util.concurrent.atomic.AtomicLong
+
+import table.ProgramTable
 
 trait ProgramEditMapping[F[_]]
   extends ProgramTable[F] { this: SkunkMapping[F] =>

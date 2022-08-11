@@ -5,25 +5,26 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import lucuma.odb.instances.given
-import lucuma.core.model.User
+import cats.effect.kernel.Par
+import cats.syntax.all._
+import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
-import edu.gemini.grackle.Predicate._
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.model.User
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.snippet.input.WhereObservation
+import lucuma.odb.graphql.snippet.input.WhereProgram
 import lucuma.odb.graphql.snippet.predicates.ObservationPredicates
 import lucuma.odb.graphql.snippet.predicates.ProgramPredicates
-import scala.reflect.ClassTag
 import lucuma.odb.graphql.util.Bindings._
-import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.TypeRef
-import lucuma.odb.graphql.snippet.input.WhereProgram
-import cats.syntax.all._
-import edu.gemini.grackle.Path.UniquePath
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.snippet.input.WhereObservation
-import cats.effect.kernel.Par
-import lucuma.odb.data.Tag
+import lucuma.odb.instances.given
+
+import scala.reflect.ClassTag
 
 trait QueryMapping[F[_]]
   extends ObservationPredicates[F]

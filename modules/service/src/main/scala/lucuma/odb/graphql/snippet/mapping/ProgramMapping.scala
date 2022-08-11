@@ -5,24 +5,24 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table._
-import input._
-
 import cats.syntax.all._
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
-import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+
+import table._
+import input._
 import util.Bindings._
-import edu.gemini.grackle.Predicate
-import lucuma.core.model.Observation
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]

@@ -16,6 +16,7 @@ import lucuma.core.enums.Band
 import lucuma.core.math.Angle
 import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -33,7 +34,6 @@ import skunk.Codec
 
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
-import lucuma.core.model.Partner
 
 package object snippet {
 

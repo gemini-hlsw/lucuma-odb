@@ -20,6 +20,7 @@ import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
+import lucuma.odb.graphql.snippet.enums.FilterTypeEnumType
 import lucuma.odb.graphql.snippet.enums.PartnerEnumType
 import lucuma.odb.graphql.snippet.mapping._
 import lucuma.odb.graphql.topic.ProgramTopic
@@ -34,7 +35,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
-import lucuma.odb.graphql.snippet.enums.FilterTypeEnumType
 
 object OdbMapping {
 

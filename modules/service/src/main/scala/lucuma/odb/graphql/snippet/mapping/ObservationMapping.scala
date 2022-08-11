@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
+import edu.gemini.grackle.skunk.SkunkMapping
+
 import table.ObservationView
 import table.ProgramTable
-
-import edu.gemini.grackle.skunk.SkunkMapping
 
 trait ObservationMapping[F[_]]
   extends ObservationView[F]
