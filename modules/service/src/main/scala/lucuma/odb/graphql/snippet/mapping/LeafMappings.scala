@@ -24,12 +24,22 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.enums.EphemerisKeyType
+import lucuma.core.model.Target
+import io.circe.Encoder
+import lucuma.core.math.Epoch
+import io.circe.Json
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
+
+  private given Encoder[Epoch] =
+    e => Json.fromString(Epoch.fromString.reverseGet(e))
 
   lazy val BigDecimalType        = schema.ref("BigDecimal")
   lazy val CloudExtinctionType   = schema.ref("CloudExtinction")
   lazy val DmsStringType         = schema.ref("DmsString")
+  lazy val EphemerisKeyTypeType  = schema.ref("EphemerisKeyType")
+  lazy val EpochStringType       = schema.ref("EpochString")
   lazy val ExistenceType         = schema.ref("Existence")
   lazy val HmsStringType         = schema.ref("HmsString")
   lazy val HourAngleRangeType    = schema.ref("HourAngleRange")
@@ -48,12 +58,15 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val SkyBackgroundType     = schema.ref("SkyBackground")
   lazy val UserIdType            = schema.ref("UserId")
   lazy val UserTypeType          = schema.ref("UserType")
+  lazy val TargetIdType          = schema.ref("TargetId")
   lazy val WaterVaporType        = schema.ref("WaterVapor")
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
+      LeafMapping[Epoch](EpochStringType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Long](LongType),
@@ -72,6 +85,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
+      LeafMapping[Target.Id](TargetIdType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[WaterVapor](WaterVaporType)
