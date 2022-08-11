@@ -11,6 +11,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
 import munit.IgnoreSuite
+
 import scala.concurrent.duration._
 
 // N.B. this works locally, most of the time. Need to get it working reliably.
