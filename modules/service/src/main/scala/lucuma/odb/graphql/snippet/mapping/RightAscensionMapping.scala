@@ -52,7 +52,7 @@ trait RightAscensionMapping[F[_]]
       tpe = RightAscensionType,
       mappings = List(
         // Observation
-        // List("explicitBase", "ra") -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
+        List("explicitBase", "ra") -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
         // Target
         List("sidereal", "ra") -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra)
       )

@@ -23,6 +23,8 @@ trait ObservationView[F[_]] { self: SkunkMapping[F] =>
       object TargetEnvironment {
         object Coordinates {
           val SyntheticId: ColumnRef = col("c_explicit_base_id",  observation_id.embedded)
+          val Ra: ColumnRef          = col("c_explicit_ra",       right_ascension.embedded)
+          val Dec: ColumnRef         = col("c_explicit_dec",      declination.embedded)
         }
       }
 
