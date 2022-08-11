@@ -22,6 +22,8 @@ import cats.syntax.all._
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.snippet.input.WhereObservation
+import cats.effect.kernel.Par
+import lucuma.odb.data.Tag
 
 trait QueryMapping[F[_]]
   extends ObservationPredicates[F]
@@ -36,6 +38,7 @@ trait QueryMapping[F[_]]
       fieldMappings = List(
         SqlRoot("observation"),
         SqlRoot("observations"),
+        SqlRoot("partnerMeta"),
         SqlRoot("program"),
         SqlRoot("programs"),
       )
@@ -43,8 +46,11 @@ trait QueryMapping[F[_]]
 
   lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
+      Observation,
+      Observations,
+      PartnerMeta,
       Program,
-      Programs
+      Programs,
     ).foldMap(pf => Map(QueryType -> pf))
 
   def user: User
@@ -90,6 +96,12 @@ trait QueryMapping[F[_]]
           )
         )
       }
+
+  private val PartnerMeta: PartialFunction[Select, Result[Query]] =
+    case Select("partnerMeta", Nil, child) =>
+      Result(Select("partnerMeta", Nil,
+        OrderBy(OrderSelections(List(OrderSelection(UniquePath[Tag](List("tag"))))), child)
+      ))
 
   private val Program: PartialFunction[Select, Result[Query]] =
     case Select("program", List(

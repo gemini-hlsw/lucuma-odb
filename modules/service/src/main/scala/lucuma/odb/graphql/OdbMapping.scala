@@ -33,6 +33,7 @@ import lucuma.odb.service.AllocationService
 import org.checkerframework.checker.units.qual.s
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.TargetService
+import lucuma.odb.graphql.snippet.enums.PartnerEnumType
 
 object OdbMapping {
 
@@ -86,6 +87,7 @@ object OdbMapping {
           with NonsiderealMapping[F]
           with ObservationMapping[F]
           with ParallaxMapping[F]
+          with PartnerMetaMapping[F]
           with PlannedTimeSummaryMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
@@ -134,6 +136,7 @@ object OdbMapping {
               NonsiderealMapping,
               ObservationMapping,
               ParallaxMapping,
+              PartnerMetaMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
               ProgramEditMapping,
@@ -179,7 +182,7 @@ object OdbMapping {
     }
 
   def enumSchema[F[_]: Applicative](s: Session[F]): F[Schema] =
-    List(FilterTypeSnippet.enumType(s), PartnerSnippet.enumType(s)).sequence.map { tpes =>
+    List(FilterTypeSnippet.enumType(s), PartnerEnumType.fetch(s)).sequence.map { tpes =>
       new Schema {
         def pos: SourcePos = SourcePos.instance
         def types: List[NamedType] = tpes
