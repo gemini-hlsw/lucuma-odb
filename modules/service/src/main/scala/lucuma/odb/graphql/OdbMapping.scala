@@ -70,24 +70,34 @@ object OdbMapping {
         new SkunkMapping[F](database, monitor) with SnippetMapping
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
+          with CatalogInfoMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
+          with CreateTargetResultMapping[F]
           with ElevationRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonNegDurationMapping[F]
+          with NonsiderealMapping[F]
           with ObservationMapping[F]
+          with ParallaxMapping[F]
           with PlannedTimeSummaryMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
           with ProgramUserMapping[F]
+          with ProperMotionDeclinationMapping[F]
+          with ProperMotionMapping[F]
+          with ProperMotionRAMapping[F]
           with QueryMapping[F]
+          with RadialVelocityMapping[F]
           with SetAllocationResultMapping[F]
+          with SiderealMapping[F]
           with SubscriptionMapping[F]
           with TargetEnvironmentMapping[F]
+          with TargetMapping[F]
           with UserMapping[F]
         {
 
@@ -106,23 +116,33 @@ object OdbMapping {
             List(
               AirMassRangeMapping,
               AllocationMapping,
+              CatalogInfoMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
               CreateObservationResultMapping,
               CreateProgramResultMapping,
+              CreateTargetResultMapping,
               ElevationRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
+              NonsiderealMapping,
               ObservationMapping,
+              ParallaxMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
               ProgramEditMapping,
               ProgramUserMapping,
+              ProperMotionDeclinationMapping,
+              ProperMotionMapping,
+              ProperMotionRAMapping,
               QueryMapping,
+              RadialVelocityMapping,
               SetAllocationResultMapping,
+              SiderealMapping,
               SubscriptionMapping,
               TargetEnvironmentMapping,
+              TargetMapping,
               UserMapping,
             ) ++ LeafMappings
 
