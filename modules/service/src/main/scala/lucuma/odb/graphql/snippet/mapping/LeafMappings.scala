@@ -17,40 +17,64 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.UserType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.core.model.Partner
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.core.model.Observation
+import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.WaterVapor
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 
-  lazy val BigDecimalType       = schema.ref("BigDecimal")
-  lazy val DmsStringType        = schema.ref("DmsString")
-  lazy val ExistenceType        = schema.ref("Existence")
-  lazy val HmsStringType        = schema.ref("HmsString")
-  lazy val LongType             = schema.ref("Long")
-  lazy val NonEmptyStringType   = schema.ref("NonEmptyString")
-  lazy val NonNegBigDecimalType = schema.ref("NonNegBigDecimal")
-  lazy val NonNegLongType       = schema.ref("NonNegLong")
-  lazy val PosBigDecimalType    = schema.ref("PosBigDecimal")
-  lazy val PartnerType          = schema.ref("Partner")
-  lazy val ProgramIdType        = schema.ref("ProgramId")
-  lazy val ProgramUserRoleType  = schema.ref("ProgramUserRole")
-  lazy val UserIdType           = schema.ref("UserId")
-  lazy val UserTypeType         = schema.ref("UserType")
+  lazy val BigDecimalType        = schema.ref("BigDecimal")
+  lazy val CloudExtinctionType   = schema.ref("CloudExtinction")
+  lazy val DmsStringType         = schema.ref("DmsString")
+  lazy val ExistenceType         = schema.ref("Existence")
+  lazy val HmsStringType         = schema.ref("HmsString")
+  lazy val HourAngleRangeType    = schema.ref("HourAngleRange")
+  lazy val ImageQualityType      = schema.ref("ImageQuality")
+  lazy val LongType              = schema.ref("Long")
+  lazy val NonEmptyStringType    = schema.ref("NonEmptyString")
+  lazy val NonNegBigDecimalType  = schema.ref("NonNegBigDecimal")
+  lazy val NonNegLongType        = schema.ref("NonNegLong")
+  lazy val ObsActiveStatusType   = schema.ref("ObsActiveStatus")
+  lazy val ObservationIdType     = schema.ref("ObservationId")
+  lazy val ObsStatusType         = schema.ref("ObsStatus")
+  lazy val PartnerType           = schema.ref("Partner")
+  lazy val PosBigDecimalType     = schema.ref("PosBigDecimal")
+  lazy val ProgramIdType         = schema.ref("ProgramId")
+  lazy val ProgramUserRoleType   = schema.ref("ProgramUserRole")
+  lazy val SkyBackgroundType     = schema.ref("SkyBackground")
+  lazy val UserIdType            = schema.ref("UserId")
+  lazy val UserTypeType          = schema.ref("UserType")
+  lazy val WaterVaporType        = schema.ref("WaterVapor")
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
       LeafMapping[BigDecimal](BigDecimalType),
+      LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[Existence](ExistenceType),
+      LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Long](LongType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
       LeafMapping[NonNegLong](NonNegLongType),
-      LeafMapping[PosBigDecimal](PosBigDecimalType),
+      LeafMapping[ObsActiveStatus](ObsActiveStatusType),
+      LeafMapping[ObsActiveStatus](ObsActiveStatusType),
+      LeafMapping[Observation.Id](ObservationIdType),
+      LeafMapping[ObsStatus](ObsStatusType),
+      LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[Partner](PartnerType),
+      LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
+      LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
       LeafMapping[User.Id](UserIdType),
-      LeafMapping[UserType](UserTypeType)
+      LeafMapping[UserType](UserTypeType),
+      LeafMapping[WaterVapor](WaterVaporType)
     )
 
 }

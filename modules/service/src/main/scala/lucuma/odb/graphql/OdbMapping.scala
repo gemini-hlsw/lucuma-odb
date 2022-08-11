@@ -31,6 +31,7 @@ import scala.io.AnsiColor
 import scala.io.Source
 import lucuma.odb.service.AllocationService
 import org.checkerframework.checker.units.qual.s
+import lucuma.odb.service.ObservationService
 
 object OdbMapping {
 
@@ -67,12 +68,18 @@ object OdbMapping {
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
         new SkunkMapping[F](database, monitor) with SnippetMapping
+          with AirMassRangeMapping[F]
           with AllocationMapping[F]
+          with ConstraintSetMapping[F]
+          with CoordinatesMapping[F]
+          with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
+          with ElevationRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonNegDurationMapping[F]
+          with ObservationMapping[F]
           with PlannedTimeSummaryMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
@@ -80,6 +87,7 @@ object OdbMapping {
           with QueryMapping[F]
           with SetAllocationResultMapping[F]
           with SubscriptionMapping[F]
+          with TargetEnvironmentMapping[F]
           with UserMapping[F]
         {
 
@@ -89,17 +97,24 @@ object OdbMapping {
           // Our services and resources needed by various mappings.
           val user = user0
           val topics = topics0
-          val allocationService = pool.map(AllocationService.fromSessionAndUser(_, user))
-          val programService    = pool.map(ProgramService.fromSessionAndUser(_, user))
+          val allocationService  = pool.map(AllocationService.fromSessionAndUser(_, user))
+          val observationService = pool.map(ObservationService.fromSessionAndUser(_, user))
+          val programService     = pool.map(ProgramService.fromSessionAndUser(_, user))
 
           // Our combined type mappings
           val typeMappings: List[TypeMapping] =
             List(
+              AirMassRangeMapping,
               AllocationMapping,
+              ConstraintSetMapping,
+              CoordinatesMapping,
+              CreateObservationResultMapping,
               CreateProgramResultMapping,
+              ElevationRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
+              ObservationMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
               ProgramEditMapping,
@@ -107,6 +122,7 @@ object OdbMapping {
               QueryMapping,
               SetAllocationResultMapping,
               SubscriptionMapping,
+              TargetEnvironmentMapping,
               UserMapping,
             ) ++ LeafMappings
 

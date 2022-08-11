@@ -22,6 +22,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.snippet.input.CreateProgramInput
 import lucuma.odb.graphql.snippet.input.UpdateProgramsInput
 import lucuma.odb.graphql.snippet.predicates.ProgramPredicates
+import lucuma.odb.graphql.snippet.predicates.ObservationPredicates
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import lucuma.odb.service.ProgramService
@@ -33,9 +34,14 @@ import edu.gemini.grackle.Path.UniquePath
 import lucuma.odb.graphql.snippet.input.SetAllocationInput
 import lucuma.odb.service.AllocationService
 import org.tpolecat.typename.TypeName
+import lucuma.odb.graphql.snippet.input.CreateObservationInput
+import lucuma.odb.service.ObservationService
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
 
 trait MutationMapping[F[_]: MonadCancelThrow]
   extends ProgramPredicates[F]
+     with ObservationPredicates[F]
      with MutationCompanionOps[F]
   { this: SkunkMapping[F] =>
 
@@ -43,9 +49,11 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   private lazy val mutationFields: List[MutationField] =
     List(
+      CreateObservation,
       CreateProgram,
       LinkUser,
       SetAllocation,
+      UpdateObservations,
       UpdatePrograms,
     )
 
@@ -57,6 +65,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   // Resources needed by mutations
   def allocationService: Resource[F, AllocationService[F]]
+  def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
   def user: User
 
@@ -81,6 +90,17 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       programService.use(_.insertProgram(input.SET.name)).map { id =>
         Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
+      }
+    }
+
+  private val CreateObservation =
+    MutationField("createObservation", CreateObservationInput.Binding) { (input, child)=>
+      observationService.use { svc =>
+        import ObservationService.CreateResult._
+        svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
+          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case Success(id)         => Result(Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
+        }
       }
     }
 
@@ -112,6 +132,39 @@ trait MutationMapping[F[_]: MonadCancelThrow]
             Eql(UniquePath(List("partner")), Const(input.partner)),
           ), child)))
       }
+    }
+
+  private val UpdateObservations =
+    MutationField("updateObservations", UpdateObservationsInput.Binding) { (input, child) =>
+
+      // Predicate for selecting programs to update
+      val filterPredicate: Predicate = and(List(
+        ObservationPredicates.isWritableBy(user),
+        ObservationPredicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+        input.WHERE.getOrElse(True)
+      ))
+
+      // An applied fragment that selects all program ids that satisfy
+      // `filterPredicate`
+      val idSelect: Result[AppliedFragment] =
+        Result.fromOption(
+          MappedQuery(
+            Filter(filterPredicate, Select("id", Nil, Query.Empty)),
+            Cursor.Context(ObservationType)
+          ).map(_.fragment),
+          "Could not construct a subquery for the provided WHERE condition."
+        )
+
+      idSelect.traverse { which =>
+        observationService.use { svc =>
+          svc
+            .updateObservations(input.SET, which)
+            .map { lst =>
+              Filter(ObservationPredicates.inObservationIds(lst), child)
+            }
+        }
+      }
+
     }
 
   private val UpdatePrograms =
