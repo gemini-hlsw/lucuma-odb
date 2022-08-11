@@ -25,7 +25,7 @@ trait ProgramEditMapping[F[_]]
         SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
         CursorField("id", _.envR[Long]("id")),
         CursorField("editType", _.envR[EditType]("editType")),
-        SqlObject("value"),
+        SqlObject("value")
       )
     )
 

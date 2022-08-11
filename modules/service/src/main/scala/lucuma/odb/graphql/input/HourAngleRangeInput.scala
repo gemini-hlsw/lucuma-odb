@@ -6,8 +6,10 @@ package input
 
 import cats.syntax.apply._
 import cats.syntax.either._
+import cats.syntax.option._
 import cats.syntax.parallel._
 import edu.gemini.grackle.Result
+import eu.timepit.refined.api.Refined.value
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.odb.graphql.binding._
@@ -18,6 +20,12 @@ final case class HourAngleRangeInput(
   maxHours: Option[DecimalHour]
 ) {
 
+  def minBigDecimal: Option[BigDecimal] =
+    minHours.map(_.value)
+
+  def maxBigDecimal: Option[BigDecimal] =
+    maxHours.map(_.value)
+
   def create: Result[HourAngle] =
     Result.fromOption[HourAngle](
       (minHours, maxHours)
@@ -26,36 +34,27 @@ final case class HourAngleRangeInput(
       "Creating an hour angle range requires specifying both minHours and maxHours where minHours < maxHours"
     )
 
-  def edit: HourAngle => Result[HourAngle] = ha => {
-    val mn = minHours.getOrElse(ha.minHours)
-    val mx = maxHours.getOrElse(ha.maxHours)
-    Result.fromOption[HourAngle](
-      HourAngle.fromOrderedDecimalHours.getOption((mn, mx)),
-      s"Editing the hour angle range as specified would create an invalid range: minHours ($mn) >= maxHours ($mx)"
-    )
-  }
-
 }
 
 object HourAngleRangeInput {
+
+  val Default: HourAngleRangeInput =
+    HourAngleRangeInput(
+      HourAngle.DefaultMin.some,
+      HourAngle.DefaultMax.some
+    )
 
   val HourAngleDecimalHour: Matcher[DecimalHour] =
     BigDecimalBinding.emap { bd =>
       DecimalHour.from(bd).leftMap(m => s"Invalid Hour Angle constraint: $bd: $m")
     }
 
-  val SimpleBinding: Matcher[HourAngleRangeInput] =
+  val Binding: Matcher[HourAngleRangeInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        HourAngleDecimalHour.Option("min", rMin),
-        HourAngleDecimalHour.Option("max", rMax)
+        HourAngleDecimalHour.Option("minHours", rMin),
+        HourAngleDecimalHour.Option("maxHours", rMax)
       ) => (rMin, rMax).parMapN(HourAngleRangeInput(_, _))
     }
-
-  val CreateBinding: Matcher[HourAngle] =
-    SimpleBinding.rmap(_.create)
-
-  val EditBinding: Matcher[HourAngle => Result[HourAngle]] =
-    SimpleBinding.map(_.edit)
 
 }

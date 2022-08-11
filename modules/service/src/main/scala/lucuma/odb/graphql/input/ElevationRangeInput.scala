@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.flatMap._
+import cats.syntax.option._
 import cats.syntax.parallel._
 import edu.gemini.grackle.Result
 import lucuma.core.model.ElevationRange
@@ -26,35 +28,28 @@ final case class ElevationRangeInput(
       case (Some(_), Some(_)) => OnlyOneFailure
     }
 
-  def edit: ElevationRange => Result[ElevationRange] = er =>
-    (er, airMass, hourAngle) match {
-      case (a@AirMass(_, _),   Some(am), None    ) => am.edit(a)
-      case (_,                 Some(am), None    ) => am.create
-      case (h@HourAngle(_, _), None,     Some(hr)) => hr.edit(h)
-      case (_,                 None,     Some(hr)) => hr.create
-      case (_,                 None,     None    ) => Result(er)
-      case (_,                 Some(_),  Some(_) ) => OnlyOneFailure
-    }
-
 }
 
 object ElevationRangeInput {
 
+  val Default: ElevationRangeInput =
+    ElevationRangeInput(
+      AirMassRangeInput.Default.some,
+      none
+    )
+
   private def OnlyOneFailure[A]: Result[A] =
     Result.failure[A]("Only one of airMass or hourAngle may be specified.")
 
-  val SimpleBinding: Matcher[ElevationRangeInput] =
+  val Binding: Matcher[ElevationRangeInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        AirMassRangeInput.SimpleBinding.Option("airMass", rAir),
-        HourAngleRangeInput.SimpleBinding.Option("hourAngle", rHour)
-      ) => (rAir, rHour).parMapN(ElevationRangeInput(_, _))
+        AirMassRangeInput.Binding.Option("airMass", rAir),
+        HourAngleRangeInput.Binding.Option("hourAngle", rHour)
+      ) => (rAir, rHour).parMapN(ElevationRangeInput(_, _)).flatMap {
+        case ElevationRangeInput(Some(_), Some(_)) => OnlyOneFailure[ElevationRangeInput]
+        case other                                 => Result(other)
+      }
     }
-
-  val CreateBinding: Matcher[ElevationRange] =
-    SimpleBinding.rmap(_.create)
-
-  val EditBinding: Matcher[ElevationRange => Result[ElevationRange]] =
-    SimpleBinding.map(_.edit)
 
 }

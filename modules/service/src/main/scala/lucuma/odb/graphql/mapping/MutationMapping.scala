@@ -4,16 +4,18 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.data.Ior
+import cats.data.NonEmptyChain
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
-import cats.syntax.all._
+import cats.syntax.all.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
+import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
+import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -97,7 +99,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child)=>
       observationService.use { svc =>
         import ObservationService.CreateResult._
-        svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
+        svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map {
+          case BadInput(problems)  => Ior.left(NonEmptyChain.fromNonEmptyList(problems))
           case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
           case Success(id)         => Result(Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
         }
@@ -153,7 +156,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       }
     }
 
-  private val UpdateObservations =
+  private val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.Binding) { (input, child) =>
 
       // Predicate for selecting programs to update
@@ -174,12 +177,15 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           "Could not construct a subquery for the provided WHERE condition."
         )
 
-      idSelect.traverse { which =>
+      import ObservationService.UpdateResult._
+
+      idSelect.flatTraverse { which =>
         observationService.use { svc =>
           svc
             .updateObservations(input.SET, which)
-            .map { lst =>
-              Filter(ObservationPredicates.inObservationIds(lst), child)
+            .map {
+              case BadInput(ps) => Ior.left(NonEmptyChain.fromNonEmptyList(ps))
+              case Success(lst) => Result(Filter(ObservationPredicates.inObservationIds(lst), child))
             }
         }
       }
