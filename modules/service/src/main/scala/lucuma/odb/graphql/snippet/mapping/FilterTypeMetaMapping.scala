@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table.ObservationView
-
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.snippet.table.FilterTypeTable
+
+import table.ObservationView
 
 trait FilterTypeMetaMapping[F[_]]
   extends FilterTypeTable[F] { this: SkunkMapping[F] =>

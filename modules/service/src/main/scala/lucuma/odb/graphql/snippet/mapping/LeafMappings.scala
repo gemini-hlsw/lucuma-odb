@@ -10,26 +10,26 @@ import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.Encoder
+import io.circe.Json
 import io.circe.refined._
-import lucuma.core.model.Program
-import lucuma.core.model.User
-import lucuma.odb.data.Existence
-import lucuma.odb.data.UserType
-import lucuma.odb.data.ProgramUserRole
-import lucuma.core.model.Partner
-import lucuma.odb.data.ObsStatus
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.core.model.Observation
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.enums.EphemerisKeyType
-import lucuma.core.model.Target
-import io.circe.Encoder
 import lucuma.core.math.Epoch
-import io.circe.Json
+import lucuma.core.model.Observation
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ObsActiveStatus
+import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
+import lucuma.odb.data.UserType
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 

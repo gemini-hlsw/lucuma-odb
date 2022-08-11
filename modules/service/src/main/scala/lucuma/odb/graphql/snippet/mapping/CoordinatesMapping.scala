@@ -5,8 +5,9 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table.ObservationView
 import edu.gemini.grackle.skunk.SkunkMapping
+
+import table.ObservationView
 
 trait CoordinatesMapping[F[_]]
   extends ObservationView[F] { this: SkunkMapping[F] =>

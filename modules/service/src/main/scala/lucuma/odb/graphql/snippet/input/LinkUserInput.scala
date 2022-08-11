@@ -6,10 +6,10 @@ package snippet
 package input
 
 import cats.syntax.all._
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.odb.service.ProgramService.LinkUserRequest
-import lucuma.odb.service.ProgramService
 import edu.gemini.grackle.Result
+import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.service.ProgramService
+import lucuma.odb.service.ProgramService.LinkUserRequest
 
 object LinkUserInput {
 

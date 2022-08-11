@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package snippet
 package mapping
 
-import table.ObservationView
-
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.snippet.table.PartnerTable
+
+import table.ObservationView
 
 trait PartnerMetaMapping[F[_]]
   extends PartnerTable[F] { this: SkunkMapping[F] =>

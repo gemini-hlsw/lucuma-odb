@@ -5,10 +5,11 @@ package lucuma.odb.graphql.snippet.mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import io.circe.Encoder
-import java.time.Duration
 import lucuma.core.model.Program
 import lucuma.odb.graphql.snippet.table.AllocationTable
 import lucuma.odb.graphql.snippet.table.ProgramTable
+
+import java.time.Duration
 
 trait NonNegDurationMapping[F[_]]
   extends AllocationTable[F]

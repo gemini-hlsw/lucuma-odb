@@ -10,6 +10,7 @@ import cats.effect.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -19,28 +20,28 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.User
+import lucuma.odb.graphql.snippet.input.CreateObservationInput
 import lucuma.odb.graphql.snippet.input.CreateProgramInput
+import lucuma.odb.graphql.snippet.input.CreateTargetInput
+import lucuma.odb.graphql.snippet.input.LinkUserInput
+import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.snippet.input.SetAllocationInput
+import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
 import lucuma.odb.graphql.snippet.input.UpdateProgramsInput
-import lucuma.odb.graphql.snippet.predicates.ProgramPredicates
 import lucuma.odb.graphql.snippet.predicates.ObservationPredicates
+import lucuma.odb.graphql.snippet.predicates.ProgramPredicates
+import lucuma.odb.graphql.snippet.predicates.TargetPredicates
+import lucuma.odb.graphql.util.Bindings.Matcher
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
-import lucuma.odb.service.ProgramService
-import skunk.AppliedFragment
-import scala.reflect.ClassTag
-import lucuma.odb.graphql.util.Bindings.Matcher
-import lucuma.odb.graphql.snippet.input.LinkUserInput
-import edu.gemini.grackle.Path.UniquePath
-import lucuma.odb.graphql.snippet.input.SetAllocationInput
 import lucuma.odb.service.AllocationService
-import org.tpolecat.typename.TypeName
-import lucuma.odb.graphql.snippet.input.CreateObservationInput
 import lucuma.odb.service.ObservationService
-import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
-import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
-import lucuma.odb.graphql.snippet.input.CreateTargetInput
+import lucuma.odb.service.ProgramService
 import lucuma.odb.service.TargetService
-import lucuma.odb.graphql.snippet.predicates.TargetPredicates
+import org.tpolecat.typename.TypeName
+import skunk.AppliedFragment
+
+import scala.reflect.ClassTag
 
 trait MutationMapping[F[_]: MonadCancelThrow]
   extends ProgramPredicates[F]

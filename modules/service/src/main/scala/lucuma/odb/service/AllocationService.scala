@@ -9,17 +9,17 @@ import cats.syntax.all._
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.snippet.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.codec.temporal.interval
 import skunk.implicits._
 
 import java.time.Duration
-import lucuma.odb.graphql.snippet.input.SetAllocationInput
-import lucuma.core.model.Partner
 
 trait AllocationService[F[_]] {
   def setAllocation(input: SetAllocationInput): F[AllocationService.SetAllocationResponse]
