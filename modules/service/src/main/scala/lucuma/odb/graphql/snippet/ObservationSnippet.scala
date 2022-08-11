@@ -7,6 +7,7 @@ package snippet
 import cats.effect.Sync
 import cats.effect.kernel.Resource
 import cats.syntax.all._
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path.ListPath
 import edu.gemini.grackle.Path.UniquePath
@@ -39,6 +40,7 @@ import lucuma.odb.service.ObservationService.CreateResult.NotAuthorized
 import lucuma.odb.service.ObservationService.CreateResult.Success
 import lucuma.odb.util.Codecs._
 import natchez.Trace
+import skunk.AppliedFragment
 import skunk.Session
 
 object ObservationSnippet {
@@ -49,25 +51,42 @@ object ObservationSnippet {
     user:   User
   ): m.Snippet = {
 
-    import m.{ ColumnRef, TableDef, ObjectMapping, Join, Snippet, SqlField, SqlObject, Mutation, MutationCompanionOps, SqlRoot, LeafMapping, col, schema }
+    import m.ColumnRef
+    import m.Join
+    import m.LeafMapping
+    import m.MappedQuery
+    import m.Mutation
+    import m.MutationCompanionOps
+    import m.ObjectMapping
+    import m.Snippet
+    import m.SqlField
+    import m.SqlObject
+    import m.SqlRoot
+    import m.TableDef
+    import m.col
+    import m.schema
 
     // The types that we're going to map.
-    val QueryType           = schema.ref("Query")
-    val MutationType        = schema.ref("Mutation")
-    val ObservationType     = schema.ref("Observation")
-    val ObservationIdType   = schema.ref("ObservationId")
-    val ObsStatusType       = schema.ref("ObsStatus")
-    val ObsActiveStatusType = schema.ref("ObsActiveStatus")
-    val CreateObservationResultType  = schema.ref("CreateObservationResult")
+    val QueryType             = schema.ref("Query")
+    val MutationType          = schema.ref("Mutation")
+    val ObservationType       = schema.ref("Observation")
+    val ObservationIdType     = schema.ref("ObservationId")
+    val ObsStatusType         = schema.ref("ObsStatus")
+    val ObsActiveStatusType   = schema.ref("ObsActiveStatus")
 
-    val ConstraintSetType   = schema.ref("ConstraintSet")
-    val CloudExtinctionType = schema.ref("CloudExtinction")
-    val ImageQualityType    = schema.ref("ImageQuality")
-    val SkyBackgroundType   = schema.ref("SkyBackground")
-    val WaterVaporType      = schema.ref("WaterVapor")
-    val ElevationRangeType  = schema.ref("ElevationRange")
-    val AirMassRangeType    = schema.ref("AirMassRange")
-    val HourAngleRangeType  = schema.ref("HourAngleRange")
+    val TargetEnvironmentType = schema.ref("TargetEnvironment")
+    val CoordinatesType       = schema.ref("Coordinates")
+
+    val ConstraintSetType     = schema.ref("ConstraintSet")
+    val CloudExtinctionType   = schema.ref("CloudExtinction")
+    val ImageQualityType      = schema.ref("ImageQuality")
+    val SkyBackgroundType     = schema.ref("SkyBackground")
+    val WaterVaporType        = schema.ref("WaterVapor")
+    val ElevationRangeType    = schema.ref("ElevationRange")
+    val AirMassRangeType      = schema.ref("AirMassRange")
+    val HourAngleRangeType    = schema.ref("HourAngleRange")
+
+    val CreateObservationResultType  = schema.ref("CreateObservationResult")
 
     val pool = dbPool.map(ObservationService.fromSessionAndUser(_, user))
 
@@ -93,6 +112,10 @@ object ObservationSnippet {
           case Ngo => ???
           case Staff | Admin | Service => True
         }
+
+      def isWritableBy(user: User): Predicate =
+        isVisibleTo(user)
+
     }
 
     // Column references for our mapping.
@@ -104,6 +127,13 @@ object ObservationSnippet {
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
       val Status: ColumnRef       = col("c_status",              obs_status)
       val ActiveStatus: ColumnRef = col("c_active_status",       obs_active_status)
+
+      object TargetEnvironment {
+        object Coordinates {
+          val SyntheticId: ColumnRef = col("c_explicit_base_id",  observation_id.embedded)
+        }
+      }
+
       object ConstraintSet {
         val CloudExtinction: ColumnRef = col("c_cloud_extinction", cloud_extinction.embedded)
         val ImageQuality: ColumnRef    = col("c_image_quality",    image_quality.embedded)
@@ -129,6 +159,13 @@ object ObservationSnippet {
       val Id: ColumnRef = col("c_program_id", program_id)
     }
 
+    // TBD
+//    object AsterismTargetTable extends TableDef("t_asterism_target") {
+//      val ProgramId: ColumnRef     = col("c_program_id",     program_id)
+//      val ObservationId: ColumnRef = col("c_observation_id", observation_id)
+//      val TargetId: ColumnRef      = col("c_target_id",      target_id)
+//    }
+
     def uniqueObservationNoFiltering(id: Observation.Id, child: Query): Query =
       Unique(Filter(Predicates.hasObservationId(id), child))
 
@@ -147,42 +184,36 @@ object ObservationSnippet {
         }
       }
 
-    // TODO: probably delete
-//    val updateObservationsOneByOne: Mutation =
-//      Mutation.simple { (child, env) =>
-//        env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
-//          pool.use { svc =>
-//
-//            val updateResults: F[List[(Observation.Id, UpdateResult[Observation.Id])]] =
-//              input.WHERE.toList.flatten.traverse { oid =>
-//                svc.updateObservation(oid, input.SET).tupleLeft(oid)
-//              }
-//
-//            updateResults.map { lst =>
-//              lst.foldLeft(List.empty[Observation.Id].rightIor[String].toIorNes) {
-//                case (ior, (_, UpdateResult.NothingToBeDone)) => ior.addLeft(NonEmptySet.one("No updates specified."))
-//                case (ior, (oid, UpdateResult.NoSuchObject )) => ior.addLeft(NonEmptySet.one(s"Observation $oid does not exist or is not editable by user ${user.id}."))
-//                case (ior, (_,   UpdateResult.Success(oid) )) => ior.addRight(List(oid))
-//              }.bimap(
-//                ms  => NonEmptyChain.fromNonEmptyList(ms.toNonEmptyList.map(m => Problem(m))),
-//                oids => observationListNoFiltering(oids, child))
-//            }
-//          }
-//        }
-//      }
-
-    // TODO: This seems closer to what we want than the one-by-one approach above?
     val updateObservations: Mutation =
       Mutation.simple { (child, env) =>
         env.getR[UpdateObservationsInput]("input").flatTraverse { input =>
-          pool.use { svc =>
-            svc
-              .updateObservations(input.WHERE.toList.flatten, input.SET)
-              .map {
-                case UpdateResult.NothingToBeDone => Result.failure("No updates specified.")
-                case UpdateResult.NoSuchObject    => Result.failure(s"No matching editable observations for user ${user.id}")
-                case UpdateResult.Success(ids)    => Result(observationListNoFiltering(ids, child))
-              }
+
+          // Predicate for selecting programs to update
+          val filterPredicate: Predicate = and(List(
+            Predicates.isWritableBy(user),
+            Predicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True)
+          ))
+
+          // An applied fragment that selects all program ids that satisfy
+          // `filterPredicate`
+          val idSelect: Result[AppliedFragment] =
+            Result.fromOption(
+              MappedQuery(
+                Filter(filterPredicate, Select("id", Nil, Query.Empty)),
+                Cursor.Context(ObservationType)
+              ).map(_.fragment),
+              "Could not construct a subquery for the provided WHERE condition."
+            )
+
+          idSelect.traverse { which =>
+            pool.use { svc =>
+              svc
+                .updateObservations(input.SET, which)
+                .map { lst =>
+                  Filter(Predicates.inObservationIds(lst), child)
+                }
+            }
           }
         }
       }
@@ -198,9 +229,25 @@ object ObservationSnippet {
             SqlField("subtitle", ObservationView.Subtitle),
             SqlField("status", ObservationView.Status),
             SqlField("activeStatus", ObservationView.ActiveStatus),
+            SqlObject("targetEnvironment"),
             SqlObject("constraintSet"),
             SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
           ),
+        ),
+        ObjectMapping(
+          tpe = TargetEnvironmentType,
+          fieldMappings = List(
+            SqlField("id", ObservationView.Id, key = true, hidden = true),
+            SqlObject("explicitBase")
+          )
+        ),
+        ObjectMapping(
+          tpe = CoordinatesType,
+          fieldMappings = List(
+            SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
+            SqlObject("ra"),
+            SqlObject("dec")
+          )
         ),
         ObjectMapping(
           tpe = ConstraintSetType,
