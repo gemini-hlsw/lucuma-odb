@@ -11,6 +11,7 @@ import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.Predicate._
+import lucuma.odb.graphql.snippet.predicates.ObservationPredicates
 import lucuma.odb.graphql.snippet.predicates.ProgramPredicates
 import scala.reflect.ClassTag
 import lucuma.odb.graphql.util.Bindings._
@@ -20,10 +21,12 @@ import lucuma.odb.graphql.snippet.input.WhereProgram
 import cats.syntax.all._
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.snippet.input.WhereObservation
 
 trait QueryMapping[F[_]]
-  extends ProgramPredicates[F]
-{ this: SkunkMapping[F] =>
+  extends ObservationPredicates[F]
+     with ProgramPredicates[F]
+ { this: SkunkMapping[F] =>
 
   lazy val QueryType = schema.ref("Query")
 
@@ -31,6 +34,8 @@ trait QueryMapping[F[_]]
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
+        SqlRoot("observation"),
+        SqlRoot("observations"),
         SqlRoot("program"),
         SqlRoot("programs"),
       )
@@ -43,6 +48,48 @@ trait QueryMapping[F[_]]
     ).foldMap(pf => Map(QueryType -> pf))
 
   def user: User
+
+  private val Observation: PartialFunction[Select, Result[Query]] =
+    case Select("observation", List(
+      ObservationIdBinding("observationId", rOid)
+    ), child) =>
+      rOid.map { oid =>
+        Select("observation", Nil,
+          Unique(
+            Filter(
+              And(
+                ObservationPredicates.hasObservationId(oid),
+                ObservationPredicates.isVisibleTo(user)
+              ),
+              child
+            )
+          )
+        )
+      }
+
+  private val Observations: PartialFunction[Select, Result[Query]] =
+    case Select("observations", List(
+      WhereObservation.Binding.Option("WHERE", rWHERE),
+      ObservationIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    ), child) =>
+      (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+        Select("observations", Nil,
+          Limit(
+            LIMIT.foldLeft(1000)(_ min _.value),  // TODO: we need a common place for the max limit
+            Filter(
+              And.all(
+                OFFSET.map(oid => GtEql(UniquePath(List("id")), Const(oid))).getOrElse(True),
+                ObservationPredicates.includeDeleted(includeDeleted),
+                ObservationPredicates.isVisibleTo(user),
+                WHERE.getOrElse(True)
+              ),
+              child
+            )
+          )
+        )
+      }
 
   private val Program: PartialFunction[Select, Result[Query]] =
     case Select("program", List(
