@@ -10,7 +10,7 @@ val http4sEmberVersion         = "0.23.14"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.2.11"
 val log4catsVersion            = "2.4.0"
-val lucumaGraphQLRoutesVersion = "0.5.1"
+val lucumaGraphQLRoutesVersion = "0.5.0-5-69e5df1-20220811T154208Z-SNAPSHOT"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val natchezHttp4sVersion       = "0.3.2"
@@ -22,7 +22,7 @@ val testcontainersScalaVersion = "0.40.10"
 
 enablePlugins(NoPublishPlugin)
 
-ThisBuild / Test / fork := true
+ThisBuild / Test / fork := false
 ThisBuild / scalaVersion       := "3.1.3"
 ThisBuild / crossScalaVersions := Seq("3.1.3")
 

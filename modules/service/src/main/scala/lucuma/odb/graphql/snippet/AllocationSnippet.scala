@@ -56,24 +56,24 @@ object AllocationSnippet {
       val Duration = col("c_duration", interval)
     }
 
-    val setAllocation: Mutation =
-      Mutation.simple { (child, env) =>
-        ( env.get[Program.Id]("programId"),
-          env.get[Tag]("partner"),
-          env.get[Duration]("duration")
-        ).mapN { (pid, p, d) =>
-          pool.use(_.setAllocation(pid, p, d)).map[Result[Query]] {
-            case NotAuthorized(user)      => Result.failure(s"User ${user.id} is not authorized to perform this action")
-            case PartnerNotFound(_) => ???
-            case ProgramNotFound(_)     => ???
-            case Success                  =>
-              Result(Unique(Filter(And(
-                Eql(UniquePath(List("programId")), Const(pid)),
-                Eql(UniquePath(List("partner")), Const(p)),
-              ), child)))
-          }
-        } getOrElse Result.failure(s"Implementation error: expected 'programId', 'partner', and 'duration' in $env.").pure[F].widen
-      }
+    val setAllocation: Mutation = ???
+      // Mutation.simple { (child, env) =>
+      //   ( env.get[Program.Id]("programId"),
+      //     env.get[Tag]("partner"),
+      //     env.get[Duration]("duration")
+      //   ).mapN { (pid, p, d) =>
+      //     pool.use(_.setAllocation(pid, p, d)).map[Result[Query]] {
+      //       case NotAuthorized(user)      => Result.failure(s"User ${user.id} is not authorized to perform this action")
+      //       case PartnerNotFound(_) => ???
+      //       case ProgramNotFound(_)     => ???
+      //       case Success                  =>
+      //         Result(Unique(Filter(And(
+      //           Eql(UniquePath(List("programId")), Const(pid)),
+      //           Eql(UniquePath(List("partner")), Const(p)),
+      //         ), child)))
+      //     }
+      //   } getOrElse Result.failure(s"Implementation error: expected 'programId', 'partner', and 'duration' in $env.").pure[F].widen
+      // }
 
     val typeMappings =
       List(

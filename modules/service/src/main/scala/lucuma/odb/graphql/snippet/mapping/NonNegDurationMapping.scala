@@ -7,10 +7,12 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import io.circe.Encoder
 import java.time.Duration
 import lucuma.core.model.Program
+import lucuma.odb.graphql.snippet.table.AllocationTable
 import lucuma.odb.graphql.snippet.table.ProgramTable
 
 trait NonNegDurationMapping[F[_]]
-  extends ProgramTable[F] { this: SkunkMapping[F] =>
+  extends AllocationTable[F]
+     with ProgramTable[F] { this: SkunkMapping[F] =>
 
   lazy val NonNegDurationType = schema.ref("NonNegDuration")
 
@@ -19,20 +21,22 @@ trait NonNegDurationMapping[F[_]]
       tpe = NonNegDurationType,
       mappings = List(
         // Program
-        List("plannedTime", "pi")        -> nonNegDurationMapping(ProgramTable.Id, ProgramTable.PlannedTime.Pi),
-        List("plannedTime", "uncharged") -> nonNegDurationMapping(ProgramTable.Id, ProgramTable.PlannedTime.Uncharged),
-        List("plannedTime", "execution") -> nonNegDurationMapping(ProgramTable.Id, ProgramTable.PlannedTime.Execution),
+        List("plannedTime", "pi")        -> nonNegDurationMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
+        List("plannedTime", "uncharged") -> nonNegDurationMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
+        List("plannedTime", "execution") -> nonNegDurationMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
+        // Allocation
+        List("duration") -> nonNegDurationMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
       ),
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Duration => A): CursorField[A] =
     CursorField[A](name, c => c.fieldAs[Duration]("value").map(f), List("value"))
 
-  private def nonNegDurationMapping(key: ColumnRef, data: ColumnRef): ObjectMapping =
+  private def nonNegDurationMapping(data: ColumnRef)(keys: ColumnRef*): ObjectMapping =
     ObjectMapping(
       tpe = NonNegDurationType,
-      fieldMappings = List(
-        SqlField("id", ProgramTable.Id, key = true, hidden = true),
+      fieldMappings =
+        keyFields(keys: _*) ++ List(
         SqlField("value", data, hidden = true),
         valueAs("microseconds")(d => d.toMillis * 1000L),
         valueAs("milliseconds")(d => BigDecimal(d.toMillis)),
@@ -42,5 +46,10 @@ trait NonNegDurationMapping[F[_]]
         valueAs("iso")(d => d.toString),
       ),
     )
+
+  private def keyFields(keys: ColumnRef*): List[FieldMapping] =
+    keys.toList.zipWithIndex.map { (col, n) =>
+      SqlField(s"key_$n", col, key = true, hidden = true)
+    }
 
 }
