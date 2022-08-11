@@ -38,10 +38,14 @@ import lucuma.odb.graphql.snippet.input.CreateObservationInput
 import lucuma.odb.service.ObservationService
 import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
 import lucuma.odb.graphql.snippet.input.UpdateObservationsInput
+import lucuma.odb.graphql.snippet.input.CreateTargetInput
+import lucuma.odb.service.TargetService
+import lucuma.odb.graphql.snippet.predicates.TargetPredicates
 
 trait MutationMapping[F[_]: MonadCancelThrow]
   extends ProgramPredicates[F]
      with ObservationPredicates[F]
+     with TargetPredicates[F]
      with MutationCompanionOps[F]
   { this: SkunkMapping[F] =>
 
@@ -51,6 +55,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     List(
       CreateObservation,
       CreateProgram,
+      CreateTarget,
       LinkUser,
       SetAllocation,
       UpdateObservations,
@@ -67,6 +72,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   def allocationService: Resource[F, AllocationService[F]]
   def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
+  def targetService: Resource[F, TargetService[F]]
   def user: User
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
@@ -86,13 +92,6 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   // Field definitions
 
-  private val CreateProgram =
-    MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
-      programService.use(_.insertProgram(input.SET.name)).map { id =>
-        Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
-      }
-    }
-
   private val CreateObservation =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child)=>
       observationService.use { svc =>
@@ -100,6 +99,25 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.DefaultCreate)).map {
           case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
           case Success(id)         => Result(Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
+        }
+      }
+    }
+
+  private val CreateProgram =
+    MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
+      programService.use(_.insertProgram(input.SET.name)).map { id =>
+        Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
+      }
+    }
+
+  private val CreateTarget =
+    MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
+      targetService.use { ts =>
+        import TargetService.CreateTargetResponse._
+        ts.createTarget(input.programId, input.SET).map {
+          case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
+          case Success(id)          => Result(Unique(Filter(TargetPredicates.hasTargetId(id), child)))
         }
       }
     }

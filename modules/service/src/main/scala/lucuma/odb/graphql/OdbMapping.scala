@@ -32,6 +32,7 @@ import scala.io.Source
 import lucuma.odb.service.AllocationService
 import org.checkerframework.checker.units.qual.s
 import lucuma.odb.service.ObservationService
+import lucuma.odb.service.TargetService
 
 object OdbMapping {
 
@@ -76,6 +77,7 @@ object OdbMapping {
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
+          with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
@@ -93,6 +95,7 @@ object OdbMapping {
           with ProperMotionRAMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
+          with RightAscensionMapping[F]
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
           with SubscriptionMapping[F]
@@ -110,6 +113,7 @@ object OdbMapping {
           val allocationService  = pool.map(AllocationService.fromSessionAndUser(_, user))
           val observationService = pool.map(ObservationService.fromSessionAndUser(_, user))
           val programService     = pool.map(ProgramService.fromSessionAndUser(_, user))
+          val targetService      = pool.map(TargetService.fromSession(_, user))
 
           // Our combined type mappings
           val typeMappings: List[TypeMapping] =
@@ -122,6 +126,7 @@ object OdbMapping {
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
+              DeclinationMapping,
               ElevationRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
@@ -138,6 +143,7 @@ object OdbMapping {
               ProperMotionRAMapping,
               QueryMapping,
               RadialVelocityMapping,
+              RightAscensionMapping,
               SetAllocationResultMapping,
               SiderealMapping,
               SubscriptionMapping,

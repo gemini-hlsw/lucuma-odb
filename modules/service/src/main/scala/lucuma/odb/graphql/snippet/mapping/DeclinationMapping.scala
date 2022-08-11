@@ -5,7 +5,7 @@ package lucuma.odb.graphql.snippet
 package mapping
 
 import edu.gemini.grackle.sql.SqlMapping
-import lucuma.core.math.RightAscension
+import lucuma.core.math.Declination
 import io.circe
 import scala.reflect.ClassTag
 import cats.syntax.all._
@@ -21,38 +21,37 @@ import table.TargetView
 import lucuma.odb.graphql.util.MappingExtras
 import lucuma.odb.graphql.snippet.table.ObservationView
 
-trait RightAscensionMapping[F[_]]
+trait DeclinationMapping[F[_]]
   extends ObservationView[F]
      with TargetView[F]
      with MappingExtras[F]
   { this: SkunkMapping[F]  =>
 
-  lazy val RightAscensionType = schema.ref("RightAscension")
+  lazy val DeclinationType = schema.ref("Declination")
 
-  private def rightAscensionMapping(
+  private def declinationMapping(
     idColumn:    ColumnRef,
     valueColumn: ColumnRef
   ): ObjectMapping =
     ObjectMapping(
-      tpe = RightAscensionType,
+      tpe = DeclinationType,
       fieldMappings = List(
         SqlField("synthetic_id", idColumn, key = true, hidden = true),
         SqlField("value", valueColumn, hidden = true),
-        FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),
-        FieldRef[RightAscension]("value").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
-        FieldRef[RightAscension]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-        FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
+        FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
+        FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+        FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
       )
     )
 
-  lazy val RightAscensionMapping =
+  lazy val DeclinationMapping =
     PrefixedMapping(
-      tpe = RightAscensionType,
+      tpe = DeclinationType,
       mappings = List(
         // Observation
-        // List("explicitBase", "ra") -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
+        // List("explicitBase", "dec") -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
         // Target
-        List("sidereal", "ra") -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra)
+        List("sidereal", "dec") -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec)
       )
     )
 
