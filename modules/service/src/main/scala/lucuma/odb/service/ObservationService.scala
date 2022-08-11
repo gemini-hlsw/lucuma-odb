@@ -7,7 +7,8 @@ import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.all.*
 import edu.gemini.grackle.Predicate
-import eu.timepit.refined.types.numeric.{NonNegInt, PosBigDecimal}
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
