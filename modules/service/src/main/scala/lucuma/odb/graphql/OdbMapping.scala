@@ -6,34 +6,35 @@ package lucuma.odb.graphql
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Applicative
-import cats.data.NonEmptyList
-import cats.effect.{Unique => _, _}
-import cats.effect.std.Supervisor
 import cats.Monoid
+import cats.data.NonEmptyList
+import cats.effect.std.Supervisor
+import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
-import edu.gemini.grackle._
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
+import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
+import lucuma.odb.graphql.snippet.enums.PartnerEnumType
 import lucuma.odb.graphql.snippet.mapping._
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
+import lucuma.odb.service.AllocationService
+import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.TargetService
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
+
 import scala.io.AnsiColor
 import scala.io.Source
-import lucuma.odb.service.AllocationService
-import org.checkerframework.checker.units.qual.s
-import lucuma.odb.service.ObservationService
-import lucuma.odb.service.TargetService
-import lucuma.odb.graphql.snippet.enums.PartnerEnumType
+import lucuma.odb.graphql.snippet.enums.FilterTypeEnumType
 
 object OdbMapping {
 
@@ -80,6 +81,7 @@ object OdbMapping {
           with CreateTargetResultMapping[F]
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
+          with FilterTypeMetaMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
@@ -130,6 +132,7 @@ object OdbMapping {
               CreateTargetResultMapping,
               DeclinationMapping,
               ElevationRangeMapping,
+              FilterTypeMetaMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
@@ -182,7 +185,7 @@ object OdbMapping {
     }
 
   def enumSchema[F[_]: Applicative](s: Session[F]): F[Schema] =
-    List(FilterTypeSnippet.enumType(s), PartnerEnumType.fetch(s)).sequence.map { tpes =>
+    List(FilterTypeEnumType.fetch(s), PartnerEnumType.fetch(s)).sequence.map { tpes =>
       new Schema {
         def pos: SourcePos = SourcePos.instance
         def types: List[NamedType] = tpes

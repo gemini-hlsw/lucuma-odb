@@ -36,6 +36,7 @@ trait QueryMapping[F[_]]
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
+        SqlRoot("filterTypeMeta"),
         SqlRoot("observation"),
         SqlRoot("observations"),
         SqlRoot("partnerMeta"),
@@ -46,6 +47,7 @@ trait QueryMapping[F[_]]
 
   lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
+      FilterTypeMeta,
       Observation,
       Observations,
       PartnerMeta,
@@ -54,6 +56,14 @@ trait QueryMapping[F[_]]
     ).foldMap(pf => Map(QueryType -> pf))
 
   def user: User
+
+  // Elaborators below
+
+  private val FilterTypeMeta: PartialFunction[Select, Result[Query]] =
+    case Select("filterTypeMeta", Nil, child) =>
+      Result(Select("filterTypeMeta", Nil,
+        OrderBy(OrderSelections(List(OrderSelection(UniquePath[Tag](List("tag"))))), child)
+      ))
 
   private val Observation: PartialFunction[Select, Result[Query]] =
     case Select("observation", List(

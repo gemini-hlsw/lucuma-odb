@@ -42,6 +42,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val EphemerisKeyTypeType  = schema.ref("EphemerisKeyType")
   lazy val EpochStringType       = schema.ref("EpochString")
   lazy val ExistenceType         = schema.ref("Existence")
+  lazy val FilterTypeType        = schema.ref("FilterType")
   lazy val HmsStringType         = schema.ref("HmsString")
   lazy val HourAngleRangeType    = schema.ref("HourAngleRange")
   lazy val ImageQualityType      = schema.ref("ImageQuality")
@@ -69,6 +70,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[Existence](ExistenceType),
+      LeafMapping[Tag](FilterTypeType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Long](LongType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
