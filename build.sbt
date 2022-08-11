@@ -22,7 +22,8 @@ val testcontainersScalaVersion = "0.40.10"
 
 enablePlugins(NoPublishPlugin)
 
-ThisBuild / Test / fork := true
+ThisBuild / Test / fork := false
+ThisBuild / Test / parallelExecution := false
 ThisBuild / scalaVersion       := "3.1.3"
 ThisBuild / crossScalaVersions := Seq("3.1.3")
 

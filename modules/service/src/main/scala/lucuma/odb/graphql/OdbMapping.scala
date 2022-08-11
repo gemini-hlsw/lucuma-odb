@@ -6,19 +6,29 @@ package lucuma.odb.graphql
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Applicative
+import cats.Monoid
 import cats.data.NonEmptyList
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
+import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
+import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.odb.graphql.snippet._
+import lucuma.odb.graphql.snippet.enums.FilterTypeEnumType
+import lucuma.odb.graphql.snippet.enums.PartnerEnumType
+import lucuma.odb.graphql.snippet.mapping._
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
+import lucuma.odb.service.AllocationService
+import lucuma.odb.service.ObservationService
+import lucuma.odb.service.ProgramService
+import lucuma.odb.service.TargetService
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
@@ -49,39 +59,117 @@ object OdbMapping {
     finally src.close()
   }
 
+  private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
+    Monoid.instance(PartialFunction.empty, _ orElse _)
+
   def apply[F[_]: Sync: Trace: Logger](
     database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
-    user:     User,
-    topics:   Topics[F],
+    user0:     User,
+    topics0:   Topics[F],
   ):  F[Mapping[F]] =
-    Trace[F].span(s"Creating mapping for ${user.displayName} (${user.id}, ${user.role})") {
+    Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
-        val m: Mapping[F] =
-          new SkunkMapping[F](database, monitor)
-            with SnippetMapping[F]
-            with ComputeMapping[F]
-            with MappingExtras[F]
-            with MutationCompanionOps[F] {
+        new SkunkMapping[F](database, monitor) with SnippetMapping
+          with AirMassRangeMapping[F]
+          with AllocationMapping[F]
+          with CatalogInfoMapping[F]
+          with ConstraintSetMapping[F]
+          with CoordinatesMapping[F]
+          with CreateObservationResultMapping[F]
+          with CreateProgramResultMapping[F]
+          with CreateTargetResultMapping[F]
+          with DeclinationMapping[F]
+          with ElevationRangeMapping[F]
+          with FilterTypeMetaMapping[F]
+          with LeafMappings[F]
+          with LinkUserResultMapping[F]
+          with MutationMapping[F]
+          with NonNegDurationMapping[F]
+          with NonsiderealMapping[F]
+          with ObservationMapping[F]
+          with ParallaxMapping[F]
+          with PartnerMetaMapping[F]
+          with PlannedTimeSummaryMapping[F]
+          with ProgramEditMapping[F]
+          with ProgramMapping[F]
+          with ProgramUserMapping[F]
+          with ProperMotionDeclinationMapping[F]
+          with ProperMotionMapping[F]
+          with ProperMotionRAMapping[F]
+          with QueryMapping[F]
+          with RadialVelocityMapping[F]
+          with RightAscensionMapping[F]
+          with SetAllocationResultMapping[F]
+          with SiderealMapping[F]
+          with SubscriptionMapping[F]
+          with TargetEnvironmentMapping[F]
+          with TargetMapping[F]
+          with UserMapping[F]
+        {
 
+          // Our schema
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
-          val snippet: Snippet =
-            NonEmptyList.of(
-              BaseSnippet(this),
-              FilterTypeSnippet(this),
-              PartnerSnippet(this),
-              UserSnippet(this),
-              ProgramSnippet(this, database, user, topics),
-              AllocationSnippet(this, database, user),
-              SharedTargetSnippet(this),
-              ObservationSnippet(this, database, user),
-              TargetSnippet(this, database, user)
-            ).reduce
+          // Our services and resources needed by various mappings.
+          val user = user0
+          val topics = topics0
+          val allocationService  = pool.map(AllocationService.fromSessionAndUser(_, user))
+          val observationService = pool.map(ObservationService.fromSessionAndUser(_, user))
+          val programService     = pool.map(ProgramService.fromSessionAndUser(_, user))
+          val targetService      = pool.map(TargetService.fromSession(_, user))
 
-          val typeMappings = snippet.typeMappings
-          override val selectElaborator = snippet.selectElaborator
+          // Our combined type mappings
+          val typeMappings: List[TypeMapping] =
+            List(
+              AirMassRangeMapping,
+              AllocationMapping,
+              CatalogInfoMapping,
+              ConstraintSetMapping,
+              CoordinatesMapping,
+              CreateObservationResultMapping,
+              CreateProgramResultMapping,
+              CreateTargetResultMapping,
+              DeclinationMapping,
+              ElevationRangeMapping,
+              FilterTypeMetaMapping,
+              LinkUserResultMapping,
+              MutationMapping,
+              NonNegDurationMapping,
+              NonsiderealMapping,
+              ObservationMapping,
+              ParallaxMapping,
+              PartnerMetaMapping,
+              PlannedTimeSummaryMapping,
+              ProgramMapping,
+              ProgramEditMapping,
+              ProgramUserMapping,
+              ProperMotionDeclinationMapping,
+              ProperMotionMapping,
+              ProperMotionRAMapping,
+              QueryMapping,
+              RadialVelocityMapping,
+              RightAscensionMapping,
+              SetAllocationResultMapping,
+              SiderealMapping,
+              SubscriptionMapping,
+              TargetEnvironmentMapping,
+              TargetMapping,
+              UserMapping,
+            ) ++ LeafMappings
 
+          // Our combined select elaborator
+          override val selectElaborator: SelectElaborator =
+            SelectElaborator(
+              List(
+                MutationElaborator,
+                ProgramElaborator,
+                SubscriptionElaborator,
+                QueryElaborator,
+              ).combineAll
+            )
+
+          // Overide `fetch` to log the query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
@@ -93,13 +181,11 @@ object OdbMapping {
           }
 
         }
-        // m.validator.validateMapping().map(_.toErrorMessage).foreach(println)
-        m
       }
     }
 
   def enumSchema[F[_]: Applicative](s: Session[F]): F[Schema] =
-    List(FilterTypeSnippet.enumType(s), PartnerSnippet.enumType(s)).sequence.map { tpes =>
+    List(FilterTypeEnumType.fetch(s), PartnerEnumType.fetch(s)).sequence.map { tpes =>
       new Schema {
         def pos: SourcePos = SourcePos.instance
         def types: List[NamedType] = tpes
