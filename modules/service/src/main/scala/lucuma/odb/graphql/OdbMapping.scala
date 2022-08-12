@@ -70,7 +70,7 @@ object OdbMapping {
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
-        new SkunkMapping[F](database, monitor) with SnippetMapping
+        new SkunkMapping[F](database, monitor) with SchemaSemigroup
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with CatalogInfoMapping[F]

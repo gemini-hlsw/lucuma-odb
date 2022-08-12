@@ -18,39 +18,8 @@ import edu.gemini.grackle.Type
 import edu.gemini.grackle.TypeRef
 import org.tpolecat.sourcepos.SourcePos
 
-trait SnippetMapping[F[_]] extends Mapping[F] {
-
-  case class Snippet(
-    typeMappings: List[TypeMapping],
-    elaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] = Map.empty
-  ) {
-    def selectElaborator = new QueryCompiler.SelectElaborator(elaborator.map { case (k, v) =>
-      schema.ref(k).getOrElse(sys.error(s"Elaborator references type $k, which is not present in schema:\n$schema")) -> v
-    })
-  }
-
-  implicit val SemigroupSnippetData: Semigroup[Snippet] = (a, b) => {
-    Snippet(
-      concatAndMergeWhen(a.typeMappings, b.typeMappings)(sameName),
-     a.elaborator |+| b.elaborator
-    )
-  }
-
-  private implicit val SemigroupObjectMapping: Semigroup[ObjectMapping] = (a, b) =>
-    if (!sameName(a.tpe, b.tpe)) a else ObjectMapping(
-      a.tpe,
-      (a.fieldMappings ++ b.fieldMappings).distinctBy(_.fieldName)
-    )
-
-  private implicit val SemigroupTypeMapping: Semigroup[TypeMapping] = (a, b) =>
-    (a, b) match {
-      case (a: ObjectMapping, b: ObjectMapping) => a |+| b
-      case (a: LeafMapping[x], _: LeafMapping[y]) => a
-      case (a, b) => sys.error(s"Can't combine $a and $b")
-    }
-
-  private implicit def semigroupPartialFunction[A, B]: Semigroup[PartialFunction[A, B]] = (a, b) =>
-    a orElse b
+/** A mixin that provides Semigroup[Schema]. */
+trait SchemaSemigroup[F[_]] extends Mapping[F] {
 
   private implicit val SemigroupDirective: Semigroup[Directive] = (a, b) =>
     if (a.name != b.name) a
@@ -81,7 +50,6 @@ trait SnippetMapping[F[_]] extends Mapping[F] {
         val directives: List[Directive] = concatAndMergeWhen(a.directives, b.directives)(_.name == _.name)
       }
     }
-
 
   // elements in `left` merged with corresponding elements in `right`, when available, followed by unmatched elements in `right`.
   private def concatAndMergeWhen[A: Semigroup](left: List[A], right: List[A])(matches: (A, A) => Boolean): List[A] =

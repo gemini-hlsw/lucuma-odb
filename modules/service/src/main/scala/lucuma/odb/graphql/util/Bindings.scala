@@ -94,9 +94,6 @@ object Bindings {
   val ObjectBinding:          Matcher[ObjectValue] = primitiveBinding("Input") { case ov : ObjectValue        => ov }
   val ObjectFieldsBinding = ObjectBinding.map(_.fields)
 
-  val ObjectAsJsonBinding: Matcher[Json] =
-    ObjectBinding.emap(ValueAsJson.toJson)
-
   val DurationBinding: Matcher[Duration] =
     StringBinding.emap(s =>
       Either.catchOnly[DateTimeParseException](Duration.parse(s))
