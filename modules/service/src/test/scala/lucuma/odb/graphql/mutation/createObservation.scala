@@ -16,6 +16,7 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 
+@munit.IgnoreSuite // pending https://github.com/gemini-hlsw/lucuma-core/pull/569
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
