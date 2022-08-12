@@ -30,8 +30,8 @@ import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UpdateResult
-import lucuma.odb.graphql.snippet.input.ConstraintSetInput
-import lucuma.odb.graphql.snippet.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ConstraintSetInput
+import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
