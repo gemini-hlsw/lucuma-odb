@@ -19,6 +19,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.binding._
 
 import table._
 import input._

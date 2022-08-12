@@ -11,9 +11,7 @@ import edu.gemini.grackle.Predicate._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.odb.graphql.ObservationIdBinding
-import lucuma.odb.graphql.ProgramIdBinding
-import lucuma.odb.graphql.TargetIdBinding
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings.Matcher
 import lucuma.odb.graphql.util.Bindings.ObjectFieldsBinding
 

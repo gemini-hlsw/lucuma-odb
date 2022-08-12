@@ -11,6 +11,7 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 final case class SiderealInput(
