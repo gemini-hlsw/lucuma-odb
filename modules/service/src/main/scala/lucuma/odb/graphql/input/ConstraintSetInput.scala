@@ -13,6 +13,7 @@ import lucuma.core.enums.WaterVapor
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.optics.syntax.lens._
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.ConstraintSetInput.NominalConstraints
 import lucuma.odb.graphql.util.Bindings._
 

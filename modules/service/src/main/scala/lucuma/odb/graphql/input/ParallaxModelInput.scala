@@ -8,6 +8,7 @@ import cats.data.OptionT
 import cats.syntax.all._
 import edu.gemini.grackle.Result
 import lucuma.core.math.Parallax
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 object ParallaxModelInput {
