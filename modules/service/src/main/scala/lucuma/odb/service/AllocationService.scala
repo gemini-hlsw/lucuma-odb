@@ -13,7 +13,7 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.snippet.input.SetAllocationInput
+import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.codec.temporal.interval

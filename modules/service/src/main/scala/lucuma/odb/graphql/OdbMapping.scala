@@ -19,10 +19,10 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
 import lucuma.core.model.User
-import lucuma.odb.graphql.snippet._
-import lucuma.odb.graphql.snippet.enums.FilterTypeEnumType
-import lucuma.odb.graphql.snippet.enums.PartnerEnumType
-import lucuma.odb.graphql.snippet.mapping._
+import lucuma.odb.graphql._
+import lucuma.odb.graphql.enums.FilterTypeEnumType
+import lucuma.odb.graphql.enums.PartnerEnumType
+import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService

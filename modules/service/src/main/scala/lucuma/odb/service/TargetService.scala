@@ -19,9 +19,9 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.input.SiderealInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.instances.SourceProfileEncoder
-import lucuma.odb.graphql.snippet.input.SiderealInput
-import lucuma.odb.graphql.snippet.input.TargetPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Session
