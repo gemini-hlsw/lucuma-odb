@@ -15,7 +15,7 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.odb.data._
-import lucuma.odb.graphql.snippet.input.ProgramPropertiesInput
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._
