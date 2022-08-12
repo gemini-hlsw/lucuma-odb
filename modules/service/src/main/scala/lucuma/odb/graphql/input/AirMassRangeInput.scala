@@ -10,6 +10,7 @@ import cats.syntax.parallel._
 import edu.gemini.grackle.Result
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 final case class AirMassRangeInput(

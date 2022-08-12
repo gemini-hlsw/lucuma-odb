@@ -2,7 +2,6 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
-
 package mapping
 
 import cats.effect.MonadCancelThrow
@@ -20,6 +19,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.User
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput

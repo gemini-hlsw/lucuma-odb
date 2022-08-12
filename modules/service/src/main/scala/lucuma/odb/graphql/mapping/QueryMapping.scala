@@ -17,6 +17,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.predicates.ObservationPredicates
@@ -96,12 +97,12 @@ trait QueryMapping[F[_]]
           Limit(
             LIMIT.foldLeft(1000)(_ min _.value),  // TODO: we need a common place for the max limit
             Filter(
-              And.all(
+              and(List(
                 OFFSET.map(oid => GtEql(UniquePath(List("id")), Const(oid))).getOrElse(True),
                 ObservationPredicates.includeDeleted(includeDeleted),
                 ObservationPredicates.isVisibleTo(user),
                 WHERE.getOrElse(True)
-              ),
+              )),
               child
             )
           )
@@ -144,12 +145,12 @@ trait QueryMapping[F[_]]
           Limit(
             LIMIT.foldLeft(1000)(_ min _.value),
             Filter(
-              And.all(
+              and(List(
                 OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
                 ProgramPredicates.includeDeleted(includeDeleted),
                 ProgramPredicates.isVisibleTo(user),
                 WHERE.getOrElse(True)
-              ),
+              )),
               child
             )
           )

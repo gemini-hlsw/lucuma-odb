@@ -9,6 +9,7 @@ import cats.syntax.parallel.*
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings.*
 
 final case class UpdateObservationsInput(
