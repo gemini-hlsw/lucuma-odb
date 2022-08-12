@@ -6,6 +6,7 @@ package input
 
 import cats.syntax.all._
 import edu.gemini.grackle.Result
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 /**

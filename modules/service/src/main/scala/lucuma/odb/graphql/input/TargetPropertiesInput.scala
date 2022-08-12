@@ -10,6 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.SourceProfile
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.sourceprofile.SourceProfileInput
 import lucuma.odb.graphql.util.Bindings._
 

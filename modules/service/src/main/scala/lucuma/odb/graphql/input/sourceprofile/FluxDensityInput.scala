@@ -9,6 +9,7 @@ import cats.syntax.all._
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 object FluxDensityInput {
