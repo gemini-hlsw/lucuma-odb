@@ -10,7 +10,7 @@ import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import lucuma.core.enums.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 

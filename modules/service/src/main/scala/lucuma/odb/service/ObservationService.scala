@@ -12,6 +12,8 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.model.ConstraintSet
@@ -26,8 +28,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UpdateResult
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -77,8 +77,8 @@ object ObservationService {
             programId,
             SET.subtitle.toOption,
             SET.existence.getOrElse(Existence.Default),
-            SET.status.getOrElse(ObsStatus.Default),
-            SET.activeStatus.getOrElse(ObsActiveStatus.Default),
+            SET.status.getOrElse(ObsStatus.New),
+            SET.activeStatus.getOrElse(ObsActiveStatus.Active),
             SET.constraintSet.getOrElse(ConstraintSetInput.NominalConstraints),
           )
           session.prepare(af.fragment.query(observation_id)).use { pq =>

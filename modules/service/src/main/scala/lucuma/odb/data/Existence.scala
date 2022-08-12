@@ -5,7 +5,6 @@ package lucuma.odb.data
 
 import lucuma.core.util.Enumerated
 
-
 sealed abstract class Existence(val tag: String) extends Product with Serializable
 
 object Existence {
