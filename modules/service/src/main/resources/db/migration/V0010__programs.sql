@@ -87,25 +87,11 @@ insert into t_program (c_program_id, c_name) values ('p-3', 'An Empty Placeholde
 
 -- trigger to notify when rows are updated
 
-CREATE UNLOGGED TABLE t_program_event (
-  c_event_id     bigint not null default nextval('s_event_id'), -- primary key, incrementing
-  c_edit_type    e_edit_type  not null,
-  c_program_id   d_program_id  not null references t_program(c_program_id) on delete cascade
-);
-
 CREATE OR REPLACE FUNCTION ch_program_edit()
   RETURNS trigger AS $$
 DECLARE
 BEGIN
-  IF (TG_OP = 'INSERT') THEN
-    INSERT INTO t_program_event (c_edit_type, c_program_id)
-    VALUES ('created', NEW.c_program_id);
-    PERFORM pg_notify('ch_program_edit', NEW.c_program_id || ',' || currval('s_event_id')::text);
-  ELSIF (TG_OP = 'UPDATE') THEN
-    INSERT INTO t_program_event (c_edit_type, c_program_id)
-    VALUES ('updated', NEW.c_program_id);
-    PERFORM pg_notify('ch_program_edit',  NEW.c_program_id || ',' || currval('s_event_id')::text);
-  END IF;
+  PERFORM pg_notify('ch_program_edit',  NEW.c_program_id || ',' || nextval('s_event_id')::text || ',' || TG_OP);
   RETURN NEW; -- n.b. doesn't matter, it's an AFTER trigger
 END;
 $$ LANGUAGE plpgsql;

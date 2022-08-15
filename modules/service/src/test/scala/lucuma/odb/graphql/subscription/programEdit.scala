@@ -64,6 +64,7 @@ class programEdit extends OdbSuite {
             subscription {
               programEdit {
                 editType
+                id
                 value {
                   name
                 }

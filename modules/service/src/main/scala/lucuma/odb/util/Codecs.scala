@@ -24,6 +24,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model._
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
@@ -35,7 +36,6 @@ import skunk._
 import skunk.codec.all._
 import skunk.data.Arr
 import skunk.data.Type
-import lucuma.odb.data.EditType
 
 // Codecs for some atomic types.
 trait Codecs {
