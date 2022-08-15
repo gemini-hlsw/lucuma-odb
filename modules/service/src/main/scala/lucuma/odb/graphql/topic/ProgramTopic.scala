@@ -30,6 +30,7 @@ object ProgramTopic {
    * @param users users associated with this program
    */
   case class Element(
+    eventId: Long,
     programId: Program.Id,
     users:     List[User.Id],
     // TODO: time allocation
@@ -42,12 +43,16 @@ object ProgramTopic {
       }
   }
 
-  /** Infinite stream of program ids. */
-  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, Program.Id] =
+  /** Infinite stream of program id and event id. */
+  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Program.Id, Long)] =
     s.channel(id"ch_program_edit").listen(maxQueued).flatMap { n =>
-      Gid[Program.Id].fromString.getOption(n.value) match {
-        case Some(pid) => Stream(pid)
-        case None      => Stream.exec(Logger[F].warn(s"Invalid Program.Id in $n"))
+      n.value.split(",") match {
+        case Array(_pid, _eid) =>
+          (Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption).tupled match {
+            case Some(pair) => Stream(pair)
+            case None       => Stream.exec(Logger[F].warn(s"Invalid progran and/or event: $n"))
+          }
+        case _ => Stream.exec(Logger[F].warn(s"Invalid progran and/or event: $n"))
       }
     }
 
@@ -68,8 +73,8 @@ object ProgramTopic {
     for {
       pq    <- Stream.resource(s.prepare(SelectProgramUsers))
       pid   <- updates(s, maxQueued)
-      users <- Stream.eval(pq.stream(pid, 1024).compile.toList)
-      elem   = Element(pid, users)
+      users <- Stream.eval(pq.stream(pid._1, 1024).compile.toList)
+      elem   = Element(pid._2, pid._1, users)
       _     <- Stream.eval(Logger[F].info(s"ProgramChannel: $elem"))
     } yield elem
 

@@ -35,6 +35,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.data.Arr
 import skunk.data.Type
+import lucuma.odb.data.EditType
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -155,6 +156,9 @@ trait Codecs {
 
   val partner: Codec[Partner] =
     enumerated(Type.varchar)
+
+  val edit_type: Codec[EditType] =
+    enumerated(Type("e_edit_type"))
 
 }
 
