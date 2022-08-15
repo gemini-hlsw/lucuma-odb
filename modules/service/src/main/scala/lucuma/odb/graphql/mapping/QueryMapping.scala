@@ -26,6 +26,7 @@ import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
+import lucuma.odb.graphql.input.WhereTarget
 
 trait QueryMapping[F[_]]
   extends ObservationPredicates[F]
@@ -44,6 +45,7 @@ trait QueryMapping[F[_]]
         SqlRoot("partnerMeta"),
         SqlRoot("program"),
         SqlRoot("programs"),
+        SqlRoot("targets"),
       )
     )
 
@@ -55,6 +57,7 @@ trait QueryMapping[F[_]]
       PartnerMeta,
       Program,
       Programs,
+      Targets,
     ).foldMap(pf => Map(QueryType -> pf))
 
   def user: User
@@ -149,6 +152,30 @@ trait QueryMapping[F[_]]
                 OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
                 ProgramPredicates.includeDeleted(includeDeleted),
                 ProgramPredicates.isVisibleTo(user),
+                WHERE.getOrElse(True)
+              )),
+              child
+            )
+          )
+        )
+      }
+
+  private val Targets: PartialFunction[Select, Result[Query]] =
+    case Select("targets", List(
+      WhereTarget.Binding.Option("WHERE", rWHERE),
+      TargetIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    ), child) =>
+      (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+        Select("targets", Nil,
+          Limit(
+            LIMIT.foldLeft(1000)(_ min _.value),
+            Filter(
+              and(List(
+                OFFSET.map(tid => GtEql(UniquePath(List("id")), Const(tid))).getOrElse(True),
+                ProgramPredicates.includeDeleted(includeDeleted),
+                ProgramPredicates.isVisibleTo(user, List("program")),
                 WHERE.getOrElse(True)
               )),
               child

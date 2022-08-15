@@ -33,12 +33,12 @@ trait ProgramPredicates[F[_]] extends ProgramMapping[F] { this: SkunkMapping[F] 
       def hasProgramId(pids: Option[List[Program.Id]]): Predicate =
         pids.fold[Predicate](True)(hasProgramId)
 
-      def isVisibleTo(user: User): Predicate =
+      def isVisibleTo(user: User, prefix: List[String] = Nil): Predicate =
         user.role.access match {
           case Guest | Pi =>
             Or(
-              Contains(ListPath(List("users", "userId")), Const(user.id)), // user is linked, or
-              Eql(UniquePath(List("piUserId")), Const(user.id))            // user is the PI
+              Contains(ListPath(prefix ++ List("users", "userId")), Const(user.id)), // user is linked, or
+              Eql(UniquePath(prefix ++ List("piUserId")), Const(user.id))            // user is the PI
             )
           case Ngo => ???
           case Staff | Admin | Service => True
