@@ -14,6 +14,14 @@ comment on domain d_angle_µas is 'Angles in integral microarcseconds.';
 create type e_existence as enum ('present', 'deleted');
 comment on type e_existence is 'Logical deletion indicator.';
 
+--- EVENTS
+
+create sequence s_event_id cache 256 cycle;
+
+-- EDITS
+
+create type e_edit_type as enum ('created', 'updated');
+
 --- FILTER TYPES
 
 create table t_filter_type (

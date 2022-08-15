@@ -30,6 +30,7 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
+import lucuma.odb.data.EditType
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 
@@ -39,6 +40,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val BigDecimalType        = schema.ref("BigDecimal")
   lazy val CloudExtinctionType   = schema.ref("CloudExtinction")
   lazy val DmsStringType         = schema.ref("DmsString")
+  lazy val EditTypeType          = schema.ref("EditType")
   lazy val EphemerisKeyTypeType  = schema.ref("EphemerisKeyType")
   lazy val EpochStringType       = schema.ref("EpochString")
   lazy val ExistenceType         = schema.ref("Existence")
@@ -67,6 +69,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
     List(
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[Existence](ExistenceType),

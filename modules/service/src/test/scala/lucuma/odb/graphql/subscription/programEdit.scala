@@ -15,7 +15,7 @@ import munit.IgnoreSuite
 import scala.concurrent.duration._
 
 // N.B. this works locally, most of the time. Need to get it working reliably.
-@IgnoreSuite
+// @IgnoreSuite
 class programEdit extends OdbSuite {
 
   object Group1 {
@@ -63,6 +63,7 @@ class programEdit extends OdbSuite {
           """
             subscription {
               programEdit {
+                editType
                 value {
                   name
                 }
@@ -76,8 +77,8 @@ class programEdit extends OdbSuite {
           ),
         expected =
           List(
-            json"""{ "programEdit": { "value": { "name": "foo" } } }""",
-            json"""{ "programEdit": { "value": { "name": "bar" } } }""",
+            json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+            json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
           )
       )
     }
@@ -91,6 +92,7 @@ class programEdit extends OdbSuite {
         """
           subscription {
             programEdit {
+              editType
               value {
                 name
               }
@@ -105,7 +107,7 @@ class programEdit extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
         )
     )
   }
@@ -118,6 +120,7 @@ class programEdit extends OdbSuite {
         """
           subscription {
             programEdit {
+              editType
               value {
                 name
               }
@@ -132,7 +135,7 @@ class programEdit extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
         )
     )
   }
@@ -145,6 +148,7 @@ class programEdit extends OdbSuite {
         """
           subscription {
             programEdit {
+              editType
               value {
                 name
               }
@@ -159,9 +163,9 @@ class programEdit extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "value": { "name": "foo" } } }""",
-          json"""{ "programEdit": { "value": { "name": "bar" } } }""",
-          json"""{ "programEdit": { "value": { "name": "baz" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
         )
     )
   }

@@ -8,25 +8,22 @@ package mapping
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.skunk.SkunkMapping
 
-import java.util.concurrent.atomic.AtomicLong
-
+import table.ProgramEditTable
 import table.ProgramTable
 
 trait ProgramEditMapping[F[_]]
-  extends ProgramTable[F] { this: SkunkMapping[F] =>
+  extends ProgramEditTable[F]
+     with ProgramTable[F] { this: SkunkMapping[F] =>
 
   lazy val ProgramEditType = schema.ref("ProgramEdit")
-
-  private val ProgramEditId = AtomicLong(0L)
 
   lazy val ProgramEditMapping =
     ObjectMapping(
       tpe = ProgramEditType,
       fieldMappings = List(
-        SqlField("synthetic-key", ProgramTable.Id, key = true, hidden = true),
-        // todo: id
-        SqlObject("value"),
-        // todo: editType
+        SqlField("id", ProgramEditTable.EventId, key = true),
+        SqlField("editType", ProgramEditTable.EditType),
+        SqlObject("value", Join(ProgramEditTable.ProgramId, ProgramTable.Id)),
       )
     )
 
