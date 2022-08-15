@@ -4736,7 +4736,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): TargetSelectResult!
+  ): [Target!]! #TargetSelectResult!
 }
 
 # Queue observing at Gemini
