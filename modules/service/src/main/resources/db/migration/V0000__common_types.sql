@@ -16,11 +16,7 @@ comment on type e_existence is 'Logical deletion indicator.';
 
 --- EVENTS
 
-create sequence s_event_id cache 256 cycle;
-
--- EDITS
-
-create type e_edit_type as enum ('created', 'updated');
+create sequence s_event_id cycle;
 
 --- FILTER TYPES
 

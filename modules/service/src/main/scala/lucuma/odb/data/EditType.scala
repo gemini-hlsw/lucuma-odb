@@ -20,4 +20,15 @@ object EditType {
   implicit val EnumeratedUserType: Enumerated[EditType] =
     Enumerated.from(Created, Updated).withTag(_.tag)
 
+  /**
+   * Map `TG_OP` to `EditType`.
+   * @see https://www.postgresql.org/docs/9.6/plpgsql-trigger.html
+   */
+  def fromTgOp(s: String): Option[EditType] =
+    s match {
+      case "INSERT" => Some(Created)
+      case "UPDATE" => Some(Updated)
+      case _        => None
+    }
+
 }
