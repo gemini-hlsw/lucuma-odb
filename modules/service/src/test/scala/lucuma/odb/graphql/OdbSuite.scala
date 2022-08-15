@@ -206,7 +206,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         op
       }
 
-  def subscriptionTest(user: User, query: String, mutations: Either[List[(String, Option[Json])], IO[Any]], expected: List[Json], variables: Option[Json] = None) =
+  def subscription(user: User, query: String, mutations: Either[List[(String, Option[Json])], IO[Any]], variables: Option[Json] = None): IO[List[Json]] =
     Supervisor[IO].use { sup =>
       Resource.eval(IO(serverFixture()))
         .flatMap(streamingClient(user))
@@ -231,9 +231,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
                 _   <- sub.stop()
                 _   <- log.info("*** ----- joining fiber")
                 obt <- fib.joinWithNever
-              } yield assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
+              } yield obt
             }
         }
+    }
+
+  def subscriptionExpect(user: User, query: String, mutations: Either[List[(String, Option[Json])], IO[Any]], expected: List[Json], variables: Option[Json] = None) =
+    subscription(user, query, mutations, variables).map { obt =>
+      assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
     }
 
 }
