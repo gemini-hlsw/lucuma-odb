@@ -11,7 +11,7 @@ import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import lucuma.odb.graphql.util.Bindings._
 
-object WhereTarget {
+object WhereTargetInput {
 
   private val NameBinding = WhereString.binding(UniquePath(List("name")))
   private val ProgramIdBinding = WhereOrder.ProgramIdWithPath("program", "id")
@@ -19,9 +19,9 @@ object WhereTarget {
   val Binding: Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
-        WhereTarget.Binding.List.Option("AND", rAND),
-        WhereTarget.Binding.List.Option("OR", rOR),
-        WhereTarget.Binding.Option("NOT", rNOT),
+        WhereTargetInput.Binding.List.Option("AND", rAND),
+        WhereTargetInput.Binding.List.Option("OR", rOR),
+        WhereTargetInput.Binding.Option("NOT", rNOT),
         WhereOrder.TargetId.Option("id", rId),
         WhereOrder.ProgramId.Option("programId", rProgramId),
         NameBinding.Option("name", rName),

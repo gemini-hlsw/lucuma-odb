@@ -20,17 +20,19 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
+import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicates.ObservationPredicates
 import lucuma.odb.graphql.predicates.ProgramPredicates
+import lucuma.odb.graphql.predicates.TargetPredicates
 import lucuma.odb.graphql.util.Bindings._
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.input.WhereTarget
 
 trait QueryMapping[F[_]]
   extends ObservationPredicates[F]
      with ProgramPredicates[F]
+     with TargetPredicates[F]
  { this: SkunkMapping[F] =>
 
   lazy val QueryType = schema.ref("Query")
@@ -45,6 +47,7 @@ trait QueryMapping[F[_]]
         SqlRoot("partnerMeta"),
         SqlRoot("program"),
         SqlRoot("programs"),
+        SqlRoot("target"),
         SqlRoot("targets"),
       )
     )
@@ -57,6 +60,7 @@ trait QueryMapping[F[_]]
       PartnerMeta,
       Program,
       Programs,
+      Target,
       Targets,
     ).foldMap(pf => Map(QueryType -> pf))
 
@@ -160,9 +164,27 @@ trait QueryMapping[F[_]]
         )
       }
 
+  private val Target: PartialFunction[Select, Result[Query]] =
+    case Select("target", List(
+      TargetIdBinding("targetId", rPid),
+    ), child) =>
+      rPid.map { pid =>
+        Select("target", Nil,
+          Unique(
+            Filter(
+              And(
+                TargetPredicates.hasTargetId(pid),
+                ProgramPredicates.isVisibleTo(user, List("program")),
+              ),
+              child
+            )
+          )
+        )
+      }
+
   private val Targets: PartialFunction[Select, Result[Query]] =
     case Select("targets", List(
-      WhereTarget.Binding.Option("WHERE", rWHERE),
+      WhereTargetInput.Binding.Option("WHERE", rWHERE),
       TargetIdBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT),
       BooleanBinding("includeDeleted", rIncludeDeleted)
