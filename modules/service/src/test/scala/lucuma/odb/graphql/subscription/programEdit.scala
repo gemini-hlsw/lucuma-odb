@@ -15,7 +15,7 @@ import munit.IgnoreSuite
 import scala.concurrent.duration._
 
 // N.B. this works locally, most of the time. Need to get it working reliably.
-@IgnoreSuite
+// @IgnoreSuite
 class programEdit extends OdbSuite {
 
   object Group1 {
@@ -57,12 +57,13 @@ class programEdit extends OdbSuite {
   test("trigger for my own new programs") {
     import Group1._
     List(pi, guest, service).traverse { user =>
-      subscriptionTest(
+      subscriptionExpect(
         user = user,
         query =
           """
             subscription {
               programEdit {
+                editType
                 value {
                   name
                 }
@@ -76,8 +77,8 @@ class programEdit extends OdbSuite {
           ),
         expected =
           List(
-            json"""{ "programEdit": { "value": { "name": "foo" } } }""",
-            json"""{ "programEdit": { "value": { "name": "bar" } } }""",
+            json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+            json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
           )
       )
     }
@@ -85,12 +86,13 @@ class programEdit extends OdbSuite {
 
   test("trigger for my own new programs (but nobody else's) as guest user") {
     import Group2._
-    subscriptionTest(
+    subscriptionExpect(
       user = guest,
       query =
         """
           subscription {
             programEdit {
+              editType
               value {
                 name
               }
@@ -105,19 +107,20 @@ class programEdit extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
         )
     )
   }
 
   test("trigger for my own new programs (but nobody else's) as standard user in PI role") {
     import Group2._
-    subscriptionTest(
+    subscriptionExpect(
       user = pi,
       query =
         """
           subscription {
             programEdit {
+              editType
               value {
                 name
               }
@@ -132,19 +135,20 @@ class programEdit extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
         )
     )
   }
 
   test("trigger for all programs as service user") {
     import Group2._
-    subscriptionTest(
+    subscriptionExpect(
       user = service,
       query =
         """
           subscription {
             programEdit {
+              editType
               value {
                 name
               }
@@ -159,9 +163,77 @@ class programEdit extends OdbSuite {
         ),
       expected =
         List(
-          json"""{ "programEdit": { "value": { "name": "foo" } } }""",
-          json"""{ "programEdit": { "value": { "name": "bar" } } }""",
-          json"""{ "programEdit": { "value": { "name": "baz" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
+        )
+    )
+  }
+
+  test("event ids should be distinct") {
+    import Group2._
+    subscription(
+      user = service,
+      query =
+        """
+          subscription {
+            programEdit {
+              id
+            }
+          }
+        """,
+      mutations =
+        Right(
+          createProgram(guest, "foo") >>
+          createProgram(pi, "bar") >>
+          createProgram(service, "baz")
+        ),
+    ).map { js =>
+      val ids = js.map(_.hcursor.downFields("programEdit", "id").require[Long]).distinct
+      assertEquals(ids.length, 3, "Should get three distinct IDs.")
+    }
+  }
+
+  test("edit event should show up") {
+    import Group2._
+    subscriptionExpect(
+      user = service,
+      query =
+        """
+          subscription {
+            programEdit {
+              editType
+              value {
+                name
+              }
+            }
+          }
+        """,
+      mutations =
+        Right(
+          createProgram(guest, "foo").flatMap { id =>
+            IO.sleep(1.second) >> // give time to see the creation before we do an update
+            query(
+              service,
+              s"""
+              mutation {
+                updatePrograms(input: {
+                  WHERE: { id: { EQ: "$id" } }
+                  SET: { name: "foo2" }
+                }) {
+                  id
+                }
+              }
+              """
+            )
+          } >>
+          createProgram(service, "baz").void
+        ),
+      expected =
+        List(
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo2" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
         )
     )
   }

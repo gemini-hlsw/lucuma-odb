@@ -69,7 +69,12 @@ trait SubscriptionMapping[F[_]]
         .program
         .subscribe(1024)
         .filter(e => e.canRead(user) && input.flatMap(_.programId).forall(_ === e.programId))
-        .map(e => Result(Unique(Filter(Eql(UniquePath(List("value", "id")), Const(e.programId)), child))))
+        .map(e => Result(
+          Environment(
+            Env("id" -> e.eventId, "editType" -> e.editType),
+            Unique(Filter(Eql(UniquePath(List("value", "id")), Const(e.programId)), child))
+          )
+        ))
     }
 
 }

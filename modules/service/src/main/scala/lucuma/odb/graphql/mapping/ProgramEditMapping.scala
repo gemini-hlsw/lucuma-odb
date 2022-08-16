@@ -7,9 +7,9 @@ package mapping
 
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.data.EditType
 
-import java.util.concurrent.atomic.AtomicLong
-
+import table.ProgramEditTable
 import table.ProgramTable
 
 trait ProgramEditMapping[F[_]]
@@ -17,16 +17,15 @@ trait ProgramEditMapping[F[_]]
 
   lazy val ProgramEditType = schema.ref("ProgramEdit")
 
-  private val ProgramEditId = AtomicLong(0L)
-
+  // N.B. env is populated by the subscription elaborator
   lazy val ProgramEditMapping =
     ObjectMapping(
       tpe = ProgramEditType,
       fieldMappings = List(
-        SqlField("synthetic-key", ProgramTable.Id, key = true, hidden = true),
-        // todo: id
+        SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+        CursorField("id", _.envR[Long]("id")),
+        CursorField("editType", _.envR[EditType]("editType")),
         SqlObject("value"),
-        // todo: editType
       )
     )
 

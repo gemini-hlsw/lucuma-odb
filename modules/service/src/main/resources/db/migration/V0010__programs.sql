@@ -91,8 +91,8 @@ CREATE OR REPLACE FUNCTION ch_program_edit()
   RETURNS trigger AS $$
 DECLARE
 BEGIN
-  PERFORM pg_notify('ch_program_edit', NEW.c_program_id);
-  RETURN NEW;
+  PERFORM pg_notify('ch_program_edit',  NEW.c_program_id || ',' || nextval('s_event_id')::text || ',' || TG_OP);
+  RETURN NEW; -- n.b. doesn't matter, it's an AFTER trigger
 END;
 $$ LANGUAGE plpgsql;
 
