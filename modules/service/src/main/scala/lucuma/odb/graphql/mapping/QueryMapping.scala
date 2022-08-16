@@ -191,18 +191,34 @@ trait QueryMapping[F[_]]
     ), child) =>
       (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
         Select("targets", Nil,
-          Limit(
-            LIMIT.foldLeft(1000)(_ min _.value),
-            Filter(
+          FilterOrderByOffsetLimit(
+            pred = Some(
               and(List(
                 OFFSET.map(tid => GtEql(UniquePath(List("id")), Const(tid))).getOrElse(True),
                 ProgramPredicates.includeDeleted(includeDeleted),
                 ProgramPredicates.isVisibleTo(user, List("program")),
                 WHERE.getOrElse(True)
-              )),
-              child
-            )
+              )
+            )),
+            oss    = Some(List(
+              OrderSelection(UniquePath[lucuma.core.model.Target.Id](List("id")))
+            )),
+            offset = None,
+            limit  = Some(LIMIT.foldLeft(1000)(_ min _.value)),
+            child  = child
           )
+          // Limit(
+          //   LIMIT.foldLeft(1000)(_ min _.value),
+          //   Filter(
+          //     and(List(
+          //       OFFSET.map(tid => GtEql(UniquePath(List("id")), Const(tid))).getOrElse(True),
+          //       ProgramPredicates.includeDeleted(includeDeleted),
+          //       ProgramPredicates.isVisibleTo(user, List("program")),
+          //       WHERE.getOrElse(True)
+          //     )),
+          //     child
+          //   )
+          // )
         )
       }
 

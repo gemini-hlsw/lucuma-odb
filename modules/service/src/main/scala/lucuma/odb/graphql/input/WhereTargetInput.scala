@@ -23,7 +23,7 @@ object WhereTargetInput {
         WhereTargetInput.Binding.List.Option("OR", rOR),
         WhereTargetInput.Binding.Option("NOT", rNOT),
         WhereOrder.TargetId.Option("id", rId),
-        WhereOrder.ProgramId.Option("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rProgramId),
         NameBinding.Option("name", rName),
       ) =>
         (rAND, rOR, rNOT, rId, rProgramId, rName).parMapN { (AND, OR, NOT, id, pid, name) =>
