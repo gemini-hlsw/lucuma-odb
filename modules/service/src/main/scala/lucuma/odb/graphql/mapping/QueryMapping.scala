@@ -200,25 +200,13 @@ trait QueryMapping[F[_]]
                 WHERE.getOrElse(True)
               )
             )),
-            oss    = Some(List(
+            oss = Some(List(
               OrderSelection(UniquePath[lucuma.core.model.Target.Id](List("id")))
             )),
             offset = None,
-            limit  = Some(LIMIT.foldLeft(1000)(_ min _.value)),
-            child  = child
+            limit = Some(LIMIT.foldLeft(1000)(_ min _.value)),
+            child = child
           )
-          // Limit(
-          //   LIMIT.foldLeft(1000)(_ min _.value),
-          //   Filter(
-          //     and(List(
-          //       OFFSET.map(tid => GtEql(UniquePath(List("id")), Const(tid))).getOrElse(True),
-          //       ProgramPredicates.includeDeleted(includeDeleted),
-          //       ProgramPredicates.isVisibleTo(user, List("program")),
-          //       WHERE.getOrElse(True)
-          //     )),
-          //     child
-          //   )
-          // )
         )
       }
 
