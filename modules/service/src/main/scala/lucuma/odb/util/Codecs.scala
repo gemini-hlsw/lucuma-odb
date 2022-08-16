@@ -24,6 +24,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model._
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
@@ -155,6 +156,9 @@ trait Codecs {
 
   val partner: Codec[Partner] =
     enumerated(Type.varchar)
+
+  val edit_type: Codec[EditType] =
+    enumerated(Type("e_edit_type"))
 
 }
 

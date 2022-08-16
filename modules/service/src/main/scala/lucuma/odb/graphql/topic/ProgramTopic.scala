@@ -16,7 +16,9 @@ import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.odb.data.EditType
 import lucuma.odb.util.Codecs._
 import org.typelevel.log4cats.Logger
 import skunk.Query
@@ -31,6 +33,8 @@ object ProgramTopic {
    */
   case class Element(
     programId: Program.Id,
+    eventId: Long,
+    editType: EditType,
     users:     List[User.Id],
     // TODO: time allocation
   ) {
@@ -42,12 +46,16 @@ object ProgramTopic {
       }
   }
 
-  /** Infinite stream of program ids. */
-  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, Program.Id] =
+  /** Infinite stream of program id and event id. */
+  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Program.Id, Long, EditType)] =
     s.channel(id"ch_program_edit").listen(maxQueued).flatMap { n =>
-      Gid[Program.Id].fromString.getOption(n.value) match {
-        case Some(pid) => Stream(pid)
-        case None      => Stream.exec(Logger[F].warn(s"Invalid Program.Id in $n"))
+      n.value.split(",") match {
+        case Array(_pid, _eid, _tg_op) =>
+          (Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption, EditType.fromTgOp(_tg_op)).tupled match {
+            case Some(tuple) => Stream(tuple)
+            case None        => Stream.exec(Logger[F].warn(s"Invalid progran and/or event: $n"))
+          }
+        case _ => Stream.exec(Logger[F].warn(s"Invalid progran and/or event: $n"))
       }
     }
 
@@ -68,8 +76,8 @@ object ProgramTopic {
     for {
       pq    <- Stream.resource(s.prepare(SelectProgramUsers))
       pid   <- updates(s, maxQueued)
-      users <- Stream.eval(pq.stream(pid, 1024).compile.toList)
-      elem   = Element(pid, users)
+      users <- Stream.eval(pq.stream(pid._1, 1024).compile.toList)
+      elem   = Element(pid._1, pid._2, pid._3, users)
       _     <- Stream.eval(Logger[F].info(s"ProgramChannel: $elem"))
     } yield elem
 
