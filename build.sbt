@@ -11,6 +11,7 @@ val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.2.11"
 val log4catsVersion            = "2.4.0"
 val lucumaGraphQLRoutesVersion = "0.5.2"
+val lucumaCoreVersion          = "0.51.0"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val natchezHttp4sVersion       = "0.3.2"
@@ -63,3 +64,12 @@ lazy val service = project
     reStartArgs       += "-skip-migration"
   )
 
+lazy val enums = project
+  .in(file("modules/enums"))
+  .settings(
+    name := "lucuma-odb-enums",
+    libraryDependencies ++= Seq(
+      "edu.gemini" %% "lucuma-core" % lucumaCoreVersion,
+      "edu.gemini" %% "clue-core"   % clueVersion,
+    )
+  )
