@@ -152,6 +152,39 @@ class updateObservations extends OdbSuite
     )
 
   }
+
+  test("conflicting elevation range updates") {
+
+    constraintSetUpdateTest(
+      update =
+        """
+        elevationRange: {
+          airMass: {
+            min: 1.1
+          },
+          hourAngle: {
+            minHours: -1.0
+          }
+        }
+      """,
+      query =
+        """
+        elevationRange {
+          airMass {
+            min
+            max
+          }
+          hourAngle {
+            minHours
+            maxHours
+          }
+        }
+      """,
+      expected = "Argument 'input.SET.constraintSet.elevationRange' is invalid: Only one of airMass or hourAngle may be specified.".asLeft
+    )
+
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
