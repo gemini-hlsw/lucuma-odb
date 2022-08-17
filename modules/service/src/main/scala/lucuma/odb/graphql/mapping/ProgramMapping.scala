@@ -29,6 +29,7 @@ trait ProgramMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
      with ProgramUserTable[F]
+     with ProposalTable[F]
      with ObservationView[F] { this: SkunkMapping[F] =>
 
   def user: User
@@ -47,8 +48,9 @@ trait ProgramMapping[F[_]]
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
         SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
         SqlObject("plannedTime"),
-        SqlObject("observations", Join(ProgramTable.Id, ObservationView.ProgramId))
-      )
+        SqlObject("observations", Join(ProgramTable.Id, ObservationView.ProgramId)),
+        SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
+      ),
     )
 
   lazy val ProgramElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
