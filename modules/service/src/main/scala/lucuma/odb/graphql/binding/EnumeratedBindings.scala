@@ -13,6 +13,7 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.graphql.util.Bindings._
+import lucuma.core.enums.ToOActivation
 
 def enumeratedBinding[A](implicit ev: Enumerated[A]) =
   TypedEnumBinding.map(b => Json.fromString(b.name)).emap { j =>
@@ -25,5 +26,5 @@ val ProgramUserSupportRoleTypeBinding = enumeratedBinding[ProgramUserSupportType
 val ObsStatusBinding                  = enumeratedBinding[ObsStatus]
 val ObsActiveStatusBinding            = enumeratedBinding[ObsActiveStatus]
 val BandBinding                       = enumeratedBinding[Band]
-
+val ToOActivationBinding              = enumeratedBinding[ToOActivation]
 
