@@ -101,6 +101,7 @@ object OdbMapping {
           with ProperMotionMapping[F]
           with ProperMotionRAMapping[F]
           with ProposalMapping[F]
+          with ProposalClassMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RightAscensionMapping[F]
@@ -164,7 +165,7 @@ object OdbMapping {
               TargetEnvironmentMapping,
               TargetMapping,
               UserMapping,
-            ) ++ LeafMappings
+            ) ++ LeafMappings ++ ProposalClassMappings
 
           // Our combined select elaborator
           override val selectElaborator: SelectElaborator =

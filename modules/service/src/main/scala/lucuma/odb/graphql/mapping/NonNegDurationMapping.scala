@@ -8,12 +8,14 @@ import io.circe.Encoder
 import lucuma.core.model.Program
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProposalTable
 
 import java.time.Duration
 
 trait NonNegDurationMapping[F[_]]
   extends AllocationTable[F]
-     with ProgramTable[F] { this: SkunkMapping[F] =>
+     with ProgramTable[F]
+     with ProposalTable[F] { this: SkunkMapping[F] =>
 
   lazy val NonNegDurationType = schema.ref("NonNegDuration")
 
@@ -25,6 +27,8 @@ trait NonNegDurationMapping[F[_]]
         List("plannedTime", "pi")        -> nonNegDurationMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
         List("plannedTime", "uncharged") -> nonNegDurationMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
         List("plannedTime", "execution") -> nonNegDurationMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
+        // Proposal
+        List("totalTime") -> nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         // Allocation
         List("duration") -> nonNegDurationMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
       ),

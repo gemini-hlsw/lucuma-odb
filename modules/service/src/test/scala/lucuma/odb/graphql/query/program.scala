@@ -57,6 +57,21 @@ class program extends OdbSuite {
                       partner
                       percent
                     }
+                    proposalClass {
+                      minPercentTime
+                      ... on LargeProgram {
+                        minPercentTotalTime
+                        totalTime {
+                          iso
+                        }
+                      }
+                      ... on Intensive {
+                        minPercentTotalTime
+                        totalTime {
+                          iso
+                        }
+                      }
+                    }
                   }
                 }
               }
