@@ -22,7 +22,7 @@ final case class ObservationPropertiesInput(
   // visualizationTime: Option[Instant],
   // posAngleConstraint: Option[PosAngleConstraintInput],
   // targetEnvironment: Option[TargetEnvironmentInput],
-  constraintSet: Option[ConstraintSet],
+  constraintSet: Option[ConstraintSetInput],
   // scienceRequirements: Option[ScienceRequirementsInput],
   // scienceMode: Option[ScienceModeInput],
   existence:     Option[Existence]
@@ -30,13 +30,13 @@ final case class ObservationPropertiesInput(
 
 object ObservationPropertiesInput {
 
-  val DefaultCreate: ObservationPropertiesInput =
+  val Default: ObservationPropertiesInput =
     ObservationPropertiesInput(
       subtitle      = Nullable.Null,
-      status        = Some(ObsStatus.New),
-      activeStatus  = Some(ObsActiveStatus.Active),
-      existence     = Some(Existence.Present),
-      constraintSet = Some(ConstraintSetInput.NominalConstraints)
+      status        = ObsStatus.New.some,
+      activeStatus  = ObsActiveStatus.Active.some,
+      existence     = Existence.Present.some,
+      constraintSet = ConstraintSetInput.Default.some
     )
 
   val CreateBinding: Matcher[ObservationPropertiesInput] =
@@ -48,7 +48,7 @@ object ObservationPropertiesInput {
         ("visualizationTime", _),     // ignore for now
         ("posAngleConstraint", _),    // ignore for now
         ("targetEnvironment", _),     // ignore for now
-        ConstraintSetInput.CreateBinding.Option("constraintSet", rConstraintSet),
+        ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
@@ -65,7 +65,7 @@ object ObservationPropertiesInput {
         ("visualizationTime", _),     // ignore for now
         ("posAngleConstraint", _),    // ignore for now
         ("targetEnvironment", _),     // ignore for now
-        ConstraintSetInput.CreateBinding.Option("constraintSet", rConstraintSet),
+        ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
