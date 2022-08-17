@@ -92,6 +92,7 @@ object OdbMapping {
           with ObservationMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
+          with PartnerSplitMapping[F]
           with PlannedTimeSummaryMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
@@ -99,6 +100,7 @@ object OdbMapping {
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
           with ProperMotionRAMapping[F]
+          with ProposalMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RightAscensionMapping[F]
@@ -144,6 +146,7 @@ object OdbMapping {
               ObservationMapping,
               ParallaxMapping,
               PartnerMetaMapping,
+              PartnerSplitMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
               ProgramEditMapping,
@@ -151,6 +154,7 @@ object OdbMapping {
               ProperMotionDeclinationMapping,
               ProperMotionMapping,
               ProperMotionRAMapping,
+              ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
               RightAscensionMapping,
