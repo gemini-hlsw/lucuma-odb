@@ -30,7 +30,7 @@ trait ProposalMapping[F[_]]
         SqlField("category", ProposalTable.Category),
         SqlField("toOActivation", ProposalTable.TooActivation),
         SqlField("abstract", ProposalTable.Abstrakt),
-        // SqlInterfaceMapping("proposalClass", ...)
+        SqlObject("proposalClass"),
         SqlObject("partnerSplits", Join(ProposalTable.ProgramId, PartnerSplitTable.ProgramId))
       )
     )
