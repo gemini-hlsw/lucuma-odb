@@ -3,10 +3,13 @@
 
 package lucuma.odb.service
 
-import cats.data.{Ior, NonEmptyList}
+import cats.data.Ior
+import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.all.*
-import edu.gemini.grackle.{Predicate, Problem, Result}
+import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.Problem
+import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
