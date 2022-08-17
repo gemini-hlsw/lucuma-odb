@@ -6,8 +6,11 @@ package input
 
 import cats.syntax.apply._
 import cats.syntax.either._
+import cats.syntax.option._
 import cats.syntax.parallel._
 import edu.gemini.grackle.Result
+import eu.timepit.refined.api.Refined.value
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
 import lucuma.odb.graphql.binding._
@@ -18,6 +21,12 @@ final case class AirMassRangeInput(
   max: Option[DecimalValue]
 ) {
 
+  def minPosBigDecimal: Option[PosBigDecimal] =
+    min.flatMap(dv => PosBigDecimal.from(dv.value).toOption)
+
+  def maxPosBigDecimal: Option[PosBigDecimal] =
+    max.flatMap(dv => PosBigDecimal.from(dv.value).toOption)
+
   def create: Result[AirMass] =
     Result.fromOption[AirMass](
       (min, max)
@@ -26,36 +35,27 @@ final case class AirMassRangeInput(
       "Creating an air mass range requires specifying both min and max where min < max"
     )
 
-  def edit: AirMass => Result[AirMass] = am => {
-    val mn = min.getOrElse(am.min)
-    val mx = max.getOrElse(am.max)
-    Result.fromOption[AirMass](
-      AirMass.fromOrderedDecimalValues.getOption((mn, mx)),
-      s"Editing the air mass range as specified would create an invalid range: min ($mn) >= max ($mx)"
-    )
-  }
-
 }
 
 object AirMassRangeInput {
+
+  val Default: AirMassRangeInput =
+    AirMassRangeInput(
+      AirMass.DefaultMin.some,
+      AirMass.DefaultMax.some
+    )
 
   val AirMassDecimalValue: Matcher[DecimalValue] =
     BigDecimalBinding.emap { bd =>
       DecimalValue.from(bd).leftMap(m => s"Invalid air mass constraint: $bd: $m")
     }
 
-  val SimpleBinding: Matcher[AirMassRangeInput] =
+  val Binding: Matcher[AirMassRangeInput] =
     ObjectFieldsBinding.rmap {
       case List(
         AirMassDecimalValue.Option("min", rMin),
         AirMassDecimalValue.Option("max", rMax)
       ) => (rMin, rMax).parMapN(AirMassRangeInput(_, _))
     }
-
-  val CreateBinding: Matcher[AirMass] =
-    SimpleBinding.rmap(_.create)
-
-  val EditBinding: Matcher[AirMass => Result[AirMass]] =
-    SimpleBinding.map(_.edit)
 
 }

@@ -46,7 +46,6 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val ExistenceType         = schema.ref("Existence")
   lazy val FilterTypeType        = schema.ref("FilterType")
   lazy val HmsStringType         = schema.ref("HmsString")
-  lazy val HourAngleRangeType    = schema.ref("HourAngleRange")
   lazy val ImageQualityType      = schema.ref("ImageQuality")
   lazy val LongType              = schema.ref("Long")
   lazy val NonEmptyStringType    = schema.ref("NonEmptyString")

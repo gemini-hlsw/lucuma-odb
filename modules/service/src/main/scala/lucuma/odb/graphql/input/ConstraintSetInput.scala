@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.option._
 import cats.syntax.parallel._
 import edu.gemini.grackle.Result
 import lucuma.core.enums.CloudExtinction
@@ -12,7 +13,6 @@ import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
-import lucuma.core.optics.syntax.lens._
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.ConstraintSetInput.NominalConstraints
 import lucuma.odb.graphql.util.Bindings._
@@ -37,17 +37,6 @@ final case class ConstraintSetInput(
     }
   }
 
-  def edit: ConstraintSet => Result[ConstraintSet] = cs =>
-    elevationRange.fold(Result(cs.elevationRange))(_.edit(cs.elevationRange)).map { er =>
-      (for {
-        _ <- ConstraintSet.cloudExtinction := cloudExtinction
-        _ <- ConstraintSet.imageQuality    := imageQuality
-        _ <- ConstraintSet.skyBackground   := skyBackground
-        _ <- ConstraintSet.waterVapor      := waterVapor
-        _ <- ConstraintSet.elevationRange  := er
-      } yield ()).runS(cs).value
-    }
-
 }
 
 object ConstraintSetInput {
@@ -63,6 +52,15 @@ object ConstraintSetInput {
       elevationRange  = ElevationRange.AirMass.Default
     )
 
+  val Default: ConstraintSetInput =
+    ConstraintSetInput(
+      NominalConstraints.cloudExtinction.some,
+      NominalConstraints.imageQuality.some,
+      NominalConstraints.skyBackground.some,
+      NominalConstraints.waterVapor.some,
+      ElevationRangeInput.Default.some
+    )
+
   val CloudExtinctionBinding: Matcher[CloudExtinction] =
     enumeratedBinding[CloudExtinction]
 
@@ -75,21 +73,15 @@ object ConstraintSetInput {
   val WaterVaporBinding: Matcher[WaterVapor] =
     enumeratedBinding[WaterVapor]
 
-  val SimpleBinding: Matcher[ConstraintSetInput] =
+  val Binding: Matcher[ConstraintSetInput] =
     ObjectFieldsBinding.rmap {
       case List(
         ImageQualityBinding.Option("imageQuality", rImage),
         CloudExtinctionBinding.Option("cloudExtinction", rCloud),
         SkyBackgroundBinding.Option("skyBackground", rSky),
         WaterVaporBinding.Option("waterVapor", rWater),
-        ElevationRangeInput.SimpleBinding.Option("elevationRange", rElevation)
+        ElevationRangeInput.Binding.Option("elevationRange", rElevation)
       ) => (rCloud, rImage, rSky, rWater, rElevation).parMapN(ConstraintSetInput(_, _, _, _, _))
     }
-
-  val CreateBinding: Matcher[ConstraintSet] =
-    SimpleBinding.rmap(_.create)
-
-  val EditBinding: Matcher[ConstraintSet => Result[ConstraintSet]] =
-    SimpleBinding.map(_.edit)
 
 }

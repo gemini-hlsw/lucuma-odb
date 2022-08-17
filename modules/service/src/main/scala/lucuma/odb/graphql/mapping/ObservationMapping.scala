@@ -29,7 +29,7 @@ trait ObservationMapping[F[_]]
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
-      ),
+      )
     )
 
 }

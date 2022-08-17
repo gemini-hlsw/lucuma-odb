@@ -82,6 +82,7 @@ object OdbMapping {
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
+          with HourAngleRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
@@ -133,6 +134,7 @@ object OdbMapping {
               DeclinationMapping,
               ElevationRangeMapping,
               FilterTypeMetaMapping,
+              HourAngleRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
