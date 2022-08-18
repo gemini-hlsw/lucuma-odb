@@ -18,12 +18,14 @@ import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.input.ProposalInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
 import skunk.syntax.all._
+import skunk.codec.all._
 
 trait ProgramService[F[_]] {
 
@@ -31,7 +33,7 @@ trait ProgramService[F[_]] {
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(name: Option[NonEmptyString]): F[Program.Id]
+  def insertProgram(SET: ProgramPropertiesInput): F[Program.Id]
 
   /**
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
@@ -101,9 +103,15 @@ object ProgramService {
   def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
 
-      def insertProgram(name: Option[NonEmptyString]): F[Program.Id] =
+      def insertProgram(SET: ProgramPropertiesInput): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          s.prepare(Statements.InsertProgram).use(ps => ps.unique(name ~ user))
+          s.transaction.use { _ =>
+            s.prepare(Statements.InsertProgram).use(ps => ps.unique(SET.name ~ user)).flatTap { pid =>
+              SET.proposal.traverse { proposalInput =>
+                s.prepare(Statements.InsertProposal).use(ps => ps.execute(pid ~ proposalInput))
+              }
+            }
+          }
         }
 
       def linkUser(req: ProgramService.LinkUserRequest): F[LinkUserResponse] = {
@@ -204,6 +212,44 @@ object ProgramService {
          .contramap {
             case oNes ~ ServiceUser(_, _) => oNes ~ None
             case oNes ~ nonServiceUser    => oNes ~ Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser))
+         }
+
+    /** Insert a proposal. */
+    val InsertProposal: Command[Program.Id ~ ProposalInput] =
+      sql"""
+        INSERT INTO t_proposal (
+          c_program_id,
+          c_title,
+          c_abstract,
+          c_category,
+          c_too_activation,
+          c_class,
+          c_min_percent,
+          c_min_percent_total,
+          c_totalTime
+        ) VALUES (
+          ${program_id},
+          ${text_nonempty.opt},
+          ${text_nonempty.opt},
+          ${tag.opt},
+          ${too_activation.opt},
+          ${tag},
+          ${int_percent},
+          ${int_percent.opt},
+          ${interval.opt}
+        )
+      """.command
+         .contramap {
+            case pid ~ ppi =>
+              pid ~
+              ppi.title ~
+              ppi.abstrakt ~
+              ppi.category ~
+              ppi.toOActivation ~
+              ppi.proposalClass.tag ~
+              ppi.proposalClass.minPercentTime ~
+              ppi.proposalClass.minPercentTotalTime ~
+              ppi.proposalClass.totalTime.map(_.value)
          }
 
     /** Link a user to a program, without any access checking. */

@@ -18,24 +18,23 @@ import lucuma.core.model.IntPercent
 
 case class ProposalClassInput(
   tag: Tag,
-  minPercentTime: Option[IntPercent],
+  minPercentTime: IntPercent,
   minPercentTotalTime: Option[IntPercent],
   totalTime: Option[NonNegDuration],
 )
 
-
 object ProposalClassInput {
 
-  private val ClassicalBinding          = small("Classical")
-  private val DemoScienceBinding        = small("DemoScience")
-  private val DirectorsTimeBinding      = small("DirectorsTime")
-  private val ExchangeBinding           = small("Exchange")
-  private val FastTurnaroundBinding     = small("FastTurnaround")
-  private val IntensiveBinding          = large("Intensive")
-  private val LargeProgramBinding       = large("LargeProgram")
-  private val PoorWeatherBinding        = small("PoorWeather")
-  private val QueueBinding              = small("Queue")
-  private val SystemVerificationBinding = small("SystemVerification")
+  private val ClassicalBinding          = typeA("classical")
+  private val DemoScienceBinding        = typeA("demo_science")
+  private val DirectorsTimeBinding      = typeA("directors_time")
+  private val ExchangeBinding           = typeA("exchange")
+  private val FastTurnaroundBinding     = typeA("fast_turnaround")
+  private val IntensiveBinding          = typeB("intensive")
+  private val LargeProgramBinding       = typeB("large_program")
+  private val PoorWeatherBinding        = typeA("poor_weather")
+  private val QueueBinding              = typeA("queue")
+  private val SystemVerificationBinding = typeA("system_verification")
 
   val Binding: Matcher[ProposalClassInput] =
     ObjectFieldsBinding.rmap {
@@ -60,18 +59,18 @@ object ProposalClassInput {
         }
     }
 
-  private def small(tagValue: String): Matcher[ProposalClassInput] =
+  private def typeA(tagValue: String): Matcher[ProposalClassInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        IntPercentBinding.Option("minPercentTime", rMinPercentTime)
+        IntPercentBinding("minPercentTime", rMinPercentTime)
       ) =>
         rMinPercentTime.map(apply(Tag(tagValue), _, None, None))
     }
 
-  private def large(tagValue: String): Matcher[ProposalClassInput] =
+  private def typeB(tagValue: String): Matcher[ProposalClassInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        IntPercentBinding.Option("minPercentTime", rMinPercentTime),
+        IntPercentBinding("minPercentTime", rMinPercentTime),
         IntPercentBinding.Option("minPercentTotalTime", rMinPercentTotalTime),
         NonNegDurationInput.Binding.Option("totalTime", rTotalTime),
       ) =>

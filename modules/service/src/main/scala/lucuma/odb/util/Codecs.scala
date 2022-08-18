@@ -98,8 +98,13 @@ trait Codecs {
   val obs_active_status: Codec[ObsActiveStatus] =
     enumerated(Type("e_obs_active_status"))
 
+  // TEMPORARY; the tag will be correct soon
   val too_activation: Codec[ToOActivation] =
-    enumerated(Type("e_too_activation"))
+    `enum`(
+      e => e.label.toLowerCase(),
+      s => Enumerated[ToOActivation].all.find(_.label.toLowerCase == s),
+      Type("e_too_activation")
+    )
 
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
@@ -163,6 +168,10 @@ trait Codecs {
 
   val edit_type: Codec[EditType] =
     enumerated(Type("e_edit_type"))
+
+  val int_percent: Codec[IntPercent] =
+    int2.eimap(n => IntPercent.from(n))(_.value.toShort)
+
 
 }
 

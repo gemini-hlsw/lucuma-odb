@@ -17,7 +17,7 @@ import edu.gemini.grackle.Result
 
 case class ProposalInput(
   title: Option[NonEmptyString],
-  proposalClass: Option[ProposalClassInput],
+  proposalClass: ProposalClassInput,
   category: Option[Tag],
   toOActivation: Option[ToOActivation],
   abstrakt: Option[NonEmptyString],
@@ -41,7 +41,7 @@ object ProposalInput {
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("title", rTitle),
-        ProposalClassInput.Binding.Option("proposalClass", rProposalClass),
+        ProposalClassInput.Binding("proposalClass", rProposalClass),
         TagBinding.Option("category", rCategory),
         ToOActivationBinding.Option("toOActivation", rToOActivation),
         NonEmptyStringBinding.Option("abstract", rAbstract),

@@ -3,12 +3,14 @@
 
 package lucuma.odb.graphql.mapping
 
+import cats.data.Ior
 import edu.gemini.grackle.skunk.SkunkMapping
 import io.circe.Encoder
 import lucuma.core.model.Program
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
+import edu.gemini.grackle.Result
 
 import java.time.Duration
 
@@ -35,7 +37,13 @@ trait NonNegDurationMapping[F[_]]
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Duration => A): CursorField[A] =
-    CursorField[A](name, c => c.fieldAs[Duration]("value").map(f), List("value"))
+    CursorField[A](name, c =>
+      c.fieldAs[Some[Duration]]("value") match {
+        case Ior.Right(Some(d)) => Result(f(d))
+        case _ => c.fieldAs[Duration]("value").map(f)
+      },
+      List("value")
+    )
 
   private def nonNegDurationMapping(data: ColumnRef)(keys: ColumnRef*): ObjectMapping =
     ObjectMapping(

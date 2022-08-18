@@ -31,6 +31,8 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
+import lucuma.core.enums.ToOActivation
+import lucuma.core.model.IntPercent
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 
@@ -47,6 +49,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val FilterTypeType        = schema.ref("FilterType")
   lazy val HmsStringType         = schema.ref("HmsString")
   lazy val ImageQualityType      = schema.ref("ImageQuality")
+  lazy val IntPercentType        = schema.ref("IntPercent")
   lazy val LongType              = schema.ref("Long")
   lazy val NonEmptyStringType    = schema.ref("NonEmptyString")
   lazy val NonNegBigDecimalType  = schema.ref("NonNegBigDecimal")
@@ -61,6 +64,8 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val SkyBackgroundType     = schema.ref("SkyBackground")
   lazy val UserIdType            = schema.ref("UserId")
   lazy val UserTypeType          = schema.ref("UserType")
+  lazy val TacCategoryType       = schema.ref("TacCategory")
+  lazy val ToOActivationType     = schema.ref("ToOActivation")
   lazy val TargetIdType          = schema.ref("TargetId")
   lazy val WaterVaporType        = schema.ref("WaterVapor")
 
@@ -74,6 +79,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[ImageQuality](ImageQualityType),
+      LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
@@ -90,7 +96,9 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
+      LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[ToOActivation](ToOActivationType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[WaterVapor](WaterVaporType)
