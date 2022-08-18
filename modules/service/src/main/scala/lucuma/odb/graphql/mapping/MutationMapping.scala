@@ -134,7 +134,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   private val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
-      programService.use(_.insertProgram(input.SET.name)).map { id =>
+      programService.use(_.insertProgram(input.SET)).map { id =>
         Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
       }
     }

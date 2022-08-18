@@ -15,7 +15,7 @@ trait PartnerSplitTable[F[_]] { self: SkunkMapping[F] =>
   object PartnerSplitTable extends TableDef("t_partner_split") {
     val ProgramId  = col("c_program_id", program_id)
     val Partner    = col("c_partner", tag)
-    val Percent    = col("c_percent", int2)
+    val Percent    = col("c_percent", int_percent)
   }
 
 }
