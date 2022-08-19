@@ -4,9 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.NonEmptyChain
-import cats.data.Validated
-import cats.data.ValidatedNec
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
@@ -29,12 +26,12 @@ final case class HourAngleRangeInput(
   def maxBigDecimal: Option[BigDecimal] =
     maxHours.map(_.value)
 
-  def create: ValidatedNec[String, HourAngle] =
-    Validated.fromOption(
+  def create: Result[HourAngle] =
+    Result.fromOption(
       (minHours, maxHours)
         .tupled
         .flatMap(HourAngle.fromOrderedDecimalHours.getOption),
-      NonEmptyChain.one(HourAngleRangeInput.messages.BothMinAndMax)
+      HourAngleRangeInput.messages.BothMinAndMax
     )
 
 }

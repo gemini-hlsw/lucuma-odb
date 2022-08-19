@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.ValidatedNec
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.validated.*
@@ -27,14 +26,14 @@ final case class ConstraintSetInput(
   elevationRange:  Option[ElevationRangeInput]
 ) {
 
-  def create: ValidatedNec[String, ConstraintSet] = {
+  def create: Result[ConstraintSet] = {
     // TODO: default this (as below) or fail when missing?
     val ce = cloudExtinction.getOrElse(NominalConstraints.cloudExtinction)
     val iq = imageQuality.getOrElse(NominalConstraints.imageQuality)
     val sb = skyBackground.getOrElse(NominalConstraints.skyBackground)
     val wv = waterVapor.getOrElse(NominalConstraints.waterVapor)
 
-    elevationRange.fold(NominalConstraints.elevationRange.validNec[String])(_.create).map { er =>
+    elevationRange.fold(Result(NominalConstraints.elevationRange))(_.create).map { er =>
       ConstraintSet(iq, ce, sb, wv, er)
     }
   }

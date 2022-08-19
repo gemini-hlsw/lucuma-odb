@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.ValidatedNec
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.validated.*
@@ -26,11 +25,11 @@ final case class CoordinatesInput(
   dec: Option[Declination]
 ) {
 
-  def create: ValidatedNec[String, Option[Coordinates]] =
+  def create: Result[Option[Coordinates]] =
     (ra, dec) match {
-      case (Some(r), Some(d)) => Coordinates(r, d).some.validNec
-      case (None, None)       => none.validNec
-      case _                  => CoordinatesInput.messages.BothRaAndDecNeeded.invalidNec
+      case (Some(r), Some(d)) => Result(Coordinates(r, d).some)
+      case (None, None)       => Result(none)
+      case _                  => Result.failure(CoordinatesInput.messages.BothRaAndDecNeeded)
     }
 
 }
