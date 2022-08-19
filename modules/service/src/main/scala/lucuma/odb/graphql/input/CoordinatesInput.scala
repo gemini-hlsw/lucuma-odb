@@ -9,8 +9,11 @@ import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.validated.*
 import edu.gemini.grackle.Result
-import lucuma.core.math.{Coordinates, Declination, RightAscension}
-import lucuma.odb.graphql.util.Bindings.{Matcher, ObjectFieldsBinding}
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.util.Bindings.Matcher
+import lucuma.odb.graphql.util.Bindings.ObjectFieldsBinding
 
 //# Absolute coordinates relative base epoch
 //input CoordinatesInput {
