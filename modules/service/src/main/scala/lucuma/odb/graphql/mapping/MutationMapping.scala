@@ -100,8 +100,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       observationService.use { svc =>
         import ObservationService.CreateResult._
         svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map {
-          case BadInput(problems)  => Ior.left(NonEmptyChain.fromNonEmptyList(problems))
-          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case bi@BadInput(_)      => bi.toResult
+          case na@NotAuthorized(_) => na.toResult
           case Success(id)         => Result(Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
         }
       }
@@ -184,8 +184,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           svc
             .updateObservations(input.SET, which)
             .map {
-              case BadInput(ps) => Ior.left(NonEmptyChain.fromNonEmptyList(ps))
-              case Success(lst) => Result(Filter(ObservationPredicates.inObservationIds(lst), child))
+              case bi@BadInput(_) => bi.toResult
+              case Success(lst)   => Result(Filter(ObservationPredicates.inObservationIds(lst), child))
             }
         }
       }
