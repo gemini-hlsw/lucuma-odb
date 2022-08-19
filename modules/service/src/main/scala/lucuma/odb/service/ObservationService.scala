@@ -3,9 +3,12 @@
 
 package lucuma.odb.service
 
-import cats.data.{Ior, NonEmptyChain, NonEmptyList, ValidatedNec}
+import cats.data.Ior
+import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.data.Validated.Invalid
 import cats.data.Validated.Valid
+import cats.data.ValidatedNec
 import cats.effect.Sync
 import cats.syntax.all.*
 import edu.gemini.grackle.Predicate
@@ -19,7 +22,9 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.math.{Coordinates, Declination, RightAscension}
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
@@ -37,7 +42,12 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.input.{AirMassRangeInput, ConstraintSetInput, ElevationRangeInput, HourAngleRangeInput, ObservationPropertiesInput, TargetEnvironmentInput}
+import lucuma.odb.graphql.input.AirMassRangeInput
+import lucuma.odb.graphql.input.ConstraintSetInput
+import lucuma.odb.graphql.input.ElevationRangeInput
+import lucuma.odb.graphql.input.HourAngleRangeInput
+import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*

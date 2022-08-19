@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.{NonEmptyChain, Validated, ValidatedNec}
+import cats.data.NonEmptyChain
+import cats.data.Validated
+import cats.data.ValidatedNec
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._

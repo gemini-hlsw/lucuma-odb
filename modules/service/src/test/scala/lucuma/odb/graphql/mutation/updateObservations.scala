@@ -7,7 +7,6 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
-import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
