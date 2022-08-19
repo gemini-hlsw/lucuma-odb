@@ -204,8 +204,8 @@ input ConstraintSetInput {
 
 # Absolute coordinates relative base epoch
 input CoordinatesInput {
-  ra: RightAscensionInput!
-  dec: DeclinationInput!
+  ra: RightAscensionInput
+  dec: DeclinationInput
 }
 
 # Observation creation parameters
@@ -1569,7 +1569,6 @@ input LargeProgramInput {
 
 # A line flux value with integrated units
 input LineFluxIntegratedInput {
-  value: PosBigDecimal!
   units: LineFluxIntegratedUnits!
 }
 

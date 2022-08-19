@@ -3,8 +3,9 @@
 
 package lucuma.odb.service
 
-import cats.data.Ior
-import cats.data.NonEmptyList
+import cats.data.{Ior, NonEmptyChain, NonEmptyList, ValidatedNec}
+import cats.data.Validated.Invalid
+import cats.data.Validated.Valid
 import cats.effect.Sync
 import cats.syntax.all.*
 import edu.gemini.grackle.Predicate
@@ -18,6 +19,7 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.math.{Coordinates, Declination, RightAscension}
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
@@ -35,11 +37,7 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.input.AirMassRangeInput
-import lucuma.odb.graphql.input.ConstraintSetInput
-import lucuma.odb.graphql.input.ElevationRangeInput
-import lucuma.odb.graphql.input.HourAngleRangeInput
-import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.{AirMassRangeInput, ConstraintSetInput, ElevationRangeInput, HourAngleRangeInput, ObservationPropertiesInput, TargetEnvironmentInput}
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -64,46 +62,80 @@ trait ObservationService[F[_]] {
 
 object ObservationService {
 
-  val MissingAirMassConstraint: String          =
-    "air_mass_neither_or_both"
+  final case class DatabaseConstraint(
+    constraint: String,
+    message:    String
+  )
 
-  val MissingAirMassConstraintMessage: String   =
-      "Air mass constraint requires both min and max values."
+  val MissingAirMassConstraint: DatabaseConstraint =
+    DatabaseConstraint(
+      "air_mass_neither_or_both",
+      "airMass constraint requires both min and max values."
+    )
 
-  val MissingHourAngleConstraint: String        =
-    "hour_angle_neither_or_both"
+  val MissingHourAngleConstraint: DatabaseConstraint =
+    DatabaseConstraint(
+      "hour_angle_neither_or_both",
+      "hourAngle constraint requires both minHours and maxHours."
+    )
 
-  val MissingHourAngleConstraintMessage: String =
-    "Hour angle constraint requires both minHours and maxHours."
+  val BothExplicitCoordinatesConstraint: DatabaseConstraint =
+    DatabaseConstraint(
+      "explicit_base_neither_or_both",
+      "explicitBase requires both ra and dec"
+    )
 
   def GenericConstraintViolationMessage(m: String): String =
     s"Database constraint violation produced by input: $m"
 
-  val ConstraintViolationMessages: List[(String, String)] =
+  val DatabaseConstraints: List[DatabaseConstraint] =
     List(
-      MissingAirMassConstraint   -> MissingAirMassConstraintMessage,
-      MissingHourAngleConstraint -> MissingHourAngleConstraintMessage
+      MissingAirMassConstraint,
+      MissingHourAngleConstraint,
+      BothExplicitCoordinatesConstraint
     )
 
   def constraintViolationMessage(ex: PostgresErrorException): String =
-    ConstraintViolationMessages
-      .find { case (c, _) => ex.message.contains(c) }
-      .map(_._2)
+    DatabaseConstraints
+      .find { dc => ex.message.contains(dc.constraint) }
+      .map(_.message)
       .getOrElse(GenericConstraintViolationMessage(ex.message))
 
   sealed trait CreateResult
   object CreateResult {
-    final case class BadInput(problems: NonEmptyList[Problem]) extends CreateResult
-    final case class NotAuthorized(user: User)                 extends CreateResult
+    final case class BadInput(problems: NonEmptyChain[String]) extends CreateResult {
+      def toResult[A]: Result[A] =
+        Ior.left(problems.map(Problem(_)))
+    }
+
+    object BadInput {
+      def apply(problem: String, problems: String*): CreateResult =
+        BadInput(NonEmptyChain.of(problem, problems *))
+    }
+
+
+    final case class NotAuthorized(user: User)                 extends CreateResult {
+      def toResult[A]: Result[A] =
+        Result.failure(s"User ${user.id} is not authorized to perform this action.")
+    }
+
     final case class Success(id: Observation.Id)               extends CreateResult
   }
 
   sealed trait UpdateResult
 
   object UpdateResult {
-    final case class BadInput(problems: NonEmptyList[Problem]) extends UpdateResult
+    final case class BadInput(problems: NonEmptyChain[String]) extends UpdateResult {
+      def toResult[A]: Result[A] =
+        Ior.left(problems.map(Problem(_)))
+    }
 
-    final case class Success(ids: List[Observation.Id]) extends UpdateResult
+    object BadInput {
+      def apply(problem: String, problems: String*): UpdateResult =
+        BadInput(NonEmptyChain.of(problem, problems*))
+    }
+
+    final case class Success(ids: List[Observation.Id])        extends UpdateResult
   }
 
 
@@ -118,35 +150,30 @@ object ObservationService {
         SET:         ObservationPropertiesInput
       ): F[CreateResult] =
         Trace[F].span("createObservation") {
-          SET.constraintSet.traverse(_.create).map { cs =>
-            Statements.insertObservationAs(
-              user,
-              programId,
-              SET.subtitle.toOption,
-              SET.existence.getOrElse(Existence.Default),
-              SET.status.getOrElse(ObsStatus.Default),
-              SET.activeStatus.getOrElse(ObsActiveStatus.Default),
-              cs.getOrElse(ConstraintSetInput.NominalConstraints)
+          Statements
+            .insertObservationAs(user, programId, SET)
+            .fold(
+              ps => CreateResult.BadInput(ps).pure[F],
+              af =>
+                session.prepare(af.fragment.query(observation_id)).use { pq =>
+                  pq.option(af.argument).map {
+                    case Some(oid) => CreateResult.Success(oid)
+                    case None      => CreateResult.NotAuthorized(user)
+                  }
+                }
+
             )
-          }.toEither.fold(ps => CreateResult.BadInput(ps.toNonEmptyList).pure[F], af => {
-            session.prepare(af.fragment.query(observation_id)).use { pq =>
-              pq.option(af.argument).map {
-                case Some(oid) => CreateResult.Success(oid)
-                case None      => CreateResult.NotAuthorized(user)
-              }
-            }
-          })
         }
 
       override def updateObservations(
         SET:   ObservationPropertiesInput,
         which: AppliedFragment
       ): F[UpdateResult] =
-        Statements.updateObservations(SET, which) match
-          case Left(msg)   =>
-            UpdateResult.BadInput(NonEmptyList.one(Problem(msg))).pure[F]
+        Statements.updateObservations(SET, which) match {
+          case Invalid(msg) =>
+            UpdateResult.BadInput(msg).pure[F]
 
-          case Right(oaf) =>
+          case Valid(oaf) =>
             oaf.toList.flatTraverse { af =>
               session.prepare(af.fragment.query(observation_id)).use { pq =>
                 pq.stream(af.argument, chunkSize = 1024).compile.toList
@@ -154,15 +181,39 @@ object ObservationService {
             }.map(UpdateResult.Success(_))
              .recoverWith {
                case SqlState.CheckViolation(ex) =>
-                 UpdateResult.BadInput(
-                   NonEmptyList.one(Problem(constraintViolationMessage(ex)))
-                 ).pure[F]
+                 UpdateResult.BadInput(constraintViolationMessage(ex)).pure[F]
              }
+        }
     }
 
 
   object Statements {
-    import ProgramService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
+
+    import ProgramService.Statements.{
+      existsUserAsPi,
+      existsUserAsCoi,
+      existsAllocationForPartner
+    }
+
+    def insertObservationAs(
+      user:      User,
+      programId: Program.Id,
+      SET:       ObservationPropertiesInput
+    ): ValidatedNec[String, AppliedFragment] =
+      (SET.targetEnvironment.flatMap(_.explicitBase.toOption).flatTraverse(_.create),
+       SET.constraintSet.traverse(_.create)
+      ).mapN { (eb, cs) =>
+        insertObservationAs(
+          user,
+          programId,
+          SET.subtitle.toOption,
+          SET.existence.getOrElse(Existence.Default),
+          SET.status.getOrElse(ObsStatus.Default),
+          SET.activeStatus.getOrElse(ObsActiveStatus.Default),
+          eb,
+          cs.getOrElse(ConstraintSetInput.NominalConstraints)
+        )
+      }
 
     def insertObservationAs(
       user:          User,
@@ -171,6 +222,7 @@ object ObservationService {
       existence:     Existence,
       status:        ObsStatus,
       activeState:   ObsActiveStatus,
+      explicitBase:  Option[Coordinates],
       constraintSet: ConstraintSet
     ): AppliedFragment = {
 
@@ -181,6 +233,8 @@ object ObservationService {
            existence   ~
            status      ~
            activeState ~
+           explicitBase.map(_.ra)        ~
+           explicitBase.map(_.dec)       ~
            constraintSet.cloudExtinction ~
            constraintSet.imageQuality    ~
            constraintSet.skyBackground   ~
@@ -215,6 +269,8 @@ object ObservationService {
       Existence              ~
       ObsStatus              ~
       ObsActiveStatus        ~
+      Option[RightAscension] ~
+      Option[Declination]    ~
       CloudExtinction        ~
       ImageQuality           ~
       SkyBackground          ~
@@ -231,6 +287,8 @@ object ObservationService {
           c_existence,
           c_status,
           c_active_status,
+          c_explicit_ra,
+          c_explicit_dec,
           c_cloud_extinction,
           c_image_quality,
           c_sky_background,
@@ -246,6 +304,8 @@ object ObservationService {
           $existence,
           $obs_status,
           $obs_active_status,
+          ${right_ascension.opt},
+          ${declination.opt},
           $cloud_extinction,
           $image_quality,
           $sky_background,
@@ -256,42 +316,73 @@ object ObservationService {
           ${hour_angle_range_value.opt}
       """
 
-    def updates(SET: ObservationPropertiesInput): Either[String, Option[NonEmptyList[AppliedFragment]]] = {
-      val upExistence    = sql"c_existence = $existence"
-      val upSubtitle     = sql"c_subtitle = ${text_nonempty.opt}"
-      val upStatus       = sql"c_status = $obs_status"
-      val upActive       = sql"c_active_status = $obs_active_status"
+    def explicitBaseUpdates(in: TargetEnvironmentInput): ValidatedNec[String, List[AppliedFragment]] = {
 
-      val upCloud        = sql"c_cloud_extinction = $cloud_extinction"
-      val upImage        = sql"c_image_quality = $image_quality"
-      val upSky          = sql"c_sky_background = $sky_background"
-      val upWater        = sql"c_water_vapor = $water_vapor"
+      val upRa  = sql"c_explicit_ra = ${right_ascension.opt}"
+      val upDec = sql"c_explicit_dec = ${declination.opt}"
 
+      in.explicitBase match {
+        case Nullable.Null   => List(upRa(none), upDec(none)).validNec
+        case Nullable.Absent => Nil.validNec
+        case NonNull(value)  =>
+          (value.ra.map(r => upRa(r.some)).toList ++ value.dec.map(d => upDec(d.some)).toList) match {
+            case Nil => "At least one of ra or dec must be specified for an edit".invalidNec
+            case lst => lst.validNec
+          }
+      }
+    }
+
+    def elevationRangeUpdates(in: ElevationRangeInput): ValidatedNec[String, List[AppliedFragment]] = {
       val upAirMassMin   = sql"c_air_mass_min = ${air_mass_range_value.opt}"
       val upAirMassMax   = sql"c_air_mass_max = ${air_mass_range_value.opt}"
       val upHourAngleMin = sql"c_hour_angle_min = ${hour_angle_range_value.opt}"
       val upHourAngleMax = sql"c_hour_angle_max = ${hour_angle_range_value.opt}"
 
-      def elevationRangeUps(e: ElevationRangeInput): Either[String, List[AppliedFragment]] = {
-        val airMass: List[AppliedFragment] =
-          List(
-            e.airMass.flatMap(_.minPosBigDecimal).map(v => upAirMassMin(v.some)),
-            e.airMass.flatMap(_.maxPosBigDecimal).map(v => upAirMassMax(v.some))
-          ).flattenOption
+      val airMass: List[AppliedFragment] =
+        List(
+          in.airMass.flatMap(_.minPosBigDecimal).map(v => upAirMassMin(v.some)),
+          in.airMass.flatMap(_.maxPosBigDecimal).map(v => upAirMassMax(v.some))
+        ).flattenOption
 
-        val hourAngle: List[AppliedFragment] =
-          List(
-            e.hourAngle.flatMap(_.minBigDecimal).map(v => upHourAngleMin(v.some)),
-            e.hourAngle.flatMap(_.maxBigDecimal).map(v => upHourAngleMax(v.some))
-          ).flattenOption
+      val hourAngle: List[AppliedFragment] =
+        List(
+          in.hourAngle.flatMap(_.minBigDecimal).map(v => upHourAngleMin(v.some)),
+          in.hourAngle.flatMap(_.maxBigDecimal).map(v => upHourAngleMax(v.some))
+        ).flattenOption
 
-        (airMass, hourAngle) match {
-          case (Nil, Nil) => List.empty[AppliedFragment].asRight
-          case (am,  Nil) => (upHourAngleMin(None) :: upHourAngleMax(None) :: am).asRight
-          case (Nil, ha ) => (upAirMassMin(None)   :: upAirMassMax(None)   :: ha).asRight
-          case (_,   _  ) => "Only one of airMass or hourAngle may be specified.".asLeft
-        }
+      (airMass, hourAngle) match {
+        case (Nil, Nil) => List.empty[AppliedFragment].validNec
+        case (am, Nil)  => (upHourAngleMin(None) :: upHourAngleMax(None) :: am).validNec
+        case (Nil, ha)  => (upAirMassMin(None) :: upAirMassMax(None) :: ha).validNec
+        case (_, _)     => "Only one of airMass or hourAngle may be specified.".invalidNec
       }
+    }
+
+    def constraintSetUpdates(in: ConstraintSetInput): ValidatedNec[String, List[AppliedFragment]] = {
+      val upCloud = sql"c_cloud_extinction = $cloud_extinction"
+      val upImage = sql"c_image_quality = $image_quality"
+      val upSky   = sql"c_sky_background = $sky_background"
+      val upWater = sql"c_water_vapor = $water_vapor"
+
+      val ups: List[AppliedFragment] =
+        List(
+          in.cloudExtinction.map(upCloud),
+          in.imageQuality.map(upImage),
+          in.skyBackground.map(upSky),
+          in.waterVapor.map(upWater)
+        ).flattenOption
+
+      in.elevationRange
+        .toList
+        .flatTraverse(elevationRangeUpdates)
+        .map(_ ++ ups)
+    }
+
+    def updates(SET: ObservationPropertiesInput): ValidatedNec[String, Option[NonEmptyList[AppliedFragment]]] = {
+      val upExistence = sql"c_existence = $existence"
+      val upSubtitle  = sql"c_subtitle = ${text_nonempty.opt}"
+      val upStatus    = sql"c_status = $obs_status"
+      val upActive    = sql"c_active_status = $obs_active_status"
 
       val ups: List[AppliedFragment] =
         List(
@@ -302,29 +393,28 @@ object ObservationService {
             case NonNull(value) => Some(upSubtitle(Some(value)))
           },
           SET.status.map(upStatus),
-          SET.activeStatus.map(upActive),
-          SET.constraintSet.toList.flatMap { cs =>
-            List(
-              cs.cloudExtinction.map(upCloud),
-              cs.imageQuality.map(upImage),
-              cs.skyBackground.map(upSky),
-              cs.waterVapor.map(upWater)
-            ).flattenOption
-          }
+          SET.activeStatus.map(upActive)
         ).flatten
 
-      SET
-        .constraintSet
-        .flatMap(_.elevationRange)
-        .toList
-        .flatTraverse(elevationRangeUps)
-        .map { ers => NonEmptyList.fromList(ers ++ ups) }
+      val explicitBase: ValidatedNec[String, List[AppliedFragment]] =
+        SET.targetEnvironment
+           .toList
+           .flatTraverse(explicitBaseUpdates)
+
+      val constraintSet: ValidatedNec[String, List[AppliedFragment]] =
+        SET.constraintSet
+           .toList
+           .flatTraverse(constraintSetUpdates)
+
+      (explicitBase, constraintSet).mapN { (eb, cs) =>
+        NonEmptyList.fromList(eb ++ cs ++ ups)
+      }
     }
 
     def updateObservations(
       SET:   ObservationPropertiesInput,
       which: AppliedFragment
-    ): Either[String, Option[AppliedFragment]] =
+    ): ValidatedNec[String, Option[AppliedFragment]] =
       updates(SET).map {
         _.map { us =>
           void"UPDATE t_observation " |+|

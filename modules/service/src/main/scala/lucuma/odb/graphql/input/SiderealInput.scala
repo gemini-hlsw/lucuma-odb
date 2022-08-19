@@ -21,7 +21,7 @@ final case class SiderealInput(
   properMotion: Option[ProperMotion],
   radialVelocity: Option[RadialVelocity],
   parallax: Option[Parallax],
-  catalogInfo: Option[CatalogInfoInput],
+  catalogInfo: Option[CatalogInfoInput]
 )
 
 object SiderealInput {

@@ -7,11 +7,13 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
 
 class updateObservations extends OdbSuite
@@ -107,7 +109,7 @@ class updateObservations extends OdbSuite
           }
         }
       """,
-      expected = ObservationService.MissingHourAngleConstraintMessage.asLeft
+      expected = ObservationService.MissingHourAngleConstraint.message.asLeft
     )
 
   }
@@ -187,6 +189,203 @@ class updateObservations extends OdbSuite
 
   }
 
+  test("set explicit base in existing observation without one") {
+
+    val update = """
+      explicitBase: {
+        ra: { hms: "1:00:00"},
+        dec: { dms: "2:00:00"}
+      }
+    """
+
+    val query = """
+      explicitBase {
+        ra { hours }
+        dec { degrees }
+      }
+    """
+
+    val expected = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "explicitBase": {
+                "ra": {
+                  "hours": 1.0
+                },
+                "dec": {
+                  "degrees": 2.0
+                }
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- updateExplicitBase(pi, oid, update, query, expected)
+    } yield ()
+
+  }
+
+  test("update explicit ra in observation with existing explicit base") {
+
+    val update1 = """
+      explicitBase: {
+        ra: { hms: "1:00:00" },
+        dec: { dms: "2:00:00"}
+      }
+    """
+
+    val update2 ="""
+      explicitBase: {
+        ra: { hms: "3:00:00"}
+      }
+    """
+
+    val query = """
+      explicitBase {
+        ra { hours }
+        dec { degrees }
+      }
+    """
+
+    val expected1 = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "explicitBase": {
+                "ra": {
+                  "hours": 1.0
+                },
+                "dec": {
+                  "degrees": 2.0
+                }
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val expected2 = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "explicitBase": {
+                "ra": {
+                  "hours": 3.0
+                },
+                "dec": {
+                  "degrees": 2.0
+                }
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- updateExplicitBase(pi, oid, update1, query, expected1)
+      _   <- updateExplicitBase(pi, oid, update2, query, expected2)
+    } yield ()
+
+  }
+
+  test("delete explicit base") {
+
+    val update1 = """
+      explicitBase: {
+        ra: { hms: "1:00:00" },
+        dec: { dms: "2:00:00"}
+      }
+    """
+
+    val update2 = """
+      explicitBase: null
+    """
+
+    val query = """
+      explicitBase {
+        ra { hours }
+        dec { degrees }
+      }
+    """
+
+    val expected1 = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "explicitBase": {
+                "ra": {
+                  "hours": 1.0
+                },
+                "dec": {
+                  "degrees": 2.0
+                }
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val expected2 = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "explicitBase": null
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- updateExplicitBase(pi, oid, update1, query, expected1)
+      _ <- updateExplicitBase(pi, oid, update2, query, expected2)
+    } yield ()
+
+  }
+
+  test("fail to set (only) explicit ra in existing observation without explicit base") {
+
+    val update = """
+      explicitBase: {
+        ra: { hms: "1:00:00"}
+      }
+    """
+
+    val query = """
+      explicitBase {
+        ra { hours }
+        dec { degrees }
+      }
+    """
+
+    val expected = ObservationService.BothExplicitCoordinatesConstraint.message.asLeft
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- updateExplicitBase(pi, oid, update, query, expected)
+    } yield ()
+
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
@@ -200,12 +399,43 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
   ): IO[Unit] = {
       expect(
         user = user,
-        query =
-          s"""
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                constraintSet: {
+                  $update
+                }
+              },
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              constraintSet {
+                $query
+              }
+            }
+          }
+        """,
+        expected = expected.leftMap(msg => List(msg))
+      )
+
+  }
+
+  def updateExplicitBase(
+    user:     User,
+    oid:      Observation.Id,
+    update:   String,
+    query:    String,
+    expected: Either[String, Json]
+  ): IO[Unit] = {
+    expect(
+      user = user,
+      query = s"""
         mutation {
           updateObservations(input: {
             SET: {
-              constraintSet: {
+              targetEnvironment: {
                 $update
               }
             },
@@ -213,15 +443,14 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
               id: { EQ: ${oid.asJson} }
             }
           }) {
-            constraintSet {
+            targetEnvironment {
               $query
             }
           }
         }
       """,
-        expected = expected.leftMap(msg => List(msg))
-      )
+      expected = expected.leftMap(msg => List(msg))
+    )
 
   }
-
 }

@@ -4,8 +4,10 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.option._
-import cats.syntax.parallel._
+import cats.data.ValidatedNec
+import cats.syntax.option.*
+import cats.syntax.parallel.*
+import cats.syntax.validated.*
 import edu.gemini.grackle.Result
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
@@ -13,9 +15,9 @@ import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ConstraintSetInput.NominalConstraints
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.util.Bindings.*
 
 final case class ConstraintSetInput(
   cloudExtinction: Option[CloudExtinction],
@@ -25,14 +27,14 @@ final case class ConstraintSetInput(
   elevationRange:  Option[ElevationRangeInput]
 ) {
 
-  def create: Result[ConstraintSet] = {
+  def create: ValidatedNec[String, ConstraintSet] = {
     // TODO: default this (as below) or fail when missing?
     val ce = cloudExtinction.getOrElse(NominalConstraints.cloudExtinction)
     val iq = imageQuality.getOrElse(NominalConstraints.imageQuality)
     val sb = skyBackground.getOrElse(NominalConstraints.skyBackground)
     val wv = waterVapor.getOrElse(NominalConstraints.waterVapor)
 
-    elevationRange.fold(Result(NominalConstraints.elevationRange))(_.create).map { er =>
+    elevationRange.fold(NominalConstraints.elevationRange.validNec[String])(_.create).map { er =>
       ConstraintSet(iq, ce, sb, wv, er)
     }
   }
