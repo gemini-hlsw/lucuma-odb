@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.ValidatedNec
 import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
@@ -20,12 +19,12 @@ final case class ElevationRangeInput(
   hourAngle: Option[HourAngleRangeInput]
 ) {
 
-  def create: ValidatedNec[String, ElevationRange] =
+  def create: Result[ElevationRange] =
     (airMass, hourAngle) match {
       case (Some(am), None)   => am.create
       case (None, Some(hr))   => hr.create
-      case (None, None)       => AirMass.Default.validNec
-      case (Some(_), Some(_)) => ElevationRangeInput.messages.OnlyOneDefinition.invalidNec
+      case (None, None)       => Result(AirMass.Default)
+      case (Some(_), Some(_)) => Result.failure(ElevationRangeInput.messages.OnlyOneDefinition)
     }
 
 }

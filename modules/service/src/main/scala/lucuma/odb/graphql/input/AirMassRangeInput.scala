@@ -4,9 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.NonEmptyChain
-import cats.data.Validated
-import cats.data.ValidatedNec
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -31,12 +28,12 @@ final case class AirMassRangeInput(
   def maxPosBigDecimal: Option[PosBigDecimal] =
     max.flatMap(dv => PosBigDecimal.from(dv.value).toOption)
 
-  def create: ValidatedNec[String, AirMass] =
-    Validated.fromOption(
+  def create: Result[AirMass] =
+    Result.fromOption(
       (min, max)
         .tupled
         .flatMap(AirMass.fromOrderedDecimalValues.getOption),
-      NonEmptyChain.one(AirMassRangeInput.messages.BothMinAndMax)
+      AirMassRangeInput.messages.BothMinAndMax
     )
 
 }
