@@ -1569,6 +1569,7 @@ input LargeProgramInput {
 
 # A line flux value with integrated units
 input LineFluxIntegratedInput {
+  value: PosBigDecimal!
   units: LineFluxIntegratedUnits!
 }
 
