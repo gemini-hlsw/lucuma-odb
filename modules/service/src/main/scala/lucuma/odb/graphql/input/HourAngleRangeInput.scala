@@ -27,16 +27,21 @@ final case class HourAngleRangeInput(
     maxHours.map(_.value)
 
   def create: Result[HourAngle] =
-    Result.fromOption[HourAngle](
+    Result.fromOption(
       (minHours, maxHours)
         .tupled
         .flatMap(HourAngle.fromOrderedDecimalHours.getOption),
-      "Creating an hour angle range requires specifying both minHours and maxHours where minHours < maxHours"
+      HourAngleRangeInput.messages.BothMinAndMax
     )
 
 }
 
 object HourAngleRangeInput {
+
+  object messages {
+    val BothMinAndMax: String =
+      "Creating an hour angle range requires specifying both minHours and maxHours where minHours < maxHours"
+  }
 
   val Default: HourAngleRangeInput =
     HourAngleRangeInput(

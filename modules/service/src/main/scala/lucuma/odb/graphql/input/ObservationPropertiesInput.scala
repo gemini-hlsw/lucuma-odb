@@ -21,7 +21,7 @@ final case class ObservationPropertiesInput(
   activeStatus:  Option[ObsActiveStatus],
   // visualizationTime: Option[Instant],
   // posAngleConstraint: Option[PosAngleConstraintInput],
-  // targetEnvironment: Option[TargetEnvironmentInput],
+  targetEnvironment: Option[TargetEnvironmentInput],
   constraintSet: Option[ConstraintSetInput],
   // scienceRequirements: Option[ScienceRequirementsInput],
   // scienceMode: Option[ScienceModeInput],
@@ -32,11 +32,12 @@ object ObservationPropertiesInput {
 
   val Default: ObservationPropertiesInput =
     ObservationPropertiesInput(
-      subtitle      = Nullable.Null,
-      status        = ObsStatus.New.some,
-      activeStatus  = ObsActiveStatus.Active.some,
-      existence     = Existence.Present.some,
-      constraintSet = ConstraintSetInput.Default.some
+      subtitle          = Nullable.Null,
+      status            = ObsStatus.New.some,
+      activeStatus      = ObsActiveStatus.Active.some,
+      targetEnvironment = None,
+      constraintSet     = ConstraintSetInput.Default.some,
+      existence         = Existence.Present.some
     )
 
   val CreateBinding: Matcher[ObservationPropertiesInput] =
@@ -47,13 +48,13 @@ object ObservationPropertiesInput {
         ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
         ("visualizationTime", _),     // ignore for now
         ("posAngleConstraint", _),    // ignore for now
-        ("targetEnvironment", _),     // ignore for now
+        TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rSubtitle.map(Nullable.orNull), rObsStatus, rObsActiveStatus, rConstraintSet, rExistence).parMapN(apply)
+        (rSubtitle.map(Nullable.orNull), rObsStatus, rObsActiveStatus, rTargetEnvironment, rConstraintSet, rExistence).parMapN(apply)
     }
 
   val EditBinding: Matcher[ObservationPropertiesInput] =
@@ -64,13 +65,13 @@ object ObservationPropertiesInput {
         ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
         ("visualizationTime", _),     // ignore for now
         ("posAngleConstraint", _),    // ignore for now
-        ("targetEnvironment", _),     // ignore for now
+        TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),     // ignore for now
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rSubtitle, rObsStatus, rObsActiveStatus, rConstraintSet, rExistence).parMapN(apply)
+        (rSubtitle, rObsStatus, rObsActiveStatus, rTargetEnvironment, rConstraintSet, rExistence).parMapN(apply)
     }
 
 }
