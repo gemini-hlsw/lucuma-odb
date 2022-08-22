@@ -26,6 +26,7 @@ import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
+import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.TargetService
@@ -113,15 +114,16 @@ object OdbMapping {
           val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
           // Our services and resources needed by various mappings.
-          val user = user0
-          val topics = topics0
-          val allocationService  = pool.map(AllocationService.fromSessionAndUser(_, user))
-          val observationService = pool.map(ObservationService.fromSessionAndUser(_, user))
-          val programService     = pool.map(ProgramService.fromSessionAndUser(_, user))
-          val targetService      = pool.map(TargetService.fromSession(_, user))
+          override val user = user0
+          override val topics = topics0
+          override val allocationService  = pool.map(AllocationService.fromSessionAndUser(_, user))
+          override val asterismService    = pool.map(AsterismService.fromSessionAndUser(_, user))
+          override val observationService = pool.map(ObservationService.fromSessionAndUser(_, user))
+          override val programService     = pool.map(ProgramService.fromSessionAndUser(_, user))
+          override val targetService      = pool.map(TargetService.fromSession(_, user))
 
           // Our combined type mappings
-          val typeMappings: List[TypeMapping] =
+          override val typeMappings: List[TypeMapping] =
             List(
               AirMassRangeMapping,
               AllocationMapping,
@@ -171,7 +173,7 @@ object OdbMapping {
               ).combineAll
             )
 
-          // Overide `fetch` to log the query. This is optional.
+          // Override `fetch` to log the query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
