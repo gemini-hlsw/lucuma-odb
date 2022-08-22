@@ -43,7 +43,7 @@ trait RightAscensionMapping[F[_]]
         FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),
         FieldRef[RightAscension]("value").as("hours", c => BigDecimal(c.toHourAngle.toDoubleHours)),
         FieldRef[RightAscension]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-        FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
+        FieldRef[RightAscension]("value").as("microarcseconds", _.toAngle.toMicroarcseconds)
       )
     )
 

@@ -4,17 +4,18 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.apply._
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.parallel._
+import cats.syntax.apply.*
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.parallel.*
+import cats.syntax.validated.*
 import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
-import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.util.Bindings.*
 
 final case class AirMassRangeInput(
   min: Option[DecimalValue],
@@ -28,16 +29,21 @@ final case class AirMassRangeInput(
     max.flatMap(dv => PosBigDecimal.from(dv.value).toOption)
 
   def create: Result[AirMass] =
-    Result.fromOption[AirMass](
+    Result.fromOption(
       (min, max)
         .tupled
         .flatMap(AirMass.fromOrderedDecimalValues.getOption),
-      "Creating an air mass range requires specifying both min and max where min < max"
+      AirMassRangeInput.messages.BothMinAndMax
     )
 
 }
 
 object AirMassRangeInput {
+
+  object messages {
+    val BothMinAndMax: String =
+      "Creating an air mass range requires specifying both min and max where min < max"
+  }
 
   val Default: AirMassRangeInput =
     AirMassRangeInput(

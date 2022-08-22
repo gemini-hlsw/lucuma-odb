@@ -98,12 +98,9 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   private val CreateObservation =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child)=>
       observationService.use { svc =>
-        import ObservationService.CreateResult._
-        svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map {
-          case BadInput(problems)  => Ior.left(NonEmptyChain.fromNonEmptyList(problems))
-          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
-          case Success(id)         => Result(Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
-        }
+        svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
+          _.map(id => Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
+        )
       }
     }
 
@@ -177,16 +174,11 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           "Could not construct a subquery for the provided WHERE condition."
         )
 
-      import ObservationService.UpdateResult._
-
       idSelect.flatTraverse { which =>
         observationService.use { svc =>
           svc
             .updateObservations(input.SET, which)
-            .map {
-              case BadInput(ps) => Ior.left(NonEmptyChain.fromNonEmptyList(ps))
-              case Success(lst) => Result(Filter(ObservationPredicates.inObservationIds(lst), child))
-            }
+            .map(_.map(ids => Filter(ObservationPredicates.inObservationIds(ids), child)))
         }
       }
 

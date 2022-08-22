@@ -15,6 +15,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.graphql.input.CoordinatesInput
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
@@ -229,6 +230,123 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
+  test("[general] created observation has no explicit base by default") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+          }) {
+            observation {
+              targetEnvironment {
+                explicitBase {
+                  ra { hms }
+                  dec { dms }
+                }
+              }
+            }
+          }
+        }
+        """).map { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("targetEnvironment")
+          .downField("explicitBase")
+          .downField("ra")
+          .failed
+        assert(get, "Expected a failed cursor on ra")
+      }
+    }
+  }
+
+  test("[general] created observation should have specified explicit base") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            targetEnvironment: {
+              explicitBase: {
+                ra: { hms: "1:00:00" }
+                dec: { dms: "2:00:00" }
+              }
+            }
+          }
+        }) {
+          observation {
+            targetEnvironment {
+              explicitBase {
+                ra { hours }
+                dec { degrees }
+              }
+            }
+          }
+        }
+      }
+      """).flatMap { js =>
+        val c = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("targetEnvironment")
+          .downField("explicitBase")
+
+        val ra = c
+          .downField("ra")
+          .downField("hours")
+          .as[Int]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+
+        val dec = c
+          .downField("dec")
+          .downField("degrees")
+          .as[Int]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+
+        for {
+          _ <- assertIO(ra, 1)
+          _ <- assertIO(dec, 2)
+        } yield ()
+      }
+    }
+  }
+
+  test("[general] both ra and dec are required to set an explicit base") {
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(CoordinatesInput.messages.BothRaAndDecNeeded) {
+        query(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  targetEnvironment: {
+                    explicitBase: {
+                      ra: { hms: "1:00:00" }
+                    }
+                  }
+                }
+              }) {
+                observation {
+                  targetEnvironment {
+                    explicitBase {
+                      ra { hours }
+                    }
+                  }
+                }
+              }
+            }
+            """
+        )
+      }
+    }
+  }
+
   test("[general] created observation should have specified cloud extinction") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
@@ -346,7 +464,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
 
   test("[pi] pi can't create an observation in someone else's program") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action.") {
         createObservationAs(pi2, pid)
       }
     }
@@ -360,7 +478,7 @@ trait CreateObservationOps { this: OdbSuite =>
 
   def createObservationAs(
     user: User,
-    pid: Program.Id,
+    pid: Program.Id
   ): IO[Observation.Id] =
     query(user, s"mutation { createObservation(input: { programId: ${pid.asJson} }) { observation { id } } }").flatMap { js =>
       js.hcursor
