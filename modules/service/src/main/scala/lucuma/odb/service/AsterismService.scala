@@ -12,8 +12,6 @@ import cats.syntax.functor.*
 import cats.syntax.show.*
 import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
