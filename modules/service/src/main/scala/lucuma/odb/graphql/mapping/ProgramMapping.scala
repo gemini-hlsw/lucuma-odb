@@ -63,7 +63,7 @@ trait ProgramMapping[F[_]]
             Select("observations", Nil,
               Filter(and(List(
                 if (includeDeleted) True else Eql[Existence](UniquePath(List("existence")), Const(Existence.Present)),
-                OFFSET.fold[Predicate](True)(o => GtEql[Observation.Id](UniquePath(List("id")), Const(o))),
+                OFFSET.fold[Predicate](True)(o => GtEql[Observation.Id](UniquePath(List("id")), Const(o)))
               )),
               child
               )
