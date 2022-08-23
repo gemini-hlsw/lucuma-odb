@@ -9,6 +9,7 @@ import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.show.*
 import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
 import lucuma.core.model.Observation
@@ -33,6 +34,13 @@ trait AsterismService[F[_]] {
 }
 
 object AsterismService {
+
+  def ForeignKeyViolationMessage(
+    programId: Program.Id,
+    targetIds: NonEmptyList[Target.Id]
+  ): String =
+    s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
+
 
   /*
   create table t_asterism_target (
@@ -64,9 +72,8 @@ object AsterismService {
           p.execute(af.argument)
             .as(Result.unit)
             .recoverWith {
-              // TODO: not catching the problem
-              case SqlState.ForeignKeyViolation(ex) =>
-                Result.failure(ex.getMessage).pure[F]
+              case SqlState.ForeignKeyViolation(_) =>
+                Result.failure(ForeignKeyViolationMessage(programId, targetIds)).pure[F]
             }
         }
       }
