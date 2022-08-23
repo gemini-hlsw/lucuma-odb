@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
@@ -31,17 +32,31 @@ trait TargetEnvironmentMapping[F[_]]
   lazy val TargetEnvironmentType: TypeRef =
     schema.ref("TargetEnvironment")
 
+  private def asterismObject(name: String): SqlObject =
+    SqlObject(
+      name,
+      Join(ObservationView.Id, AsterismTargetTable.ObservationId),
+      Join(AsterismTargetTable.TargetId, TargetView.TargetId)
+    )
+
   lazy val TargetEnvironmentMapping: ObjectMapping =
     ObjectMapping(
       tpe = TargetEnvironmentType,
       fieldMappings = List(
         SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlObject("asterism",
-          Join(ObservationView.Id, AsterismTargetTable.ObservationId),
-          Join(AsterismTargetTable.TargetId, TargetView.TargetId)
-        ),
+        asterismObject("asterism"),
+        asterismObject("firstScienceTarget"),
         SqlObject("explicitBase")
       )
+    )
+
+  private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
+    FilterOrderByOffsetLimit(
+      pred   = Option.unless(includeDeleted)(Eql[Existence](UniquePath(List("existence")), Const(Existence.Present))),
+      oss    = List(OrderSelection(UniquePath[lucuma.core.model.Target.Id](List("id")))).some,
+      offset = none,
+      limit  = Option.when(firstOnly)(1),
+      child  = child
     )
 
   lazy val TargetEnvironmentElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
@@ -51,12 +66,15 @@ trait TargetEnvironmentMapping[F[_]]
           BooleanBinding("includeDeleted", rIncludeDeleted)
         ), child) =>
           rIncludeDeleted.map { includeDeleted =>
-            Select("asterism", Nil,
-              Filter(
-                if (includeDeleted) True else Eql[Existence](UniquePath(List("existence")), Const(Existence.Present)),
-                child
-              )
-            )
+            Select("asterism", Nil, asterismQuery(includeDeleted, firstOnly = false, child))
+          }
+
+        // TODO: not yet working
+        case Select("firstScienceTarget", List(
+          BooleanBinding("includeDeleted", rIncludeDeleted)
+        ), child) =>
+          rIncludeDeleted.map { includeDeleted =>
+            Select("firstScienceTarget", Nil, Unique(asterismQuery(includeDeleted, firstOnly = true, child)))
           }
       }
     )
