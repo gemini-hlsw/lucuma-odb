@@ -5,8 +5,11 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Sync
+import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -25,7 +28,7 @@ trait AsterismService[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     targetIds:     NonEmptyList[Target.Id]
-  ): F[Unit]
+  ): F[Result[Unit]]
 
 }
 
@@ -55,11 +58,18 @@ object AsterismService {
         programId:     Program.Id,
         observationId: Observation.Id,
         targetIds:     NonEmptyList[Target.Id]
-      ): F[Unit] =
+      ): F[Result[Unit]] = {
         val af = Statements.insertLinksAs(user, programId, observationId, targetIds.toList)
         session.prepare(af.fragment.command).use { p =>
-          p.execute(af.argument).void
+          p.execute(af.argument)
+            .as(Result.unit)
+            .recoverWith {
+              // TODO: not catching the problem
+              case SqlState.ForeignKeyViolation(ex) =>
+                Result.failure(ex.getMessage).pure[F]
+            }
         }
+      }
     }
 
   object Statements {

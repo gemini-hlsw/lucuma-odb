@@ -6,12 +6,14 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
@@ -410,7 +412,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-    test("[general] created observation should have specified air mass") {
+  test("[general] created observation should have specified air mass") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
         s"""
@@ -455,6 +457,89 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
+  test("[general] created observation should have specified asterism") {
+
+    def createObs(pid: Program.Id, t0: Target.Id, t1: Target.Id): IO[List[Target.Id]] =
+      query(
+        pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [ ${t0.asJson}, ${t1.asJson} ]
+                }
+              }
+            }) {
+              observation {
+                targetEnvironment {
+                  asterism {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        """.stripMargin
+      ).map { js =>
+        js
+          .hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("targetEnvironment")
+          .downField("asterism")
+          .values
+          .toList // List[Iterable[Json]]
+          .flatMap { it =>
+            it.toList.flatMap { targetJson =>
+              targetJson.hcursor.downField("id").as[Target.Id].toOption.toList
+            }
+          }
+      }
+
+    for {
+      pid <- createProgramAs(pi)
+      t0  <- createEmptyTargetAs(pi, pid, "Biff")
+      t1  <- createEmptyTargetAs(pi, pid, "Henderson")
+      res <- createObs(pid, t0, t1)
+    } yield assertEquals(res, List(t0, t1))
+  }
+
+  test("[general] handle unknown target id") {
+
+    def createObs(pid: Program.Id): IO[Unit] =
+      interceptGraphQL("foo")(
+        query(
+          pi,
+          s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [ ${Target.Id.fromLong(1).get.asJson} ]
+                }
+              }
+            }) {
+              observation {
+                targetEnvironment {
+                  asterism {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        """.stripMargin
+        )
+      )
+
+    for {
+      pid <- createProgramAs(pi)
+      _   <- createObs(pid)
+    } yield ()
+  }
 
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>
@@ -486,6 +571,51 @@ trait CreateObservationOps { this: OdbSuite =>
         .downField("observation")
         .downField("id")
         .as[Observation.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def createEmptyTargetAs(
+    user: User,
+    pid:  Program.Id,
+    name: String
+  ): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                sidereal: {
+                  ra: { hours: "0.0" }
+                  dec: { degrees: "0.0" }
+                }
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: B5_III
+                      }
+                      brightnesses: []
+                    }
+                  }
+                }
+              }
+            }
+          ) {
+            target { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("createTarget")
+        .downField("target")
+        .downField("id")
+        .as[Target.Id]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }

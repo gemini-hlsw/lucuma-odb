@@ -111,19 +111,18 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           )
         }
 
-      def insertAst(oid: Option[Observation.Id]): F[Unit] =
-        oid.traverse { o =>
+      def insertAst(oid: Option[Observation.Id]): F[Result[Unit]] =
+        oid.flatTraverse { o =>
           input.asterism.toOption.traverse { a =>
             asterismService.use(_.insertAsterism(input.programId, o, a))
           }
-        }.void
+        }.map(_.getOrElse(Result.unit))
 
       for {
-        r    <- createObs
-        oid   = r.toOption.map(_._1)
-        query = r.map(_._2)
-        _    <- insertAst(oid)
-      } yield query
+        rTup <- createObs
+        oid   = rTup.toOption.map(_._1)
+        rUni <- insertAst(oid)
+      } yield (rTup, rUni).parMapN { case ((_, query), _) =>  query }
     }
 
   private val CreateProgram =
