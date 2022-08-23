@@ -169,6 +169,7 @@ object OdbMapping {
                 MutationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,
+                TargetEnvironmentElaborator,
                 QueryElaborator,
               ).combineAll
             )

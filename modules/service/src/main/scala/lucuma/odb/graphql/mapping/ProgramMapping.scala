@@ -33,9 +33,10 @@ trait ProgramMapping[F[_]]
 
   def user: User
 
-  lazy val ProgramType = schema.ref("Program")
+  lazy val ProgramType: TypeRef =
+    schema.ref("Program")
 
-  lazy val ProgramMapping =
+  lazy val ProgramMapping: ObjectMapping =
     ObjectMapping(
       tpe = ProgramType,
       fieldMappings = List(
@@ -46,8 +47,8 @@ trait ProgramMapping[F[_]]
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
         SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
         SqlObject("plannedTime"),
-        SqlObject("observations", Join(ProgramTable.Id, ObservationView.ProgramId)),
-      ),
+        SqlObject("observations", Join(ProgramTable.Id, ObservationView.ProgramId))
+      )
     )
 
   lazy val ProgramElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =

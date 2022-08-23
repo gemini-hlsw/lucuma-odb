@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.TargetView
@@ -14,9 +15,10 @@ trait TargetMapping[F[_]]
   extends ProgramTable[F]
      with TargetView[F] { this: SkunkMapping[F] =>
 
-  lazy val TargetType = schema.ref("Target")
+  lazy val TargetType: TypeRef =
+    schema.ref("Target")
 
-  lazy val TargetMapping =
+  lazy val TargetMapping: ObjectMapping =
     ObjectMapping(
       tpe = TargetType,
       fieldMappings = List(
@@ -26,8 +28,8 @@ trait TargetMapping[F[_]]
         SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
         SqlJson("sourceProfile", TargetView.SourceProfile),
         SqlObject("sidereal"),
-        SqlObject("nonsidereal"),
-      ),
+        SqlObject("nonsidereal")
+      )
     )
 
 }
