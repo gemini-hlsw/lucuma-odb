@@ -7,13 +7,13 @@ package mapping
 
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Result
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding._

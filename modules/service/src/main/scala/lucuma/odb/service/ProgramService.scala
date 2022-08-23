@@ -13,8 +13,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
-import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.StandardRole.Ngo
+import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
