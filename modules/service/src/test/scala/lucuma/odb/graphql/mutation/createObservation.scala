@@ -4,11 +4,12 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import io.circe.Json
-import io.circe.literal._
-import io.circe.syntax._
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
@@ -18,6 +19,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.input.CoordinatesInput
+import lucuma.odb.service.AsterismService
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
@@ -489,13 +491,10 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           .downField("observation")
           .downField("targetEnvironment")
           .downField("asterism")
-          .values
-          .toList // List[Iterable[Json]]
-          .flatMap { it =>
-            it.toList.flatMap { targetJson =>
-              targetJson.hcursor.downField("id").as[Target.Id].toOption.toList
-            }
-          }
+          .values              // Option[Iterable[Json]]
+          .toList              // List[Iterable[Json]]
+          .flatMap(_.toList)   // List[Json]
+          .flatMap(_.hcursor.downField("id").as[Target.Id].toOption.toList)
       }
 
     for {
@@ -508,8 +507,10 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
 
   test("[general] handle unknown target id") {
 
+    val fakeTarget: Target.Id = Target.Id.fromLong(1).get
+
     def createObs(pid: Program.Id): IO[Unit] =
-      interceptGraphQL("foo")(
+      interceptGraphQL(AsterismService.ForeignKeyViolationMessage(pid, NonEmptyList.one(fakeTarget)))(
         query(
           pi,
           s"""
@@ -518,7 +519,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
               programId: ${pid.asJson}
               SET: {
                 targetEnvironment: {
-                  asterism: [ ${Target.Id.fromLong(1).get.asJson} ]
+                  asterism: [ ${fakeTarget.asJson} ]
                 }
               }
             }) {
