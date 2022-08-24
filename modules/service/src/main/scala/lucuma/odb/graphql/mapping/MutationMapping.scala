@@ -126,7 +126,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
             rUnit <- insertAsterism(oid)
             query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
             // Fail altogether if there was an issue, say, creating the asterism
-            _     <- query.left.fold(Applicative[F].unit)(_ => xa.rollback.void)
+            _     <- query.left.traverse_(_ => xa.rollback)
           } yield query
         }
       }
