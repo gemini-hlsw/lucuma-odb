@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
@@ -14,9 +15,10 @@ trait ObservationMapping[F[_]]
   extends ObservationView[F]
      with ProgramTable[F] { this: SkunkMapping[F] =>
 
-  lazy val ObservationType = schema.ref("Observation")
+  lazy val ObservationType: TypeRef =
+    schema.ref("Observation")
 
-  lazy val ObservationMapping =
+  lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
       tpe = ObservationType,
       fieldMappings = List(

@@ -4,8 +4,10 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.Applicative
 import cats.data.Ior
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.syntax.all.*
@@ -20,6 +22,8 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.CreateObservationInput
@@ -37,6 +41,7 @@ import lucuma.odb.graphql.util.Bindings.Matcher
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
+import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.TargetService
@@ -62,10 +67,10 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       LinkUser,
       SetAllocation,
       UpdateObservations,
-      UpdatePrograms,
+      UpdatePrograms
     )
 
-  lazy val MutationMapping =
+  lazy val MutationMapping: ObjectMapping =
     ObjectMapping(tpe = MutationType, fieldMappings = mutationFields.map(_.FieldMapping))
 
   lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
@@ -73,6 +78,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   // Resources needed by mutations
   def allocationService: Resource[F, AllocationService[F]]
+  def asterismService: Resource[F, AsterismService[F]]
   def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
   def targetService: Resource[F, TargetService[F]]
@@ -95,12 +101,34 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   // Field definitions
 
-  private val CreateObservation =
-    MutationField("createObservation", CreateObservationInput.Binding) { (input, child)=>
-      observationService.use { svc =>
-        svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
-          _.map(id => Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
-        )
+  private val CreateObservation: MutationField =
+    MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
+
+      val createObs: F[Result[(Observation.Id, Query)]] =
+        observationService.use { svc =>
+          svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
+            _.fproduct(id => Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
+          )
+        }
+
+      def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
+        oid.flatTraverse { o =>
+          input.asterism.toOption.traverse { a =>
+            asterismService.use(_.insertAsterism(input.programId, o, a))
+          }
+        }.map(_.getOrElse(Result.unit))
+
+      pool.use { s =>
+        s.transaction.use { xa =>
+          for {
+            rTup  <- createObs
+            oid    = rTup.toOption.map(_._1)
+            rUnit <- insertAsterism(oid)
+            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+            // Fail altogether if there was an issue, say, creating the asterism
+            _     <- query.left.traverse_(_ => xa.rollback)
+          } yield query
+        }
       }
     }
 
@@ -133,7 +161,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         case Success(pid, uid)       =>
           Result(Unique(Filter(And(
             Eql(UniquePath(List("programId")), Const(pid)),
-            Eql(UniquePath(List("userId")), Const(uid)),
+            Eql(UniquePath(List("userId")), Const(uid))
           ), child)))
       }
     }
@@ -148,7 +176,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         case Success             =>
           Result(Unique(Filter(And(
             Eql(UniquePath(List("programId")), Const(input.programId)),
-            Eql(UniquePath(List("partner")), Const(input.partner)),
+            Eql(UniquePath(List("partner")), Const(input.partner))
           ), child)))
       }
     }
@@ -191,7 +219,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       val filterPredicate = and(List(
         ProgramPredicates.isWritableBy(user),
         ProgramPredicates.includeDeleted(input.includeDeleted.getOrElse(false)),
-        input.WHERE.getOrElse(True),
+        input.WHERE.getOrElse(True)
       ))
 
       // An applied fragment that selects all program ids that satisfy `filterPredicate`
