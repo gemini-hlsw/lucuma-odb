@@ -5,15 +5,27 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 final case class CreateObservationInput(
   programId: Program.Id,
   SET: Option[ObservationPropertiesInput]
-)
+) {
+
+  def asterism: Nullable[NonEmptyList[Target.Id]] =
+    for {
+      p <- Nullable.orAbsent(SET)
+      t <- Nullable.orAbsent(p.targetEnvironment)
+      a <- t.asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+    } yield a
+
+}
 
 object CreateObservationInput {
 

@@ -151,11 +151,7 @@ object ObservationService {
 
   object Statements {
 
-    import ProgramService.Statements.{
-      existsUserAsPi,
-      existsUserAsCoi,
-      existsAllocationForPartner
-    }
+    import ProgramService.Statements.whereUserAccess
 
     def insertObservationAs(
       user:      User,
@@ -207,21 +203,11 @@ object ObservationService {
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)
         )
 
-      val where: AppliedFragment =
-        user.role match {
-          case GuestRole       => void"WHERE " |+| existsUserAsPi(programId, user.id)
-          case Pi(_)           => void"WHERE " |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id)
-          case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(programId, Tag(partner.tag))
-          case ServiceRole(_)  |
-               Admin(_)        |
-               Staff(_)        => AppliedFragment.empty
-        }
-
       val returning: AppliedFragment =
         void"RETURNING c_observation_id"
 
       // done!
-      insert |+| where |+| returning
+      insert |+| whereUserAccess(user, programId) |+| returning
 
     }
 

@@ -13,6 +13,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
+import lucuma.core.model.StandardRole.Ngo
+import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
@@ -176,6 +178,21 @@ object ProgramService {
       sql"""
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=$tag and c_duration > 'PT')
         """.apply(programId ~ partner)
+
+
+    def whereUserAccess(
+      user:      User,
+      programId: Program.Id
+    ): AppliedFragment =
+      user.role match {
+        case GuestRole       => void"WHERE " |+| existsUserAsPi(programId, user.id)
+        case Pi(_)           => void"WHERE " |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id)
+        case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(programId, Tag(partner.tag))
+        case ServiceRole(_)        |
+             StandardRole.Admin(_) |
+             StandardRole.Staff(_)   => AppliedFragment.empty
+      }
+
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
     val InsertProgram: Query[Option[NonEmptyString] ~ User, Program.Id] =
