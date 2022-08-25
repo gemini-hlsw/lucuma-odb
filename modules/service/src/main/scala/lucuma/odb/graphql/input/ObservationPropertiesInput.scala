@@ -16,16 +16,16 @@ import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 final case class ObservationPropertiesInput(
-  subtitle:      Nullable[NonEmptyString],
-  status:        Option[ObsStatus],
-  activeStatus:  Option[ObsActiveStatus],
+  subtitle:          Nullable[NonEmptyString],
+  status:            Option[ObsStatus],
+  activeStatus:      Option[ObsActiveStatus],
   // visualizationTime: Option[Instant],
   // posAngleConstraint: Option[PosAngleConstraintInput],
   targetEnvironment: Option[TargetEnvironmentInput],
-  constraintSet: Option[ConstraintSetInput],
+  constraintSet:     Option[ConstraintSetInput],
   // scienceRequirements: Option[ScienceRequirementsInput],
   // scienceMode: Option[ScienceModeInput],
-  existence:     Option[Existence]
+  existence:         Option[Existence]
 )
 
 object ObservationPropertiesInput {
