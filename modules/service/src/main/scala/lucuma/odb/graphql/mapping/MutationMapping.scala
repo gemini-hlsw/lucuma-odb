@@ -114,7 +114,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
         oid.flatTraverse { o =>
           input.asterism.toOption.traverse { a =>
-            asterismService.use(_.insertAsterism(input.programId, o, a))
+            asterismService.use(_.insertAsterism(input.programId, NonEmptyList.one(o), a))
           }
         }.map(_.getOrElse(Result.unit))
 
