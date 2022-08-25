@@ -8,16 +8,16 @@ package predicates
 import edu.gemini.grackle.Path.ListPath
 import edu.gemini.grackle.Path.UniquePath
 import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
+import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.core.model.Access._
+import lucuma.core.model.Access.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
-
 import mapping.ObservationMapping
 
-trait ObservationPredicates[F[_]] extends ObservationMapping[F] { this: SkunkMapping[F] =>
+trait ObservationPredicates[F[_]] extends ObservationMapping[F]
+                                     with ProgramPredicates[F] { this: SkunkMapping[F] =>
 
     object ObservationPredicates {
 
@@ -31,15 +31,7 @@ trait ObservationPredicates[F[_]] extends ObservationMapping[F] { this: SkunkMap
         In(UniquePath(List("id")), oids)
 
       def isVisibleTo(user: User): Predicate =
-        user.role.access match {
-          case Guest | Pi =>
-            Or(
-              Contains(ListPath(List("program", "users", "userId")), Const(user.id)), // user is linked, or
-              Eql(UniquePath(List("program", "piUserId")), Const(user.id))            // user is the PI
-            )
-          case Ngo => ???
-          case Staff | Admin | Service => True
-        }
+        ProgramPredicates.isVisibleTo(user, List("program"))
 
       def isWritableBy(user: User): Predicate =
         isVisibleTo(user)

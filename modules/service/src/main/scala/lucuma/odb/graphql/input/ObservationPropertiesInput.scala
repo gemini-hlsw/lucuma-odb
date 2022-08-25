@@ -5,9 +5,11 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.ConstraintSet
+import lucuma.core.model.Target
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObsActiveStatus
@@ -26,7 +28,15 @@ final case class ObservationPropertiesInput(
   // scienceRequirements: Option[ScienceRequirementsInput],
   // scienceMode: Option[ScienceModeInput],
   existence:         Option[Existence]
-)
+) {
+
+  def asterism: Nullable[NonEmptyList[Target.Id]] =
+    for {
+      t <- Nullable.orAbsent(targetEnvironment)
+      a <- t.asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+    } yield a
+
+}
 
 object ObservationPropertiesInput {
 
