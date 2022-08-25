@@ -17,7 +17,7 @@ import java.time.format.DateTimeParseException
 
 object Bindings {
 
-  trait Matcher[A] { outer =>
+  trait Matcher[+A] { outer =>
 
     def validate(v: Value): Either[String, A]
 
@@ -67,6 +67,19 @@ object Bindings {
       ListBinding.emap { vs =>
         // This fast-fails on the first invalid one, which is the best we can do
         vs.zipWithIndex.traverse { case (v, n) => validate(v).leftMap(s => s"at index $n: $s") }
+      }
+
+    def or[B](mb: Matcher[B]): Matcher[Either[A, B]] =
+      new Matcher[Either[A, B]] {
+        def validate(v: Value): Either[String, Either[A, B]] =
+          outer.validate(v).map(_.asLeft) orElse
+          mb.validate(v).map(_.asRight)
+      }
+
+    def orElse[B >: A](mb: Matcher[B]) =
+      new Matcher[B] {
+        def validate(v: Value): Either[String, B] =
+          outer.validate(v) orElse mb.validate(v)
       }
 
   }

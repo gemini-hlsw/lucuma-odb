@@ -22,16 +22,22 @@ object ProgramPropertiesInput {
   val Default: ProgramPropertiesInput =
     ProgramPropertiesInput(None, None, None)
 
-  val Binding: Matcher[ProgramPropertiesInput] =
+  private def binding(
+    proposal: Matcher[ProposalInput]
+  ): Matcher[ProgramPropertiesInput] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("name", rName),
-        ProposalInput.Binding.Option("proposal", rProposal),
+        ProposalInput.CreateBinding.Option("proposal", rProposal),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rProposal, rExistence).parMapN { (on, op, oe) =>
-          ProgramPropertiesInput(on, op, oe)
-       }
+        (rName, rProposal, rExistence).parMapN(apply)
     }
+
+  val CreateBinding: Matcher[ProgramPropertiesInput] =
+    binding(ProposalInput.CreateBinding)
+
+  val EditBinding: Matcher[ProgramPropertiesInput] =
+    binding(ProposalInput.EditBinding)
 
 }

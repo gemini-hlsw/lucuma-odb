@@ -26,6 +26,7 @@ import natchez.Trace
 import skunk._
 import skunk.syntax.all._
 import skunk.codec.all._
+import lucuma.core.model.IntPercent
 
 trait ProgramService[F[_]] {
 
@@ -106,9 +107,12 @@ object ProgramService {
       def insertProgram(SET: ProgramPropertiesInput): F[Program.Id] =
         Trace[F].span("insertProgram") {
           s.transaction.use { _ =>
-            s.prepare(Statements.InsertProgram).use(ps => ps.unique(SET.name ~ user)).flatTap { pid =>
+            s.prepare(Statements.InsertProgram).use(_.unique(SET.name ~ user)).flatTap { pid =>
               SET.proposal.traverse { proposalInput =>
-                s.prepare(Statements.InsertProposal).use(ps => ps.execute(pid ~ proposalInput))
+                s.prepare(Statements.InsertProposal).use(_.execute(pid ~ proposalInput)) >>
+                proposalInput.partnerSplits.traverse { splits =>
+                  s.prepare(Statements.insertPartnerSplits(splits)).use(_.execute(pid ~ splits))
+                }
               }
             }
           }
@@ -242,14 +246,23 @@ object ProgramService {
          .contramap {
             case pid ~ ppi =>
               pid ~
-              ppi.title ~
-              ppi.abstrakt ~
-              ppi.category ~
+              ppi.title.toOption ~
+              ppi.abstrakt.toOption ~
+              ppi.category.toOption ~
               ppi.toOActivation ~
-              ppi.proposalClass.tag ~
-              ppi.proposalClass.minPercentTime ~
-              ppi.proposalClass.minPercentTotalTime ~
-              ppi.proposalClass.totalTime.map(_.value)
+              ppi.proposalClass.get.tag ~ // TODO: fix this!
+              ppi.proposalClass.get.minPercentTime.get ~ // TODO: fix this!
+              ppi.proposalClass.get.minPercentTotalTime ~ // TODO: fix this!
+              ppi.proposalClass.get.totalTime.map(_.value) // TODO: fix this!
+         }
+
+    def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =
+      sql"""
+         INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
+         VALUES ${(program_id ~ tag ~ int_percent).values.list(splits.size)}
+      """.command
+         .contramap {
+          case pid ~ splits => splits.toList.map { case (t, p) => pid ~ t ~ p }
          }
 
     /** Link a user to a program, without any access checking. */

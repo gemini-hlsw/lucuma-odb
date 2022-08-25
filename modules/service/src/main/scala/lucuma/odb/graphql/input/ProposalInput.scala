@@ -14,19 +14,20 @@ import lucuma.odb.data.Tag
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
 import edu.gemini.grackle.Result
+import lucuma.odb.data.Nullable
 
 case class ProposalInput(
-  title: Option[NonEmptyString],
-  proposalClass: ProposalClassInput,
-  category: Option[Tag],
+  title: Nullable[NonEmptyString],
+  proposalClass: Option[ProposalClassInput],
+  category: Nullable[Tag],
   toOActivation: Option[ToOActivation],
-  abstrakt: Option[NonEmptyString],
+  abstrakt: Nullable[NonEmptyString],
   partnerSplits: Option[Map[Tag, IntPercent]],
 )
 
 object ProposalInput {
 
-  val PartnerSplitsInput: Matcher[Map[Tag, IntPercent]] =
+  private val PartnerSplitsInput: Matcher[Map[Tag, IntPercent]] =
     PartnerSplitInput.Binding.List.rmap { splits =>
       val map = splits.map(a => (a.partner -> a.percent)).toMap
       if splits.length != map.size
@@ -37,18 +38,29 @@ object ProposalInput {
         else Result(map)
     }
 
-  val Binding: Matcher[ProposalInput] =
+  private def binding(
+    proposalClass: Matcher[ProposalClassInput]
+  ): Matcher[ProposalInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        NonEmptyStringBinding.Option("title", rTitle),
-        ProposalClassInput.Binding("proposalClass", rProposalClass),
-        TagBinding.Option("category", rCategory),
+        NonEmptyStringBinding.Nullable("title", rTitle),
+        proposalClass.Option("proposalClass", rProposalClass),
+        TagBinding.Nullable("category", rCategory),
         ToOActivationBinding.Option("toOActivation", rToOActivation),
-        NonEmptyStringBinding.Option("abstract", rAbstract),
+        NonEmptyStringBinding.Nullable("abstract", rAbstract),
         PartnerSplitsInput.Option("partnerSplits", rSplits),
       ) =>
         (rTitle, rProposalClass, rCategory, rToOActivation, rAbstract, rSplits).parMapN(apply)
     }
+
+  val CreateBinding: Matcher[ProposalInput] =
+    binding(ProposalClassInput.CreateBinding).rmap {
+      case ok @ ProposalInput(_, Some(_), _, Some(_), _, Some(_)) => Result(ok)
+      case _ => Result.failure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
+    }
+
+  val EditBinding: Matcher[ProposalInput] =
+    binding(ProposalClassInput.EditBinding)
 
 }
 

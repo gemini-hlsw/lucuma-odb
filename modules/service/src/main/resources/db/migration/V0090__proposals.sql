@@ -76,8 +76,9 @@ create table t_proposal (
 -- Partner Splits
 
 create table t_partner_split (
-  c_program_id        d_program_id      not null  primary key references t_program(c_program_id) on delete cascade,
+  c_program_id        d_program_id      not null  references t_program(c_program_id) on delete cascade,
   c_partner           d_tag             not null  references t_partner(c_tag),
-  c_percent           d_int_percentage  not null
+  c_percent           d_int_percentage  not null,
+  unique(c_program_id, c_partner)
 );
 
