@@ -148,7 +148,7 @@ object AsterismService {
         links.intercalate(void", ")
 
       val as: AppliedFragment =
-        void""") AS t (c_program_id, c_observation_id, c_target_id)"""
+        void""") AS t (c_program_id, c_observation_id, c_target_id) """
 
       insert |+| values |+| as |+| whereUserAccess(user, programId)
     }
@@ -168,7 +168,7 @@ object AsterismService {
         }
 
       void"DELETE FROM ONLY t_asterism_target "                  |+|
-        void"WHERE c_observation_id IN (" |+| which |+| void")" |+|
+        void"WHERE c_observation_id IN (" |+| which |+| void") " |+|
         andExistsUserAccess
     }
 

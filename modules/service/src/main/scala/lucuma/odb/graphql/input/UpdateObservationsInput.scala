@@ -5,10 +5,13 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings.*
 
@@ -17,7 +20,12 @@ final case class UpdateObservationsInput(
   WHERE:          Option[Predicate],
   LIMIT:          Option[NonNegInt],
   includeDeleted: Option[Boolean]
-)
+) {
+
+  def asterism: Nullable[NonEmptyList[Target.Id]] =
+    SET.asterism
+
+}
 
 object UpdateObservationsInput {
 

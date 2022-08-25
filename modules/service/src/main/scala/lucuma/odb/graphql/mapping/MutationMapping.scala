@@ -23,6 +23,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.binding._
@@ -191,7 +192,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         input.WHERE.getOrElse(True)
       ))
 
-      // An applied fragment that selects all program ids that satisfy
+      // An applied fragment that selects all observation ids that satisfy
       // `filterPredicate`
       val idSelect: Result[AppliedFragment] =
         Result.fromOption(
@@ -202,14 +203,25 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           "Could not construct a subquery for the provided WHERE condition."
         )
 
-      idSelect.flatTraverse { which =>
-        observationService.use { svc =>
-          svc
-            .updateObservations(input.SET, which)
-            .map(_.map(ids => Filter(ObservationPredicates.inObservationIds(ids), child)))
+      val updateObservations: F[Result[(List[Observation.Id], Query)]] =
+        idSelect.flatTraverse { which =>
+          observationService.use { svc =>
+            svc
+              .updateObservations(input.SET, which)
+              .map(_.fproduct(ids => Filter(ObservationPredicates.inObservationIds(ids), child)))
+          }
+        }
+
+/*
+      val updateAsterisms(oids: List[Observation.Id]): F[Result[Unit]] = {
+        input.asterism
+        NonEmptyList.of(oids).map { os =>
+          asterismService.use(_.updateAsterism())
         }
       }
+*/
 
+      updateObservations.map(_.map(_._2))
     }
 
   private val UpdatePrograms =
