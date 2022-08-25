@@ -23,7 +23,7 @@ object UpdateProgramsInput {
   val Binding =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramPropertiesInput.Binding("SET", rSET),
+        ProgramPropertiesInput.EditBinding("SET", rSET),
         WhereProgram.Binding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)

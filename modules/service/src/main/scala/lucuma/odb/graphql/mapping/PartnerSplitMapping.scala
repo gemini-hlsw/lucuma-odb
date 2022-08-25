@@ -22,7 +22,7 @@ trait PartnerSplitMapping[F[_]]
       tpe = PartnerSplitType,
       fieldMappings = List(
         SqlField("program_id", PartnerSplitTable.ProgramId, key = true, hidden = true),
-        SqlField("partner", PartnerSplitTable.Partner),
+        SqlField("partner", PartnerSplitTable.Partner, key = true),
         SqlField("percent", PartnerSplitTable.Percent),
       )
     )
