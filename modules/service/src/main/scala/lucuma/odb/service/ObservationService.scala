@@ -55,8 +55,8 @@ trait ObservationService[F[_]] {
   import ObservationService._
 
   def createObservation(
-    programId:   Program.Id,
-    SET:         ObservationPropertiesInput
+    programId: Program.Id,
+    SET:       ObservationPropertiesInput
   ): F[Result[Observation.Id]]
 
   def updateObservations(
@@ -135,17 +135,14 @@ object ObservationService {
         SET:   ObservationPropertiesInput,
         which: AppliedFragment
       ): F[Result[List[Observation.Id]]] =
-        Statements.updateObservations(SET, which).flatTraverse { oaf =>
-          oaf.toList.flatTraverse { af =>
-            session.prepare(af.fragment.query(observation_id)).use { pq =>
-              pq.stream(af.argument, chunkSize = 1024).compile.toList
-            }
-          }.map(Result(_))
-           .recoverWith {
-             case SqlState.CheckViolation(ex) =>
-               Result.failure(constraintViolationMessage(ex)).pure[F]
-           }
-        }
+        Statements.updateObservations(SET, which).traverse { af =>
+          session.prepare(af.fragment.query(observation_id)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList
+          }
+        }.recoverWith {
+           case SqlState.CheckViolation(ex) =>
+             Result.failure(constraintViolationMessage(ex)).pure[F]
+         }
     }
 
 
@@ -362,15 +359,17 @@ object ObservationService {
     def updateObservations(
       SET:   ObservationPropertiesInput,
       which: AppliedFragment
-    ): Result[Option[AppliedFragment]] =
-      updates(SET).map {
-        _.map { us =>
-          void"UPDATE t_observation " |+|
-            void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-            void"WHERE t_observation.c_observation_id IN (" |+| which |+| void")" |+|
-            void"RETURNING t_observation.c_observation_id"
-        }
-      }
+    ): Result[AppliedFragment] = {
+
+      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
+        void"UPDATE t_observation "                                              |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" "                    |+|
+          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") " |+|
+          void"RETURNING t_observation.c_observation_id"
+
+      updates(SET).map(_.fold(which)(update))
+
+    }
 
   }
 
