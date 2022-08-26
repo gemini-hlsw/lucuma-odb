@@ -14,6 +14,7 @@ import lucuma.core.model.Access.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+
 import mapping.ObservationMapping
 
 trait ObservationPredicates[F[_]] extends ObservationMapping[F]
