@@ -105,7 +105,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   private val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
 
-      val createObs: F[Result[(Observation.Id, Query)]] =
+      val createObservation: F[Result[(Observation.Id, Query)]] =
         observationService.use { svc =>
           svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
             _.fproduct(id => Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
@@ -122,7 +122,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       pool.use { s =>
         s.transaction.use { xa =>
           for {
-            rTup  <- createObs
+            rTup  <- createObservation
             oid    = rTup.toOption.map(_._1)
             rUnit <- insertAsterism(oid)
             query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
@@ -185,8 +185,9 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   private val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.Binding) { (input, child) =>
 
-      // Predicate for selecting programs to update
+      // Predicate for selecting observations to update
       val filterPredicate: Predicate = and(List(
+        Eql(UniquePath(List("program", "id")), Const(input.programId)),
         ObservationPredicates.isWritableBy(user),
         ObservationPredicates.includeDeleted(input.includeDeleted.getOrElse(false)),
         input.WHERE.getOrElse(True)
@@ -208,20 +209,43 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           observationService.use { svc =>
             svc
               .updateObservations(input.SET, which)
-              .map(_.fproduct(ids => Filter(ObservationPredicates.inObservationIds(ids), child)))
+              .map(_.fproduct {
+
+                // When there are no selected ids, return a Query which matches
+                // nothing (i.e., no results for the update).
+
+                // "In" Predicate is used in the normal case where there is
+                // at least one matching observation id.  But "In" requires a
+                // non-empty list (eventually) so we need to catch the Nil
+                // case.
+
+                // Produces "Unable to map query":
+                // case Nil => Filter(False, child)
+
+                // Work around using a zero limit
+                case Nil => Limit(0, child)
+
+                case ids => Filter(ObservationPredicates.inObservationIds(ids), child)
+              })
           }
         }
 
-/*
-      val updateAsterisms(oids: List[Observation.Id]): F[Result[Unit]] = {
-        input.asterism
-        NonEmptyList.of(oids).map { os =>
-          asterismService.use(_.updateAsterism())
+      def updateAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+        NonEmptyList.fromList(oids).traverse { os =>
+          asterismService.use(_.updateAsterism(input.programId, os, input.asterism))
+        }.map(_.getOrElse(Result.unit))
+
+      pool.use { s =>
+        s.transaction.use { xa =>
+          for {
+            rTup  <- updateObservations
+            oids   = rTup.toList.flatMap(_._1)
+            rUnit <- updateAsterisms(oids)
+            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+            _     <- query.left.traverse_(_ => xa.rollback)
+          } yield query
         }
       }
-*/
-
-      updateObservations.map(_.map(_._2))
     }
 
   private val UpdatePrograms =

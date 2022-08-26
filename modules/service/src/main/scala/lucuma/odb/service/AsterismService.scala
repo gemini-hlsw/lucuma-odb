@@ -92,12 +92,11 @@ object AsterismService {
       override def deleteAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id]
-      ): F[Result[Unit]] = {
+      ): F[Result[Unit]] =
         val af = Statements.deleteLinksAs(user, programId, observationIds)
         session.prepare(af.fragment.command).use { p =>
           p.execute(af.argument).as(Result.unit)
         }
-      }
 
       override def updateAsterism(
         programId:      Program.Id,

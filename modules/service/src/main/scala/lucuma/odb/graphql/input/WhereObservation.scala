@@ -16,9 +16,6 @@ import lucuma.odb.graphql.util.Bindings._
 
 object WhereObservation {
 
-  private val ProgramIdBinding: Matcher[Predicate] =
-    WhereOrder.ProgramIdWithPath("programId")
-
   private val SubtitleBinding: Matcher[Predicate] =
     WhereOptionString.binding(UniquePath(List("subtitle")))
 
@@ -35,18 +32,16 @@ object WhereObservation {
         WhereObservation.Binding.List.Option("OR", rOR),
         WhereObservation.Binding.Option("NOT", rNOT),
         WhereOrder.ObservationId.Option("id", rId),
-        ProgramIdBinding.Option("programId", rPid),
         SubtitleBinding.Option("subtitle", rSubtitle),
         StatusBinding.Option("status", rStatus),
         ActiveStatusBinding.Option("activeStatus", rActiveStatus)
       ) =>
-        (rAND, rOR, rNOT, rId, rPid, rSubtitle, rStatus, rActiveStatus).parMapN { (AND, OR, NOT, id, pid, subtitle, status, activeStatus) =>
+        (rAND, rOR, rNOT, rId, rSubtitle, rStatus, rActiveStatus).parMapN { (AND, OR, NOT, id, subtitle, status, activeStatus) =>
           and(List(
             AND.map(and),
             OR.map(or),
             NOT.map(Not(_)),
             id,
-            pid,
             subtitle,
             status,
             activeStatus

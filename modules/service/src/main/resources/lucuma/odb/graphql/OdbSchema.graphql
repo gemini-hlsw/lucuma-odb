@@ -2469,6 +2469,10 @@ type UpdateDatasetsResult {
 
 # Observation selection and update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
 input UpdateObservationsInput {
+
+  # The program whose observations will be updated.
+  programId: ProgramId!
+
   # Describes the observation values to modify.
   SET: ObservationPropertiesInput!
 
@@ -5716,9 +5720,6 @@ input WhereObservation {
 
   # Matches the observation id.
   id: WhereOrderObservationId
-
-  # Matches the id of the program associated with this observation.
-  programId: WhereOrderProgramId
 
   # Matches the subtitle of the observation.
   subtitle: WhereOptionString
