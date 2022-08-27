@@ -33,6 +33,7 @@ import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.SetAllocationInput
+import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.predicates.ObservationPredicates
@@ -67,6 +68,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       CreateTarget,
       LinkUser,
       SetAllocation,
+      UpdateAsterisms,
       UpdateObservations,
       UpdatePrograms
     )
@@ -182,27 +184,77 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       }
     }
 
+  // Predicate for selecting observations to update
+  private def whereObservationPredicate(
+    programId:      Program.Id,
+    includeDeleted: Option[Boolean],
+    WHERE:          Option[Predicate]
+  ): Predicate =
+    and(List(
+      Eql(UniquePath(List("program", "id")), Const(programId)),
+      ObservationPredicates.isWritableBy(user),
+      ObservationPredicates.includeDeleted(includeDeleted.getOrElse(false)),
+      WHERE.getOrElse(True)
+    ))
+
+  // An applied fragment that selects all observation ids that satisfy
+  // `filterPredicate`
+  private def observationIdSelect(
+    programId:      Program.Id,
+    includeDeleted: Option[Boolean],
+    WHERE:          Option[Predicate]
+  ): Result[AppliedFragment] =
+    Result.fromOption(
+      MappedQuery(
+        Filter(whereObservationPredicate(programId, includeDeleted, WHERE), Select("id", Nil, Query.Empty)),
+        Cursor.Context(ObservationType)
+      ).map(_.fragment),
+      "Could not construct a subquery for the provided WHERE condition."
+    )
+
+  private val UpdateAsterisms: MutationField =
+    MutationField("updateAsterisms", UpdateAsterismsInput.Binding) { (input, child) =>
+
+      val idSelect: Result[AppliedFragment] =
+        observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+
+      val selectObservations: F[Result[(List[Observation.Id], Query)]] =
+        idSelect.traverse { which =>
+          observationService.use { svc =>
+            svc
+              .selectObservations(which)
+              .fproduct {
+                case Nil => Limit(0, child)
+                case ids => Filter(ObservationPredicates.inObservationIds(ids), child)
+              }
+          }
+        }
+
+      def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+        NonEmptyList.fromList(oids).traverse { os =>
+          val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
+          val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
+          asterismService.use(_.updateAsterism(input.programId, os, add, del))
+        }.map(_.getOrElse(Result.unit))
+
+      pool.use { s =>
+        s.transaction.use { xa =>
+          for {
+            rTup  <- selectObservations
+            oids   = rTup.toList.flatMap(_._1)
+            rUnit <- setAsterisms(oids)
+            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+            _     <- query.left.traverse_(_ => xa.rollback)
+          } yield query
+        }
+      }
+    }
+
   private val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.Binding) { (input, child) =>
 
-      // Predicate for selecting observations to update
-      val filterPredicate: Predicate = and(List(
-        Eql(UniquePath(List("program", "id")), Const(input.programId)),
-        ObservationPredicates.isWritableBy(user),
-        ObservationPredicates.includeDeleted(input.includeDeleted.getOrElse(false)),
-        input.WHERE.getOrElse(True)
-      ))
-
-      // An applied fragment that selects all observation ids that satisfy
-      // `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        Result.fromOption(
-          MappedQuery(
-            Filter(filterPredicate, Select("id", Nil, Query.Empty)),
-            Cursor.Context(ObservationType)
-          ).map(_.fragment),
-          "Could not construct a subquery for the provided WHERE condition."
-        )
+        observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
       val updateObservations: F[Result[(List[Observation.Id], Query)]] =
         idSelect.flatTraverse { which =>
@@ -230,9 +282,9 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           }
         }
 
-      def updateAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+      def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
         NonEmptyList.fromList(oids).traverse { os =>
-          asterismService.use(_.updateAsterism(input.programId, os, input.asterism))
+          asterismService.use(_.setAsterism(input.programId, os, input.asterism))
         }.map(_.getOrElse(Result.unit))
 
       pool.use { s =>
@@ -240,7 +292,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           for {
             rTup  <- updateObservations
             oids   = rTup.toList.flatMap(_._1)
-            rUnit <- updateAsterisms(oids)
+            rUnit <- setAsterisms(oids)
             query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
             _     <- query.left.traverse_(_ => xa.rollback)
           } yield query

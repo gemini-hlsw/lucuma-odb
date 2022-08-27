@@ -36,10 +36,17 @@ trait AsterismService[F[_]] {
     observationIds: NonEmptyList[Observation.Id]
   ): F[Result[Unit]]
 
-  def updateAsterism(
+  def setAsterism(
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      Nullable[NonEmptyList[Target.Id]]
+  ): F[Result[Unit]]
+
+  def updateAsterism(
+    programId:      Program.Id,
+    observationIds: NonEmptyList[Observation.Id],
+    ADD:            Option[NonEmptyList[Target.Id]],
+    DELETE:         Option[NonEmptyList[Target.Id]]
   ): F[Result[Unit]]
 
 }
@@ -93,12 +100,12 @@ object AsterismService {
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id]
       ): F[Result[Unit]] =
-        val af = Statements.deleteLinksAs(user, programId, observationIds)
+        val af = Statements.deleteAllLinksAs(user, programId, observationIds)
         session.prepare(af.fragment.command).use { p =>
           p.execute(af.argument).as(Result.unit)
         }
 
-      override def updateAsterism(
+      override def setAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      Nullable[NonEmptyList[Target.Id]]
@@ -114,6 +121,20 @@ object AsterismService {
             deleteAsterism(programId, observationIds) *>
               insertAsterism(programId, observationIds, tids)
         }
+
+      override def updateAsterism(
+        programId:      Program.Id,
+        observationIds: NonEmptyList[Observation.Id],
+        ADD:            Option[NonEmptyList[Target.Id]],
+        DELETE:         Option[NonEmptyList[Target.Id]]
+      ): F[Result[Unit]] =
+        ADD.fold(Result.unit.pure[F])(insertAsterism(programId, observationIds, _)) *>
+          DELETE.fold(Result.unit.pure[F]) { tids =>
+            val af = Statements.deleteLinksAs(user, programId, observationIds, tids)
+            session.prepare(af.fragment.command).use { p =>
+              p.execute(af.argument).as(Result.unit)
+            }
+          }
 
     }
 
@@ -149,27 +170,58 @@ object AsterismService {
       val as: AppliedFragment =
         void""") AS t (c_program_id, c_observation_id, c_target_id) """
 
-      insert |+| values |+| as |+| whereUserAccess(user, programId)
+      insert |+| values |+| as |+| whereUserAccess(user, programId) |+|
+        void""" ON CONFLICT DO NOTHING"""
     }
+
+    private def programIdEqual(
+      programId: Program.Id
+    ): AppliedFragment =
+      sql"c_program_id = $program_id"(programId)
+
+    private def observationIdIn(
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      void"c_observation_id IN (" |+|
+        observationIds.map(sql"$observation_id").intercalate(void", ") |+|
+      void")"
+
+    private def targetIdIn(
+      targetIds: NonEmptyList[Target.Id]
+    ): AppliedFragment =
+      void"c_target_id IN (" |+|
+        targetIds.map(sql"$target_id").intercalate(void", ") |+|
+      void")"
+
+    private def andExistsUserAccess(
+      user:      User,
+      programId: Program.Id
+    ): AppliedFragment =
+      existsUserAccess(user, programId).fold(AppliedFragment.empty) { af =>
+        void" AND " |+| af
+      }
 
     def deleteLinksAs(
       user:           User,
       programId:      Program.Id,
+      observationIds: NonEmptyList[Observation.Id],
+      targetIds:      NonEmptyList[Target.Id]
+    ): AppliedFragment =
+       void"DELETE FROM ONLY t_asterism_target "        |+|
+         void"WHERE " |+| programIdEqual(programId)     |+|
+         void"AND " |+| observationIdIn(observationIds) |+|
+         void"AND " |+| targetIdIn(targetIds)           |+|
+         andExistsUserAccess(user, programId)
+
+    def deleteAllLinksAs(
+      user:           User,
+      programId:      Program.Id,
       observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment = {
-
-      val which: AppliedFragment =
-        observationIds.map(sql"$observation_id").intercalate(void", ")
-
-      val andExistsUserAccess: AppliedFragment =
-        existsUserAccess(user, programId).fold(AppliedFragment.empty) { af =>
-          void" AND " |+| af
-        }
-
-      void"DELETE FROM ONLY t_asterism_target "                  |+|
-        void"WHERE c_observation_id IN (" |+| which |+| void") " |+|
-        andExistsUserAccess
-    }
+    ): AppliedFragment =
+      void"DELETE FROM ONLY t_asterism_target "         |+|
+        void"WHERE " |+| programIdEqual(programId)      |+|
+        void"AND "  |+| observationIdIn(observationIds) |+|
+        andExistsUserAccess(user, programId)
 
   }
 

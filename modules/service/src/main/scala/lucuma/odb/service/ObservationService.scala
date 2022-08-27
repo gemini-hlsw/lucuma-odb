@@ -59,6 +59,10 @@ trait ObservationService[F[_]] {
     SET:       ObservationPropertiesInput
   ): F[Result[Observation.Id]]
 
+  def selectObservations(
+    which: AppliedFragment
+  ): F[List[Observation.Id]]
+
   def updateObservations(
     SET:   ObservationPropertiesInput,
     which: AppliedFragment
@@ -129,6 +133,13 @@ object ObservationService {
                 }
               }
             }
+        }
+
+      override def selectObservations(
+        which: AppliedFragment
+      ): F[List[Observation.Id]] =
+        session.prepare(which.fragment.query(observation_id)).use { pq =>
+          pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
       override def updateObservations(
