@@ -33,7 +33,7 @@ class updateAsterisms extends OdbSuite
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
-        oid  = oid,
+        oids = List(oid),
         add  = List(tid),
         del  = Nil,
         exp  = List((oid, List(tid)))
@@ -50,7 +50,7 @@ class updateAsterisms extends OdbSuite
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
-        oid  = oid,
+        oids = List(oid),
         add  = List(t0),
         del  = Nil,
         exp  = List((oid, List(t0)))
@@ -58,7 +58,7 @@ class updateAsterisms extends OdbSuite
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
-        oid  = oid,
+        oids = List(oid),
         add  = List(t1),
         del  = Nil,
         exp  = List((oid, List(t0, t1)))
@@ -75,7 +75,7 @@ class updateAsterisms extends OdbSuite
       _ <- updateAsterisms(
         user = pi,
         pid  = pid,
-        oid  = oid,
+        oids = List(oid),
         add  = List(t0, t1),
         del  = Nil,
         exp  = List((oid, List(t0, t1)))
@@ -83,10 +83,45 @@ class updateAsterisms extends OdbSuite
       _ <- updateAsterisms(
         user = pi,
         pid  = pid,
-        oid  = oid,
+        oids = List(oid),
         add  = Nil,
         del  = List(t0),
         exp  = List((oid, List(t1)))
+      )
+    } yield ()
+  }
+
+  test("multi-observation") {
+    for {
+      pid <- createProgramAs(pi)
+      o0 <- createObservationAs(pi, pid)
+      o1 <- createObservationAs(pi, pid)
+      t0  <- createEmptyTargetAs(pi, pid, "Larry")
+      t1  <- createEmptyTargetAs(pi, pid, "Curly")
+      t2  <- createEmptyTargetAs(pi, pid, "Moe")
+      _   <- updateAsterisms(
+        user = pi,
+        pid  = pid,
+        oids = List(o0),
+        add  = List(t0, t1),
+        del  = Nil,
+        exp  = List((o0, List(t0, t1)))
+      )
+      _ <- updateAsterisms(
+        user = pi,
+        pid  = pid,
+        oids = List(o1),
+        add  = List(t1, t2),
+        del  = Nil,
+        exp  = List((o1, List(t1, t2)))
+      )
+      _   <- updateAsterisms(
+        user = pi,
+        pid  = pid,
+        oids = List(o0, o1),
+        add  = Nil,
+        del  = List(t1),
+        exp  = List((o0, List(t0)), (o1, List(t2)))
       )
     } yield ()
   }
@@ -98,7 +133,7 @@ trait UpdateAsterismOps { this: OdbSuite =>
   def updateAsterisms(
     user: User,
     pid:  Program.Id,
-    oid:  Observation.Id,
+    oids: List[Observation.Id],
     add:  List[Target.Id],
     del:  List[Target.Id],
     exp:  List[(Observation.Id, List[Target.Id])]
@@ -125,7 +160,7 @@ trait UpdateAsterismOps { this: OdbSuite =>
               }
             }
             WHERE: {
-              id: { EQ: ${oid.asJson} }
+              id: { IN: [ ${oids.map(_.show).mkString("\"", "\",\"", "\"")} ] }
             }
           }) {
             id
