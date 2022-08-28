@@ -171,7 +171,7 @@ object AsterismService {
         void""") AS t (c_program_id, c_observation_id, c_target_id) """
 
       insert |+| values |+| as |+| whereUserAccess(user, programId) |+|
-        void""" ON CONFLICT DO NOTHING"""
+        void""" ON CONFLICT DO NOTHING"""  // the key consists of all the columns anyway
     }
 
     private def programIdEqual(
