@@ -7,7 +7,7 @@ package input
 import lucuma.odb.graphql.util.Bindings._
 
 case class CreateProgramInput(
-  SET: ProgramPropertiesInput
+  SET: Option[ProgramPropertiesInput.Create]
 )
 
 object CreateProgramInput {
@@ -15,7 +15,7 @@ object CreateProgramInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramPropertiesInput.CreateBinding.Option("SET", rInput)
-      ) => rInput.map(o => CreateProgramInput(o.getOrElse(ProgramPropertiesInput.Default)))
+      ) => rInput.map(apply)
     }
 }
 
