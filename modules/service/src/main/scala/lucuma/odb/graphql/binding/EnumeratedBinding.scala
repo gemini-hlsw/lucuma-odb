@@ -12,18 +12,8 @@ import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.graphql.util.Bindings._
 
-def enumeratedBinding[A](implicit ev: Enumerated[A]) =
+def enumeratedBinding[A](implicit ev: Enumerated[A]): Matcher[A] =
   TypedEnumBinding.map(b => Json.fromString(b.name)).emap { j =>
     ev.decodeJson(j).leftMap(_.message)
   }
-
-val ExistenceBinding                  = enumeratedBinding[Existence]
-val ProgramUserRoleBinding            = enumeratedBinding[ProgramUserRole]
-val ProgramUserSupportRoleTypeBinding = enumeratedBinding[ProgramUserSupportType]
-val ObsStatusBinding                  = enumeratedBinding[ObsStatus]
-val ObsActiveStatusBinding            = enumeratedBinding[ObsActiveStatus]
-val BandBinding                       = enumeratedBinding[Band]
-
-

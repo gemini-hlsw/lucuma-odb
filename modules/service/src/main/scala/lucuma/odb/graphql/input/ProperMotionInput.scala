@@ -6,7 +6,7 @@ package input
 
 import cats.syntax.all._
 import lucuma.core.math.ProperMotion
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 object ProperMotionInput {
 

@@ -7,8 +7,7 @@ package input
 import cats.syntax.all._
 import edu.gemini.grackle.Result
 import lucuma.core.math.RightAscension
-import lucuma.odb.graphql.binding.HourAngleBinding
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 object RightAscensionInput {
 

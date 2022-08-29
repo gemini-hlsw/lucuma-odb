@@ -19,11 +19,10 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
-import lucuma.odb.graphql.binding._
 
-import table._
+import binding._
 import input._
-import util.Bindings._
+import table._
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]

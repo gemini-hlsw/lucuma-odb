@@ -16,7 +16,6 @@ import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ConstraintSetInput.NominalConstraints
-import lucuma.odb.graphql.util.Bindings.*
 
 final case class ConstraintSetInput(
   cloudExtinction: Option[CloudExtinction],
