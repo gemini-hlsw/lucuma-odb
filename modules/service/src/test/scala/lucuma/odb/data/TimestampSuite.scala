@@ -21,7 +21,7 @@ class TimestampSuite extends FunSuite {
   }
 
   test("Value is truncated") {
-    val precise = ZonedDateTime.of(2022, 08, 29, 12, 00, 00, 000000001, UTC).toInstant
+    val precise = ZonedDateTime.of(2022, 8, 29, 12, 0, 0, 1, UTC).toInstant
     val trunc   = precise.minusNanos(1L)
     assertEquals(trunc.some, Timestamp.fromInstant(precise).map(_.toInstant))
   }

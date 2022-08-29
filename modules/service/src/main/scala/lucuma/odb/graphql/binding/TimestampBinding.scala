@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.binding
 
 import lucuma.odb.data.Timestamp
+
 import java.time.Instant
 import java.time.format.DateTimeParseException
 

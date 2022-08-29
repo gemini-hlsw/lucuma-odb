@@ -13,7 +13,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined._
-import java.time.Instant
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
@@ -32,6 +31,8 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
+
+import java.time.Instant
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 

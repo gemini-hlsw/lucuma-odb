@@ -5,14 +5,14 @@ package lucuma.odb.data
 
 import cats.Order
 import cats.syntax.order._
+import lucuma.core.optics.Format
+import org.typelevel.cats.time.instances.instant._
 
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset.UTC
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit.MICROS
-import lucuma.core.optics.Format
-import org.typelevel.cats.time.instances.instant._
 
 /**
  * Timestamp is an Instant truncated and limited to fit in a database
