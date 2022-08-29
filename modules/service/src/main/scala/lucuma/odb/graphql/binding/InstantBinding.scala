@@ -5,12 +5,12 @@ package lucuma.odb.graphql.binding
 
 import cats.syntax.either.*
 
-import java.time.Duration
+import java.time.Instant
 import java.time.format.DateTimeParseException
 
-val DurationBinding: Matcher[Duration] =
+val InstantBinding: Matcher[Instant] =
   StringBinding.emap { s =>
     Either
-      .catchOnly[DateTimeParseException](Duration.parse(s))
-      .leftMap(_ => s"Invalid ISO-8601 duration: $s")
+      .catchOnly[DateTimeParseException](Instant.parse(s))
+      .leftMap(_ => s"Invalid ISO-8601 instant: $s")
   }
