@@ -184,35 +184,31 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       }
     }
 
-  // Predicate for selecting observations to update
-  private def whereObservationPredicate(
-    programId:      Program.Id,
-    includeDeleted: Option[Boolean],
-    WHERE:          Option[Predicate]
-  ): Predicate =
-    and(List(
-      Eql(UniquePath(List("program", "id")), Const(programId)),
-      ObservationPredicates.isWritableBy(user),
-      ObservationPredicates.includeDeleted(includeDeleted.getOrElse(false)),
-      WHERE.getOrElse(True)
-    ))
-
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
   private def observationIdSelect(
     programId:      Program.Id,
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
-  ): Result[AppliedFragment] =
+  ): Result[AppliedFragment] = {
+    val whereObservation: Predicate =
+      and(List(
+        Eql(UniquePath(List("program", "id")), Const(programId)),
+        ObservationPredicates.isWritableBy(user),
+        ObservationPredicates.includeDeleted(includeDeleted.getOrElse(false)),
+        WHERE.getOrElse(True)
+      ))
+
     Result.fromOption(
       MappedQuery(
-        Filter(whereObservationPredicate(programId, includeDeleted, WHERE), Select("id", Nil, Query.Empty)),
+        Filter(whereObservation, Select("id", Nil, Query.Empty)),
         Cursor.Context(ObservationType)
       ).map(_.fragment),
       "Could not construct a subquery for the provided WHERE condition."
     )
+  }
 
-  private val UpdateAsterisms: MutationField =
+    private val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.Binding) { (input, child) =>
 
       val idSelect: Result[AppliedFragment] =

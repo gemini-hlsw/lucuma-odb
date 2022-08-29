@@ -25,23 +25,41 @@ import skunk.implicits.*
 
 trait AsterismService[F[_]] {
 
+  /**
+   * Inserts (program, observation, target) triplets covering all combinations.
+   * In other words, every observation in `observationIds` will be given all
+   * the targets in `targetIds` in addition to any existing targets they may
+   * already have.
+   */
   def insertAsterism(
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      NonEmptyList[Target.Id]
   ): F[Result[Unit]]
 
+  /**
+   * Deletes the asterisms associated with the given observation ids.
+   */
   def deleteAsterism(
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id]
   ): F[Result[Unit]]
 
+  /**
+   * Replaces the existing asterisms assocaited with the given observation ids
+   * (if any) with the given targets.  This is essentially a delete followed
+   * by an insert.
+   */
   def setAsterism(
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      Nullable[NonEmptyList[Target.Id]]
   ): F[Result[Unit]]
 
+  /**
+   * Updates the asterisms associated with each observation id, adding and
+   * deleting targets as indicated.
+   */
   def updateAsterism(
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
