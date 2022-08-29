@@ -10,7 +10,6 @@ import edu.gemini.grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 object AngleInput {
 

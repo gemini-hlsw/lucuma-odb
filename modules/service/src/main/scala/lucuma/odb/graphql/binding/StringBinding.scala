@@ -3,8 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
-import eu.timepit.refined.types.numeric.NonNegInt
+import edu.gemini.grackle.Value.StringValue
 
-val NonNegIntBinding: Matcher[NonNegInt] =
-  IntBinding.emap(NonNegInt.from)
+val StringBinding: Matcher[String] =
+  primitiveBinding("String") { case StringValue(value) => value }

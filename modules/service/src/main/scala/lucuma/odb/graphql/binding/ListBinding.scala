@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
-import eu.timepit.refined.types.numeric.NonNegInt
+import edu.gemini.grackle.Value
+import edu.gemini.grackle.Value.ListValue
 
-val NonNegIntBinding: Matcher[NonNegInt] =
-  IntBinding.emap(NonNegInt.from)
+val ListBinding: Matcher[List[Value]] =
+  primitiveBinding("List") { case ListValue(elems) => elems }

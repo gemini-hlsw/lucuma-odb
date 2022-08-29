@@ -15,7 +15,6 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 final case class ObservationPropertiesInput(
   subtitle:          Nullable[NonEmptyString],
