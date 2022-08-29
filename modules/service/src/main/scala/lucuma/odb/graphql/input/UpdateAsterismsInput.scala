@@ -2,40 +2,48 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
-
 package input
 
-import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Target
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings.*
 
-final case class UpdateObservationsInput(
+
+//# Input for bulk updating multiple observations.  Select observations
+//# with the 'WHERE' input and specify the changes in 'SET'.
+//#
+//input UpdateAsterismsInput {
+//  # Program ID for the program whose asterism is to be edited.
+//  programId: ProgramId!
+//
+//  # Describes the values to modify.
+//  SET: EditAsterismsPatchInput!
+//
+//  # Filters the observations to be updated according to those that match the given constraints.
+//  WHERE: WhereObservation
+//
+//  # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+//  LIMIT: NonNegInt
+//}
+
+final case class UpdateAsterismsInput(
   programId:      Program.Id,
-  SET:            ObservationPropertiesInput,
+  SET:            EditAsterismsPatchInput,
   WHERE:          Option[Predicate],
   LIMIT:          Option[NonNegInt],
   includeDeleted: Option[Boolean]
-) {
+)
 
-  def asterism: Nullable[NonEmptyList[Target.Id]] =
-    SET.asterism
+object UpdateAsterismsInput {
 
-}
-
-object UpdateObservationsInput {
-
-  val Binding: Matcher[UpdateObservationsInput] =
+  val Binding: Matcher[UpdateAsterismsInput] =
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rPid),
-        ObservationPropertiesInput.EditBinding("SET", rSET),
+        EditAsterismsPatchInput.Binding("SET", rSET),
         WhereObservation.Binding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)

@@ -317,8 +317,8 @@ input DirectorsTimeInput {
 
 # Add or delete targets in an asterism
 input EditAsterismsPatchInput {
-  ADD: TargetId
-  DELETE: TargetId
+  ADD:    [TargetId!]
+  DELETE: [TargetId!]
 }
 
 # Type of edit that triggered an event
@@ -1763,7 +1763,10 @@ type Mutation {
   updateAsterisms(
     # Bulk update asterism
     input: UpdateAsterismsInput!
-  ): UpdateAsterismsResult!
+  ): [Observation!]!
+# TODO: UpdateAsterismsResult
+#  ): UpdateAsterismsResult!
+
   updateDatasets(
     # Parameters for editing existing datasets
     input: UpdateDatasetsInput!
@@ -2427,14 +2430,19 @@ input UnnormalizedSedInput {
 # with the 'WHERE' input and specify the changes in 'SET'.
 #
 input UpdateAsterismsInput {
+  # Program ID for the program whose asterism is to be edited.
+  programId: ProgramId!
+
   # Describes the values to modify.
-  SET: [EditAsterismsPatchInput!]!
+  SET: EditAsterismsPatchInput!
 
   # Filters the observations to be updated according to those that match the given constraints.
   WHERE: WhereObservation
 
   # Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
   LIMIT: NonNegInt
+
+  includeDeleted: Boolean = false
 }
 
 # The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
@@ -2469,6 +2477,10 @@ type UpdateDatasetsResult {
 
 # Observation selection and update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
 input UpdateObservationsInput {
+
+  # The program whose observations will be updated.
+  programId: ProgramId!
+
   # Describes the observation values to modify.
   SET: ObservationPropertiesInput!
 
@@ -5716,9 +5728,6 @@ input WhereObservation {
 
   # Matches the observation id.
   id: WhereOrderObservationId
-
-  # Matches the id of the program associated with this observation.
-  programId: WhereOrderProgramId
 
   # Matches the subtitle of the observation.
   subtitle: WhereOptionString

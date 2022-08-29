@@ -11,6 +11,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
@@ -32,9 +33,45 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateConstraintSet(pi, oid, update, query, expected)
+      _   <- updateConstraintSet(pi, pid, oid, update, query, expected)
     } yield ()
 
+  test("update that selects nothing") {
+    def emptyUpdate(user: User, pid: Program.Id): IO[Unit] =
+      expect(
+        user = user,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              programId: ${pid.asJson}
+              SET: {
+                constraintSet: {
+                  cloudExtinction: ONE_POINT_ZERO
+                }
+              },
+              WHERE: {
+                id: { EQ: "o-9999" }
+              }
+            }) {
+              constraintSet {
+                cloudExtinction
+              }
+            }
+          }
+        """,
+        expected =json"""
+          {
+            "updateObservations": [ ]
+          }
+        """.asRight
+      )
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- emptyUpdate(pi, pid)
+    } yield ()
+  }
 
   test("update cloud extinction") {
     constraintSetUpdateTest(
@@ -159,8 +196,7 @@ class updateObservations extends OdbSuite
   test("conflicting elevation range updates") {
 
     constraintSetUpdateTest(
-      update =
-        """
+      update = """
         elevationRange: {
           airMass: {
             min: 1.1
@@ -170,8 +206,7 @@ class updateObservations extends OdbSuite
           }
         }
       """,
-      query =
-        """
+      query = """
         elevationRange {
           airMass {
             min
@@ -226,7 +261,82 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateExplicitBase(pi, oid, update, query, expected)
+      _   <- updateTargetEnvironment(pi, pid, oid, update, query, expected)
+    } yield ()
+
+  }
+
+
+  test("set an asterism in existing observation without one") {
+
+    def update(tid: Target.Id) = s"""
+      asterism: [ "${tid.show}" ]
+    """
+
+    val query = """
+      asterism {
+        id
+      }
+    """
+
+    def expected(tid: Target.Id) = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "asterism": [
+                {
+                  "id": ${tid.show}
+                }
+              ]
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      tid <- createEmptyTargetAs(pi, pid, "Biff")
+      _   <- updateTargetEnvironment(pi, pid, oid, update(tid), query, expected(tid))
+    } yield ()
+
+  }
+
+  test("update an asterism in existing observation") {
+
+    def update(tids: Target.Id*) =
+      s"""
+        asterism: [ "${tids.map(_.show).intercalate("\", \"")}" ]
+      """
+
+    val query = """
+      asterism {
+        id
+      }
+    """
+
+    def expected(tids: Target.Id*) = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "asterism": ${tids.map(tid => json"""{ "id": ${tid.asJson} }""").asJson}
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      t0  <- createEmptyTargetAs(pi, pid, "Larry")
+      t1  <- createEmptyTargetAs(pi, pid, "Curly")
+      t2  <- createEmptyTargetAs(pi, pid, "Moe")
+      _   <- updateTargetEnvironment(pi, pid, oid, update(t0, t1), query, expected(t0, t1))
+      _   <- updateTargetEnvironment(pi, pid, oid, update(t1, t2), query, expected(t1, t2))
     } yield ()
 
   }
@@ -294,8 +404,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateExplicitBase(pi, oid, update1, query, expected1)
-      _   <- updateExplicitBase(pi, oid, update2, query, expected2)
+      _   <- updateTargetEnvironment(pi, pid, oid, update1, query, expected1)
+      _   <- updateTargetEnvironment(pi, pid, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -354,8 +464,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _ <- updateExplicitBase(pi, oid, update1, query, expected1)
-      _ <- updateExplicitBase(pi, oid, update2, query, expected2)
+      _   <- updateTargetEnvironment(pi, pid, oid, update1, query, expected1)
+      _   <- updateTargetEnvironment(pi, pid, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -380,7 +490,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _ <- updateExplicitBase(pi, oid, update, query, expected)
+      _   <- updateTargetEnvironment(pi, pid, oid, update, query, expected)
     } yield ()
 
   }
@@ -391,48 +501,51 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
 
   def updateConstraintSet(
     user:     User,
+    pid:      Program.Id,
     oid:      Observation.Id,
     update:   String,
     query:    String,
     expected: Either[String, Json]
-  ): IO[Unit] = {
-      expect(
-        user = user,
-        query = s"""
-          mutation {
-            updateObservations(input: {
-              SET: {
-                constraintSet: {
-                  $update
-                }
-              },
-              WHERE: {
-                id: { EQ: ${oid.asJson} }
-              }
-            }) {
-              constraintSet {
-                $query
-              }
-            }
-          }
-        """,
-        expected = expected.leftMap(msg => List(msg))
-      )
-
-  }
-
-  def updateExplicitBase(
-    user:     User,
-    oid:      Observation.Id,
-    update:   String,
-    query:    String,
-    expected: Either[String, Json]
-  ): IO[Unit] = {
+  ): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
           updateObservations(input: {
+            programId: ${pid.asJson}
+            SET: {
+              constraintSet: {
+                $update
+              }
+            },
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            constraintSet {
+              $query
+            }
+          }
+        }
+      """,
+      expected = expected.leftMap(msg => List(msg))
+    )
+
+
+  def updateTargetEnvironment(
+    user:     User,
+    pid:      Program.Id,
+    oid:      Observation.Id,
+    update:   String,
+    query:    String,
+    expected: Either[String, Json]
+  ): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            programId: ${pid.asJson}
             SET: {
               targetEnvironment: {
                 $update
@@ -451,5 +564,4 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
       expected = expected.leftMap(msg => List(msg))
     )
 
-  }
 }
