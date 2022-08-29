@@ -12,7 +12,7 @@ import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
 case class UpdateProgramsInput(
-  SET: ProgramPropertiesInput,
+  SET: ProgramPropertiesInput.Edit,
   WHERE: Option[Predicate],
   LIMIT: Option[NonNegInt],
   includeDeleted: Option[Boolean],

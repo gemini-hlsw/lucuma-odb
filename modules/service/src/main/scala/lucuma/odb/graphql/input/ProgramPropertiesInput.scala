@@ -11,33 +11,40 @@ import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
 
-case class ProgramPropertiesInput(
-  name: Option[NonEmptyString],
-  proposal: Option[ProposalInput],
-  existence: Option[Existence]
-)
-
 object ProgramPropertiesInput {
 
-  val Default: ProgramPropertiesInput =
-    ProgramPropertiesInput(None, None, None)
+  case class Create(
+    name: Option[NonEmptyString],
+    proposal: Option[ProposalInput.Create],
+    existence: Option[Existence]
+  )
 
-  private def binding(
-    proposal: Matcher[ProposalInput]
-  ): Matcher[ProgramPropertiesInput] =
+  case class Edit(
+    name: Option[NonEmptyString],
+    proposal: Option[ProposalInput.Edit],
+    existence: Option[Existence]
+  )
+
+  private def data[A](
+    proposal: Matcher[A]
+  ): Matcher[(
+    Option[NonEmptyString],
+    Option[A],
+    Option[Existence]
+  )] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("name", rName),
-        ProposalInput.CreateBinding.Option("proposal", rProposal),
+        proposal.Option("proposal", rProposal),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rProposal, rExistence).parMapN(apply)
+        (rName, rProposal, rExistence).parTupled
     }
 
-  val CreateBinding: Matcher[ProgramPropertiesInput] =
-    binding(ProposalInput.CreateBinding)
+  val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
+    data(ProposalInput.CreateBinding).map(Create.apply)
 
-  val EditBinding: Matcher[ProgramPropertiesInput] =
-    binding(ProposalInput.EditBinding)
+  val EditBinding: Matcher[Edit] =
+    data(ProposalInput.EditBinding).map(Edit.apply)
 
 }

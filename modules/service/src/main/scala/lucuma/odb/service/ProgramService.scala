@@ -34,7 +34,7 @@ trait ProgramService[F[_]] {
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(SET: ProgramPropertiesInput): F[Program.Id]
+  def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id]
 
   /**
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
@@ -43,7 +43,7 @@ trait ProgramService[F[_]] {
   def linkUser(req: ProgramService.LinkUserRequest): F[ProgramService.LinkUserResponse]
 
   /** Update the properies for programs with ids given by the supplied fragment. */
-  def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): F[Unit]
+  def updatePrograms(SET: ProgramPropertiesInput.Edit, which: AppliedFragment): F[Unit]
 
 }
 
@@ -104,15 +104,14 @@ object ProgramService {
   def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
 
-      def insertProgram(SET: ProgramPropertiesInput): F[Program.Id] =
+      def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id] =
         Trace[F].span("insertProgram") {
           s.transaction.use { _ =>
-            s.prepare(Statements.InsertProgram).use(_.unique(SET.name ~ user)).flatTap { pid =>
-              SET.proposal.traverse { proposalInput =>
+            val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
+            s.prepare(Statements.InsertProgram).use(_.unique(SETʹ.name ~ user)).flatTap { pid =>
+              SETʹ.proposal.traverse { proposalInput =>
                 s.prepare(Statements.InsertProposal).use(_.execute(pid ~ proposalInput)) >>
-                proposalInput.partnerSplits.traverse { splits =>
-                  s.prepare(Statements.insertPartnerSplits(splits)).use(_.execute(pid ~ splits))
-                }
+                s.prepare(Statements.insertPartnerSplits(proposalInput.partnerSplits)).use(_.execute(pid ~ proposalInput.partnerSplits))
               }
             }
           }
@@ -142,7 +141,7 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] =
+      def updatePrograms(props: ProgramPropertiesInput.Edit, where: AppliedFragment): F[Unit] =
         Statements.updatePrograms(props, where).traverse { af =>
           s.prepare(af.fragment.command).use(_.execute(af.argument))
         } .void
@@ -152,7 +151,7 @@ object ProgramService {
 
   object Statements {
 
-    def updates(SET: ProgramPropertiesInput): Option[NonEmptyList[AppliedFragment]] =
+    def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
           SET.existence.map(e => sql"c_existence = $existence".apply(e)),
@@ -160,7 +159,7 @@ object ProgramService {
         ).flatten
       )
 
-    def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): Option[AppliedFragment] =
+    def updatePrograms(SET: ProgramPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
       updates(SET).map { us =>
         void"UPDATE t_program " |+|
         void"SET " |+| us.intercalate(void", ") |+| void" " |+|
@@ -219,7 +218,7 @@ object ProgramService {
          }
 
     /** Insert a proposal. */
-    val InsertProposal: Command[Program.Id ~ ProposalInput] =
+    val InsertProposal: Command[Program.Id ~ ProposalInput.Create] =
       sql"""
         INSERT INTO t_proposal (
           c_program_id,
@@ -236,9 +235,9 @@ object ProgramService {
           ${text_nonempty.opt},
           ${text_nonempty.opt},
           ${tag.opt},
-          ${too_activation.opt},
+          ${too_activation},
           ${tag},
-          ${int_percent},
+          ${int_percent.opt},
           ${int_percent.opt},
           ${interval.opt}
         )
@@ -250,10 +249,10 @@ object ProgramService {
               ppi.abstrakt.toOption ~
               ppi.category.toOption ~
               ppi.toOActivation ~
-              ppi.proposalClass.get.tag ~ // TODO: fix this!
-              ppi.proposalClass.get.minPercentTime.get ~ // TODO: fix this!
-              ppi.proposalClass.get.minPercentTotalTime ~ // TODO: fix this!
-              ppi.proposalClass.get.totalTime.map(_.value) // TODO: fix this!
+              ppi.proposalClass.tag ~
+              ppi.proposalClass.minPercentTime ~
+              ppi.proposalClass.minPercentTotalTime ~
+              ppi.proposalClass.totalTime.map(_.value)
          }
 
     def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =
