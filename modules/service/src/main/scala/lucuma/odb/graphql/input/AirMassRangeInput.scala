@@ -15,7 +15,6 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.util.Bindings.*
 
 final case class AirMassRangeInput(
   min: Option[DecimalValue],

@@ -8,7 +8,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Gid
-import lucuma.odb.graphql.util.Bindings._
 
 def gidBinding[A: Gid](name: String): Matcher[A] =
   StringBinding.emap { s =>

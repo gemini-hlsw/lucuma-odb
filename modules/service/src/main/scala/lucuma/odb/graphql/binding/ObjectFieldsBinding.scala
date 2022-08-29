@@ -3,8 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
-import eu.timepit.refined.types.numeric.NonNegInt
+import edu.gemini.grackle.Value
 
-val NonNegIntBinding: Matcher[NonNegInt] =
-  IntBinding.emap(NonNegInt.from)
+val ObjectFieldsBinding: Matcher[List[(String, Value)]] =
+  ObjectBinding.map(_.fields)

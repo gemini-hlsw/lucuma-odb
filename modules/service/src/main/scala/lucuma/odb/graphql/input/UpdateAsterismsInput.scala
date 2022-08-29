@@ -9,7 +9,6 @@ import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings.*
 
 
 //# Input for bulk updating multiple observations.  Select observations

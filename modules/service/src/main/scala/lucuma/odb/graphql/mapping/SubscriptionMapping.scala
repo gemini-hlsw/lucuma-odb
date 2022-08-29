@@ -20,7 +20,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.predicates.ProgramPredicates
-import lucuma.odb.graphql.util.Bindings.Matcher
+import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName

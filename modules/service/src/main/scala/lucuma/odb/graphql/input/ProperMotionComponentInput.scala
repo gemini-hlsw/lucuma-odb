@@ -13,7 +13,6 @@ import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
 import lucuma.core.math.units._
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 object ProperMotionComponentInput {
 

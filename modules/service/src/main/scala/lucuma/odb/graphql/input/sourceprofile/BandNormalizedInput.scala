@@ -10,7 +10,7 @@ import edu.gemini.grackle.Result
 import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.model.SpectralDefinition.BandNormalized
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 import scala.collection.immutable.SortedMap
 

@@ -12,7 +12,6 @@ import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.graphql.util.Bindings._
 
 def enumeratedBinding[A](implicit ev: Enumerated[A]) =
   TypedEnumBinding.map(b => Json.fromString(b.name)).emap { j =>

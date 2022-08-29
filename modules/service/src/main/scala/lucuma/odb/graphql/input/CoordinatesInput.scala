@@ -11,8 +11,8 @@ import edu.gemini.grackle.Result
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
-import lucuma.odb.graphql.util.Bindings.Matcher
-import lucuma.odb.graphql.util.Bindings.ObjectFieldsBinding
+import lucuma.odb.graphql.binding.Matcher
+import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 //# Absolute coordinates relative base epoch
 //input CoordinatesInput {

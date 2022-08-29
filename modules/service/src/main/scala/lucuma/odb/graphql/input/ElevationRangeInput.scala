@@ -12,7 +12,7 @@ import edu.gemini.grackle.Result
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
-import lucuma.odb.graphql.util.Bindings.*
+import lucuma.odb.graphql.binding._
 
 final case class ElevationRangeInput(
   airMass:   Option[AirMassRangeInput],

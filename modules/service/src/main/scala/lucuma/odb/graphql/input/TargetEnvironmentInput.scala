@@ -8,7 +8,7 @@ import cats.syntax.parallel.*
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.TargetIdBinding
-import lucuma.odb.graphql.util.Bindings.*
+import lucuma.odb.graphql.binding.*
 
 //# Target environment editing and creation parameters
 //input TargetEnvironmentInput {
