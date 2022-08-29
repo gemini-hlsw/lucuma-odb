@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.binding
 
 import cats.syntax.either.*
+
 import java.time.Duration
 import java.time.format.DateTimeParseException
 
