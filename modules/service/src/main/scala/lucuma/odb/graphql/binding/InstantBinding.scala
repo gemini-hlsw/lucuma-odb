@@ -7,6 +7,7 @@ import cats.syntax.either.*
 
 import java.time.Instant
 import java.time.format.DateTimeParseException
+import eu.timepit.refined
 
 val InstantBinding: Matcher[Instant] =
   StringBinding.emap { s =>
