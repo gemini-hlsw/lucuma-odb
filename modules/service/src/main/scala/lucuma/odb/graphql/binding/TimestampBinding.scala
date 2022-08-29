@@ -3,9 +3,6 @@
 
 package lucuma.odb.graphql.binding
 
-//import cats.syntax.either._
-//import cats.syntax.option._
-
 import lucuma.odb.data.Timestamp
 
 val TimestampBinding: Matcher[Timestamp] =
