@@ -4,11 +4,13 @@
 package lucuma.odb.graphql.binding
 
 import lucuma.odb.data.Timestamp
+import java.time.Instant
+import java.time.format.DateTimeParseException
 
 val TimestampBinding: Matcher[Timestamp] =
-  InstantBinding.emap { inst =>
+  LocalDateTimeBinding.emap { ldt =>
     Timestamp
-      .FromInstant
-      .getOption(inst)
-      .toRight(s"Timestamp out of range: $inst")
+      .FromLocalDateTime
+      .getOption(ldt)
+      .toRight(s"Timestamp out of range: $ldt")
   }

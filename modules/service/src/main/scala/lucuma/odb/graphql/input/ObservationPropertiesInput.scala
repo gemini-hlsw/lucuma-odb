@@ -14,13 +14,14 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
 
 final case class ObservationPropertiesInput(
   subtitle:          Nullable[NonEmptyString],
   status:            Option[ObsStatus],
   activeStatus:      Option[ObsActiveStatus],
-  // visualizationTime: Option[Instant],
+  visualizationTime: Nullable[Timestamp],
   // posAngleConstraint: Option[PosAngleConstraintInput],
   targetEnvironment: Option[TargetEnvironmentInput],
   constraintSet:     Option[ConstraintSetInput],
@@ -44,6 +45,7 @@ object ObservationPropertiesInput {
       subtitle          = Nullable.Null,
       status            = ObsStatus.New.some,
       activeStatus      = ObsActiveStatus.Active.some,
+      visualizationTime = Nullable.Null,
       targetEnvironment = None,
       constraintSet     = ConstraintSetInput.Default.some,
       existence         = Existence.Present.some
@@ -55,7 +57,7 @@ object ObservationPropertiesInput {
         NonEmptyStringBinding.Option("subtitle", rSubtitle),
         ObsStatusBinding.Option("status", rObsStatus),
         ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
-        ("visualizationTime", _),     // ignore for now
+        TimestampBinding.Option("visualizationTime", rVisualizationTime),
         ("posAngleConstraint", _),    // ignore for now
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
@@ -63,7 +65,14 @@ object ObservationPropertiesInput {
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rSubtitle.map(Nullable.orNull), rObsStatus, rObsActiveStatus, rTargetEnvironment, rConstraintSet, rExistence).parMapN(apply)
+        (rSubtitle.map(Nullable.orNull),
+         rObsStatus,
+         rObsActiveStatus,
+         rVisualizationTime.map(Nullable.orNull),
+         rTargetEnvironment,
+         rConstraintSet,
+         rExistence
+        ).parMapN(apply)
     }
 
   val EditBinding: Matcher[ObservationPropertiesInput] =
@@ -72,7 +81,7 @@ object ObservationPropertiesInput {
         NonEmptyStringBinding.Nullable("subtitle", rSubtitle),
         ObsStatusBinding.Option("status", rObsStatus),
         ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
-        ("visualizationTime", _),     // ignore for now
+        TimestampBinding.Nullable("visualizationTime", rVisualizationTime),
         ("posAngleConstraint", _),    // ignore for now
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),     // ignore for now
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
@@ -80,7 +89,14 @@ object ObservationPropertiesInput {
         ("scienceMode", _),           // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rSubtitle, rObsStatus, rObsActiveStatus, rTargetEnvironment, rConstraintSet, rExistence).parMapN(apply)
+        (rSubtitle,
+         rObsStatus,
+         rObsActiveStatus,
+         rVisualizationTime,
+         rTargetEnvironment,
+         rConstraintSet,
+         rExistence
+        ).parMapN(apply)
     }
 
 }

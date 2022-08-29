@@ -12,13 +12,14 @@ import skunk.codec.all._
 trait ObservationView[F[_]] { self: SkunkMapping[F] =>
 
     object ObservationView extends TableDef("v_observation") {
-      val ProgramId: ColumnRef    = col("c_program_id",          program_id)
-      val Id: ColumnRef           = col("c_observation_id",      observation_id)
-      val Existence: ColumnRef    = col("c_existence",           existence)
-      val Subtitle: ColumnRef     = col("c_subtitle",            text_nonempty.opt)
+      val ProgramId: ColumnRef         = col("c_program_id",         program_id)
+      val Id: ColumnRef                = col("c_observation_id",     observation_id)
+      val Existence: ColumnRef         = col("c_existence",          existence)
+      val Subtitle: ColumnRef          = col("c_subtitle",           text_nonempty.opt)
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
-      val Status: ColumnRef       = col("c_status",              obs_status)
-      val ActiveStatus: ColumnRef = col("c_active_status",       obs_active_status)
+      val Status: ColumnRef            = col("c_status",             obs_status)
+      val ActiveStatus: ColumnRef      = col("c_active_status",      obs_active_status)
+      val VisualizationTime: ColumnRef = col("c_visualization_time", data_timestamp.opt)
 
       object TargetEnvironment {
         object Coordinates {

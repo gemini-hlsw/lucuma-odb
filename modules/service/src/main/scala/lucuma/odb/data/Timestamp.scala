@@ -58,4 +58,7 @@ object Timestamp {
   val FromInstant: Format[Instant, Timestamp] =
     Format(fromInstant, toInstant)
 
+  val FromLocalDateTime: Format[LocalDateTime, Timestamp] =
+    Format(fromLocalDateTime, toLocalDateTime)
+
 }
