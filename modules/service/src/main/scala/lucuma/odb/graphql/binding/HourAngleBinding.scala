@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package binding
 
 import lucuma.core.math.HourAngle
-import lucuma.odb.graphql.util.Bindings._
 
 object HourAngleBinding {
 

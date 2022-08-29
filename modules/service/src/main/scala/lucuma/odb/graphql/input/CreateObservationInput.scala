@@ -11,7 +11,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 final case class CreateObservationInput(
   programId: Program.Id,

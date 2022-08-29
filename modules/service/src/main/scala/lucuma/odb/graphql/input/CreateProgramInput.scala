@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 case class CreateProgramInput(
   SET: ProgramPropertiesInput

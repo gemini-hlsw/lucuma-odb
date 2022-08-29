@@ -13,7 +13,6 @@ import eu.timepit.refined.api.Refined.value
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 final case class HourAngleRangeInput(
   minHours: Option[DecimalHour],
