@@ -4,10 +4,10 @@
 package lucuma.odb.graphql.binding
 
 import cats.syntax.either.*
+import eu.timepit.refined
 
 import java.time.Instant
 import java.time.format.DateTimeParseException
-import eu.timepit.refined
 
 val InstantBinding: Matcher[Instant] =
   StringBinding.emap { s =>
