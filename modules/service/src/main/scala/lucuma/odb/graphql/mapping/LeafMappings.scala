@@ -13,6 +13,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined._
+import java.time.Instant
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
@@ -47,6 +48,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val FilterTypeType        = schema.ref("FilterType")
   lazy val HmsStringType         = schema.ref("HmsString")
   lazy val ImageQualityType      = schema.ref("ImageQuality")
+  lazy val InstantType           = schema.ref("Instant")
   lazy val LongType              = schema.ref("Long")
   lazy val NonEmptyStringType    = schema.ref("NonEmptyString")
   lazy val NonNegBigDecimalType  = schema.ref("NonNegBigDecimal")
@@ -74,6 +76,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[ImageQuality](ImageQualityType),
+      LeafMapping[Instant](InstantType),
       LeafMapping[Long](LongType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
