@@ -30,10 +30,8 @@ object Timestamp {
   val Max: Timestamp =
     ZonedDateTime.of(294275, 12, 31, 23, 59, 59, 999999000, UTC).toInstant
 
-  def fromInstant(value: Instant): Option[Timestamp] = {
-    val valueʹ = value.truncatedTo(MICROS)
-    Option.when(Min <= valueʹ && valueʹ <= Max)(valueʹ)
-  }
+  def fromInstant(value: Instant): Option[Timestamp] =
+    Option.when(Min <= value && value <= Max)(value.truncatedTo(MICROS))
 
   def fromLocalDateTime(value: LocalDateTime): Option[Timestamp] =
     fromInstant(value.toInstant(UTC))

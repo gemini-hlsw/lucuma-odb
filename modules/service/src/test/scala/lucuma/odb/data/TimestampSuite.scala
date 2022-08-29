@@ -3,21 +3,27 @@
 
 package lucuma.odb.data
 
-import cats.Order
-
+import cats.syntax.option.*
 import munit.FunSuite
+
 import java.time.Instant
+import java.time.ZoneOffset.UTC
+import java.time.ZonedDateTime
 
 class TimestampSuite extends FunSuite {
 
-  test("foo") {
+  test("Below Min produces None") {
+    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Min.toInstant.minusNanos(1L)))
+  }
 
-    val t0 = Timestamp.fromInstant(Instant.parse("2022-08-29T15:22:01.000001Z"))
-    val t1 = Timestamp.fromInstant(Instant.parse("2022-08-29T15:22:00.000001Z"))
-    println(t1.get.toInstant)
+  test("Above Max produces None") {
+    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Max.toInstant.plusNanos(1L)))
+  }
 
-    Order[Timestamp].compare(t0.get, t1.get)
-
+  test("Value is truncated") {
+    val precise = ZonedDateTime.of(2022, 08, 29, 12, 00, 00, 000000001, UTC).toInstant
+    val trunc   = precise.minusNanos(1L)
+    assertEquals(trunc.some, Timestamp.fromInstant(precise).map(_.toInstant))
   }
 
 }
