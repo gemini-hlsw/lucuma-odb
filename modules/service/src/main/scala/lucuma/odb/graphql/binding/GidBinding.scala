@@ -13,8 +13,3 @@ def gidBinding[A: Gid](name: String): Matcher[A] =
   StringBinding.emap { s =>
     Gid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
   }
-
-val ObservationIdBinding = gidBinding[Observation.Id]("observation")
-val ProgramIdBinding     = gidBinding[Program.Id]("program")
-val TargetIdBinding      = gidBinding[Target.Id]("target")
-val UserIdBinding        = gidBinding[User.Id]("user")
