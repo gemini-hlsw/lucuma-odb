@@ -14,6 +14,12 @@ import java.time.temporal.ChronoUnit.MICROS
 import lucuma.core.optics.Format
 import org.typelevel.cats.time.instances.instant._
 
+/**
+ * Timestamp is an Instant truncated and limited to fit in a database
+ * `timestamp` column.  Using a `Timestamp`, we're guaranteed to safely
+ * round-trip values through the database.
+ */
+
 opaque type Timestamp = Instant
 
 object Timestamp {
