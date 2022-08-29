@@ -1,6 +1,7 @@
 *.class
 *.log
 
+.jvmopts
 .sbtopts
 
 # these are moved into the doc project by the build
