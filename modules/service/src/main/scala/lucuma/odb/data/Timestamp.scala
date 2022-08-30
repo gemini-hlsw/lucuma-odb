@@ -48,30 +48,33 @@ object Timestamp {
   def fromLocalDateTime(value: LocalDateTime): Option[Timestamp] =
     fromInstant(value.toInstant(UTC))
 
+  def unsafeFromLocalDateTime(value: LocalDateTime): Timestamp =
+    fromLocalDateTime(value).get
+
   def ofEpochMilli(epochMilli: Long): Option[Timestamp] =
     fromInstant(Instant.ofEpochMilli(epochMilli))
 
-  private def formatter(sep: Char): DateTimeFormatter =
-    new DateTimeFormatterBuilder()
-      .append(DateTimeFormatter.ISO_LOCAL_DATE)
-      .appendLiteral(sep)
-      .appendPattern("HH:mm:ss")
-      .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
-      .optionalStart()
-      .appendLiteral('Z')
-      .optionalEnd()
-      .toFormatter(Locale.US)
+  private def formatter(iso: Boolean): DateTimeFormatter = {
+    val builder =
+      new DateTimeFormatterBuilder()
+        .append(DateTimeFormatter.ISO_LOCAL_DATE)
+        .appendLiteral(if (iso) then 'T' else ' ')
+        .appendPattern("HH:mm:ss")
+        .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
+
+    (if (iso) builder.appendLiteral('Z') else builder).toFormatter(Locale.US)
+  }
 
   val Formatter: DateTimeFormatter =
-    formatter(' ')
+    formatter(iso = false)
 
-  private val AltFormatter: DateTimeFormatter =
-    formatter('T')
+  private val IsoFormatter: DateTimeFormatter =
+    formatter(iso = true)
 
   def parse(s: String): Either[String, Timestamp] =
     Either
       .catchOnly[DateTimeParseException](LocalDateTime.parse(s, Formatter).toInstant(UTC))
-      .orElse(Either.catchOnly[DateTimeParseException](LocalDateTime.parse(s, AltFormatter).toInstant(UTC)))
+      .orElse(Either.catchOnly[DateTimeParseException](LocalDateTime.parse(s, IsoFormatter).toInstant(UTC)))
       .leftMap(_ => s"Could not parse as a Timestamp: $s")
       .flatMap(fromInstant(_).toRight(s"Invalid Timestamp: $s"))
 
@@ -105,6 +108,6 @@ object Timestamp {
     Decoder.decodeString.emap(parse)
 
   given encoderTimestamp: Encoder[Timestamp] =
-    Encoder.encodeString.contramap[Timestamp](t => ISO_DATE_TIME.format(LocalDateTime.ofInstant(t, UTC)))
+    Encoder.encodeString.contramap[Timestamp](_.format)
 
 }

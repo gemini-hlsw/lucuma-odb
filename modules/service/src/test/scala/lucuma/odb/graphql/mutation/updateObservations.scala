@@ -495,6 +495,72 @@ class updateObservations extends OdbSuite
 
   }
 
+  test("set visualization time") {
+
+    val update   = """
+      visualizationTime: "2022-08-30 17:18:00"
+    """
+
+    val query    = "visualizationTime"
+
+    val expected = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": "2022-08-30 17:18:00"
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- updateObservation(pi, pid, oid, update, query, expected)
+    } yield ()
+  }
+
+  test("delete visualization time") {
+
+    val update0  = """
+      visualizationTime: "2022-08-30 17:18:00"
+    """
+
+    val update1 = """
+      visualizationTime: null
+    """
+
+    val query    = "visualizationTime"
+
+    val expected0 = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": "2022-08-30 17:18:00"
+          }
+        ]
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": null
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- updateObservation(pi, pid, oid, update0, query, expected0)
+      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
+    } yield ()
+
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
@@ -558,6 +624,34 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
             targetEnvironment {
               $query
             }
+          }
+        }
+      """,
+      expected = expected.leftMap(msg => List(msg))
+    )
+
+  def updateObservation(
+    user:     User,
+    pid:      Program.Id,
+    oid:      Observation.Id,
+    update:   String,
+    query:    String,
+    expected: Either[String, Json]
+  ): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            programId: ${pid.asJson}
+            SET: {
+              $update
+            },
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            $query
           }
         }
       """,
