@@ -27,6 +27,7 @@ import skunk._
 import skunk.syntax.all._
 import skunk.codec.all._
 import lucuma.core.model.IntPercent
+import lucuma.core.enums.ToOActivation
 
 trait ProgramService[F[_]] {
 
@@ -141,9 +142,11 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(props: ProgramPropertiesInput.Edit, where: AppliedFragment): F[Unit] =
-        Statements.updatePrograms(props, where).traverse { af =>
-          s.prepare(af.fragment.command).use(_.execute(af.argument))
+      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[Unit] =
+        s.transaction.use { _ =>
+          Statements.updatePrograms(SET, where).traverse(s.executeCommand) >>
+          SET.proposal.flatMap(Statements.updateProposals(_, where)).traverse(s.executeCommand)
+          // TODO: each update needs to collect affected program ids so we can return them
         } .void
 
     }
@@ -154,10 +157,32 @@ object ProgramService {
     def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
-          SET.existence.map(e => sql"c_existence = $existence".apply(e)),
-          SET.name.map(s => sql"c_name = $text_nonempty".apply(s)),
+          SET.existence.map(sql"c_existence = $existence"),
+          SET.name.map(sql"c_name = $text_nonempty"),
         ).flatten
       )
+
+    def updates(SET: ProposalInput.Edit): Option[NonEmptyList[AppliedFragment]] =
+      NonEmptyList.fromList(
+        List(
+          SET.abstrakt.foldPresent(sql"c_abstract = ${text_nonempty.opt}"),
+          SET.category.foldPresent(sql"c_category = ${tag.opt}"),
+          SET.title.foldPresent(sql"c_name = ${text_nonempty.opt}"),
+          SET.toOActivation.map(sql"c_too_activation = $too_activation"),
+          // SET.proposalClass.map { pci =>
+          //   // if pci is complete then ok to replace the proposal class
+          //   // if it's partial then it must match and we have to do an extra read to check first
+          //   ???
+          // }
+        ).flatten
+      )
+
+    def updateProposals(SET: ProposalInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
+      updates(SET).map { us =>
+        void"UPDATE t_proposal " |+|
+        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+        void"WHERE t_proposal.c_program_id IN (" |+| which |+| void")"
+      }
 
     def updatePrograms(SET: ProgramPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
       updates(SET).map { us =>
