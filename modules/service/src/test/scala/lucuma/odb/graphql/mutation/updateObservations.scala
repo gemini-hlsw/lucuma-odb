@@ -573,30 +573,11 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
     query:    String,
     expected: Either[String, Json]
   ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          updateObservations(input: {
-            programId: ${pid.asJson}
-            SET: {
-              constraintSet: {
-                $update
-              }
-            },
-            WHERE: {
-              id: { EQ: ${oid.asJson} }
-            }
-          }) {
-            constraintSet {
-              $query
-            }
-          }
-        }
-      """,
-      expected = expected.leftMap(msg => List(msg))
+    updateObservation(user, pid, oid,
+      s"""constraintSet: { $update }""",
+      s"""constraintSet { $query }""",
+      expected
     )
-
 
   def updateTargetEnvironment(
     user:     User,
@@ -606,28 +587,10 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
     query:    String,
     expected: Either[String, Json]
   ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          updateObservations(input: {
-            programId: ${pid.asJson}
-            SET: {
-              targetEnvironment: {
-                $update
-              }
-            },
-            WHERE: {
-              id: { EQ: ${oid.asJson} }
-            }
-          }) {
-            targetEnvironment {
-              $query
-            }
-          }
-        }
-      """,
-      expected = expected.leftMap(msg => List(msg))
+    updateObservation(user, pid, oid,
+      s"""targetEnvironment: { $update }""",
+      s"""targetEnvironment { $query }""",
+      expected
     )
 
   def updateObservation(
