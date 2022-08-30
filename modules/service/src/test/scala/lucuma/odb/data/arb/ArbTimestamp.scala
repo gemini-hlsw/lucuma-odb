@@ -10,24 +10,20 @@ import org.scalacheck._
 import java.time.Duration
 import java.time.temporal.ChronoUnit.MICROS
 
-trait ArbTimestamp {
-
-  val arbTimestamp: Arbitrary[Timestamp] =
-    Arbitrary {
-      Gen.choose[Long](0, ArbTimestamp.MaxDurationNanos).map { µs =>
-        Timestamp.unsafeFromInstant(
-          Timestamp.Min.toInstant.plusNanos(µs).truncatedTo(MICROS)
-        )
-      }
-    }
-}
-
-object ArbTimestamp extends ArbTimestamp {
+object ArbTimestamp {
 
   private val MaxDuration: Duration =
     Duration.between(Timestamp.Min.toInstant, Timestamp.Max.toInstant)
 
-  private val MaxDurationNanos: Long =
-    MaxDuration.toNanos
+  private val MaxDurationMillis: Long =
+    MaxDuration.toMillis
 
+  given arbTimestamp: Arbitrary[Timestamp] =
+    Arbitrary {
+      Gen.choose[Long](0, ArbTimestamp.MaxDurationMillis).map { ms =>
+        Timestamp.unsafeFromInstant(
+          Timestamp.Min.toInstant.plusMillis(ms)
+        )
+      }
+    }
 }

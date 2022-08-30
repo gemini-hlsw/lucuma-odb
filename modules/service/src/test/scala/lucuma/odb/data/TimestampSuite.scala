@@ -5,13 +5,16 @@ package lucuma.odb.data
 
 import cats.syntax.either.*
 import cats.syntax.option.*
-import munit.FunSuite
+import munit.ScalaCheckSuite
+import org.scalacheck.Prop.*
 
 import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.ZonedDateTime
 
-class TimestampSuite extends FunSuite {
+class TimestampSuite extends ScalaCheckSuite {
+
+  import arb.ArbTimestamp.arbTimestamp
 
   test("Below Min produces None") {
     assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Min.toInstant.minusNanos(1000L)))
@@ -47,6 +50,12 @@ class TimestampSuite extends FunSuite {
   test("Parse sub-microsecond fails") {
     val s = "1863-07-03 03:00:00.0000000"
     assertEquals(s"Could not parse as a Timestamp: $s".asLeft[Timestamp], Timestamp.parse(s))
+  }
+
+  property("Round-trip parse / format") {
+    forAll { (t0: Timestamp) =>
+      assertEquals(t0.some, Timestamp.parse(t0.format).toOption)
+    }
   }
 
 }
