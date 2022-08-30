@@ -4,10 +4,11 @@
 package lucuma.odb.data
 package arb
 
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck._
+
 import java.time.Duration
 import java.time.temporal.ChronoUnit.MICROS
-import org.scalacheck._
-import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbTimestamp {
 
