@@ -262,7 +262,7 @@ object ProgramService {
           ${tag.opt},
           ${too_activation},
           ${tag},
-          ${int_percent.opt},
+          ${int_percent},
           ${int_percent.opt},
           ${interval.opt}
         )
@@ -274,10 +274,10 @@ object ProgramService {
               ppi.abstrakt.toOption ~
               ppi.category.toOption ~
               ppi.toOActivation ~
-              ppi.proposalClass.tag ~
-              ppi.proposalClass.minPercentTime ~
-              ppi.proposalClass.minPercentTotalTime ~
-              ppi.proposalClass.totalTime.map(_.value)
+              ppi.proposalClass.fold(_.tag, _.tag) ~
+              ppi.proposalClass.fold(_.minPercentTime, _.minPercentTime) ~
+              ppi.proposalClass.toOption.map(_.minPercentTotalTime) ~
+              ppi.proposalClass.toOption.map(_.totalTime.value)
          }
 
     def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =

@@ -17,21 +17,21 @@ import edu.gemini.grackle.Result
 import lucuma.odb.data.Nullable
 import lucuma.core.enums.ProposalClass
 
-case class ProposalInput(
-  title: Nullable[NonEmptyString],
-  proposalClass: Option[ProposalClassInput],
-  category: Nullable[Tag],
-  toOActivation: Option[ToOActivation],
-  abstrakt: Nullable[NonEmptyString],
-  partnerSplits: Option[Map[Tag, IntPercent]],
-)
+// case class ProposalInput(
+//   title: Nullable[NonEmptyString],
+//   proposalClass: Option[ProposalClassInput],
+//   category: Nullable[Tag],
+//   toOActivation: Option[ToOActivation],
+//   abstrakt: Nullable[NonEmptyString],
+//   partnerSplits: Option[Map[Tag, IntPercent]],
+// )
 
 
 object ProposalInput {
 
   case class Create(
     title: Nullable[NonEmptyString],
-    proposalClass: ProposalClassInput,
+    proposalClass: Either[ProposalClassInput.TypeA.Create, ProposalClassInput.TypeB.Create],
     category: Nullable[Tag],
     toOActivation: ToOActivation,
     abstrakt: Nullable[NonEmptyString],
@@ -40,7 +40,7 @@ object ProposalInput {
 
   case class Edit(
     title: Nullable[NonEmptyString],
-    proposalClass: Option[ProposalClassInput],
+    proposalClass: Option[Either[ProposalClassInput.TypeA.Edit, ProposalClassInput.TypeB.Edit]],
     category: Nullable[Tag],
     toOActivation: Option[ToOActivation],
     abstrakt: Nullable[NonEmptyString],
@@ -76,7 +76,7 @@ object ProposalInput {
     }
 
   val EditBinding: Matcher[Edit] =
-    data(ProposalClassInput.CreateBinding).map(Edit.apply)
+    data(ProposalClassInput.EditBinding).map(Edit.apply)
 
   private val PartnerSplitsInput: Matcher[Map[Tag, IntPercent]] =
     PartnerSplitInput.Binding.List.rmap { splits =>
