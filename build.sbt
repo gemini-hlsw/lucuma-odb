@@ -56,10 +56,10 @@ lazy val service = project
       "edu.gemini"     %% "clue-http4s-jdk-client"          % clueVersion                % Test,
       "io.circe"       %% "circe-literal"                   % circeVersion               % Test,
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
       "org.typelevel"  %% "cats-time"                       % catsTimeVersion,
       "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
-
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
     reStart / envVars += "PORT" -> "8082",
