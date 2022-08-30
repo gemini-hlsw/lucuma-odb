@@ -148,7 +148,7 @@ trait Codecs {
 
   val data_timestamp: Codec[Timestamp] =
     timestamp.eimap(
-      ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid timestamp: $ldt"))(
+      ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
       _.toLocalDateTime
     )
 

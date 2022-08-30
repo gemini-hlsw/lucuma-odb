@@ -3,6 +3,7 @@
 
 package lucuma.odb.data
 
+import cats.syntax.either.*
 import cats.syntax.option.*
 import munit.FunSuite
 
@@ -13,17 +14,39 @@ import java.time.ZonedDateTime
 class TimestampSuite extends FunSuite {
 
   test("Below Min produces None") {
-    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Min.toInstant.minusNanos(1L)))
+    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Min.toInstant.minusNanos(1000L)))
   }
 
   test("Above Max produces None") {
-    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Max.toInstant.plusNanos(1L)))
+    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Max.toInstant.plusNanos(1000L)))
   }
 
-  test("Value is truncated") {
-    val precise = ZonedDateTime.of(2022, 8, 29, 12, 0, 0, 1, UTC).toInstant
-    val trunc   = precise.minusNanos(1L)
-    assertEquals(trunc.some, Timestamp.fromInstant(precise).map(_.toInstant))
+  test("Construction at microsecond precision only") {
+    val inst = ZonedDateTime.of(2022, 8, 29, 12, 0, 0, 1, UTC).toInstant
+    assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(inst))
+  }
+
+  test("Parse options") {
+    val ts = List(
+      Timestamp.parse("1863-07-03 03:00:00"),
+      Timestamp.parse("1863-07-03T03:00:00"),
+      Timestamp.parse("1863-07-03 03:00:00Z"),
+      Timestamp.parse("1863-07-03T03:00:00Z"),
+      Timestamp.parse("1863-07-03 03:00:00.0"),
+      Timestamp.parse("1863-07-03 03:00:00.00"),
+      Timestamp.parse("1863-07-03 03:00:00.000"),
+      Timestamp.parse("1863-07-03 03:00:00.0000"),
+      Timestamp.parse("1863-07-03 03:00:00.00000"),
+      Timestamp.parse("1863-07-03 03:00:00.000000")
+    )
+    val expected = Instant.parse("1863-07-03T03:00:00Z")
+
+    assert(ts.forall(_.toOption.map(_.toInstant) == Some(expected)))
+  }
+
+  test("Parse sub-microsecond fails") {
+    val s = "1863-07-03 03:00:00.0000000"
+    assertEquals(s"Could not parse as a Timestamp: $s".asLeft[Timestamp], Timestamp.parse(s))
   }
 
 }

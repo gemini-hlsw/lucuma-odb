@@ -9,9 +9,4 @@ import java.time.Instant
 import java.time.format.DateTimeParseException
 
 val TimestampBinding: Matcher[Timestamp] =
-  LocalDateTimeBinding.emap { ldt =>
-    Timestamp
-      .FromLocalDateTime
-      .getOption(ldt)
-      .toRight(s"Timestamp out of range: $ldt")
-  }
+  StringBinding.emap(Timestamp.parse)
