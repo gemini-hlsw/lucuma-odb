@@ -216,7 +216,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           createObservation(input: {
             programId: ${pid.asJson}
             SET: {
-              visualizationTime: "2022-08-29T18:01:00"
+              visualizationTime: "2022-08-29 18:01:00"
             }
           }) {
             observation {

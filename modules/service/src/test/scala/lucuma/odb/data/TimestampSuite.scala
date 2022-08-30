@@ -32,15 +32,19 @@ class TimestampSuite extends ScalaCheckSuite {
   test("Parse options") {
     val ts = List(
       Timestamp.parse("1863-07-03 03:00:00"),
-      Timestamp.parse("1863-07-03T03:00:00"),
-      Timestamp.parse("1863-07-03 03:00:00Z"),
       Timestamp.parse("1863-07-03T03:00:00Z"),
       Timestamp.parse("1863-07-03 03:00:00.0"),
+      Timestamp.parse("1863-07-03T03:00:00.0Z"),
       Timestamp.parse("1863-07-03 03:00:00.00"),
+      Timestamp.parse("1863-07-03T03:00:00.00Z"),
       Timestamp.parse("1863-07-03 03:00:00.000"),
+      Timestamp.parse("1863-07-03T03:00:00.000Z"),
       Timestamp.parse("1863-07-03 03:00:00.0000"),
+      Timestamp.parse("1863-07-03T03:00:00.0000Z"),
       Timestamp.parse("1863-07-03 03:00:00.00000"),
-      Timestamp.parse("1863-07-03 03:00:00.000000")
+      Timestamp.parse("1863-07-03T03:00:00.00000Z"),
+      Timestamp.parse("1863-07-03 03:00:00.000000"),
+      Timestamp.parse("1863-07-03T03:00:00.000000Z")
     )
     val expected = Instant.parse("1863-07-03T03:00:00Z")
 
