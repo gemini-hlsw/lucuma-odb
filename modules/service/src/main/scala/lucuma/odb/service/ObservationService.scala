@@ -39,6 +39,7 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
+import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
@@ -177,19 +178,21 @@ object ObservationService {
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.Default),
           SET.activeStatus.getOrElse(ObsActiveStatus.Default),
+          SET.visualizationTime.toOption,
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints)
         )
 
     def insertObservationAs(
-      user:          User,
-      programId:     Program.Id,
-      subtitle:      Option[NonEmptyString],
-      existence:     Existence,
-      status:        ObsStatus,
-      activeState:   ObsActiveStatus,
-      explicitBase:  Option[Coordinates],
-      constraintSet: ConstraintSet
+      user:              User,
+      programId:         Program.Id,
+      subtitle:          Option[NonEmptyString],
+      existence:         Existence,
+      status:            ObsStatus,
+      activeState:       ObsActiveStatus,
+      visualizationTime: Option[Timestamp],
+      explicitBase:      Option[Coordinates],
+      constraintSet:     ConstraintSet
     ): AppliedFragment = {
 
       val insert: AppliedFragment =
@@ -199,6 +202,7 @@ object ObservationService {
            existence   ~
            status      ~
            activeState ~
+           visualizationTime             ~
            explicitBase.map(_.ra)        ~
            explicitBase.map(_.dec)       ~
            constraintSet.cloudExtinction ~
@@ -225,6 +229,7 @@ object ObservationService {
       Existence              ~
       ObsStatus              ~
       ObsActiveStatus        ~
+      Option[Timestamp]      ~
       Option[RightAscension] ~
       Option[Declination]    ~
       CloudExtinction        ~
@@ -243,6 +248,7 @@ object ObservationService {
           c_existence,
           c_status,
           c_active_status,
+          c_visualization_time,
           c_explicit_ra,
           c_explicit_dec,
           c_cloud_extinction,
@@ -260,6 +266,7 @@ object ObservationService {
           $existence,
           $obs_status,
           $obs_active_status,
+          ${data_timestamp.opt},
           ${right_ascension.opt},
           ${declination.opt},
           $cloud_extinction,
@@ -335,10 +342,11 @@ object ObservationService {
     }
 
     def updates(SET: ObservationPropertiesInput): Result[Option[NonEmptyList[AppliedFragment]]] = {
-      val upExistence = sql"c_existence = $existence"
-      val upSubtitle  = sql"c_subtitle = ${text_nonempty.opt}"
-      val upStatus    = sql"c_status = $obs_status"
-      val upActive    = sql"c_active_status = $obs_active_status"
+      val upExistence         = sql"c_existence = $existence"
+      val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
+      val upStatus            = sql"c_status = $obs_status"
+      val upActive            = sql"c_active_status = $obs_active_status"
+      val upVisualizationTime = sql"c_visualization_time = ${data_timestamp.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -349,7 +357,12 @@ object ObservationService {
             case NonNull(value) => Some(upSubtitle(Some(value)))
           },
           SET.status.map(upStatus),
-          SET.activeStatus.map(upActive)
+          SET.activeStatus.map(upActive),
+          SET.visualizationTime match {
+            case Nullable.Null  => Some(upVisualizationTime(None))
+            case Absent         => None
+            case NonNull(value) => Some(upVisualizationTime(Some(value)))
+          }
         ).flatten
 
       val explicitBase: Result[List[AppliedFragment]] =

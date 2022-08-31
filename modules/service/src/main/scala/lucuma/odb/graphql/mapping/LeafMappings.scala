@@ -30,6 +30,7 @@ import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
+import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
@@ -59,9 +60,10 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val ProgramIdType         = schema.ref("ProgramId")
   lazy val ProgramUserRoleType   = schema.ref("ProgramUserRole")
   lazy val SkyBackgroundType     = schema.ref("SkyBackground")
+  lazy val TargetIdType          = schema.ref("TargetId")
+  lazy val TimestampType         = schema.ref("Timestamp")
   lazy val UserIdType            = schema.ref("UserId")
   lazy val UserTypeType          = schema.ref("UserType")
-  lazy val TargetIdType          = schema.ref("TargetId")
   lazy val WaterVaporType        = schema.ref("WaterVapor")
 
   lazy val LeafMappings: List[TypeMapping] =
@@ -91,6 +93,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[Timestamp](TimestampType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[WaterVapor](WaterVaporType)
