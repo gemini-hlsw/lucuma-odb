@@ -3,18 +3,28 @@
 
 package lucuma.odb.data
 
+import cats.kernel.laws.discipline.OrderTests
 import cats.syntax.either.*
 import cats.syntax.option.*
-import munit.ScalaCheckSuite
+import lucuma.core.optics.laws.discipline.FormatTests
+import monocle.law.discipline.PrismTests
+import munit.DisciplineSuite
 import org.scalacheck.Prop.*
+import org.typelevel.cats.time.instances.instant.*
+import org.typelevel.cats.time.instances.localdatetime.*
 
 import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.ZonedDateTime
 
-class TimestampSuite extends ScalaCheckSuite {
+class TimestampSuite extends DisciplineSuite {
 
-  import arb.ArbTimestamp.arbTimestamp
+  import arb.ArbTimestamp.{genTimestampString, given}
+
+  checkAll("Timestamp Order", OrderTests[Timestamp].order)
+  checkAll("Timestamp.FromString", FormatTests(Timestamp.FromString).formatWith(genTimestampString))
+  checkAll("Timestamp.FromInstant", PrismTests(Timestamp.FromInstant))
+  checkAll("Timestamp.FromLocalDateTime", PrismTests(Timestamp.FromLocalDateTime))
 
   test("Below Min produces None") {
     assertEquals(Option.empty[Timestamp], Timestamp.fromInstant(Timestamp.Min.toInstant.minusNanos(1000L)))

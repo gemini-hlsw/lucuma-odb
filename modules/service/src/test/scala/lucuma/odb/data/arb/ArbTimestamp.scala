@@ -8,6 +8,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck._
 
 import java.time.Duration
+import java.time.Instant
 import java.time.temporal.ChronoUnit.MICROS
 
 object ArbTimestamp {
@@ -26,4 +27,21 @@ object ArbTimestamp {
         )
       }
     }
+
+  given cogTimestamp: Cogen[Timestamp] =
+    Cogen[Instant].contramap(_.toInstant)
+
+  val genTimestampString: Gen[String] =
+    Gen.oneOf(
+      arbitrary[Timestamp].map(_.format),
+      arbitrary[Timestamp].map(_.format).map(s => s"${s}000"),
+      arbitrary[Timestamp].map(_.isoFormat),
+      arbitrary[(Timestamp, Int, Char)].map { case (t, i, c) =>
+        val cs = t.format.toCharArray
+        val in = (i % cs.size).abs
+        cs(in) = c
+        String.valueOf(cs)
+      }
+    )
+
 }

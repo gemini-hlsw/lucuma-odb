@@ -9,6 +9,8 @@ import cats.syntax.order.*
 import io.circe.Decoder
 import io.circe.Encoder
 import lucuma.core.optics.Format
+import lucuma.core.optics.SplitEpi
+import monocle.Prism
 import org.typelevel.cats.time.instances.instant.*
 
 import java.time.Instant
@@ -83,6 +85,9 @@ object Timestamp {
     def format: String =
       Formatter.format(toLocalDateTime)
 
+    def isoFormat: String =
+      IsoFormatter.format(toLocalDateTime)
+
     def toInstant: Instant =
       timestamp
 
@@ -92,13 +97,13 @@ object Timestamp {
   }
 
   val FromString: Format[String, Timestamp] =
-    Format(parse(_).toOption, Formatter.format)
+    Format(parse(_).toOption, _.format)
 
-  val FromInstant: Format[Instant, Timestamp] =
-    Format(fromInstant, toInstant)
+  val FromInstant: Prism[Instant, Timestamp] =
+    Prism(fromInstant)(toInstant)
 
-  val FromLocalDateTime: Format[LocalDateTime, Timestamp] =
-    Format(fromLocalDateTime, toLocalDateTime)
+  val FromLocalDateTime: Prism[LocalDateTime, Timestamp] =
+    Prism(fromLocalDateTime)(toLocalDateTime)
 
   given orderTimestamp: Order[Timestamp] with
     def compare(t0: Timestamp, t1: Timestamp): Int =
