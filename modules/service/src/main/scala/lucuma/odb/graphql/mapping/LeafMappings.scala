@@ -17,8 +17,10 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
+import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
@@ -31,8 +33,6 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-import lucuma.core.enums.ToOActivation
-import lucuma.core.model.IntPercent
 
 trait LeafMappings[F[_]] { this: Mapping[F] =>
 

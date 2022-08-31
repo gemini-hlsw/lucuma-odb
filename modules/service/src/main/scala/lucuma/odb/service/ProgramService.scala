@@ -4,11 +4,14 @@
 package lucuma.odb.service
 
 import cats.Monad
+import cats.Semigroup
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
+import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enums.ToOActivation
 import lucuma.core.model.GuestRole
+import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
@@ -21,13 +24,14 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProposalInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
+import lucuma.odb.service.ProgramService.UpdateProgramResponse
+import lucuma.odb.service.ProgramService.UpdateProgramResponse.ProposalUpdateFailed
+import lucuma.odb.service.ProposalService.UpdateProposalResponse
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
-import skunk.syntax.all._
 import skunk.codec.all._
-import lucuma.core.model.IntPercent
-import lucuma.core.enums.ToOActivation
+import skunk.syntax.all._
 
 trait ProgramService[F[_]] {
 
@@ -43,12 +47,28 @@ trait ProgramService[F[_]] {
    */
   def linkUser(req: ProgramService.LinkUserRequest): F[ProgramService.LinkUserResponse]
 
-  /** Update the properies for programs with ids given by the supplied fragment. */
-  def updatePrograms(SET: ProgramPropertiesInput.Edit, which: AppliedFragment): F[Unit]
+  /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
+  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[UpdateProgramResponse]
 
 }
 
 object ProgramService {
+
+  sealed class UpdateProgramResponse
+  object UpdateProgramResponse {
+
+    case class Success(pids: List[Program.Id]) extends UpdateProgramResponse
+    case class ProposalUpdateFailed(failure: ProposalService.UpdateProposalResponse.Failure) extends UpdateProgramResponse
+
+    given Semigroup[UpdateProgramResponse] with
+      def combine(a: UpdateProgramResponse, b: UpdateProgramResponse): UpdateProgramResponse =
+        (a, b) match {
+          case (Success(a), Success(b)) => Success((a ++ b).distinct)
+          case (Success(_), failure)    => failure
+          case (failure, _)             => failure
+        }
+
+  }
 
   sealed abstract class LinkUserRequest(val role: ProgramUserRole, val supportType: Option[ProgramUserSupportType] = None, val supportPartner: Option[Tag] = None) {
     def programId: Program.Id
@@ -102,17 +122,18 @@ object ProgramService {
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
    */
-  def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
+  def fromSessionAndUser[F[_]: Concurrent: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
+
+      lazy val proposalService = ProposalService.fromSession(s)
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          s.transaction.use { _ =>
+          s.transaction.use { xa =>
             val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
             s.prepare(Statements.InsertProgram).use(_.unique(SETʹ.name ~ user)).flatTap { pid =>
               SETʹ.proposal.traverse { proposalInput =>
-                s.prepare(Statements.InsertProposal).use(_.execute(pid ~ proposalInput)) >>
-                s.prepare(Statements.insertPartnerSplits(proposalInput.partnerSplits)).use(_.execute(pid ~ proposalInput.partnerSplits))
+                proposalService.insertProposal(proposalInput, pid, xa)
               }
             }
           }
@@ -142,12 +163,34 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[Unit] =
-        s.transaction.use { _ =>
-          Statements.updatePrograms(SET, where).traverse(s.executeCommand) >>
-          SET.proposal.flatMap(Statements.updateProposals(_, where)).traverse(s.executeCommand)
-          // TODO: each update needs to collect affected program ids so we can return them
-        } .void
+      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[UpdateProgramResponse] =
+        s.transaction.use { xa =>
+
+          // Update the program itself
+          val a: F[UpdateProgramResponse] =
+            Statements.updatePrograms(SET, where).fold(UpdateProgramResponse.Success(Nil).pure[F]) { af =>
+              s.prepare(af.fragment.query(program_id)).use { ps =>
+                ps.stream(af.argument, 1024)
+                  .compile
+                  .toList
+                  .map(UpdateProgramResponse.Success(_))
+              }
+            }
+
+          // Update the proposal
+          val b: F[UpdateProgramResponse] =
+            SET.proposal.fold(UpdateProgramResponse.Success(Nil).pure[F]) {
+              proposalService.updateProposals(_, where, xa).map {
+                case UpdateProposalResponse.Success(pids)      => UpdateProgramResponse.Success(pids)
+                case UpdateProposalResponse.CreationFailed     => UpdateProgramResponse.ProposalUpdateFailed(UpdateProposalResponse.CreationFailed)
+                case UpdateProposalResponse.InconsistentUpdate => UpdateProgramResponse.ProposalUpdateFailed(UpdateProposalResponse.InconsistentUpdate)
+              }
+            }
+
+          // Combie the results
+          (a, b).mapN(_ |+| _)
+
+        }
 
     }
 
@@ -162,33 +205,12 @@ object ProgramService {
         ).flatten
       )
 
-    def updates(SET: ProposalInput.Edit): Option[NonEmptyList[AppliedFragment]] =
-      NonEmptyList.fromList(
-        List(
-          SET.abstrakt.foldPresent(sql"c_abstract = ${text_nonempty.opt}"),
-          SET.category.foldPresent(sql"c_category = ${tag.opt}"),
-          SET.title.foldPresent(sql"c_name = ${text_nonempty.opt}"),
-          SET.toOActivation.map(sql"c_too_activation = $too_activation"),
-          // SET.proposalClass.map { pci =>
-          //   // if pci is complete then ok to replace the proposal class
-          //   // if it's partial then it must match and we have to do an extra read to check first
-          //   ???
-          // }
-        ).flatten
-      )
-
-    def updateProposals(SET: ProposalInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
-      updates(SET).map { us =>
-        void"UPDATE t_proposal " |+|
-        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE t_proposal.c_program_id IN (" |+| which |+| void")"
-      }
-
     def updatePrograms(SET: ProgramPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
       updates(SET).map { us =>
         void"UPDATE t_program " |+|
         void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE t_program.c_program_id IN (" |+| which |+| void")"
+        void"WHERE t_program.c_program_id IN (" |+| which |+| void") " |+|
+        void"RETURNING t_program.c_program_id"
       }
 
     def existsUserAsPi(
@@ -240,53 +262,6 @@ object ProgramService {
          .contramap {
             case oNes ~ ServiceUser(_, _) => oNes ~ None
             case oNes ~ nonServiceUser    => oNes ~ Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser))
-         }
-
-    /** Insert a proposal. */
-    val InsertProposal: Command[Program.Id ~ ProposalInput.Create] =
-      sql"""
-        INSERT INTO t_proposal (
-          c_program_id,
-          c_title,
-          c_abstract,
-          c_category,
-          c_too_activation,
-          c_class,
-          c_min_percent,
-          c_min_percent_total,
-          c_totalTime
-        ) VALUES (
-          ${program_id},
-          ${text_nonempty.opt},
-          ${text_nonempty.opt},
-          ${tag.opt},
-          ${too_activation},
-          ${tag},
-          ${int_percent},
-          ${int_percent.opt},
-          ${interval.opt}
-        )
-      """.command
-         .contramap {
-            case pid ~ ppi =>
-              pid ~
-              ppi.title.toOption ~
-              ppi.abstrakt.toOption ~
-              ppi.category.toOption ~
-              ppi.toOActivation ~
-              ppi.proposalClass.fold(_.tag, _.tag) ~
-              ppi.proposalClass.fold(_.minPercentTime, _.minPercentTime) ~
-              ppi.proposalClass.toOption.map(_.minPercentTotalTime) ~
-              ppi.proposalClass.toOption.map(_.totalTime.value)
-         }
-
-    def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =
-      sql"""
-         INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
-         VALUES ${(program_id ~ tag ~ int_percent).values.list(splits.size)}
-      """.command
-         .contramap {
-          case pid ~ splits => splits.toList.map { case (t, p) => pid ~ t ~ p }
          }
 
     /** Link a user to a program, without any access checking. */

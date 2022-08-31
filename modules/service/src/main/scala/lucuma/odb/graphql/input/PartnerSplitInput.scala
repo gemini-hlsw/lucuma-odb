@@ -7,12 +7,12 @@ package input
 
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.odb.data.Existence
-import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.odb.data.Tag
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
+import lucuma.odb.data.Existence
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.util.Bindings._
 
 case class PartnerSplitInput(
   partner: Tag,

@@ -6,15 +6,15 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
+import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enums.ToOActivation
+import lucuma.core.model.IntPercent
+import lucuma.core.model.NonNegDuration
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.util.Bindings._
-import lucuma.odb.data.Tag
-import lucuma.core.enums.ToOActivation
-import lucuma.core.model.NonNegDuration
-import edu.gemini.grackle.Result
-import lucuma.core.model.IntPercent
 
 object ProposalClassInput {
 

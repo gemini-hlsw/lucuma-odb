@@ -44,6 +44,8 @@ import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.ProgramService.UpdateProgramResponse
+import lucuma.odb.service.ProposalService.UpdateProposalResponse
 import lucuma.odb.service.TargetService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
@@ -229,9 +231,20 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
         )
 
-      // Update the specified programs and then return a query for the same set of programs.
-      idSelect.traverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).as(Filter(filterPredicate, child))
+      // Update the specified programs and then return a query for the affected programs.
+      idSelect.flatTraverse { which =>
+        programService.use(_.updatePrograms(input.SET, which)).map {
+          case UpdateProgramResponse.Success(Nil)  => Result(Limit(0, child)) // hack
+          case UpdateProgramResponse.Success(pids) => Result(Filter(ProgramPredicates.hasProgramId(pids), child))
+          case UpdateProgramResponse.ProposalUpdateFailed(f) =>
+            f match {
+              case UpdateProposalResponse.CreationFailed =>
+                Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
+              case UpdateProposalResponse.InconsistentUpdate =>
+                Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+            }
+          case _ => sys.error("unpossible, doing this for the buggy exhaustiveness checker")
+        }
       }
 
     }
