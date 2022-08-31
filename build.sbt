@@ -11,9 +11,11 @@ val http4sEmberVersion         = "0.23.15"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.0"
 val log4catsVersion            = "2.4.0"
+val lucumaCoreVersion          = "0.51.0"
 val lucumaGraphQLRoutesVersion = "0.5.3"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
+val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.3.2"
 val natchezVersion             = "0.1.6"
 val postgresVersion            = "42.5.0"
@@ -40,6 +42,7 @@ lazy val service = project
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
+      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
       "io.circe"       %% "circe-parser"                    % circeVersion,
       "io.circe"       %% "circe-refined"                   % circeVersion,
       "is.cir"         %% "ciris"                           % cirisVersion,
@@ -60,6 +63,7 @@ lazy val service = project
       "org.typelevel"  %% "cats-time"                       % catsTimeVersion,
       "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
+      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
     reStart / envVars += "PORT" -> "8082",
