@@ -4,13 +4,13 @@
 package lucuma.odb.graphql.mapping
 
 import cats.data.Ior
+import edu.gemini.grackle.Result
 import edu.gemini.grackle.skunk.SkunkMapping
 import io.circe.Encoder
 import lucuma.core.model.Program
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
-import edu.gemini.grackle.Result
 
 import java.time.Duration
 

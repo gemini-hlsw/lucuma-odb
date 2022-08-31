@@ -5,21 +5,21 @@ package lucuma.odb.graphql
 
 package mapping
 
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.Predicate._
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Type
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.enums.ProposalClass
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.util.MappingExtras
 
 import table.TargetView
 import table.ProgramTable
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.Type
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
-import lucuma.core.enums.ProposalClass
-import lucuma.odb.data.Tag
-import edu.gemini.grackle.Path.UniquePath
 
 trait ProposalClassMapping[F[_]]
   extends ProposalTable[F] { this: SkunkMapping[F] =>

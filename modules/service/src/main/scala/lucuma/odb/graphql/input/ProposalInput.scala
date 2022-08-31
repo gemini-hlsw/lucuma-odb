@@ -6,26 +6,16 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
+import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.odb.data.Existence
-import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
-import lucuma.odb.data.Tag
+import lucuma.core.enums.ProposalClass
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
-import edu.gemini.grackle.Result
+import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.core.enums.ProposalClass
-
-// case class ProposalInput(
-//   title: Nullable[NonEmptyString],
-//   proposalClass: Option[ProposalClassInput],
-//   category: Nullable[Tag],
-//   toOActivation: Option[ToOActivation],
-//   abstrakt: Nullable[NonEmptyString],
-//   partnerSplits: Option[Map[Tag, IntPercent]],
-// )
-
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.util.Bindings._
 
 object ProposalInput {
 
@@ -45,7 +35,18 @@ object ProposalInput {
     toOActivation: Option[ToOActivation],
     abstrakt: Nullable[NonEmptyString],
     partnerSplits: Option[Map[Tag, IntPercent]],
-  )
+  ) {
+    def asCreate: Option[Create] = {
+      val proposalClassʹ = proposalClass.flatMap {
+        case Left(a) => a.asCreate.map(_.asLeft)
+        case Right(b) => b.asCreate.map(_.asRight)
+      }
+      (proposalClassʹ, toOActivation, partnerSplits).mapN { (pc, too, splits) =>
+        Create(title, pc, category, too, abstrakt, splits)
+      }
+    }
+
+  }
 
   private def data[A](
     proposalClass: Matcher[A]

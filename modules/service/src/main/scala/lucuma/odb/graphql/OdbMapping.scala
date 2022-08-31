@@ -63,7 +63,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: Sync: Trace: Logger](
+  def apply[F[_]: Async: Trace: Logger](
     database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user0:     User,

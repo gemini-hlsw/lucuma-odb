@@ -6,6 +6,7 @@ package lucuma.odb.graphql.binding
 import cats.syntax.all._
 import io.circe.Json
 import lucuma.core.enums.Band
+import lucuma.core.enums.ToOActivation
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
@@ -13,7 +14,6 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.graphql.util.Bindings._
-import lucuma.core.enums.ToOActivation
 
 def enumeratedBinding[A](implicit ev: Enumerated[A]) =
   TypedEnumBinding.map(b => Json.fromString(b.name)).emap { j =>
