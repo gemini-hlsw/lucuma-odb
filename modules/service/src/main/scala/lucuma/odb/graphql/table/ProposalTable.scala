@@ -21,7 +21,7 @@ trait ProposalTable[F[_]] { self: SkunkMapping[F] =>
     val Clazz           = col("c_class", tag)
     val MinPercent      = col("c_min_percent", int_percent)
     val MinPercentTotal = col("c_min_percent_total", int_percent.embedded)
-    val TotalTime       = col("c_totaltime", interval.embedded)
+    val TotalTime       = col("c_total_time", interval.embedded)
   }
 
 }

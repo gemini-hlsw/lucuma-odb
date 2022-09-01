@@ -256,4 +256,437 @@ class updateProgram extends OdbSuite with CreateProgramOps {
     }
   }
 
+  test("edit proposal (non-class properties)") {
+    createProgramAs(pi).flatMap { pid =>
+      // First add the proposal
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      queue: {
+                        minPercentTime: 50
+                      }
+                    }
+                    category: COSMOLOGY
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: US
+                        percent: 100
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          """)
+      ) >>
+      // Now update it with a different type-A proposal class
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    title: "updated title"
+                    category: SMALL_BODIES
+                    toOActivation: RAPID
+                    partnerSplits: [
+                      {
+                        partner: AR
+                        percent: 70
+                      }
+                      {
+                        partner: KECK
+                        percent: 30
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+              proposal {
+                title
+                category
+                toOActivation
+                partnerSplits {
+                  partner
+                  percent
+                }
+              }
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid,
+                  "proposal" : {
+                    "title" : "updated title",
+                    "category" : "SMALL_BODIES",
+                    "toOActivation" : "RAPID",
+                    "partnerSplits" : [
+                      {
+                        "partner" : "KECK",
+                        "percent" : 30
+                      },
+                      {
+                        "partner" : "AR",
+                        "percent" : 70
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          """)
+      )
+
+    }
+  }
+
+  test("edit proposal (proposal class, type A -> type A)") {
+    createProgramAs(pi).flatMap { pid =>
+
+      // First add the proposal
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      queue: {
+                        minPercentTime: 50
+                      }
+                    }
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: US
+                        percent: 100
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          """)
+      ) >>
+      // Now update it with a different type-A proposal class
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      classical: {
+                        minPercentTime: 40
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+              proposal {
+                proposalClass {
+                  ... on Classical {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid,
+                  "proposal" : {
+                    "proposalClass" : {
+                      "minPercentTime" : 40
+                    }
+                  }
+                }
+              ]
+            }
+          """)
+      )
+
+    }
+
+  }
+
+  test("edit proposal (proposal class, type A -> type B, incomplete)") {
+    createProgramAs(pi).flatMap { pid =>
+      // First add the proposal
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      queue: {
+                        minPercentTime: 50
+                      }
+                    }
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: US
+                        percent: 100
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          """)
+      ) >>
+      // Now update it with an incomplete type-B proposal class
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      intensive: {
+                        minPercentTime: 40
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+              proposal {
+                proposalClass {
+                  ... on Intensive {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = Left(List(
+          "The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class."
+        ))
+      )
+
+    }
+
+  }
+
+    test("edit proposal (proposal class, type A -> type B)") {
+    createProgramAs(pi).flatMap { pid =>
+      // First add the proposal
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      queue: {
+                        minPercentTime: 50
+                      }
+                    }
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: US
+                        percent: 100
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          """)
+      ) >>
+      // Now update it with an valid type-B proposal class
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      intensive: {
+                        minPercentTime: 40
+                        minPercentTotalTime: 10
+                        totalTime: {
+                          hours: 10.5
+                        }
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              id
+              proposal {
+                proposalClass {
+                  ... on Intensive {
+                    minPercentTime
+                    minPercentTotalTime
+                    totalTime {
+                      hours
+                      iso
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : "p-108",
+                  "proposal" : {
+                    "proposalClass" : {
+                      "minPercentTime" : 40,
+                      "minPercentTotalTime" : 10,
+                      "totalTime" : {
+                        "hours" : 10.5,
+                        "iso" : "PT10H30M"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          """
+        )
+      )
+
+    }
+
+  }
+
+
 }

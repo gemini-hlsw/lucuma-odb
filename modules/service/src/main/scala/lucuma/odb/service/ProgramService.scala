@@ -24,9 +24,6 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProposalInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
-import lucuma.odb.service.ProgramService.UpdateProgramResponse
-import lucuma.odb.service.ProgramService.UpdateProgramResponse.ProposalUpdateFailed
-import lucuma.odb.service.ProposalService.UpdateProposalResponse
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
@@ -48,27 +45,11 @@ trait ProgramService[F[_]] {
   def linkUser(req: ProgramService.LinkUserRequest): F[ProgramService.LinkUserResponse]
 
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
-  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[UpdateProgramResponse]
+  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]]
 
 }
 
 object ProgramService {
-
-  sealed class UpdateProgramResponse
-  object UpdateProgramResponse {
-
-    case class Success(pids: List[Program.Id]) extends UpdateProgramResponse
-    case class ProposalUpdateFailed(failure: ProposalService.UpdateProposalResponse.Failure) extends UpdateProgramResponse
-
-    given Semigroup[UpdateProgramResponse] with
-      def combine(a: UpdateProgramResponse, b: UpdateProgramResponse): UpdateProgramResponse =
-        (a, b) match {
-          case (Success(a), Success(b)) => Success((a ++ b).distinct)
-          case (Success(_), failure)    => failure
-          case (failure, _)             => failure
-        }
-
-  }
 
   sealed abstract class LinkUserRequest(val role: ProgramUserRole, val supportType: Option[ProgramUserSupportType] = None, val supportPartner: Option[Tag] = None) {
     def programId: Program.Id
@@ -163,7 +144,7 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[UpdateProgramResponse] =
+      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]] =
         s.transaction.use { xa =>
 
           // Create the temp table with the programs we're updating. We will join with this
@@ -174,24 +155,19 @@ object ProgramService {
           }
 
           // Update programs
-          val updatePrograms: F[UpdateProgramResponse] =
-            Statements.updatePrograms(SET).fold(UpdateProgramResponse.Success(Nil).pure[F]) { af =>
+          val updatePrograms: F[List[Program.Id]] =
+            Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
               s.prepare(af.fragment.query(program_id)).use { ps =>
                 ps.stream(af.argument, 1024)
                   .compile
                   .toList
-                  .map(UpdateProgramResponse.Success(_))
               }
             }
 
           // Update proposals. This can fail in a few ways.
-          val updateProposals: F[UpdateProgramResponse] =
-            SET.proposal.fold(UpdateProgramResponse.Success(Nil).pure[F]) {
-              proposalService.updateProposals(_, xa).map {
-                case UpdateProposalResponse.Success(pids)      => UpdateProgramResponse.Success(pids)
-                case UpdateProposalResponse.CreationFailed     => UpdateProgramResponse.ProposalUpdateFailed(UpdateProposalResponse.CreationFailed)
-                case UpdateProposalResponse.InconsistentUpdate => UpdateProgramResponse.ProposalUpdateFailed(UpdateProposalResponse.InconsistentUpdate)
-              }
+          val updateProposals: F[List[Program.Id]] =
+            SET.proposal.fold(Nil.pure[F]) {
+              proposalService.updateProposals(_, xa)
             }
 
           // Combie the results
