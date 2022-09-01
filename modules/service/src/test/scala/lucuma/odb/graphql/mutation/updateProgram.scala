@@ -688,5 +688,186 @@ class updateProgram extends OdbSuite with CreateProgramOps {
 
   }
 
+  test("bulk update basic properties") {
+    // create a bunch and edit a few of them
+    createProgramAs(pi).replicateA(10).flatMap { pids =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  name: "updated"
+                }
+                WHERE: {
+                  id: {
+                    IN: [ ${pids.take(3).mkString("\"", "\", \"", "\"")} ]
+                  }
+                }
+              }
+            ) {
+              id
+              name
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : ${pids(0)},
+                  "name" : "updated"
+                },
+                {
+                  "id" : ${pids(1)},
+                  "name" : "updated"
+                },
+                {
+                  "id" : ${pids(2)},
+                  "name" : "updated"
+                }
+              ]
+            }
+          """
+        )
+      )
+
+    }
+  }
+
+  test("bulk update proposal: one insert, one update") {
+    (createProgramAs(pi), createProgramAs(pi)).tupled.flatMap { (pid1, pid2) =>
+      // Add a proposal to one of them
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      queue: {
+                        minPercentTime: 50
+                      }
+                    }
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: US
+                        percent: 100
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid1"
+                  }
+                }
+              }
+            ) {
+              id
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid1
+                }
+              ]
+            }
+          """
+        )
+      )
+      // Now update both of them
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      classical: {
+                        minPercentTime: 30
+                      }
+                    }
+                    toOActivation: RAPID
+                    partnerSplits: [
+                      {
+                        partner: KECK
+                        percent: 100
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    IN: ["$pid1", "$pid2"]
+                  }
+                }
+              }
+            ) {
+              id
+              proposal {
+                proposalClass {
+                  ... on Classical {
+                    minPercentTime
+                  }
+                }
+                partnerSplits {
+                  partner
+                  percent
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : [
+                {
+                  "id" : $pid1,
+                  "proposal" : {
+                    "proposalClass" : {
+                      "minPercentTime" : 30
+                    },
+                    "partnerSplits" : [
+                      {
+                        "partner" : "KECK",
+                        "percent" : 100
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id" : $pid2,
+                  "proposal" : {
+                    "proposalClass" : {
+                      "minPercentTime" : 30
+                    },
+                    "partnerSplits" : [
+                      {
+                        "partner" : "KECK",
+                        "percent" : 100
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          """
+        )
+      )
+    }
+  }
 
 }
