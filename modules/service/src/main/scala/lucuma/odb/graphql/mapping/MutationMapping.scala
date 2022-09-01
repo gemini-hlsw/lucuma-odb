@@ -23,6 +23,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.binding._
@@ -230,11 +231,15 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
         )
 
+      // We want to order the returned programs by id
+      def orderByPid(child: Query) =
+        OrderBy(OrderSelections(List(OrderSelection(UniquePath[Program.Id](List("id"))))), child)
+
       // Update the specified programs and then return a query for the affected programs.
       idSelect.flatTraverse { which =>
         programService.use(_.updatePrograms(input.SET, which)).map {
-          case Nil  => Result(Limit(0, child)) // hack
-          case pids => Result(Filter(ProgramPredicates.hasProgramId(pids), child))
+          case Nil  => Result(orderByPid(Limit(0, child)))
+          case pids => Result(orderByPid(Filter(ProgramPredicates.hasProgramId(pids), child)))
         } recover {
           case ProposalService.ProposalUpdateException.CreationFailed =>
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
