@@ -44,12 +44,12 @@ import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.ProposalService
 import lucuma.odb.service.TargetService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
-import lucuma.odb.service.ProposalService
 
 trait MutationMapping[F[_]: MonadCancelThrow]
   extends ProgramPredicates[F]
