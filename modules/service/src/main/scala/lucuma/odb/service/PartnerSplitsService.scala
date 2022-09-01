@@ -32,7 +32,7 @@ private[service] trait PartnerSplitsService[F[_]] {
 
     def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id, xa: Transaction[F]): F[Unit]
 
-    def updateSplits(splits: Map[Tag, IntPercent], whichProgramIds: AppliedFragment, xa: Transaction[F]): F[List[Program.Id]]
+    def updateSplits(splits: Map[Tag, IntPercent], xa: Transaction[F]): F[List[Program.Id]]
 
 }
 
@@ -48,17 +48,15 @@ object PartnerSplitsService {
       def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id, xa: Transaction[F]): F[Unit] =
         s.prepare(Statements.insertSplits(splits)).use(_.execute(pid ~ splits)).void
 
-      def updateSplits(splits: Map[Tag, IntPercent], whichProgramIds: AppliedFragment, xa: Transaction[F]): F[List[Program.Id]] = {
+      def updateSplits(splits: Map[Tag, IntPercent], xa: Transaction[F]): F[List[Program.Id]] = {
 
         // First delete all the splits for these programs.
-        val a: F[List[Program.Id]] = {
-          val af = Statements.deleteSplits(whichProgramIds)
-          s.prepare(af.fragment.query(program_id)).use(_.stream(af.argument, 1024).compile.toList)
-        }
+        val a: F[List[Program.Id]] =
+          s.prepare(Statements.DeleteSplits).use(_.stream(Void, 1024).compile.toList)
 
         // Then insert the new ones
         val b: F[List[Program.Id]] = {
-          val af = Statements.insertManySplits(splits, whichProgramIds)
+          val af = Statements.insertManySplits(splits)
           s.prepare(af.fragment.query(program_id)).use(_.stream(af.argument, 1024).compile.toList)
         }
 
@@ -80,22 +78,22 @@ object PartnerSplitsService {
           case pid ~ splits => splits.toList.map { case (t, p) => pid ~ t ~ p }
          }
 
-    def deleteSplits(whichProgramIds: AppliedFragment): AppliedFragment =
-      void"""
+    val DeleteSplits: Query[Void, Program.Id] =
+      sql"""
          DELETE FROM t_partner_split
-         WHERE c_program_id IN (""" |+| whichProgramIds |+| void""")
-         RETURNING c_program_id
-      """
+         USING t_program_update
+         WHERE t_partner_split.c_program_id = t_program_update.c_program_id
+         RETURNING t_partner_split.c_program_id
+      """.query(program_id)
 
-    def insertManySplits(splits: Map[Tag, IntPercent], whichProgramIds: AppliedFragment) = {
+    def insertManySplits(splits: Map[Tag, IntPercent]) = {
       val splitsʹ = splits.toList
       sql"""
         INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
-        SELECT pid, partner, percent
-        FROM (VALUES ${(tag ~ int_percent).values.list(splitsʹ)}) AS splits (partner, percent),
-      """.apply(splitsʹ) |+| void"(" |+| whichProgramIds |+| void""") AS pids (pid)
+        SELECT c_program_id, partner, percent
+        FROM (VALUES ${(tag ~ int_percent).values.list(splitsʹ)}) AS splits (partner, percent), t_program_update
         RETURNING c_program_id
-      """
+      """.apply(splitsʹ)
     }
 
   }

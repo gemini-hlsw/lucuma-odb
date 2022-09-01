@@ -166,9 +166,16 @@ object ProgramService {
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[UpdateProgramResponse] =
         s.transaction.use { xa =>
 
-          // Update the program itself
-          val a: F[UpdateProgramResponse] =
-            Statements.updatePrograms(SET, where).fold(UpdateProgramResponse.Success(Nil).pure[F]) { af =>
+          // Create the temp table with the programs we're updating. We will join with this
+          // several times later on in the transaction.
+          val setup: F[Unit] = {
+            val af = Statements.createProgramUpdateTempTable(where)
+            s.prepare(af.fragment.command).use(_.execute(af.argument)).void
+          }
+
+          // Update programs
+          val updatePrograms: F[UpdateProgramResponse] =
+            Statements.updatePrograms(SET).fold(UpdateProgramResponse.Success(Nil).pure[F]) { af =>
               s.prepare(af.fragment.query(program_id)).use { ps =>
                 ps.stream(af.argument, 1024)
                   .compile
@@ -177,10 +184,10 @@ object ProgramService {
               }
             }
 
-          // Update the proposal
-          val b: F[UpdateProgramResponse] =
+          // Update proposals. This can fail in a few ways.
+          val updateProposals: F[UpdateProgramResponse] =
             SET.proposal.fold(UpdateProgramResponse.Success(Nil).pure[F]) {
-              proposalService.updateProposals(_, where, xa).map {
+              proposalService.updateProposals(_, xa).map {
                 case UpdateProposalResponse.Success(pids)      => UpdateProgramResponse.Success(pids)
                 case UpdateProposalResponse.CreationFailed     => UpdateProgramResponse.ProposalUpdateFailed(UpdateProposalResponse.CreationFailed)
                 case UpdateProposalResponse.InconsistentUpdate => UpdateProgramResponse.ProposalUpdateFailed(UpdateProposalResponse.InconsistentUpdate)
@@ -188,7 +195,7 @@ object ProgramService {
             }
 
           // Combie the results
-          (a, b).mapN(_ |+| _)
+          (setup >> updatePrograms, updateProposals).mapN(_ |+| _)
 
         }
 
@@ -196,6 +203,16 @@ object ProgramService {
 
 
   object Statements {
+
+    def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
+      void"""
+        CREATE TEMPORARY TABLE t_program_update (c_program_id, c_has_proposal)
+        ON COMMIT DROP
+        AS SELECT which.pid, p.c_program_id IS NOT NULL
+        FROM (""" |+| whichProgramIds |+| void""") as which (pid)
+        LEFT JOIN t_proposal p
+        ON p.c_program_id = which.pid
+      """
 
     def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
@@ -205,12 +222,14 @@ object ProgramService {
         ).flatten
       )
 
-    def updatePrograms(SET: ProgramPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
+    def updatePrograms(SET: ProgramPropertiesInput.Edit): Option[AppliedFragment] =
       updates(SET).map { us =>
-        void"UPDATE t_program " |+|
-        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE t_program.c_program_id IN (" |+| which |+| void") " |+|
-        void"RETURNING t_program.c_program_id"
+        void"""
+          UPDATE t_program
+          SET """ |+| us.intercalate(void", ") |+| void"""
+          FROM t_program_update WHERE t_program.c_program_id = t_program_update.c_program_id
+          RETURNING t_program.c_program_id
+        """
       }
 
     def existsUserAsPi(

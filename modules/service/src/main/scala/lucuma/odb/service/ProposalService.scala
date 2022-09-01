@@ -39,13 +39,15 @@ private[service] trait ProposalService[F[_]] {
   def insertProposal(SET: ProposalInput.Create, pid: Program.Id, xa: Transaction[F]): F[Unit]
 
   /**
-   * Update the proposals associated with the specified programs. If the update specifies enough
-   * information to replace the proposal class then it will be replaced in its entirety (potentially
+   * Update the proposals associated with the programs in temporary table `t_program_update`
+   * (created by ProgramService#updatePrograms). If the update specifies enough information to
+   * replace the proposal class then it will be replaced in its entirety (potentially
    * changing the proposal class). Otherwise the proposal class will be updated in-place, but only
    * where the class matches what `SET` specifies. This action only makes sense in the context of
-   * a larger transaction, which is why `xa` is required here.
+   * a larger transaction, which is why `xa` is required here. This action also assumes the
+   * presence of the t_program_update
    */
-  def updateProposals(SET: ProposalInput.Edit, whichProgramIds: AppliedFragment, xa: Transaction[F]): F[ProposalService.UpdateProposalResponse]
+  def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[ProposalService.UpdateProposalResponse]
 
 }
 
@@ -60,13 +62,11 @@ object ProposalService {
     case object CreationFailed                  extends UpdateProposalResponse with Failure
     case object InconsistentUpdate              extends UpdateProposalResponse with Failure
 
-    given Semigroup[UpdateProposalResponse] with
-      def combine(a: UpdateProposalResponse, b: UpdateProposalResponse): UpdateProposalResponse =
-        (a, b) match {
-          case (Success(a), Success(b)) => Success((a |+| b).distinct)
-          case (Success(_), failure)    => failure
-          case (failure, _)             => failure
-        }
+    given Semigroup[UpdateProposalResponse] = {
+      case (Success(a), Success(b)) => Success((a |+| b).distinct)
+      case (Success(_), failure)    => failure
+      case (failure, _)             => failure
+    }
 
   }
 
@@ -80,52 +80,38 @@ object ProposalService {
         s.prepare(Statements.InsertProposal).use(_.execute(pid ~ SET)) >>
         partnerSplitsService.insertSplits(SET.partnerSplits, pid, xa)
 
-      def updateProposals(SET: ProposalInput.Edit, whichProgramIds: AppliedFragment, xa: Transaction[F]): F[UpdateProposalResponse] = {
+      def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[UpdateProposalResponse] = {
 
-        // Which of our programs have proposals?
-        val programsWithProposals: F[List[Program.Id ~ Boolean]] = {
-          val af = Statements.programsWithProposals(whichProgramIds)
-          s.prepare(af.fragment.query(program_id ~ bool)).use(_.stream(af.argument, 1024).compile.toList)
-        }
-
-        // Update the proposal slice
-        def updateProposalFields(whichProgramIdsToUpdate: AppliedFragment): F[UpdateProposalResponse] =
-          Statements.updateProposals(SET, whichProgramIdsToUpdate).fold(UpdateProposalResponse.Success(Nil).pure[F]) { af =>
+        // Update existing proposals. This will fail if SET.asCreate.isEmpty and there is a class mismatch.
+        val update: F[UpdateProposalResponse] =
+          Statements.updateProposals(SET).fold(UpdateProposalResponse.Success(Nil).pure[F]) { af =>
             s.prepare(af.fragment.query(program_id)).use { ps =>
-              ps.stream(af.argument, 1024).compile.toList.map(UpdateProposalResponse.Success(_))
+              ps.stream(af.argument, 1024)
+                .compile
+                .toList
+                .map(UpdateProposalResponse.Success(_))
             }
           }
 
-        // Then replace the splits
-        def replaceSplits(whichProgramIdsToUpdate: AppliedFragment): F[UpdateProposalResponse] =
+        // Insert new proposals. This will fail if there's not enough information.
+        val insert: F[UpdateProposalResponse] =
+          s.prepare(Statements.InsertProposals).use { ps =>
+            ps.stream(SET, 1024)
+              .compile
+              .toList
+              .map(UpdateProposalResponse.Success(_))
+          } recover {
+            case SqlState.NotNullViolation(ex) => UpdateProposalResponse.CreationFailed
+          }
+
+        // Replace the splits
+        def replaceSplits: F[UpdateProposalResponse] =
           SET.partnerSplits.fold(UpdateProposalResponse.Success(Nil).pure[F]) { ps =>
-            partnerSplitsService.updateSplits(ps, whichProgramIdsToUpdate, xa).map(UpdateProposalResponse.Success(_))
+            partnerSplitsService.updateSplits(ps, xa).map(UpdateProposalResponse.Success(_))
           }
 
-        // Ok let's see if we can do this.
-        programsWithProposals.flatMap { info =>
-
-          val toInsert: List[Program.Id] = info.collect { case (pid, false) => pid }
-          val toUpdate = info.collect { case (pid, true) => pid }
-
-          val create: F[UpdateProposalResponse] =
-            SET.asCreate match {
-              case None    => UpdateProposalResponse.CreationFailed.pure[F]
-              case Some(c) => toInsert.traverse(insertProposal(c, _, xa)).as(UpdateProposalResponse.Success(toInsert)) // TODO: this is inefficient
-            }
-
-          val update: F[UpdateProposalResponse] =
-            toUpdate match {
-              case Nil  => UpdateProposalResponse.Success(Nil).pure[F]
-              case pids =>
-                val whichProgramIdsToUpdate: AppliedFragment = sql"VALUES ${program_id.values.list(toUpdate)}".apply(toUpdate)
-                (updateProposalFields(whichProgramIdsToUpdate), replaceSplits(whichProgramIdsToUpdate)).mapN(_ |+| _)
-            }
-
-          (create, update).mapN(_ |+| _)
-
-        }
-
+        // Done!
+        (update, insert, replaceSplits).mapN(_ |+| _ |+| _)
 
       }
 
@@ -189,12 +175,16 @@ object ProposalService {
           }
       }
 
-    def updateProposals(SET: ProposalInput.Edit, whichProgramIds: AppliedFragment): Option[AppliedFragment] =
+    def updateProposals(SET: ProposalInput.Edit): Option[AppliedFragment] =
       updates(SET).map { us =>
-        void"UPDATE t_proposal " |+|
-        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE t_proposal.c_program_id IN (" |+| whichProgramIds |+| void") " |+|
-        void"RETURNING c_program_id"
+        void"""
+          UPDATE t_proposal
+          SET """ |+| us.intercalate(void", ") |+| void"""
+          FROM t_program_update
+          WHERE t_proposal.c_program_id = t_program_update.c_program_id
+          AND t_program_update.c_has_proposal = true
+          RETURNING t_proposal.c_program_id
+        """
       }
 
     /** Insert a proposal. */
@@ -233,6 +223,46 @@ object ProposalService {
               ppi.proposalClass.fold(_.minPercentTime, _.minPercentTime) ~
               ppi.proposalClass.toOption.map(_.minPercentTotalTime) ~
               ppi.proposalClass.toOption.map(_.totalTime.value)
+         }
+
+    /** Insert proposals into all programs lacking one, based on the t_program_update temporary table. */
+    val InsertProposals: Query[ProposalInput.Edit, Program.Id] =
+      sql"""
+        INSERT INTO t_proposal (
+          c_program_id,
+          c_title,
+          c_abstract,
+          c_category,
+          c_too_activation,
+          c_class,
+          c_min_percent,
+          c_min_percent_total,
+          c_totalTime
+        )
+        SELECT
+          c_program_id,
+          ${text_nonempty.opt},
+          ${text_nonempty.opt},
+          ${tag.opt},
+          ${too_activation.opt},
+          ${tag.opt},
+          ${int_percent.opt},
+          ${int_percent.opt},
+          ${interval.opt}
+        FROM t_program_update
+        WHERE c_has_proposal = false
+        RETURNING c_program_id
+      """.query(program_id)
+         .contramap {
+            case ppi =>
+              ppi.title.toOption ~
+              ppi.abstrakt.toOption ~
+              ppi.category.toOption ~
+              ppi.toOActivation ~
+              ppi.proposalClass.map(_.fold(_.tag, _.tag)) ~
+              ppi.proposalClass.flatMap(_.fold(_.minPercentTime, _.minPercentTime)) ~
+              ppi.proposalClass.flatMap(_.toOption.flatMap(_.minPercentTotalTime)) ~
+              ppi.proposalClass.flatMap(_.toOption.flatMap(_.totalTime.map(_.value)))
          }
 
     def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =
