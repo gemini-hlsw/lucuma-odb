@@ -70,7 +70,7 @@ create table t_proposal (
   c_class             d_tag             not null  references t_proposal_class(c_tag),
   c_min_percent       d_int_percentage  not null,
   c_min_percent_total d_int_percentage  null      check((c_min_percent_total is not null) = (c_category = 'intensive' or c_category = 'large_program')),
-  c_totalTime         interval          null      check((c_totalTime is not null) = (c_category = 'intensive' or c_category = 'large_program'))
+  c_total_time        interval          null      check((c_total_time is not null) = (c_category = 'intensive' or c_category = 'large_program'))
 );
 
 -- Partner Splits

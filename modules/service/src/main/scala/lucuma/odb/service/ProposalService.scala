@@ -47,27 +47,16 @@ private[service] trait ProposalService[F[_]] {
    * a larger transaction, which is why `xa` is required here. This action also assumes the
    * presence of the t_program_update
    */
-  def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[ProposalService.UpdateProposalResponse]
+  def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]]
 
 }
 
 object ProposalService {
 
-  sealed trait UpdateProposalResponse
-  object UpdateProposalResponse {
-
-    sealed trait Failure
-
-    case class  Success(pids: List[Program.Id]) extends UpdateProposalResponse
-    case object CreationFailed                  extends UpdateProposalResponse with Failure
-    case object InconsistentUpdate              extends UpdateProposalResponse with Failure
-
-    given Semigroup[UpdateProposalResponse] = {
-      case (Success(a), Success(b)) => Success((a |+| b).distinct)
-      case (Success(_), failure)    => failure
-      case (failure, _)             => failure
-    }
-
+  sealed trait ProposalUpdateException extends Exception
+  object ProposalUpdateException {
+    case object CreationFailed     extends ProposalUpdateException
+    case object InconsistentUpdate extends ProposalUpdateException
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
@@ -80,34 +69,36 @@ object ProposalService {
         s.prepare(Statements.InsertProposal).use(_.execute(pid ~ SET)) >>
         partnerSplitsService.insertSplits(SET.partnerSplits, pid, xa)
 
-      def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[UpdateProposalResponse] = {
+      def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]] = {
 
         // Update existing proposals. This will fail if SET.asCreate.isEmpty and there is a class mismatch.
-        val update: F[UpdateProposalResponse] =
-          Statements.updateProposals(SET).fold(UpdateProposalResponse.Success(Nil).pure[F]) { af =>
+        val update: F[List[Program.Id]] =
+          Statements.updateProposals(SET).fold(Nil.pure[F]) { af =>
             s.prepare(af.fragment.query(program_id)).use { ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
-                .map(UpdateProposalResponse.Success(_))
+            } .recoverWith {
+              case SqlState.NotNullViolation(e) if e.columnName == Some("c_class") =>
+                ProposalUpdateException.InconsistentUpdate.raiseError
             }
           }
 
         // Insert new proposals. This will fail if there's not enough information.
-        val insert: F[UpdateProposalResponse] =
+        val insert: F[List[Program.Id]] =
           s.prepare(Statements.InsertProposals).use { ps =>
             ps.stream(SET, 1024)
               .compile
               .toList
-              .map(UpdateProposalResponse.Success(_))
-          } recover {
-            case SqlState.NotNullViolation(ex) => UpdateProposalResponse.CreationFailed
+          } recoverWith {
+            case SqlState.NotNullViolation(ex) =>
+              ProposalUpdateException.CreationFailed.raiseError
           }
 
         // Replace the splits
-        def replaceSplits: F[UpdateProposalResponse] =
-          SET.partnerSplits.fold(UpdateProposalResponse.Success(Nil).pure[F]) { ps =>
-            partnerSplitsService.updateSplits(ps, xa).map(UpdateProposalResponse.Success(_))
+        def replaceSplits: F[List[Program.Id]] =
+          SET.partnerSplits.fold(Nil.pure[F]) { ps =>
+            partnerSplitsService.updateSplits(ps, xa)
           }
 
         // Done!
@@ -143,10 +134,9 @@ object ProposalService {
               ta.minPercentTime.map(sql"c_min_percent = $int_percent").toList
           case Right(tb) =>
             List(
-              Some(sql"c_class = $tag".apply(tb.tag)),
               tb.minPercentTime.map(sql"c_min_percent = $int_percent"),
               tb.minPercentTotalTime.map(sql"c_min_percent_total = $int_percent"),
-              tb.totalTime.map(_.value).map(sql"c_total_tome = $interval"),
+              tb.totalTime.map(_.value).map(sql"c_total_time = $interval"),
             ).flatten
         }
 
@@ -158,7 +148,7 @@ object ProposalService {
         SET.proposalClass.updateType match {
           case ProposalClassUpdate.None  => none
           case ProposalClassUpdate.Total(t) => sql"c_class = $tag".apply(t).some
-          case ProposalClassUpdate.Partial(t) => sql"c_class = case when c_tag = $tag then c_tag end".apply(t).some // force constraint violation on mismatch
+          case ProposalClassUpdate.Partial(t) => sql"c_class = case when c_class = $tag then c_class end".apply(t).some // force constraint violation on mismatch
         }
 
       NonEmptyList.fromList(nonProposalClassUpdates ++ proposalClassUpdates ++ proposalClassTag.toList)
@@ -199,7 +189,7 @@ object ProposalService {
           c_class,
           c_min_percent,
           c_min_percent_total,
-          c_totalTime
+          c_total_time
         ) VALUES (
           ${program_id},
           ${text_nonempty.opt},
@@ -237,7 +227,7 @@ object ProposalService {
           c_class,
           c_min_percent,
           c_min_percent_total,
-          c_totalTime
+          c_total_time
         )
         SELECT
           c_program_id,
