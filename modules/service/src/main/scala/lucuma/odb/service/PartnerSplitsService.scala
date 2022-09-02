@@ -40,7 +40,7 @@ object PartnerSplitsService {
 
   /**
    * Construct a `PartnerSplitsService` using the specified `Session`. This service is intended for
-  * indirect use by `ProgramService`, which is in charge of access control (which is unchecked here).
+  * indirect use by `ProgramService`, and we thus assume the presence of the `t_program_update` table.
    */
   def fromSession[F[_]: Concurrent: Trace](s: Session[F]): PartnerSplitsService[F] =
     new PartnerSplitsService[F] {
