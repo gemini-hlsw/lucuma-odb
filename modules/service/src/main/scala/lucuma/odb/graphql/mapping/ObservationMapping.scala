@@ -29,6 +29,7 @@ trait ObservationMapping[F[_]]
         SqlField("status", ObservationView.Status),
         SqlField("activeStatus", ObservationView.ActiveStatus),
         SqlField("visualizationTime", ObservationView.VisualizationTime),
+        SqlObject("posAngleConstraint"),
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))

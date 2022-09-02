@@ -18,16 +18,16 @@ import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
 
 final case class ObservationPropertiesInput(
-  subtitle:          Nullable[NonEmptyString],
-  status:            Option[ObsStatus],
-  activeStatus:      Option[ObsActiveStatus],
-  visualizationTime: Nullable[Timestamp],
-  // posAngleConstraint: Option[PosAngleConstraintInput],
-  targetEnvironment: Option[TargetEnvironmentInput],
-  constraintSet:     Option[ConstraintSetInput],
+  subtitle:           Nullable[NonEmptyString],
+  status:             Option[ObsStatus],
+  activeStatus:       Option[ObsActiveStatus],
+  visualizationTime:  Nullable[Timestamp],
+  posAngleConstraint: Option[PosAngleConstraintInput],
+  targetEnvironment:  Option[TargetEnvironmentInput],
+  constraintSet:      Option[ConstraintSetInput],
   // scienceRequirements: Option[ScienceRequirementsInput],
   // scienceMode: Option[ScienceModeInput],
-  existence:         Option[Existence]
+  existence:          Option[Existence]
 ) {
 
   def asterism: Nullable[NonEmptyList[Target.Id]] =
@@ -42,13 +42,14 @@ object ObservationPropertiesInput {
 
   val Default: ObservationPropertiesInput =
     ObservationPropertiesInput(
-      subtitle          = Nullable.Null,
-      status            = ObsStatus.New.some,
-      activeStatus      = ObsActiveStatus.Active.some,
-      visualizationTime = Nullable.Null,
-      targetEnvironment = None,
-      constraintSet     = ConstraintSetInput.Default.some,
-      existence         = Existence.Present.some
+      subtitle           = Nullable.Null,
+      status             = ObsStatus.New.some,
+      activeStatus       = ObsActiveStatus.Active.some,
+      visualizationTime  = Nullable.Null,
+      posAngleConstraint = None,
+      targetEnvironment  = None,
+      constraintSet      = ConstraintSetInput.Default.some,
+      existence          = Existence.Present.some
     )
 
   val CreateBinding: Matcher[ObservationPropertiesInput] =
@@ -58,7 +59,7 @@ object ObservationPropertiesInput {
         ObsStatusBinding.Option("status", rObsStatus),
         ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
         TimestampBinding.Option("visualizationTime", rVisualizationTime),
-        ("posAngleConstraint", _),    // ignore for now
+        PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
@@ -69,6 +70,7 @@ object ObservationPropertiesInput {
          rObsStatus,
          rObsActiveStatus,
          rVisualizationTime.map(Nullable.orNull),
+         rPosAngleConstraint,
          rTargetEnvironment,
          rConstraintSet,
          rExistence
@@ -82,8 +84,8 @@ object ObservationPropertiesInput {
         ObsStatusBinding.Option("status", rObsStatus),
         ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
         TimestampBinding.Nullable("visualizationTime", rVisualizationTime),
-        ("posAngleConstraint", _),    // ignore for now
-        TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),     // ignore for now
+        PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
+        TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ("scienceRequirements", _),   // ignore for now
         ("scienceMode", _),           // ignore for now
@@ -93,6 +95,7 @@ object ObservationPropertiesInput {
          rObsStatus,
          rObsActiveStatus,
          rVisualizationTime,
+         rPosAngleConstraint,
          rTargetEnvironment,
          rConstraintSet,
          rExistence

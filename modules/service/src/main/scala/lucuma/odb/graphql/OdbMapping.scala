@@ -74,6 +74,7 @@ object OdbMapping {
         new SkunkMapping[F](database, monitor) with SchemaSemigroup
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
+          with AngleMapping[F]
           with CatalogInfoMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
@@ -94,6 +95,7 @@ object OdbMapping {
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
           with PlannedTimeSummaryMapping[F]
+          with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
           with ProgramUserMapping[F]
@@ -130,6 +132,7 @@ object OdbMapping {
             List(
               AirMassRangeMapping,
               AllocationMapping,
+              AngleMapping,
               CatalogInfoMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
@@ -149,6 +152,7 @@ object OdbMapping {
               PartnerMetaMapping,
               PartnerSplitMapping,
               PlannedTimeSummaryMapping,
+              PosAngleConstraintMapping,
               ProgramMapping,
               ProgramEditMapping,
               ProgramUserMapping,
