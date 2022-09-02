@@ -18,6 +18,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.AsterismService
@@ -573,6 +574,109 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
       _   <- createObs(pid)
     } yield ()
   }
+
+  test("[general] created observation can default pos angle constraint mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+          }) {
+            observation {
+              posAngleConstraint {
+                mode
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("posAngleConstraint")
+          .downField("mode")
+          .as[PosAngleConstraintMode]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, PosAngleConstraintMode.Default)
+      }
+    }
+  }
+
+  test("[general] created observation can default pos angle constraint angle") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+          }) {
+            observation {
+              posAngleConstraint {
+                angle { degrees }
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("posAngleConstraint")
+          .downField("angle")
+          .downField("degrees")
+          .as[BigDecimal]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, BigDecimal(0))
+      }
+    }
+  }
+
+  test("[general] created observation should have specified position angle constraint") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              posAngleConstraint: {
+                mode: ALLOW_FLIP
+                angle: { degrees: 14 }
+              }
+            }
+          }) {
+            observation {
+              posAngleConstraint {
+                mode
+                angle { degrees }
+              }
+            }
+          }
+        }
+        """).flatMap { js =>
+        val pac = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("posAngleConstraint")
+
+        val mode = pac
+          .downField("mode")
+          .as[PosAngleConstraintMode]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+
+        val angle = pac
+          .downField("angle")
+          .downField("degrees")
+          .as[BigDecimal]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+
+        assertIO((mode, angle).tupled, (PosAngleConstraintMode.AllowFlip, BigDecimal(14)))
+      }
+    }
+  }
+
 
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>

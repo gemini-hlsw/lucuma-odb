@@ -1,3 +1,5 @@
+create type e_pos_angle_cons_mode as enum('unbounded', 'fixed', 'allow_flip', 'average_parallactic', 'parallactic_override');
+
 --- AIR MASS
 
 create domain d_air_mass as numeric(3,2)
@@ -93,18 +95,22 @@ comment on domain d_observation_id is 'GID type for observations.';
 
 create sequence s_observation_id START with 256; -- three hex digits
 create table t_observation (
-  c_program_id         d_program_id        not null    references t_program(c_program_id),
-  c_observation_id     d_observation_id    primary key default 'o-' || to_hex(nextval('s_observation_id')),
-  c_existence          e_existence         not null    default 'present',
-  c_subtitle           text                null        check (length(c_subtitle) > 0),
-  c_instrument         d_tag               null        references t_instrument(c_tag),
-  c_status             e_obs_status        not null    default 'new',
-  c_active_status      e_obs_active_status not null    default 'active',
-  c_visualization_time timestamp           null        default null,
+  c_program_id           d_program_id          not null    references t_program(c_program_id),
+  c_observation_id       d_observation_id      primary key default 'o-' || to_hex(nextval('s_observation_id')),
+  c_existence            e_existence           not null    default 'present',
+  c_subtitle             text                  null        check (length(c_subtitle) > 0),
+  c_instrument           d_tag                 null        references t_instrument(c_tag),
+  c_status               e_obs_status          not null    default 'new',
+  c_active_status        e_obs_active_status   not null    default 'active',
+  c_visualization_time   timestamp             null        default null,
+
+  -- position angle constraint
+  c_pos_angle_cons_mode  e_pos_angle_cons_mode not null    default 'unbounded',
+  c_pos_angle_cons_angle d_angle_µas           not null    default 0,
 
   -- target environment
-  c_explicit_ra        d_angle_µas         null        default null,
-  c_explicit_dec       d_angle_µas         null        default null,
+  c_explicit_ra          d_angle_µas           null        default null,
+  c_explicit_dec         d_angle_µas           null        default null,
 
   -- both explicit coordinates are defined or neither are defined
   constraint explicit_base_neither_or_both

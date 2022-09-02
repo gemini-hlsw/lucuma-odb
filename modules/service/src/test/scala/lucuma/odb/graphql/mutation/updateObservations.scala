@@ -641,6 +641,39 @@ class updateObservations extends OdbSuite
 
   }
 
+  test("update pos angle constraint") {
+    oneUpdateTest(
+      user = pi,
+      update =
+        """
+        posAngleConstraint: {
+          mode: ALLOW_FLIP
+          angle: { degrees: 14 }
+        }
+      """,
+      query =
+        """
+        posAngleConstraint {
+          mode
+          angle { degrees }
+        }
+      """,
+      expected =
+        json"""
+        {
+          "updateObservations": [
+            {
+              "posAngleConstraint": {
+                "mode": "ALLOW_FLIP",
+                "angle": { "degrees": 14.0 }
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

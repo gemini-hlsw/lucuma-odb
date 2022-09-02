@@ -29,6 +29,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -179,6 +180,8 @@ trait Codecs {
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
 
+  val pos_angle_cons_mode: Codec[PosAngleConstraintMode] =
+    enumerated(Type("e_pos_angle_cons_mode"))
 
 }
 
