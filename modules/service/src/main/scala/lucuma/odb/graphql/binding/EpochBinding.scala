@@ -5,7 +5,6 @@ package lucuma.odb.graphql.binding
 
 import cats.syntax.all._
 import lucuma.core.math.Epoch
-import lucuma.odb.graphql.util.Bindings._
 
 val EpochBinding: Matcher[Epoch] =
   StringBinding.emap { s =>

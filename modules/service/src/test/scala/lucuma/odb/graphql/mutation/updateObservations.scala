@@ -11,6 +11,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
@@ -24,22 +25,83 @@ class updateObservations extends OdbSuite
 
   override lazy val validUsers: List[User] = List(pi)
 
-  def constraintSetUpdateTest(
+  private def oneUpdateTest(
+    user:     User,
     update:   String,
     query:    String,
     expected: Either[String, Json]
   ): IO[Unit] =
-    for {
+
+    for
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid)
+      _   <- updateObservation(user, pid, oid, update, query, expected)
+    yield ()
+
+  private def multiUpdateTest(
+    user:    User,
+    updates: List[(String, String, Either[String, Json])]
+  ): IO[Unit] =
+
+    for
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid)
+      _   <- updates.traverse_ { case (update, query, expected) =>
+        updateObservation(user, pid, oid, update, query, expected)
+      }
+    yield ()
+
+
+  test("update that selects nothing") {
+    def emptyUpdate(user: User, pid: Program.Id): IO[Unit] =
+      expect(
+        user = user,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              programId: ${pid.asJson}
+              SET: {
+                constraintSet: {
+                  cloudExtinction: ONE_POINT_ZERO
+                }
+              },
+              WHERE: {
+                id: { EQ: "o-9999" }
+              }
+            }) {
+              constraintSet {
+                cloudExtinction
+              }
+            }
+          }
+        """,
+        expected =json"""
+          {
+            "updateObservations": [ ]
+          }
+        """.asRight
+      )
+
+    for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateConstraintSet(pi, oid, update, query, expected)
-    } yield ()
-
+      _   <- emptyUpdate(pi, pid)
+    yield ()
+  }
 
   test("update cloud extinction") {
-    constraintSetUpdateTest(
-      update   = "cloudExtinction: ONE_POINT_ZERO",
-      query    = "cloudExtinction",
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        constraintSet: {
+          cloudExtinction: ONE_POINT_ZERO
+        }
+      """,
+      query = """
+        constraintSet {
+          cloudExtinction
+        }
+      """,
       expected = json"""
         {
           "updateObservations": [
@@ -55,19 +117,24 @@ class updateObservations extends OdbSuite
   }
 
   test("update air mass range") {
-    constraintSetUpdateTest(
+    oneUpdateTest(
+      user   = pi,
       update = """
-        elevationRange: {
-          airMass: {
-            min: 1.1
+        constraintSet: {
+          elevationRange: {
+            airMass: {
+              min: 1.1
+            }
           }
         }
       """,
       query = """
-        elevationRange {
-          airMass {
-            min
-            max
+        constraintSet {
+          elevationRange {
+            airMass {
+              min
+              max
+            }
           }
         }
       """,
@@ -92,19 +159,24 @@ class updateObservations extends OdbSuite
 
   test("hour angle constraint violation") {
 
-    constraintSetUpdateTest(
+    oneUpdateTest(
+      user   = pi,
       update = """
-        elevationRange: {
-          hourAngle: {
-            minHours: -1.0
+        constraintSet: {
+          elevationRange: {
+            hourAngle: {
+              minHours: -1.0
+            }
           }
         }
       """,
       query = """
-        elevationRange {
-          airMass {
-            min
-            max
+        constraintSet {
+          elevationRange {
+            airMass {
+              min
+              max
+            }
           }
         }
       """,
@@ -114,24 +186,29 @@ class updateObservations extends OdbSuite
   }
 
   test("switch elevation range constraint type") {
-    constraintSetUpdateTest(
+    oneUpdateTest(
+      user   = pi,
       update = """
-        elevationRange: {
-          hourAngle: {
-            minHours: -1.0,
-            maxHours:  1.0
+        constraintSet: {
+          elevationRange: {
+            hourAngle: {
+              minHours: -1.0,
+              maxHours:  1.0
+            }
           }
         }
       """,
       query = """
-        elevationRange {
-          airMass {
-            min
-            max
-          }
-          hourAngle {
-            minHours
-            maxHours
+        constraintSet {
+          elevationRange {
+            airMass {
+              min
+              max
+            }
+            hourAngle {
+              minHours
+              maxHours
+            }
           }
         }
       """,
@@ -158,28 +235,31 @@ class updateObservations extends OdbSuite
 
   test("conflicting elevation range updates") {
 
-    constraintSetUpdateTest(
-      update =
-        """
-        elevationRange: {
-          airMass: {
-            min: 1.1
-          },
-          hourAngle: {
-            minHours: -1.0
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        constraintSet: {
+          elevationRange: {
+            airMass: {
+              min: 1.1
+            },
+            hourAngle: {
+              minHours: -1.0
+            }
           }
         }
       """,
-      query =
-        """
-        elevationRange {
-          airMass {
-            min
-            max
-          }
-          hourAngle {
-            minHours
-            maxHours
+      query = """
+        constraintSet {
+          elevationRange {
+            airMass {
+              min
+              max
+            }
+            hourAngle {
+              minHours
+              maxHours
+            }
           }
         }
       """,
@@ -190,33 +270,73 @@ class updateObservations extends OdbSuite
 
   test("set explicit base in existing observation without one") {
 
-    val update = """
-      explicitBase: {
-        ra: { hms: "1:00:00"},
-        dec: { dms: "2:00:00"}
+    oneUpdateTest(
+      user = pi,
+      update = """
+        targetEnvironment: {
+          explicitBase: {
+            ra: { hms: "1:00:00"},
+            dec: { dms: "2:00:00"}
+          }
+        }
+      """,
+      query = """
+        targetEnvironment {
+          explicitBase {
+            ra { hours }
+            dec { degrees }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": [
+            {
+              "targetEnvironment": {
+                "explicitBase": {
+                  "ra": {
+                    "hours": 1.0
+                  },
+                  "dec": {
+                    "degrees": 2.0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+
+  }
+
+
+  test("set an asterism in existing observation without one") {
+
+    def update(tid: Target.Id) = s"""
+      targetEnvironment: {
+        asterism: [ "${tid.show}" ]
       }
     """
 
     val query = """
-      explicitBase {
-        ra { hours }
-        dec { degrees }
+      targetEnvironment {
+        asterism {
+          id
+        }
       }
     """
 
-    val expected = json"""
+    def expected(tid: Target.Id) = json"""
       {
         "updateObservations": [
           {
             "targetEnvironment": {
-              "explicitBase": {
-                "ra": {
-                  "hours": 1.0
-                },
-                "dec": {
-                  "degrees": 2.0
+              "asterism": [
+                {
+                  "id": ${tid.show}
                 }
-              }
+              ]
             }
           }
         ]
@@ -226,7 +346,49 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateExplicitBase(pi, oid, update, query, expected)
+      tid <- createEmptyTargetAs(pi, pid, "Biff")
+      _   <- updateObservation(pi, pid, oid, update(tid), query, expected(tid))
+    } yield ()
+
+  }
+
+  test("update an asterism in existing observation") {
+
+    def update(tids: Target.Id*) =
+      s"""
+        targetEnvironment: {
+          asterism: [ "${tids.map(_.show).intercalate("\", \"")}" ]
+        }
+      """
+
+    val query = """
+      targetEnvironment {
+        asterism {
+          id
+        }
+      }
+    """
+
+    def expected(tids: Target.Id*) = json"""
+      {
+        "updateObservations": [
+          {
+            "targetEnvironment": {
+              "asterism": ${tids.map(tid => json"""{ "id": ${tid.asJson} }""").asJson}
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      t0  <- createEmptyTargetAs(pi, pid, "Larry")
+      t1  <- createEmptyTargetAs(pi, pid, "Curly")
+      t2  <- createEmptyTargetAs(pi, pid, "Moe")
+      _   <- updateObservation(pi, pid, oid, update(t0, t1), query, expected(t0, t1))
+      _   <- updateObservation(pi, pid, oid, update(t1, t2), query, expected(t1, t2))
     } yield ()
 
   }
@@ -234,22 +396,28 @@ class updateObservations extends OdbSuite
   test("update explicit ra in observation with existing explicit base") {
 
     val update1 = """
-      explicitBase: {
-        ra: { hms: "1:00:00" },
-        dec: { dms: "2:00:00"}
+      targetEnvironment: {
+        explicitBase: {
+          ra: { hms: "1:00:00" },
+          dec: { dms: "2:00:00"}
+        }
       }
     """
 
     val update2 ="""
-      explicitBase: {
-        ra: { hms: "3:00:00"}
+      targetEnvironment: {
+        explicitBase: {
+          ra: { hms: "3:00:00"}
+        }
       }
     """
 
     val query = """
-      explicitBase {
-        ra { hours }
-        dec { degrees }
+      targetEnvironment {
+        explicitBase {
+          ra { hours }
+          dec { degrees }
+        }
       }
     """
 
@@ -294,8 +462,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateExplicitBase(pi, oid, update1, query, expected1)
-      _   <- updateExplicitBase(pi, oid, update2, query, expected2)
+      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
+      _   <- updateObservation(pi, pid, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -303,20 +471,26 @@ class updateObservations extends OdbSuite
   test("delete explicit base") {
 
     val update1 = """
-      explicitBase: {
-        ra: { hms: "1:00:00" },
-        dec: { dms: "2:00:00"}
+      targetEnvironment: {
+        explicitBase: {
+          ra: { hms: "1:00:00" },
+          dec: { dms: "2:00:00"}
+        }
       }
     """
 
     val update2 = """
-      explicitBase: null
+      targetEnvironment: {
+        explicitBase: null
+      }
     """
 
     val query = """
-      explicitBase {
-        ra { hours }
-        dec { degrees }
+      targetEnvironment {
+        explicitBase {
+          ra { hours }
+          dec { degrees }
+        }
       }
     """
 
@@ -354,8 +528,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _ <- updateExplicitBase(pi, oid, update1, query, expected1)
-      _ <- updateExplicitBase(pi, oid, update2, query, expected2)
+      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
+      _   <- updateObservation(pi, pid, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -363,15 +537,19 @@ class updateObservations extends OdbSuite
   test("fail to set (only) explicit ra in existing observation without explicit base") {
 
     val update = """
-      explicitBase: {
-        ra: { hms: "1:00:00"}
+      targetEnvironment: {
+        explicitBase: {
+          ra: { hms: "1:00:00"}
+        }
       }
     """
 
     val query = """
-      explicitBase {
-        ra { hours }
-        dec { degrees }
+      targetEnvironment {
+        explicitBase {
+          ra { hours }
+          dec { degrees }
+        }
       }
     """
 
@@ -380,8 +558,86 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _ <- updateExplicitBase(pi, oid, update, query, expected)
+      _   <- updateObservation(pi, pid, oid, update, query, expected)
     } yield ()
+
+  }
+
+  test("set visualization time") {
+
+    val update   = """
+      visualizationTime: "2022-08-30 17:18:00"
+    """
+
+    val query    = "visualizationTime"
+
+    val expected = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": "2022-08-30 17:18:00"
+          }
+        ]
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("set visualization time ISO-8601") {
+
+    val update = """
+      visualizationTime: "2022-08-30 17:18:00"
+    """
+
+    val query = "visualizationTime"
+
+    val expected = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": "2022-08-30 17:18:00"
+          }
+        ]
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("delete visualization time") {
+
+    val update0  = """
+      visualizationTime: "2022-08-30 17:18:00"
+    """
+
+    val update1 = """
+      visualizationTime: null
+    """
+
+    val query    = "visualizationTime"
+
+    val expected0 = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": "2022-08-30 17:18:00"
+          }
+        ]
+      }
+    """.asRight
+
+    val expected1 = json"""
+      {
+        "updateObservations": [
+          {
+            "visualizationTime": null
+          }
+        ]
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
 
   }
 
@@ -389,67 +645,32 @@ class updateObservations extends OdbSuite
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
 
-  def updateConstraintSet(
+  def updateObservation(
     user:     User,
+    pid:      Program.Id,
     oid:      Observation.Id,
     update:   String,
     query:    String,
     expected: Either[String, Json]
-  ): IO[Unit] = {
-      expect(
-        user = user,
-        query = s"""
-          mutation {
-            updateObservations(input: {
-              SET: {
-                constraintSet: {
-                  $update
-                }
-              },
-              WHERE: {
-                id: { EQ: ${oid.asJson} }
-              }
-            }) {
-              constraintSet {
-                $query
-              }
-            }
-          }
-        """,
-        expected = expected.leftMap(msg => List(msg))
-      )
-
-  }
-
-  def updateExplicitBase(
-    user:     User,
-    oid:      Observation.Id,
-    update:   String,
-    query:    String,
-    expected: Either[String, Json]
-  ): IO[Unit] = {
+  ): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
           updateObservations(input: {
+            programId: ${pid.asJson}
             SET: {
-              targetEnvironment: {
-                $update
-              }
+              $update
             },
             WHERE: {
               id: { EQ: ${oid.asJson} }
             }
           }) {
-            targetEnvironment {
-              $query
-            }
+            $query
           }
         }
       """,
       expected = expected.leftMap(msg => List(msg))
     )
 
-  }
 }

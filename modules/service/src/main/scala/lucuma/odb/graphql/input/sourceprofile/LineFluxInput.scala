@@ -10,7 +10,7 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Of
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 object LineFluxInput {
   object Integrated {

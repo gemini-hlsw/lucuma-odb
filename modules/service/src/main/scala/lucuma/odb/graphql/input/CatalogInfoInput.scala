@@ -8,7 +8,6 @@ import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CatalogName
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 final case class CatalogInfoInput(
   name: Option[CatalogName],

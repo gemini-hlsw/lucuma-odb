@@ -9,7 +9,6 @@ import cats.syntax.all._
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 case class UpdateProgramsInput(
   SET: ProgramPropertiesInput.Edit,

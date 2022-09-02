@@ -32,6 +32,7 @@ import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
+import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
 import skunk._
 import skunk.codec.all._
@@ -153,6 +154,12 @@ trait Codecs {
 
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
+
+  val data_timestamp: Codec[Timestamp] =
+    timestamp.eimap(
+      ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
+      _.toLocalDateTime
+    )
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)

@@ -13,7 +13,6 @@ import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Of
 import lucuma.core.math.dimensional.Units
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 object FluxDensityContinuumInput {
 

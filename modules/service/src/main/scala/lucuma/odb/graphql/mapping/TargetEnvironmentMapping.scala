@@ -16,12 +16,11 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.data.Existence
-import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.table.AsterismTargetTable
 
-import table._
+import binding._
 import input._
-import util.Bindings._
+import table._
 
 
 trait TargetEnvironmentMapping[F[_]]

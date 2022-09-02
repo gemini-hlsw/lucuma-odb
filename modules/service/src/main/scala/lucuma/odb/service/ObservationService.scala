@@ -39,6 +39,7 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Tag
+import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
@@ -55,9 +56,13 @@ trait ObservationService[F[_]] {
   import ObservationService._
 
   def createObservation(
-    programId:   Program.Id,
-    SET:         ObservationPropertiesInput
+    programId: Program.Id,
+    SET:       ObservationPropertiesInput
   ): F[Result[Observation.Id]]
+
+  def selectObservations(
+    which: AppliedFragment
+  ): F[List[Observation.Id]]
 
   def updateObservations(
     SET:   ObservationPropertiesInput,
@@ -131,21 +136,25 @@ object ObservationService {
             }
         }
 
+      override def selectObservations(
+        which: AppliedFragment
+      ): F[List[Observation.Id]] =
+        session.prepare(which.fragment.query(observation_id)).use { pq =>
+          pq.stream(which.argument, chunkSize = 1024).compile.toList
+        }
+
       override def updateObservations(
         SET:   ObservationPropertiesInput,
         which: AppliedFragment
       ): F[Result[List[Observation.Id]]] =
-        Statements.updateObservations(SET, which).flatTraverse { oaf =>
-          oaf.toList.flatTraverse { af =>
-            session.prepare(af.fragment.query(observation_id)).use { pq =>
-              pq.stream(af.argument, chunkSize = 1024).compile.toList
-            }
-          }.map(Result(_))
-           .recoverWith {
-             case SqlState.CheckViolation(ex) =>
-               Result.failure(constraintViolationMessage(ex)).pure[F]
-           }
-        }
+        Statements.updateObservations(SET, which).traverse { af =>
+          session.prepare(af.fragment.query(observation_id)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList
+          }
+        }.recoverWith {
+           case SqlState.CheckViolation(ex) =>
+             Result.failure(constraintViolationMessage(ex)).pure[F]
+         }
     }
 
 
@@ -169,19 +178,21 @@ object ObservationService {
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.Default),
           SET.activeStatus.getOrElse(ObsActiveStatus.Default),
+          SET.visualizationTime.toOption,
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints)
         )
 
     def insertObservationAs(
-      user:          User,
-      programId:     Program.Id,
-      subtitle:      Option[NonEmptyString],
-      existence:     Existence,
-      status:        ObsStatus,
-      activeState:   ObsActiveStatus,
-      explicitBase:  Option[Coordinates],
-      constraintSet: ConstraintSet
+      user:              User,
+      programId:         Program.Id,
+      subtitle:          Option[NonEmptyString],
+      existence:         Existence,
+      status:            ObsStatus,
+      activeState:       ObsActiveStatus,
+      visualizationTime: Option[Timestamp],
+      explicitBase:      Option[Coordinates],
+      constraintSet:     ConstraintSet
     ): AppliedFragment = {
 
       val insert: AppliedFragment =
@@ -191,6 +202,7 @@ object ObservationService {
            existence   ~
            status      ~
            activeState ~
+           visualizationTime             ~
            explicitBase.map(_.ra)        ~
            explicitBase.map(_.dec)       ~
            constraintSet.cloudExtinction ~
@@ -217,6 +229,7 @@ object ObservationService {
       Existence              ~
       ObsStatus              ~
       ObsActiveStatus        ~
+      Option[Timestamp]      ~
       Option[RightAscension] ~
       Option[Declination]    ~
       CloudExtinction        ~
@@ -235,6 +248,7 @@ object ObservationService {
           c_existence,
           c_status,
           c_active_status,
+          c_visualization_time,
           c_explicit_ra,
           c_explicit_dec,
           c_cloud_extinction,
@@ -252,6 +266,7 @@ object ObservationService {
           $existence,
           $obs_status,
           $obs_active_status,
+          ${data_timestamp.opt},
           ${right_ascension.opt},
           ${declination.opt},
           $cloud_extinction,
@@ -327,10 +342,11 @@ object ObservationService {
     }
 
     def updates(SET: ObservationPropertiesInput): Result[Option[NonEmptyList[AppliedFragment]]] = {
-      val upExistence = sql"c_existence = $existence"
-      val upSubtitle  = sql"c_subtitle = ${text_nonempty.opt}"
-      val upStatus    = sql"c_status = $obs_status"
-      val upActive    = sql"c_active_status = $obs_active_status"
+      val upExistence         = sql"c_existence = $existence"
+      val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
+      val upStatus            = sql"c_status = $obs_status"
+      val upActive            = sql"c_active_status = $obs_active_status"
+      val upVisualizationTime = sql"c_visualization_time = ${data_timestamp.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -341,7 +357,12 @@ object ObservationService {
             case NonNull(value) => Some(upSubtitle(Some(value)))
           },
           SET.status.map(upStatus),
-          SET.activeStatus.map(upActive)
+          SET.activeStatus.map(upActive),
+          SET.visualizationTime match {
+            case Nullable.Null  => Some(upVisualizationTime(None))
+            case Absent         => None
+            case NonNull(value) => Some(upVisualizationTime(Some(value)))
+          }
         ).flatten
 
       val explicitBase: Result[List[AppliedFragment]] =
@@ -362,15 +383,17 @@ object ObservationService {
     def updateObservations(
       SET:   ObservationPropertiesInput,
       which: AppliedFragment
-    ): Result[Option[AppliedFragment]] =
-      updates(SET).map {
-        _.map { us =>
-          void"UPDATE t_observation " |+|
-            void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-            void"WHERE t_observation.c_observation_id IN (" |+| which |+| void")" |+|
-            void"RETURNING t_observation.c_observation_id"
-        }
-      }
+    ): Result[AppliedFragment] = {
+
+      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
+        void"UPDATE t_observation "                                              |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" "                    |+|
+          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") " |+|
+          void"RETURNING t_observation.c_observation_id"
+
+      updates(SET).map(_.fold(which)(update))
+
+    }
 
   }
 

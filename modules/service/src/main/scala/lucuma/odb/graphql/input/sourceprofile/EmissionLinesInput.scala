@@ -15,7 +15,7 @@ import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Of
 import lucuma.core.model.EmissionLine
 import lucuma.core.model.SpectralDefinition.EmissionLines
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 import scala.collection.immutable.TreeMap
 

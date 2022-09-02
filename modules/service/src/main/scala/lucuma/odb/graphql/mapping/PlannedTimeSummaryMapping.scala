@@ -18,9 +18,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 
-import table._
+import binding._
 import input._
-import util.Bindings._
+import table._
 
 trait PlannedTimeSummaryMapping[F[_]]
   extends ProgramTable[F] { this: SkunkMapping[F] =>

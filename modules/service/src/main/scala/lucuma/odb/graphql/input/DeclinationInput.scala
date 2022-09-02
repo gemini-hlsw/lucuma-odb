@@ -8,8 +8,7 @@ import cats.syntax.all._
 import edu.gemini.grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
-import lucuma.odb.graphql.binding.AngleBinding
-import lucuma.odb.graphql.util.Bindings._
+import lucuma.odb.graphql.binding._
 
 object DeclinationInput {
 
