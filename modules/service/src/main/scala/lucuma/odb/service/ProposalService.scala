@@ -45,7 +45,7 @@ private[service] trait ProposalService[F[_]] {
    * changing the proposal class). Otherwise the proposal class will be updated in-place, but only
    * where the class matches what `SET` specifies. This action only makes sense in the context of
    * a larger transaction, which is why `xa` is required here. This action also assumes the
-   * presence of the t_program_update
+   * presence of the `t_program_update` table.
    */
   def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]]
 
