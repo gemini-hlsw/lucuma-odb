@@ -17,8 +17,10 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
+import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
@@ -48,6 +50,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val FilterTypeType        = schema.ref("FilterType")
   lazy val HmsStringType         = schema.ref("HmsString")
   lazy val ImageQualityType      = schema.ref("ImageQuality")
+  lazy val IntPercentType        = schema.ref("IntPercent")
   lazy val LongType              = schema.ref("Long")
   lazy val NonEmptyStringType    = schema.ref("NonEmptyString")
   lazy val NonNegBigDecimalType  = schema.ref("NonNegBigDecimal")
@@ -60,8 +63,10 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val ProgramIdType         = schema.ref("ProgramId")
   lazy val ProgramUserRoleType   = schema.ref("ProgramUserRole")
   lazy val SkyBackgroundType     = schema.ref("SkyBackground")
+  lazy val TacCategoryType       = schema.ref("TacCategory")
   lazy val TargetIdType          = schema.ref("TargetId")
   lazy val TimestampType         = schema.ref("Timestamp")
+  lazy val ToOActivationType     = schema.ref("ToOActivation")
   lazy val UserIdType            = schema.ref("UserId")
   lazy val UserTypeType          = schema.ref("UserType")
   lazy val WaterVaporType        = schema.ref("WaterVapor")
@@ -76,6 +81,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[ImageQuality](ImageQualityType),
+      LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
@@ -92,8 +98,10 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
+      LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
       LeafMapping[Timestamp](TimestampType),
+      LeafMapping[ToOActivation](ToOActivationType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[WaterVapor](WaterVaporType)

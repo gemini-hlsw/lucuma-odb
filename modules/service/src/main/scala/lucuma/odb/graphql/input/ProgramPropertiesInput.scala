@@ -10,27 +10,40 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding._
 
-case class ProgramPropertiesInput(
-  name: Option[NonEmptyString],
-  // TODO: Proposal
-  existence: Option[Existence]
-)
-
 object ProgramPropertiesInput {
 
-  val Default: ProgramPropertiesInput =
-    ProgramPropertiesInput(None, None)
+  case class Create(
+    name: Option[NonEmptyString],
+    proposal: Option[ProposalInput.Create],
+    existence: Option[Existence]
+  )
 
-  val Binding: Matcher[ProgramPropertiesInput] =
+  case class Edit(
+    name: Option[NonEmptyString],
+    proposal: Option[ProposalInput.Edit],
+    existence: Option[Existence]
+  )
+
+  private def data[A](
+    proposal: Matcher[A]
+  ): Matcher[(
+    Option[NonEmptyString],
+    Option[A],
+    Option[Existence]
+  )] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("name", rName),
-        ("proposal", _), // ignored
+        proposal.Option("proposal", rProposal),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rExistence).parMapN { (on, oe) =>
-          ProgramPropertiesInput(on, oe)
-       }
+        (rName, rProposal, rExistence).parTupled
     }
+
+  val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
+    data(ProposalInput.CreateBinding).map(Create.apply)
+
+  val EditBinding: Matcher[Edit] =
+    data(ProposalInput.EditBinding).map(Edit.apply)
 
 }

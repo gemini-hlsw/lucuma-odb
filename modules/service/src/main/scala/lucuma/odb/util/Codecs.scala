@@ -14,6 +14,7 @@ import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
@@ -98,6 +99,14 @@ trait Codecs {
   val obs_active_status: Codec[ObsActiveStatus] =
     enumerated(Type("e_obs_active_status"))
 
+  // TEMPORARY; the tag will be correct soon
+  val too_activation: Codec[ToOActivation] =
+    `enum`(
+      e => e.label.toLowerCase(),
+      s => Enumerated[ToOActivation].all.find(_.label.toLowerCase == s),
+      Type("e_too_activation")
+    )
+
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
@@ -166,6 +175,10 @@ trait Codecs {
 
   val edit_type: Codec[EditType] =
     enumerated(Type("e_edit_type"))
+
+  val int_percent: Codec[IntPercent] =
+    int2.eimap(n => IntPercent.from(n))(_.value.toShort)
+
 
 }
 

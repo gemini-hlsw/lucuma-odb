@@ -1908,13 +1908,10 @@ type PartnerMeta {
   active:     Boolean!
 }
 
-# Partner time allocation: must be empty or sum to 100%
-input PartnerSplitsInput {
-  # The partner field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  partner: Partner
-
-  # The percent field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  percent: IntPercent
+# Partner time allocation
+input PartnerSplitInput {
+  partner: Partner!
+  percent: IntPercent!
 }
 
 # Poor weather
@@ -2042,7 +2039,8 @@ input ProposalInput {
   abstract: NonEmptyString
 
   # The partnerSplits field is required when creating a new instance of proposal, but optional when editing
-  partnerSplits: [PartnerSplitsInput!]
+  # When specified, must sum to 100%
+  partnerSplits: [PartnerSplitInput!]
 }
 
 # Queue observing at Gemini

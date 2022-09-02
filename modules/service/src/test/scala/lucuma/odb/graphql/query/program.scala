@@ -48,6 +48,31 @@ class program extends OdbSuite {
                 program(programId: "$id") {
                   id
                   name
+                  proposal {
+                    title
+                    category
+                    toOActivation
+                    abstract
+                    partnerSplits {
+                      partner
+                      percent
+                    }
+                    proposalClass {
+                      minPercentTime
+                      ... on LargeProgram {
+                        minPercentTotalTime
+                        totalTime {
+                          iso
+                        }
+                      }
+                      ... on Intensive {
+                        minPercentTotalTime
+                        totalTime {
+                          iso
+                        }
+                      }
+                    }
+                  }
                 }
               }
             """,
@@ -56,7 +81,8 @@ class program extends OdbSuite {
               {
                 "program": {
                   "id": $id,
-                  "name": $name
+                  "name": $name,
+                  "proposal": null
                 }
               }
             """
