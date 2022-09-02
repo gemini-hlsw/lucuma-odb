@@ -18,8 +18,11 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.AsterismService
+
+import java.time.LocalDateTime
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
@@ -201,6 +204,35 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
         assertIO(get, ObsStatus.ForReview)
+      }
+    }
+  }
+
+  test("[general] created observation should have specified visualization time") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              visualizationTime: "2022-08-29 18:01:00"
+            }
+          }) {
+            observation {
+              visualizationTime
+            }
+          }
+        }
+        """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("visualizationTime")
+          .as[Timestamp]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, Timestamp.fromLocalDateTime(LocalDateTime.of(2022, 8, 29, 18, 1, 0, 0)).get)
       }
     }
   }

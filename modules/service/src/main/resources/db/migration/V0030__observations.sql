@@ -93,31 +93,32 @@ comment on domain d_observation_id is 'GID type for observations.';
 
 create sequence s_observation_id START with 256; -- three hex digits
 create table t_observation (
-  c_program_id       d_program_id        not null    references t_program(c_program_id),
-  c_observation_id   d_observation_id    primary key default 'o-' || to_hex(nextval('s_observation_id')),
-  c_existence        e_existence         not null    default 'present',
-  c_subtitle         text                null        check (length(c_subtitle) > 0),
-  c_instrument       d_tag               null        references t_instrument(c_tag),
-  c_status           e_obs_status        not null    default 'new',
-  c_active_status    e_obs_active_status not null    default 'active',
+  c_program_id         d_program_id        not null    references t_program(c_program_id),
+  c_observation_id     d_observation_id    primary key default 'o-' || to_hex(nextval('s_observation_id')),
+  c_existence          e_existence         not null    default 'present',
+  c_subtitle           text                null        check (length(c_subtitle) > 0),
+  c_instrument         d_tag               null        references t_instrument(c_tag),
+  c_status             e_obs_status        not null    default 'new',
+  c_active_status      e_obs_active_status not null    default 'active',
+  c_visualization_time timestamp           null        default null,
 
   -- target environment
-  c_explicit_ra      d_angle_µas         null        default null,
-  c_explicit_dec     d_angle_µas         null        default null,
+  c_explicit_ra        d_angle_µas         null        default null,
+  c_explicit_dec       d_angle_µas         null        default null,
 
   -- both explicit coordinates are defined or neither are defined
   constraint explicit_base_neither_or_both
   check (num_nulls(c_explicit_ra, c_explicit_dec) <> 1),
 
   -- observing conditions (aka "observing constraints")
-  c_cloud_extinction d_tag               not null    references t_cloud_extinction(c_tag),
-  c_image_quality    d_tag               not null    references t_image_quality(c_tag),
-  c_sky_background   d_tag               not null    references t_sky_background(c_tag),
-  c_water_vapor      d_tag               not null    references t_water_vapor(c_tag),
-  c_air_mass_min     d_air_mass          null        default 1.0,
-  c_air_mass_max     d_air_mass          null        default 2.0,
-  c_hour_angle_min   d_hour_angle        null        default null,
-  c_hour_angle_max   d_hour_angle        null        default null,
+  c_cloud_extinction   d_tag               not null    references t_cloud_extinction(c_tag),
+  c_image_quality      d_tag               not null    references t_image_quality(c_tag),
+  c_sky_background     d_tag               not null    references t_sky_background(c_tag),
+  c_water_vapor        d_tag               not null    references t_water_vapor(c_tag),
+  c_air_mass_min       d_air_mass          null        default 1.0,
+  c_air_mass_max       d_air_mass          null        default 2.0,
+  c_hour_angle_min     d_hour_angle        null        default null,
+  c_hour_angle_max     d_hour_angle        null        default null,
 
   -- both air mass fields are defined or neither are defined
   constraint air_mass_neither_or_both

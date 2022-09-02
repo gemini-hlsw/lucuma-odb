@@ -5,7 +5,6 @@ package lucuma.odb.graphql.binding
 
 import edu.gemini.grackle.Result
 import lucuma.core.model.IntPercent
-import lucuma.odb.graphql.util.Bindings._
 
 val IntPercentBinding: Matcher[IntPercent] =
   IntBinding.rmap(n => Result.fromEither(IntPercent.from(n)))

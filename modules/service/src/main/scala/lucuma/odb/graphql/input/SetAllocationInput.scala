@@ -12,7 +12,6 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 case class SetAllocationInput(
   programId: Program.Id,

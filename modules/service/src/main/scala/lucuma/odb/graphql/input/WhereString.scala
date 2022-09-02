@@ -14,7 +14,6 @@ import edu.gemini.grackle.sql.Like
 import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.util.Bindings._
 
 object WhereString {
 
