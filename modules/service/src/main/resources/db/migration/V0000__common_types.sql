@@ -40,10 +40,18 @@ create type d_offset as (
 );
 comment on type d_offset is 'Composite type for offsets, a pair of angles.';
 
+--- PERCENTAGES
+
+create domain d_int_percentage as int2 check(VALUE >= 0 and VALUE <= 100);
+
 --- PIXELS
 
 create domain d_pixels as int check (VALUE >= 0);
 comment on domain d_pixels is 'Pixel count.';
+
+-- TOO ACTIVATION
+
+create type e_too_activation as enum('none', 'standard', 'rapid');
 
 --- WAVELENGTHS
 

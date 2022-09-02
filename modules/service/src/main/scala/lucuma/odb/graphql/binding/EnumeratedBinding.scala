@@ -6,6 +6,7 @@ package lucuma.odb.graphql.binding
 import cats.syntax.all._
 import io.circe.Json
 import lucuma.core.enums.Band
+import lucuma.core.enums.ToOActivation
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObsActiveStatus

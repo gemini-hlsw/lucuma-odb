@@ -45,6 +45,7 @@ import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.ProposalService
 import lucuma.odb.service.TargetService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
@@ -136,7 +137,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   private val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
-      programService.use(_.insertProgram(input.SET.name)).map { id =>
+      programService.use(_.insertProgram(input.SET)).map { id =>
         Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
       }
     }
@@ -312,9 +313,21 @@ trait MutationMapping[F[_]: MonadCancelThrow]
           "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
         )
 
-      // Update the specified programs and then return a query for the same set of programs.
-      idSelect.traverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).as(Filter(filterPredicate, child))
+      // We want to order the returned programs by id
+      def orderByPid(child: Query) =
+        OrderBy(OrderSelections(List(OrderSelection(UniquePath[Program.Id](List("id"))))), child)
+
+      // Update the specified programs and then return a query for the affected programs.
+      idSelect.flatTraverse { which =>
+        programService.use(_.updatePrograms(input.SET, which)).map {
+          case Nil  => Result(orderByPid(Limit(0, child)))
+          case pids => Result(orderByPid(Filter(ProgramPredicates.hasProgramId(pids), child)))
+        } recover {
+          case ProposalService.ProposalUpdateException.CreationFailed =>
+            Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
+          case ProposalService.ProposalUpdateException.InconsistentUpdate =>
+            Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+        }
       }
 
     }

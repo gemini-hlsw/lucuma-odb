@@ -164,6 +164,100 @@ class createProgram extends OdbSuite {
     )
   }
 
+  test("proposal properties persist") {
+    expect(
+      user = pi,
+      query =
+        """
+          mutation {
+            createProgram(
+              input: {
+                SET: {
+                  proposal: {
+                    title: "My Proposal"
+                    proposalClass: {
+                      intensive: {
+                        minPercentTime: 40
+                        minPercentTotalTime: 20
+                        totalTime: {
+                          hours: 1.23
+                        }
+                      }
+                    }
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: US
+                        percent: 70
+                      },
+                      {
+                        partner: CA
+                        percent: 30
+                      }
+                    ]
+                  }
+                }
+              }
+            ) {
+              program {
+                proposal {
+                  title
+                  proposalClass {
+                    ... on Intensive {
+                      minPercentTime
+                      minPercentTotalTime
+                      totalTime {
+                        hours
+                        iso
+                      }
+                    }
+                  }
+                  toOActivation
+                  partnerSplits {
+                    partner
+                    percent
+                  }
+                }
+              }
+            }
+          }
+        """,
+      expected =
+        Right(
+          json"""
+            {
+              "createProgram" : {
+                "program" : {
+                  "proposal" : {
+                    "title" : "My Proposal",
+                    "proposalClass" : {
+                      "minPercentTime" : 40,
+                      "minPercentTotalTime" : 20,
+                      "totalTime" : {
+                        "hours" : 1.23,
+                        "iso" : "PT1H13M48S"
+                      }
+                    },
+                    "toOActivation" : "NONE",
+                    "partnerSplits" : [
+                      {
+                        "partner" : "CA",
+                        "percent" : 30
+                      },
+                      {
+                        "partner" : "US",
+                        "percent" : 70
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """
+        ),
+    )
+  }
+
 }
 
 trait CreateProgramOps { this: OdbSuite =>

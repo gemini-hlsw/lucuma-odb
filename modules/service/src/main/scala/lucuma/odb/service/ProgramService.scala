@@ -4,11 +4,14 @@
 package lucuma.odb.service
 
 import cats.Monad
+import cats.Semigroup
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
+import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enums.ToOActivation
 import lucuma.core.model.GuestRole
+import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
@@ -18,11 +21,13 @@ import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.input.ProposalInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
+import skunk.codec.all._
 import skunk.syntax.all._
 
 trait ProgramService[F[_]] {
@@ -31,7 +36,7 @@ trait ProgramService[F[_]] {
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(name: Option[NonEmptyString]): F[Program.Id]
+  def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id]
 
   /**
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
@@ -39,8 +44,8 @@ trait ProgramService[F[_]] {
    */
   def linkUser(req: ProgramService.LinkUserRequest): F[ProgramService.LinkUserResponse]
 
-  /** Update the properies for programs with ids given by the supplied fragment. */
-  def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): F[Unit]
+  /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
+  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]]
 
 }
 
@@ -98,12 +103,21 @@ object ProgramService {
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
    */
-  def fromSessionAndUser[F[_]: MonadCancelThrow: Trace](s: Session[F], user: User): ProgramService[F] =
+  def fromSessionAndUser[F[_]: Concurrent: Trace](s: Session[F], user: User): ProgramService[F] =
     new ProgramService[F] {
 
-      def insertProgram(name: Option[NonEmptyString]): F[Program.Id] =
+      lazy val proposalService = ProposalService.fromSession(s)
+
+      def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          s.prepare(Statements.InsertProgram).use(ps => ps.unique(name ~ user))
+          s.transaction.use { xa =>
+            val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
+            s.prepare(Statements.InsertProgram).use(_.unique(SETʹ.name ~ user)).flatTap { pid =>
+              SETʹ.proposal.traverse { proposalInput =>
+                proposalService.insertProposal(proposalInput, pid, xa)
+              }
+            }
+          }
         }
 
       def linkUser(req: ProgramService.LinkUserRequest): F[LinkUserResponse] = {
@@ -130,29 +144,68 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(props: ProgramPropertiesInput, where: AppliedFragment): F[Unit] =
-        Statements.updatePrograms(props, where).traverse { af =>
-          s.prepare(af.fragment.command).use(_.execute(af.argument))
-        } .void
+      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]] =
+        s.transaction.use { xa =>
+
+          // Create the temp table with the programs we're updating. We will join with this
+          // several times later on in the transaction.
+          val setup: F[Unit] = {
+            val af = Statements.createProgramUpdateTempTable(where)
+            s.prepare(af.fragment.command).use(_.execute(af.argument)).void
+          }
+
+          // Update programs
+          val updatePrograms: F[List[Program.Id]] =
+            Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
+              s.prepare(af.fragment.query(program_id)).use { ps =>
+                ps.stream(af.argument, 1024)
+                  .compile
+                  .toList
+              }
+            }
+
+          // Update proposals. This can fail in a few ways.
+          val updateProposals: F[List[Program.Id]] =
+            SET.proposal.fold(Nil.pure[F]) {
+              proposalService.updateProposals(_, xa)
+            }
+
+          // Combie the results
+          (setup >> updatePrograms, updateProposals).mapN(_ |+| _)
+
+        }
 
     }
 
 
   object Statements {
 
-    def updates(SET: ProgramPropertiesInput): Option[NonEmptyList[AppliedFragment]] =
+    def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
+      void"""
+        CREATE TEMPORARY TABLE t_program_update (c_program_id, c_has_proposal)
+        ON COMMIT DROP
+        AS SELECT which.pid, p.c_program_id IS NOT NULL
+        FROM (""" |+| whichProgramIds |+| void""") as which (pid)
+        LEFT JOIN t_proposal p
+        ON p.c_program_id = which.pid
+      """
+
+    def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
-          SET.existence.map(e => sql"c_existence = $existence".apply(e)),
-          SET.name.map(s => sql"c_name = $text_nonempty".apply(s)),
+          SET.existence.map(sql"c_existence = $existence"),
+          SET.name.map(sql"c_name = $text_nonempty"),
         ).flatten
       )
 
-    def updatePrograms(SET: ProgramPropertiesInput, which: AppliedFragment): Option[AppliedFragment] =
+    def updatePrograms(SET: ProgramPropertiesInput.Edit): Option[AppliedFragment] =
       updates(SET).map { us =>
-        void"UPDATE t_program " |+|
-        void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE t_program.c_program_id IN (" |+| which |+| void")"
+        void"""
+          UPDATE t_program
+          SET """ |+| us.intercalate(void", ") |+| void"""
+          FROM t_program_update WHERE t_program.c_program_id = t_program_update.c_program_id
+          RETURNING t_program.c_program_id
+        """
       }
 
     def existsUserAsPi(

@@ -11,7 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.odb.graphql.binding._
 
 case class UpdateProgramsInput(
-  SET: ProgramPropertiesInput,
+  SET: ProgramPropertiesInput.Edit,
   WHERE: Option[Predicate],
   LIMIT: Option[NonNegInt],
   includeDeleted: Option[Boolean],
@@ -22,7 +22,7 @@ object UpdateProgramsInput {
   val Binding =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramPropertiesInput.Binding("SET", rSET),
+        ProgramPropertiesInput.EditBinding("SET", rSET),
         WhereProgram.Binding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)

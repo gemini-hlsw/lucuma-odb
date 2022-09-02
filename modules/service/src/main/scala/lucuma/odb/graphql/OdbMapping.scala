@@ -63,7 +63,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: Sync: Trace: Logger](
+  def apply[F[_]: Async: Trace: Logger](
     database:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     user0:     User,
@@ -92,6 +92,7 @@ object OdbMapping {
           with ObservationMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
+          with PartnerSplitMapping[F]
           with PlannedTimeSummaryMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
@@ -99,6 +100,8 @@ object OdbMapping {
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
           with ProperMotionRAMapping[F]
+          with ProposalMapping[F]
+          with ProposalClassMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RightAscensionMapping[F]
@@ -144,6 +147,7 @@ object OdbMapping {
               ObservationMapping,
               ParallaxMapping,
               PartnerMetaMapping,
+              PartnerSplitMapping,
               PlannedTimeSummaryMapping,
               ProgramMapping,
               ProgramEditMapping,
@@ -151,6 +155,7 @@ object OdbMapping {
               ProperMotionDeclinationMapping,
               ProperMotionMapping,
               ProperMotionRAMapping,
+              ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
               RightAscensionMapping,
@@ -160,7 +165,7 @@ object OdbMapping {
               TargetEnvironmentMapping,
               TargetMapping,
               UserMapping,
-            ) ++ LeafMappings
+            ) ++ LeafMappings ++ ProposalClassMappings
 
           // Our combined select elaborator
           override val selectElaborator: SelectElaborator =
