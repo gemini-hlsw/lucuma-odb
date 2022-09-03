@@ -260,8 +260,8 @@ object ObservationService {
           c_status,
           c_active_status,
           c_visualization_time,
-          c_pos_angle_cons_mode,
-          c_pos_angle_cons_angle,
+          c_pac_mode,
+          c_pac_angle,
           c_explicit_ra,
           c_explicit_dec,
           c_cloud_extinction,
@@ -280,7 +280,7 @@ object ObservationService {
           $obs_status,
           $obs_active_status,
           ${data_timestamp.opt},
-          ${pos_angle_cons_mode},
+          ${pac_mode},
           ${angle_µas},
           ${right_ascension.opt},
           ${declination.opt},
@@ -296,8 +296,8 @@ object ObservationService {
 
     def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {
 
-      val upMode  = sql"c_pos_angle_cons_mode  = $pos_angle_cons_mode"
-      val upAngle = sql"c_pos_angle_cons_angle = $angle_µas"
+      val upMode  = sql"c_pac_mode  = $pac_mode"
+      val upAngle = sql"c_pac_angle = $angle_µas"
 
       in.mode.map(upMode).toList ++ in.angle.map(upAngle).toList
     }

@@ -22,8 +22,8 @@ trait ObservationView[F[_]] { self: SkunkMapping[F] =>
       val VisualizationTime: ColumnRef = col("c_visualization_time", data_timestamp.opt)
 
       object PosAngleConstraint {
-        val Mode: ColumnRef            = col("c_pos_angle_cons_mode",  pos_angle_cons_mode.embedded)
-        val Angle: ColumnRef           = col("c_pos_angle_cons_angle", angle_µas.embedded)
+        val Mode: ColumnRef            = col("c_pac_mode",  pac_mode.embedded)
+        val Angle: ColumnRef           = col("c_pac_angle", angle_µas.embedded)
       }
 
       object TargetEnvironment {
