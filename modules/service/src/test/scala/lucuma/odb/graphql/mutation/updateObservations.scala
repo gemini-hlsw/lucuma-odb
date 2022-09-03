@@ -648,14 +648,27 @@ class updateObservations extends OdbSuite
         """
         posAngleConstraint: {
           mode: ALLOW_FLIP
-          angle: { degrees: 14 }
+          angle: { degrees: 15 }
         }
       """,
       query =
         """
         posAngleConstraint {
           mode
-          angle { degrees }
+          angle {
+            microarcseconds
+            microseconds
+            milliarcseconds
+            milliseconds
+            arcseconds
+            seconds
+            arcminutes
+            minutes
+            degrees
+            hours
+            dms
+            hms
+          }
         }
       """,
       expected =
@@ -665,7 +678,20 @@ class updateObservations extends OdbSuite
             {
               "posAngleConstraint": {
                 "mode": "ALLOW_FLIP",
-                "angle": { "degrees": 14.0 }
+                "angle": {
+                  "microarcseconds": 54000000000,
+                  "microseconds": 3600000000,
+                  "milliarcseconds": 54000000,
+                  "milliseconds": 3600000,
+                  "arcseconds": 54000,
+                  "seconds": 3600,
+                  "arcminutes": 900,
+                  "minutes": 60,
+                  "degrees": 15,
+                  "hours": 1,
+                  "dms": "15:00:00.000000",
+                  "hms": "01:00:00.000000"
+                }
               }
             }
           ]

@@ -2687,6 +2687,12 @@ type Angle {
 
   # Angle in hrs
   hours: BigDecimal!
+
+  # Angle in HH:MM:SS
+  hms: String!
+
+  # Angle in DD:MM:SS
+  dms: String!
 }
 
 type AsterismGroup {
