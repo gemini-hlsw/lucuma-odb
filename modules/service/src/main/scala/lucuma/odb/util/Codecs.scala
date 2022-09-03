@@ -180,8 +180,8 @@ trait Codecs {
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
 
-  val pos_angle_cons_mode: Codec[PosAngleConstraintMode] =
-    enumerated(Type("e_pos_angle_cons_mode"))
+  val pac_mode: Codec[PosAngleConstraintMode] =
+    enumerated(Type("e_pac_mode"))
 
 }
 
