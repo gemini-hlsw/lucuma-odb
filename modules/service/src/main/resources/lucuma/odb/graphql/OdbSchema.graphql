@@ -1925,8 +1925,8 @@ input PoorWeatherInput {
 #
 input PosAngleConstraintInput {
 
-  # The constraint mode field determines whether the angle field, 'degrees', is
-  # respected or ignored.
+  # The constraint mode field determines whether the angle field is respected
+  # or ignored.
   mode: PosAngleConstraintMode
 
   # The fixed position angle that is used when the mode is FIXED, ALLOW_FLIP or
@@ -4383,11 +4383,11 @@ type PoorWeather implements ProposalClass {
 type PosAngleConstraint {
 
   # The position angle constraint mode in use.  The value will determine whether
-  # the angle in degrees is respected or ignored.
+  # the angle is respected or ignored.
   mode: PosAngleConstraintMode!
 
-  # Describes the fixed position angle, in degrees.  This will be kept but
-  # ignored for UNBOUNDED and AVERAGE_PARALLACTIC modes.
+  # The fixed position angle.  This will be kept but ignored for UNBOUNDED and
+  # AVERAGE_PARALLACTIC modes.
   angle: Angle!
 }
 
