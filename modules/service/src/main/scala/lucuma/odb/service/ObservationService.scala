@@ -19,6 +19,7 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -38,6 +39,7 @@ import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObsActiveStatus
 import lucuma.odb.data.ObsStatus
+import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
@@ -45,6 +47,7 @@ import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.HourAngleRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -179,6 +182,8 @@ object ObservationService {
           SET.status.getOrElse(ObsStatus.Default),
           SET.activeStatus.getOrElse(ObsActiveStatus.Default),
           SET.visualizationTime.toOption,
+          SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
+          SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints)
         )
@@ -191,6 +196,8 @@ object ObservationService {
       status:            ObsStatus,
       activeState:       ObsActiveStatus,
       visualizationTime: Option[Timestamp],
+      posAngleConsMode:  PosAngleConstraintMode,
+      posAngle:          Angle,
       explicitBase:      Option[Coordinates],
       constraintSet:     ConstraintSet
     ): AppliedFragment = {
@@ -203,6 +210,8 @@ object ObservationService {
            status      ~
            activeState ~
            visualizationTime             ~
+           posAngleConsMode              ~
+           posAngle                      ~
            explicitBase.map(_.ra)        ~
            explicitBase.map(_.dec)       ~
            constraintSet.cloudExtinction ~
@@ -230,6 +239,8 @@ object ObservationService {
       ObsStatus              ~
       ObsActiveStatus        ~
       Option[Timestamp]      ~
+      PosAngleConstraintMode ~
+      Angle                  ~
       Option[RightAscension] ~
       Option[Declination]    ~
       CloudExtinction        ~
@@ -249,6 +260,8 @@ object ObservationService {
           c_status,
           c_active_status,
           c_visualization_time,
+          c_pac_mode,
+          c_pac_angle,
           c_explicit_ra,
           c_explicit_dec,
           c_cloud_extinction,
@@ -267,6 +280,8 @@ object ObservationService {
           $obs_status,
           $obs_active_status,
           ${data_timestamp.opt},
+          ${pac_mode},
+          ${angle_µas},
           ${right_ascension.opt},
           ${declination.opt},
           $cloud_extinction,
@@ -278,6 +293,14 @@ object ObservationService {
           ${hour_angle_range_value.opt},
           ${hour_angle_range_value.opt}
       """
+
+    def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {
+
+      val upMode  = sql"c_pac_mode  = $pac_mode"
+      val upAngle = sql"c_pac_angle = $angle_µas"
+
+      in.mode.map(upMode).toList ++ in.angle.map(upAngle).toList
+    }
 
     def explicitBaseUpdates(in: TargetEnvironmentInput): Result[List[AppliedFragment]] = {
 
@@ -365,6 +388,11 @@ object ObservationService {
           }
         ).flatten
 
+      val posAngleConstraint: List[AppliedFragment] =
+        SET.posAngleConstraint
+           .toList
+           .flatMap(posAngleConstraintUpdates)
+
       val explicitBase: Result[List[AppliedFragment]] =
         SET.targetEnvironment
            .toList
@@ -376,7 +404,7 @@ object ObservationService {
            .flatTraverse(constraintSetUpdates)
 
       (explicitBase, constraintSet).mapN { (eb, cs) =>
-        NonEmptyList.fromList(eb ++ cs ++ ups)
+        NonEmptyList.fromList(eb ++ cs ++ ups ++ posAngleConstraint)
       }
     }
 

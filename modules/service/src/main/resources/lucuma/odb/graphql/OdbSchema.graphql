@@ -1924,10 +1924,13 @@ input PoorWeatherInput {
 # position angle required to reach the best guide star option will be used.
 #
 input PosAngleConstraintInput {
-  # The constraint field is required when creating a new instance of position angle constraint type, but optional when editing
-  constraint: PosAngleConstraintType
 
-  # The angle field is required when creating a new instance of fixed any, if any (not required for average parallactic, but optional when editing
+  # The constraint mode field determines whether the angle field is respected
+  # or ignored.
+  mode: PosAngleConstraintMode
+
+  # The fixed position angle that is used when the mode is FIXED, ALLOW_FLIP or
+  # PARALLACTIC_OVERRIDE.  Set but ignored when UNBOUNDED or AVERAGE_PARALLACTIC.
   angle: AngleInput
 }
 
@@ -2684,6 +2687,12 @@ type Angle {
 
   # Angle in hrs
   hours: BigDecimal!
+
+  # Angle in HH:MM:SS
+  hms: String!
+
+  # Angle in DD:MM:SS
+  dms: String!
 }
 
 type AsterismGroup {
@@ -4372,23 +4381,34 @@ type PoorWeather implements ProposalClass {
 
 # Constraints (if any) on the observation's position angle.
 type PosAngleConstraint {
-  # The position angle constraint type in use
-  constraint: PosAngleConstraintType!
 
-  # Describes the fixed position angle constraint, if set
-  angle: Angle
+  # The position angle constraint mode in use.  The value will determine whether
+  # the angle is respected or ignored.
+  mode: PosAngleConstraintMode!
+
+  # The fixed position angle.  This will be kept but ignored for UNBOUNDED and
+  # AVERAGE_PARALLACTIC modes.
+  angle: Angle!
 }
 
 # Position angle constraint type
-enum PosAngleConstraintType {
-  # PosAngleConstraintType Fixed
+enum PosAngleConstraintMode {
+
+  # PosAngleConstraintMode Unbounded
+  UNBOUNDED
+
+  # PosAngleConstraintMode Fixed
   FIXED
 
-  # PosAngleConstraintType AllowFlip
+  # PosAngleConstraintMode AllowFlip
   ALLOW_FLIP
 
-  # PosAngleConstraintType AverageParallactic
+  # PosAngleConstraintMode AverageParallactic
   AVERAGE_PARALLACTIC
+
+  # PosAngleConstraintMode ParallacticOverride
+  PARALLACTIC_OVERRIDE
+
 }
 
 # A `BigDecimal` greater than 0
