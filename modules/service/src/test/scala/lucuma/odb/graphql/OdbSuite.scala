@@ -27,13 +27,13 @@ import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.client.websocket.WSClient
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.{Uri => Http4sUri, _}
-import org.http4s.client.websocket.WSClient
 import org.slf4j
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
@@ -217,20 +217,20 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           val req = conn.subscribe(Operation(query))
           variables.fold(req.apply)(req.apply).allocated.flatMap { case (sub, cleanup) =>
             for {
-              _ <- log.info("*** ----- about to start stream fiber")
+              _   <- log.info("*** ----- about to start stream fiber")
               fib <- sup.supervise(sub.compile.toList)
-              _ <- log.info("*** ----- pausing a bit")
-              _ <- IO.sleep(1.second)
-              _ <- log.info("*** ----- running mutations")
-              _ <- mutations.fold(_.traverse_ { case (query, vars) =>
+              _   <- log.info("*** ----- pausing a bit")
+              _   <- IO.sleep(1.second)
+              _   <- log.info("*** ----- running mutations")
+              _   <- mutations.fold(_.traverse_ { case (query, vars) =>
                 val req = conn.request(Operation(query))
                 vars.fold(req.apply)(req.apply)
               }, identity)
-              _ <- log.info("*** ----- pausing a bit")
-              _ <- IO.sleep(1.second)
-              _ <- log.info("*** ----- stopping subscription")
-              _ <- cleanup
-              _ <- log.info("*** ----- joining fiber")
+              _   <- log.info("*** ----- pausing a bit")
+              _   <- IO.sleep(1.second)
+              _   <- log.info("*** ----- stopping subscription")
+              _   <- cleanup
+              _   <- log.info("*** ----- joining fiber")
               obt <- fib.joinWithNever
             } yield obt
           }
