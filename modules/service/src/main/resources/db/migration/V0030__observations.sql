@@ -1,3 +1,5 @@
+create type e_pac_mode as enum('unbounded', 'fixed', 'allow_flip', 'average_parallactic', 'parallactic_override');
+
 --- AIR MASS
 
 create domain d_air_mass as numeric(3,2)
@@ -101,6 +103,10 @@ create table t_observation (
   c_status             e_obs_status        not null    default 'new',
   c_active_status      e_obs_active_status not null    default 'active',
   c_visualization_time timestamp           null        default null,
+
+  -- position angle constraint
+  c_pac_mode           e_pac_mode          not null    default 'unbounded',
+  c_pac_angle          d_angle_µas         not null    default 0,
 
   -- target environment
   c_explicit_ra        d_angle_µas         null        default null,
