@@ -12,7 +12,6 @@ import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.core.enums.ProposalClass
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalTable
