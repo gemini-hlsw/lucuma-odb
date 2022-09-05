@@ -12,8 +12,8 @@ import clue.GraphQLOperation
 import clue.PersistentStreamingClient
 import clue.ResponseException
 import clue.TransactionalClient
-import clue.http4sjdk.Http4sJDKBackend
-import clue.http4sjdk.Http4sJDKWSBackend
+import clue.http4s.Http4sBackend
+import clue.http4s.Http4sWSBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import io.circe.Json
@@ -27,7 +27,10 @@ import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.client.websocket.WSClient
 import org.http4s.headers.Authorization
+import org.http4s.jdkhttpclient.JdkHttpClient
+import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.{Uri => Http4sUri, _}
@@ -123,14 +126,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   private def transactionalClient(user: User)(svr: Server): Resource[IO, TransactionalClient[IO, Nothing]] =
     for {
-      xbe <- Http4sJDKBackend.apply[IO]
+      xbe <- JdkHttpClient.simple[IO].map(Http4sBackend[IO](_))
       uri  = svr.baseUri / "odb"
       xc  <- Resource.eval(TransactionalClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, Gid[User.Id].fromString.reverseGet(user.id)))))(Async[IO], xbe, Logger[IO]))
     } yield xc
 
   private def streamingClient(user: User)(svr: Server): Resource[IO, ApolloWebSocketClient[IO, Nothing]] =
     for {
-      sbe <- Http4sJDKWSBackend[IO]
+      sbe <- JdkWSClient.simple[IO].map(Http4sWSBackend[IO](_))
       uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
       sc  <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[IO], Logger[IO], sbe))
       ps   = Map("Authorization" -> Json.fromString(s"Bearer ${Gid[User.Id].fromString.reverseGet(user.id)}"))
@@ -212,27 +215,25 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .flatMap(streamingClient(user))
         .use { conn =>
           val req = conn.subscribe(Operation(query))
-          variables
-            .fold(req.apply)(req.apply) // awkward API
-            .flatMap { sub =>
-              for {
-                _   <- log.info("*** ----- about to start stream fiber")
-                fib <- sup.supervise(sub.stream.compile.toList)
-                _   <- log.info("*** ----- pausing a bit")
-                _   <- IO.sleep(1.second)
-                _   <- log.info("*** ----- running mutations")
-                _   <- mutations.fold(_.traverse_ { case (query, vars) =>
-                        val req = conn.request(Operation(query))
-                        vars.fold(req.apply)(req.apply)
-                      }, identity)
-                _   <- log.info("*** ----- pausing a bit")
-                _   <- IO.sleep(1.second)
-                _   <- log.info("*** ----- stopping subscription")
-                _   <- sub.stop()
-                _   <- log.info("*** ----- joining fiber")
-                obt <- fib.joinWithNever
-              } yield obt
-            }
+          variables.fold(req.apply)(req.apply).allocated.flatMap { case (sub, cleanup) =>
+            for {
+              _   <- log.info("*** ----- about to start stream fiber")
+              fib <- sup.supervise(sub.compile.toList)
+              _   <- log.info("*** ----- pausing a bit")
+              _   <- IO.sleep(1.second)
+              _   <- log.info("*** ----- running mutations")
+              _   <- mutations.fold(_.traverse_ { case (query, vars) =>
+                val req = conn.request(Operation(query))
+                vars.fold(req.apply)(req.apply)
+              }, identity)
+              _   <- log.info("*** ----- pausing a bit")
+              _   <- IO.sleep(1.second)
+              _   <- log.info("*** ----- stopping subscription")
+              _   <- cleanup
+              _   <- log.info("*** ----- joining fiber")
+              obt <- fib.joinWithNever
+            } yield obt
+          }
         }
     }
 
