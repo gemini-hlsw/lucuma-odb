@@ -22,13 +22,13 @@ create table t_cloud_extinction (
   c_value      numeric(2,1)  not null check(c_value > 0.0 and c_value <= 3.0)
 );
 
-insert into t_cloud_extinction values ('PointOne',   '0.1', '0.1', 0.1);
-insert into t_cloud_extinction values ('PointThree', '0.3', '0.3', 0.3);
-insert into t_cloud_extinction values ('PointFive',  '0.5', '0.5', 0.5);
-insert into t_cloud_extinction values ('OnePointZero',   '1.0', '1.0', 1.0);
-insert into t_cloud_extinction values ('OnePointFive',   '1.5', '1.5', 1.5);
-insert into t_cloud_extinction values ('TwoPointZero',   '2.0', '2.0', 2.0);
-insert into t_cloud_extinction values ('ThreePointZero', '3.0', '3.0', 3.0);
+insert into t_cloud_extinction values ('point_one',   '0.1', '0.1', 0.1);
+insert into t_cloud_extinction values ('point_three', '0.3', '0.3', 0.3);
+insert into t_cloud_extinction values ('point_five',  '0.5', '0.5', 0.5);
+insert into t_cloud_extinction values ('one_point_zero',   '1.0', '1.0', 1.0);
+insert into t_cloud_extinction values ('one_point_five',   '1.5', '1.5', 1.5);
+insert into t_cloud_extinction values ('two_point_zero',   '2.0', '2.0', 2.0);
+insert into t_cloud_extinction values ('three_point_zero', '3.0', '3.0', 3.0);
 
 --- IMAGE QUALITY
 
@@ -39,15 +39,15 @@ create table t_image_quality (
   c_value      numeric(2,1)  not null check(c_value > 0.0 and c_value <= 2.0)
 );
 
-insert into t_image_quality values ('PointOne',   '0.1', '0.1', 0.1);
-insert into t_image_quality values ('PointTwo',   '0.2', '0.2', 0.2);
-insert into t_image_quality values ('PointThree', '0.3', '0.3', 0.3);
-insert into t_image_quality values ('PointFour',  '0.4', '0.4', 0.4);
-insert into t_image_quality values ('PointSix',   '0.6', '0.6', 0.6);
-insert into t_image_quality values ('PointEight', '0.8', '0.8', 0.8);
-insert into t_image_quality values ('OnePointZero',   '1.0', '1.0', 1.0);
-insert into t_image_quality values ('OnePointFive',   '1.5', '1.5', 1.5);
-insert into t_image_quality values ('TwoPointZero',   '2.0', '2.0', 2.0);
+insert into t_image_quality values ('point_one',   '0.1', '0.1', 0.1);
+insert into t_image_quality values ('point_two',   '0.2', '0.2', 0.2);
+insert into t_image_quality values ('point_three', '0.3', '0.3', 0.3);
+insert into t_image_quality values ('point_four',  '0.4', '0.4', 0.4);
+insert into t_image_quality values ('point_six',   '0.6', '0.6', 0.6);
+insert into t_image_quality values ('point_eight', '0.8', '0.8', 0.8);
+insert into t_image_quality values ('one_point_zero',   '1.0', '1.0', 1.0);
+insert into t_image_quality values ('one_point_five',   '1.5', '1.5', 1.5);
+insert into t_image_quality values ('two_point_zero',   '2.0', '2.0', 2.0);
 
 --- SKY BACKGROUND
 
@@ -57,10 +57,10 @@ create table t_sky_background (
   c_long_name  varchar       not null
 );
 
-insert into t_sky_background values ('Darkest', 'Darkest', 'Darkest');
-insert into t_sky_background values ('Dark', 'Dark', 'Dark');
-insert into t_sky_background values ('Gray', 'Gray', 'Gray');
-insert into t_sky_background values ('Bright', 'Bright', 'Bright');
+insert into t_sky_background values ('darkest', 'Darkest', 'Darkest');
+insert into t_sky_background values ('dark', 'Dark', 'Dark');
+insert into t_sky_background values ('gray', 'Gray', 'Gray');
+insert into t_sky_background values ('bright', 'Bright', 'Bright');
 
 --- WATER VAPOR
 
@@ -70,10 +70,10 @@ create table t_water_vapor (
   c_long_name  varchar       not null
 );
 
-insert into t_water_vapor values ('VeryDry', 'Very Dry', 'Very Dry');
-insert into t_water_vapor values ('Dry',     'Dry',      'Dry'     );
-insert into t_water_vapor values ('Median',  'Median',   'Median'  );
-insert into t_water_vapor values ('Wet',     'Wet',      'Wet'     );
+insert into t_water_vapor values ('very_dry', 'Very Dry', 'Very Dry');
+insert into t_water_vapor values ('dry',     'Dry',      'Dry'     );
+insert into t_water_vapor values ('median',  'Median',   'Median'  );
+insert into t_water_vapor values ('wet',     'Wet',      'Wet'     );
 
 -- OBSERVATIONS
 
