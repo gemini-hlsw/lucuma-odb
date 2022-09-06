@@ -429,13 +429,6 @@ input FluxDensityContinuumSurfaceInput {
   units: FluxDensityContinuumSurfaceUnits!
 }
 
-# Focal plane angle source angle in appropriate units
-input FocalPlaneAngleInput {
-  microarcseconds: Long
-  milliarcseconds: BigDecimal
-  arcseconds: BigDecimal
-}
-
 # Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
 input GaussianInput {
   # The fwhm field is required when creating a new instance of Gaussian, but optional when editing
@@ -2138,7 +2131,7 @@ input ScienceModeInput {
 # Edit science requirements
 input ScienceRequirementsInput {
   # The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  mode: ScienceRequirementMode
+  mode: ScienceRequirementsMode
 
   # The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   spectroscopy: SpectroscopyScienceRequirementsInput
@@ -2234,7 +2227,7 @@ input SpectroscopyScienceRequirementsInput {
   focalPlane: FocalPlane
 
   # The focalPlaneAngle field may be unset by assigning a null value, or ignored by skipping it altogether
-  focalPlaneAngle: FocalPlaneAngleInput
+  focalPlaneAngle: AngleInput
 
   # The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
   capabilities: SpectroscopyCapabilities
@@ -3411,17 +3404,6 @@ enum FocalPlane {
 
   # FocalPlane IFU
   IFU
-}
-
-type FocalPlaneAngle {
-  # Focal plane angle in µas
-  microarcseconds: Long!
-
-  # Focal plane angle in mas
-  milliarcseconds: BigDecimal!
-
-  # Focal plane angle in arcsec
-  arcseconds: BigDecimal!
 }
 
 # Galaxy spectrum
@@ -4845,17 +4827,17 @@ type ScienceModeGroupSelectResult {
 }
 
 # Mode Spectroscopy/Imaging
-enum ScienceRequirementMode {
-  # ScienceRequirementMode Imaging
+enum ScienceRequirementsMode {
+  # ScienceRequirementsMode Imaging
   IMAGING
 
-  # ScienceRequirementMode Spectroscopy
+  # ScienceRequirementsMode Spectroscopy
   SPECTROSCOPY
 }
 
 type ScienceRequirements {
   # Science requirement mode
-  mode: ScienceRequirementMode!
+  mode: ScienceRequirementsMode!
 
   # Spectroscopy requirements
   spectroscopy: SpectroscopyScienceRequirements!
@@ -5059,7 +5041,7 @@ type SpectroscopyScienceRequirements {
   focalPlane: FocalPlane
 
   # Focal plane angle
-  focalPlaneAngle: FocalPlaneAngle
+  focalPlaneAngle: Angle
 
   # Spectroscopy Capabilities
   capabilities: SpectroscopyCapabilities

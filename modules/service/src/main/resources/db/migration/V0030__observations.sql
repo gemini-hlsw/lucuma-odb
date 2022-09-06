@@ -1,19 +1,19 @@
 create type e_pac_mode as enum('unbounded', 'fixed', 'allow_flip', 'average_parallactic', 'parallactic_override');
 
---- AIR MASS
+--- OBSERVING CONDITIONS: AIR MASS
 
 create domain d_air_mass as numeric(3,2)
 check (value between 1.0 AND 3.0);
 comment on domain d_air_mass is 'air mass limited to the range [1.00, 3.00]';
 
---- HOUR ANGLE
+--- OBSERVING CONDITIONS: HOUR ANGLE
 
 create domain d_hour_angle as numeric(3,2)
 check (value between -5.0 and 5.0);
 comment on domain d_hour_angle is 'hour angle limited to the range [-5.0, 5.0]';
 
 
---- CLOUD EXTINCTION
+--- OBSERVING CONDITIONS: CLOUD EXTINCTION
 
 create table t_cloud_extinction (
   c_tag        d_tag         primary key,
@@ -30,7 +30,7 @@ insert into t_cloud_extinction values ('one_point_five',   '1.5', '1.5', 1.5);
 insert into t_cloud_extinction values ('two_point_zero',   '2.0', '2.0', 2.0);
 insert into t_cloud_extinction values ('three_point_zero', '3.0', '3.0', 3.0);
 
---- IMAGE QUALITY
+--- OBSERVING CONDITIONS: IMAGE QUALITY
 
 create table t_image_quality (
   c_tag        d_tag         primary key,
@@ -49,7 +49,7 @@ insert into t_image_quality values ('one_point_zero',   '1.0', '1.0', 1.0);
 insert into t_image_quality values ('one_point_five',   '1.5', '1.5', 1.5);
 insert into t_image_quality values ('two_point_zero',   '2.0', '2.0', 2.0);
 
---- SKY BACKGROUND
+--- OBSERVING CONDITIONS: SKY BACKGROUND
 
 create table t_sky_background (
   c_tag        d_tag         primary key,
@@ -62,7 +62,7 @@ insert into t_sky_background values ('dark', 'Dark', 'Dark');
 insert into t_sky_background values ('gray', 'Gray', 'Gray');
 insert into t_sky_background values ('bright', 'Bright', 'Bright');
 
---- WATER VAPOR
+--- OBSERVING CONDITIONS: WATER VAPOR
 
 create table t_water_vapor (
   c_tag        d_tag         primary key,
@@ -75,7 +75,7 @@ insert into t_water_vapor values ('dry',     'Dry',      'Dry'     );
 insert into t_water_vapor values ('median',  'Median',   'Median'  );
 insert into t_water_vapor values ('wet',     'Wet',      'Wet'     );
 
--- OBSERVATIONS
+-- OBSERVATION STATUS
 
 create type e_obs_status as enum(
   'new',
@@ -89,6 +89,44 @@ create type e_obs_status as enum(
 );
 
 create type e_obs_active_status as enum('active', 'inactive');
+
+-- SCIENCE REQUIREMENTS: MODE
+
+create table t_science_requirements_mode (
+  c_tag        d_tag         primary key,
+  c_short_name varchar       not null,
+  c_long_name  varchar       not null
+);
+
+insert into t_science_requirements_mode values ('imaging', 'Imaging', 'Imaging');
+insert into t_science_requirements_mode values ('spectroscopy', 'Spectroscopy', 'Spectroscopy');
+
+
+-- SCIENCE REQUIREMENTS: SPECTROSCOPY FOCAL PLANE
+
+create table t_focal_plane (
+  c_tag        d_tag         primary key,
+  c_short_name varchar       not null,
+  c_long_name  varchar       not null
+);
+
+insert into t_focal_plane values ('single_slit', 'Single Slit', 'Single Slit');
+insert into t_focal_plane values ('multiple_slit', 'Multiple Slit', 'Multiple Slit');
+insert into t_focal_plane values ('ifu', 'IFU', 'Intregal Field Unit');
+
+-- SCIENCE REQUIREMENTS: SPECTROSCOPY CAPABILITIES
+
+create table t_spectroscopy_capabilities (
+  c_tag        d_tag         primary key,
+  c_short_name varchar       not null,
+  c_long_name  varchar       not null
+);
+
+insert into t_spectroscopy_capabilities values ('nod_and_shuffle', 'Nod and Shuffle', 'Nod and Shuffle');
+insert into t_spectroscopy_capabilities values ('polarimetry', 'Polarimetry', 'Polarimetry');
+insert into t_spectroscopy_capabilities values ('coronagraphy', 'Coronagraphy', 'Coronagraphy');
+
+-- OBSERVATIONS
 
 create domain d_observation_id as varchar; -- TODO format check
 comment on domain d_observation_id is 'GID type for observations.';
@@ -126,17 +164,42 @@ create table t_observation (
   c_hour_angle_min     d_hour_angle        null        default null,
   c_hour_angle_max     d_hour_angle        null        default null,
 
-  -- both air mass fields are defined or neither are defined
+  -- observing conditions: both air mass fields are defined or neither are defined
   constraint air_mass_neither_or_both
   check (num_nulls(c_air_mass_min, c_air_mass_max) <> 1),
 
-  -- both hour angle fields are defined or neither are defined
+  -- observing conditions: both hour angle fields are defined or neither are defined
   constraint hour_angle_neither_or_both
   check (num_nulls(c_hour_angle_min, c_hour_angle_max) <> 1),
 
-  -- one elevation range definition is required, but both cannot be defined
+  -- observing conditions: one elevation range definition is required, but both cannot be defined
   constraint one_elevation_range
   check (num_nulls(c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max) = 2),
+
+  -- science requirements
+  c_requirements_mode       d_tag           not null default 'spectroscopy' references t_science_requirements_mode(c_tag),
+
+  -- imaging science requirements (TBD)
+
+  -- spectroscopy science requirements
+  c_spec_wavelength         d_wavelength_pm null default null,
+  c_spec_resolution         integer         null default null,
+  c_spec_signal_to_noise    numeric(5,2)    null default null, -- TODO, what's an appropriate precision and scale?
+  c_spec_signal_to_noise_at d_wavelength_pm null default null,
+  c_spec_wavelength_range   d_wavelength_pm null default null,
+  c_spec_focal_plane        d_tag           null default null references t_focal_plane(c_tag),
+  c_spec_focal_plane_angle  d_angle_µas     null default null,
+  c_spec_capability         d_tag           null default null references t_spectroscopy_capabilities(c_tag),
+
+  -- spectroscopy: requested resolution is positive
+  constraint spectroscopy_resolution_positive
+  check (c_spec_resolution > 0),
+
+  -- spectroscopy: S/N is positive
+  constraint spectroscopy_signal_to_noise_positive
+  check (c_spec_signal_to_noise > 0),
+
+  --
 
   unique (c_observation_id, c_instrument),
   unique (c_program_id, c_observation_id)
