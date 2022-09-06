@@ -1851,8 +1851,8 @@ input ObservationPropertiesInput {
   # The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
   scienceRequirements: ScienceRequirementsInput
 
-  # The scienceMode describes the chosen observing mode and instrument, is optional and may be deleted
-  scienceMode: ScienceModeInput
+  # The observingMode describes the chosen observing mode and instrument, is optional and may be deleted
+  observingMode: ObservingModeInput
 
   # Whether the observation is considered deleted (defaults to PRESENT) but may be edited
   existence: Existence
@@ -2120,7 +2120,7 @@ type Science implements StepConfig {
 }
 
 # Edit or create an observation's science mode
-input ScienceModeInput {
+input ObservingModeInput {
   # The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   gmosNorthLongSlit: GmosNorthLongSlitInput
 
@@ -4250,10 +4250,10 @@ type Observation {
   ): ScienceRequirements!
 
   # The science configuration
-  scienceMode(
+  observingMode(
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ScienceMode
+  ): ObservingMode
 
   # ITC execution results
   itc(
@@ -4664,7 +4664,7 @@ type Query {
   ): [Program!]! #ProgramSelectResult!
 
   # Observations grouped by commonly held science mode
-  scienceModeGroup(
+  observingModeGroup(
     # Program ID
     programId: ProgramId!
 
@@ -4676,7 +4676,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ScienceModeGroupSelectResult!
+  ): ObservingModeGroupSelectResult!
 
   # Observations grouped by commonly held science requirements
   scienceRequirementsGroup(
@@ -4783,7 +4783,7 @@ type RightAscension {
 }
 
 # Base science mode
-type ScienceMode {
+type ObservingMode {
   # Instrument
   instrument: InstrumentType!
 
@@ -4797,7 +4797,7 @@ type ScienceMode {
   gmosSouthLongSlit: GmosSouthLongSlit
 }
 
-type ScienceModeGroup {
+type ObservingModeGroup {
   # IDs of observations that use the same constraints
   observationIds: [ObservationId!]!
 
@@ -4814,13 +4814,13 @@ type ScienceModeGroup {
   ): ObservationSelectResult!
 
   # Commonly held value across the observations
-  scienceMode: ScienceMode
+  observingMode: ObservingMode
 }
 
-# The matching scienceModeGroup results, limited to a maximum of 1000 entries.
-type ScienceModeGroupSelectResult {
-  # Matching scienceModeGroups up to the return size limit of 1000
-  matches: [ScienceModeGroup!]!
+# The matching ObservingModeGroup results, limited to a maximum of 1000 entries.
+type ObservingModeGroupSelectResult {
+  # Matching ObservingModeGroups up to the return size limit of 1000
+  matches: [ObservingModeGroup!]!
 
   # `true` when there were additional matches that were not returned.
   hasMore: Boolean!
@@ -4836,7 +4836,7 @@ enum ScienceMode {
 }
 
 type ScienceRequirements {
-  # Science requirement mode
+  # Science mode
   mode: ScienceMode!
 
   # Spectroscopy requirements
