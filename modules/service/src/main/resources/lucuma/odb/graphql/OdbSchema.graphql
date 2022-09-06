@@ -2230,7 +2230,7 @@ input SpectroscopyScienceRequirementsInput {
   focalPlaneAngle: AngleInput
 
   # The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
-  capabilities: SpectroscopyCapabilities
+  capability: SpectroscopyCapabilities
 }
 
 # Sequence step
