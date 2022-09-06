@@ -92,14 +92,14 @@ create type e_obs_active_status as enum('active', 'inactive');
 
 -- SCIENCE REQUIREMENTS: MODE
 
-create table t_science_requirements_mode (
+create table t_science_mode (
   c_tag        d_tag         primary key,
   c_short_name varchar       not null,
   c_long_name  varchar       not null
 );
 
-insert into t_science_requirements_mode values ('imaging', 'Imaging', 'Imaging');
-insert into t_science_requirements_mode values ('spectroscopy', 'Spectroscopy', 'Spectroscopy');
+insert into t_science_mode values ('imaging', 'Imaging', 'Imaging');
+insert into t_science_mode values ('spectroscopy', 'Spectroscopy', 'Spectroscopy');
 
 
 -- SCIENCE REQUIREMENTS: SPECTROSCOPY FOCAL PLANE
@@ -177,7 +177,7 @@ create table t_observation (
   check (num_nulls(c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max) = 2),
 
   -- science requirements
-  c_requirements_mode       d_tag           not null default 'spectroscopy' references t_science_requirements_mode(c_tag),
+  c_science_mode            d_tag           not null default 'spectroscopy' references t_science_mode(c_tag),
 
   -- imaging science requirements (TBD)
 

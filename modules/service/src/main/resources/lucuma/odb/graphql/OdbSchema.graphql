@@ -2131,7 +2131,7 @@ input ScienceModeInput {
 # Edit science requirements
 input ScienceRequirementsInput {
   # The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  mode: ScienceRequirementsMode
+  mode: ScienceMode
 
   # The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   spectroscopy: SpectroscopyScienceRequirementsInput
@@ -4827,17 +4827,17 @@ type ScienceModeGroupSelectResult {
 }
 
 # Mode Spectroscopy/Imaging
-enum ScienceRequirementsMode {
-  # ScienceRequirementsMode Imaging
+enum ScienceMode {
+  # ScienceMode Imaging
   IMAGING
 
-  # ScienceRequirementsMode Spectroscopy
+  # ScienceMode Spectroscopy
   SPECTROSCOPY
 }
 
 type ScienceRequirements {
   # Science requirement mode
-  mode: ScienceRequirementsMode!
+  mode: ScienceMode!
 
   # Spectroscopy requirements
   spectroscopy: SpectroscopyScienceRequirements!
