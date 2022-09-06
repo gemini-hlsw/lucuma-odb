@@ -13,6 +13,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ScienceMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
@@ -677,6 +678,33 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
+  test("[general] created observation defaults to spectroscopy") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+          }) {
+            observation {
+              scienceRequirements {
+                mode
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("scienceRequirements")
+          .downField("mode")
+          .as[ScienceMode]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, ScienceMode.Spectroscopy)
+      }
+    }
+  }
 
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>

@@ -64,10 +64,10 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database:     Resource[F, Session[F]],
+    database: Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
-    user0:     User,
-    topics0:   Topics[F],
+    user0:    User,
+    topics0:  Topics[F],
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
@@ -107,12 +107,15 @@ object OdbMapping {
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RightAscensionMapping[F]
+          with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
+          with SpectroscopyScienceRequirementsMapping[F]
           with SubscriptionMapping[F]
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
           with UserMapping[F]
+          with WavelengthMapping[F]
         {
 
           // Our schema
@@ -163,12 +166,15 @@ object OdbMapping {
               QueryMapping,
               RadialVelocityMapping,
               RightAscensionMapping,
+              ScienceRequirementsMapping,
+              SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SiderealMapping,
               SubscriptionMapping,
               TargetEnvironmentMapping,
               TargetMapping,
               UserMapping,
+              WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings
 
           // Our combined select elaborator

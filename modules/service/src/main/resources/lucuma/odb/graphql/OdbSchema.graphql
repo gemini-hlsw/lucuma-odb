@@ -4244,16 +4244,10 @@ type Observation {
   constraintSet: ConstraintSet!
 
   # The top level science requirements
-  scienceRequirements(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): ScienceRequirements!
+  scienceRequirements: ScienceRequirements!
 
   # The science configuration
-  observingMode(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): ObservingMode
+  observingMode: ObservingMode
 
   # ITC execution results
   itc(
@@ -5044,7 +5038,7 @@ type SpectroscopyScienceRequirements {
   focalPlaneAngle: Angle
 
   # Spectroscopy Capabilities
-  capabilities: SpectroscopyCapabilities
+  capability: SpectroscopyCapabilities
 }
 
 # Stellar library spectrum
