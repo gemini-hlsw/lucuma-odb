@@ -182,14 +182,14 @@ create table t_observation (
   -- imaging science requirements (TBD)
 
   -- spectroscopy science requirements
-  c_spec_wavelength         d_wavelength_pm null default null,
-  c_spec_resolution         integer         null default null,
-  c_spec_signal_to_noise    numeric(5,2)    null default null, -- TODO, what's an appropriate precision and scale?
-  c_spec_signal_to_noise_at d_wavelength_pm null default null,
-  c_spec_wavelength_range   d_wavelength_pm null default null,
-  c_spec_focal_plane        d_tag           null default null references t_focal_plane(c_tag),
-  c_spec_focal_plane_angle  d_angle_µas     null default null,
-  c_spec_capability         d_tag           null default null references t_spectroscopy_capabilities(c_tag),
+  c_spec_wavelength          d_wavelength_pm null default null,
+  c_spec_resolution          integer         null default null,
+  c_spec_signal_to_noise     numeric(5,2)    null default null, -- TODO, what's an appropriate precision and scale?
+  c_spec_signal_to_noise_at  d_wavelength_pm null default null,
+  c_spec_wavelength_coverage d_wavelength_pm null default null,
+  c_spec_focal_plane         d_tag           null default null references t_focal_plane(c_tag),
+  c_spec_focal_plane_angle   d_angle_µas     null default null,
+  c_spec_capability          d_tag           null default null references t_spectroscopy_capabilities(c_tag),
 
   -- spectroscopy: requested resolution is positive
   constraint spectroscopy_resolution_positive
