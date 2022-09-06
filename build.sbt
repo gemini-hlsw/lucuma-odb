@@ -28,8 +28,8 @@ enablePlugins(NoPublishPlugin)
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
-ThisBuild / scalaVersion       := "3.1.3"
-ThisBuild / crossScalaVersions := Seq("3.1.3")
+ThisBuild / scalaVersion       := "3.2.0"
+ThisBuild / crossScalaVersions := Seq("3.2.0")
 
 lazy val service = project
   .in(file("modules/service"))
