@@ -40,20 +40,6 @@ object AngleInput {
   val DMS             = StringBinding.emap(getDMS)
   val HMS             = StringBinding.emap(getHMS)
 
-
-  def decimalInputHandler: PartialFunction[(BigDecimal, String), Result[Angle]] = {
-    case (v, "MICROARCSECONDS")    => Result(getMicroarcseconds(v.toLong))
-    case (v, "MICROSECONDS")    => Result(getMicroseconds(v.toLong))
-    case (v, "MILLIARCSECONDS") => Result(getMilliarcseconds(v.toInt))
-    case (v, "MILLISECONDS")    => Result(getMilliseconds(v.toInt))
-    case (v, "ARCSECONDS")      => Result(getArcSeconds(v.toDouble))
-    case (v, "SECONDS")         => Result(getSeconds(v.toInt))
-    case (v, "ARCMINUTES")      => Result(getArcMinutes(v.toInt))
-    case (v, "MINUTES")         => Result(getMinutes(v.toInt))
-    case (v, "DEGREES")         => Result(getDegrees(v.toDouble))
-    case (v, "HOURS")           => Result(getHours(v.toDouble))
-  }
-
   def oneOrFail(all: Option[Angle]*): Result[Angle] =
     all.toList.flatten match {
       case List(w) => Result(w)
