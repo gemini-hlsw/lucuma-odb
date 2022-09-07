@@ -14,17 +14,22 @@ import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
@@ -48,6 +53,8 @@ import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.HourAngleRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
+import lucuma.odb.graphql.input.ScienceRequirementsInput
+import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -185,24 +192,29 @@ object ObservationService {
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           eb,
-          cs.getOrElse(ConstraintSetInput.NominalConstraints)
+          cs.getOrElse(ConstraintSetInput.NominalConstraints),
+          SET.scienceRequirements
         )
 
     def insertObservationAs(
-      user:              User,
-      programId:         Program.Id,
-      subtitle:          Option[NonEmptyString],
-      existence:         Existence,
-      status:            ObsStatus,
-      activeState:       ObsActiveStatus,
-      visualizationTime: Option[Timestamp],
-      posAngleConsMode:  PosAngleConstraintMode,
-      posAngle:          Angle,
-      explicitBase:      Option[Coordinates],
-      constraintSet:     ConstraintSet
+      user:                User,
+      programId:           Program.Id,
+      subtitle:            Option[NonEmptyString],
+      existence:           Existence,
+      status:              ObsStatus,
+      activeState:         ObsActiveStatus,
+      visualizationTime:   Option[Timestamp],
+      posAngleConsMode:    PosAngleConstraintMode,
+      posAngle:            Angle,
+      explicitBase:        Option[Coordinates],
+      constraintSet:       ConstraintSet,
+      scienceRequirements: Option[ScienceRequirementsInput]
     ): AppliedFragment = {
 
-      val insert: AppliedFragment =
+      val insert: AppliedFragment = {
+        val spectroscopy: Option[SpectroscopyScienceRequirementsInput] =
+          scienceRequirements.flatMap(_.spectroscopy)
+
         InsertObservation.apply(
           programId    ~
            subtitle    ~
@@ -221,8 +233,17 @@ object ObservationService {
            ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.value)) ~  // TODO: fix in core
            ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.value)) ~
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.value)                           ~
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)                           ~
+           scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ~
+           spectroscopy.flatMap(_.wavelength.toOption)                              ~
+           spectroscopy.flatMap(_.resolution.toOption)                              ~
+           spectroscopy.flatMap(_.signalToNoise.toOption)                           ~
+           spectroscopy.flatMap(_.signalToNoiseAt.toOption)                         ~
+           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ~
+           spectroscopy.flatMap(_.focalPlane.toOption)                              ~
+           spectroscopy.flatMap(_.capability.toOption)
         )
+      }
 
       val returning: AppliedFragment =
         void"RETURNING c_observation_id"
@@ -250,7 +271,16 @@ object ObservationService {
       Option[PosBigDecimal]  ~
       Option[PosBigDecimal]  ~
       Option[BigDecimal]     ~
-      Option[BigDecimal]
+      Option[BigDecimal]     ~
+      ScienceMode            ~
+      Option[Wavelength]     ~
+      Option[PosInt]         ~
+      Option[PosBigDecimal]  ~
+      Option[Wavelength]     ~
+      Option[Wavelength]     ~
+      Option[FocalPlane]     ~
+      Option[Angle]          ~
+      Option[SpectroscopyCapabilities]
     ] =
       sql"""
         INSERT INTO t_observation (
@@ -271,7 +301,16 @@ object ObservationService {
           c_air_mass_min,
           c_air_mass_max,
           c_hour_angle_min,
-          c_hour_angle_max
+          c_hour_angle_max,
+          c_science_mode,
+          c_spec_wavelength,
+          c_spec_resolution,
+          c_spec_signal_to_noise,
+          c_spec_signal_to_noise_at,
+          c_spec_wavelength_coverage,
+          c_spec_focal_plane,
+          c_spec_focal_plane_angle,
+          c_spec_capability
         )
         SELECT
           $program_id,
@@ -280,8 +319,8 @@ object ObservationService {
           $obs_status,
           $obs_active_status,
           ${data_timestamp.opt},
-          ${pac_mode},
-          ${angle_µas},
+          $pac_mode,
+          $angle_µas,
           ${right_ascension.opt},
           ${declination.opt},
           $cloud_extinction,
@@ -291,7 +330,16 @@ object ObservationService {
           ${air_mass_range_value.opt},
           ${air_mass_range_value.opt},
           ${hour_angle_range_value.opt},
-          ${hour_angle_range_value.opt}
+          ${hour_angle_range_value.opt},
+          $science_mode,
+          ${wavelength_pm.opt},
+          ${pos_int.opt},
+          ${signal_to_noise.opt},
+          ${wavelength_pm.opt},
+          ${wavelength_pm.opt},
+          ${focal_plane.opt},
+          ${angle_µas.opt},
+          ${spectroscopy_capabilities.opt}
       """
 
     def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {
