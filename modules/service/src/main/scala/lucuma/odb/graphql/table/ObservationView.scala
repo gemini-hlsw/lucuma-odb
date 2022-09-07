@@ -58,15 +58,14 @@ trait ObservationView[F[_]] { self: SkunkMapping[F] =>
         val Mode: ColumnRef = col("c_science_mode", science_mode.embedded)
 
         object Spectroscopy {
-          val SyntheticId        = col("c_spec_id",                  observation_id.embedded)
           val Wavelength         = col("c_spec_wavelength",          wavelength_pm.embedded)
-          val Resolution         = col("c_spec_resolution",          pos_int.embedded)
-          val SignalToNoise      = col("c_spec_signal_to_noise",     signal_to_noise.embedded)
+          val Resolution         = col("c_spec_resolution",          pos_int.opt)
+          val SignalToNoise      = col("c_spec_signal_to_noise",     signal_to_noise.opt)
           val SignalToNoiseAt    = col("c_spec_signal_to_noise_at",  wavelength_pm.embedded)
           val WavelengthCoverage = col("c_spec_wavelength_coverage", wavelength_pm.embedded)
-          val FocalPlane         = col("c_spec_focal_plane",         focal_plane.embedded)
+          val FocalPlane         = col("c_spec_focal_plane",         focal_plane.opt)
           val FocalPlaneAngle    = col("c_spec_focal_plane_angle",   angle_µas.embedded)
-          val Capability         = col("c_spec_capability",          spectroscopy_capabilities.embedded)
+          val Capability         = col("c_spec_capability",          spectroscopy_capabilities.opt)
         }
       }
     }

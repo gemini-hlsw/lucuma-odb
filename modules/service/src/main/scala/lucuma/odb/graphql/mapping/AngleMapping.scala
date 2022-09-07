@@ -56,7 +56,7 @@ trait AngleMapping[F[_]]
       mappings = List(
         // Observation PosAngleConstraint
         List("posAngleConstraint", "angle") -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
-        List("focalPlaneAngle")             -> angleMapping(ObservationView.ScienceRequirements.Spectroscopy.SyntheticId, ObservationView.ScienceRequirements.Spectroscopy.FocalPlaneAngle)
+        List("focalPlaneAngle")             -> angleMapping(ObservationView.Id, ObservationView.ScienceRequirements.Spectroscopy.FocalPlaneAngle)
       )
     )
 }

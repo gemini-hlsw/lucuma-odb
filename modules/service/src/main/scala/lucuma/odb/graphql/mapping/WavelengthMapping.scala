@@ -45,9 +45,9 @@ trait WavelengthMapping[F[_]]
     PrefixedMapping(
       tpe = WavelengthType,
       mappings = List(
-        List("wavelength")         -> wavelengthMapping(Spectroscopy.SyntheticId, Spectroscopy.Wavelength),
-        List("signalToNoiseAt")    -> wavelengthMapping(Spectroscopy.SyntheticId, Spectroscopy.SignalToNoiseAt),
-        List("wavelengthCoverage") -> wavelengthMapping(Spectroscopy.SyntheticId, Spectroscopy.WavelengthCoverage)
+        List("wavelength")         -> wavelengthMapping(ObservationView.Id, Spectroscopy.Wavelength),
+        List("signalToNoiseAt")    -> wavelengthMapping(ObservationView.Id, Spectroscopy.SignalToNoiseAt),
+        List("wavelengthCoverage") -> wavelengthMapping(ObservationView.Id, Spectroscopy.WavelengthCoverage)
       )
     )
 }
