@@ -241,6 +241,7 @@ object ObservationService {
            spectroscopy.flatMap(_.signalToNoiseAt.toOption)                         ~
            spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ~
            spectroscopy.flatMap(_.focalPlane.toOption)                              ~
+           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ~
            spectroscopy.flatMap(_.capability.toOption)
         )
       }
