@@ -12,11 +12,11 @@ import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.binding.enumeratedBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosBigDecimalBinding
 import lucuma.odb.graphql.binding.PosIntBinding
+import lucuma.odb.graphql.binding.enumeratedBinding
 
 /*
 input SpectroscopyScienceRequirementsInput {
