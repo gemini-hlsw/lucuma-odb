@@ -22,7 +22,7 @@ trait SpectroscopyScienceRequirementsMapping[F[_]]
     ObjectMapping(
       tpe = SpectroscopyScienceRequirementsType,
       fieldMappings = List(
-        SqlField("id", Spectroscopy.SyntheticId, key = true, hidden = true),
+        SqlField("id", ObservationView.Id, key = true, hidden = true),
         SqlObject("wavelength"),
         SqlField("resolution",           Spectroscopy.Resolution),
         SqlField("signalToNoise",        Spectroscopy.SignalToNoise),

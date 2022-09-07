@@ -9,6 +9,7 @@ import edu.gemini.grackle.Mapping
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
@@ -66,6 +67,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
   lazy val PartnerType                  = schema.ref("Partner")
   lazy val PosAngleConstraintModeType   = schema.ref("PosAngleConstraintMode")
   lazy val PosBigDecimalType            = schema.ref("PosBigDecimal")
+  lazy val PosIntType                   = schema.ref("PosInt")
   lazy val ProgramIdType                = schema.ref("ProgramId")
   lazy val ProgramUserRoleType          = schema.ref("ProgramUserRole")
   lazy val ScienceModeType              = schema.ref("ScienceMode")
@@ -103,6 +105,7 @@ trait LeafMappings[F[_]] { this: Mapping[F] =>
       LeafMapping[Tag](PartnerType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
+      LeafMapping[PosInt](PosIntType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[ScienceMode](ScienceModeType),
