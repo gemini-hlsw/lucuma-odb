@@ -183,8 +183,8 @@ trait Codecs {
   val spectroscopy_capabilities: Codec[SpectroscopyCapabilities] =
     enumerated[SpectroscopyCapabilities](Type.varchar)
 
-  val signal_to_noise: Codec[BigDecimal] =
-    numeric(5, 2)
+  val signal_to_noise: Codec[PosBigDecimal] =
+    numeric(5, 2).eimap(PosBigDecimal.from)(_.value)
 
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)
