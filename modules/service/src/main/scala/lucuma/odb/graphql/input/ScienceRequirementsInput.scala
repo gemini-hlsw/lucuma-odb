@@ -11,17 +11,6 @@ import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.enumeratedBinding
 
-/*
-# Edit science requirements
-input ScienceRequirementsInput {
-  # The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  mode: ScienceMode
-
-  # The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  spectroscopy: SpectroscopyScienceRequirementsInput
-}
-*/
-
 final case class ScienceRequirementsInput(
   mode:         Option[ScienceMode],
   spectroscopy: Option[SpectroscopyScienceRequirementsInput]
@@ -40,13 +29,5 @@ object ScienceRequirementsInput {
       ) =>
         (rMode, rSpectroscopy).parMapN(apply)
     }
-
-//  val CreateBinding: Matcher[ScienceRequirementsInput] =
-//    Binding.map { sri =>
-//      ScienceRequirementsInput(
-//        sri.mode.orElse(ScienceMode.Spectroscopy.some),
-//        sri.spectroscopy.orElse(SpectroscopyScienceRequirementsInput.Default.some)
-//      )
-//    }
 
 }
