@@ -18,34 +18,6 @@ import lucuma.odb.graphql.binding.PosBigDecimalBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.binding.enumeratedBinding
 
-/*
-input SpectroscopyScienceRequirementsInput {
-  # The wavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  wavelength: WavelengthInput
-
-  # The resolution field may be unset by assigning a null value, or ignored by skipping it altogether
-  resolution: PosInt
-
-  # The signalToNoise field may be unset by assigning a null value, or ignored by skipping it altogether
-  signalToNoise: PosBigDecimal
-
-  # The signalToNoiseAt field may be unset by assigning a null value, or ignored by skipping it altogether
-  signalToNoiseAt: WavelengthInput
-
-  # The wavelengthCoverage field may be unset by assigning a null value, or ignored by skipping it altogether
-  wavelengthCoverage: WavelengthInput
-
-  # The focalPlane field may be unset by assigning a null value, or ignored by skipping it altogether
-  focalPlane: FocalPlane
-
-  # The focalPlaneAngle field may be unset by assigning a null value, or ignored by skipping it altogether
-  focalPlaneAngle: AngleInput
-
-  # The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
-  capabilities: SpectroscopyCapabilities
-}
-*/
-
 final case class SpectroscopyScienceRequirementsInput(
   wavelength:         Nullable[Wavelength],
   resolution:         Nullable[PosInt],
