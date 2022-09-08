@@ -413,6 +413,37 @@ object ObservationService {
         .map(_ ++ ups)
     }
 
+    def spectroscopyRequirementsUpdates(in: SpectroscopyScienceRequirementsInput): List[AppliedFragment] = {
+
+      val upWavelength         = sql"c_spec_wavelength = ${wavelength_pm.opt}"
+      val upResolution         = sql"c_spec_resolution = ${pos_int.opt}"
+      val upSignalToNoise      = sql"c_spec_signal_to_noise = ${signal_to_noise.opt}"
+      val upSignalToNoiseAt    = sql"c_spec_signal_to_noise_at = ${wavelength_pm.opt}"
+      val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
+      val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
+      val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
+      val upCapability         = sql"c_spec_capability = ${spectroscopy_capabilities.opt}"
+
+      List(
+        in.wavelength.foldPresent(upWavelength),
+        in.resolution.foldPresent(upResolution),
+        in.signalToNoise.foldPresent(upSignalToNoise),
+        in.signalToNoiseAt.foldPresent(upSignalToNoiseAt),
+        in.wavelengthCoverage.foldPresent(upWavelengthCoverage),
+        in.focalPlane.foldPresent(upFocalPlane),
+        in.focalPlaneAngle.foldPresent(upFocalPlaneAngle),
+        in.capability.foldPresent(upCapability)
+      ).flattenOption
+    }
+
+    def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
+      val upMode = sql"c_science_mode = $science_mode"
+      val ups    = in.mode.map(upMode).toList
+
+      ups ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
+
+    }
+
     def updates(SET: ObservationPropertiesInput): Result[Option[NonEmptyList[AppliedFragment]]] = {
       val upExistence         = sql"c_existence = $existence"
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
@@ -442,6 +473,11 @@ object ObservationService {
            .toList
            .flatMap(posAngleConstraintUpdates)
 
+      val scienceRequirements: List[AppliedFragment] =
+        SET.scienceRequirements
+           .toList
+           .flatMap(scienceRequirementsUpdates)
+
       val explicitBase: Result[List[AppliedFragment]] =
         SET.targetEnvironment
            .toList
@@ -453,7 +489,7 @@ object ObservationService {
            .flatTraverse(constraintSetUpdates)
 
       (explicitBase, constraintSet).mapN { (eb, cs) =>
-        NonEmptyList.fromList(eb ++ cs ++ ups ++ posAngleConstraint)
+        NonEmptyList.fromList(eb ++ cs ++ ups ++ posAngleConstraint ++ scienceRequirements)
       }
     }
 
