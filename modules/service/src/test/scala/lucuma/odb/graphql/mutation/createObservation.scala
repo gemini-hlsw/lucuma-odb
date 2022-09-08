@@ -11,13 +11,13 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.CoordinatesInput
