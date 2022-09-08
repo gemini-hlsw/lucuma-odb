@@ -8,12 +8,12 @@ package input
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
 
