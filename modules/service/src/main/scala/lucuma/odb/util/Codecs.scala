@@ -12,6 +12,8 @@ import lucuma.core.enums.CatalogName
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.ToOActivation
@@ -27,8 +29,6 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
