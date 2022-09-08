@@ -700,9 +700,196 @@ class updateObservations extends OdbSuite
     )
   }
 
+  private object scienceRequirements {
+    val update: String = """
+      scienceRequirements: {
+        spectroscopy: {
+          wavelength: { nanometers: 400 }
+          resolution: 10
+          signalToNoise: 75
+          signalToNoiseAt: { nanometers: 410 }
+          wavelengthCoverage: { picometers: 10 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { arcseconds: 5 }
+          capability: NOD_AND_SHUFFLE
+        }
+      }
+    """
+
+    val query: String = """
+      scienceRequirements {
+        mode
+        spectroscopy {
+          wavelength { nanometers }
+          resolution
+          signalToNoise
+          signalToNoiseAt { nanometers }
+          wavelengthCoverage { nanometers }
+          focalPlane
+          focalPlaneAngle { arcseconds }
+          capability
+        }
+      }
+    """
+
+    val expected: Json = json"""
+      {
+        "updateObservations": [
+          {
+            "scienceRequirements": {
+              "mode": "SPECTROSCOPY",
+              "spectroscopy": {
+                "wavelength": {
+                  "nanometers": 400.000
+                },
+                "resolution": 10,
+                "signalToNoise": 75.00,
+                "signalToNoiseAt": {
+                  "nanometers": 410.000
+                },
+                "wavelengthCoverage": {
+                  "nanometers": 0.010
+                },
+                "focalPlane": "SINGLE_SLIT",
+                "focalPlaneAngle": {
+                  "arcseconds": 5
+                },
+                "capability": "NOD_AND_SHUFFLE"
+              }
+            }
+          }
+        ]
+      }
+    """
+
+  }
+
+  test("update science requirements") {
+    oneUpdateTest(
+      pi,
+      scienceRequirements.update,
+      scienceRequirements.query,
+      scienceRequirements.expected.asRight
+    )
+  }
+
+  test("delete science requirements spectroscopy focal plane") {
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- query(pi, updateObservationsMutation(pid, oid, scienceRequirements.update, scienceRequirements.query))
+      _   <- updateObservation(
+        user   = pi,
+        pid    = pid,
+        oid    = oid,
+        update = """
+          scienceRequirements: {
+            spectroscopy: {
+              focalPlane: null
+            }
+          }
+        """,
+        query = """
+          scienceRequirements {
+            spectroscopy {
+              focalPlane
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateObservations": [
+              {
+                "scienceRequirements": {
+                  "spectroscopy": {
+                    "focalPlane": null
+                  }
+                }
+              }
+            ]
+          }
+        """.asRight
+      )
+    } yield ()
+  }
+
+  /*
+
+  [ERROR] lucuma-odb-test - Error computing GraphQL response.
+  java.lang.AssertionError: assertion failed
+    at get @ skunk.util.Pool$.free$1(Pool.scala:148)
+    at get @ skunk.util.Pool$.free$1(Pool.scala:148)
+    at flatMap @ fs2.Compiler$Target.flatMap(Compiler.scala:163)
+    at flatMap @ fs2.Compiler$Target.flatMap(Compiler.scala:163)
+    at flatMap @ fs2.Pull$.fs2$Pull$$$_$interruptGuard$1(Pull.scala:938)
+    at unsafeRunSync @ munit.CatsEffectFixturesPlatform$$anon$1.beforeAll(CatsEffectFixturesPlatform.scala:41)
+    at *> @ skunk.net.SSLNegotiation$.negotiateSSL(SSLNegotiation.scala:49)
+
+  test("delete science requirements spectroscopy wavelength") {
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- query(pi, updateObservationsMutation(pid, oid, scienceRequirements.update, scienceRequirements.query))
+      _ <- updateObservation(
+        user = pi,
+        pid = pid,
+        oid = oid,
+        update = """
+          scienceRequirements: {
+            spectroscopy: {
+              wavelength: null
+            }
+          }
+        """,
+        query = """
+          scienceRequirements {
+            spectroscopy {
+              wavelength { nanometers }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateObservations": [
+              {
+                "scienceRequirements": {
+                  "spectroscopy": {
+                    "wavelength": null
+                  }
+                }
+              }
+            ]
+          }
+        """.asRight
+      )
+    } yield ()
+  }
+*/
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
+
+  def updateObservationsMutation(
+    pid:    Program.Id,
+    oid:    Observation.Id,
+    update: String,
+    query:  String
+  ): String = s"""
+    mutation {
+      updateObservations(input: {
+        programId: ${pid.asJson}
+        SET: {
+          $update
+        },
+        WHERE: {
+          id: { EQ: ${oid.asJson} }
+        }
+      }) {
+        $query
+      }
+    }
+  """
 
   def updateObservation(
     user:     User,
@@ -713,22 +900,8 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
     expected: Either[String, Json]
   ): IO[Unit] =
     expect(
-      user = user,
-      query = s"""
-        mutation {
-          updateObservations(input: {
-            programId: ${pid.asJson}
-            SET: {
-              $update
-            },
-            WHERE: {
-              id: { EQ: ${oid.asJson} }
-            }
-          }) {
-            $query
-          }
-        }
-      """,
+      user     = user,
+      query    = updateObservationsMutation(pid, oid, update, query),
       expected = expected.leftMap(msg => List(msg))
     )
 
