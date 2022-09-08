@@ -43,18 +43,8 @@ import skunk.data.Type
 // Codecs for some atomic types.
 trait Codecs {
 
-  val text_nonempty: Codec[NonEmptyString] =
-    text.eimap(NonEmptyString.from)(_.value)
-
-  val pos_big_decimal: Codec[PosBigDecimal] =
-    numeric.eimap(PosBigDecimal.from)(_.value)
-
-  val orcid_id: Codec[OrcidId] =
-    Codec.simple[OrcidId](
-      _.value.toString(),
-      OrcidId.fromValue(_),
-      Type.varchar
-    )
+  def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
+    `enum`(ev.tag, ev.fromTag, tpe)
 
   def gid[A](implicit ev: Gid[A]): Codec[A] = {
     val prism = ev.fromString
@@ -65,56 +55,24 @@ trait Codecs {
     )
   }
 
-  def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
-    `enum`(ev.tag, ev.fromTag, tpe)
+  // -----
 
-  val user_id: Codec[User.Id] = gid[User.Id]
-  val target_id: Codec[Target.Id] = gid[Target.Id]
-  val program_id: Codec[Program.Id] = gid[Program.Id]
-  val observation_id: Codec[Observation.Id] = gid[Observation.Id]
-
-  val site: Codec[Site] =
-    `enum`(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase), Type("e_site"))
-
-  val user_type: Codec[UserType] =
-    enumerated(Type("e_user_type"))
-
-  val program_user_role: Codec[ProgramUserRole] =
-    enumerated(Type("e_program_user_role"))
-
-  val program_user_support_type: Codec[ProgramUserSupportType] =
-    enumerated(Type("e_program_user_support_type"))
-
-  val _site: Codec[Arr[Site]] =
-    Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
-
-  val existence: Codec[Existence] =
-    enumerated(Type("e_existence"))
-
-  val tag: Codec[Tag] =
-    varchar.imap(Tag(_))(_.value)
-
-  val obs_status: Codec[ObsStatus] =
-    enumerated(Type("e_obs_status"))
-
-  val obs_active_status: Codec[ObsActiveStatus] =
-    enumerated(Type("e_obs_active_status"))
-
-  // TEMPORARY; the tag will be correct soon
-  val too_activation: Codec[ToOActivation] =
-    `enum`(
-      e => e.label.toLowerCase(),
-      s => Enumerated[ToOActivation].all.find(_.label.toLowerCase == s),
-      Type("e_too_activation")
-    )
+  val air_mass_range_value: Codec[PosBigDecimal] =
+    numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
 
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
-  val right_ascension: Codec[RightAscension] =
-    angle_µas.eimap(
-      a => RightAscension.fromAngleExact.getOption(a).toRight(s"Invalid right ascension: $a"))(
-      RightAscension.fromAngleExact.reverseGet
+  val catalog_name: Codec[CatalogName] =
+    enumerated(Type("e_catalog_name"))
+
+  val cloud_extinction: Codec[CloudExtinction] =
+    enumerated[CloudExtinction](Type.varchar)
+
+  val data_timestamp: Codec[Timestamp] =
+    timestamp.eimap(
+      ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
+      _.toLocalDateTime
     )
 
   val declination: Codec[Declination] =
@@ -123,23 +81,48 @@ trait Codecs {
       Declination.fromAngle.reverseGet
     )
 
+  val edit_type: Codec[EditType] =
+    enumerated(Type("e_edit_type"))
+
+  val ephemeris_key_type: Codec[EphemerisKeyType] =
+    enumerated(Type("e_ephemeris_key_type"))
+
   val epoch: Codec[Epoch] =
     varchar.eimap(
       s => Epoch.fromString.getOption(s).toRight(s"Invalid epoch: $s"))(
       Epoch.fromString.reverseGet
     )
 
-  val radial_velocity: Codec[RadialVelocity] =
-    numeric.eimap(
-      bd => RadialVelocity.kilometerspersecond.getOption(bd).toRight(s"Invalid radial velocity: $bd"))(
-      RadialVelocity.kilometerspersecond.reverseGet
+  val existence: Codec[Existence] =
+    enumerated(Type("e_existence"))
+
+  val hour_angle_range_value: Codec[BigDecimal] =
+    numeric(3, 2)
+
+  val image_quality: Codec[ImageQuality] =
+    enumerated[ImageQuality](Type.varchar)
+
+  val int_percent: Codec[IntPercent] =
+    int2.eimap(n => IntPercent.from(n))(_.value.toShort)
+
+  val obs_active_status: Codec[ObsActiveStatus] =
+    enumerated(Type("e_obs_active_status"))
+
+  val obs_status: Codec[ObsStatus] =
+    enumerated(Type("e_obs_status"))
+
+  val observation_id: Codec[Observation.Id] =
+    gid[Observation.Id]
+
+  val orcid_id: Codec[OrcidId] =
+    Codec.simple[OrcidId](
+      _.value.toString(),
+      OrcidId.fromValue(_),
+      Type.varchar
     )
 
-  val catalog_name: Codec[CatalogName] =
-    enumerated(Type("e_catalog_name"))
-
-  val ephemeris_key_type: Codec[EphemerisKeyType] =
-    enumerated(Type("e_ephemeris_key_type"))
+  val pac_mode: Codec[PosAngleConstraintMode] =
+    enumerated(Type("e_pac_mode"))
 
   val parallax: Codec[Parallax] =
     angle_µas.imap(
@@ -147,41 +130,62 @@ trait Codecs {
       p => Angle.fromMicroarcseconds(p.μas.value.value)
     )
 
-  val cloud_extinction: Codec[CloudExtinction] =
-    enumerated[CloudExtinction](Type.varchar)
+  val partner: Codec[Partner] =
+    enumerated(Type.varchar)
 
-  val image_quality: Codec[ImageQuality] =
-    enumerated[ImageQuality](Type.varchar)
+  val pos_big_decimal: Codec[PosBigDecimal] =
+    numeric.eimap(PosBigDecimal.from)(_.value)
+
+  val program_id: Codec[Program.Id] =
+    gid[Program.Id]
+
+  val program_user_role: Codec[ProgramUserRole] =
+    enumerated(Type("e_program_user_role"))
+
+  val program_user_support_type: Codec[ProgramUserSupportType] =
+    enumerated(Type("e_program_user_support_type"))
+
+  val radial_velocity: Codec[RadialVelocity] =
+    numeric.eimap(
+      bd => RadialVelocity.kilometerspersecond.getOption(bd).toRight(s"Invalid radial velocity: $bd"))(
+      RadialVelocity.kilometerspersecond.reverseGet
+    )
+
+  val right_ascension: Codec[RightAscension] =
+    angle_µas.eimap(
+      a => RightAscension.fromAngleExact.getOption(a).toRight(s"Invalid right ascension: $a"))(
+      RightAscension.fromAngleExact.reverseGet
+    )
+
+  val _site: Codec[Arr[Site]] =
+    Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
+
+  val site: Codec[Site] =
+    `enum`(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase), Type("e_site"))
 
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
 
-  val data_timestamp: Codec[Timestamp] =
-    timestamp.eimap(
-      ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
-      _.toLocalDateTime
-    )
+  val tag: Codec[Tag] =
+    varchar.imap(Tag(_))(_.value)
+
+  val target_id: Codec[Target.Id] =
+    gid[Target.Id]
+
+  val text_nonempty: Codec[NonEmptyString] =
+    text.eimap(NonEmptyString.from)(_.value)
+
+  val too_activation: Codec[ToOActivation] =
+    enumerated(Type("e_too_activation"))
+
+  val user_id: Codec[User.Id] =
+    gid[User.Id]
+
+  val user_type: Codec[UserType] =
+    enumerated(Type("e_user_type"))
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)
-
-  val air_mass_range_value: Codec[PosBigDecimal] =
-    numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
-
-  val hour_angle_range_value: Codec[BigDecimal] =
-    numeric(3, 2)
-
-  val partner: Codec[Partner] =
-    enumerated(Type.varchar)
-
-  val edit_type: Codec[EditType] =
-    enumerated(Type("e_edit_type"))
-
-  val int_percent: Codec[IntPercent] =
-    int2.eimap(n => IntPercent.from(n))(_.value.toShort)
-
-  val pac_mode: Codec[PosAngleConstraintMode] =
-    enumerated(Type("e_pac_mode"))
 
 }
 
