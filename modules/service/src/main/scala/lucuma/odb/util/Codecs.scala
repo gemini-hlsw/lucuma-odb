@@ -7,15 +7,19 @@ package lucuma.odb.util
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CatalogName
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
+import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
@@ -24,6 +28,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
+import lucuma.core.math.Wavelength
 import lucuma.core.model._
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -96,6 +101,9 @@ trait Codecs {
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
 
+  val focal_plane: Codec[FocalPlane] =
+    enumerated[FocalPlane](Type.varchar)
+
   val hour_angle_range_value: Codec[BigDecimal] =
     numeric(3, 2)
 
@@ -136,6 +144,9 @@ trait Codecs {
   val pos_big_decimal: Codec[PosBigDecimal] =
     numeric.eimap(PosBigDecimal.from)(_.value)
 
+  val pos_int: Codec[PosInt] =
+    int4.eimap(PosInt.from)(_.value)
+
   val program_id: Codec[Program.Id] =
     gid[Program.Id]
 
@@ -157,6 +168,9 @@ trait Codecs {
       RightAscension.fromAngleExact.reverseGet
     )
 
+  val science_mode: Codec[ScienceMode] =
+    enumerated[ScienceMode](Type.varchar)
+
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
 
@@ -165,6 +179,12 @@ trait Codecs {
 
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
+
+  val spectroscopy_capabilities: Codec[SpectroscopyCapabilities] =
+    enumerated[SpectroscopyCapabilities](Type.varchar)
+
+  val signal_to_noise: Codec[PosBigDecimal] =
+    numeric(5, 2).eimap(PosBigDecimal.from)(_.value)
 
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)
@@ -187,6 +207,11 @@ trait Codecs {
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)
 
+  val wavelength_pm: Codec[Wavelength] =
+    int4.eimap(
+      pm => Wavelength.fromPicometers.getOption(pm).toRight(s"Invalid wavelength, must be positive pm: $pm"))(
+      Wavelength.fromPicometers.reverseGet
+    )
 }
 
 object Codecs extends Codecs

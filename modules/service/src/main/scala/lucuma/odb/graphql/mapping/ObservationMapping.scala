@@ -32,6 +32,7 @@ trait ObservationMapping[F[_]]
         SqlObject("posAngleConstraint"),
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
+        SqlObject("scienceRequirements"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
       )
     )
