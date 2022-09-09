@@ -905,11 +905,11 @@ input GmosNorthLongSlitInput {
   # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   fpu: GmosNorthBuiltinFpu
 
-  # The overrideWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideCentralWavelength: WavelengthInput
-
   # The overrideExposureTimeMode field may be unset by assigning a null value, or ignored by skipping it altogether
   overrideExposureTimeMode: ExposureTimeModeInput
+
+  # The explicitCentralWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitCentralWavelength: WavelengthInput
 
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitXBin: GmosXBinning
@@ -1282,11 +1282,11 @@ input GmosSouthLongSlitInput {
   # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   fpu: GmosSouthBuiltinFpu
 
-  # The overrideWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideCentralWavelength: WavelengthInput
-
   # The overrideExposureTimeMode field may be unset by assigning a null value, or ignored by skipping it altogether
   overrideExposureTimeMode: ExposureTimeModeInput
+
+  # The explicitCentralWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitCentralWavelength: WavelengthInput
 
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitXBin: GmosXBinning
@@ -3574,11 +3574,21 @@ enum GmosNorthGrating {
 # GMOS Long Slit Observing Mode common fields
 interface GmosLongSlitObservingMode {
 
-  # Overrides the central wavelength
-  overrideCentralWavelength: Wavelength
-
   # Exposure time mode, taking the place of the value from science requirements
+  # if specified.
   overrideExposureTimeMode: ExposureTimeMode
+
+
+  # The central wavelength, either explicitly specified in `explicitCentralWavelength`
+  # or else taken from the `defaultCentralWavelength`.
+  centralWavelength: Wavelength!
+
+  # Default central wavelength, as calculated from the filter and grating (?)
+  defaultCentralWavelength: Wavelength!
+
+  # Optional explicitly specified central wavelength.  If set it overrides the
+  # default.
+  explicitCentralWavelength: Wavelength
 
 
   # GMOS X-Binning, either explicitly specified in explicitXBin or else taken
@@ -3677,8 +3687,12 @@ type GmosNorthLongSlit implements GmosLongSlitObservingMode {
   # GMOS North FPU
   fpu: GmosNorthBuiltinFpu
 
-  overrideCentralWavelength: Wavelength
   overrideExposureTimeMode: ExposureTimeMode
+
+  centralWavelength: Wavelength!
+  defaultCentralWavelength: Wavelength!
+  explicitCentralWavelength: Wavelength
+
 
   xBin: GmosXBinning!
   defaultXBin: GmosXBinning!
@@ -3917,8 +3931,11 @@ type GmosSouthLongSlit implements GmosLongSlitObservingMode {
   # GMOS South FPU
   fpu: GmosSouthBuiltinFpu!
 
-  overrideCentralWavelength: Wavelength
   overrideExposureTimeMode: ExposureTimeMode
+
+  centralWavelength: Wavelength!
+  defaultCentralWavelength: Wavelength!
+  explicitCentralWavelength: Wavelength
 
   xBin: GmosXBinning!
   defaultXBin: GmosXBinning!
