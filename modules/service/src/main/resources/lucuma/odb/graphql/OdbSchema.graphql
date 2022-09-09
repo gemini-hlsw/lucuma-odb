@@ -894,18 +894,19 @@ input GmosNorthGratingConfigInput {
 }
 
 # Edit or create GMOS North Long Slit advanced configuration
-input GmosNorthLongSlitAdvancedConfigInput {
+input GmosNorthLongSlitInput {
+
+  # The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  grating: GmosNorthGrating
+
+  # The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  filter: GmosNorthFilter
+
+  # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  fpu: GmosNorthBuiltinFpu
+
   # The overrideWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideWavelength: WavelengthInput
-
-  # The overrideGrating field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideGrating: GmosNorthGrating
-
-  # The overrideFilter field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideFilter: GmosNorthFilter
-
-  # The overrideFpu field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideFpu: GmosNorthBuiltinFpu
+  overrideCentralWavelength: WavelengthInput
 
   # The overrideExposureTimeMode field may be unset by assigning a null value, or ignored by skipping it altogether
   overrideExposureTimeMode: ExposureTimeModeInput
@@ -930,27 +931,6 @@ input GmosNorthLongSlitAdvancedConfigInput {
 
   # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitSpatialOffsets: [OffsetComponentInput!]
-}
-
-# Edit or create GMOS North Long Slit basic configuration
-input GmosNorthLongSlitBasicConfigInput {
-  # The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  grating: GmosNorthGrating
-
-  # The filter field may be unset by assigning a null value, or ignored by skipping it altogether
-  filter: GmosNorthFilter
-
-  # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  fpu: GmosNorthBuiltinFpu
-}
-
-# Edit or create GMOS North Long Slit configuration
-input GmosNorthLongSlitInput {
-  # The basic field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  basic: GmosNorthLongSlitBasicConfigInput
-
-  # The advanced field may be unset by assigning a null value, or ignored by skipping it altogether
-  advanced: GmosNorthLongSlitAdvancedConfigInput
 }
 
 # GMOS North Manual Configuration
@@ -1291,18 +1271,19 @@ input GmosSouthGratingConfigInput {
 }
 
 # Edit or create GMOS South Long Slit advanced configuration
-input GmosSouthLongSlitAdvancedConfigInput {
+input GmosSouthLongSlitInput {
+
+  # The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  grating: GmosSouthGrating
+
+  # The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  filter: GmosSouthFilter
+
+  # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  fpu: GmosSouthBuiltinFpu
+
   # The overrideWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideWavelength: WavelengthInput
-
-  # The overrideGrating field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideGrating: GmosSouthGrating
-
-  # The overrideFilter field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideFilter: GmosSouthFilter
-
-  # The overrideFpu field may be unset by assigning a null value, or ignored by skipping it altogether
-  overrideFpu: GmosSouthBuiltinFpu
+  overrideCentralWavelength: WavelengthInput
 
   # The overrideExposureTimeMode field may be unset by assigning a null value, or ignored by skipping it altogether
   overrideExposureTimeMode: ExposureTimeModeInput
@@ -1327,27 +1308,7 @@ input GmosSouthLongSlitAdvancedConfigInput {
 
   # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitSpatialOffsets: [OffsetComponentInput!]
-}
 
-# Edit or create GMOS South Long Slit basic configuration
-input GmosSouthLongSlitBasicConfigInput {
-  # The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  grating: GmosSouthGrating
-
-  # The filter field may be unset by assigning a null value, or ignored by skipping it altogether
-  filter: GmosSouthFilter
-
-  # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  fpu: GmosSouthBuiltinFpu
-}
-
-# Edit or create GMOS South Long Slit configuration
-input GmosSouthLongSlitInput {
-  # The basic field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  basic: GmosSouthLongSlitBasicConfigInput
-
-  # The advanced field may be unset by assigning a null value, or ignored by skipping it altogether
-  advanced: GmosSouthLongSlitAdvancedConfigInput
 }
 
 # GMOS South Manual Configuration
@@ -2119,8 +2080,9 @@ type Science implements StepConfig {
   stepType: StepType!
 }
 
-# Edit or create an observation's science mode
+# Edit or create an observation's observing mode
 input ObservingModeInput {
+
   # The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   gmosNorthLongSlit: GmosNorthLongSlitInput
 
@@ -2921,13 +2883,15 @@ enum CloudExtinction {
   THREE_POINT_ZERO
 }
 
-# ConfigurationMode
-enum ConfigurationModeType {
-  # ConfigurationModeType GmosNorthLongSlit
+# ObservingMode
+enum ObservingModeType {
+
+  # ObservingModeType GmosNorthLongSlit
   GMOS_NORTH_LONG_SLIT
 
-  # ConfigurationModeType GmosSouthLongSlit
+  # ObservingModeType GmosSouthLongSlit
   GMOS_SOUTH_LONG_SLIT
+
 }
 
 type ConstraintSet {
@@ -3607,56 +3571,103 @@ enum GmosNorthGrating {
   R150_G5308
 }
 
-# GMOS North Long Slit mode
-type GmosNorthLongSlit {
-  # GMOS North Long Slit basic configuration
-  basic: GmosNorthLongSlitBasic!
+# GMOS Long Slit Observing Mode common fields
+interface GmosLongSlitObservingMode {
 
-  # GMOS North Long Slit advanced configuration
-  advanced: GmosNorthLongSlitAdvanced
-}
-
-# GMOS North Long Slit advanced configuration
-type GmosNorthLongSlitAdvanced {
-  # Overrides the science requirement wavelength
-  overrideWavelength: Wavelength
-
-  # GMOS North Grating override, taking the place of the basic configuration grating
-  overrideGrating: GmosNorthGrating
-
-  # GMOS North filter override, taking the place of the basic configuration filter
-  overrideFilter: GmosNorthFilter
-
-  # GMOS North FPU override, taking the place of the basic configuration FPU
-  overrideFpu: GmosNorthBuiltinFpu
+  # Overrides the central wavelength
+  overrideCentralWavelength: Wavelength
 
   # Exposure time mode, taking the place of the value from science requirements
   overrideExposureTimeMode: ExposureTimeMode
 
-  # Explicitly specified GMOS X-Binning, override the default (calculated from effective slit size)
+
+  # GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  # from the defaultXBin.
+  xBin: GmosXBinning!
+
+  # Default GMOS X-Binning, calculated from the effective slit size which in
+  # turn is based on the selected FPU, target source profile and image quality.
+  defaultXBin: GmosXBinning!
+
+  # Optional explicitly specified GMOS X-Binning. If set it overrides the
+  # default.
   explicitXBin: GmosXBinning
 
-  # Explicitly specified GMOS Y-Binning, override the default (TWO)
+
+  # GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  # from the defaultYBin.
+  yBin: GmosYBinning!
+
+  # Default GMOS Y-Binning (TWO).
+  defaultYBin: GmosYBinning!
+
+  # Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  # default.
   explicitYBin: GmosYBinning
 
-  # Explicitly specified GMOS amp read mode, override the default (SLOW)
+
+  # GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  # else taken from the defaultAmpReadMode.
+  ampReadMode: GmosAmpReadMode!
+
+  # Default GmosAmpReadMode (SLOW).
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  # Optional explicitly specified GMOS amp read mode. If set it overrides the
+  # default.
   explicitAmpReadMode: GmosAmpReadMode
 
-  # Explicitly specified GMOS amp gain, override the default (LOW)
+
+  # GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  # taken from the defaultAmpGain.
+  ampGain: GmosAmpGain!
+
+  # Default GMOS amp gain (LOW).
+  defaultAmpGain: GmosAmpGain!
+
+  # Optional explicitly specified GMOS amp gain.  If set it override the default.
   explicitAmpGain: GmosAmpGain
 
-  # Explicitly specified GMOS ROI, overriding the default (FULL_FRAME)
+
+  # GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  # defaultRoi.
+  roi: GmosRoi!
+
+  # Default GMOS ROI (FULL_FRAME).
+  defaultRoi: GmosRoi!
+
+  # Optional explicitly specified GMOS ROI. If set it overrides the default.
   explicitRoi: GmosRoi
 
-  # Explicitly specified wavelength dithers required to fill in the chip gaps (in nm), taking the place of the calculated value based on the grating dispersion
+
+  # Wavelength dithers required to fill in the chip gaps, expressed in nanometers.
+  # This value is either explicitly specified in explicitWavelengthDithersNm
+  wavelengthDithersNm: [BigDecimal!]!
+
+  # Default wavelength dithers, calculated based on the grating dispersion.
+  defaultWavelengthDithersNm: [BigDecimal!]!
+
+  # Optional explicitly specified wavelength dithers.  If set it overrides the
+  # default.
   explicitWavelengthDithersNm: [BigDecimal!]
 
-  # Explicitly specified spatial q offsets, overriding the default
+
+  # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
+  # or else taken from defaultSpatialOffsets
+  spatialOffsets: [q!]!
+
+  # Default spatial offsets.
+  defaultSpatialOffsets: [q!]!
+
+  # Optional explicitly specified spatial q offsets. If set it overrides the
+  # the default.
   explicitSpatialOffsets: [q!]
+
 }
 
-# GMOS North Long Slit basic configuration
-type GmosNorthLongSlitBasic {
+# GMOS North Long Slit mode
+type GmosNorthLongSlit implements GmosLongSlitObservingMode {
+
   # GMOS North Grating
   grating: GmosNorthGrating!
 
@@ -3664,7 +3675,39 @@ type GmosNorthLongSlitBasic {
   filter: GmosNorthFilter
 
   # GMOS North FPU
-  fpu: GmosNorthBuiltinFpu!
+  fpu: GmosNorthBuiltinFpu
+
+  overrideCentralWavelength: Wavelength
+  overrideExposureTimeMode: ExposureTimeMode
+
+  xBin: GmosXBinning!
+  defaultXBin: GmosXBinning!
+  explicitXBin: GmosXBinning
+
+  yBin: GmosYBinning!
+  defaultYBin: GmosYBinning!
+  explicitYBin: GmosYBinning
+
+  ampReadMode: GmosAmpReadMode!
+  defaultAmpReadMode: GmosAmpReadMode!
+  explicitAmpReadMode: GmosAmpReadMode
+
+  ampGain: GmosAmpGain!
+  defaultAmpGain: GmosAmpGain!
+  explicitAmpGain: GmosAmpGain
+
+  roi: GmosRoi!
+  defaultRoi: GmosRoi!
+  explicitRoi: GmosRoi
+
+  wavelengthDithersNm: [BigDecimal!]!
+  defaultWavelengthDithersNm: [BigDecimal!]!
+  explicitWavelengthDithersNm: [BigDecimal!]
+
+  spatialOffsets: [q!]!
+  defaultSpatialOffsets: [q!]!
+  explicitSpatialOffsets: [q!]
+
 }
 
 # GMOS Region Of Interest
@@ -3863,63 +3906,48 @@ enum GmosSouthGrating {
 }
 
 # GMOS South Long Slit mode
-type GmosSouthLongSlit {
-  # GMOS South Long Slit basic configuration
-  basic: GmosSouthLongSlitBasic!
+type GmosSouthLongSlit implements GmosLongSlitObservingMode {
 
-  # GMOS South Long Slit advanced configuration
-  advanced: GmosSouthLongSlitAdvanced
-}
-
-# GMOS South Long Slit advanced configuration
-type GmosSouthLongSlitAdvanced {
-  # Overrides the science requirement wavelength
-  overrideWavelength: Wavelength
-
-  # GMOS North Grating override, taking the place of the basic configuration grating
-  overrideGrating: GmosSouthGrating
-
-  # GMOS North filter override, taking the place of the basic configuration filter
-  overrideFilter: GmosSouthFilter
-
-  # GMOS North FPU override, taking the place of the basic configuration FPU
-  overrideFpu: GmosSouthBuiltinFpu
-
-  # Exposure time mode, taking the place of the value from science requirements
-  overrideExposureTimeMode: ExposureTimeMode
-
-  # Explicitly specified GMOS X-Binning, override the default (calculated from effective slit size)
-  explicitXBin: GmosXBinning
-
-  # Explicitly specified GMOS Y-Binning, override the default (TWO)
-  explicitYBin: GmosYBinning
-
-  # Explicitly specified GMOS amp read mode, override the default (SLOW)
-  explicitAmpReadMode: GmosAmpReadMode
-
-  # Explicitly specified GMOS amp gain, override the default (LOW)
-  explicitAmpGain: GmosAmpGain
-
-  # Explicitly specified GMOS ROI, overriding the default (FULL_FRAME)
-  explicitRoi: GmosRoi
-
-  # Explicitly specified wavelength dithers required to fill in the chip gaps (in nm), taking the place of the calculated value based on the grating dispersion
-  explicitWavelengthDithersNm: [BigDecimal!]
-
-  # Explicitly specified spatial q offsets, overriding the default
-  explicitSpatialOffsets: [q!]
-}
-
-# GMOS South Long Slit basic configuration
-type GmosSouthLongSlitBasic {
-  # GMOS North Grating
+  # GMOS South Grating
   grating: GmosSouthGrating!
 
-  # GMOS North Filter
+  # GMOS South Filter
   filter: GmosSouthFilter
 
-  # GMOS North FPU
+  # GMOS South FPU
   fpu: GmosSouthBuiltinFpu!
+
+  overrideCentralWavelength: Wavelength
+  overrideExposureTimeMode: ExposureTimeMode
+
+  xBin: GmosXBinning!
+  defaultXBin: GmosXBinning!
+  explicitXBin: GmosXBinning
+
+  yBin: GmosYBinning!
+  defaultYBin: GmosYBinning!
+  explicitYBin: GmosYBinning
+
+  ampReadMode: GmosAmpReadMode!
+  defaultAmpReadMode: GmosAmpReadMode!
+  explicitAmpReadMode: GmosAmpReadMode
+
+  ampGain: GmosAmpGain!
+  defaultAmpGain: GmosAmpGain!
+  explicitAmpGain: GmosAmpGain
+
+  roi: GmosRoi!
+  defaultRoi: GmosRoi!
+  explicitRoi: GmosRoi
+
+  wavelengthDithersNm: [BigDecimal!]!
+  defaultWavelengthDithersNm: [BigDecimal!]!
+  explicitWavelengthDithersNm: [BigDecimal!]
+
+  spatialOffsets: [q!]!
+  defaultSpatialOffsets: [q!]!
+  explicitSpatialOffsets: [q!]
+
 }
 
 # GMOS X Binning
@@ -4782,7 +4810,7 @@ type ObservingMode {
   instrument: InstrumentType!
 
   # Mode type
-  mode: ConfigurationModeType!
+  mode: ObservingModeType!
 
   # GMOS North Long Slit mode
   gmosNorthLongSlit: GmosNorthLongSlit
