@@ -36,9 +36,7 @@ import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
-import lucuma.odb.graphql.predicates.ObservationPredicates
-import lucuma.odb.graphql.predicates.ProgramPredicates
-import lucuma.odb.graphql.predicates.TargetPredicates
+import lucuma.odb.graphql.predicates.Predicates
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
@@ -53,9 +51,9 @@ import skunk.AppliedFragment
 import scala.reflect.ClassTag
 
 trait MutationMapping[F[_]: MonadCancelThrow]
-  extends ProgramPredicates[F]
-     with ObservationPredicates[F]
-     with TargetPredicates[F]
+  extends ProgramMapping[F]
+     with ObservationMapping[F]
+     with TargetMapping[F]
      with MutationCompanionOps[F]
   { this: SkunkMapping[F] =>
 
@@ -110,7 +108,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       val createObservation: F[Result[(Observation.Id, Query)]] =
         observationService.use { svc =>
           svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
-            _.fproduct(id => Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
+            _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
           )
         }
 
@@ -138,7 +136,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   private val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       programService.use(_.insertProgram(input.SET)).map { id =>
-        Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
+        Result(Unique(Filter(Predicates.program.id.eql(id), child)))
       }
     }
 
@@ -149,7 +147,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         ts.createTarget(input.programId, input.SET).map {
           case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
           case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
-          case Success(id)          => Result(Unique(Filter(TargetPredicates.hasTargetId(id), child)))
+          case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
         }
       }
     }
@@ -194,8 +192,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     val whereObservation: Predicate =
       and(List(
         Eql(UniquePath(List("program", "id")), Const(programId)),
-        ObservationPredicates.isWritableBy(user),
-        ObservationPredicates.includeDeleted(includeDeleted.getOrElse(false)),
+        Predicates.observation.program.isWritableBy(user),
+        Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
         WHERE.getOrElse(True)
       ))
 
@@ -221,7 +219,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
               .selectObservations(which)
               .fproduct {
                 case Nil => Limit(0, child)
-                case ids => Filter(ObservationPredicates.inObservationIds(ids), child)
+                case ids => Filter(Predicates.observation.id.in(ids), child)
               }
           }
         }
@@ -273,7 +271,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
                 // Work around using a zero limit
                 case Nil => Limit(0, child)
 
-                case ids => Filter(ObservationPredicates.inObservationIds(ids), child)
+                case ids => Filter(Predicates.observation.id.in(ids), child)
               })
           }
         }
@@ -301,8 +299,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
       // Our predicate for selecting programs to update
       val filterPredicate = and(List(
-        ProgramPredicates.isWritableBy(user),
-        ProgramPredicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+        Predicates.program.isWritableBy(user),
+        Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
         input.WHERE.getOrElse(True)
       ))
 
@@ -321,7 +319,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       idSelect.flatTraverse { which =>
         programService.use(_.updatePrograms(input.SET, which)).map {
           case Nil  => Result(orderByPid(Limit(0, child)))
-          case pids => Result(orderByPid(Filter(ProgramPredicates.hasProgramId(pids), child)))
+          case pids => Result(orderByPid(Filter(Predicates.program.id.in(pids), child)))
         } recover {
           case ProposalService.ProposalUpdateException.CreationFailed =>
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
