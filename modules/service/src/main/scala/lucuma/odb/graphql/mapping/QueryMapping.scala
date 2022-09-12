@@ -21,18 +21,12 @@ import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
-import lucuma.odb.graphql.predicates.ObservationPredicates
-import lucuma.odb.graphql.predicates.ProgramPredicates
-import lucuma.odb.graphql.predicates.TargetPredicates
+import lucuma.odb.graphql.predicates.Predicates
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
 
-trait QueryMapping[F[_]]
-  extends ObservationPredicates[F]
-     with ProgramPredicates[F]
-     with TargetPredicates[F]
- { this: SkunkMapping[F] =>
+trait QueryMapping[F[_]] { this: SkunkMapping[F] =>
 
   lazy val QueryType = schema.ref("Query")
 
@@ -82,8 +76,8 @@ trait QueryMapping[F[_]]
           Unique(
             Filter(
               And(
-                ObservationPredicates.hasObservationId(oid),
-                ObservationPredicates.isVisibleTo(user)
+                Predicates.observation.id.eql(oid),
+                Predicates.observation.program.isVisibleTo(user)
               ),
               child
             )
@@ -104,9 +98,9 @@ trait QueryMapping[F[_]]
             LIMIT.foldLeft(1000)(_ min _.value),  // TODO: we need a common place for the max limit
             Filter(
               and(List(
-                OFFSET.map(oid => GtEql(UniquePath(List("id")), Const(oid))).getOrElse(True),
-                ObservationPredicates.includeDeleted(includeDeleted),
-                ObservationPredicates.isVisibleTo(user),
+                OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                Predicates.observation.program.isVisibleTo(user),
                 WHERE.getOrElse(True)
               )),
               child
@@ -130,8 +124,8 @@ trait QueryMapping[F[_]]
           Unique(
             Filter(
               And(
-                ProgramPredicates.hasProgramId(pid),
-                ProgramPredicates.isVisibleTo(user),
+                Predicates.program.id.eql(pid),
+                Predicates.program.isVisibleTo(user),
               ),
               child
             )
@@ -152,9 +146,9 @@ trait QueryMapping[F[_]]
             LIMIT.foldLeft(1000)(_ min _.value),
             Filter(
               and(List(
-                OFFSET.map(pid => GtEql(UniquePath(List("id")), Const(pid))).getOrElse(True),
-                ProgramPredicates.includeDeleted(includeDeleted),
-                ProgramPredicates.isVisibleTo(user),
+                OFFSET.map(Predicates.program.id.gtEql).getOrElse(True),
+                Predicates.program.existence.includeDeleted(includeDeleted),
+                Predicates.program.isVisibleTo(user),
                 WHERE.getOrElse(True)
               )),
               child
@@ -172,8 +166,8 @@ trait QueryMapping[F[_]]
           Unique(
             Filter(
               And(
-                TargetPredicates.hasTargetId(pid),
-                ProgramPredicates.isVisibleTo(user, List("program")),
+                Predicates.target.id.eql(pid),
+                Predicates.target.program.isVisibleTo(user),
               ),
               child
             )
@@ -181,7 +175,7 @@ trait QueryMapping[F[_]]
         )
       }
 
-  private val Targets: PartialFunction[Select, Result[Query]] =
+  private val Targets: PartialFunction[Select, Result[Query]] = {
     case Select("targets", List(
       WhereTargetInput.Binding.Option("WHERE", rWHERE),
       TargetIdBinding.Option("OFFSET", rOFFSET),
@@ -193,9 +187,9 @@ trait QueryMapping[F[_]]
           FilterOrderByOffsetLimit(
             pred = Some(
               and(List(
-                OFFSET.map(tid => GtEql(UniquePath(List("id")), Const(tid))).getOrElse(True),
-                ProgramPredicates.includeDeleted(includeDeleted),
-                ProgramPredicates.isVisibleTo(user, List("program")),
+                OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
+                Predicates.target.existence.includeDeleted(includeDeleted),
+                Predicates.target.program.isVisibleTo(user),
                 WHERE.getOrElse(True)
               )
             )),
@@ -208,5 +202,6 @@ trait QueryMapping[F[_]]
           )
         )
       }
+    }
 
 }
