@@ -3568,11 +3568,6 @@ enum GmosNorthGrating {
 # GMOS Long Slit Observing Mode common fields
 interface GmosLongSlitObservingMode {
 
-  # Exposure time mode, taking the place of the value from science requirements
-  # if specified.
-  overrideExposureTimeMode: ExposureTimeMode
-
-
   # The central wavelength, either explicitly specified in `explicitCentralWavelength`
   # or else taken from the `defaultCentralWavelength`.
   centralWavelength: Wavelength!
@@ -3681,12 +3676,9 @@ type GmosNorthLongSlit implements GmosLongSlitObservingMode {
   # GMOS North FPU
   fpu: GmosNorthBuiltinFpu
 
-  overrideExposureTimeMode: ExposureTimeMode
-
   centralWavelength: Wavelength!
   defaultCentralWavelength: Wavelength!
   explicitCentralWavelength: Wavelength
-
 
   xBin: GmosXBinning!
   defaultXBin: GmosXBinning!
@@ -3935,8 +3927,6 @@ type GmosSouthLongSlit implements GmosLongSlitObservingMode {
 
   # GMOS South FPU
   fpu: GmosSouthBuiltinFpu!
-
-  overrideExposureTimeMode: ExposureTimeMode
 
   centralWavelength: Wavelength!
   defaultCentralWavelength: Wavelength!
