@@ -118,7 +118,7 @@ insert into t_gmos_north_fpu values ('Ifu3', 'IFU-R', 'IFU Right Slit (red)', nu
 create table t_gmos_north_static (
 
   c_observation_id d_observation_id NOT NULL PRIMARY KEY,
-  c_instrument d_tag            NOT NULL DEFAULT ('GmosNorth'),
+  c_instrument     d_tag            NOT NULL DEFAULT ('GmosNorth'),
 
   -- We link back to the observation table thus.
   FOREIGN KEY (c_observation_id, c_instrument)
@@ -203,5 +203,28 @@ create table t_gmos_north_dynamic (
     )
   )
 
+);
+
+create table t_obs_mode_gmos_north_longslit (
+
+  c_observation_id     d_observation_id NOT NULL PRIMARY KEY REFERENCES t_observation(c_observation_id),
+
+  c_grating            d_tag            NOT NULL             REFERENCES t_gmos_north_disperser(c_tag),
+  c_filter             d_tag            NULL DEFAULT NULL    REFERENCES t_gmos_north_filter(c_tag),
+  c_fpu                d_tag            NOT NULL             REFERENCES t_gmos_north_fpu(c_tag),
+
+  c_wavelength         d_wavelength_pm  NULL DEFAULT NULL,
+  c_xbin               d_tag            NULL DEFAULT NULL   REFERENCES t_gmos_binning(c_tag),
+  c_ybin               d_tag            NULL DEFAULT NULL   REFERENCES t_gmos_binning(c_tag),
+  c_amp_read_mode      d_tag            NULL DEFAULT NULL   REFERENCES t_gmos_amp_read_mode(c_tag),
+  c_amp_gain           d_tag            NULL DEFAULT NULL   REFERENCES t_gmos_amp_gain(c_tag),
+  c_amp_roi            d_tag            NULL DEFAULT NULL   REFERENCES t_gmos_roi(c_tag),
+
+  -- stuff wavelength dithers and offsets into a string until grackle supports array columns?
+  c_wavelength_dithers text             NULL DEFAULT NULL,
+  c_spatial_offsets    text             NULL DEFAULT NULL,
+
+  CONSTRAINT wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(?:,-?\d+)*$'),
+  CONSTRAINT offset_format            CHECK (c_spatial_offsets ~ '^\(-?\d+,-?\d+\)(?:,\(-?\d+,-?\d+\))*$')
 );
 
