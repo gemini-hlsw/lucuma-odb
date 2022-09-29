@@ -8,7 +8,7 @@ package table
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 
-trait ProgramUserTable[F[_]] { self: SkunkMapping[F] =>
+trait ProgramUserTable[F[_]] extends BaseMapping[F] {
 
   object ProgramUserTable extends TableDef("t_program_user") {
     val ProgramId = col("c_program_id", program_id)

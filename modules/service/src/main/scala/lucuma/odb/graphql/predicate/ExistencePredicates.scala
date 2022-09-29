@@ -1,16 +1,17 @@
 // Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql.predicates
+package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.*
 import lucuma.odb.data.Existence
+import edu.gemini.grackle.Path
 
-class ExistencePredicates(path: List[String]) extends LeafPredicates[Existence](path) {
+class ExistencePredicates(path: Path) extends LeafPredicates[Existence](path) {
 
   def includeDeleted(b: Boolean): Predicate =
-    if (b) True else Eql(UniquePath(path), Const[Existence](Existence.Present))
+    if (b) True else Eql(path, Const[Existence](Existence.Present))
 
 }

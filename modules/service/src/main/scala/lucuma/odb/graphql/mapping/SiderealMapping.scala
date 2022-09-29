@@ -10,11 +10,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import table.TargetView
 import table.ProgramTable
 
-trait SiderealMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F] { this: SkunkMapping[F] =>
-
-  lazy val SiderealType = schema.ref("Sidereal")
+trait SiderealMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val SiderealMapping =
     ObjectMapping(

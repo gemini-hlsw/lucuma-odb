@@ -14,6 +14,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
+import edu.gemini.grackle.Path
 
 final case class UpdateObservationsInput(
   programId:      Program.Id,
@@ -30,16 +31,18 @@ final case class UpdateObservationsInput(
 
 object UpdateObservationsInput {
 
-  val Binding: Matcher[UpdateObservationsInput] =
+  def binding(path: Path): Matcher[UpdateObservationsInput] = {
+    val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rPid),
         ObservationPropertiesInput.EditBinding("SET", rSET),
-        WhereObservation.Binding.Option("WHERE", rWHERE),
+        WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
         (rPid, rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
     }
+  }
 
 }

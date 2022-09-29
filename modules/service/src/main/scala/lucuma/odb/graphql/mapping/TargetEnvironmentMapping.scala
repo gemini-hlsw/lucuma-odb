@@ -7,7 +7,7 @@ package mapping
 
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -21,12 +21,15 @@ import lucuma.odb.graphql.table.AsterismTargetTable
 import binding._
 import input._
 import table._
+import lucuma.odb.graphql.predicate.Predicates
+import lucuma.core.model.Target
 
 
 trait TargetEnvironmentMapping[F[_]]
   extends AsterismTargetTable[F]
      with ObservationView[F]
-     with TargetView[F] { this: SkunkMapping[F] =>
+     with Predicates[F]
+     with TargetView[F] { this: SkunkMapping[F] with TargetMapping[F] =>
 
   lazy val TargetEnvironmentType: TypeRef =
     schema.ref("TargetEnvironment")
@@ -51,8 +54,8 @@ trait TargetEnvironmentMapping[F[_]]
 
   private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
     FilterOrderByOffsetLimit(
-      pred   = Option.unless(includeDeleted)(Eql[Existence](UniquePath(List("existence")), Const(Existence.Present))),
-      oss    = List(OrderSelection(UniquePath[lucuma.core.model.Target.Id](List("id")))).some,
+      pred   = Some(Predicates.target.existence.includeDeleted(includeDeleted)),
+      oss    = List(OrderSelection[Target.Id](TargetType / "id")).some,
       offset = none,
       limit  = Option.when(firstOnly)(1),
       child  = child

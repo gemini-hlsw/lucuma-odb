@@ -5,7 +5,7 @@ package lucuma.odb.graphql.input
 
 import cats.Order
 import cats.syntax.parallel._
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import lucuma.core.model.Observation
@@ -15,10 +15,10 @@ import lucuma.odb.graphql.binding._
 
 object WhereOrder {
 
-  def SimpleBinding[A: Order](name: String, binding: Matcher[A]): Matcher[Predicate] =
-    Binding[A](UniquePath[A](List(name)), binding)
+  // def SimpleBinding[A: Order](name: String, binding: Matcher[A]): Matcher[Predicate] =
+  //   Binding[A](UniquePath[A](List(name)), binding)
 
-  def Binding[A: Order](path: UniquePath[A], binding: Matcher[A]): Matcher[Predicate] =
+  def binding[A: Order](path: Path, binding: Matcher[A]): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
         binding.Option("EQ", rEQ),
@@ -45,22 +45,22 @@ object WhereOrder {
         }
     }
 
-  val ObservationId: Matcher[Predicate] =
-    ObservationIdWithPath("id")
+  // val ObservationId: Matcher[Predicate] =
+  //   ObservationIdWithPath("id")
 
-  def ObservationIdWithPath(head: String, tail: String*): Matcher[Predicate] =
-    Binding(UniquePath[Observation.Id](head :: tail.toList), ObservationIdBinding)
+  // def ObservationIdWithPath(head: String, tail: String*): Matcher[Predicate] =
+  //   Binding(UniquePath[Observation.Id](head :: tail.toList), ObservationIdBinding)
 
-  val ProgramId: Matcher[Predicate] =
-    ProgramIdWithPath("id")
+  // val ProgramId: Matcher[Predicate] =
+  //   ProgramIdWithPath("id")
 
-  def ProgramIdWithPath(head: String, tail: String*): Matcher[Predicate] =
-    Binding(UniquePath[Program.Id](head :: tail.toList), ProgramIdBinding)
+  // def ProgramIdWithPath(head: String, tail: String*): Matcher[Predicate] =
+  //   Binding(UniquePath[Program.Id](head :: tail.toList), ProgramIdBinding)
 
-  val TargetId: Matcher[Predicate] =
-    TargetIdWithPath("id")
+  // val TargetId: Matcher[Predicate] =
+  //   TargetIdWithPath("id")
 
-  def TargetIdWithPath(head: String, tail: String*): Matcher[Predicate] =
-    Binding(UniquePath[Target.Id](head :: tail.toList), TargetIdBinding)
+  // def TargetIdWithPath(head: String, tail: String*): Matcher[Predicate] =
+  //   Binding(UniquePath[Target.Id](head :: tail.toList), TargetIdBinding)
 
 }

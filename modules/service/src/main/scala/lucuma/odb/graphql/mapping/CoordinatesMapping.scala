@@ -9,10 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 
-trait CoordinatesMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
-
-  lazy val CoordinatesType = schema.ref("Coordinates")
+trait CoordinatesMapping[F[_]] extends ObservationView[F] {
 
   lazy val CoordinatesMapping =
     ObjectMapping(

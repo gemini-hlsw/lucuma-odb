@@ -10,10 +10,7 @@ import lucuma.odb.graphql.table.PartnerTable
 
 import table.ObservationView
 
-trait PartnerMetaMapping[F[_]]
-  extends PartnerTable[F] { this: SkunkMapping[F] =>
-
-  lazy val PartnerMetaType = schema.ref("PartnerMeta")
+trait PartnerMetaMapping[F[_]] extends PartnerTable[F] {
 
   lazy val PartnerMetaMapping =
     ObjectMapping(
