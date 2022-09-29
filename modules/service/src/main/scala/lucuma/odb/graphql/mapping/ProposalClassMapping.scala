@@ -6,7 +6,7 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Result
@@ -16,25 +16,12 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.graphql.predicate.Predicates
 
 import table.TargetView
 import table.ProgramTable
 
-trait ProposalClassMapping[F[_]]
-  extends ProposalTable[F] { this: SkunkMapping[F] =>
-
-  lazy val ProposalClassType      = schema.ref("ProposalClass")
-
-  lazy val ClassicalType          = schema.ref("Classical")
-  lazy val DemoScienceType        = schema.ref("DemoScience")
-  lazy val DirectorsTimeType      = schema.ref("DirectorsTime")
-  lazy val ExchangeType           = schema.ref("Exchange")
-  lazy val FastTurnaroundType     = schema.ref("FastTurnaround")
-  lazy val IntensiveType          = schema.ref("Intensive")
-  lazy val LargeProgramType       = schema.ref("LargeProgram")
-  lazy val PoorWeatherType        = schema.ref("PoorWeather")
-  lazy val QueueType              = schema.ref("Queue")
-  lazy val SystemVerificationType = schema.ref("SystemVerification")
+trait ProposalClassMapping[F[_]] extends ProposalTable[F]  with Predicates[F] {
 
   lazy val ProposalClassMappings =
     List(
@@ -96,7 +83,7 @@ trait ProposalClassMapping[F[_]]
         }
 
       def narrowPredicate(tpe: Type): Option[Predicate] = {
-        def pred(tagName: String) = Some(Eql(UniquePath(List("discriminator")), Const(Tag(tagName))))
+        def pred(tagName: String) = Some(Predicates.proposalClass.discriminator.eql(Tag(tagName)))
         tpe match
           case ClassicalType          => pred("classical_type")
           case DemoScienceType        => pred("demo_science_type")

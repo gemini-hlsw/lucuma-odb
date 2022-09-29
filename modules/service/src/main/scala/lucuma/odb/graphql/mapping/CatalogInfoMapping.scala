@@ -10,11 +10,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import table.TargetView
 import table.ProgramTable
 
-trait CatalogInfoMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F] { this: SkunkMapping[F] =>
-
-  lazy val CatalogInfoType = schema.ref("CatalogInfo")
+trait CatalogInfoMapping[F[_]] extends ProgramTable[F] with TargetView[F]  {
 
   lazy val CatalogInfoMapping =
     ObjectMapping(
@@ -27,5 +23,5 @@ trait CatalogInfoMapping[F[_]]
       )
     )
 
-  }
+}
 

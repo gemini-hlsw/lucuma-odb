@@ -9,7 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 
-trait PartnerTable[F[_]] { self: SkunkMapping[F] =>
+trait PartnerTable[F[_]] extends BaseMapping[F] {
 
   object PartnerTable extends TableDef("t_partner") {
     val Tag       = col("c_tag", tag)

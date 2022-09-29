@@ -10,7 +10,7 @@ import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 import skunk.data.Type
 
-trait ProposalTable[F[_]] { self: SkunkMapping[F] =>
+trait ProposalTable[F[_]] extends BaseMapping[F] {
 
   object ProposalTable extends TableDef("t_proposal") {
     val ProgramId       = col("c_program_id", program_id)

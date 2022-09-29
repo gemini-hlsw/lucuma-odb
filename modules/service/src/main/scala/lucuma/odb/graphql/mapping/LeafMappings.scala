@@ -36,42 +36,10 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
 
-trait LeafMappings[F[_]] { this: Mapping[F] =>
+trait LeafMappings[F[_]] extends BaseMapping[F] {
 
-  private given Encoder[Epoch] =
+  private given io.circe.Encoder[Epoch] =
     e => Json.fromString(Epoch.fromString.reverseGet(e))
-
-  lazy val BigDecimalType             = schema.ref("BigDecimal")
-  lazy val CloudExtinctionType        = schema.ref("CloudExtinction")
-  lazy val DmsStringType              = schema.ref("DmsString")
-  lazy val EditTypeType               = schema.ref("EditType")
-  lazy val EphemerisKeyTypeType       = schema.ref("EphemerisKeyType")
-  lazy val EpochStringType            = schema.ref("EpochString")
-  lazy val ExistenceType              = schema.ref("Existence")
-  lazy val FilterTypeType             = schema.ref("FilterType")
-  lazy val HmsStringType              = schema.ref("HmsString")
-  lazy val ImageQualityType           = schema.ref("ImageQuality")
-  lazy val IntPercentType             = schema.ref("IntPercent")
-  lazy val LongType                   = schema.ref("Long")
-  lazy val NonEmptyStringType         = schema.ref("NonEmptyString")
-  lazy val NonNegBigDecimalType       = schema.ref("NonNegBigDecimal")
-  lazy val NonNegLongType             = schema.ref("NonNegLong")
-  lazy val ObsActiveStatusType        = schema.ref("ObsActiveStatus")
-  lazy val ObservationIdType          = schema.ref("ObservationId")
-  lazy val ObsStatusType              = schema.ref("ObsStatus")
-  lazy val PartnerType                = schema.ref("Partner")
-  lazy val PosAngleConstraintModeType = schema.ref("PosAngleConstraintMode")
-  lazy val PosBigDecimalType          = schema.ref("PosBigDecimal")
-  lazy val ProgramIdType              = schema.ref("ProgramId")
-  lazy val ProgramUserRoleType        = schema.ref("ProgramUserRole")
-  lazy val SkyBackgroundType          = schema.ref("SkyBackground")
-  lazy val TacCategoryType            = schema.ref("TacCategory")
-  lazy val TargetIdType               = schema.ref("TargetId")
-  lazy val TimestampType              = schema.ref("Timestamp")
-  lazy val ToOActivationType          = schema.ref("ToOActivation")
-  lazy val UserIdType                 = schema.ref("UserId")
-  lazy val UserTypeType               = schema.ref("UserType")
-  lazy val WaterVaporType             = schema.ref("WaterVapor")
 
   lazy val LeafMappings: List[TypeMapping] =
     List(

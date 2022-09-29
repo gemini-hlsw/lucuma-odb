@@ -17,7 +17,7 @@ import lucuma.odb.graphql.binding._
 
 object WhereOptionString {
 
-  def binding(path: Term[Option[NonEmptyString]] with Path): Matcher[Predicate] =
+  def binding(path: Path): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
         BooleanBinding.Option("IS_NULL", rIsNull),
@@ -38,8 +38,8 @@ object WhereOptionString {
             in.map(as => In(path, as.map(_.some))),
             nin.map(as => Not(In(path, as.map(a => a.some)))),
             // the casts below are safe; the type parameter is a phantom in this case
-            like.map(s => Like(path.asInstanceOf[Term[Option[String]]], s.value, !matchCase.getOrElse(true))),
-            nlike.map(s => Not(Like(path.asInstanceOf[Term[Option[String]]], s.value, !matchCase.getOrElse(true)))),
+            like.map(s => Like(path, s.value, !matchCase.getOrElse(true))),
+            nlike.map(s => Not(Like(path, s.value, !matchCase.getOrElse(true)))),
           ).flatten)
         }
     }

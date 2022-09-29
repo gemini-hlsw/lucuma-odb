@@ -7,7 +7,7 @@ package mapping
 
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
@@ -20,7 +20,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.input.ProgramEditInput
-import lucuma.odb.graphql.predicates.Predicates
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
@@ -29,6 +29,7 @@ import scala.reflect.ClassTag
 
 trait SubscriptionMapping[F[_]]
   extends MutationCompanionOps[F]
+     with Predicates[F]
   { this: SkunkMapping[F] =>
 
   def topics: Topics[F]
@@ -71,7 +72,7 @@ trait SubscriptionMapping[F[_]]
         .map(e => Result(
           Environment(
             Env("id" -> e.eventId, "editType" -> e.editType),
-            Unique(Filter(Eql(UniquePath(List("value", "id")), Const(e.programId)), child))
+            Unique(Filter(Predicates.programEdit.value.id.eql(e.programId), child))
           )
         ))
     }

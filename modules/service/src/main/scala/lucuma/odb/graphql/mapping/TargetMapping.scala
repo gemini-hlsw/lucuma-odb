@@ -11,12 +11,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import table.TargetView
 import table.ProgramTable
 
-trait TargetMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F] { this: SkunkMapping[F] =>
-
-  lazy val TargetType: TypeRef =
-    schema.ref("Target")
+trait TargetMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val TargetMapping: ObjectMapping =
     ObjectMapping(

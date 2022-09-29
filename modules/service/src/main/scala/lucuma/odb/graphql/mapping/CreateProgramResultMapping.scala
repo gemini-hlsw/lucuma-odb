@@ -9,10 +9,8 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ProgramTable
 
-trait CreateProgramResultMapping[F[_]]
-  extends ProgramTable[F] { this: SkunkMapping[F] =>
+trait CreateProgramResultMapping[F[_]] extends ProgramTable[F] {
 
-  lazy val CreateProgramResultType = schema.ref("CreateProgramResult")
 
   lazy val CreateProgramResultMapping =
     ObjectMapping(

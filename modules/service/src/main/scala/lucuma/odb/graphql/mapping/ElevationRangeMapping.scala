@@ -9,10 +9,8 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 
-trait ElevationRangeMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
+trait ElevationRangeMapping[F[_]] extends ObservationView[F] {
 
-  lazy val ElevationRangeType = schema.ref("ElevationRange")
 
   lazy val ElevationRangeMapping =
     ObjectMapping(

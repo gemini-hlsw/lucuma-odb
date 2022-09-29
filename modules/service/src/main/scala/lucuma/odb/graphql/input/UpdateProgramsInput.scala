@@ -9,6 +9,7 @@ import cats.syntax.all._
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.odb.graphql.binding._
+import edu.gemini.grackle.Path
 
 case class UpdateProgramsInput(
   SET: ProgramPropertiesInput.Edit,
@@ -19,15 +20,17 @@ case class UpdateProgramsInput(
 
 object UpdateProgramsInput {
 
-  val Binding =
+  def binding(path: Path) = {
+    val WhereProgramBinding = WhereProgram.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
         ProgramPropertiesInput.EditBinding("SET", rSET),
-        WhereProgram.Binding.Option("WHERE", rWHERE),
+        WhereProgramBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
         (rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
     }
+  }
 
 }

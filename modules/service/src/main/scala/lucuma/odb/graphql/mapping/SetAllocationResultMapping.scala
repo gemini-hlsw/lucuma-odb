@@ -10,10 +10,7 @@ import lucuma.odb.graphql.table.AllocationTable
 
 import table.AllocationTable
 
-trait SetAllocationResultMapping[F[_]]
-  extends AllocationTable[F] { this: SkunkMapping[F] =>
-
-  lazy val SetAllocationResultType = schema.ref("SetAllocationResult")
+trait SetAllocationResultMapping[F[_]] extends AllocationTable[F] {
 
   lazy val SetAllocationResultMapping =
     ObjectMapping(

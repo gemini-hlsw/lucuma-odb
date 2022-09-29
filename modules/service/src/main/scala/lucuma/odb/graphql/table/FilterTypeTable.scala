@@ -9,7 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 
-trait FilterTypeTable[F[_]] { self: SkunkMapping[F] =>
+trait FilterTypeTable[F[_]] extends BaseMapping[F] {
 
   object FilterTypeTable extends TableDef("t_filter_type") {
     val Tag       = col("c_tag", tag)

@@ -10,10 +10,7 @@ import lucuma.odb.graphql.table.FilterTypeTable
 
 import table.ObservationView
 
-trait FilterTypeMetaMapping[F[_]]
-  extends FilterTypeTable[F] { this: SkunkMapping[F] =>
-
-  lazy val FilterTypeMetaType = schema.ref("FilterTypeMeta")
+trait FilterTypeMetaMapping[F[_]] extends FilterTypeTable[F] {
 
   lazy val FilterTypeMetaMapping =
     ObjectMapping(

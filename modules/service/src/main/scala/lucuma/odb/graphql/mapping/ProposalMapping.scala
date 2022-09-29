@@ -13,13 +13,7 @@ import lucuma.odb.graphql.util.MappingExtras
 import table.TargetView
 import table.ProgramTable
 
-trait ProposalMapping[F[_]]
-  extends PartnerSplitTable[F]
-     with ProgramTable[F]
-     with ProposalTable[F]
-     with MappingExtras[F] { this: SkunkMapping[F] =>
-
-  lazy val ProposalType = schema.ref("Proposal")
+trait ProposalMapping[F[_]] extends PartnerSplitTable[F] with ProgramTable[F] with ProposalTable[F] {
 
   lazy val ProposalMapping =
     ObjectMapping(

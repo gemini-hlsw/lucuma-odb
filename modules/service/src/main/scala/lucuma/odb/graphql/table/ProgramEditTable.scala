@@ -9,7 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 
-trait ProgramEditTable[F[_]] { self: SkunkMapping[F] =>
+trait ProgramEditTable[F[_]] extends BaseMapping[F] {
 
   object ProgramEditTable extends TableDef("t_program_event") {
     val EventId   = col("c_event_id", int8)

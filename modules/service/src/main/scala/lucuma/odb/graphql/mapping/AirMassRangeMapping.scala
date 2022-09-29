@@ -8,11 +8,9 @@ package mapping
 import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
+import edu.gemini.grackle.sql.SqlMapping
 
-trait AirMassRangeMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
-
-  lazy val AirMassRangeType = schema.ref("AirMassRange")
+trait AirMassRangeMapping[F[_]] extends ObservationView[F] {
 
   lazy val AirMassRangeMapping =
     ObjectMapping(

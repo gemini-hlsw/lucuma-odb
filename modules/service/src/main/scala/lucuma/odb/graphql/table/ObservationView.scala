@@ -5,11 +5,10 @@ package lucuma.odb.graphql
 
 package table
 
-import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 
-trait ObservationView[F[_]] { self: SkunkMapping[F] =>
+trait ObservationView[F[_]] extends BaseMapping[F] {
 
     object ObservationView extends TableDef("v_observation") {
       val ProgramId: ColumnRef         = col("c_program_id",         program_id)

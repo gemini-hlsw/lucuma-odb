@@ -10,11 +10,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import table.TargetView
 import table.ProgramTable
 
-trait ProperMotionMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F] { this: SkunkMapping[F] =>
-
-  lazy val ProperMotionType = schema.ref("ProperMotion")
+trait ProperMotionMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ProperMotionMapping =
     ObjectMapping(
