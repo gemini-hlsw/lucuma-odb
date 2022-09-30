@@ -6,10 +6,10 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.odb.graphql.binding._
-import edu.gemini.grackle.Path
 
 case class UpdateProgramsInput(
   SET: ProgramPropertiesInput.Edit,

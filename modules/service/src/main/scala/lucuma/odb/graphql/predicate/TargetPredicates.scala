@@ -9,7 +9,6 @@ import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
-import edu.gemini.grackle.Path
 
 class TargetPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")

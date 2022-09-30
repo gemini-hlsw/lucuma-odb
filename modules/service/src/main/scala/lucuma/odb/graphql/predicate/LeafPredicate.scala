@@ -8,7 +8,6 @@ import cats.Order
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Path
 
 class LeafPredicates[A](path: Path) {
 

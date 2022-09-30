@@ -6,11 +6,12 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
+import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.odb.graphql.binding._
-import edu.gemini.grackle.Path
-import lucuma.core.model.{ Program, Target }
 
 object WhereTargetInput {
 

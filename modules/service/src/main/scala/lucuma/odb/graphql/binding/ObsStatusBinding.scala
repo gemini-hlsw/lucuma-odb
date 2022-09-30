@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ObsStatus
+import lucuma.core.enums.ObsStatus
 
 val ObsStatusBinding: Matcher[ObsStatus] =
   enumeratedBinding

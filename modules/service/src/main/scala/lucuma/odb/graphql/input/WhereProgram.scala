@@ -9,8 +9,8 @@ import cats.syntax.all._
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import lucuma.odb.graphql.binding._
 import lucuma.core.model.Program
+import lucuma.odb.graphql.binding._
 
 object WhereProgram {
 

@@ -15,6 +15,7 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.enums.ProgramType
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
@@ -25,8 +26,6 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
-import lucuma.core.enums.ProgramType
-import edu.gemini.grackle.Path
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]

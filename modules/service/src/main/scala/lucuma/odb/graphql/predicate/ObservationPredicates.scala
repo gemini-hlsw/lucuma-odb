@@ -4,7 +4,6 @@
 package lucuma.odb.graphql.predicate
 
 import edu.gemini.grackle.Path
-import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -12,7 +11,6 @@ import lucuma.core.model.Access.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
-import edu.gemini.grackle.Path
 
 class ObservationPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")
