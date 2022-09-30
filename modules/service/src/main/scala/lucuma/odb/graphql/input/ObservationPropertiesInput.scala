@@ -8,26 +8,26 @@ package input
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
 
 final case class ObservationPropertiesInput(
-  subtitle:           Nullable[NonEmptyString],
-  status:             Option[ObsStatus],
-  activeStatus:       Option[ObsActiveStatus],
-  visualizationTime:  Nullable[Timestamp],
-  posAngleConstraint: Option[PosAngleConstraintInput],
-  targetEnvironment:  Option[TargetEnvironmentInput],
-  constraintSet:      Option[ConstraintSetInput],
-  // scienceRequirements: Option[ScienceRequirementsInput],
-  // scienceMode: Option[ScienceModeInput],
-  existence:          Option[Existence]
+  subtitle:            Nullable[NonEmptyString],
+  status:              Option[ObsStatus],
+  activeStatus:        Option[ObsActiveStatus],
+  visualizationTime:   Nullable[Timestamp],
+  posAngleConstraint:  Option[PosAngleConstraintInput],
+  targetEnvironment:   Option[TargetEnvironmentInput],
+  constraintSet:       Option[ConstraintSetInput],
+  scienceRequirements: Option[ScienceRequirementsInput],
+  // observingMode: Option[ObservingModeInput],
+  existence:           Option[Existence]
 ) {
 
   def asterism: Nullable[NonEmptyList[Target.Id]] =
@@ -42,14 +42,15 @@ object ObservationPropertiesInput {
 
   val Default: ObservationPropertiesInput =
     ObservationPropertiesInput(
-      subtitle           = Nullable.Null,
-      status             = ObsStatus.New.some,
-      activeStatus       = ObsActiveStatus.Active.some,
-      visualizationTime  = Nullable.Null,
-      posAngleConstraint = None,
-      targetEnvironment  = None,
-      constraintSet      = ConstraintSetInput.Default.some,
-      existence          = Existence.Present.some
+      subtitle            = Nullable.Null,
+      status              = ObsStatus.New.some,
+      activeStatus        = ObsActiveStatus.Active.some,
+      visualizationTime   = Nullable.Null,
+      posAngleConstraint  = None,
+      targetEnvironment   = None,
+      constraintSet       = ConstraintSetInput.Default.some,
+      scienceRequirements = None,
+      existence           = Existence.Present.some
     )
 
   val CreateBinding: Matcher[ObservationPropertiesInput] =
@@ -62,8 +63,8 @@ object ObservationPropertiesInput {
         PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
-        ("scienceRequirements", _),   // ignore for now
-        ("scienceMode", _),           // ignore for now
+        ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
+        ("observingMode", _),         // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rSubtitle.map(Nullable.orNull),
@@ -73,6 +74,7 @@ object ObservationPropertiesInput {
          rPosAngleConstraint,
          rTargetEnvironment,
          rConstraintSet,
+         rScienceRequirements,
          rExistence
         ).parMapN(apply)
     }
@@ -87,8 +89,8 @@ object ObservationPropertiesInput {
         PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
-        ("scienceRequirements", _),   // ignore for now
-        ("scienceMode", _),           // ignore for now
+        ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
+        ("observingMode", _),         // ignore for now
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rSubtitle,
@@ -98,6 +100,7 @@ object ObservationPropertiesInput {
          rPosAngleConstraint,
          rTargetEnvironment,
          rConstraintSet,
+         rScienceRequirements,
          rExistence
         ).parMapN(apply)
     }

@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package predicate
 
-import lucuma.odb.graphql.mapping.*
 import edu.gemini.grackle.Path
+import lucuma.odb.graphql.mapping.*
 
 trait Predicates[F[_]] extends BaseMapping[F] {
 

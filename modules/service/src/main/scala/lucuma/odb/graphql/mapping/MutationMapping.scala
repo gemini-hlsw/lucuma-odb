@@ -49,7 +49,6 @@ import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
-import edu.gemini.grackle.Path
 
 trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
 

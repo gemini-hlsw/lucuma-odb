@@ -15,14 +15,14 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.model.Target
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
 
 import binding._
 import input._
 import table._
-import lucuma.odb.graphql.predicate.Predicates
-import lucuma.core.model.Target
 
 
 trait TargetEnvironmentMapping[F[_]]

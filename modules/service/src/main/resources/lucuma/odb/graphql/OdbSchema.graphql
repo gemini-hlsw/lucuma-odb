@@ -429,13 +429,6 @@ input FluxDensityContinuumSurfaceInput {
   units: FluxDensityContinuumSurfaceUnits!
 }
 
-# Focal plane angle source angle in appropriate units
-input FocalPlaneAngleInput {
-  microarcseconds: Long
-  milliarcseconds: BigDecimal
-  arcseconds: BigDecimal
-}
-
 # Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
 input GaussianInput {
   # The fwhm field is required when creating a new instance of Gaussian, but optional when editing
@@ -1858,8 +1851,8 @@ input ObservationPropertiesInput {
   # The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
   scienceRequirements: ScienceRequirementsInput
 
-  # The scienceMode describes the chosen observing mode and instrument, is optional and may be deleted
-  scienceMode: ScienceModeInput
+  # The observingMode describes the chosen observing mode and instrument, is optional and may be deleted
+  observingMode: ObservingModeInput
 
   # Whether the observation is considered deleted (defaults to PRESENT) but may be edited
   existence: Existence
@@ -2127,7 +2120,7 @@ type Science implements StepConfig {
 }
 
 # Edit or create an observation's science mode
-input ScienceModeInput {
+input ObservingModeInput {
   # The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   gmosNorthLongSlit: GmosNorthLongSlitInput
 
@@ -2138,7 +2131,7 @@ input ScienceModeInput {
 # Edit science requirements
 input ScienceRequirementsInput {
   # The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  mode: ScienceRequirementMode
+  mode: ScienceMode
 
   # The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   spectroscopy: SpectroscopyScienceRequirementsInput
@@ -2234,10 +2227,10 @@ input SpectroscopyScienceRequirementsInput {
   focalPlane: FocalPlane
 
   # The focalPlaneAngle field may be unset by assigning a null value, or ignored by skipping it altogether
-  focalPlaneAngle: FocalPlaneAngleInput
+  focalPlaneAngle: AngleInput
 
   # The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
-  capabilities: SpectroscopyCapabilities
+  capability: SpectroscopyCapabilities
 }
 
 # Sequence step
@@ -3413,17 +3406,6 @@ enum FocalPlane {
   IFU
 }
 
-type FocalPlaneAngle {
-  # Focal plane angle in µas
-  microarcseconds: Long!
-
-  # Focal plane angle in mas
-  milliarcseconds: BigDecimal!
-
-  # Focal plane angle in arcsec
-  arcseconds: BigDecimal!
-}
-
 # Galaxy spectrum
 enum GalaxySpectrum {
   # GalaxySpectrum Elliptical
@@ -4262,16 +4244,10 @@ type Observation {
   constraintSet: ConstraintSet!
 
   # The top level science requirements
-  scienceRequirements(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): ScienceRequirements!
+  scienceRequirements: ScienceRequirements!
 
   # The science configuration
-  scienceMode(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): ScienceMode
+  observingMode: ObservingMode
 
   # ITC execution results
   itc(
@@ -4682,7 +4658,7 @@ type Query {
   ): [Program!]! #ProgramSelectResult!
 
   # Observations grouped by commonly held science mode
-  scienceModeGroup(
+  observingModeGroup(
     # Program ID
     programId: ProgramId!
 
@@ -4694,7 +4670,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): ScienceModeGroupSelectResult!
+  ): ObservingModeGroupSelectResult!
 
   # Observations grouped by commonly held science requirements
   scienceRequirementsGroup(
@@ -4801,7 +4777,7 @@ type RightAscension {
 }
 
 # Base science mode
-type ScienceMode {
+type ObservingMode {
   # Instrument
   instrument: InstrumentType!
 
@@ -4815,7 +4791,7 @@ type ScienceMode {
   gmosSouthLongSlit: GmosSouthLongSlit
 }
 
-type ScienceModeGroup {
+type ObservingModeGroup {
   # IDs of observations that use the same constraints
   observationIds: [ObservationId!]!
 
@@ -4832,30 +4808,30 @@ type ScienceModeGroup {
   ): ObservationSelectResult!
 
   # Commonly held value across the observations
-  scienceMode: ScienceMode
+  observingMode: ObservingMode
 }
 
-# The matching scienceModeGroup results, limited to a maximum of 1000 entries.
-type ScienceModeGroupSelectResult {
-  # Matching scienceModeGroups up to the return size limit of 1000
-  matches: [ScienceModeGroup!]!
+# The matching ObservingModeGroup results, limited to a maximum of 1000 entries.
+type ObservingModeGroupSelectResult {
+  # Matching ObservingModeGroups up to the return size limit of 1000
+  matches: [ObservingModeGroup!]!
 
   # `true` when there were additional matches that were not returned.
   hasMore: Boolean!
 }
 
 # Mode Spectroscopy/Imaging
-enum ScienceRequirementMode {
-  # ScienceRequirementMode Imaging
+enum ScienceMode {
+  # ScienceMode Imaging
   IMAGING
 
-  # ScienceRequirementMode Spectroscopy
+  # ScienceMode Spectroscopy
   SPECTROSCOPY
 }
 
 type ScienceRequirements {
-  # Science requirement mode
-  mode: ScienceRequirementMode!
+  # Science mode
+  mode: ScienceMode!
 
   # Spectroscopy requirements
   spectroscopy: SpectroscopyScienceRequirements!
@@ -5059,10 +5035,10 @@ type SpectroscopyScienceRequirements {
   focalPlane: FocalPlane
 
   # Focal plane angle
-  focalPlaneAngle: FocalPlaneAngle
+  focalPlaneAngle: Angle
 
   # Spectroscopy Capabilities
-  capabilities: SpectroscopyCapabilities
+  capability: SpectroscopyCapabilities
 }
 
 # Stellar library spectrum

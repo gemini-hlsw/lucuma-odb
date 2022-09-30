@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
-import edu.gemini.grackle.Path
 
 
 //# Input for bulk updating multiple observations.  Select observations

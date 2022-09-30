@@ -3,7 +3,10 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.ObsActiveStatus
+import cats.syntax.either._
+import eu.timepit.refined.types.numeric.PosInt
 
-val ObsActiveStatusBinding: Matcher[ObsActiveStatus] =
-  enumeratedBinding
+val PosIntBinding: Matcher[PosInt] =
+  IntBinding.emap { i =>
+    PosInt.from(i).leftMap(m => s"Invalid PosInt: $i: $m")
+  }

@@ -7,7 +7,6 @@ import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.*
 import lucuma.odb.data.Existence
-import edu.gemini.grackle.Path
 
 class ExistencePredicates(path: Path) extends LeafPredicates[Existence](path) {
 

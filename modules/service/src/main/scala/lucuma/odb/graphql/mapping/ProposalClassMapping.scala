@@ -13,10 +13,10 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.util.MappingExtras
-import lucuma.odb.graphql.predicate.Predicates
 
 import table.TargetView
 import table.ProgramTable

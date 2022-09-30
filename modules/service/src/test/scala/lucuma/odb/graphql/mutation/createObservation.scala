@@ -7,17 +7,22 @@ package mutation
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.ACursor
+import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.ObsActiveStatus
-import lucuma.odb.data.ObsStatus
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.CoordinatesInput
@@ -26,6 +31,19 @@ import lucuma.odb.service.AsterismService
 import java.time.LocalDateTime
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
+
+  extension (ac: ACursor)
+    def downPath(p: String*): ACursor =
+      p.toList match {
+        case Nil    => ac
+        case h :: t => ac.downField(h).downPath(t*)
+      }
+
+    def liftIO[A: Decoder]: IO[A] =
+      ac.as[A].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
+    def downIO[A: Decoder](p: String*): IO[A] =
+      downPath(p*).liftIO[A]
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
@@ -677,6 +695,106 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
+  test("[general] created observation defaults to spectroscopy") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+          }) {
+            observation {
+              scienceRequirements {
+                mode
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("scienceRequirements")
+          .downField("mode")
+          .as[ScienceMode]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, ScienceMode.Spectroscopy)
+      }
+    }
+  }
+
+  test("[general] created observation accepts spectroscopy requirements") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                mode: SPECTROSCOPY
+                spectroscopy: {
+                  wavelength: { nanometers: 400 }
+                  resolution: 200
+                  signalToNoise: 75.5
+                  signalToNoiseAt: { micrometers: 2.5 }
+                  wavelengthCoverage: { picometers: 100000 }
+                  focalPlane: SINGLE_SLIT
+                  focalPlaneAngle: { microarcseconds: 3 }
+                  capability: null
+                }
+              }
+            }
+          }) {
+            observation {
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { picometers }
+                  resolution
+                  signalToNoise
+                  signalToNoiseAt { nanometers }
+                  wavelengthCoverage { micrometers }
+                  focalPlane
+                  focalPlaneAngle { microarcseconds }
+                  capability
+                }
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+
+        val reqs: ACursor =
+          js.hcursor.downPath("createObservation", "observation", "scienceRequirements")
+
+        val spectroscopy: ACursor =
+          reqs.downField("spectroscopy")
+
+        assertIO(
+          (reqs.downIO[ScienceMode]("mode"),
+           spectroscopy.downIO[Long]("wavelength", "picometers"),
+           spectroscopy.downIO[Int]("resolution"),
+           spectroscopy.downIO[BigDecimal]("signalToNoise"),
+           spectroscopy.downIO[Long]("signalToNoiseAt", "nanometers"),
+           spectroscopy.downIO[BigDecimal]("wavelengthCoverage", "micrometers"),
+           spectroscopy.downIO[FocalPlane]("focalPlane"),
+           spectroscopy.downIO[Int]("focalPlaneAngle", "microarcseconds"),
+           spectroscopy.downIO[Option[SpectroscopyCapabilities]]("capability")
+          ).tupled,
+          (ScienceMode.Spectroscopy,
+           400_000L,
+           200,
+           BigDecimal("75.50"),
+           2_500L,
+           BigDecimal("0.1"),
+           FocalPlane.SingleSlit,
+           3,
+           Option.empty[SpectroscopyCapabilities]
+          )
+        )
+      }
+    }
+  }
 
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>
