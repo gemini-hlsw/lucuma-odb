@@ -6,25 +6,28 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
+import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.odb.graphql.binding._
 
 object WhereTargetInput {
 
-  private val NameBinding = WhereString.binding(UniquePath(List("name")))
-  private val ProgramIdBinding = WhereOrder.ProgramIdWithPath("program", "id")
-
-  val Binding: Matcher[Predicate] =
+  def binding(path: Path): Matcher[Predicate] = {
+    val WhereNameBinding = WhereString.binding(path / "name")
+    val WhereProgramIdBinding = WhereOrder.binding[Program.Id](path / "program" / "id", ProgramIdBinding)
+    val WhereTargetIdBinding = WhereOrder.binding[Target.Id](path / "id", TargetIdBinding)
+    lazy val WhereTargetInputBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        WhereTargetInput.Binding.List.Option("AND", rAND),
-        WhereTargetInput.Binding.List.Option("OR", rOR),
-        WhereTargetInput.Binding.Option("NOT", rNOT),
-        WhereOrder.TargetId.Option("id", rId),
-        ProgramIdBinding.Option("programId", rProgramId),
-        NameBinding.Option("name", rName),
+        WhereTargetInputBinding.List.Option("AND", rAND),
+        WhereTargetInputBinding.List.Option("OR", rOR),
+        WhereTargetInputBinding.Option("NOT", rNOT),
+        WhereTargetIdBinding.Option("id", rId),
+        WhereProgramIdBinding.Option("programId", rProgramId),
+        WhereNameBinding.Option("name", rName),
       ) =>
         (rAND, rOR, rNOT, rId, rProgramId, rName).parMapN { (AND, OR, NOT, id, pid, name) =>
           and(List(
@@ -37,5 +40,6 @@ object WhereTargetInput {
           ).flatten)
         }
     }
+  }
 
 }

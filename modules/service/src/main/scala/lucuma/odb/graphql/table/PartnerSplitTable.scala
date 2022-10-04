@@ -10,7 +10,7 @@ import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 import skunk.data.Type
 
-trait PartnerSplitTable[F[_]] { self: SkunkMapping[F] =>
+trait PartnerSplitTable[F[_]] extends BaseMapping[F] {
 
   object PartnerSplitTable extends TableDef("t_partner_split") {
     val ProgramId  = col("c_program_id", program_id)

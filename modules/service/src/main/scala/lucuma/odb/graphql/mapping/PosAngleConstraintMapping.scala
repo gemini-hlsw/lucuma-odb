@@ -11,12 +11,7 @@ import lucuma.odb.graphql.util.MappingExtras
 
 import table.ObservationView
 
-trait PosAngleConstraintMapping[F[_]]
-  extends ObservationView[F]
-     with MappingExtras[F] { this: SkunkMapping[F] =>
-
-  lazy val PosAngleConstraintType: TypeRef =
-    schema.ref("PosAngleConstraint")
+trait PosAngleConstraintMapping[F[_]] extends ObservationView[F] {
 
   lazy val PosAngleConstraintMapping =
     ObjectMapping(

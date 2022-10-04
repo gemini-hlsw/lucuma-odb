@@ -8,12 +8,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ObservationView
 
-trait ScienceRequirementsMapping[F[_]]
-  extends ObservationView[F]
-{ this: SkunkMapping[F] =>
-
-  lazy val ScienceRequirementsType: TypeRef =
-    schema.ref("ScienceRequirements")
+trait ScienceRequirementsMapping[F[_]] extends ObservationView[F] {
 
   import ObservationView.ScienceRequirements
 

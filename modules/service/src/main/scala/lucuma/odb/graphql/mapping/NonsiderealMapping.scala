@@ -10,11 +10,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import table.TargetView
 import table.ProgramTable
 
-trait NonsiderealMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F] { this: SkunkMapping[F] =>
-
-  lazy val NonsiderealType = schema.ref("Nonsidereal")
+trait NonsiderealMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val NonsiderealMapping =
     ObjectMapping(

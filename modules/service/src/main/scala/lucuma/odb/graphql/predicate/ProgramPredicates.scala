@@ -1,12 +1,9 @@
 // Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql
+package lucuma.odb.graphql.predicate
 
-package predicates
-
-import edu.gemini.grackle.Path.ListPath
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -15,39 +12,24 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 
-import mapping.ProgramMapping
+class ProgramPredicates(path: Path) {
 
-trait ProgramPredicates[F[_]] extends ProgramMapping[F] { this: SkunkMapping[F] =>
+  lazy val existence = ExistencePredicates(path / "existence")
+  lazy val id = LeafPredicates[Program.Id](path / "id")
+  lazy val piUserId = LeafPredicates[User.Id](path / "piUserId")
 
-    object ProgramPredicates {
-
-      def includeDeleted(b: Boolean): Predicate =
-        if (b) True else Eql(UniquePath(List("existence")), Const[Existence](Existence.Present))
-
-      def hasProgramId(pid: Program.Id): Predicate =
-        Eql(UniquePath(List("id")), Const(pid))
-
-      def hasProgramId(pids: List[Program.Id]): Predicate =
-        In(UniquePath(List("id")), pids)
-
-      def hasProgramId(pids: Option[List[Program.Id]]): Predicate =
-        pids.fold[Predicate](True)(hasProgramId)
-
-      def isVisibleTo(user: User, prefix: List[String] = Nil): Predicate =
-        user.role.access match {
-          case Guest | Pi =>
-            Or(
-              Contains(ListPath(prefix ++ List("users", "userId")), Const(user.id)), // user is linked, or
-              Eql(UniquePath(prefix ++ List("piUserId")), Const(user.id))            // user is the PI
-            )
-          case Ngo => ???
-          case Staff | Admin | Service => True
-        }
-
-      def isWritableBy(user: User): Predicate =
-        isVisibleTo(user) // this is true for now
-
+  def isVisibleTo(user: User): Predicate =
+    user.role.access match {
+      case Guest | Pi =>
+        Or(
+          Contains(path / "users" / "userId", Const(user.id)), // user is linked, or
+          piUserId.eql(user.id)            // user is the PI
+        )
+      case Ngo => ???
+      case Staff | Admin | Service => True
     }
 
+  def isWritableBy(user: User): Predicate =
+    isVisibleTo(user) // this is true for now
 
 }

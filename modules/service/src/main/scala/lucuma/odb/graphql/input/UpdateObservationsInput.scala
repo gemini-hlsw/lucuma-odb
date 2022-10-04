@@ -7,6 +7,7 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.parallel.*
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
@@ -30,16 +31,18 @@ final case class UpdateObservationsInput(
 
 object UpdateObservationsInput {
 
-  val Binding: Matcher[UpdateObservationsInput] =
+  def binding(path: Path): Matcher[UpdateObservationsInput] = {
+    val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rPid),
         ObservationPropertiesInput.EditBinding("SET", rSET),
-        WhereObservation.Binding.Option("WHERE", rWHERE),
+        WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
         (rPid, rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
     }
+  }
 
 }

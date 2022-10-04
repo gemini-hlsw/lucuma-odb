@@ -11,12 +11,7 @@ import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
 
 
-trait AngleMapping[F[_]]
-  extends ObservationView[F]
-     with MappingExtras[F]
-{ this: SkunkMapping[F] =>
-
-  lazy val AngleType = schema.ref("Angle")
+trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
 
   private val µPerMilli: Long = 1000L
   private val µPerSec: Long   = 1000L * µPerMilli

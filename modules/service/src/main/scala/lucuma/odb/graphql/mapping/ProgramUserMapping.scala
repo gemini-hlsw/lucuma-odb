@@ -7,7 +7,7 @@ package mapping
 
 import cats.syntax.all._
 import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._

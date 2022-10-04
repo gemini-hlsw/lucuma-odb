@@ -1,19 +1,19 @@
 val catsTimeVersion            = "0.5.0"
 val circeVersion               = "0.14.3"
-val cirisVersion               = "2.3.3"
+val cirisVersion               = "2.4.0"
 val clueVersion                = "0.23.1"
 val declineVersion             = "2.3.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.4.0"
-val grackleVersion             = "0.6.0"
+val grackleVersion             = "0.7.0"
 val http4sBlazeVersion         = "0.23.12"
 val http4sEmberVersion         = "0.23.16"
 val http4sJdkHttpClientVersion = "0.7.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.3"
 val log4catsVersion            = "2.5.0"
-val lucumaCoreVersion          = "0.54.0"
-val lucumaGraphQLRoutesVersion = "0.5.3"
+val lucumaCoreVersion          = "0.57.0"
+val lucumaGraphQLRoutesVersion = "0.5.4"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -28,8 +28,8 @@ enablePlugins(NoPublishPlugin)
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
-ThisBuild / scalaVersion       := "3.1.3"
-ThisBuild / crossScalaVersions := Seq("3.1.3")
+ThisBuild / scalaVersion       := "3.2.0"
+ThisBuild / crossScalaVersions := Seq("3.2.0")
 
 lazy val service = project
   .in(file("modules/service"))

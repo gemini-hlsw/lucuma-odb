@@ -9,10 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ProgramUserTable
 
-trait LinkUserResultMapping[F[_]]
-  extends ProgramUserTable[F] { this: SkunkMapping[F] =>
-
-  lazy val LinkUserResultType = schema.ref("LinkUserResult")
+trait LinkUserResultMapping[F[_]] extends ProgramUserTable[F]  {
 
   lazy val LinkUserResultMapping =
     ObjectMapping(

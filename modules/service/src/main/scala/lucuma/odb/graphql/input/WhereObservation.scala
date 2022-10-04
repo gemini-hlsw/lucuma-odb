@@ -6,31 +6,29 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel._
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.mapping.ObservationMapping
 
 object WhereObservation {
 
-  private val SubtitleBinding: Matcher[Predicate] =
-    WhereOptionString.binding(UniquePath(List("subtitle")))
-
-  private val StatusBinding: Matcher[Predicate] =
-    WhereOrder.SimpleBinding[ObsStatus]("status", enumeratedBinding)
-
-  private val ActiveStatusBinding: Matcher[Predicate] =
-    WhereOrder.SimpleBinding[ObsActiveStatus]("activeStatus", enumeratedBinding)
-
-  val Binding: Matcher[Predicate] =
+  def binding(path: Path): Matcher[Predicate] = {
+    val SubtitleBinding = WhereOptionString.binding(path / "subtitle")
+    val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "id", ObservationIdBinding)
+    val StatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ObsStatus])
+    val ActiveStatusBinding = WhereOrder.binding(path / "activeStatus", enumeratedBinding[ObsActiveStatus])
+    lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        WhereObservation.Binding.List.Option("AND", rAND),
-        WhereObservation.Binding.List.Option("OR", rOR),
-        WhereObservation.Binding.Option("NOT", rNOT),
-        WhereOrder.ObservationId.Option("id", rId),
+        WhereObservationBinding.List.Option("AND", rAND),
+        WhereObservationBinding.List.Option("OR", rOR),
+        WhereObservationBinding.Option("NOT", rNOT),
+        WhereOrderObservationIdBinding.Option("id", rId),
         SubtitleBinding.Option("subtitle", rSubtitle),
         StatusBinding.Option("status", rStatus),
         ActiveStatusBinding.Option("activeStatus", rActiveStatus)
@@ -47,5 +45,7 @@ object WhereObservation {
           ).flatten)
         }
     }
+  }
 
 }
+

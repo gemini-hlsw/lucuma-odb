@@ -6,23 +6,25 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
+import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
 
 object WhereProgram {
 
-  private val NameBinding = WhereOptionString.binding(UniquePath(List("name")))
-
-  val Binding: Matcher[Predicate] =
+  def binding(path: Path): Matcher[Predicate] = {
+    val WhereNameBinding = WhereOptionString.binding(path / "name")
+    val WhereOrderProgramId = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
+    lazy val WhereProgramBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        WhereProgram.Binding.List.Option("AND", rAND),
-        WhereProgram.Binding.List.Option("OR", rOR),
-        WhereProgram.Binding.Option("NOT", rNOT),
-        WhereOrder.ProgramId.Option("id", rId),
-        NameBinding.Option("name", rName),
+        WhereProgramBinding.List.Option("AND", rAND),
+        WhereProgramBinding.List.Option("OR", rOR),
+        WhereProgramBinding.Option("NOT", rNOT),
+        WhereOrderProgramId.Option("id", rId),
+        WhereNameBinding.Option("name", rName),
         ("proposal", _), // ignore for now
       ) =>
         (rAND, rOR, rNOT, rId, rName).parMapN { (AND, OR, NOT, id, name) =>
@@ -35,5 +37,6 @@ object WhereProgram {
           ).flatten)
         }
     }
+  }
 
 }

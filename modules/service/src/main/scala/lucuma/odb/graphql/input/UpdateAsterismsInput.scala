@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Program
@@ -38,16 +39,18 @@ final case class UpdateAsterismsInput(
 
 object UpdateAsterismsInput {
 
-  val Binding: Matcher[UpdateAsterismsInput] =
+  def binding(path: Path): Matcher[UpdateAsterismsInput] = {
+    val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rPid),
         EditAsterismsPatchInput.Binding("SET", rSET),
-        WhereObservation.Binding.Option("WHERE", rWHERE),
+        WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
         (rPid, rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
     }
+  }
 
 }

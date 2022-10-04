@@ -7,7 +7,7 @@ package mapping
 
 import cats.syntax.all._
 import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -19,6 +19,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.predicate.Predicates
 
 import binding._
 import input._
@@ -29,12 +30,10 @@ trait ProgramMapping[F[_]]
      with UserTable[F]
      with ProgramUserTable[F]
      with ProposalTable[F]
-     with ObservationView[F] { this: SkunkMapping[F] =>
+     with ObservationView[F]
+     with Predicates[F] {
 
   def user: User
-
-  lazy val ProgramType: TypeRef =
-    schema.ref("Program")
 
   lazy val ProgramMapping: ObjectMapping =
     ObjectMapping(
@@ -63,8 +62,8 @@ trait ProgramMapping[F[_]]
           (rIncludeDeleted, rOFFSET, rLIMIT).parMapN { (includeDeleted, OFFSET, _) =>
             Select("observations", Nil,
               Filter(and(List(
-                if (includeDeleted) True else Eql[Existence](UniquePath(List("existence")), Const(Existence.Present)),
-                OFFSET.fold[Predicate](True)(o => GtEql[Observation.Id](UniquePath(List("id")), Const(o)))
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
               )),
               child
               )

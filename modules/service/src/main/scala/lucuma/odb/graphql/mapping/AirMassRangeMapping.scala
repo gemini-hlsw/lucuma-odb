@@ -6,13 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
+import edu.gemini.grackle.sql.SqlMapping
 
 import table.ObservationView
 
-trait AirMassRangeMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
-
-  lazy val AirMassRangeType = schema.ref("AirMassRange")
+trait AirMassRangeMapping[F[_]] extends ObservationView[F] {
 
   lazy val AirMassRangeMapping =
     ObjectMapping(

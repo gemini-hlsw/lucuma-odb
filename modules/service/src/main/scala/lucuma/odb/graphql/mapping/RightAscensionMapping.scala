@@ -23,13 +23,7 @@ import scala.reflect.ClassTag
 
 import table.TargetView
 
-trait RightAscensionMapping[F[_]]
-  extends ObservationView[F]
-     with TargetView[F]
-     with MappingExtras[F]
-  { this: SkunkMapping[F]  =>
-
-  lazy val RightAscensionType = schema.ref("RightAscension")
+trait RightAscensionMapping[F[_]] extends ObservationView[F] with TargetView[F] {
 
   private def rightAscensionMapping(
     idColumn:    ColumnRef,
