@@ -3,16 +3,21 @@
 
 package lucuma.odb.graphql.predicate
 
+import cats.Eq
+import cats.Order
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.core.model.Target
-import lucuma.odb.data.Existence
 
-class TargetPredicates(path: Path) {
-  lazy val existence = ExistencePredicates(path / "existence")
-  lazy val id = LeafPredicates[Target.Id](path / "id")
-  lazy val program = ProgramPredicates(path / "program")
+class LeafPredicates[A](path: Path) {
+
+  def eql(a: A)(using Eq[A]): Predicate =
+    Eql(path, Const(a))
+
+  def gtEql(a: A)(using Order[A]): Predicate =
+    GtEql(path, Const(a))
+
+  def in(as: List[A])(using Eq[A]): Predicate =
+    In(path, as)
+
 }
-

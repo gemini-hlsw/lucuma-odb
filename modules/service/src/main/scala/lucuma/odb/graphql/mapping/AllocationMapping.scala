@@ -9,10 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.AllocationTable
 
-trait AllocationMapping[F[_]]
-  extends AllocationTable[F] { this: SkunkMapping[F] =>
-
-  lazy val AllocationType = schema.ref("Allocation")
+trait AllocationMapping[F[_]] extends AllocationTable[F]  {
 
   lazy val AllocationMapping =
     ObjectMapping(

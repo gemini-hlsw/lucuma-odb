@@ -14,12 +14,7 @@ import java.math.MathContext
 import table.TargetView
 import table.ProgramTable
 
-trait ParallaxMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F]
-     with MappingExtras[F] { this: SkunkMapping[F] =>
-
-  lazy val ParallaxType = schema.ref("Parallax")
+trait ParallaxMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ParallaxMapping =
     ObjectMapping(

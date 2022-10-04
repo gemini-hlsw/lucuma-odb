@@ -9,7 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 
-trait AllocationTable[F[_]] { self: SkunkMapping[F] =>
+trait AllocationTable[F[_]] extends BaseMapping[F] {
 
   object AllocationTable extends TableDef("t_allocation") {
     val ProgramId = col("c_program_id", program_id)

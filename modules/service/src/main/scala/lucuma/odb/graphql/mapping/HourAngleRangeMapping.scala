@@ -9,10 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 
-trait HourAngleRangeMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
-
-  lazy val HourAngleRangeType = schema.ref("HourAngleRange")
+trait HourAngleRangeMapping[F[_]] extends ObservationView[F] {
 
   lazy val HourAngleRangeMapping =
     ObjectMapping(

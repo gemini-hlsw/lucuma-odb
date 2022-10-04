@@ -23,13 +23,7 @@ import scala.reflect.ClassTag
 
 import table.TargetView
 
-trait DeclinationMapping[F[_]]
-  extends ObservationView[F]
-     with TargetView[F]
-     with MappingExtras[F]
-  { this: SkunkMapping[F]  =>
-
-  lazy val DeclinationType = schema.ref("Declination")
+trait DeclinationMapping[F[_]] extends ObservationView[F] with TargetView[F] {
 
   private def declinationMapping(
     idColumn:    ColumnRef,

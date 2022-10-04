@@ -9,10 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 
-trait CreateObservationResultMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
-
-  lazy val CreateObservationResultType = schema.ref("CreateObservationResult")
+trait CreateObservationResultMapping[F[_]] extends ObservationView[F] {
 
   lazy val CreateObservationResultMapping =
     ObjectMapping(

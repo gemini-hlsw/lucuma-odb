@@ -12,10 +12,7 @@ import lucuma.odb.data.EditType
 import table.ProgramEditTable
 import table.ProgramTable
 
-trait ProgramEditMapping[F[_]]
-  extends ProgramTable[F] { this: SkunkMapping[F] =>
-
-  lazy val ProgramEditType = schema.ref("ProgramEdit")
+trait ProgramEditMapping[F[_]] extends ProgramTable[F]  {
 
   // N.B. env is populated by the subscription elaborator
   lazy val ProgramEditMapping =

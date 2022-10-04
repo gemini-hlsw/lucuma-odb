@@ -13,7 +13,7 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Path.UniquePath
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
@@ -36,9 +36,7 @@ import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
-import lucuma.odb.graphql.predicates.ObservationPredicates
-import lucuma.odb.graphql.predicates.ProgramPredicates
-import lucuma.odb.graphql.predicates.TargetPredicates
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
@@ -52,14 +50,7 @@ import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
 
-trait MutationMapping[F[_]: MonadCancelThrow]
-  extends ProgramPredicates[F]
-     with ObservationPredicates[F]
-     with TargetPredicates[F]
-     with MutationCompanionOps[F]
-  { this: SkunkMapping[F] =>
-
-  lazy val MutationType = schema.ref("Mutation")
+trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
@@ -104,13 +95,13 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
   // Field definitions
 
-  private val CreateObservation: MutationField =
+  private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
 
       val createObservation: F[Result[(Observation.Id, Query)]] =
         observationService.use { svc =>
           svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
-            _.fproduct(id => Unique(Filter(ObservationPredicates.hasObservationId(id), child)))
+            _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
           )
         }
 
@@ -135,26 +126,26 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       }
     }
 
-  private val CreateProgram =
+  private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       programService.use(_.insertProgram(input.SET)).map { id =>
-        Result(Unique(Filter(ProgramPredicates.hasProgramId(id), child)))
+        Result(Unique(Filter(Predicates.program.id.eql(id), child)))
       }
     }
 
-  private val CreateTarget =
+  private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
       targetService.use { ts =>
         import TargetService.CreateTargetResponse._
         ts.createTarget(input.programId, input.SET).map {
           case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
           case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
-          case Success(id)          => Result(Unique(Filter(TargetPredicates.hasTargetId(id), child)))
+          case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
         }
       }
     }
 
-  private val LinkUser =
+  private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>
       import lucuma.odb.service.ProgramService.LinkUserResponse._
       programService.use(_.linkUser(input)).map[Result[Query]] {
@@ -163,13 +154,13 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
         case Success(pid, uid)       =>
           Result(Unique(Filter(And(
-            Eql(UniquePath(List("programId")), Const(pid)),
-            Eql(UniquePath(List("userId")), Const(uid))
+            Predicates.linkUserResult.programId.eql(pid),
+            Predicates.linkUserResult.userId.eql(uid),
           ), child)))
       }
     }
 
-  private val SetAllocation =
+  private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
       import AllocationService.SetAllocationResponse._
       allocationService.use(_.setAllocation(input)).map[Result[Query]] {
@@ -178,8 +169,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
         case ProgramNotFound(_)  => ???
         case Success             =>
           Result(Unique(Filter(And(
-            Eql(UniquePath(List("programId")), Const(input.programId)),
-            Eql(UniquePath(List("partner")), Const(input.partner))
+            Predicates.setAllocationResult.programId.eql(input.programId),
+            Predicates.setAllocationResult.partner.eql(input.partner)
           ), child)))
       }
     }
@@ -193,9 +184,9 @@ trait MutationMapping[F[_]: MonadCancelThrow]
   ): Result[AppliedFragment] = {
     val whereObservation: Predicate =
       and(List(
-        Eql(UniquePath(List("program", "id")), Const(programId)),
-        ObservationPredicates.isWritableBy(user),
-        ObservationPredicates.includeDeleted(includeDeleted.getOrElse(false)),
+        Predicates.observation.program.id.eql(programId),
+        Predicates.observation.program.isWritableBy(user),
+        Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
         WHERE.getOrElse(True)
       ))
 
@@ -208,8 +199,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
     )
   }
 
-    private val UpdateAsterisms: MutationField =
-    MutationField("updateAsterisms", UpdateAsterismsInput.Binding) { (input, child) =>
+    private lazy val UpdateAsterisms: MutationField =
+    MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
 
       val idSelect: Result[AppliedFragment] =
         observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
@@ -221,7 +212,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
               .selectObservations(which)
               .fproduct {
                 case Nil => Limit(0, child)
-                case ids => Filter(ObservationPredicates.inObservationIds(ids), child)
+                case ids => Filter(Predicates.observation.id.in(ids), child)
               }
           }
         }
@@ -246,8 +237,8 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       }
     }
 
-  private val UpdateObservations: MutationField =
-    MutationField("updateObservations", UpdateObservationsInput.Binding) { (input, child) =>
+  private lazy val UpdateObservations: MutationField =
+    MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
 
       val idSelect: Result[AppliedFragment] =
         observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
@@ -273,7 +264,7 @@ trait MutationMapping[F[_]: MonadCancelThrow]
                 // Work around using a zero limit
                 case Nil => Limit(0, child)
 
-                case ids => Filter(ObservationPredicates.inObservationIds(ids), child)
+                case ids => Filter(Predicates.observation.id.in(ids), child)
               })
           }
         }
@@ -296,13 +287,13 @@ trait MutationMapping[F[_]: MonadCancelThrow]
       }
     }
 
-  private val UpdatePrograms =
-    MutationField("updatePrograms", UpdateProgramsInput.Binding) { (input, child) =>
+  private lazy val UpdatePrograms =
+    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
 
       // Our predicate for selecting programs to update
       val filterPredicate = and(List(
-        ProgramPredicates.isWritableBy(user),
-        ProgramPredicates.includeDeleted(input.includeDeleted.getOrElse(false)),
+        Predicates.program.isWritableBy(user),
+        Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
         input.WHERE.getOrElse(True)
       ))
 
@@ -315,13 +306,13 @@ trait MutationMapping[F[_]: MonadCancelThrow]
 
       // We want to order the returned programs by id
       def orderByPid(child: Query) =
-        OrderBy(OrderSelections(List(OrderSelection(UniquePath[Program.Id](List("id"))))), child)
+        OrderBy(OrderSelections(List(OrderSelection[Program.Id](ProgramType / "id"))), child)
 
       // Update the specified programs and then return a query for the affected programs.
       idSelect.flatTraverse { which =>
         programService.use(_.updatePrograms(input.SET, which)).map {
           case Nil  => Result(orderByPid(Limit(0, child)))
-          case pids => Result(orderByPid(Filter(ProgramPredicates.hasProgramId(pids), child)))
+          case pids => Result(orderByPid(Filter(Predicates.program.id.in(pids), child)))
         } recover {
           case ProposalService.ProposalUpdateException.CreationFailed =>
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")

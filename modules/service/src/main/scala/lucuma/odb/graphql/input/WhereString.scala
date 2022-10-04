@@ -17,7 +17,7 @@ import lucuma.odb.graphql.binding._
 
 object WhereString {
 
-  def binding(path: Term[NonEmptyString] with Path): Matcher[Predicate] =
+  def binding(path: Path): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("EQ", rEq),

@@ -12,11 +12,7 @@ import table.ObservationView
 import table.ProgramTable
 
 trait ObservationMapping[F[_]]
-  extends ObservationView[F]
-     with ProgramTable[F] { this: SkunkMapping[F] =>
-
-  lazy val ObservationType: TypeRef =
-    schema.ref("Observation")
+  extends ObservationView[F] with ProgramTable[F]  {
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(

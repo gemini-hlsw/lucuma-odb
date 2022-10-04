@@ -15,13 +15,7 @@ import lucuma.odb.graphql.util.MappingExtras
 
 import java.time.Duration
 
-trait NonNegDurationMapping[F[_]]
-  extends AllocationTable[F]
-     with MappingExtras[F]
-     with ProgramTable[F]
-     with ProposalTable[F] { this: SkunkMapping[F] =>
-
-  lazy val NonNegDurationType = schema.ref("NonNegDuration")
+trait NonNegDurationMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] {
 
   lazy val NonNegDurationMapping =
     PrefixedMapping(

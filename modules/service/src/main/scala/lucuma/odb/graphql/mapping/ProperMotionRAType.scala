@@ -12,12 +12,7 @@ import lucuma.odb.graphql.util.MappingExtras
 import table.TargetView
 import table.ProgramTable
 
-trait ProperMotionRAMapping[F[_]]
-  extends ProgramTable[F]
-     with TargetView[F]
-     with MappingExtras[F] { this: SkunkMapping[F] =>
-
-  lazy val ProperMotionRAType = schema.ref("ProperMotionRA")
+trait ProperMotionRAMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ProperMotionRAMapping =
     ObjectMapping(

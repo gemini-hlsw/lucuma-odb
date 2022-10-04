@@ -9,10 +9,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 
-trait ConstraintSetMapping[F[_]]
-  extends ObservationView[F] { this: SkunkMapping[F] =>
-
-  lazy val ConstraintSetType = schema.ref("ConstraintSet")
+trait ConstraintSetMapping[F[_]] extends ObservationView[F] {
 
   lazy val ConstraintSetMapping =
     ObjectMapping(

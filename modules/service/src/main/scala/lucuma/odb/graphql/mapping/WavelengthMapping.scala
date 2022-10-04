@@ -9,12 +9,7 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
 
-trait WavelengthMapping[F[_]]
-  extends ObservationView[F]
-     with MappingExtras[F]
-{ this: SkunkMapping[F] =>
-
-  lazy val WavelengthType = schema.ref("Wavelength")
+trait WavelengthMapping[F[_]] extends ObservationView[F] {
 
   private def wavelengthMapping(
     idColumn: ColumnRef,

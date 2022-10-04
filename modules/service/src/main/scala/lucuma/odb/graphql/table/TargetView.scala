@@ -19,7 +19,7 @@ import skunk.codec.all._
 
 import scala.reflect.ClassTag
 
-trait TargetView[F[_]] { this: SkunkMapping[F] =>
+trait TargetView[F[_]] extends BaseMapping[F] {
 
   object TargetView extends TableDef("v_target") {
     val ProgramId      = col("c_program_id", program_id)
