@@ -13,11 +13,12 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.refined._
+import io.circe.refined.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -34,11 +35,13 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
+
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -56,15 +59,15 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[ImageQuality](ImageQualityType),
+      LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
       LeafMapping[NonNegLong](NonNegLongType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
-      LeafMapping[ObsActiveStatus](ObsActiveStatusType),
+      LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
-      LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[Tag](PartnerType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
