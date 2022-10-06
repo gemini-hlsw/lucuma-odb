@@ -28,7 +28,7 @@ trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
     ObjectMapping(
       tpe = AngleType,
       fieldMappings = List(
-        SqlField("synthentic_id", idColumn, key = true, hidden = true),
+        SqlField("synthetic_id", idColumn, key = true, hidden = true),
         SqlField("value", valueColumn, hidden = true),
         FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
         FieldRef[Angle]("value").as("microseconds",    angleToTime(1L)),
@@ -45,7 +45,7 @@ trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
       )
     )
 
-  lazy val AngleMapping =
+  lazy val AngleMapping: PrefixedMapping =
     PrefixedMapping(
       tpe = AngleType,
       mappings = List(

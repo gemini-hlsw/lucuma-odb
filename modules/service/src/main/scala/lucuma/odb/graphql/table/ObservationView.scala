@@ -67,6 +67,13 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           val Capability: ColumnRef         = col("c_spec_capability",          spectroscopy_capabilities.opt)
         }
       }
+      
+      object ObservingMode {
+        val SyntheticId: ColumnRef = col("c_observing_mode_id", observation_id.embedded)
+        
+        val ObservingModeType: ColumnRef = col("c_observing_mode_type", observing_mode_type.embedded)
+        
+      }
     }
 
 }
