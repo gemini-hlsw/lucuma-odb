@@ -41,14 +41,14 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
-        SqlRoot("filterTypeMeta"),
-        SqlRoot("observation"),
-        SqlRoot("observations"),
-        SqlRoot("partnerMeta"),
-        SqlRoot("program"),
-        SqlRoot("programs"),
-        SqlRoot("target"),
-        SqlRoot("targets"),
+        SqlObject("filterTypeMeta"),
+        SqlObject("observation"),
+        SqlObject("observations"),
+        SqlObject("partnerMeta"),
+        SqlObject("program"),
+        SqlObject("programs"),
+        SqlObject("target"),
+        SqlObject("targets"),
       )
     )
 

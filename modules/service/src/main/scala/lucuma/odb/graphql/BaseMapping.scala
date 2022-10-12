@@ -6,13 +6,11 @@ package lucuma.odb.graphql
 import edu.gemini.grackle.Schema
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
-import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
      with SchemaSemigroup[F]
-     with MutationCompanionOps[F]
      with MappingExtras[F] {
 
   // TODO: auto-generate this

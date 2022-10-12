@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.data.Nested
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path
@@ -21,16 +22,12 @@ import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
 
 import scala.reflect.ClassTag
 
-trait SubscriptionMapping[F[_]]
-  extends MutationCompanionOps[F]
-     with Predicates[F]
-  { this: SkunkMapping[F] =>
+trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
   def topics: Topics[F]
   def user: User
@@ -51,12 +48,21 @@ trait SubscriptionMapping[F[_]]
   // Convenience for constructing a Subscription stream and corresponding 1-arg elaborator.
   private trait SubscriptionField {
     def Elaborator: PartialFunction[Select, Result[Query]]
-    def FieldMapping: SqlRoot
+    def FieldMapping: RootEffect
   }
   private object SubscriptionField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => Stream[F, Result[Query]]) =
       new SubscriptionField {
-        val FieldMapping = SqlRoot(fieldName, mutation = Mutation.simpleStream((child, env) => env.getR[I]("input").flatTraverse(f(_, child))))
+        val FieldMapping =
+          RootEffect.computeQueryStream(fieldName) { (query, tpe, env) =>
+            query match
+              case Environment(a, Select(b, c, q)) =>
+                Nested(env.getR[I]("input").flatTraverse(f(_, q)))
+                  .map(q => Environment(a, Select(b, c, q)))
+                  .value
+              case _ =>
+                Result.failure(s"Unexpected: $query").pure[Stream[F, *]]
+          }
         val Elaborator =
           case Select(`fieldName`, List(inputBinding("input", rInput)), child) =>
             rInput.map(input => Environment(Env("input" -> input), Select(fieldName, Nil, child)))
