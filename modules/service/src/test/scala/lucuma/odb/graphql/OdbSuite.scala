@@ -69,7 +69,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   var container: PostgreSQLContainer = null
 
-  override val containerDef = new PostgreSQLContainer.Def(DockerImageName.parse("postgres:11")) {
+  override val containerDef = new PostgreSQLContainer.Def(DockerImageName.parse("postgres:14")) {
     override def createContainer(): PostgreSQLContainer = {
       val c = super.createContainer()
       c.container.withClasspathResourceMapping("/db/migration", "/docker-entrypoint-initdb.d/", BindMode.READ_ONLY)

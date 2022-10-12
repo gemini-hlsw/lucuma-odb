@@ -6,6 +6,7 @@ package mapping
 
 import cats.Applicative
 import cats.data.Ior
+import cats.data.Nested
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
@@ -37,7 +38,6 @@ import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
@@ -50,7 +50,7 @@ import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
 
-trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
+trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
@@ -81,12 +81,22 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
     def Elaborator: PartialFunction[Select, Result[Query]]
-    def FieldMapping: SqlRoot
+    def FieldMapping: RootEffect
   }
   private object MutationField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
       new MutationField {
-        val FieldMapping = SqlRoot(fieldName, mutation = Mutation.simple((child, env) => env.getR[I]("input").flatTraverse(f(_, child))))
+        val FieldMapping =
+          RootEffect.computeQuery(fieldName) { (query, tpe, env) =>
+            query match {
+              case Environment(x, Select(y, z, child)) =>
+                Nested(env.getR[I]("input").flatTraverse(i => f(i, child)))
+                  .map(q => Environment(x, Select(y, z, q)))
+                  .value
+              case _ =>
+                Result.failure(s"Unexpected: $query").pure[F]
+            }
+          }
         val Elaborator =
           case Select(`fieldName`, List(inputBinding("input", rInput)), child) =>
             rInput.map(input => Environment(Env("input" -> input), Select(fieldName, Nil, child)))
@@ -189,14 +199,10 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
         WHERE.getOrElse(True)
       ))
-
-    Result.fromOption(
-      MappedQuery(
-        Filter(whereObservation, Select("id", Nil, Query.Empty)),
-        Cursor.Context(ObservationType)
-      ).map(_.fragment),
-      "Could not construct a subquery for the provided WHERE condition."
-    )
+    MappedQuery(
+      Filter(whereObservation, Select("id", Nil, Query.Empty)),
+      Cursor.Context(ObservationType)
+    ).map(_.fragment)
   }
 
     private lazy val UpdateAsterisms: MutationField =
@@ -299,10 +305,7 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
 
       // An applied fragment that selects all program ids that satisfy `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        Result.fromOption(
-          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(ProgramType)).map(_.fragment),
-          "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
-        )
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(ProgramType)).map(_.fragment)
 
       // We want to order the returned programs by id
       def orderByPid(child: Query) =
