@@ -905,8 +905,8 @@ input GmosNorthLongSlitInput {
   # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   fpu: GmosNorthBuiltinFpu
 
-  # The explicitCentralWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  explicitCentralWavelength: WavelengthInput
+  # The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  centralWavelength: WavelengthInput
 
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitXBin: GmosXBinning
