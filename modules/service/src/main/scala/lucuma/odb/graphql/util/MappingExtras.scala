@@ -4,11 +4,11 @@
 package lucuma.odb.graphql.util
 
 import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Result
 import io.circe.Encoder
 
 import scala.reflect.ClassTag
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Result
 
 trait MappingExtras[F[_]] extends Mapping[F] {
 

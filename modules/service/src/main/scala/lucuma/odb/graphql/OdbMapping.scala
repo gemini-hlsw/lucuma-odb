@@ -100,6 +100,7 @@ object OdbMapping {
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
+          with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
@@ -174,6 +175,7 @@ object OdbMapping {
               PosAngleConstraintMapping,
               ProgramMapping,
               ProgramEditMapping,
+              ProgramSelectResultMapping,
               ProgramUserMapping,
               ProperMotionDeclinationMapping,
               ProperMotionMapping,
@@ -208,7 +210,7 @@ object OdbMapping {
 
           // Override `fetch` to log the query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            Logger[F].warn {
+            Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")

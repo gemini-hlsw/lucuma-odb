@@ -7,7 +7,9 @@ package mapping
 
 import cats.effect.kernel.Par
 import cats.syntax.all._
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Cursor.ListTransformCursor
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -15,6 +17,7 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
@@ -26,8 +29,6 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.ListTransformCursor
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]
@@ -155,24 +156,29 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
-        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-          Select("programs", Nil,
-            Limit(
-              LIMIT.foldLeft(1000)(_ min _.value),
-              Filter(
+        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+          val limit = LIMIT.foldLeft(1000)(_ min _.value)
+          selectResultTransform("programs", child, limit) { child =>           
+            FilterOrderByOffsetLimit(
+              pred = Some(
                 and(List(
                   OFFSET.map(Predicates.program.id.gtEql).getOrElse(True),
                   Predicates.program.existence.includeDeleted(includeDeleted),
                   Predicates.program.isVisibleTo(user),
                   WHERE.getOrElse(True)
-                )),
-                child
-              )
+                ))
+              ),
+              oss = Some(List(
+                OrderSelection[lucuma.core.model.Program.Id](ProgramType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = child
             )
-          )
+          }
         }
       }
-    }
+  }
 
   private lazy val Target: PartialFunction[Select, Result[Query]] =
     case Select("target", List(
@@ -192,6 +198,53 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         )
       }
 
+ 
+  def selectResultTransform(field: String, child: Query, limit: Int)(transformMatchesChild: Query => Query): Result[Query] = {
+
+    // Transform the cursor to remove the last element from the list if the over-select
+    // revealed that there are more rows available.
+    def removeOverfetch(c: Cursor): Result[Cursor] =
+      (c.listSize, c.asList(Seq)).mapN { (size, elems) =>
+        if size <= limit then c
+        else ListTransformCursor(c, size - 1, elems.init)
+      }
+ 
+    // Find the "matches" node under the main "targets" query and add all our filtering
+    // and whatnot down in there.
+    def transformMatches(q: Query): Result[Query] =
+      Query.mapSomeFields(q) {
+        case Select("matches", Nil, child) =>
+          Result(
+            Select(
+              "matches", 
+              Nil, 
+              TransformCursor(
+                removeOverfetch, 
+                transformMatchesChild(child)                  
+              )
+            )
+          )
+      }
+
+    // If we're selecting "matches" then continue by transforming the child query, otherwise
+    // punt because there's really no point in doing such a selection.
+    if Query.hasField(child, "matches") then 
+      transformMatches(child).map { child =>
+        Select(field, Nil,
+          Environment(
+            Env(
+              SelectResultMapping.LimitKey -> limit,
+              SelectResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
+            ),
+            child
+          )
+        )
+      }
+    else Result.failure("Field `matches` must be selected.") // meh
+
+  }
+
+
   private lazy val Targets: PartialFunction[Select, Result[Query]] = {
     val WhereTargetInputBinding = WhereTargetInput.binding(Path.from(TargetType))
     {
@@ -202,68 +255,27 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-
-          // We need our limit in a few places below.
           val limit = LIMIT.foldLeft(1000)(_ min _.value)
-
-          // Transform the cursor to remove the last element from the list if the over-select
-          // revealed that there are more rows available.
-          def removeExtraRow(c: Cursor): Result[Cursor] =
-            (c.listSize, c.asList(Seq)).mapN { (size, elems) =>
-              if size <= limit then c
-              else ListTransformCursor(c, size - 1, elems.init)
-            }
-
-          // Find the "matches" node under the main "targets" query and add all our filtering
-          // and whatnot down in there.
-          def transformMatches(q: Query, limit: Int): Result[Query] =
-            Query.mapSomeFields(q) {
-              case Select("matches", Nil, child) =>
-                Result(
-                  Select(
-                    "matches", 
-                    Nil, 
-                    TransformCursor(
-                      removeExtraRow,                   
-                      FilterOrderByOffsetLimit(
-                        pred = Some(
-                          and(List(
-                            OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
-                            Predicates.target.existence.includeDeleted(includeDeleted),
-                            Predicates.target.program.isVisibleTo(user),
-                            WHERE.getOrElse(True)
-                          )
-                        )),
-                        oss = Some(List(
-                          OrderSelection[lucuma.core.model.Target.Id](TargetType / "id")
-                        )),
-                        offset = None,
-                        limit = Some(limit + 1), // Select one extra row here.
-                        child = child
-                      )
-                    ) // Remove the extra row here
-                  )
+          selectResultTransform("targets", child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(
+                and(List(
+                  OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
+                  Predicates.target.existence.includeDeleted(includeDeleted),
+                  Predicates.target.program.isVisibleTo(user),
+                  WHERE.getOrElse(True)
                 )
-            }
-
-          // If we're selecting "matches" then continue by transforming the child query, otherwise
-          // punt because there's really no point in doing such a selection.
-          if Query.hasField(child, "matches") then 
-            transformMatches(child, limit).map { child =>
-              Select("targets", Nil, 
-                Environment(
-                  Env(
-                    TargetSelectResultMapping.LimitKey -> limit,
-                    TargetSelectResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
-                  ),
-                  child
-                )
-              )
-            }
-          else Result.failure("Field `matches` must be selected.") // meh
-                  
+              )),
+              oss = Some(List(
+                OrderSelection[lucuma.core.model.Target.Id](TargetType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )          
+          }
         }
-      }
-    }
+      }        
+  }
 
 }
