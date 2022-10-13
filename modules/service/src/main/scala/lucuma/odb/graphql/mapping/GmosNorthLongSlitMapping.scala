@@ -18,6 +18,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.predicate.Predicates
+
 import binding.*
 import input.*
 import table.*
