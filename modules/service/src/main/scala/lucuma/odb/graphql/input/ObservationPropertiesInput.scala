@@ -26,7 +26,7 @@ final case class ObservationPropertiesInput(
   targetEnvironment:   Option[TargetEnvironmentInput],
   constraintSet:       Option[ConstraintSetInput],
   scienceRequirements: Option[ScienceRequirementsInput],
-  // observingMode: Option[ObservingModeInput],
+  observingMode:       Option[ObservingModeInput],
   existence:           Option[Existence]
 ) {
 
@@ -50,6 +50,7 @@ object ObservationPropertiesInput {
       targetEnvironment   = None,
       constraintSet       = ConstraintSetInput.Default.some,
       scienceRequirements = None,
+      observingMode       = None,
       existence           = Existence.Present.some
     )
 
@@ -64,7 +65,7 @@ object ObservationPropertiesInput {
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-        ("observingMode", _),         // ignore for now
+        ObservingModeInput.Binding.Option("observingMode", rObservingMode),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rSubtitle.map(Nullable.orNull),
@@ -75,6 +76,7 @@ object ObservationPropertiesInput {
          rTargetEnvironment,
          rConstraintSet,
          rScienceRequirements,
+         rObservingMode, 
          rExistence
         ).parMapN(apply)
     }
@@ -90,7 +92,7 @@ object ObservationPropertiesInput {
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-        ("observingMode", _),         // ignore for now
+        ObservingModeInput.Binding.Option("observingMode", rObservingMode),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rSubtitle,
@@ -101,6 +103,7 @@ object ObservationPropertiesInput {
          rTargetEnvironment,
          rConstraintSet,
          rScienceRequirements,
+         rObservingMode, 
          rExistence
         ).parMapN(apply)
     }
