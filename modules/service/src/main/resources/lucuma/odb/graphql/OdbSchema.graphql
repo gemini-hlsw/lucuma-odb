@@ -1279,8 +1279,8 @@ input GmosSouthLongSlitInput {
   # The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   fpu: GmosSouthBuiltinFpu
 
-  # The explicitCentralWavelength field may be unset by assigning a null value, or ignored by skipping it altogether
-  explicitCentralWavelength: WavelengthInput
+  # The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  centralWavelength: WavelengthInput
 
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitXBin: GmosXBinning
@@ -3572,14 +3572,6 @@ interface GmosLongSlitObservingMode {
   # or else taken from the `defaultCentralWavelength`.
   centralWavelength: Wavelength!
 
-  # Default central wavelength, as calculated from the filter and grating (?)
-  defaultCentralWavelength: Wavelength!
-
-  # Optional explicitly specified central wavelength.  If set it overrides the
-  # default.
-  explicitCentralWavelength: Wavelength
-
-
   # GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   # from the defaultXBin.
   xBin: GmosXBinning!
@@ -3661,6 +3653,10 @@ interface GmosLongSlitObservingMode {
   # Optional explicitly specified spatial q offsets. If set it overrides the
   # the default.
   explicitSpatialOffsets: [q!]
+
+  # The central wavelength as initially selected.  See the `centralWavelength`
+  # field for the wavelength that will be used in the observation.
+  initialCentralWavelength: Wavelength!
 
 }
 
@@ -3931,9 +3927,8 @@ type GmosSouthLongSlit implements GmosLongSlitObservingMode {
   # GMOS South FPU
   fpu: GmosSouthBuiltinFpu!
 
+  # Central wavelength.
   centralWavelength: Wavelength!
-  defaultCentralWavelength: Wavelength!
-  explicitCentralWavelength: Wavelength
 
   xBin: GmosXBinning!
   defaultXBin: GmosXBinning!
@@ -3974,6 +3969,10 @@ type GmosSouthLongSlit implements GmosLongSlitObservingMode {
   # The FPU as it was initially selected.  See the `fpu` field for the FPU that
   # will be used in the observation.
   initialFPU: GmosSouthBuiltinFpu!
+  
+  # The central wavelength as initially selected.  See the `centralWavelength`
+  # field for the wavelength that will be used in the observation.
+  initialCentralWavelength: Wavelength!
 }
 
 # GMOS X Binning
