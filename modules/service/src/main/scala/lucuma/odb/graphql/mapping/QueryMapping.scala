@@ -26,6 +26,8 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Cursor.ListTransformCursor
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]
@@ -199,25 +201,67 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
-        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-          Select("targets", Nil,
-            FilterOrderByOffsetLimit(
-              pred = Some(
-                and(List(
-                  OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
-                  Predicates.target.existence.includeDeleted(includeDeleted),
-                  Predicates.target.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
+        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+
+          // We need our limit in a few places below.
+          val limit = LIMIT.foldLeft(1000)(_ min _.value)
+
+          // Transform the cursor to remove the last element from the list if the over-select
+          // revealed that there are more rows available.
+          def removeExtraRow(c: Cursor): Result[Cursor] =
+            (c.listSize, c.asList(Seq)).mapN { (size, elems) =>
+              if size <= limit then c
+              else ListTransformCursor(c, size - 1, elems.init)
+            }
+
+          // Find the "matches" node under the main "targets" query and add all our filtering
+          // and whatnot down in there.
+          def transformMatches(q: Query, limit: Int): Result[Query] =
+            Query.mapSomeFields(q) {
+              case Select("matches", Nil, child) =>
+                Result(
+                  Select(
+                    "matches", 
+                    Nil, 
+                    TransformCursor(
+                      removeExtraRow,                   
+                      FilterOrderByOffsetLimit(
+                        pred = Some(
+                          and(List(
+                            OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
+                            Predicates.target.existence.includeDeleted(includeDeleted),
+                            Predicates.target.program.isVisibleTo(user),
+                            WHERE.getOrElse(True)
+                          )
+                        )),
+                        oss = Some(List(
+                          OrderSelection[lucuma.core.model.Target.Id](TargetType / "id")
+                        )),
+                        offset = None,
+                        limit = Some(limit + 1), // Select one extra row here.
+                        child = child
+                      )
+                    ) // Remove the extra row here
+                  )
                 )
-              )),
-              oss = Some(List(
-                OrderSelection[lucuma.core.model.Target.Id](TargetType / "id")
-              )),
-              offset = None,
-              limit = Some(LIMIT.foldLeft(1000)(_ min _.value)),
-              child = child
-            )
-          )
+            }
+
+          // If we're selecting "matches" then continue by transforming the child query, otherwise
+          // punt because there's really no point in doing such a selection.
+          if Query.hasField(child, "matches") then 
+            transformMatches(child, limit).map { child =>
+              Select("targets", Nil, 
+                Environment(
+                  Env(
+                    TargetSelectResultMapping.LimitKey -> limit,
+                    TargetSelectResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
+                  ),
+                  child
+                )
+              )
+            }
+          else Result.failure("Field `matches` must be selected.") // meh
+                  
         }
       }
     }

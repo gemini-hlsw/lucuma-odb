@@ -108,6 +108,7 @@ trait BaseMapping[F[_]]
   lazy val TacCategoryType                     = schema.ref("TacCategory")
   lazy val TargetEnvironmentType               = schema.ref("TargetEnvironment")
   lazy val TargetIdType                        = schema.ref("TargetId")
+  lazy val TargetSelectResultType              = schema.ref("TargetSelectResult")
   lazy val TargetType                          = schema.ref("Target")
   lazy val TimestampType                       = schema.ref("Timestamp")
   lazy val ToOActivationType                   = schema.ref("ToOActivation")

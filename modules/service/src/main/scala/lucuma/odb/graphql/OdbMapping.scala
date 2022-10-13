@@ -116,6 +116,7 @@ object OdbMapping {
           with SubscriptionMapping[F]
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
+          with TargetSelectResultMapping[F]
           with UserMapping[F]
           with WavelengthMapping[F]
         {
@@ -188,6 +189,7 @@ object OdbMapping {
               SubscriptionMapping,
               TargetEnvironmentMapping,
               TargetMapping,
+              TargetSelectResultMapping,
               UserMapping,
               WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings
@@ -206,7 +208,7 @@ object OdbMapping {
 
           // Override `fetch` to log the query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            Logger[F].info {
+            Logger[F].warn {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
               val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
