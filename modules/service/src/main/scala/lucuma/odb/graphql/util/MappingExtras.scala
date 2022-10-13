@@ -7,6 +7,8 @@ import edu.gemini.grackle.Mapping
 import io.circe.Encoder
 
 import scala.reflect.ClassTag
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Result
 
 trait MappingExtras[F[_]] extends Mapping[F] {
 
@@ -20,4 +22,8 @@ trait MappingExtras[F[_]] extends Mapping[F] {
     }
   }
 
+  extension (self: Query.type)
+    def mapSomeFields(query: Query)(f: PartialFunction[Query, Result[Query]]): Result[Query] = 
+      self.mapFields(query)(f.applyOrElse(_, Result.apply))
+      
 }
