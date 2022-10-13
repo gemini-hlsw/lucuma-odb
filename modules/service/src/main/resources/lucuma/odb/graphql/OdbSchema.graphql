@@ -4733,7 +4733,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): [Program!]! #ProgramSelectResult!
+  ): ProgramSelectResult!
 
   # Observations grouped by commonly held science mode
   observingModeGroup(
