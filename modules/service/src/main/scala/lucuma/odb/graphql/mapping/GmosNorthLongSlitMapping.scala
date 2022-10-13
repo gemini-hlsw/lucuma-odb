@@ -34,8 +34,6 @@ filter: GmosNorthFilter
 fpu: GmosNorthBuiltinFpu
 
 centralWavelength: Wavelength!
-defaultCentralWavelength: Wavelength!
-explicitCentralWavelength: Wavelength
 
 xBin: GmosXBinning!
 defaultXBin: GmosXBinning!
@@ -76,6 +74,8 @@ initialFilter: GmosNorthFilter
 # The FPU as it was initially selected.  See the `fpu` field for the FPU that
 # will be used in the observation.
 initialFPU: GmosNorthBuiltinFpu!
+
+initialCentralWavelength: Wavelength!
 */
 
 trait GmosNorthLongSlitMapping[F[_]]

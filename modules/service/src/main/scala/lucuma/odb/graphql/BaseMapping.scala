@@ -63,6 +63,7 @@ trait BaseMapping[F[_]]
   lazy val ObservingModeType                   = schema.ref("ObservingMode")
   lazy val ObservingModeTypeType               = schema.ref("ObservingModeType")
   lazy val GmosNorthLongSlitType               = schema.ref("GmosNorthLongSlit")
+  lazy val GmosSouthLongSlitType               = schema.ref("GmosSouthLongSlit")
   lazy val ObsStatusType                       = schema.ref("ObsStatus")
   lazy val ParallaxType                        = schema.ref("Parallax")
   lazy val PartnerMetaType                     = schema.ref("PartnerMeta")
