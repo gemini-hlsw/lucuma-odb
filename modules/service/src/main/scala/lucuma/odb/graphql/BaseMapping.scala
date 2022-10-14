@@ -73,6 +73,7 @@ trait BaseMapping[F[_]]
   lazy val ObservationType                     = schema.ref("Observation")
   lazy val ObservingModeType                   = schema.ref("ObservingMode")
   lazy val ObservingModeTypeType               = schema.ref("ObservingModeType")
+  lazy val ObservationSelectResultType         = schema.ref("ObservationSelectResult")
   lazy val ObsStatusType                       = schema.ref("ObsStatus")
   lazy val pType                               = schema.ref("p")
   lazy val ParallaxType                        = schema.ref("Parallax")

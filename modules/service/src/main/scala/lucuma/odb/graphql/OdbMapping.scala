@@ -93,6 +93,7 @@ object OdbMapping {
           with NonsiderealMapping[F]
           with ObservationMapping[F]
           with ObservingModeMapping[F]
+          with ObservationSelectResultMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
@@ -168,6 +169,7 @@ object OdbMapping {
               NonsiderealMapping,
               ObservationMapping,
               ObservingModeMapping,
+              ObservationSelectResultMapping,
               ParallaxMapping,
               PartnerMetaMapping,
               PartnerSplitMapping,

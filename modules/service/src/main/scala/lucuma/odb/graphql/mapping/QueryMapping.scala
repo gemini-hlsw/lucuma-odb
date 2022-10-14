@@ -104,21 +104,24 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
-        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parMapN { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-          Select("observations", Nil,
-            Limit(
-              LIMIT.foldLeft(1000)(_ min _.value),  // TODO: we need a common place for the max limit
-              Filter(
-                and(List(
-                  OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
-                  Predicates.observation.existence.includeDeleted(includeDeleted),
-                  Predicates.observation.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                )),
-                child
-              )
+        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+          val limit = LIMIT.foldLeft(1000)(_ min _.value)
+          selectResult("observations", child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                Predicates.observation.program.isVisibleTo(user),
+                WHERE.getOrElse(True)
+              ))),
+              oss = Some(List(
+                OrderSelection[lucuma.core.model.Observation.Id](ObservationType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
             )
-          )
+          }
         }
       }
     }
@@ -158,7 +161,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(1000)(_ min _.value)
-          selectResultTransform("programs", child, limit) { child =>           
+          selectResult("programs", child, limit) { q =>           
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
@@ -173,7 +176,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
               )),
               offset = None,
               limit = Some(limit + 1), // Select one extra row here.
-              child = child
+              child = q
             )
           }
         }
@@ -198,37 +201,39 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         )
       }
 
- 
-  def selectResultTransform(field: String, child: Query, limit: Int)(transformMatchesChild: Query => Query): Result[Query] = {
-
-    // Transform the cursor to remove the last element from the list if the over-select
-    // revealed that there are more rows available.
-    def removeOverfetch(c: Cursor): Result[Cursor] =
+  /** A cursor transformation that takes `n` elements from a list (if it's a list). */
+  object Take {
+    def apply(n: Int)(c: Cursor): Result[Cursor] =
       (c.listSize, c.asList(Seq)).mapN { (size, elems) =>
-        if size <= limit then c
+        if size <= n then c
         else ListTransformCursor(c, size - 1, elems.init)
       }
+  }
  
+  /**
+   * Transform a top-level `Select(field, ..., child)` that yields a SelectResult with a specified
+   * `limit` into the proper form. The "matches" subselect's child is passed to `transform`, which
+   * is how you add filter, ordering, limit (MUST BE `limit + 1`!) and so on as if it were a
+   * top-level query without the SelectResult structure. See `Targets` for instance, in this source
+   * file, for an example. Note that this will fail if there is no "matches" subquery. Supporting
+   * such queries would complicate things and isn't really necessary.
+   */
+  def selectResult(field: String, child: Query, limit: Int)(transform: Query => Query): Result[Query] = {
+
     // Find the "matches" node under the main "targets" query and add all our filtering
-    // and whatnot down in there.
+    // and whatnot down in there, wrapping with a transform that removes the last row from the
+    // final results. See an `SelectResultMapping` to see how `hasMore` works.
     def transformMatches(q: Query): Result[Query] =
       Query.mapSomeFields(q) {
         case Select("matches", Nil, child) =>
-          Result(
-            Select(
-              "matches", 
-              Nil, 
-              TransformCursor(
-                removeOverfetch, 
-                transformMatchesChild(child)                  
-              )
-            )
-          )
+          Result(Select("matches", Nil, TransformCursor(Take(limit), transform(child))))
       }
 
     // If we're selecting "matches" then continue by transforming the child query, otherwise
     // punt because there's really no point in doing such a selection.
-    if Query.hasField(child, "matches") then 
+    if !Query.hasField(child, "matches") 
+    then Result.failure("Field `matches` must be selected.") // meh
+    else
       transformMatches(child).map { child =>
         Select(field, Nil,
           Environment(
@@ -240,7 +245,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           )
         )
       }
-    else Result.failure("Field `matches` must be selected.") // meh
 
   }
 
@@ -256,7 +260,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(1000)(_ min _.value)
-          selectResultTransform("targets", child, limit) { q =>
+          selectResult("targets", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
