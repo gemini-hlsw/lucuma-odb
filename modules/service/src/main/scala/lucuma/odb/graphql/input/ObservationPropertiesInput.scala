@@ -26,7 +26,7 @@ final case class ObservationPropertiesInput(
   targetEnvironment:   Option[TargetEnvironmentInput],
   constraintSet:       Option[ConstraintSetInput],
   scienceRequirements: Option[ScienceRequirementsInput],
-  observingMode:       Option[ObservingModeInput],
+  observingMode:       Option[ObservingModeCreateInput],  // TODO: will need to split ObservationPropertiesInput into create and edit inputs
   existence:           Option[Existence]
 ) {
 
@@ -65,7 +65,7 @@ object ObservationPropertiesInput {
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-        ObservingModeInput.Binding.Option("observingMode", rObservingMode),
+        ObservingModeCreateInput.Binding.Option("observingMode", rObservingMode),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rSubtitle.map(Nullable.orNull),
@@ -92,7 +92,7 @@ object ObservationPropertiesInput {
         TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
         ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
         ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-        ObservingModeInput.Binding.Option("observingMode", rObservingMode),
+        ObservingModeCreateInput.Binding.Option("observingMode", rObservingMode),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rSubtitle,

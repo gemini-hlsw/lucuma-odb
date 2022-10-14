@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.syntax.functor._
 import cats.syntax.parallel._
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -14,19 +15,19 @@ gmosNorthLongSlit: GmosNorthLongSlitInput
 gmosSouthLongSlit: GmosSouthLongSlitInput
 */
 
-final case class ObservingModeInput(
-  gmosNorthLongSlit: Nullable[GmosNorthLongSlitInput]
+final case class ObservingModeCreateInput(
+  gmosNorthLongSlit: Option[GmosNorthLongSlitCreateInput]
 )
 
-object ObservingModeInput {
+object ObservingModeCreateInput {
 
-  val Binding: Matcher[ObservingModeInput] =
+  val Binding: Matcher[ObservingModeCreateInput] =
     ObjectFieldsBinding.rmap {
       case List(
         // TODO: when we add GMOS South, then we need to make the input at most one defined
-        GmosNorthLongSlitInput.Binding.Nullable("gmosNorthLongSlit", rGmosNorthLongSlit)
+        GmosNorthLongSlitCreateInput.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit)
       ) =>
-        rGmosNorthLongSlit.map(ObservingModeInput.apply)
+        rGmosNorthLongSlit.map(ObservingModeCreateInput.apply)
     }
 
 }
