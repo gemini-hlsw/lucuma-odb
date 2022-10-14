@@ -14,7 +14,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.graphql.input.GmosNorthLongSlitCreateInput
+import lucuma.odb.graphql.input.GmosNorthLongSlitInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import natchez.Trace
@@ -26,7 +26,7 @@ trait GmosLongSlitService[F[_]] {
 
   def createGmosNorthLongSlit(
     observationId: Observation.Id,
-    input:         GmosNorthLongSlitCreateInput
+    input:         GmosNorthLongSlitInput.Create
   ): F[Result[Unit]]
 
 }
@@ -71,7 +71,7 @@ object GmosLongSlitService {
 
       override def createGmosNorthLongSlit(
         observationId: Observation.Id,
-        input:         GmosNorthLongSlitCreateInput
+        input:         GmosNorthLongSlitInput.Create
       ): F[Result[Unit]] = {
         val af = Statements.insertGmosNorthLongSlit(observationId, input)
         session.prepare(af.fragment.command).use { pq =>
@@ -120,7 +120,7 @@ object GmosLongSlitService {
 
     def insertGmosNorthLongSlit(
       observationId: Observation.Id,
-      input:         GmosNorthLongSlitCreateInput
+      input:         GmosNorthLongSlitInput.Create
     ): AppliedFragment =
       InsertGmosNorthLongSlit.apply(
         observationId              ~
