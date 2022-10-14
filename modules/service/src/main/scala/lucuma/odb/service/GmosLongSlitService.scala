@@ -24,10 +24,11 @@ import skunk.implicits.*
 
 trait GmosLongSlitService[F[_]] {
 
-  def createGmosNorthLongSlit(
+  def insert(
     observationId: Observation.Id,
-    input:         GmosNorthLongSlitInput.Create
-  ): F[Result[Unit]]
+    input:         GmosNorthLongSlitInput.Create,
+    xa:            Transaction[F]
+  ): F[Unit]
 
 }
 
@@ -69,13 +70,14 @@ object GmosLongSlitService {
 
     new GmosLongSlitService[F] {
 
-      override def createGmosNorthLongSlit(
+      override def insert(
         observationId: Observation.Id,
-        input:         GmosNorthLongSlitInput.Create
-      ): F[Result[Unit]] = {
+        input:         GmosNorthLongSlitInput.Create,
+        xa:            Transaction[F]
+      ): F[Unit] = {
         val af = Statements.insertGmosNorthLongSlit(observationId, input)
         session.prepare(af.fragment.command).use { pq =>
-          pq.execute(af.argument).as(Result.unit)
+          pq.execute(af.argument).void
         }
       }
 
