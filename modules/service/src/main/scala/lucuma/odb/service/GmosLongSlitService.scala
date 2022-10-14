@@ -8,11 +8,10 @@ import cats.syntax.functor.*
 import cats.syntax.monoid.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Result
-import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.math.Wavelength
-import lucuma.core.model.Observation
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.GmosNorthLongSlitCreateInput
