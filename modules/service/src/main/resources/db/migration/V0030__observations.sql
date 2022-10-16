@@ -212,6 +212,7 @@ create table t_observation (
   --
 
   unique (c_observation_id, c_instrument),
+  unique (c_observation_id, c_observing_mode_type),
   unique (c_program_id, c_observation_id)
 );
 comment on table t_observation is 'Observations.';

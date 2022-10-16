@@ -21,7 +21,7 @@ import lucuma.odb.graphql.util.MappingExtras
 import table.TargetView
 import table.ProgramTable
 
-trait ProposalClassMapping[F[_]] extends ProposalTable[F]  with Predicates[F] {
+trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
 
   lazy val ProposalClassMappings =
     List(

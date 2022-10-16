@@ -14,13 +14,17 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.model.GuestUser
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.ServiceUser
+import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.PosAngleConstraintMode
@@ -45,16 +49,17 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     def downIO[A: Decoder](p: String*): IO[A] =
       downPath(p*).liftIO[A]
 
-  val pi       = TestUsers.Standard.pi(nextId, nextId)
-  val pi2      = TestUsers.Standard.pi(nextId, nextId)
-  val pi3      = TestUsers.Standard.pi(nextId, nextId)
-  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
-  val staff    = TestUsers.Standard.staff(nextId, nextId)
-  val admin    = TestUsers.Standard.admin(nextId, nextId)
-  val guest    = TestUsers.guest(nextId)
-  val service  = TestUsers.service(nextId)
+  val pi: StandardUser     = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
+  val pi3: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
+  val ngo: StandardUser    = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val staff: StandardUser  = TestUsers.Standard.staff(nextId, nextId)
+  val admin: StandardUser  = TestUsers.Standard.admin(nextId, nextId)
+  val guest: GuestUser     = TestUsers.guest(nextId)
+  val service: ServiceUser = TestUsers.service(nextId)
 
-  lazy val validUsers = List(pi, pi2, pi3, ngo, staff, admin, guest, service)
+  lazy val validUsers: List[User] =
+    List(pi, pi2, pi3, ngo, staff, admin, guest, service)
 
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs) // TODO: something cheaper
@@ -650,6 +655,54 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
+  test("[general] specify gmos north long slit observing mode at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  grating: B1200_G5301
+                  filter: G_PRIME
+                  fpu: LONG_SLIT_0_25
+                  centralWavelength: {
+                    nanometers: 234.56
+                  }
+                }
+              }
+            }
+          }) {
+            observation {
+              observingMode {
+                gmosNorthLongSlit {
+                  grating
+                  filter
+                  fpu
+                  centralWavelength {
+                    nanometers
+                  }
+                }
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("observingMode")
+          .downField("gmosNorthLongSlit")
+          .downField("grating")
+          .as[GmosNorthGrating]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, GmosNorthGrating.B1200_G5301)
+      }
+    }
+  }
+
   test("[general] created observation should have specified position angle constraint") {
     createProgramAs(pi).flatMap { pid =>
       query(pi, s"""
@@ -809,7 +862,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
       }
     }
   }
-
+  
   // TODO: more access control tests
 
 }

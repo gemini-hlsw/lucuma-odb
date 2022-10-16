@@ -17,6 +17,17 @@ import io.circe.refined.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
@@ -58,6 +69,18 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
+      LeafMapping[GmosNorthGrating](GmosNorthGratingType),
+      LeafMapping[GmosAmpGain](GmosAmpGainType),
+      LeafMapping[GmosAmpReadMode](GmosAmpReadModeType),
+      LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
+      LeafMapping[GmosNorthFilter](GmosNorthFilterType),
+      LeafMapping[GmosNorthGrating](GmosNorthGratingType),
+      LeafMapping[GmosSouthFpu](GmosSouthBuiltinFpuType),
+      LeafMapping[GmosSouthFilter](GmosSouthFilterType),
+      LeafMapping[GmosSouthGrating](GmosSouthGratingType),
+      LeafMapping[GmosRoi](GmosRoiType),
+      LeafMapping[GmosXBinning](GmosXBinningType),
+      LeafMapping[GmosYBinning](GmosYBinningType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),

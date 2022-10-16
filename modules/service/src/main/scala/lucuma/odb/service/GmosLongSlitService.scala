@@ -24,7 +24,7 @@ import skunk.implicits.*
 
 trait GmosLongSlitService[F[_]] {
 
-  def insert(
+  def insertNorth(
     observationId: Observation.Id,
     input:         GmosNorthLongSlitInput.Create,
     xa:            Transaction[F]
@@ -63,14 +63,13 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
-  def fromSessionAndUser[F[_]: Sync: Trace](
-    session: Session[F],
-    user:    User
+  def fromSession[F[_]: Sync: Trace](
+    session: Session[F]
   ): GmosLongSlitService[F] =
 
     new GmosLongSlitService[F] {
 
-      override def insert(
+      override def insertNorth(
         observationId: Observation.Id,
         input:         GmosNorthLongSlitInput.Create,
         xa:            Transaction[F]
