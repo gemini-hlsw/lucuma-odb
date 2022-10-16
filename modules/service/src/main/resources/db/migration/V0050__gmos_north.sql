@@ -4,59 +4,64 @@
 create table t_gmos_north_detector (
   c_tag               d_tag       not null primary key,
   c_short_name        varchar     not null,
-  c_long_name 		    varchar     not null,
+  c_long_name 		  varchar     not null,
   c_pixel_size        d_angle_µas not null,
   c_shuffle_offset    d_pixels    not null check (c_shuffle_offset > 0),
   c_x_size            d_pixels    not null check (c_x_size > 0),
   c_y_size            d_pixels    not null check (c_y_size > 0),
+  c_gap_size          smallint    not null check (c_gap_size > 0),
   c_max_rois          int         not null check (c_max_rois > 0)
 );
 comment on table t_gmos_north_detector is 'Lookup table for GMOS North detectors.';
 
-insert into t_gmos_north_detector values ('E2V', 'E2V', 'E2V', 72700, 1536, 6144, 4608, 4);
-insert into t_gmos_north_detector values ('HAMAMATSU', 'Hamamatsu', 'Hamamatsu', 80900, 1392, 6144, 4224, 5);
+insert into t_gmos_north_detector values ('E2V',       'E2V',        'E2V',      72700, 1536, 6144, 4608, 37, 4);
+insert into t_gmos_north_detector values ('HAMAMATSU', 'Hamamatsu', 'Hamamatsu', 80900, 1392, 6278, 4176, 80, 5);
 
 --- GMOS NORTH STAGE MODE
 
 create table t_gmos_north_stage_mode (
   c_tag               d_tag       not null primary key,
   c_short_name        varchar     not null,
-  c_long_name 		    varchar     not null
+  c_long_name         varchar     not null
 );
 
-insert into t_gmos_north_stage_mode values ('Low', 'No Follow', 'Do Not Follow');
+insert into t_gmos_north_stage_mode values ('NoFollow',  'No Follow',  'Do Not Follow');
 insert into t_gmos_north_stage_mode values ('FollowXyz', 'Follow XYZ', 'Follow in XYZ (focus)');
-insert into t_gmos_north_stage_mode values ('FollowXy', 'Follow XY', 'Follow in XY');
-insert into t_gmos_north_stage_mode values ('FollowZ', 'Follow Z', 'Follow in Z Only');
+insert into t_gmos_north_stage_mode values ('FollowXy',  'Follow XY',  'Follow in XY');
+insert into t_gmos_north_stage_mode values ('FollowZ',   'Follow Z',   'Follow in Z Only');
 
 --- GMOS NORTH DISPERSER
 
 create table t_gmos_north_disperser (
-  c_tag               d_tag       not null primary key,
-  c_short_name        varchar     not null,
-  c_long_name 		    varchar     not null,
-  c_ruling_density    smallint    not null
+  c_tag                      d_tag       not null primary key,
+  c_short_name               varchar     not null,
+  c_long_name 		         varchar     not null,
+  c_ruling_density           smallint    not null check (c_ruling_density > 0),
+  c_dispersion_pm            smallint    not null check (c_dispersion_pm > 0),
+  c_simultaneous_coverage_nm smallint    not null check (c_simultaneous_coverage_nm > 0),
+  c_blaze_wavelength_nm      smallint    not null check (c_blaze_wavelength_nm > 0),
+  c_reference_resolution     smallint    not null check (c_reference_resolution > 0)
 );
 
-insert into t_gmos_north_disperser values ('B1200_G5301', 'B1200', 'B1200_G5301', 1200);
-insert into t_gmos_north_disperser values ('R831_G5302', 'R831', 'R831_G5302', 831);
-insert into t_gmos_north_disperser values ('B600_G5303', 'B600', 'B600_G5303', 600);
-insert into t_gmos_north_disperser values ('B600_G5307', 'B600', 'B600_G5307', 600);
-insert into t_gmos_north_disperser values ('R600_G5304', 'R600', 'R600_G5304', 600);
-insert into t_gmos_north_disperser values ('B480_G5309', 'B480', 'B480_G5309', 480);
-insert into t_gmos_north_disperser values ('R400_G5305', 'R400', 'R400_G5305', 400);
-insert into t_gmos_north_disperser values ('R150_G5306', 'R150', 'R150_G5306', 150);
-insert into t_gmos_north_disperser values ('R150_G5308', 'R150', 'R150_G5308', 150);
+insert into t_gmos_north_disperser values ('B1200_G5301', 'B1200', 'B1200_G5301', 1200,  26,  164, 463, 3744);
+insert into t_gmos_north_disperser values ('R831_G5302',   'R831',  'R831_G5302',  831,  38,  235, 757, 4396);
+insert into t_gmos_north_disperser values ('B600_G5303',   'B600',  'B600_G5303',  600,  45,  276, 461, 1688);
+insert into t_gmos_north_disperser values ('B600_G5307',   'B600',  'B600_G5307',  600,  50,  317, 461, 1688);
+insert into t_gmos_north_disperser values ('R600_G5304',   'R600',  'R600_G5304',  600,  52,  328, 926, 3744);
+insert into t_gmos_north_disperser values ('B480_G5309',   'B480',  'B480_G5309',  480,  62,  390, 422, 1520);
+insert into t_gmos_north_disperser values ('R400_G5305',   'R400',  'R400_G5305',  400,  74,  472, 764, 1918);
+insert into t_gmos_north_disperser values ('R150_G5306',   'R150',  'R150_G5306',  150, 174, 1071, 717,  631);
+insert into t_gmos_north_disperser values ('R150_G5308',   'R150',  'R150_G5308',  150, 193, 1219, 717,  631);
 
 --- GMOS NORTH FILTER
 
 create table t_gmos_north_filter (
-  c_tag               d_tag       not null primary key,
-  c_short_name        varchar     not null,
-  c_long_name 		    varchar     not null,
+  c_tag               d_tag           not null primary key,
+  c_short_name        varchar         not null,
+  c_long_name 		  varchar         not null,
   c_wavelength        d_wavelength_pm not null,
   d_width             d_wavelength_pm_range, -- can be null
-  d_filter_type       d_tag       not null references t_filter_type(c_tag)
+  d_filter_type       d_tag           not null references t_filter_type(c_tag)
 );
 
 insert into t_gmos_north_filter values ('GPrime', 'g', 'g_G0301', 475000, '[398000, 552000]', 'BroadBand');
@@ -204,6 +209,8 @@ create table t_gmos_north_dynamic (
   )
 
 );
+
+--- GMOS NORTH LONG SLIT OBSERVING MODE
 
 create table t_gmos_north_long_slit (
 

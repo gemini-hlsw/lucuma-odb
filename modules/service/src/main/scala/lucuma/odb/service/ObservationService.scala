@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
@@ -129,21 +130,32 @@ object ObservationService {
   ): ObservationService[F] =
     new ObservationService[F] {
 
+      lazy val gmosLongSlitService = GmosLongSlitService.fromSession(session)
+
       override def createObservation(
         programId:   Program.Id,
         SET:         ObservationPropertiesInput
       ): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
-          Statements
-            .insertObservationAs(user, programId, SET)
-            .flatTraverse { af =>
-              session.prepare(af.fragment.query(observation_id)).use { pq =>
-                pq.option(af.argument).map {
-                  case Some(oid) => Result(oid)
-                  case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+          session.transaction.use { xa =>
+            Statements
+              .insertObservationAs(user, programId, SET)
+              .flatTraverse { af =>
+                session.prepare(af.fragment.query(observation_id)).use { pq =>
+                  pq.option(af.argument).map {
+                    case Some(oid) => Result(oid)
+                    case None => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                  }
+                }.flatTap { rOid =>
+                  rOid.toOption.traverse { oid =>
+                    for {
+                      _ <- SET.observingMode.flatMap(_.gmosNorthLongSlit).traverse(gmosLongSlitService.insertNorth(oid, _, xa))
+//                      _ <- SET.observingMode.flatMap(_.gmosSouthLongSlit).traverse(gmosLongSlitService.insertSouth(oid, _, xa))
+                    } yield ()
+                  }
                 }
               }
-            }
+          }
         }
 
       override def selectObservations(

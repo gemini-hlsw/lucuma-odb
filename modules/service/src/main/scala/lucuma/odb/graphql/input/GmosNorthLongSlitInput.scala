@@ -36,7 +36,14 @@ object GmosNorthLongSlitInput {
         GmosNorthGratingBinding.Option("grating", rGrating),
         GmosNorthFilterBinding.Nullable("filter", rFilter),
         GmosNorthFpuBinding.Option("fpu", rFpu),
-        WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength)
+        WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
+        ("explicitXBin", _),
+        ("explicitYBin", _),
+        ("explicitAmpReadMode", _),
+        ("explicitAmpGain", _),
+        ("explicitRoi", _),
+        ("explicitWavelengthDithersNm", _),
+        ("explicitSpatialOffsets", _)
       ) => (rGrating, rFilter, rFpu, rCentralWavelength).parTupled
     }
 

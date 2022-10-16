@@ -25,7 +25,8 @@ object ObservingModeInput {
     ObjectFieldsBinding.rmap {
       case List(
         // TODO: when we add GMOS South, then we need to make the input at most one defined
-        GmosNorthLongSlitInput.CreateBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit)
+        GmosNorthLongSlitInput.CreateBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
+        ("gmosSouthLongSlit", _)
       ) =>
         rGmosNorthLongSlit.map(Create.apply)
     }
