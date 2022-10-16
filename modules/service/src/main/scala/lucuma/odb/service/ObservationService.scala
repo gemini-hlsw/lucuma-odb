@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
@@ -44,6 +45,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
@@ -129,21 +131,32 @@ object ObservationService {
   ): ObservationService[F] =
     new ObservationService[F] {
 
+      lazy val gmosLongSlitService = GmosLongSlitService.fromSession(session)
+
       override def createObservation(
         programId:   Program.Id,
         SET:         ObservationPropertiesInput
       ): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
-          Statements
-            .insertObservationAs(user, programId, SET)
-            .flatTraverse { af =>
-              session.prepare(af.fragment.query(observation_id)).use { pq =>
-                pq.option(af.argument).map {
-                  case Some(oid) => Result(oid)
-                  case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+          session.transaction.use { xa =>
+            Statements
+              .insertObservationAs(user, programId, SET)
+              .flatTraverse { af =>
+                session.prepare(af.fragment.query(observation_id)).use { pq =>
+                  pq.option(af.argument).map {
+                    case Some(oid) => Result(oid)
+                    case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                  }
+                }.flatTap { rOid =>
+                  rOid.toOption.traverse { oid =>
+                    for {
+                      _ <- SET.observingMode.flatMap(_.gmosNorthLongSlit).traverse(gmosLongSlitService.insertNorth(oid, _, xa))
+//                      _ <- SET.observingMode.flatMap(_.gmosSouthLongSlit).traverse(gmosLongSlitService.insertSouth(oid, _, xa))
+                    } yield ()
+                  }
                 }
               }
-            }
+          }
         }
 
       override def selectObservations(
@@ -193,7 +206,8 @@ object ObservationService {
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
-          SET.scienceRequirements
+          SET.scienceRequirements,
+          SET.observingMode.flatMap(_.modeType)
         )
 
     def insertObservationAs(
@@ -208,7 +222,8 @@ object ObservationService {
       posAngle:            Angle,
       explicitBase:        Option[Coordinates],
       constraintSet:       ConstraintSet,
-      scienceRequirements: Option[ScienceRequirementsInput]
+      scienceRequirements: Option[ScienceRequirementsInput],
+      modeType:            Option[ObservingModeType]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -242,7 +257,8 @@ object ObservationService {
            spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ~
            spectroscopy.flatMap(_.focalPlane.toOption)                              ~
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ~
-           spectroscopy.flatMap(_.capability.toOption)
+           spectroscopy.flatMap(_.capability.toOption)                              ~
+           modeType
         )
       }
 
@@ -255,33 +271,34 @@ object ObservationService {
     }
 
     val InsertObservation: Fragment[
-      Program.Id             ~
-      Option[NonEmptyString] ~
-      Existence              ~
-      ObsStatus              ~
-      ObsActiveStatus        ~
-      Option[Timestamp]      ~
-      PosAngleConstraintMode ~
-      Angle                  ~
-      Option[RightAscension] ~
-      Option[Declination]    ~
-      CloudExtinction        ~
-      ImageQuality           ~
-      SkyBackground          ~
-      WaterVapor             ~
-      Option[PosBigDecimal]  ~
-      Option[PosBigDecimal]  ~
-      Option[BigDecimal]     ~
-      Option[BigDecimal]     ~
-      ScienceMode            ~
-      Option[Wavelength]     ~
-      Option[PosInt]         ~
-      Option[PosBigDecimal]  ~
-      Option[Wavelength]     ~
-      Option[Wavelength]     ~
-      Option[FocalPlane]     ~
-      Option[Angle]          ~
-      Option[SpectroscopyCapabilities]
+      Program.Id                       ~
+      Option[NonEmptyString]           ~
+      Existence                        ~
+      ObsStatus                        ~
+      ObsActiveStatus                  ~
+      Option[Timestamp]                ~
+      PosAngleConstraintMode           ~
+      Angle                            ~
+      Option[RightAscension]           ~
+      Option[Declination]              ~
+      CloudExtinction                  ~
+      ImageQuality                     ~
+      SkyBackground                    ~
+      WaterVapor                       ~
+      Option[PosBigDecimal]            ~
+      Option[PosBigDecimal]            ~
+      Option[BigDecimal]               ~
+      Option[BigDecimal]               ~
+      ScienceMode                      ~
+      Option[Wavelength]               ~
+      Option[PosInt]                   ~
+      Option[PosBigDecimal]            ~
+      Option[Wavelength]               ~
+      Option[Wavelength]               ~
+      Option[FocalPlane]               ~
+      Option[Angle]                    ~
+      Option[SpectroscopyCapabilities] ~
+      Option[ObservingModeType]
     ] =
       sql"""
         INSERT INTO t_observation (
@@ -311,7 +328,8 @@ object ObservationService {
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
-          c_spec_capability
+          c_spec_capability,
+          c_observing_mode_type
         )
         SELECT
           $program_id,
@@ -340,7 +358,8 @@ object ObservationService {
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
-          ${spectroscopy_capabilities.opt}
+          ${spectroscopy_capabilities.opt},
+          ${observing_mode_type.opt}
       """
 
     def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {

@@ -5,14 +5,15 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.flatMap._
-import cats.syntax.parallel._
+import cats.syntax.flatMap.*
+import cats.syntax.parallel.*
 import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
 
 
@@ -23,7 +24,12 @@ object GmosNorthLongSlitInput {
     filter:            Option[GmosNorthFilter],
     fpu:               GmosNorthFpu,
     centralWavelength: Wavelength
-  )
+  ) {
+    
+    def observingModeType: ObservingModeType =
+      ObservingModeType.GmosNorthLongSlit
+    
+  }
 
   private val data: Matcher[(
     Option[GmosNorthGrating],
@@ -36,7 +42,14 @@ object GmosNorthLongSlitInput {
         GmosNorthGratingBinding.Option("grating", rGrating),
         GmosNorthFilterBinding.Nullable("filter", rFilter),
         GmosNorthFpuBinding.Option("fpu", rFpu),
-        WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength)
+        WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
+        ("explicitXBin", _),
+        ("explicitYBin", _),
+        ("explicitAmpReadMode", _),
+        ("explicitAmpGain", _),
+        ("explicitRoi", _),
+        ("explicitWavelengthDithersNm", _),
+        ("explicitSpatialOffsets", _)
       ) => (rGrating, rFilter, rFpu, rCentralWavelength).parTupled
     }
 

@@ -3565,8 +3565,17 @@ enum GmosNorthGrating {
   R150_G5308
 }
 
-# GMOS Long Slit Observing Mode common fields
-interface GmosLongSlitObservingMode {
+# GMOS North Long Slit mode
+type GmosNorthLongSlit {
+
+  # GMOS North Grating
+  grating: GmosNorthGrating!
+
+  # GMOS North Filter
+  filter: GmosNorthFilter
+
+  # GMOS North FPU
+  fpu: GmosNorthBuiltinFpu!
 
   # The central wavelength, either explicitly specified in `explicitCentralWavelength`
   # or else taken from the `defaultCentralWavelength`.
@@ -3652,55 +3661,6 @@ interface GmosLongSlitObservingMode {
 
   # Optional explicitly specified spatial q offsets. If set it overrides the
   # the default.
-  explicitSpatialOffsets: [q!]
-
-  # The central wavelength as initially selected.  See the `centralWavelength`
-  # field for the wavelength that will be used in the observation.
-  initialCentralWavelength: Wavelength!
-
-}
-
-# GMOS North Long Slit mode
-type GmosNorthLongSlit implements GmosLongSlitObservingMode {
-
-  # GMOS North Grating
-  grating: GmosNorthGrating!
-
-  # GMOS North Filter
-  filter: GmosNorthFilter
-
-  # GMOS North FPU
-  fpu: GmosNorthBuiltinFpu
-
-  # Central wavelength.
-  centralWavelength: Wavelength!
-
-  xBin: GmosXBinning!
-  defaultXBin: GmosXBinning!
-  explicitXBin: GmosXBinning
-
-  yBin: GmosYBinning!
-  defaultYBin: GmosYBinning!
-  explicitYBin: GmosYBinning
-
-  ampReadMode: GmosAmpReadMode!
-  defaultAmpReadMode: GmosAmpReadMode!
-  explicitAmpReadMode: GmosAmpReadMode
-
-  ampGain: GmosAmpGain!
-  defaultAmpGain: GmosAmpGain!
-  explicitAmpGain: GmosAmpGain
-
-  roi: GmosRoi!
-  defaultRoi: GmosRoi!
-  explicitRoi: GmosRoi
-
-  wavelengthDithersNm: [BigDecimal!]!
-  defaultWavelengthDithersNm: [BigDecimal!]!
-  explicitWavelengthDithersNm: [BigDecimal!]
-
-  spatialOffsets: [q!]!
-  defaultSpatialOffsets: [q!]!
   explicitSpatialOffsets: [q!]
 
   # The grating as it was initially selected.  See the `grating` field for the
@@ -3916,7 +3876,7 @@ enum GmosSouthGrating {
 }
 
 # GMOS South Long Slit mode
-type GmosSouthLongSlit implements GmosLongSlitObservingMode {
+type GmosSouthLongSlit {
 
   # GMOS South Grating
   grating: GmosSouthGrating!
@@ -3927,35 +3887,90 @@ type GmosSouthLongSlit implements GmosLongSlitObservingMode {
   # GMOS South FPU
   fpu: GmosSouthBuiltinFpu!
 
-  # Central wavelength.
+  # The central wavelength, either explicitly specified in `explicitCentralWavelength`
+  # or else taken from the `defaultCentralWavelength`.
   centralWavelength: Wavelength!
 
+  # GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  # from the defaultXBin.
   xBin: GmosXBinning!
+
+  # Default GMOS X-Binning, calculated from the effective slit size which in
+  # turn is based on the selected FPU, target source profile and image quality.
   defaultXBin: GmosXBinning!
+
+  # Optional explicitly specified GMOS X-Binning. If set it overrides the
+  # default.
   explicitXBin: GmosXBinning
 
+
+  # GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  # from the defaultYBin.
   yBin: GmosYBinning!
+
+  # Default GMOS Y-Binning (TWO).
   defaultYBin: GmosYBinning!
+
+  # Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  # default.
   explicitYBin: GmosYBinning
 
+
+  # GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  # else taken from the defaultAmpReadMode.
   ampReadMode: GmosAmpReadMode!
+
+  # Default GmosAmpReadMode (SLOW).
   defaultAmpReadMode: GmosAmpReadMode!
+
+  # Optional explicitly specified GMOS amp read mode. If set it overrides the
+  # default.
   explicitAmpReadMode: GmosAmpReadMode
 
+
+  # GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  # taken from the defaultAmpGain.
   ampGain: GmosAmpGain!
+
+  # Default GMOS amp gain (LOW).
   defaultAmpGain: GmosAmpGain!
+
+  # Optional explicitly specified GMOS amp gain.  If set it override the default.
   explicitAmpGain: GmosAmpGain
 
+
+  # GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  # defaultRoi.
   roi: GmosRoi!
+
+  # Default GMOS ROI (FULL_FRAME).
   defaultRoi: GmosRoi!
+
+  # Optional explicitly specified GMOS ROI. If set it overrides the default.
   explicitRoi: GmosRoi
 
+
+  # Wavelength dithers required to fill in the chip gaps, expressed in nanometers.
+  # This value is either explicitly specified in explicitWavelengthDithersNm
   wavelengthDithersNm: [BigDecimal!]!
+
+  # Default wavelength dithers, calculated based on the grating dispersion.
   defaultWavelengthDithersNm: [BigDecimal!]!
+
+  # Optional explicitly specified wavelength dithers.  If set it overrides the
+  # default.
   explicitWavelengthDithersNm: [BigDecimal!]
 
+
+  # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
+  # or else taken from defaultSpatialOffsets
   spatialOffsets: [q!]!
+
+  # Default spatial offsets.
   defaultSpatialOffsets: [q!]!
+
+  # Optional explicitly specified spatial q offsets. If set it overrides the
+  # the default.
   explicitSpatialOffsets: [q!]
 
   # The grating as it was initially selected.  See the `grating` field for the
