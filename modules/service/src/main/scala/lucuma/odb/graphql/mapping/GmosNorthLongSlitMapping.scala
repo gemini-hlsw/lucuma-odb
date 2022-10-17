@@ -106,6 +106,9 @@ trait GmosNorthLongSlitMapping[F[_]]
         CursorField[GmosYBinning]("defaultYBin", _ => Result(DefaultYBinning)),
         SqlField("explicitYBin", GmosNorthLongSlitTable.YBin),
 
+        SqlField("initialGrating", GmosNorthLongSlitTable.InitialGrating),
+        SqlField("initialFilter",  GmosNorthLongSlitTable.InitialFilter),
+        SqlField("initialFpu",     GmosNorthLongSlitTable.InitialFpu),
         SqlObject("initialCentralWavelength")
       )
     )
