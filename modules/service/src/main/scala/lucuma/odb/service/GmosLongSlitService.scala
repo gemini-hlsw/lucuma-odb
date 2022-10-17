@@ -11,6 +11,8 @@ import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -90,6 +92,8 @@ object GmosLongSlitService {
       Option[GmosNorthFilter] ~
       GmosNorthFpu            ~
       Wavelength              ~
+      Option[GmosXBinning]    ~
+      Option[GmosYBinning]    ~
       GmosNorthGrating        ~
       Option[GmosNorthFilter] ~
       GmosNorthFpu            ~
@@ -102,6 +106,8 @@ object GmosLongSlitService {
           c_filter,
           c_fpu,
           c_central_wavelength,
+          c_xbin,
+          c_ybin,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -113,6 +119,8 @@ object GmosLongSlitService {
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
           $wavelength_pm,
+          ${gmos_x_binning.opt},
+          ${gmos_y_binning.opt},
           $gmos_north_grating,
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
@@ -129,6 +137,8 @@ object GmosLongSlitService {
           input.filter             ~
           input.fpu                ~
           input.centralWavelength  ~
+          input.explicitXBin       ~
+          input.explicitYBin       ~
           input.grating            ~
           input.filter             ~
           input.fpu                ~
