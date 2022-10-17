@@ -14,6 +14,8 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
@@ -38,10 +40,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
 
   extension (ac: ACursor)
     def downPath(p: String*): ACursor =
-      p.toList match {
-        case Nil    => ac
-        case h :: t => ac.downField(h).downPath(t*)
-      }
+      p.foldLeft(ac) { (aCursor, field) => aCursor.downField(field) }
 
     def liftIO[A: Decoder]: IO[A] =
       ac.as[A].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
@@ -683,22 +682,41 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                   centralWavelength {
                     nanometers
                   }
+                  initialGrating
+                  initialFilter
+                  initialFpu
+                  initialCentralWavelength {
+                    nanometers
+                  }
                 }
               }
             }
           }
         }
       """).flatMap { js =>
-        val get = js.hcursor
-          .downField("createObservation")
-          .downField("observation")
-          .downField("observingMode")
-          .downField("gmosNorthLongSlit")
-          .downField("grating")
-          .as[GmosNorthGrating]
-          .leftMap(f => new RuntimeException(f.message))
-          .liftTo[IO]
-        assertIO(get, GmosNorthGrating.B1200_G5301)
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+        assertIO(
+          (longSlit.downIO[GmosNorthGrating]("grating"),
+           longSlit.downIO[Option[GmosNorthFilter]]("filter"),
+           longSlit.downIO[GmosNorthFpu]("fpu"),
+           longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.downIO[GmosNorthGrating]("initialGrating"),
+           longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
+           longSlit.downIO[GmosNorthFpu]("initialFpu"),
+           longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+          ).tupled,
+          (GmosNorthGrating.B1200_G5301,
+           Some(GmosNorthFilter.GPrime),
+           GmosNorthFpu.LongSlit_0_25,
+           234.56,
+           GmosNorthGrating.B1200_G5301,
+           Some(GmosNorthFilter.GPrime),
+           GmosNorthFpu.LongSlit_0_25,
+           234.56
+          )
+        )
+
       }
     }
   }

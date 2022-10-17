@@ -3673,7 +3673,7 @@ type GmosNorthLongSlit {
 
   # The FPU as it was initially selected.  See the `fpu` field for the FPU that
   # will be used in the observation.
-  initialFPU: GmosNorthBuiltinFpu!
+  initialFpu: GmosNorthBuiltinFpu!
   
   # The central wavelength as initially selected.  See the `centralWavelength`
   # field for the wavelength that will be used in the observation.
@@ -3983,7 +3983,7 @@ type GmosSouthLongSlit {
 
   # The FPU as it was initially selected.  See the `fpu` field for the FPU that
   # will be used in the observation.
-  initialFPU: GmosSouthBuiltinFpu!
+  initialFpu: GmosSouthBuiltinFpu!
   
   # The central wavelength as initially selected.  See the `centralWavelength`
   # field for the wavelength that will be used in the observation.
