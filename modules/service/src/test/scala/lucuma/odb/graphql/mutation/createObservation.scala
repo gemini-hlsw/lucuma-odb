@@ -17,6 +17,7 @@ import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -682,6 +683,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                   centralWavelength {
                     nanometers
                   }
+                  yBin,
+                  explicitYBin
+                  defaultYBin
                   initialGrating
                   initialFilter
                   initialFpu
@@ -701,6 +705,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            longSlit.downIO[Option[GmosNorthFilter]]("filter"),
            longSlit.downIO[GmosNorthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.downIO[GmosYBinning]("yBin"),
+           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           longSlit.downIO[GmosYBinning]("defaultYBin"),
            longSlit.downIO[GmosNorthGrating]("initialGrating"),
            longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
            longSlit.downIO[GmosNorthFpu]("initialFpu"),
@@ -710,10 +717,63 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56,
+           GmosYBinning.Two,
+           Option.empty[GmosYBinning],
+           GmosYBinning.Two,
            GmosNorthGrating.B1200_G5301,
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56
+          )
+        )
+
+      }
+    }
+  }
+
+  test("[general] specify gmos north long slit observing mode (with optional explicit parameters) at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            observingMode: {
+              gmosNorthLongSlit: {
+                grating: B1200_G5301
+                filter: G_PRIME
+                fpu: LONG_SLIT_0_25
+                centralWavelength: {
+                  nanometers: 234.56
+                }
+                explicitYBin: FOUR
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              gmosNorthLongSlit {
+                yBin,
+                explicitYBin
+                defaultYBin
+              }
+            }
+          }
+        }
+      }
+    """).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+        assertIO(
+          (longSlit.downIO[GmosYBinning]("yBin"),
+           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           longSlit.downIO[GmosYBinning]("defaultYBin"),
+          ).tupled,
+          (GmosYBinning.Four,
+           Some(GmosYBinning.Four),
+           GmosYBinning.Two,
           )
         )
 

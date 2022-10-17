@@ -11,6 +11,8 @@ import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
@@ -23,7 +25,9 @@ object GmosNorthLongSlitInput {
     grating:           GmosNorthGrating,
     filter:            Option[GmosNorthFilter],
     fpu:               GmosNorthFpu,
-    centralWavelength: Wavelength
+    centralWavelength: Wavelength,
+    explicitXBin:      Option[GmosXBinning],
+    explicitYBin:      Option[GmosYBinning]
   ) {
     
     def observingModeType: ObservingModeType =
@@ -35,7 +39,9 @@ object GmosNorthLongSlitInput {
     Option[GmosNorthGrating],
     Nullable[GmosNorthFilter],
     Option[GmosNorthFpu],
-    Option[Wavelength]
+    Option[Wavelength],
+    Option[GmosXBinning],
+    Option[GmosYBinning]
   )] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -43,21 +49,21 @@ object GmosNorthLongSlitInput {
         GmosNorthFilterBinding.Nullable("filter", rFilter),
         GmosNorthFpuBinding.Option("fpu", rFpu),
         WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
-        ("explicitXBin", _),
-        ("explicitYBin", _),
+        GmosXBinningBinding.Option("explicitXBin", rExplicitXBin),
+        GmosYBinningBinding.Option("explicitYBin", rExplicitYBin),
         ("explicitAmpReadMode", _),
         ("explicitAmpGain", _),
         ("explicitRoi", _),
         ("explicitWavelengthDithersNm", _),
         ("explicitSpatialOffsets", _)
-      ) => (rGrating, rFilter, rFpu, rCentralWavelength).parTupled
+      ) => (rGrating, rFilter, rFpu, rCentralWavelength, rExplicitXBin, rExplicitYBin).parTupled
     }
 
   val CreateBinding: Matcher[Create] =
     data.rmap {
-      case (Some(grating), filter, Some(fpu), Some(centralWavelength)) =>
-        Result(Create(grating, filter.toOption, fpu, centralWavelength))
-      case _                                                           =>
+      case (Some(grating), filter, Some(fpu), Some(centralWavelength), explicitXBin, explicitYBin) =>
+        Result(Create(grating, filter.toOption, fpu, centralWavelength, explicitXBin, explicitYBin))
+      case _                                                                         =>
         Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
     }
 
