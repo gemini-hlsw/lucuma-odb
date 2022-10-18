@@ -14,9 +14,13 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
@@ -747,7 +751,11 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                 centralWavelength: {
                   nanometers: 234.56
                 }
+                explicitXBin: FOUR
                 explicitYBin: FOUR
+                explicitAmpReadMode: FAST
+                explicitAmpGain: HIGH
+                explicitRoi: CCD2
               }
             }
           }
@@ -755,9 +763,19 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           observation {
             observingMode {
               gmosNorthLongSlit {
+                explicitXBin,
                 yBin,
                 explicitYBin
                 defaultYBin
+                ampReadMode,
+                explicitAmpReadMode,
+                defaultAmpReadMode,
+                ampGain,
+                explicitAmpGain,
+                defaultAmpGain,
+                roi,
+                explicitRoi,
+                defaultRoi
               }
             }
           }
@@ -767,13 +785,33 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
         assertIO(
-          (longSlit.downIO[GmosYBinning]("yBin"),
+          (longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           longSlit.downIO[GmosYBinning]("yBin"),
            longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
            longSlit.downIO[GmosYBinning]("defaultYBin"),
+           longSlit.downIO[GmosAmpReadMode]("ampReadMode"),
+           longSlit.downIO[Option[GmosAmpReadMode]]("explicitAmpReadMode"),
+           longSlit.downIO[GmosAmpReadMode]("defaultAmpReadMode"),
+           longSlit.downIO[GmosAmpGain]("ampGain"),
+           longSlit.downIO[Option[GmosAmpGain]]("explicitAmpGain"),
+           longSlit.downIO[GmosAmpGain]("defaultAmpGain"),
+           longSlit.downIO[GmosRoi]("roi"),
+           longSlit.downIO[Option[GmosRoi]]("explicitRoi"),
+           longSlit.downIO[GmosRoi]("defaultRoi"),
           ).tupled,
-          (GmosYBinning.Four,
+          (Some(GmosXBinning.Four),
+           GmosYBinning.Four,
            Some(GmosYBinning.Four),
            GmosYBinning.Two,
+           GmosAmpReadMode.Fast,
+           Some(GmosAmpReadMode.Fast),
+           GmosAmpReadMode.Slow,
+           GmosAmpGain.High,
+           Some(GmosAmpGain.High),
+           GmosAmpGain.Low,
+           GmosRoi.Ccd2,
+           Some(GmosRoi.Ccd2),
+           GmosRoi.FullFrame
           )
         )
 
