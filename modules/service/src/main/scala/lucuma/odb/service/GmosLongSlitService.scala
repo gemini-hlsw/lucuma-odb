@@ -8,9 +8,12 @@ import cats.syntax.functor.*
 import cats.syntax.monoid.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Result
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
@@ -94,6 +97,9 @@ object GmosLongSlitService {
       Wavelength              ~
       Option[GmosXBinning]    ~
       Option[GmosYBinning]    ~
+      Option[GmosAmpReadMode] ~
+      Option[GmosAmpGain]     ~
+      Option[GmosRoi]         ~
       GmosNorthGrating        ~
       Option[GmosNorthFilter] ~
       GmosNorthFpu            ~
@@ -108,6 +114,9 @@ object GmosLongSlitService {
           c_central_wavelength,
           c_xbin,
           c_ybin,
+          c_amp_read_mode,
+          c_amp_gain,
+          c_roi,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -121,6 +130,9 @@ object GmosLongSlitService {
           $wavelength_pm,
           ${gmos_x_binning.opt},
           ${gmos_y_binning.opt},
+          ${gmos_amp_read_mode.opt},
+          ${gmos_amp_gain.opt},
+          ${gmos_roi.opt},
           $gmos_north_grating,
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
@@ -132,16 +144,19 @@ object GmosLongSlitService {
       input:         GmosNorthLongSlitInput.Create
     ): AppliedFragment =
       InsertGmosNorthLongSlit.apply(
-        observationId              ~
-          input.grating            ~
-          input.filter             ~
-          input.fpu                ~
-          input.centralWavelength  ~
-          input.explicitXBin       ~
-          input.explicitYBin       ~
-          input.grating            ~
-          input.filter             ~
-          input.fpu                ~
+        observationId               ~
+          input.grating             ~
+          input.filter              ~
+          input.fpu                 ~
+          input.centralWavelength   ~
+          input.explicitXBin        ~
+          input.explicitYBin        ~
+          input.explicitAmpReadMode ~
+          input.explicitAmpGain     ~
+          input.explicitRoi         ~
+          input.grating             ~
+          input.filter              ~
+          input.fpu                 ~
           input.centralWavelength
       )
 
