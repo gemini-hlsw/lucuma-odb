@@ -37,35 +37,6 @@ trait GmosLongSlitService[F[_]] {
 
 }
 
-/*
-
-  c_observation_id     d_observation_id NOT NULL PRIMARY KEY REFERENCES t_observation(c_observation_id),
-
-  c_grating            d_tag           NOT NULL             REFERENCES t_gmos_north_disperser(c_tag),
-  c_filter             d_tag           NULL DEFAULT NULL    REFERENCES t_gmos_north_filter(c_tag),
-  c_fpu                d_tag           NOT NULL             REFERENCES t_gmos_north_fpu(c_tag),
-  c_central_wavelength d_wavelength_pm NULL DEFAULT NULL,
-
-  c_xbin               d_tag           NULL DEFAULT NULL   REFERENCES t_gmos_binning(c_tag),
-  c_ybin               d_tag           NULL DEFAULT NULL   REFERENCES t_gmos_binning(c_tag),
-  c_amp_read_mode      d_tag           NULL DEFAULT NULL   REFERENCES t_gmos_amp_read_mode(c_tag),
-  c_amp_gain           d_tag           NULL DEFAULT NULL   REFERENCES t_gmos_amp_gain(c_tag),
-  c_roi                d_tag           NULL DEFAULT NULL   REFERENCES t_gmos_roi(c_tag),
-
-  -- stuff wavelength dithers and offsets into a string until grackle supports array columns?
-  c_wavelength_dithers text            NULL DEFAULT NULL,
-  c_spatial_offsets    text            NULL DEFAULT NULL,
-
-  -- hold on to the initial grating, filter, fpu and central wavelength regardless of subsequent changes
-  c_initial_grating            d_tag           NOT NULL             REFERENCES t_gmos_north_disperser(c_tag),
-  c_initial_filter             d_tag           NULL DEFAULT NULL    REFERENCES t_gmos_north_filter(c_tag),
-  c_initial_fpu                d_tag           NOT NULL             REFERENCES t_gmos_north_fpu(c_tag),
-  c_initial_central_wavelength d_wavelength_pm NULL DEFAULT NULL,
-
-  CONSTRAINT wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(?:,-?\d+)*$'),
-  CONSTRAINT offset_format            CHECK (c_spatial_offsets ~ '^\(-?\d+,-?\d+\)(?:,\(-?\d+,-?\d+\))*$')
-*/
-
 object GmosLongSlitService {
 
   def fromSession[F[_]: Sync: Trace](
