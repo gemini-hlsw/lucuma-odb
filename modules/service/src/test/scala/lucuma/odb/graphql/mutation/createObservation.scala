@@ -687,6 +687,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                   centralWavelength {
                     nanometers
                   }
+                  xBin,
                   yBin,
                   explicitYBin
                   defaultYBin
@@ -709,6 +710,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            longSlit.downIO[Option[GmosNorthFilter]]("filter"),
            longSlit.downIO[GmosNorthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.downIO[GmosXBinning]("xBin"),
            longSlit.downIO[GmosYBinning]("yBin"),
            longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
            longSlit.downIO[GmosYBinning]("defaultYBin"),
@@ -721,6 +723,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56,
+           GmosXBinning.One, // Using IQ 2.0 and point source
            GmosYBinning.Two,
            Option.empty[GmosYBinning],
            GmosYBinning.Two,
@@ -763,7 +766,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           observation {
             observingMode {
               gmosNorthLongSlit {
+                xBin
                 explicitXBin,
+                defaultXBin,
                 yBin,
                 explicitYBin
                 defaultYBin
@@ -785,7 +790,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
         assertIO(
-          (longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+          (longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           longSlit.downIO[GmosXBinning]("defaultXBin"),
            longSlit.downIO[GmosYBinning]("yBin"),
            longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
            longSlit.downIO[GmosYBinning]("defaultYBin"),
@@ -799,7 +806,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            longSlit.downIO[Option[GmosRoi]]("explicitRoi"),
            longSlit.downIO[GmosRoi]("defaultRoi"),
           ).tupled,
-          (Some(GmosXBinning.Four),
+          (GmosXBinning.Four,
+           Some(GmosXBinning.Four),
+           GmosXBinning.One,
            GmosYBinning.Four,
            Some(GmosYBinning.Four),
            GmosYBinning.Two,
