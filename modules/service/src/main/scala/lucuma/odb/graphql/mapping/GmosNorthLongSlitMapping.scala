@@ -15,31 +15,28 @@ import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.model.Observation
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.UnnormalizedSED
+import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table.*
 
-import binding.*
-import input.*
-import table.*
+import scala.collection.immutable.SortedMap
 
 trait GmosNorthLongSlitMapping[F[_]]
   extends GmosNorthLongSlitTable[F] { this: SkunkMapping[F] =>
-
-  private val DefaultAmpReadMode: GmosAmpReadMode =
-    GmosAmpReadMode.Slow
-    
-  private val DefaultAmpGain: GmosAmpGain =
-    GmosAmpGain.Low
-    
-  private val DefaultRoi: GmosRoi =
-    GmosRoi.FullFrame  
-
-  private val DefaultYBinning: GmosYBinning =
-    GmosYBinning.Two
 
   lazy val GmosNorthLongSlitMapping: ObjectMapping =
     ObjectMapping(
@@ -53,10 +50,27 @@ trait GmosNorthLongSlitMapping[F[_]]
         SqlObject("centralWavelength"),
     
         // xBin
-//        FieldRef[Option[GmosYBinning]]("explicitXBin").as("yBin", _.getOrElse(defaultXBin)),
+        CursorField(
+          "xBin",
+          cursor =>
+            (cursor.field("explicitXBin", None).flatMap(_.as[Option[GmosXBinning]]),
+             cursor.field("defaultXBin",  None).flatMap(_.as[GmosXBinning])
+            ).parMapN(_.getOrElse(_))
+          ,
+          List("defaultXBin", "explicitXBin")
+        ),
 
-        // defaultXBin
         // TODO: a function of FPU, target SourceProfile, and ImageQuality
+        FieldRef[GmosNorthFpu]("fpu")
+          .as(
+            "defaultXBin",
+            fpu => GmosLongSlitMath.xbinNorth(
+              fpu,
+              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V), SortedMap.empty)),
+              /*placeholder*/ ImageQuality.TwoPointZero,  // so the FPU size is the effective slit width for now
+              PosDouble.unsafeFrom(2.0)
+            )
+          ),
 
         // (optional) `explicitXBin` is tied to a table value and is just a lookup
         SqlField("explicitXBin", GmosNorthLongSlitTable.XBin),
@@ -64,20 +78,20 @@ trait GmosNorthLongSlitMapping[F[_]]
         // `yBin` is just the explicitYBin orElse the default
         // `defaultYBin` is a constant (other similar `default` fields will require a calculation based on other values)
         // (optional) `explicitYBin` is tied to a table value and is just a lookup
-        FieldRef[Option[GmosYBinning]]("explicitYBin").as("yBin", _.getOrElse(DefaultYBinning)),
-        CursorField[GmosYBinning]("defaultYBin", _ => Result(DefaultYBinning)),
+        FieldRef[Option[GmosYBinning]]("explicitYBin").as("yBin", _.getOrElse(GmosLongSlitMath.DefaultYBinning)),
+        CursorField[GmosYBinning]("defaultYBin", _ => Result(GmosLongSlitMath.DefaultYBinning)),
         SqlField("explicitYBin", GmosNorthLongSlitTable.YBin),
 
-        FieldRef[Option[GmosAmpReadMode]]("explicitAmpReadMode").as("ampReadMode", _.getOrElse(DefaultAmpReadMode)),
-        CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode)),
+        FieldRef[Option[GmosAmpReadMode]]("explicitAmpReadMode").as("ampReadMode", _.getOrElse(GmosLongSlitMath.DefaultAmpReadMode)),
+        CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(GmosLongSlitMath.DefaultAmpReadMode)),
         SqlField("explicitAmpReadMode", GmosNorthLongSlitTable.AmpReadMode),
 
-        FieldRef[Option[GmosAmpGain]]("explicitAmpGain").as("ampGain", _.getOrElse(DefaultAmpGain)),
-        CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(DefaultAmpGain)),
+        FieldRef[Option[GmosAmpGain]]("explicitAmpGain").as("ampGain", _.getOrElse(GmosLongSlitMath.DefaultAmpGain)),
+        CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(GmosLongSlitMath.DefaultAmpGain)),
         SqlField("explicitAmpGain", GmosNorthLongSlitTable.AmpGain),
 
-        FieldRef[Option[GmosRoi]]("explicitRoi").as("roi", _.getOrElse(DefaultRoi)),
-        CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi)),
+        FieldRef[Option[GmosRoi]]("explicitRoi").as("roi", _.getOrElse(GmosLongSlitMath.DefaultRoi)),
+        CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitMath.DefaultRoi)),
         SqlField("explicitRoi", GmosNorthLongSlitTable.Roi),
         
         // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
