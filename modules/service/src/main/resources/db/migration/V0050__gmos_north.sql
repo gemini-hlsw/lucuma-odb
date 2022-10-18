@@ -4,7 +4,7 @@
 create table t_gmos_north_detector (
   c_tag               d_tag       not null primary key,
   c_short_name        varchar     not null,
-  c_long_name 		  varchar     not null,
+  c_long_name         varchar     not null,
   c_pixel_size        d_angle_µas not null,
   c_shuffle_offset    d_pixels    not null check (c_shuffle_offset > 0),
   c_x_size            d_pixels    not null check (c_x_size > 0),
@@ -35,7 +35,7 @@ insert into t_gmos_north_stage_mode values ('FollowZ',   'Follow Z',   'Follow i
 create table t_gmos_north_disperser (
   c_tag                      d_tag       not null primary key,
   c_short_name               varchar     not null,
-  c_long_name 		         varchar     not null,
+  c_long_name                varchar     not null,
   c_ruling_density           smallint    not null check (c_ruling_density > 0),
   c_dispersion_pm            smallint    not null check (c_dispersion_pm > 0),
   c_simultaneous_coverage_nm smallint    not null check (c_simultaneous_coverage_nm > 0),
@@ -58,7 +58,7 @@ insert into t_gmos_north_disperser values ('R150_G5308',   'R150',  'R150_G5308'
 create table t_gmos_north_filter (
   c_tag               d_tag           not null primary key,
   c_short_name        varchar         not null,
-  c_long_name 		  varchar         not null,
+  c_long_name         varchar         not null,
   c_wavelength        d_wavelength_pm not null,
   d_width             d_wavelength_pm_range, -- can be null
   d_filter_type       d_tag           not null references t_filter_type(c_tag)

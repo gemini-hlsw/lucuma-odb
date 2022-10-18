@@ -35,7 +35,7 @@ insert into t_gmos_south_stage_mode values ('FollowZ',   'Follow Z',   'Follow i
 create table t_gmos_south_disperser (
   c_tag                      d_tag       not null primary key,
   c_short_name               varchar     not null,
-  c_long_name 		         varchar     not null,
+  c_long_name                varchar     not null,
   c_ruling_density           smallint    not null check (c_ruling_density > 0),
   c_dispersion_pm            smallint    not null check (c_dispersion_pm  > 0),
   c_simultaneous_coverage_nm smallint    not null check (c_simultaneous_coverage_nm > 0),
