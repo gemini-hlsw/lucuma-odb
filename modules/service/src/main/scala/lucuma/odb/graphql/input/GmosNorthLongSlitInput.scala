@@ -87,14 +87,7 @@ object GmosNorthLongSlitInput {
         rExplicitAmpReadMode,
         rExplicitAmpGain,
         rExplicitRoi,
-        rWavelengthDithers                     // Result[Option[String]]
-//          .flatMap(
-//            _.traverse { (s: String) =>
-//              s.split(',')
-//               .toList
-//               .traverse(n => Result.fromOption(allCatch.opt(BigDecimal(n.trim)), s"expected a comma-separated list of decimal wavelength offsets in nm, not '$s'"))
-//            }.map { _.flatMap(NonEmptyList.fromList) }
-//          )
+        rWavelengthDithers
       ).parTupled
     }
 
