@@ -48,6 +48,9 @@ object GmosLongSlitMath {
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)
 
+  val zeroNm: Quantity[BigDecimal, Nanometer] =
+    Quantity[Nanometer](BigDecimal(0))
+
   /**
    * Object angular size estimate based on source profile alone.
    */

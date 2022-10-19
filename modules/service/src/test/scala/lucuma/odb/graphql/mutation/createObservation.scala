@@ -759,6 +759,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                 explicitAmpReadMode: FAST
                 explicitAmpGain: HIGH
                 explicitRoi: CCD2
+                explicitWavelengthDithersNm: [-7.5, 7.1, 7.1, -7.5]
               }
             }
           }
@@ -780,7 +781,10 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                 defaultAmpGain,
                 roi,
                 explicitRoi,
-                defaultRoi
+                defaultRoi,
+                wavelengthDithersNm
+                explicitWavelengthDithersNm
+                defaultWavelengthDithersNm
               }
             }
           }
@@ -805,6 +809,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            longSlit.downIO[GmosRoi]("roi"),
            longSlit.downIO[Option[GmosRoi]]("explicitRoi"),
            longSlit.downIO[GmosRoi]("defaultRoi"),
+           longSlit.downIO[List[BigDecimal]]("wavelengthDithersNm"),
+           longSlit.downIO[Option[List[BigDecimal]]]("explicitWavelengthDithersNm"),
+           longSlit.downIO[List[BigDecimal]]("defaultWavelengthDithersNm")
           ).tupled,
           (GmosXBinning.Four,
            Some(GmosXBinning.Four),
@@ -820,7 +827,10 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            GmosAmpGain.Low,
            GmosRoi.Ccd2,
            Some(GmosRoi.Ccd2),
-           GmosRoi.FullFrame
+           GmosRoi.FullFrame,
+           List(BigDecimal("-7.5"), BigDecimal("7.1"), BigDecimal("7.1"), BigDecimal("-7.5")),
+           Some(List(BigDecimal("-7.5"), BigDecimal("7.1"), BigDecimal("7.1"), BigDecimal("-7.5"))),
+           List(BigDecimal("0.0"), BigDecimal("5.0"), BigDecimal("5.0"), BigDecimal("0.0"))
           )
         )
 

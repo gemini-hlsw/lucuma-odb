@@ -238,7 +238,7 @@ create table t_gmos_north_long_slit (
   c_initial_fpu                d_tag                 NOT NULL             REFERENCES t_gmos_north_fpu(c_tag),
   c_initial_central_wavelength d_wavelength_pm       NULL DEFAULT NULL,
 
-  CONSTRAINT wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(?:,-?\d+)*$'),
+  CONSTRAINT wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
   CONSTRAINT offset_format            CHECK (c_spatial_offsets ~ '^\(-?\d+,-?\d+\)(?:,\(-?\d+,-?\d+\))*$'),
 
   PRIMARY KEY (c_observation_id, c_observing_mode_type),

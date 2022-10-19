@@ -5,8 +5,12 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
+import coulomb.Quantity
 import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -17,10 +21,12 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
+import lucuma.core.math.units.Nanometer
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
 
+import scala.util.control.Exception._
 
 object GmosNorthLongSlitInput {
 
@@ -33,12 +39,17 @@ object GmosNorthLongSlitInput {
     explicitYBin:        Option[GmosYBinning],
     explicitAmpReadMode: Option[GmosAmpReadMode],
     explicitAmpGain:     Option[GmosAmpGain],
-    explicitRoi:         Option[GmosRoi]
+    explicitRoi:         Option[GmosRoi],
+    explicitλDithers:    Option[List[BigDecimal]]
   ) {
     
     def observingModeType: ObservingModeType =
       ObservingModeType.GmosNorthLongSlit
-    
+
+    // Formatted to store in a text column in the database with a regex constraint
+    val formattedλDithers: Option[String] =
+      explicitλDithers.map(_.map(_.bigDecimal.toPlainString).intercalate(","))
+
   }
 
   private val data: Matcher[(
@@ -50,7 +61,8 @@ object GmosNorthLongSlitInput {
     Option[GmosYBinning],
     Option[GmosAmpReadMode],
     Option[GmosAmpGain],
-    Option[GmosRoi]
+    Option[GmosRoi],
+    Option[List[BigDecimal]]
   )] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -63,7 +75,7 @@ object GmosNorthLongSlitInput {
         GmosAmpReadModeBinding.Option("explicitAmpReadMode", rExplicitAmpReadMode),
         GmosAmpGainBinding.Option("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Option("explicitRoi", rExplicitRoi),
-        ("explicitWavelengthDithersNm", _),
+        BigDecimalBinding.List.Option("explicitWavelengthDithersNm", rWavelengthDithers),
         ("explicitSpatialOffsets", _)
       ) => (
         rGrating,
@@ -74,15 +86,23 @@ object GmosNorthLongSlitInput {
         rExplicitYBin,
         rExplicitAmpReadMode,
         rExplicitAmpGain,
-        rExplicitRoi
+        rExplicitRoi,
+        rWavelengthDithers                     // Result[Option[String]]
+//          .flatMap(
+//            _.traverse { (s: String) =>
+//              s.split(',')
+//               .toList
+//               .traverse(n => Result.fromOption(allCatch.opt(BigDecimal(n.trim)), s"expected a comma-separated list of decimal wavelength offsets in nm, not '$s'"))
+//            }.map { _.flatMap(NonEmptyList.fromList) }
+//          )
       ).parTupled
     }
 
   val CreateBinding: Matcher[Create] =
     data.rmap {
-      case (Some(grating), filter, Some(fpu), Some(centralWavelength), explicitXBin, explicitYBin, explicitAmpReadMode, explicitAmpGain, explicitRoi) =>
-        Result(Create(grating, filter.toOption, fpu, centralWavelength, explicitXBin, explicitYBin, explicitAmpReadMode, explicitAmpGain, explicitRoi))
-      case _                                                                         =>
+      case (Some(grating), filter, Some(fpu), Some(centralWavelength), exXBin, exYBin, exAmpReadMode, exAmpGain, exRoi, exWavelengthDithers) =>
+        Result(Create(grating, filter.toOption, fpu, centralWavelength, exXBin, exYBin, exAmpReadMode, exAmpGain, exRoi, exWavelengthDithers))
+      case _ =>
         Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
     }
 
