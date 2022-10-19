@@ -19,10 +19,12 @@ import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.Site
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
@@ -55,8 +57,7 @@ trait GmosNorthLongSlitMapping[F[_]]
           cursor =>
             (cursor.field("explicitXBin", None).flatMap(_.as[Option[GmosXBinning]]),
              cursor.field("defaultXBin",  None).flatMap(_.as[GmosXBinning])
-            ).parMapN(_.getOrElse(_))
-          ,
+            ).parMapN(_.getOrElse(_)),
           List("defaultXBin", "explicitXBin")
         ),
 
@@ -93,6 +94,34 @@ trait GmosNorthLongSlitMapping[F[_]]
         FieldRef[Option[GmosRoi]]("explicitRoi").as("roi", _.getOrElse(GmosLongSlitMath.DefaultRoi)),
         CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitMath.DefaultRoi)),
         SqlField("explicitRoi", GmosNorthLongSlitTable.Roi),
+        
+        // wavelengthDithersNm -- either the explicit value or else the default.
+        CursorField(
+          "wavelengthDithersNm",
+          cursor =>
+            (cursor.field("explicitWavelengthDithersNm", None).flatMap(_.as[Option[List[BigDecimal]]]),
+             cursor.field("defaultWavelengthDithersNm", None).flatMap(_.as[List[BigDecimal]])
+            ).parMapN(_.getOrElse(_)),
+          List("defaultWavelengthDithersNm", "explicitWavelengthDithersNm")
+        ),
+        
+        // Default wavelength dithers are based on the grating.
+        FieldRef[GmosNorthGrating]("grating")
+          .as(
+            "defaultWavelengthDithersNm",
+            grating => {
+              val deltaNm = GmosLongSlitMath.Δλ(Site.GN, grating.dispersion)
+              List(GmosLongSlitMath.zeroNm, deltaNm, deltaNm, GmosLongSlitMath.zeroNm).map(_.value)
+            }
+          ),
+
+        // For explicitWavelengthDithersNm, we have to map the csv string representation to a list of decimals.
+        SqlField("wavelengthDithersString", GmosNorthLongSlitTable.WavelengthDithers, hidden = true),
+        CursorField[Option[List[BigDecimal]]](
+          "explicitWavelengthDithersNm",
+          c => c.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(s => s.split(',').toList.map(n => BigDecimal(n.trim))))),
+          List("wavelengthDithersString")
+        ),
         
         // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
         // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.

@@ -24,6 +24,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import natchez.Trace
 import skunk.*
+import skunk.codec.text.text
 import skunk.implicits.*
 
 
@@ -71,6 +72,7 @@ object GmosLongSlitService {
       Option[GmosAmpReadMode] ~
       Option[GmosAmpGain]     ~
       Option[GmosRoi]         ~
+      Option[String]          ~
       GmosNorthGrating        ~
       Option[GmosNorthFilter] ~
       GmosNorthFpu            ~
@@ -88,6 +90,7 @@ object GmosLongSlitService {
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
+          c_wavelength_dithers,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -104,6 +107,7 @@ object GmosLongSlitService {
           ${gmos_amp_read_mode.opt},
           ${gmos_amp_gain.opt},
           ${gmos_roi.opt},
+          ${text.opt},
           $gmos_north_grating,
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
@@ -125,6 +129,7 @@ object GmosLongSlitService {
           input.explicitAmpReadMode ~
           input.explicitAmpGain     ~
           input.explicitRoi         ~
+          input.formattedλDithers   ~
           input.grating             ~
           input.filter              ~
           input.fpu                 ~
