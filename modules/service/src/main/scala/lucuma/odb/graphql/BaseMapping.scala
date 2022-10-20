@@ -96,6 +96,7 @@ trait BaseMapping[F[_]]
   lazy val ProposalClassType                   = schema.ref("ProposalClass")
   lazy val ProposalType                        = schema.ref("Proposal")
   lazy val qType                               = schema.ref("qType")
+  lazy val QueryType                           = schema.ref("Query")
   lazy val QueueType                           = schema.ref("Queue")
   lazy val RadialVelocityType                  = schema.ref("RadialVelocity")
   lazy val RightAscensionType                  = schema.ref("RightAscension")

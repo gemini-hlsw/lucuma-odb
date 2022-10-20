@@ -13,6 +13,6 @@ import scala.tools.util.PathResolver.Environment
 trait ProgramSelectResultMapping[F[_]] extends SelectResultMapping[F] {
   
   lazy val ProgramSelectResultMapping: ObjectMapping =
-    selectResultMapping(ProgramSelectResultType)
+    topLevelSelectResultMapping(ProgramSelectResultType)
 
 }

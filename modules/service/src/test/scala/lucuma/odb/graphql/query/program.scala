@@ -7,9 +7,11 @@ package query
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
+import io.circe.syntax._
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
+import lucuma.core.model.Observation
 
 class program extends OdbSuite {
 
@@ -36,7 +38,25 @@ class program extends OdbSuite {
       json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
     }
 
-  test("any user can read their own programs") {
+  def createObservation(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                id
+              }
+            }
+          }        """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  test("any user can read their own programs".ignore) {
     List(guest, pi, service).traverse { user =>
       val name = s"${user.displayName}'s Science Program"
       createProgram(user, name).flatMap { id =>
@@ -92,7 +112,7 @@ class program extends OdbSuite {
     }
   }
 
-  test("guest and standard user can't see each others' programs") {
+  test("guest and standard user can't see each others' programs".ignore) {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
@@ -136,7 +156,7 @@ class program extends OdbSuite {
     }
   }
 
-  test("service user can see anyone's programs") {
+  test("service user can see anyone's programs".ignore) {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
@@ -168,5 +188,37 @@ class program extends OdbSuite {
     }
   }
 
+  test("program / observations (simple)") {
+    createProgram(pi, "program with some observations").flatMap { pid =>
+      createObservation(pi, pid).replicateA(3).flatMap { oids =>
+        expect(
+          user = pi,
+          query = 
+             s"""
+              query {
+                program(programId: "$pid") {
+                  id
+                  observations() {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            Right(
+              json"""
+                {
+                  "program": {
+                    "id": $pid
+                  }
+                }
+              """
+            )
+        )      
+      }
+    }
+  }
 
 }

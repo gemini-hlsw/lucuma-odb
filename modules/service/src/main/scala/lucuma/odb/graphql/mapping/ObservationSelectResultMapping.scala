@@ -9,10 +9,16 @@ import lucuma.odb.graphql.BaseMapping
 import skunk.codec.numeric.int8
 
 import scala.tools.util.PathResolver.Environment
+import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.ProgramTable
 
-trait ObservationSelectResultMapping[F[_]] extends SelectResultMapping[F] {
+trait ObservationSelectResultMapping[F[_]] 
+  extends ObservationView[F] with ProgramTable[F] with SelectResultMapping[F] {
 
-  lazy val ObservationSelectResultMapping: ObjectMapping =
-    selectResultMapping(ObservationSelectResultType)
-
+  lazy val ObservationSelectResultMapping: TypeMapping =
+    SwitchMapping(ObservationSelectResultType, List(
+      (QueryType, "observations",  topLevelSelectResultMapping(ObservationSelectResultType)),
+      (ProgramType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)))
+    ))
+    
 }
