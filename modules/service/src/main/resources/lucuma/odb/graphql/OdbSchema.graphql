@@ -4297,7 +4297,7 @@ type Observation {
   visualizationTime: Timestamp
 
   # Position angle constraint, if any.
-  posAngleConstraint: PosAngleConstraint
+  posAngleConstraint: PosAngleConstraint!
 
   # Observation planned time calculation.
   plannedTime: PlannedTimeSummary!

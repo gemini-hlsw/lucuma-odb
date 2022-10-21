@@ -69,7 +69,7 @@ trait ObservationService[F[_]] {
 
   def createObservation(
     programId: Program.Id,
-    SET:       ObservationPropertiesInput
+    SET:       ObservationPropertiesInput.Create
   ): F[Result[Observation.Id]]
 
   def selectObservations(
@@ -77,7 +77,7 @@ trait ObservationService[F[_]] {
   ): F[List[Observation.Id]]
 
   def updateObservations(
-    SET:   ObservationPropertiesInput,
+    SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
   ): F[Result[List[Observation.Id]]]
 
@@ -135,7 +135,7 @@ object ObservationService {
 
       override def createObservation(
         programId:   Program.Id,
-        SET:         ObservationPropertiesInput
+        SET:         ObservationPropertiesInput.Create
       ): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
           session.transaction.use { xa =>
@@ -167,7 +167,7 @@ object ObservationService {
         }
 
       override def updateObservations(
-        SET:   ObservationPropertiesInput,
+        SET:   ObservationPropertiesInput.Edit,
         which: AppliedFragment
       ): F[Result[List[Observation.Id]]] =
         Statements.updateObservations(SET, which).traverse { af =>
@@ -188,7 +188,7 @@ object ObservationService {
     def insertObservationAs(
       user:      User,
       programId: Program.Id,
-      SET:       ObservationPropertiesInput
+      SET:       ObservationPropertiesInput.Create
     ): Result[AppliedFragment] =
       for {
         eb <- SET.targetEnvironment.flatMap(_.explicitBase.toOption).flatTraverse(_.create)
@@ -197,11 +197,11 @@ object ObservationService {
         insertObservationAs(
           user,
           programId,
-          SET.subtitle.toOption,
+          SET.subtitle,
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.New),
           SET.activeStatus.getOrElse(ObsActiveStatus.Active),
-          SET.visualizationTime.toOption,
+          SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           eb,
@@ -463,7 +463,7 @@ object ObservationService {
 
     }
 
-    def updates(SET: ObservationPropertiesInput): Result[Option[NonEmptyList[AppliedFragment]]] = {
+    def updates(SET: ObservationPropertiesInput.Edit): Result[Option[NonEmptyList[AppliedFragment]]] = {
       val upExistence         = sql"c_existence = $existence"
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upStatus            = sql"c_status = $obs_status"
@@ -513,7 +513,7 @@ object ObservationService {
     }
 
     def updateObservations(
-      SET:   ObservationPropertiesInput,
+      SET:   ObservationPropertiesInput.Edit,
       which: AppliedFragment
     ): Result[AppliedFragment] = {
 
