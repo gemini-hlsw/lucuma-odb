@@ -18,6 +18,7 @@ gmosSouthLongSlit: GmosSouthLongSlitInput
 
 
 object ObservingModeInput {
+
   final case class Create(
     gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Create]
   ) {
@@ -27,6 +28,10 @@ object ObservingModeInput {
 
   }
 
+  final case class Edit(
+    gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Edit]
+  )
+
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -35,6 +40,15 @@ object ObservingModeInput {
         ("gmosSouthLongSlit", _)
       ) =>
         rGmosNorthLongSlit.map(Create.apply)
+    }
+
+  val EditBinding: Matcher[Edit] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        GmosNorthLongSlitInput.EditBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
+        ("gmosSouthLongSlit", _)
+      ) =>
+        rGmosNorthLongSlit.map(Edit.apply)
     }
 
 }
