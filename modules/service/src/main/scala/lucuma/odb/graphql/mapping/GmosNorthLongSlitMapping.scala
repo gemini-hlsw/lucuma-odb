@@ -16,6 +16,9 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.PosDouble
+import io.circe.Json
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFpu
@@ -26,6 +29,7 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.math.Offset.Q
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -35,12 +39,47 @@ import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 
+import java.math.RoundingMode
 import scala.collection.immutable.SortedMap
+import scala.reflect.ClassTag
 
 trait GmosNorthLongSlitMapping[F[_]]
   extends GmosNorthLongSlitTable[F] { this: SkunkMapping[F] =>
 
-  lazy val GmosNorthLongSlitMapping: ObjectMapping =
+  lazy val GmosNorthLongSlitMapping: ObjectMapping = {
+
+    def explicitOrElseDefault[A: ClassTag : io.circe.Encoder](
+      name:          String,
+      explicitField: String,
+      defaultField:  String
+    ): CursorField[A] =
+      CursorField[A](
+        name,
+        cursor =>
+          (cursor.field(explicitField, None).flatMap(_.as[Option[A]]),
+            cursor.field(defaultField, None).flatMap(_.as[A])
+            ).parMapN(_.getOrElse(_)),
+        List(explicitField, defaultField)
+      )
+
+    def parseCsvBigDecimals(s: String): List[BigDecimal] =
+      s.split(',').toList.map(n => BigDecimal(n.trim))
+
+    def toOffsetQJson(arcsec: BigDecimal): Json =
+      json"""
+       {
+         "microarcseconds": ${arcsec.bigDecimal.movePointRight(6).setScale(6, RoundingMode.HALF_UP).longValue},
+         "milliarcseconds": ${arcsec.bigDecimal.movePointRight(3).setScale(6, RoundingMode.HALF_UP)},
+         "arcseconds":      ${arcsec.bigDecimal.setScale(6, RoundingMode.HALF_UP)}
+       }
+    """
+
+    def decodeSpatialOffsets(s: String): Json =
+      parseCsvBigDecimals(s).map(toOffsetQJson).asJson
+
+    val defaultSpatialOffsets: Json =
+      GmosLongSlitMath.DefaultSpatialOffsets.map(q => toOffsetQJson(q.value)).asJson
+
     ObjectMapping(
       tpe = GmosNorthLongSlitType,
       fieldMappings = List(
@@ -50,16 +89,12 @@ trait GmosNorthLongSlitMapping[F[_]]
         SqlField("filter",  GmosNorthLongSlitTable.Filter),
         SqlField("fpu",     GmosNorthLongSlitTable.Fpu),
         SqlObject("centralWavelength"),
-    
+
+        // ---------------------
         // xBin
-        CursorField(
-          "xBin",
-          cursor =>
-            (cursor.field("explicitXBin", None).flatMap(_.as[Option[GmosXBinning]]),
-             cursor.field("defaultXBin",  None).flatMap(_.as[GmosXBinning])
-            ).parMapN(_.getOrElse(_)),
-          List("defaultXBin", "explicitXBin")
-        ),
+        // ---------------------
+
+        explicitOrElseDefault[GmosXBinning]("xBin", "explicitXBin", "defaultXBin"),
 
         // TODO: a function of FPU, target SourceProfile, and ImageQuality
         FieldRef[GmosNorthFpu]("fpu")
@@ -76,53 +111,87 @@ trait GmosNorthLongSlitMapping[F[_]]
         // (optional) `explicitXBin` is tied to a table value and is just a lookup
         SqlField("explicitXBin", GmosNorthLongSlitTable.XBin),
 
+        // ---------------------
+        // yBin
+        // ---------------------
+
         // `yBin` is just the explicitYBin orElse the default
         // `defaultYBin` is a constant (other similar `default` fields will require a calculation based on other values)
         // (optional) `explicitYBin` is tied to a table value and is just a lookup
-        FieldRef[Option[GmosYBinning]]("explicitYBin").as("yBin", _.getOrElse(GmosLongSlitMath.DefaultYBinning)),
+        explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin"),
         CursorField[GmosYBinning]("defaultYBin", _ => Result(GmosLongSlitMath.DefaultYBinning)),
         SqlField("explicitYBin", GmosNorthLongSlitTable.YBin),
 
-        FieldRef[Option[GmosAmpReadMode]]("explicitAmpReadMode").as("ampReadMode", _.getOrElse(GmosLongSlitMath.DefaultAmpReadMode)),
+        // ---------------------
+        // ampReadMode
+        // ---------------------
+        explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode"),
         CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(GmosLongSlitMath.DefaultAmpReadMode)),
         SqlField("explicitAmpReadMode", GmosNorthLongSlitTable.AmpReadMode),
 
-        FieldRef[Option[GmosAmpGain]]("explicitAmpGain").as("ampGain", _.getOrElse(GmosLongSlitMath.DefaultAmpGain)),
+        // ---------------------
+        // ampGain
+        // ---------------------
+        explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain"),
         CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(GmosLongSlitMath.DefaultAmpGain)),
         SqlField("explicitAmpGain", GmosNorthLongSlitTable.AmpGain),
 
-        FieldRef[Option[GmosRoi]]("explicitRoi").as("roi", _.getOrElse(GmosLongSlitMath.DefaultRoi)),
+        // ---------------------
+        // roi
+        // ---------------------
+        explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi"),
         CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitMath.DefaultRoi)),
         SqlField("explicitRoi", GmosNorthLongSlitTable.Roi),
-        
+
+        // ---------------------
+        // wavelengthDithersNm
+        // ---------------------
+
         // wavelengthDithersNm -- either the explicit value or else the default.
-        CursorField(
-          "wavelengthDithersNm",
-          cursor =>
-            (cursor.field("explicitWavelengthDithersNm", None).flatMap(_.as[Option[List[BigDecimal]]]),
-             cursor.field("defaultWavelengthDithersNm", None).flatMap(_.as[List[BigDecimal]])
-            ).parMapN(_.getOrElse(_)),
-          List("defaultWavelengthDithersNm", "explicitWavelengthDithersNm")
-        ),
-        
+        explicitOrElseDefault[List[BigDecimal]]("wavelengthDithersNm", "explicitWavelengthDithersNm", "defaultWavelengthDithersNm"),
+
         // Default wavelength dithers are based on the grating.
         FieldRef[GmosNorthGrating]("grating")
           .as(
             "defaultWavelengthDithersNm",
-            grating => {
-              val deltaNm = GmosLongSlitMath.Δλ(Site.GN, grating.dispersion)
-              List(GmosLongSlitMath.zeroNm, deltaNm, deltaNm, GmosLongSlitMath.zeroNm).map(_.value)
-            }
+            grating => GmosLongSlitMath.defaultWavelengthDithersGN(grating).map(_.value)
           ),
 
         // For explicitWavelengthDithersNm, we have to map the csv string representation to a list of decimals.
         SqlField("wavelengthDithersString", GmosNorthLongSlitTable.WavelengthDithers, hidden = true),
-        CursorField[Option[List[BigDecimal]]](
-          "explicitWavelengthDithersNm",
-          c => c.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(s => s.split(',').toList.map(n => BigDecimal(n.trim))))),
-          List("wavelengthDithersString")
+        FieldRef[Option[String]]("wavelengthDithersString")
+          .as("explicitWavelengthDithersNm", _.map(parseCsvBigDecimals)),
+
+
+        SqlField("spatialOffsetsString", GmosNorthLongSlitTable.SpatialOffsets, hidden = true),
+
+        // ---------------------
+        // spatialOffsets
+        // ---------------------
+
+        CursorFieldJson("spatialOffsets",
+          cursor =>
+            cursor
+              .field("spatialOffsetsString", None)
+              .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+              .map(_.getOrElse(defaultSpatialOffsets)),
+          List("explicitSpatialOffsets", "defaultSpatialOffsets")
         ),
-        
+
+        CursorFieldJson("explicitSpatialOffsets",
+          cursor =>
+            cursor
+              .field("spatialOffsetsString", None)
+              .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets).asJson)),
+          List("spatialOffsetsString")
+        ),
+
+        CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsets), Nil),
+
+        // ---------------------
+        // initialValues
+        // ---------------------
+
         // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
         // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
         SqlField("initialGrating", GmosNorthLongSlitTable.InitialGrating),
@@ -131,4 +200,8 @@ trait GmosNorthLongSlitMapping[F[_]]
         SqlObject("initialCentralWavelength")
       )
     )
+  }
+
+
+
 }

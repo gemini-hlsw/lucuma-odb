@@ -73,6 +73,7 @@ object GmosLongSlitService {
       Option[GmosAmpGain]     ~
       Option[GmosRoi]         ~
       Option[String]          ~
+      Option[String]          ~
       GmosNorthGrating        ~
       Option[GmosNorthFilter] ~
       GmosNorthFpu            ~
@@ -91,6 +92,7 @@ object GmosLongSlitService {
           c_amp_gain,
           c_roi,
           c_wavelength_dithers,
+          c_spatial_offsets,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -108,6 +110,7 @@ object GmosLongSlitService {
           ${gmos_amp_gain.opt},
           ${gmos_roi.opt},
           ${text.opt},
+          ${text.opt},
           $gmos_north_grating,
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
@@ -119,20 +122,21 @@ object GmosLongSlitService {
       input:         GmosNorthLongSlitInput.Create
     ): AppliedFragment =
       InsertGmosNorthLongSlit.apply(
-        observationId               ~
-          input.grating             ~
-          input.filter              ~
-          input.fpu                 ~
-          input.centralWavelength   ~
-          input.explicitXBin        ~
-          input.explicitYBin        ~
-          input.explicitAmpReadMode ~
-          input.explicitAmpGain     ~
-          input.explicitRoi         ~
-          input.formattedλDithers   ~
-          input.grating             ~
-          input.filter              ~
-          input.fpu                 ~
+        observationId                   ~
+          input.grating                 ~
+          input.filter                  ~
+          input.fpu                     ~
+          input.centralWavelength       ~
+          input.explicitXBin            ~
+          input.explicitYBin            ~
+          input.explicitAmpReadMode     ~
+          input.explicitAmpGain         ~
+          input.explicitRoi             ~
+          input.formattedλDithers       ~
+          input.formattedSpatialOffsets ~
+          input.grating                 ~
+          input.filter                  ~
+          input.fpu                     ~
           input.centralWavelength
       )
 

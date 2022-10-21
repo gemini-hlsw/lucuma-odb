@@ -759,7 +759,13 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                 explicitAmpReadMode: FAST
                 explicitAmpGain: HIGH
                 explicitRoi: CCD2
-                explicitWavelengthDithersNm: [-7.5, 7.1, 7.1, -7.5]
+                explicitWavelengthDithersNm: [-7.5, 7.1, 7.1, -7.5],
+                explicitSpatialOffsets: [
+                  { arcseconds: -10.0 },
+                  { arcseconds:  10.0 },
+                  { arcseconds:  10.0 },
+                  { arcseconds: -10.0 }
+                ]
               }
             }
           }
@@ -768,23 +774,33 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
             observingMode {
               gmosNorthLongSlit {
                 xBin
-                explicitXBin,
-                defaultXBin,
-                yBin,
+                explicitXBin
+                defaultXBin
+                yBin
                 explicitYBin
                 defaultYBin
-                ampReadMode,
-                explicitAmpReadMode,
-                defaultAmpReadMode,
-                ampGain,
-                explicitAmpGain,
-                defaultAmpGain,
-                roi,
-                explicitRoi,
-                defaultRoi,
+                ampReadMode
+                explicitAmpReadMode
+                defaultAmpReadMode
+                ampGain
+                explicitAmpGain
+                defaultAmpGain
+                roi
+                explicitRoi
+                defaultRoi
                 wavelengthDithersNm
                 explicitWavelengthDithersNm
                 defaultWavelengthDithersNm
+                spatialOffsets {
+                  arcseconds
+                }
+                explicitSpatialOffsets {
+                  microarcseconds
+                  arcseconds
+                }
+                defaultSpatialOffsets {
+                  arcseconds
+                }
               }
             }
           }
@@ -811,7 +827,10 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            longSlit.downIO[GmosRoi]("defaultRoi"),
            longSlit.downIO[List[BigDecimal]]("wavelengthDithersNm"),
            longSlit.downIO[Option[List[BigDecimal]]]("explicitWavelengthDithersNm"),
-           longSlit.downIO[List[BigDecimal]]("defaultWavelengthDithersNm")
+           longSlit.downIO[List[BigDecimal]]("defaultWavelengthDithersNm"),
+           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
+           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
           ).tupled,
           (GmosXBinning.Four,
            Some(GmosXBinning.Four),
@@ -830,7 +849,25 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            GmosRoi.FullFrame,
            List(BigDecimal("-7.5"), BigDecimal("7.1"), BigDecimal("7.1"), BigDecimal("-7.5")),
            Some(List(BigDecimal("-7.5"), BigDecimal("7.1"), BigDecimal("7.1"), BigDecimal("-7.5"))),
-           List(BigDecimal("0.0"), BigDecimal("5.0"), BigDecimal("5.0"), BigDecimal("0.0"))
+           List(BigDecimal("0.0"), BigDecimal("5.0"), BigDecimal("5.0"), BigDecimal("0.0")),
+           List(
+             json"""{ "arcseconds": -10.0}""",
+             json"""{ "arcseconds":  10.0}""",
+             json"""{ "arcseconds":  10.0}""",
+             json"""{ "arcseconds": -10.0}"""
+           ),
+           Some(List(
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }"""
+           )),
+           List(
+             json"""{ "arcseconds":  0.0}""",
+             json"""{ "arcseconds": 15.0}""",
+             json"""{ "arcseconds": 15.0}""",
+             json"""{ "arcseconds":  0.0}"""
+           )
           )
         )
 
