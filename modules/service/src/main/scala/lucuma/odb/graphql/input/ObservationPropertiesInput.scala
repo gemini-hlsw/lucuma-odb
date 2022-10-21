@@ -17,95 +17,117 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
 
-final case class ObservationPropertiesInput(
-  subtitle:            Nullable[NonEmptyString],
-  status:              Option[ObsStatus],
-  activeStatus:        Option[ObsActiveStatus],
-  visualizationTime:   Nullable[Timestamp],
-  posAngleConstraint:  Option[PosAngleConstraintInput],
-  targetEnvironment:   Option[TargetEnvironmentInput],
-  constraintSet:       Option[ConstraintSetInput],
-  scienceRequirements: Option[ScienceRequirementsInput],
-  observingMode:       Option[ObservingModeInput.Create],  // TODO: will need to split ObservationPropertiesInput into create and edit inputs
-  existence:           Option[Existence]
-) {
-
-  def asterism: Nullable[NonEmptyList[Target.Id]] =
-    for {
-      t <- Nullable.orAbsent(targetEnvironment)
-      a <- t.asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
-    } yield a
-
-}
-
 object ObservationPropertiesInput {
 
-  val Default: ObservationPropertiesInput =
-    ObservationPropertiesInput(
-      subtitle            = Nullable.Null,
-      status              = ObsStatus.New.some,
-      activeStatus        = ObsActiveStatus.Active.some,
-      visualizationTime   = Nullable.Null,
-      posAngleConstraint  = None,
-      targetEnvironment   = None,
-      constraintSet       = ConstraintSetInput.Default.some,
-      scienceRequirements = None,
-      observingMode       = None,
-      existence           = Existence.Present.some
-    )
+  trait AsterismInput {
+    def targetEnvironment: Option[TargetEnvironmentInput]
 
-  val CreateBinding: Matcher[ObservationPropertiesInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        NonEmptyStringBinding.Option("subtitle", rSubtitle),
-        ObsStatusBinding.Option("status", rObsStatus),
-        ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
-        TimestampBinding.Option("visualizationTime", rVisualizationTime),
-        PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
-        TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
-        ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
-        ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-        ObservingModeInput.CreateBinding.Option("observingMode", rObservingMode),
-        ExistenceBinding.Option("existence", rExistence),
-      ) =>
-        (rSubtitle.map(Nullable.orNull),
-         rObsStatus,
-         rObsActiveStatus,
-         rVisualizationTime.map(Nullable.orNull),
-         rPosAngleConstraint,
-         rTargetEnvironment,
-         rConstraintSet,
-         rScienceRequirements,
-         rObservingMode, 
-         rExistence
-        ).parMapN(apply)
-    }
+    def asterism: Nullable[NonEmptyList[Target.Id]] =
+      for {
+        t <- Nullable.orAbsent(targetEnvironment)
+        a <- t.asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+      } yield a
 
-  val EditBinding: Matcher[ObservationPropertiesInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        NonEmptyStringBinding.Nullable("subtitle", rSubtitle),
-        ObsStatusBinding.Option("status", rObsStatus),
-        ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
-        TimestampBinding.Nullable("visualizationTime", rVisualizationTime),
-        PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
-        TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
-        ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
-        ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-        ObservingModeInput.CreateBinding.Option("observingMode", rObservingMode), // TODO: EditBinding
-        ExistenceBinding.Option("existence", rExistence),
-      ) =>
-        (rSubtitle,
-         rObsStatus,
-         rObsActiveStatus,
-         rVisualizationTime,
-         rPosAngleConstraint,
-         rTargetEnvironment,
-         rConstraintSet,
-         rScienceRequirements,
-         rObservingMode, 
-         rExistence
-        ).parMapN(apply)
-    }
+  }
 
+  final case class Create(
+    subtitle:            Option[NonEmptyString],
+    status:              Option[ObsStatus],
+    activeStatus:        Option[ObsActiveStatus],
+    visualizationTime:   Option[Timestamp],
+    posAngleConstraint:  Option[PosAngleConstraintInput],
+    targetEnvironment:   Option[TargetEnvironmentInput],
+    constraintSet:       Option[ConstraintSetInput],
+    scienceRequirements: Option[ScienceRequirementsInput],
+    observingMode:       Option[ObservingModeInput.Create],
+    existence:           Option[Existence]
+  ) extends AsterismInput
+
+  object Create {
+
+    val Default: Create =
+      Create(
+        subtitle            = Option.empty,
+        status              = ObsStatus.New.some,
+        activeStatus        = ObsActiveStatus.Active.some,
+        visualizationTime   = Option.empty,
+        posAngleConstraint  = None,
+        targetEnvironment   = None,
+        constraintSet       = ConstraintSetInput.Default.some,
+        scienceRequirements = None,
+        observingMode       = None,
+        existence           = Existence.Present.some
+      )
+
+    val Binding: Matcher[Create] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          NonEmptyStringBinding.Option("subtitle", rSubtitle),
+          ObsStatusBinding.Option("status", rObsStatus),
+          ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
+          TimestampBinding.Option("visualizationTime", rVisualizationTime),
+          PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
+          TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
+          ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
+          ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
+          ObservingModeInput.CreateBinding.Option("observingMode", rObservingMode),
+          ExistenceBinding.Option("existence", rExistence)
+        ) =>
+          (rSubtitle,
+            rObsStatus,
+            rObsActiveStatus,
+            rVisualizationTime,
+            rPosAngleConstraint,
+            rTargetEnvironment,
+            rConstraintSet,
+            rScienceRequirements,
+            rObservingMode,
+            rExistence
+          ).parMapN(Create.apply)
+      }
+
+  }
+
+  final case class Edit(
+    subtitle:            Nullable[NonEmptyString],
+    status:              Option[ObsStatus],
+    activeStatus:        Option[ObsActiveStatus],
+    visualizationTime:   Nullable[Timestamp],
+    posAngleConstraint:  Option[PosAngleConstraintInput],
+    targetEnvironment:   Option[TargetEnvironmentInput],
+    constraintSet:       Option[ConstraintSetInput],
+    scienceRequirements: Option[ScienceRequirementsInput],
+    observingMode:       Nullable[ObservingModeInput.Edit],
+    existence:           Option[Existence]
+  ) extends AsterismInput
+
+  object Edit {
+
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          NonEmptyStringBinding.Nullable("subtitle", rSubtitle),
+          ObsStatusBinding.Option("status", rObsStatus),
+          ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
+          TimestampBinding.Nullable("visualizationTime", rVisualizationTime),
+          PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
+          TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
+          ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
+          ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
+          ObservingModeInput.EditBinding.Nullable("observingMode", rObservingMode),
+          ExistenceBinding.Option("existence", rExistence)
+        ) =>
+          (rSubtitle,
+            rObsStatus,
+            rObsActiveStatus,
+            rVisualizationTime,
+            rPosAngleConstraint,
+            rTargetEnvironment,
+            rConstraintSet,
+            rScienceRequirements,
+            rObservingMode,
+            rExistence
+          ).parMapN(apply)
+      }
+  }
 }
