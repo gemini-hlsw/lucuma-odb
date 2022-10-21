@@ -58,18 +58,32 @@ object GmosNorthLongSlitInput {
 
   }
 
+  final case class Edit(
+    grating:                Option[GmosNorthGrating],
+    filter:                 Nullable[GmosNorthFilter],
+    fpu:                    Option[GmosNorthFpu],
+    centralWavelength:      Option[Wavelength],
+    explicitXBin:           Nullable[GmosXBinning],
+    explicitYBin:           Nullable[GmosYBinning],
+    explicitAmpReadMode:    Nullable[GmosAmpReadMode],
+    explicitAmpGain:        Nullable[GmosAmpGain],
+    explicitRoi:            Nullable[GmosRoi],
+    explicitλDithers:       Nullable[List[BigDecimal]],
+    explicitSpatialOffsets: Nullable[List[Q]]
+  )
+
   private val data: Matcher[(
     Option[GmosNorthGrating],
     Nullable[GmosNorthFilter],
     Option[GmosNorthFpu],
     Option[Wavelength],
-    Option[GmosXBinning],
-    Option[GmosYBinning],
-    Option[GmosAmpReadMode],
-    Option[GmosAmpGain],
-    Option[GmosRoi],
-    Option[List[BigDecimal]],
-    Option[List[Q]]
+    Nullable[GmosXBinning],
+    Nullable[GmosYBinning],
+    Nullable[GmosAmpReadMode],
+    Nullable[GmosAmpGain],
+    Nullable[GmosRoi],
+    Nullable[List[BigDecimal]],
+    Nullable[List[Q]]
   )] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -77,13 +91,13 @@ object GmosNorthLongSlitInput {
         GmosNorthFilterBinding.Nullable("filter", rFilter),
         GmosNorthFpuBinding.Option("fpu", rFpu),
         WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
-        GmosXBinningBinding.Option("explicitXBin", rExplicitXBin),
-        GmosYBinningBinding.Option("explicitYBin", rExplicitYBin),
-        GmosAmpReadModeBinding.Option("explicitAmpReadMode", rExplicitAmpReadMode),
-        GmosAmpGainBinding.Option("explicitAmpGain", rExplicitAmpGain),
-        GmosRoiBinding.Option("explicitRoi", rExplicitRoi),
-        BigDecimalBinding.List.Option("explicitWavelengthDithersNm", rWavelengthDithers),
-        OffsetComponentInput.Binding.List.Option("explicitSpatialOffsets", rSpatialOffsets)
+        GmosXBinningBinding.Nullable("explicitXBin", rExplicitXBin),
+        GmosYBinningBinding.Nullable("explicitYBin", rExplicitYBin),
+        GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
+        GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
+        GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
+        BigDecimalBinding.List.Nullable("explicitWavelengthDithersNm", rWavelengthDithers),
+        OffsetComponentInput.Binding.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
       ) => (
         rGrating,
         rFilter,
@@ -101,11 +115,65 @@ object GmosNorthLongSlitInput {
 
   val CreateBinding: Matcher[Create] =
     data.rmap {
-      case (Some(grating), filter, Some(fpu), Some(centralWavelength), exXBin, exYBin, exAmpReadMode, exAmpGain, exRoi, exWavelengthDithers, exSpatialOffsets) =>
-        Result(Create(grating, filter.toOption, fpu, centralWavelength, exXBin, exYBin, exAmpReadMode, exAmpGain, exRoi, exWavelengthDithers, exSpatialOffsets))
+      case (
+        Some(grating),
+        filter,
+        Some(fpu),
+        Some(centralWavelength),
+        exXBin,
+        exYBin,
+        exAmpReadMode,
+        exAmpGain,
+        exRoi,
+        exWavelengthDithers,
+        exSpatialOffsets
+      ) =>
+        Result(Create(
+          grating,
+          filter.toOption,
+          fpu,
+          centralWavelength,
+          exXBin.toOption,
+          exYBin.toOption,
+          exAmpReadMode.toOption,
+          exAmpGain.toOption,
+          exRoi.toOption,
+          exWavelengthDithers.toOption,
+          exSpatialOffsets.toOption
+        ))
       case _ =>
         Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
     }
 
+  val EditBinding: Matcher[Edit] =
+    data.rmap {
+      case (
+        grating,
+        filter,
+        fpu,
+        centralWavelength,
+        exXBin,
+        exYBin,
+        exAmpReadMode,
+        exAmpGain,
+        exRoi,
+        exWavelengthDithers,
+        exSpatialOffsets
+      ) =>
+        Result(Edit(
+          grating,
+          filter,
+          fpu,
+          centralWavelength,
+          exXBin,
+          exYBin,
+          exAmpReadMode,
+          exAmpGain,
+          exRoi,
+          exWavelengthDithers,
+          exSpatialOffsets
+        ))
+
+    }
 }
 

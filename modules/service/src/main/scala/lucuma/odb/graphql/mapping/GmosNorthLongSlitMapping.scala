@@ -57,8 +57,8 @@ trait GmosNorthLongSlitMapping[F[_]]
         name,
         cursor =>
           (cursor.field(explicitField, None).flatMap(_.as[Option[A]]),
-            cursor.field(defaultField, None).flatMap(_.as[A])
-            ).parMapN(_.getOrElse(_)),
+           cursor.field(defaultField, None).flatMap(_.as[A])
+          ).parMapN(_.getOrElse(_)),
         List(explicitField, defaultField)
       )
 
