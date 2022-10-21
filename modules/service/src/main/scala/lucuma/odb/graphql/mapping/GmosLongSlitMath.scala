@@ -7,13 +7,15 @@ package mapping
 
 import cats.Order
 import cats.syntax.order.*
-import coulomb._
+import coulomb.*
+import coulomb.units.accepted.ArcSecond
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthFpu
@@ -50,6 +52,19 @@ object GmosLongSlitMath {
 
   val zeroNm: Quantity[BigDecimal, Nanometer] =
     Quantity[Nanometer](BigDecimal(0))
+    
+  def defaultWavelengthDithersGN(grating: GmosNorthGrating): List[Quantity[BigDecimal, Nanometer]] = {
+    val deltaNm = Δλ(Site.GN, grating.dispersion)
+    List(zeroNm, deltaNm, deltaNm, zeroNm)
+  }
+
+  val DefaultSpatialOffsets: List[Quantity[BigDecimal, ArcSecond]] =
+    List(
+      Quantity[ArcSecond](BigDecimal(0)),
+      Quantity[ArcSecond](BigDecimal(15)),
+      Quantity[ArcSecond](BigDecimal(15)),
+      Quantity[ArcSecond](BigDecimal(0))
+    )
 
   /**
    * Object angular size estimate based on source profile alone.

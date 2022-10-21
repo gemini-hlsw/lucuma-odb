@@ -9,6 +9,12 @@ object AngleBinding {
 
   val Microarcseconds: Matcher[Angle] =
     LongBinding.map(Angle.fromMicroarcseconds)
+    
+  val Milliarcseconds: Matcher[Angle] =
+    BigDecimalBinding.map(bd => Angle.fromBigDecimalArcseconds(bd.bigDecimal.movePointLeft(3)))
+    
+  val Arcseconds: Matcher[Angle] =
+    BigDecimalBinding.map(bd => Angle.fromBigDecimalArcseconds(bd))
 
   val Degrees: Matcher[Angle] =
     BigDecimalBinding.map(bd => Angle.fromDoubleDegrees(bd.toDouble))
