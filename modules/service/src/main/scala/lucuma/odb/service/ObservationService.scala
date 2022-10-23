@@ -131,7 +131,8 @@ object ObservationService {
   ): ObservationService[F] =
     new ObservationService[F] {
 
-      lazy val gmosLongSlitService = GmosLongSlitService.fromSession(session)
+      lazy val gmosLongSlitService: GmosLongSlitService[F] =
+        GmosLongSlitService.fromSession(session)
 
       override def createObservation(
         programId:   Program.Id,
@@ -174,6 +175,8 @@ object ObservationService {
           session.prepare(af.fragment.query(observation_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList
           }
+//        }.flatTap {
+//          SET.observingMode.
         }.recoverWith {
            case SqlState.CheckViolation(ex) =>
              Result.failure(constraintViolationMessage(ex)).pure[F]

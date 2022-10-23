@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.foldable.*
@@ -41,9 +42,14 @@ trait GmosLongSlitService[F[_]] {
     xa:            Transaction[F]
   ): F[Unit]
 
+  def deleteNorth(
+    which: List[Observation.Id],
+    xa:    Transaction[F]
+  ): F[Unit]
+
   def updateNorth(
     SET:   GmosNorthLongSlitInput.Edit,
-    which: AppliedFragment,
+    which: List[Observation.Id],
     xa:    Transaction[F]
   ): F[Unit]
 
@@ -68,16 +74,30 @@ object GmosLongSlitService {
         }
       }
 
+      override def deleteNorth(
+        which: List[Observation.Id],
+        xa:    Transaction[F]
+      ): F[Unit] =
+        Statements
+          .deleteGmosNorthLongSlit(which)
+          .fold(Applicative[F].unit) { af =>
+            session.prepare(af.fragment.command).use { pq =>
+              pq.execute(af.argument).void
+            }
+          }
+
       override def updateNorth(
         SET:   GmosNorthLongSlitInput.Edit,
-        which: AppliedFragment,
+        which: List[Observation.Id],
         xa:    Transaction[F]
-      ): F[Unit] = {
-        val af = Statements.updateGmosNorthLongSlit(SET, which)
-        session.prepare(af.fragment.command).use { pq =>
-          pq.execute(af.argument).void
-        }
-      }
+      ): F[Unit] =
+        Statements
+          .updateGmosNorthLongSlit(SET, which)
+          .fold(Applicative[F].unit) { af =>
+            session.prepare(af.fragment.command).use { pq =>
+              pq.execute(af.argument).void
+            }
+          }
 
     }
 
@@ -162,7 +182,22 @@ object GmosLongSlitService {
           input.centralWavelength
       )
 
-    def updates(
+    private def observationIdIn(
+      oids: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      void"c_observation_id IN (" |+|
+        oids.map(sql"$observation_id").intercalate(void", ") |+|
+      void")"
+
+    def deleteGmosNorthLongSlit(
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      NonEmptyList.fromList(which).map { oids =>
+        void"DELETE FROM ONLY t_gmos_north_long_slit " |+|
+          void"WHERE " |+| observationIdIn(oids)
+      }
+
+    def gmosNorthUpdates(
       input: GmosNorthLongSlitInput.Edit
     ): Option[NonEmptyList[AppliedFragment]] = {
 
@@ -186,16 +221,17 @@ object GmosLongSlitService {
 
     def updateGmosNorthLongSlit(
       SET:   GmosNorthLongSlitInput.Edit,
-      which: AppliedFragment
-    ): AppliedFragment = {
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
 
-      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
-        void"UPDATE t_gmos_north_long_slit "                                              |+|
-          void"SET " |+| us.intercalate(void", ") |+| void" "                             |+|
-          void"WHERE t_gmos_north_long_slit.c_observation_id IN (" |+| which |+| void")"
+      for {
+        us   <- gmosNorthUpdates(SET)
+        oids <- NonEmptyList.fromList(which)
+      } yield
+        void"UPDATE t_gmos_north_long_slit " |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+          void"WHERE " |+| observationIdIn(oids)
 
-      updates(SET).fold(which)(update)
-    }
 
   }
 
