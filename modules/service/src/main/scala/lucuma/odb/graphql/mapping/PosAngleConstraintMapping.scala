@@ -13,7 +13,7 @@ import table.ObservationView
 
 trait PosAngleConstraintMapping[F[_]] extends ObservationView[F] {
 
-  lazy val PosAngleConstraintMapping =
+  lazy val PosAngleConstraintMapping: ObjectMapping =
     ObjectMapping(
       tpe = PosAngleConstraintType,
       fieldMappings = List(

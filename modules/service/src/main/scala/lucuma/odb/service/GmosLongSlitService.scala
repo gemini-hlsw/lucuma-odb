@@ -3,7 +3,9 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Sync
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.monoid.*
 import cats.syntax.traverse.*
@@ -19,6 +21,9 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.Nullable.Absent
+import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.graphql.input.GmosNorthLongSlitInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -34,6 +39,12 @@ trait GmosLongSlitService[F[_]] {
     observationId: Observation.Id,
     input:         GmosNorthLongSlitInput.Create,
     xa:            Transaction[F]
+  ): F[Unit]
+
+  def updateNorth(
+    SET:   GmosNorthLongSlitInput.Edit,
+    which: AppliedFragment,
+    xa:    Transaction[F]
   ): F[Unit]
 
 }
@@ -52,6 +63,17 @@ object GmosLongSlitService {
         xa:            Transaction[F]
       ): F[Unit] = {
         val af = Statements.insertGmosNorthLongSlit(observationId, input)
+        session.prepare(af.fragment.command).use { pq =>
+          pq.execute(af.argument).void
+        }
+      }
+
+      override def updateNorth(
+        SET:   GmosNorthLongSlitInput.Edit,
+        which: AppliedFragment,
+        xa:    Transaction[F]
+      ): F[Unit] = {
+        val af = Statements.updateGmosNorthLongSlit(SET, which)
         session.prepare(af.fragment.command).use { pq =>
           pq.execute(af.argument).void
         }
@@ -139,6 +161,41 @@ object GmosLongSlitService {
           input.fpu                     ~
           input.centralWavelength
       )
+
+    def updates(
+      input: GmosNorthLongSlitInput.Edit
+    ): Option[NonEmptyList[AppliedFragment]] = {
+
+      val upGrating  = sql"c_grating = $gmos_north_grating"
+      val upFilter   = sql"c_filter  = ${gmos_north_filter.opt}"
+      val upFpu      = sql"c_fpu     = $gmos_north_fpu"
+
+      val ups: List[AppliedFragment] =
+        List(
+          input.grating.map(upGrating),
+          input.filter match {
+            case Nullable.Null  => Some(upFilter(None))
+            case Absent         => None
+            case NonNull(value) => Some(upFilter(Some(value)))
+          },
+          input.fpu.map(upFpu)
+        ).flatten
+
+      NonEmptyList.fromList(ups)
+    }
+
+    def updateGmosNorthLongSlit(
+      SET:   GmosNorthLongSlitInput.Edit,
+      which: AppliedFragment
+    ): AppliedFragment = {
+
+      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
+        void"UPDATE t_gmos_north_long_slit "                                              |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" "                             |+|
+          void"WHERE t_gmos_north_long_slit.c_observation_id IN (" |+| which |+| void")"
+
+      updates(SET).fold(which)(update)
+    }
 
   }
 
