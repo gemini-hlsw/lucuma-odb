@@ -70,7 +70,12 @@ object GmosNorthLongSlitInput {
     explicitRoi:            Nullable[GmosRoi],
     explicitλDithers:       Nullable[List[BigDecimal]],
     explicitSpatialOffsets: Nullable[List[Q]]
-  )
+  ) {
+    
+    def observingModeType: ObservingModeType =
+      ObservingModeType.GmosNorthLongSlit
+
+  }
 
   private val data: Matcher[(
     Option[GmosNorthGrating],
