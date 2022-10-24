@@ -134,9 +134,17 @@ object ObservationService {
       lazy val gmosLongSlitService: GmosLongSlitService[F] =
         GmosLongSlitService.fromSession(session)
 
+      private def observingModeDeletionFunction(
+        mode: ObservingModeType
+      ): (List[Observation.Id], Transaction[F]) => F[Unit] =
+        mode match {
+          case ObservingModeType.GmosNorthLongSlit => gmosLongSlitService.deleteNorth
+          case ObservingModeType.GmosSouthLongSlit => throw new RuntimeException("not implemented")
+        }
+
       override def createObservation(
-        programId:   Program.Id,
-        SET:         ObservationPropertiesInput.Create
+        programId: Program.Id,
+        SET:       ObservationPropertiesInput.Create
       ): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
           session.transaction.use { xa =>
@@ -152,7 +160,7 @@ object ObservationService {
                   rOid.toOption.traverse { oid =>
                     for {
                       _ <- SET.observingMode.flatMap(_.gmosNorthLongSlit).traverse(gmosLongSlitService.insertNorth(oid, _, xa))
-//                      _ <- SET.observingMode.flatMap(_.gmosSouthLongSlit).traverse(gmosLongSlitService.insertSouth(oid, _, xa))
+                      //_ <- SET.observingMode.flatMap(_.gmosSouthLongSlit).traverse(gmosLongSlitService.insertSouth(oid, _, xa))
                     } yield ()
                   }
                 }
@@ -167,22 +175,58 @@ object ObservationService {
           pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
+      // Select the observation ids from among the provided collection of ids which have an observing mode that does
+      // not match the `newMode`.
+      private def selectWithObsoleteObservingModes(
+        oids:    List[Observation.Id],
+        newMode: Option[ObservingModeType]
+      ): F[Map[ObservingModeType, List[Observation.Id]]] =
+        NonEmptyList
+          .fromList(oids)
+          .fold(Applicative[F].pure(Map.empty)) { oids =>
+            val af = Statements.selectWithObsoleteObservingModes(oids, newMode)
+            session.prepare(af.fragment.query(observation_id ~ observing_mode_type.opt)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList.map {
+                _.collect { case (oid, Some(mode)) => (oid, mode) }
+                 .groupBy(_._2).view.mapValues(_.unzip._1).toMap
+              }
+            }
+          }
+
+
       override def updateObservations(
         SET:   ObservationPropertiesInput.Edit,
         which: AppliedFragment
       ): F[Result[List[Observation.Id]]] =
-        Statements.updateObservations(SET, which).traverse { af =>
-          session.prepare(af.fragment.query(observation_id)).use { pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList
-          }
-//        }.flatTap {
-//          SET.observingMode.
-        }.recoverWith {
-           case SqlState.CheckViolation(ex) =>
-             Result.failure(constraintViolationMessage(ex)).pure[F]
-         }
-    }
+        Trace[F].span("updateObservation") {
+          session.transaction.use { xa =>
+            Statements.updateObservations(SET, which).traverse { af =>
+              session.prepare(af.fragment.query(observation_id)).use { pq =>
+                pq.stream(af.argument, chunkSize = 1024).compile.toList
+              }
+            }.flatTap { rObservationIds =>
 
+              val deleteObsolete =
+                for {
+                  oids <- rObservationIds.toOption
+                  mode <- SET.observingMode.toOptionOption.map(_.flatMap(_.observingModeType))
+                } yield
+                  selectWithObsoleteObservingModes(oids, mode)
+                    .flatMap { obsolete =>
+                      obsolete.toList.traverse { case (modeType, oids) =>
+                        observingModeDeletionFunction(modeType).apply(oids, xa)
+                      }
+                    }
+
+              deleteObsolete.sequence.void
+
+            }.recoverWith {
+              case SqlState.CheckViolation(ex) =>
+                Result.failure(constraintViolationMessage(ex)).pure[F]
+            }
+          }
+        }
+    }
 
   object Statements {
 
@@ -210,7 +254,7 @@ object ObservationService {
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
-          SET.observingMode.flatMap(_.modeType)
+          SET.observingMode.flatMap(_.observingModeType)
         )
 
     def insertObservationAs(
@@ -365,6 +409,17 @@ object ObservationService {
           ${observing_mode_type.opt}
       """
 
+    def selectWithObsoleteObservingModes(
+      all:     NonEmptyList[Observation.Id],
+      newMode: Option[ObservingModeType]
+    ): AppliedFragment =
+      void"SELECT c_observation_id, c_observing_mode_type FROM t_observation "       |+|
+        void"WHERE " |+| sql"c_observing_mode_type != ${observing_mode_type.opt}"(newMode) |+|
+        void"AND c_observing_mode_type IS NOT NULL "          |+|
+        void"AND c_observation_id IN ("                       |+|
+          all.map(sql"$observation_id").intercalate(void", ") |+|
+        void")"
+
     def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {
 
       val upMode  = sql"c_pac_mode  = $pac_mode"
@@ -382,7 +437,7 @@ object ObservationService {
         case Nullable.Null   => Result(List(upRa(none), upDec(none)))
         case Nullable.Absent => Result(Nil)
         case NonNull(value)  =>
-          (value.ra.map(r => upRa(r.some)).toList ++ value.dec.map(d => upDec(d.some)).toList) match {
+          value.ra.map(r => upRa(r.some)).toList ++ value.dec.map(d => upDec(d.some)).toList match {
             case Nil => Result.failure("At least one of ra or dec must be specified for an edit")
             case lst => Result(lst)
           }

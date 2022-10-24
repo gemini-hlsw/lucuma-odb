@@ -23,14 +23,19 @@ object ObservingModeInput {
     gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Create]
   ) {
 
-    def modeType: Option[ObservingModeType] =
+    def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
 
   }
 
   final case class Edit(
     gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Edit]
-  )
+  ) {
+
+    def observingModeType: Option[ObservingModeType] =
+      gmosNorthLongSlit.map(_.observingModeType)
+
+  }
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
