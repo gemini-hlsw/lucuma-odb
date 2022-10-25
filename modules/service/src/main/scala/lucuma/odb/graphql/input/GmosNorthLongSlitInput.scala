@@ -31,6 +31,16 @@ import lucuma.odb.graphql.binding.*
 import scala.util.control.Exception.*
 
 object GmosNorthLongSlitInput {
+  
+  private def formattedλDithers(
+    in: List[BigDecimal]
+  ): String =
+    in.map(_.bigDecimal.toPlainString).intercalate(",")
+    
+  private def formattedSpatialOffsets(
+    in: List[Q]
+  ): String =
+    in.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")  
 
   final case class Create(
     grating:                GmosNorthGrating,
@@ -51,10 +61,10 @@ object GmosNorthLongSlitInput {
 
     // Formatted to store in a text column in the database with a regex constraint
     val formattedλDithers: Option[String] =
-      explicitλDithers.map(_.map(_.bigDecimal.toPlainString).intercalate(","))
+      explicitλDithers.map(GmosNorthLongSlitInput.formattedλDithers)
 
     val formattedSpatialOffsets: Option[String] =
-      explicitSpatialOffsets.map(_.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(","))
+      explicitSpatialOffsets.map(GmosNorthLongSlitInput.formattedSpatialOffsets)
 
   }
 
@@ -75,6 +85,13 @@ object GmosNorthLongSlitInput {
     val observingModeType: ObservingModeType =
       ObservingModeType.GmosNorthLongSlit
 
+    // Formatted to store in a text column in the database with a regex constraint
+    val formattedλDithers: Nullable[String] =
+      explicitλDithers.map(GmosNorthLongSlitInput.formattedλDithers)
+
+    val formattedSpatialOffsets: Nullable[String] =
+      explicitSpatialOffsets.map(GmosNorthLongSlitInput.formattedSpatialOffsets)
+      
     val toCreate: Result[Create] = {
       def required[A](oa: Option[A], itemName: String): Result[A] =
         Result.fromOption(oa, s"A $itemName is required in order to create a GMOS North Long Slit observing mode.")
