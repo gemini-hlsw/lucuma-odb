@@ -205,9 +205,10 @@ object GmosLongSlitService {
       input: GmosNorthLongSlitInput.Edit
     ): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upGrating  = sql"c_grating = $gmos_north_grating"
-      val upFilter   = sql"c_filter  = ${gmos_north_filter.opt}"
-      val upFpu      = sql"c_fpu     = $gmos_north_fpu"
+      val upGrating  = sql"c_grating            = $gmos_north_grating"
+      val upFilter   = sql"c_filter             = ${gmos_north_filter.opt}"
+      val upFpu      = sql"c_fpu                = $gmos_north_fpu"
+//      val upCentralλ = sql"c_central_wavelength = $wavelength_pm"
 
       val ups: List[AppliedFragment] =
         List(
@@ -217,7 +218,8 @@ object GmosLongSlitService {
             case Absent         => None
             case NonNull(value) => Some(upFilter(Some(value)))
           },
-          input.fpu.map(upFpu)
+          input.fpu.map(upFpu),
+//          input.centralWavelength.map()
         ).flatten
 
       NonEmptyList.fromList(ups)

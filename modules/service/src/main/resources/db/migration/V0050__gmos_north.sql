@@ -220,7 +220,7 @@ create table t_gmos_north_long_slit (
   c_grating                    d_tag                 NOT NULL             REFERENCES t_gmos_north_disperser(c_tag),
   c_filter                     d_tag                 NULL DEFAULT NULL    REFERENCES t_gmos_north_filter(c_tag),
   c_fpu                        d_tag                 NOT NULL             REFERENCES t_gmos_north_fpu(c_tag),
-  c_central_wavelength         d_wavelength_pm       NULL DEFAULT NULL,
+  c_central_wavelength         d_wavelength_pm       NOT NULL,
 
   c_xbin                       d_tag                 NULL DEFAULT NULL   REFERENCES t_gmos_binning(c_tag),
   c_ybin                       d_tag                 NULL DEFAULT NULL   REFERENCES t_gmos_binning(c_tag),
@@ -236,7 +236,7 @@ create table t_gmos_north_long_slit (
   c_initial_grating            d_tag                 NOT NULL             REFERENCES t_gmos_north_disperser(c_tag),
   c_initial_filter             d_tag                 NULL DEFAULT NULL    REFERENCES t_gmos_north_filter(c_tag),
   c_initial_fpu                d_tag                 NOT NULL             REFERENCES t_gmos_north_fpu(c_tag),
-  c_initial_central_wavelength d_wavelength_pm       NULL DEFAULT NULL,
+  c_initial_central_wavelength d_wavelength_pm       NOT NULL,
 
   CONSTRAINT wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
   CONSTRAINT offset_format            CHECK (c_spatial_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
