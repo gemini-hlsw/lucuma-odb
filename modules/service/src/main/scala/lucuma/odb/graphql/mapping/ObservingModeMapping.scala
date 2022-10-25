@@ -33,8 +33,8 @@ trait ObservingModeMapping[F[_]]
     ObjectMapping(
       tpe = ObservingModeType,
       fieldMappings = List(
-        SqlField("id",   ObservationView.Id, key = true, hidden = true),
-
+        SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
+          
         FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
         SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 
