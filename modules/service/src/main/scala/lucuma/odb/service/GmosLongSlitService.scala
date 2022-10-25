@@ -28,7 +28,6 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.graphql.input.GmosNorthLongSlitInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import natchez.Trace
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
@@ -37,9 +36,10 @@ import skunk.implicits.*
 trait GmosLongSlitService[F[_]] {
 
   def insertNorth(
-    observationId: Observation.Id,
-    input:         GmosNorthLongSlitInput.Create,
-    xa:            Transaction[F]
+    input: GmosNorthLongSlitInput.Create
+  )(
+    which: List[Observation.Id],
+    xa:    Transaction[F]
   ): F[Unit]
 
   def deleteNorth(
@@ -48,7 +48,8 @@ trait GmosLongSlitService[F[_]] {
   ): F[Unit]
 
   def updateNorth(
-    SET:   GmosNorthLongSlitInput.Edit,
+    SET:   GmosNorthLongSlitInput.Edit
+  )(
     which: List[Observation.Id],
     xa:    Transaction[F]
   ): F[Unit]
@@ -57,22 +58,24 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
-  def fromSession[F[_]: Sync: Trace](
+  def fromSession[F[_]: Sync](
     session: Session[F]
   ): GmosLongSlitService[F] =
 
     new GmosLongSlitService[F] {
 
       override def insertNorth(
-        observationId: Observation.Id,
-        input:         GmosNorthLongSlitInput.Create,
-        xa:            Transaction[F]
-      ): F[Unit] = {
-        val af = Statements.insertGmosNorthLongSlit(observationId, input)
-        session.prepare(af.fragment.command).use { pq =>
-          pq.execute(af.argument).void
-        }
-      }
+        input: GmosNorthLongSlitInput.Create,
+      )(
+        which: List[Observation.Id],
+        xa:    Transaction[F]
+      ): F[Unit] =
+        which.traverse { oid =>
+          val af = Statements.insertGmosNorthLongSlit(oid, input)
+          session.prepare(af.fragment.command).use { pq =>
+            pq.execute(af.argument).void
+          }
+        }.void
 
       override def deleteNorth(
         which: List[Observation.Id],
@@ -87,7 +90,8 @@ object GmosLongSlitService {
           }
 
       override def updateNorth(
-        SET:   GmosNorthLongSlitInput.Edit,
+        SET:   GmosNorthLongSlitInput.Edit
+      )(
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =

@@ -11,12 +11,6 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
 
-/*
-gmosNorthLongSlit: GmosNorthLongSlitInput
-gmosSouthLongSlit: GmosSouthLongSlitInput
-*/
-
-
 object ObservingModeInput {
 
   final case class Create(
