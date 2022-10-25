@@ -1010,6 +1010,147 @@ class updateObservations extends OdbSuite
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
+  test("observing mode: update existing, all fields") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          explicitXBin: FOUR
+          explicitYBin: FOUR
+          explicitAmpReadMode: FAST
+          explicitAmpGain: HIGH
+          explicitRoi: CCD2
+          explicitWavelengthDithersNm: [-7.5, 7.1, 7.1, -7.5],
+          explicitSpatialOffsets: [
+            { arcseconds: -10.0 },
+            { arcseconds:  10.0 },
+            { arcseconds:  10.0 },
+            { arcseconds: -10.0 }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+          filter
+          fpu
+          centralWavelength {
+            nanometers
+          }
+          explicitXBin
+          explicitYBin
+          explicitAmpReadMode
+          explicitAmpGain
+          explicitRoi
+          explicitWavelengthDithersNm
+          explicitSpatialOffsets {
+            arcseconds
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301",
+                "filter": "G_PRIME",
+                "fpu": "LONG_SLIT_0_25",
+                "centralWavelength": {
+                  "nanometers": 234.560
+                },
+                "explicitXBin": "FOUR",
+                "explicitYBin": "FOUR",
+                "explicitAmpReadMode": "FAST",
+                "explicitAmpGain": "HIGH",
+                "explicitRoi": "CCD2",
+                "explicitWavelengthDithersNm": [-7.5, 7.1, 7.1, -7.5],
+                "explicitSpatialOffsets": [
+                  { "arcseconds": -10.000000 },
+                  { "arcseconds":  10.000000 },
+                  { "arcseconds":  10.000000 },
+                  { "arcseconds": -10.000000 }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val update1 =
+      """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: R831_G5302
+          filter: R_PRIME
+          fpu: LONG_SLIT_0_50
+          centralWavelength: {
+            nanometers: 654.321
+          }
+          explicitXBin: ONE
+          explicitYBin: ONE
+          explicitAmpReadMode: SLOW
+          explicitAmpGain: LOW
+          explicitRoi: TOP_SPECTRUM
+          explicitWavelengthDithersNm: [-10, 10],
+          explicitSpatialOffsets: [
+            { arcseconds: -2.0 },
+            { arcseconds:  2.0 },
+            { arcseconds:  2.0 },
+            { arcseconds: -2.0 }
+          ]
+        }
+      }
+    """
+    val expected1 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "R831_G5302",
+                "filter": "R_PRIME",
+                "fpu": "LONG_SLIT_0_50",
+                "centralWavelength": {
+                  "nanometers": 654.321
+                },
+                "explicitXBin": "ONE",
+                "explicitYBin": "ONE",
+                "explicitAmpReadMode": "SLOW",
+                "explicitAmpGain": "LOW",
+                "explicitRoi": "TOP_SPECTRUM",
+                "explicitWavelengthDithersNm": [-10, 10],
+                "explicitSpatialOffsets": [
+                  { "arcseconds": -2.000000 },
+                  { "arcseconds":  2.000000 },
+                  { "arcseconds":  2.000000 },
+                  { "arcseconds": -2.000000 }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
   test("observing mode: delete existing") {
 
     val update0 = """
