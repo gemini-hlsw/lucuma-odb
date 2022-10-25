@@ -205,21 +205,38 @@ object GmosLongSlitService {
       input: GmosNorthLongSlitInput.Edit
     ): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upGrating  = sql"c_grating            = $gmos_north_grating"
-      val upFilter   = sql"c_filter             = ${gmos_north_filter.opt}"
-      val upFpu      = sql"c_fpu                = $gmos_north_fpu"
-//      val upCentralλ = sql"c_central_wavelength = $wavelength_pm"
+      val upGrating     = sql"c_grating            = $gmos_north_grating"
+      val upFilter      = sql"c_filter             = ${gmos_north_filter.opt}"
+      val upFpu         = sql"c_fpu                = $gmos_north_fpu"
+      val upCentralλ    = sql"c_central_wavelength = $wavelength_pm"
+      val upXBin        = sql"c_xbin               = ${gmos_x_binning.opt}"
+      val upYBin        = sql"c_ybin               = ${gmos_y_binning.opt}"
+      val upAmpReadMode = sql"c_amp_read_mode      = ${gmos_amp_read_mode.opt}"
+      val upAmpGain     = sql"c_amp_gain           = ${gmos_amp_gain.opt}"
+      val upRoi         = sql"c_roi                = ${gmos_roi.opt}"
+      val upλDithers    = sql"c_wavelength_dithers = ${text.opt}"
+      val upOffsets     = sql"c_spatial_offsets    = ${text.opt}"
+
+      def nullableUpdate[A](n: Nullable[A], f: Fragment[Option[A]]): Option[AppliedFragment] =
+        n match {
+          case Nullable.Null   => Some(f(None))
+          case Nullable.Absent => None
+          case NonNull(value)  => Some(f(Some(value)))
+        }
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
-          input.filter match {
-            case Nullable.Null  => Some(upFilter(None))
-            case Absent         => None
-            case NonNull(value) => Some(upFilter(Some(value)))
-          },
+          nullableUpdate(input.filter, upFilter),
           input.fpu.map(upFpu),
-//          input.centralWavelength.map()
+          input.centralWavelength.map(upCentralλ),
+          nullableUpdate(input.explicitXBin, upXBin),
+          nullableUpdate(input.explicitYBin, upYBin),
+          nullableUpdate(input.explicitAmpReadMode, upAmpReadMode),
+          nullableUpdate(input.explicitAmpGain, upAmpGain),
+          nullableUpdate(input.explicitRoi, upRoi),
+          nullableUpdate(input.formattedλDithers, upλDithers),
+          nullableUpdate(input.formattedSpatialOffsets, upOffsets)
         ).flatten
 
       NonEmptyList.fromList(ups)
