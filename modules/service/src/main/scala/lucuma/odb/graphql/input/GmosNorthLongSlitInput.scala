@@ -72,8 +72,31 @@ object GmosNorthLongSlitInput {
     explicitSpatialOffsets: Nullable[List[Q]]
   ) {
     
-    def observingModeType: ObservingModeType =
+    val observingModeType: ObservingModeType =
       ObservingModeType.GmosNorthLongSlit
+
+    val toCreate: Result[Create] = {
+      def required[A](oa: Option[A], itemName: String): Result[A] =
+        Result.fromOption(oa, s"A $itemName is required in order to create a GMOS North Long Slit observing mode.")
+
+      for {
+        g <- required(grating, "grating")
+        u <- required(fpu, "fpu")
+        w <- required(centralWavelength, "centralWavelength")
+      } yield Create(
+        g,
+        filter.toOption,
+        u,
+        w,
+        explicitXBin.toOption,
+        explicitYBin.toOption,
+        explicitAmpReadMode.toOption,
+        explicitAmpGain.toOption,
+        explicitRoi.toOption,
+        explicitλDithers.toOption,
+        explicitSpatialOffsets.toOption
+      )
+    }
 
   }
 

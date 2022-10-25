@@ -866,6 +866,63 @@ class updateObservations extends OdbSuite
   }
 */
 
+  test("create an observing mode in an existing observation") {
+
+    val update =
+      """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+    val query =
+      """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+          filter
+          fpu
+          centralWavelength {
+            nanometers
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301",
+                "filter": "G_PRIME",
+                "fpu": "LONG_SLIT_0_25",
+                "centralWavelength": {
+                  "nanometers": 234.560
+                }
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _ <- updateObservation(pi, pid, oid, update, query, expected)
+    } yield ()
+
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
