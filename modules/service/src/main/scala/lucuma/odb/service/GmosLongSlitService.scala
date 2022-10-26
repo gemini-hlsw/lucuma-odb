@@ -25,7 +25,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
-import lucuma.odb.graphql.input.GmosNorthLongSlitInput
+import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -36,7 +36,7 @@ import skunk.implicits.*
 trait GmosLongSlitService[F[_]] {
 
   def insertNorth(
-    input: GmosNorthLongSlitInput.Create
+    input: GmosLongSlitInput.Create.North
   )(
     which: List[Observation.Id],
     xa:    Transaction[F]
@@ -48,7 +48,7 @@ trait GmosLongSlitService[F[_]] {
   ): F[Unit]
 
   def updateNorth(
-    SET:   GmosNorthLongSlitInput.Edit
+    SET:   GmosLongSlitInput.Edit.North
   )(
     which: List[Observation.Id],
     xa:    Transaction[F]
@@ -65,7 +65,7 @@ object GmosLongSlitService {
     new GmosLongSlitService[F] {
 
       override def insertNorth(
-        input: GmosNorthLongSlitInput.Create,
+        input: GmosLongSlitInput.Create.North,
       )(
         which: List[Observation.Id],
         xa:    Transaction[F]
@@ -90,7 +90,7 @@ object GmosLongSlitService {
           }
 
       override def updateNorth(
-        SET:   GmosNorthLongSlitInput.Edit
+        SET:   GmosLongSlitInput.Edit.North
       )(
         which: List[Observation.Id],
         xa:    Transaction[F]
@@ -165,25 +165,25 @@ object GmosLongSlitService {
 
     def insertGmosNorthLongSlit(
       observationId: Observation.Id,
-      input:         GmosNorthLongSlitInput.Create
+      input:         GmosLongSlitInput.Create.North
     ): AppliedFragment =
       InsertGmosNorthLongSlit.apply(
-        observationId                   ~
-          input.grating                 ~
-          input.filter                  ~
-          input.fpu                     ~
-          input.centralWavelength       ~
-          input.explicitXBin            ~
-          input.explicitYBin            ~
-          input.explicitAmpReadMode     ~
-          input.explicitAmpGain         ~
-          input.explicitRoi             ~
-          input.formattedλDithers       ~
-          input.formattedSpatialOffsets ~
-          input.grating                 ~
-          input.filter                  ~
-          input.fpu                     ~
-          input.centralWavelength
+        observationId                          ~
+          input.grating                        ~
+          input.filter                         ~
+          input.fpu                            ~
+          input.common.centralWavelength       ~
+          input.common.explicitXBin            ~
+          input.common.explicitYBin            ~
+          input.common.explicitAmpReadMode     ~
+          input.common.explicitAmpGain         ~
+          input.common.explicitRoi             ~
+          input.common.formattedλDithers       ~
+          input.common.formattedSpatialOffsets ~
+          input.grating                        ~
+          input.filter                         ~
+          input.fpu                            ~
+          input.common.centralWavelength
       )
 
     private def observationIdIn(
@@ -202,7 +202,7 @@ object GmosLongSlitService {
       }
 
     def gmosNorthUpdates(
-      input: GmosNorthLongSlitInput.Edit
+      input: GmosLongSlitInput.Edit.North
     ): Option[NonEmptyList[AppliedFragment]] = {
 
       val upGrating     = sql"c_grating            = $gmos_north_grating"
@@ -222,21 +222,21 @@ object GmosLongSlitService {
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
           input.fpu.map(upFpu),
-          input.centralWavelength.map(upCentralλ),
-          input.explicitXBin.toOptionOption.map(upXBin),
-          input.explicitYBin.toOptionOption.map(upYBin),
-          input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
-          input.explicitAmpGain.toOptionOption.map(upAmpGain),
-          input.explicitRoi.toOptionOption.map(upRoi),
-          input.formattedλDithers.toOptionOption.map(upλDithers),
-          input.formattedSpatialOffsets.toOptionOption.map(upOffsets)
+          input.common.centralWavelength.map(upCentralλ),
+          input.common.explicitXBin.toOptionOption.map(upXBin),
+          input.common.explicitYBin.toOptionOption.map(upYBin),
+          input.common.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
+          input.common.explicitAmpGain.toOptionOption.map(upAmpGain),
+          input.common.explicitRoi.toOptionOption.map(upRoi),
+          input.common.formattedλDithers.toOptionOption.map(upλDithers),
+          input.common.formattedSpatialOffsets.toOptionOption.map(upOffsets)
         ).flatten
 
       NonEmptyList.fromList(ups)
     }
 
     def updateGmosNorthLongSlit(
-      SET:   GmosNorthLongSlitInput.Edit,
+      SET:   GmosLongSlitInput.Edit.North,
       which: List[Observation.Id]
     ): Option[AppliedFragment] =
 

@@ -14,7 +14,7 @@ import lucuma.odb.graphql.binding.*
 object ObservingModeInput {
 
   final case class Create(
-    gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Create]
+    gmosNorthLongSlit: Option[GmosLongSlitInput.Create.North]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
@@ -23,7 +23,7 @@ object ObservingModeInput {
   }
 
   final case class Edit(
-    gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Edit]
+    gmosNorthLongSlit: Option[GmosLongSlitInput.Edit.North]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
@@ -35,7 +35,7 @@ object ObservingModeInput {
     ObjectFieldsBinding.rmap {
       case List(
         // TODO: when we add GMOS South, then we need to make the input at most one defined
-        GmosNorthLongSlitInput.CreateBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
+        GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
         ("gmosSouthLongSlit", _)
       ) =>
         rGmosNorthLongSlit.map(Create.apply)
@@ -44,7 +44,7 @@ object ObservingModeInput {
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap {
       case List(
-        GmosNorthLongSlitInput.EditBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
+        GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
         ("gmosSouthLongSlit", _)
       ) =>
         rGmosNorthLongSlit.map(Edit.apply)
