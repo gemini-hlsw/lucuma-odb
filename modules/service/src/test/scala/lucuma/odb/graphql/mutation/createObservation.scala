@@ -759,7 +759,12 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                 explicitAmpReadMode: FAST
                 explicitAmpGain: HIGH
                 explicitRoi: CCD2
-                explicitWavelengthDithersNm: [-7.5, 7.1, 7.1, -7.5],
+                explicitWavelengthDithers: [
+                  { nanometers: -7.5},
+                  { nanometers:  7.1},
+                  { nanometers:  7.1},
+                  { nanometers: -7.5}
+                ],
                 explicitSpatialOffsets: [
                   { arcseconds: -10.0 },
                   { arcseconds:  10.0 },
@@ -788,9 +793,15 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
                 roi
                 explicitRoi
                 defaultRoi
-                wavelengthDithersNm
-                explicitWavelengthDithersNm
-                defaultWavelengthDithersNm
+                wavelengthDithers {
+                  nanometers
+                }
+                explicitWavelengthDithers {
+                  nanometers
+                }
+                defaultWavelengthDithers {
+                  nanometers
+                }
                 spatialOffsets {
                   arcseconds
                 }
@@ -825,9 +836,9 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            longSlit.downIO[GmosRoi]("roi"),
            longSlit.downIO[Option[GmosRoi]]("explicitRoi"),
            longSlit.downIO[GmosRoi]("defaultRoi"),
-           longSlit.downIO[List[BigDecimal]]("wavelengthDithersNm"),
-           longSlit.downIO[Option[List[BigDecimal]]]("explicitWavelengthDithersNm"),
-           longSlit.downIO[List[BigDecimal]]("defaultWavelengthDithersNm"),
+           IO(longSlit.downField("wavelengthDithers").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitWavelengthDithers").values.map(_.toList)),
+           IO(longSlit.downField("defaultWavelengthDithers").values.toList.flatMap(_.toList)),
            IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
            IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
            IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
@@ -847,9 +858,24 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            GmosRoi.Ccd2,
            Some(GmosRoi.Ccd2),
            GmosRoi.FullFrame,
-           List(BigDecimal("-7.5"), BigDecimal("7.1"), BigDecimal("7.1"), BigDecimal("-7.5")),
-           Some(List(BigDecimal("-7.5"), BigDecimal("7.1"), BigDecimal("7.1"), BigDecimal("-7.5"))),
-           List(BigDecimal("0.0"), BigDecimal("5.0"), BigDecimal("5.0"), BigDecimal("0.0")),
+           List(
+             json"""{ "nanometers": -7.5 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers": -7.5 }"""
+           ),
+           Some(List(
+             json"""{ "nanometers": -7.5 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers": -7.5 }"""
+           )),
+           List(
+             json"""{ "nanometers": 0.0 }""",
+             json"""{ "nanometers": 5.0 }""",
+             json"""{ "nanometers": 5.0 }""",
+             json"""{ "nanometers": 0.0 }"""
+           ),
            List(
              json"""{ "arcseconds": -10.0}""",
              json"""{ "arcseconds":  10.0}""",

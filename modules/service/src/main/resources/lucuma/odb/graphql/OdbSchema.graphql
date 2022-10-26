@@ -923,8 +923,8 @@ input GmosNorthLongSlitInput {
   # The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitRoi: GmosRoi
 
-  # The explicitWavelengthDithersNm field may be unset by assigning a null value, or ignored by skipping it altogether
-  explicitWavelengthDithersNm: [BigDecimal!]
+  # The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitWavelengthDithers: [WavelengthDitherInput!]
 
   # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitSpatialOffsets: [OffsetComponentInput!]
@@ -1297,8 +1297,8 @@ input GmosSouthLongSlitInput {
   # The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitRoi: GmosRoi
 
-  # The explicitWavelengthDithersNm field may be unset by assigning a null value, or ignored by skipping it altogether
-  explicitWavelengthDithersNm: [BigDecimal!]
+  # The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  explicitWavelengthDithers: [WavelengthDitherInput!]
 
   # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitSpatialOffsets: [OffsetComponentInput!]
@@ -2509,6 +2509,14 @@ input WavelengthInput {
   micrometers: PosBigDecimal
 }
 
+# WavelengthDither, choose one of the available units
+input WavelengthDitherInput {
+  picometers: Int
+  angstroms: BigDecimal
+  nanometers: BigDecimal
+  micrometers: BigDecimal
+}
+
 type p {
   # p offset in µas
   microarcseconds: Long!
@@ -3640,16 +3648,17 @@ type GmosNorthLongSlit {
   explicitRoi: GmosRoi
 
 
-  # Wavelength dithers required to fill in the chip gaps, expressed in nanometers.
-  # This value is either explicitly specified in explicitWavelengthDithersNm
-  wavelengthDithersNm: [BigDecimal!]!
+  # Wavelength dithers required to fill in the chip gaps. This value is either
+  # explicitly specified in explicitWavelengthDithers or else taken from
+  # defaultWavelengthDithers
+  wavelengthDithers: [WavelengthDither!]!
 
   # Default wavelength dithers, calculated based on the grating dispersion.
-  defaultWavelengthDithersNm: [BigDecimal!]!
+  defaultWavelengthDithers: [WavelengthDither!]!
 
   # Optional explicitly specified wavelength dithers.  If set it overrides the
   # default.
-  explicitWavelengthDithersNm: [BigDecimal!]
+  explicitWavelengthDithers: [WavelengthDither!]
 
 
   # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
@@ -3950,16 +3959,17 @@ type GmosSouthLongSlit {
   explicitRoi: GmosRoi
 
 
-  # Wavelength dithers required to fill in the chip gaps, expressed in nanometers.
-  # This value is either explicitly specified in explicitWavelengthDithersNm
-  wavelengthDithersNm: [BigDecimal!]!
+  # Wavelength dithers required to fill in the chip gaps. This value is either
+  # explicitly specified in explicitWavelengthDithers or else taken from
+  # defaultWavelengthDithers
+  wavelengthDithers: [WavelengthDither!]!
 
   # Default wavelength dithers, calculated based on the grating dispersion.
-  defaultWavelengthDithersNm: [BigDecimal!]!
+  defaultWavelengthDithers: [WavelengthDither!]!
 
   # Optional explicitly specified wavelength dithers.  If set it overrides the
   # default.
-  explicitWavelengthDithersNm: [BigDecimal!]
+  explicitWavelengthDithers: [WavelengthDither!]
 
 
   # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
@@ -5619,6 +5629,23 @@ type Wavelength {
 
   # Wavelength in µm
   micrometers: PosBigDecimal!
+}
+
+# A WavelengthDither is expressed in the same units as Wavelength but
+# constrained to positive values.  It expresses an "offset" to a given
+# Wavelength. 
+type WavelengthDither {
+  # Wavelength dither in pm
+  picometers: Int!
+
+  # Wavelength dither in Å
+  angstroms: BigDecimal!
+
+  # Wavelength dither in nm
+  nanometers: BigDecimal!
+
+  # Wavelength dither in µm
+  micrometers: BigDecimal!
 }
 
 # Dataset filter options.  All specified items must match.

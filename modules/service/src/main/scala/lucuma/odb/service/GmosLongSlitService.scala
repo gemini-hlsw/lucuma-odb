@@ -217,26 +217,19 @@ object GmosLongSlitService {
       val upλDithers    = sql"c_wavelength_dithers = ${text.opt}"
       val upOffsets     = sql"c_spatial_offsets    = ${text.opt}"
 
-      def nullableUpdate[A](n: Nullable[A], f: Fragment[Option[A]]): Option[AppliedFragment] =
-        n match {
-          case Nullable.Null   => Some(f(None))
-          case Nullable.Absent => None
-          case NonNull(value)  => Some(f(Some(value)))
-        }
-
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
-          nullableUpdate(input.filter, upFilter),
+          input.filter.toOptionOption.map(upFilter),
           input.fpu.map(upFpu),
           input.centralWavelength.map(upCentralλ),
-          nullableUpdate(input.explicitXBin, upXBin),
-          nullableUpdate(input.explicitYBin, upYBin),
-          nullableUpdate(input.explicitAmpReadMode, upAmpReadMode),
-          nullableUpdate(input.explicitAmpGain, upAmpGain),
-          nullableUpdate(input.explicitRoi, upRoi),
-          nullableUpdate(input.formattedλDithers, upλDithers),
-          nullableUpdate(input.formattedSpatialOffsets, upOffsets)
+          input.explicitXBin.toOptionOption.map(upXBin),
+          input.explicitYBin.toOptionOption.map(upYBin),
+          input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
+          input.explicitAmpGain.toOptionOption.map(upAmpGain),
+          input.explicitRoi.toOptionOption.map(upRoi),
+          input.formattedλDithers.toOptionOption.map(upλDithers),
+          input.formattedSpatialOffsets.toOptionOption.map(upOffsets)
         ).flatten
 
       NonEmptyList.fromList(ups)

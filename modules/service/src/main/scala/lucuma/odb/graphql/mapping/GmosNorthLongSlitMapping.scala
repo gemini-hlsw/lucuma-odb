@@ -65,11 +65,27 @@ trait GmosNorthLongSlitMapping[F[_]]
     def parseCsvBigDecimals(s: String): List[BigDecimal] =
       s.split(',').toList.map(n => BigDecimal(n.trim))
 
+    def toWavelengthDitherJson(nm: BigDecimal): Json =
+      json"""
+       {
+         "picometers":  ${nm.bigDecimal.movePointRight(3).setScale(0, RoundingMode.HALF_UP).longValue},
+         "angstroms":   ${nm.bigDecimal.movePointRight(1).setScale(2, RoundingMode.HALF_UP)},
+         "nanometers":  ${nm.bigDecimal.setScale(3, RoundingMode.HALF_UP)},
+         "micrometers": ${nm.bigDecimal.movePointLeft(3).setScale(6, RoundingMode.HALF_UP)}
+       }
+      """
+
+    def decodeWavelengthDithers(s: String): Json =
+      parseCsvBigDecimals(s).map(toWavelengthDitherJson).asJson
+
+    def defaultWavelengthDithers(g: GmosNorthGrating): Json =
+      GmosLongSlitMath.defaultWavelengthDithersGN(g).map(q => toWavelengthDitherJson(q.value)).asJson
+
     def toOffsetQJson(arcsec: BigDecimal): Json =
       json"""
        {
-         "microarcseconds": ${arcsec.bigDecimal.movePointRight(6).setScale(6, RoundingMode.HALF_UP).longValue},
-         "milliarcseconds": ${arcsec.bigDecimal.movePointRight(3).setScale(6, RoundingMode.HALF_UP)},
+         "microarcseconds": ${arcsec.bigDecimal.movePointRight(6).setScale(0, RoundingMode.HALF_UP).longValue},
+         "milliarcseconds": ${arcsec.bigDecimal.movePointRight(3).setScale(3, RoundingMode.HALF_UP)},
          "arcseconds":      ${arcsec.bigDecimal.setScale(6, RoundingMode.HALF_UP)}
        }
     """
@@ -144,30 +160,45 @@ trait GmosNorthLongSlitMapping[F[_]]
         SqlField("explicitRoi", GmosNorthLongSlitTable.Roi),
 
         // ---------------------
-        // wavelengthDithersNm
+        // wavelengthDithers
         // ---------------------
 
-        // wavelengthDithersNm -- either the explicit value or else the default.
-        explicitOrElseDefault[List[BigDecimal]]("wavelengthDithersNm", "explicitWavelengthDithersNm", "defaultWavelengthDithersNm"),
-
-        // Default wavelength dithers are based on the grating.
-        FieldRef[GmosNorthGrating]("grating")
-          .as(
-            "defaultWavelengthDithersNm",
-            grating => GmosLongSlitMath.defaultWavelengthDithersGN(grating).map(_.value)
-          ),
-
-        // For explicitWavelengthDithersNm, we have to map the csv string representation to a list of decimals.
         SqlField("wavelengthDithersString", GmosNorthLongSlitTable.WavelengthDithers, hidden = true),
-        FieldRef[Option[String]]("wavelengthDithersString")
-          .as("explicitWavelengthDithersNm", _.map(parseCsvBigDecimals)),
 
+        CursorFieldJson(
+          "wavelengthDithers",
+          cursor =>
+            for {
+               e <- cursor.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(decodeWavelengthDithers)))
+               d <- cursor.field("grating", None).flatMap(_.as[GmosNorthGrating]).map(g => defaultWavelengthDithers(g))
+            } yield e.getOrElse(d),
+          List("wavelengthDithersString", "grating")
+        ),
 
-        SqlField("spatialOffsetsString", GmosNorthLongSlitTable.SpatialOffsets, hidden = true),
+        CursorFieldJson(
+          "explicitWavelengthDithers",
+          cursor =>
+            cursor
+              .field("wavelengthDithersString", None)
+              .flatMap(_.as[Option[String]].map(_.map(decodeWavelengthDithers).asJson)),
+          List("wavelengthDithersString")
+        ),
+
+        CursorFieldJson(
+          "defaultWavelengthDithers",
+          cursor =>
+            cursor
+              .field("grating", None)
+              .flatMap(_.as[GmosNorthGrating])
+              .map(g => defaultWavelengthDithers(g)),
+          List("grating")
+        ),
 
         // ---------------------
         // spatialOffsets
         // ---------------------
+
+        SqlField("spatialOffsetsString", GmosNorthLongSlitTable.SpatialOffsets, hidden = true),
 
         CursorFieldJson("spatialOffsets",
           cursor =>
