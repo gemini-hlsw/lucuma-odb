@@ -172,8 +172,6 @@ object ObservationService {
           pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
-      // Select the observation ids from among the provided collection of ids which have an observing mode that does
-      // not match the `newMode`.
       override def selectObservingModes(
         which: List[Observation.Id]
       ): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
