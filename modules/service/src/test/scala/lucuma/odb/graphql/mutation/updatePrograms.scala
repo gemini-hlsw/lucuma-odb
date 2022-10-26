@@ -43,20 +43,26 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              name
+              hasMore
+              matches {
+                id
+                name
+              }
             }
           }
         """,
         expected = Right(
           json"""
           {
-            "updatePrograms": [
-              {
-                "id": $pid,
-                "name": "new name"
-              }
-            ]
+            "updatePrograms": {
+              "hasMore": false,
+              "matches": [
+                {
+                  "id": $pid,
+                  "name": "new name"
+                }
+              ]
+            }
           }
           """
         )
@@ -83,20 +89,24 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 includeDeleted: true
               }
             ) {
-              id
-              existence
+              matches {
+                id
+                existence
+              }
             }
           }
         """,
         expected = Right(
           json"""
           {
-            "updatePrograms": [
-              {
-                "id": $pid,
-                "existence": ${Existence.Deleted:Existence}
-              }
-            ]
+            "updatePrograms": {
+              "matches": [
+                {
+                  "id": $pid,
+                  "existence": ${Existence.Deleted:Existence}
+                }
+              ]
+            }
           }
           """
         )
@@ -104,45 +114,6 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
     }
   }
 
-  test("edit existence") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updatePrograms(
-              input: {
-                SET: {
-                  existence: DELETED
-                }
-                WHERE: {
-                  id: {
-                    EQ: "$pid"
-                  }
-                }
-                includeDeleted: true
-              }
-            ) {
-              id
-              existence
-            }
-          }
-        """,
-        expected = Right(
-          json"""
-          {
-            "updatePrograms": [
-              {
-                "id": $pid,
-                "existence": ${Existence.Deleted:Existence}
-              }
-            ]
-          }
-          """
-        )
-      )
-    }
-  }
 
   test("edit proposal (attempt add w/ insufficient information)") {
     createProgramAs(pi).flatMap { pid =>
@@ -164,9 +135,11 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                title
+              matches {
+                id
+                proposal {
+                  title
+                }
               }
             }
           }
@@ -210,19 +183,21 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                title
-                proposalClass {
-                  ... on Queue {
-                    minPercentTime
+              matches {
+                id
+                proposal {
+                  title
+                  proposalClass {
+                    ... on Queue {
+                      minPercentTime
+                    }
                   }
-                }
-                category
-                toOActivation
-                partnerSplits {
-                  partner
-                  percent
+                  category
+                  toOActivation
+                  partnerSplits {
+                    partner
+                    percent
+                  }
                 }
               }
             }
@@ -231,25 +206,27 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid,
-                  "proposal" : {
-                    "title" : "new title",
-                    "proposalClass" : {
-                      "minPercentTime" : 50
-                    },
-                    "category" : "COSMOLOGY",
-                    "toOActivation" : "NONE",
-                    "partnerSplits" : [
-                      {
-                        "partner" : "US",
-                        "percent" : 100
-                      }
-                    ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid,
+                    "proposal" : {
+                      "title" : "new title",
+                      "proposalClass" : {
+                        "minPercentTime" : 50
+                      },
+                      "category" : "COSMOLOGY",
+                      "toOActivation" : "NONE",
+                      "partnerSplits" : [
+                        {
+                          "partner" : "US",
+                          "percent" : 100
+                        }
+                      ]
+                    }
                   }
-                }
-              ]
+                ]
+              }
             }
           """)
       )
@@ -289,18 +266,22 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
+              matches {
+                id
+              }
             }
           }
         """,
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid
-                }
-              ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid
+                  }
+                ]
+              }
             }
           """)
       ) >>
@@ -335,14 +316,16 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                title
-                category
-                toOActivation
-                partnerSplits {
-                  partner
-                  percent
+              matches {
+                id
+                proposal {
+                  title
+                  category
+                  toOActivation
+                  partnerSplits {
+                    partner
+                    percent
+                  }
                 }
               }
             }
@@ -351,26 +334,28 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid,
-                  "proposal" : {
-                    "title" : "updated title",
-                    "category" : "SMALL_BODIES",
-                    "toOActivation" : "RAPID",
-                    "partnerSplits" : [
-                      {
-                        "partner" : "KECK",
-                        "percent" : 30
-                      },
-                      {
-                        "partner" : "AR",
-                        "percent" : 70
-                      }
-                    ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid,
+                    "proposal" : {
+                      "title" : "updated title",
+                      "category" : "SMALL_BODIES",
+                      "toOActivation" : "RAPID",
+                      "partnerSplits" : [
+                        {
+                          "partner" : "AR",
+                          "percent" : 70
+                        },
+                        {
+                          "partner" : "KECK",
+                          "percent" : 30
+                        }
+                      ]
+                    }
                   }
-                }
-              ]
+                ]
+              }
             }
           """)
       )
@@ -411,18 +396,22 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
+              matches {
+                id
+              }
             }
           }
         """,
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid
-                }
-              ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid
+                  }
+                ]
+              }
             }
           """)
       ) >>
@@ -449,11 +438,13 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                proposalClass {
-                  ... on Classical {
-                    minPercentTime
+              matches {
+                id
+                proposal {
+                  proposalClass {
+                    ... on Classical {
+                      minPercentTime
+                    }
                   }
                 }
               }
@@ -463,16 +454,18 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid,
-                  "proposal" : {
-                    "proposalClass" : {
-                      "minPercentTime" : 40
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid,
+                    "proposal" : {
+                      "proposalClass" : {
+                        "minPercentTime" : 40
+                      }
                     }
                   }
-                }
-              ]
+                ]
+              }
             }
           """)
       )
@@ -513,18 +506,22 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
+              matches {
+                id
+              }
             }
           }
         """,
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid
-                }
-              ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid
+                  }
+                ]
+              }
             }
           """)
       ) >>
@@ -551,11 +548,13 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                proposalClass {
-                  ... on Intensive {
-                    minPercentTime
+              matches {
+                id
+                proposal {
+                  proposalClass {
+                    ... on Intensive {
+                      minPercentTime
+                    }
                   }
                 }
               }
@@ -571,7 +570,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
 
   }
 
-    test("edit proposal (proposal class, type A -> type B)") {
+  test("edit proposal (proposal class, type A -> type B)") {
     createProgramAs(pi).flatMap { pid =>
       // First add the proposal
       expect(
@@ -603,18 +602,22 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
+              matches {
+                id
+              }
             }
           }
         """,
         expected =
           Right(json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid
-                }
-              ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid
+                  }
+                ]
+              }
             }
           """)
       ) >>
@@ -645,15 +648,17 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                proposalClass {
-                  ... on Intensive {
-                    minPercentTime
-                    minPercentTotalTime
-                    totalTime {
-                      hours
-                      iso
+              matches {
+                id
+                proposal {
+                  proposalClass {
+                    ... on Intensive {
+                      minPercentTime
+                      minPercentTotalTime
+                      totalTime {
+                        hours
+                        iso
+                      }
                     }
                   }
                 }
@@ -664,21 +669,23 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
         expected = Right(
           json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : "p-108",
-                  "proposal" : {
-                    "proposalClass" : {
-                      "minPercentTime" : 40,
-                      "minPercentTotalTime" : 10,
-                      "totalTime" : {
-                        "hours" : 10.5,
-                        "iso" : "PT10H30M"
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid,
+                    "proposal" : {
+                      "proposalClass" : {
+                        "minPercentTime" : 40,
+                        "minPercentTotalTime" : 10,
+                        "totalTime" : {
+                          "hours" : 10.5,
+                          "iso" : "PT10H30M"
+                        }
                       }
                     }
                   }
-                }
-              ]
+                ]
+              }
             }
           """
         )
@@ -707,28 +714,32 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              name
+              matches {
+                id
+                name
+              }
             }
           }
         """,
         expected = Right(
           json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : ${pids(0)},
-                  "name" : "updated"
-                },
-                {
-                  "id" : ${pids(1)},
-                  "name" : "updated"
-                },
-                {
-                  "id" : ${pids(2)},
-                  "name" : "updated"
-                }
-              ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : ${pids(0)},
+                    "name" : "updated"
+                  },
+                  {
+                    "id" : ${pids(1)},
+                    "name" : "updated"
+                  },
+                  {
+                    "id" : ${pids(2)},
+                    "name" : "updated"
+                  }
+                ]
+              } 
             }
           """
         )
@@ -769,18 +780,22 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
+              matches {
+                id
+              }
             }
           }
         """,
         expected = Right(
           json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid1
-                }
-              ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid1
+                  }
+                ]
+              }
             }
           """
         )
@@ -815,16 +830,18 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              id
-              proposal {
-                proposalClass {
-                  ... on Classical {
-                    minPercentTime
+              matches {
+                id
+                proposal {
+                  proposalClass {
+                    ... on Classical {
+                      minPercentTime
+                    }
                   }
-                }
-                partnerSplits {
-                  partner
-                  percent
+                  partnerSplits {
+                    partner
+                    percent
+                  }
                 }
               }
             }
@@ -833,36 +850,38 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
         expected = Right(
           json"""
             {
-              "updatePrograms" : [
-                {
-                  "id" : $pid1,
-                  "proposal" : {
-                    "proposalClass" : {
-                      "minPercentTime" : 30
-                    },
-                    "partnerSplits" : [
-                      {
-                        "partner" : "KECK",
-                        "percent" : 100
-                      }
-                    ]
+              "updatePrograms" : {
+                "matches": [
+                  {
+                    "id" : $pid1,
+                    "proposal" : {
+                      "proposalClass" : {
+                        "minPercentTime" : 30
+                      },
+                      "partnerSplits" : [
+                        {
+                          "partner" : "KECK",
+                          "percent" : 100
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id" : $pid2,
+                    "proposal" : {
+                      "proposalClass" : {
+                        "minPercentTime" : 30
+                      },
+                      "partnerSplits" : [
+                        {
+                          "partner" : "KECK",
+                          "percent" : 100
+                        }
+                      ]
+                    }
                   }
-                },
-                {
-                  "id" : $pid2,
-                  "proposal" : {
-                    "proposalClass" : {
-                      "minPercentTime" : 30
-                    },
-                    "partnerSplits" : [
-                      {
-                        "partner" : "KECK",
-                        "percent" : 100
-                      }
-                    ]
-                  }
-                }
-              ]
+                ]
+              }
             }
           """
         )
