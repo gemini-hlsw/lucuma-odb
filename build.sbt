@@ -45,6 +45,7 @@ lazy val service = project
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
       "io.circe"       %% "circe-parser"                    % circeVersion,
+      "io.circe"       %% "circe-literal"                   % circeVersion,
       "io.circe"       %% "circe-refined"                   % circeVersion,
       "is.cir"         %% "ciris"                           % cirisVersion,
       "org.flywaydb"   %  "flyway-core"                     % flywayVersion,

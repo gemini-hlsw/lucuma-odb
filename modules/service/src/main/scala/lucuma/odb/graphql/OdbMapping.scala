@@ -84,6 +84,7 @@ object OdbMapping {
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
+          with GmosNorthLongSlitMapping[F]
           with HourAngleRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
@@ -91,6 +92,7 @@ object OdbMapping {
           with NonNegDurationMapping[F]
           with NonsiderealMapping[F]
           with ObservationMapping[F]
+          with ObservingModeMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
@@ -119,16 +121,27 @@ object OdbMapping {
         {
 
           // Our schema
-          val schema = unsafeLoadSchema("OdbSchema.graphql") |+| enums
+          val schema: Schema =
+            unsafeLoadSchema("OdbSchema.graphql") |+| enums
 
           // Our services and resources needed by various mappings.
-          override val user = user0
-          override val topics = topics0
-          override val allocationService  = pool.map(AllocationService.fromSessionAndUser(_, user))
-          override val asterismService    = pool.map(AsterismService.fromSessionAndUser(_, user))
-          override val observationService = pool.map(ObservationService.fromSessionAndUser(_, user))
-          override val programService     = pool.map(ProgramService.fromSessionAndUser(_, user))
-          override val targetService      = pool.map(TargetService.fromSession(_, user))
+          override val user: User         = user0
+          override val topics: Topics[F]  = topics0
+
+          override val allocationService: Resource[F, AllocationService[F]] =
+            pool.map(AllocationService.fromSessionAndUser(_, user))
+
+          override val asterismService: Resource[F, AsterismService[F]] =
+            pool.map(AsterismService.fromSessionAndUser(_, user))
+
+          override val observationService: Resource[F, ObservationService[F]] =
+            pool.map(ObservationService.fromSessionAndUser(_, user))
+
+          override val programService: Resource[F, ProgramService[F]] =
+            pool.map(ProgramService.fromSessionAndUser(_, user))
+
+          override val targetService: Resource[F, TargetService[F]] =
+            pool.map(TargetService.fromSession(_, user))
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
@@ -145,12 +158,14 @@ object OdbMapping {
               DeclinationMapping,
               ElevationRangeMapping,
               FilterTypeMetaMapping,
+              GmosNorthLongSlitMapping,
               HourAngleRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
               NonsiderealMapping,
               ObservationMapping,
+              ObservingModeMapping,
               ParallaxMapping,
               PartnerMetaMapping,
               PartnerSplitMapping,

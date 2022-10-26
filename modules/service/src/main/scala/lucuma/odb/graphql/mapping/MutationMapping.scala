@@ -100,7 +100,7 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
 
       val createObservation: F[Result[(Observation.Id, Query)]] =
         observationService.use { svc =>
-          svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Default)).map(
+          svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
             _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
           )
         }

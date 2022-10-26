@@ -14,7 +14,7 @@ import lucuma.odb.graphql.binding._
 
 final case class CreateObservationInput(
   programId: Program.Id,
-  SET:       Option[ObservationPropertiesInput]
+  SET:       Option[ObservationPropertiesInput.Create]
 ) {
 
   def asterism: Nullable[NonEmptyList[Target.Id]] =
@@ -28,7 +28,7 @@ object CreateObservationInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rProgramId),
-        ObservationPropertiesInput.CreateBinding.Option("SET", rSET),
+        ObservationPropertiesInput.Create.Binding.Option("SET", rSET),
       ) =>
         (rProgramId, rSET).parMapN(apply)
     }

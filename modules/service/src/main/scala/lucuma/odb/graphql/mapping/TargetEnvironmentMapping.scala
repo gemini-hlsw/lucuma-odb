@@ -31,9 +31,6 @@ trait TargetEnvironmentMapping[F[_]]
      with Predicates[F]
      with TargetView[F] { this: SkunkMapping[F] with TargetMapping[F] =>
 
-  lazy val TargetEnvironmentType: TypeRef =
-    schema.ref("TargetEnvironment")
-
   private def asterismObject(name: String): SqlObject =
     SqlObject(
       name,
