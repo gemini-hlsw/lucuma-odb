@@ -1026,7 +1026,12 @@ class updateObservations extends OdbSuite
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
           explicitRoi: CCD2
-          explicitWavelengthDithersNm: [-7.5, 7.1, 7.1, -7.5],
+          explicitWavelengthDithers: [
+            { nanometers: -7.5 },
+            { nanometers:  7.1 },
+            { nanometers:  7.1 },
+            { nanometers: -7.5 }
+          ],
           explicitSpatialOffsets: [
             { arcseconds: -10.0 },
             { arcseconds:  10.0 },
@@ -1051,7 +1056,9 @@ class updateObservations extends OdbSuite
           explicitAmpReadMode
           explicitAmpGain
           explicitRoi
-          explicitWavelengthDithersNm
+          explicitWavelengthDithers {
+            picometers
+          }
           explicitSpatialOffsets {
             arcseconds
           }
@@ -1077,7 +1084,12 @@ class updateObservations extends OdbSuite
                 "explicitAmpReadMode": "FAST",
                 "explicitAmpGain": "HIGH",
                 "explicitRoi": "CCD2",
-                "explicitWavelengthDithersNm": [-7.5, 7.1, 7.1, -7.5],
+                "explicitWavelengthDithers": [
+                  { "picometers": -7500 },
+                  { "picometers":  7100 },
+                  { "picometers":  7100 },
+                  { "picometers": -7500 }
+                ],
                 "explicitSpatialOffsets": [
                   { "arcseconds": -10.000000 },
                   { "arcseconds":  10.000000 },
@@ -1106,7 +1118,10 @@ class updateObservations extends OdbSuite
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
           explicitRoi: TOP_SPECTRUM
-          explicitWavelengthDithersNm: [-10, 10],
+          explicitWavelengthDithers: [
+            { nanometers: -10 },
+            { nanometers:  10 }
+          ],
           explicitSpatialOffsets: [
             { arcseconds: -2.0 },
             { arcseconds:  2.0 },
@@ -1134,7 +1149,10 @@ class updateObservations extends OdbSuite
                 "explicitAmpReadMode": "SLOW",
                 "explicitAmpGain": "LOW",
                 "explicitRoi": "TOP_SPECTRUM",
-                "explicitWavelengthDithersNm": [-10, 10],
+                "explicitWavelengthDithers": [
+                  { "picometers": -10000 },
+                  { "picometers":  10000 }
+                ],
                 "explicitSpatialOffsets": [
                   { "arcseconds": -2.000000 },
                   { "arcseconds":  2.000000 },

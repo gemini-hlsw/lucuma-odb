@@ -23,7 +23,7 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
-import lucuma.core.math.units.Nanometer
+import lucuma.core.math.units.Picometer
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
@@ -31,16 +31,16 @@ import lucuma.odb.graphql.binding.*
 import scala.util.control.Exception.*
 
 object GmosNorthLongSlitInput {
-  
+
   private def formattedλDithers(
-    in: List[BigDecimal]
+    in: List[Quantity[Int, Picometer]]
   ): String =
-    in.map(_.bigDecimal.toPlainString).intercalate(",")
-    
+    in.map(w => BigDecimal(w.value).bigDecimal.movePointLeft(3).toPlainString).intercalate(",")
+
   private def formattedSpatialOffsets(
     in: List[Q]
   ): String =
-    in.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")  
+    in.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")
 
   final case class Create(
     grating:                GmosNorthGrating,
@@ -52,7 +52,7 @@ object GmosNorthLongSlitInput {
     explicitAmpReadMode:    Option[GmosAmpReadMode],
     explicitAmpGain:        Option[GmosAmpGain],
     explicitRoi:            Option[GmosRoi],
-    explicitλDithers:       Option[List[BigDecimal]],
+    explicitλDithers:       Option[List[Quantity[Int, Picometer]]],
     explicitSpatialOffsets: Option[List[Q]]
   ) {
     
@@ -78,7 +78,7 @@ object GmosNorthLongSlitInput {
     explicitAmpReadMode:    Nullable[GmosAmpReadMode],
     explicitAmpGain:        Nullable[GmosAmpGain],
     explicitRoi:            Nullable[GmosRoi],
-    explicitλDithers:       Nullable[List[BigDecimal]],
+    explicitλDithers:       Nullable[List[Quantity[Int, Picometer]]],
     explicitSpatialOffsets: Nullable[List[Q]]
   ) {
     
@@ -91,7 +91,7 @@ object GmosNorthLongSlitInput {
 
     val formattedSpatialOffsets: Nullable[String] =
       explicitSpatialOffsets.map(GmosNorthLongSlitInput.formattedSpatialOffsets)
-      
+
     val toCreate: Result[Create] = {
       def required[A](oa: Option[A], itemName: String): Result[A] =
         Result.fromOption(oa, s"A $itemName is required in order to create a GMOS North Long Slit observing mode.")
@@ -127,7 +127,7 @@ object GmosNorthLongSlitInput {
     Nullable[GmosAmpReadMode],
     Nullable[GmosAmpGain],
     Nullable[GmosRoi],
-    Nullable[List[BigDecimal]],
+    Nullable[List[Quantity[Int, Picometer]]],
     Nullable[List[Q]]
   )] =
     ObjectFieldsBinding.rmap {
@@ -141,7 +141,7 @@ object GmosNorthLongSlitInput {
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
-        BigDecimalBinding.List.Nullable("explicitWavelengthDithersNm", rWavelengthDithers),
+        WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
         OffsetComponentInput.Binding.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
       ) => (
         rGrating,
