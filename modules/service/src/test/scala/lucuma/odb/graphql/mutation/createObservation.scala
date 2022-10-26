@@ -519,7 +519,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] created observation should have specified asterism -- ALIASING PROBLEM".ignore) {
+  test("[general] created observation should have specified asterism") {
     def createObs(pid: Program.Id, t0: Target.Id, t1: Target.Id): IO[List[Target.Id]] =
       query(
         pi,
