@@ -26,6 +26,9 @@ sealed trait Nullable[+A] extends Product with Serializable {
   def flatMap[B](f: A => Nullable[B]): Nullable[B] = fold(Null, Absent, f)
   def orElse[B >: A](nb: Nullable[B]): Nullable[B] = fold(nb, nb, NonNull(_))
   def toOption: Option[A] = fold(None, None, Some(_))
+  
+  def toOptionOption: Option[Option[A]] =
+    fold(Some(None), None, a => Some(Some(a)))
 
   def isNull: Boolean =
     fold(ifNull = true, ifAbsent = false, _ => false)

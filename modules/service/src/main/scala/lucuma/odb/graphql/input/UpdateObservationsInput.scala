@@ -18,7 +18,7 @@ import lucuma.odb.graphql.binding._
 
 final case class UpdateObservationsInput(
   programId:      Program.Id,
-  SET:            ObservationPropertiesInput,
+  SET:            ObservationPropertiesInput.Edit,
   WHERE:          Option[Predicate],
   LIMIT:          Option[NonNegInt],
   includeDeleted: Option[Boolean]
@@ -36,7 +36,7 @@ object UpdateObservationsInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rPid),
-        ObservationPropertiesInput.EditBinding("SET", rSET),
+        ObservationPropertiesInput.Edit.Binding("SET", rSET),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)

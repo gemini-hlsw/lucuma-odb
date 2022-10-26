@@ -14,6 +14,7 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -29,19 +30,20 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
-import lucuma.core.model._
+import lucuma.core.model.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
-import skunk._
-import skunk.codec.all._
+import skunk.*
+import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
 
@@ -109,6 +111,9 @@ trait Codecs {
 
   val image_quality: Codec[ImageQuality] =
     enumerated[ImageQuality](Type.varchar)
+    
+  val instrument: Codec[Instrument] =
+    enumerated[Instrument](Type.varchar)  
 
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
@@ -121,6 +126,9 @@ trait Codecs {
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
+  
+  val observing_mode_type: Codec[ObservingModeType] =
+    enumerated(Type("e_observing_mode_type"))
 
   val orcid_id: Codec[OrcidId] =
     Codec.simple[OrcidId](

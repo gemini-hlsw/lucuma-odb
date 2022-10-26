@@ -52,7 +52,7 @@ class updateObservations extends OdbSuite
     yield ()
 
 
-  test("update that selects nothing") {
+  test("general: update that selects nothing") {
     def emptyUpdate(user: User, pid: Program.Id): IO[Unit] =
       expect(
         user = user,
@@ -84,12 +84,12 @@ class updateObservations extends OdbSuite
 
     for
       pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid)
+      _   <- createObservationAs(pi, pid)
       _   <- emptyUpdate(pi, pid)
     yield ()
   }
 
-  test("update cloud extinction") {
+  test("constraint set: update cloud extinction") {
     oneUpdateTest(
       user   = pi,
       update = """
@@ -116,7 +116,7 @@ class updateObservations extends OdbSuite
     )
   }
 
-  test("update air mass range") {
+  test("constraint set: update air mass range") {
     oneUpdateTest(
       user   = pi,
       update = """
@@ -157,7 +157,7 @@ class updateObservations extends OdbSuite
       )
   }
 
-  test("hour angle constraint violation") {
+  test("constraint set: hour angle constraint violation") {
 
     oneUpdateTest(
       user   = pi,
@@ -185,7 +185,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("switch elevation range constraint type") {
+  test("constraint set: switch elevation range constraint type") {
     oneUpdateTest(
       user   = pi,
       update = """
@@ -233,7 +233,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("conflicting elevation range updates") {
+  test("constraint set: conflicting elevation range updates") {
 
     oneUpdateTest(
       user   = pi,
@@ -268,7 +268,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("set explicit base in existing observation without one") {
+  test("target environment: set explicit base in existing observation without one") {
 
     oneUpdateTest(
       user = pi,
@@ -311,7 +311,7 @@ class updateObservations extends OdbSuite
   }
 
 
-  test("set an asterism in existing observation without one") {
+  test("target environment: set an asterism in existing observation without one") {
 
     def update(tid: Target.Id) = s"""
       targetEnvironment: {
@@ -352,7 +352,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("update an asterism in existing observation") {
+  test("target environment: update an asterism in existing observation") {
 
     def update(tids: Target.Id*) =
       s"""
@@ -393,7 +393,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("update explicit ra in observation with existing explicit base") {
+  test("target environment: update explicit ra in observation with existing explicit base") {
 
     val update1 = """
       targetEnvironment: {
@@ -468,7 +468,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("delete explicit base") {
+  test("target environment: delete explicit base") {
 
     val update1 = """
       targetEnvironment: {
@@ -534,7 +534,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("fail to set (only) explicit ra in existing observation without explicit base") {
+  test("target environment: fail to set (only) explicit ra in existing observation without explicit base") {
 
     val update = """
       targetEnvironment: {
@@ -563,7 +563,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("set visualization time") {
+  test("visualization time: set") {
 
     val update   = """
       visualizationTime: "2022-08-30 17:18:00"
@@ -584,7 +584,7 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
-  test("set visualization time ISO-8601") {
+  test("visualization time: set ISO-8601") {
 
     val update = """
       visualizationTime: "2022-08-30 17:18:00"
@@ -605,7 +605,7 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
-  test("delete visualization time") {
+  test("visualization time: delete") {
 
     val update0  = """
       visualizationTime: "2022-08-30 17:18:00"
@@ -641,7 +641,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("update pos angle constraint") {
+  test("pos angle constraint: update") {
     oneUpdateTest(
       user = pi,
       update =
@@ -764,7 +764,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("update science requirements") {
+  test("science requirements: update") {
     oneUpdateTest(
       pi,
       scienceRequirements.update,
@@ -773,7 +773,7 @@ class updateObservations extends OdbSuite
     )
   }
 
-  test("delete science requirements spectroscopy focal plane") {
+  test("science requirements: delete spectroscopy focal plane") {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -865,6 +865,367 @@ class updateObservations extends OdbSuite
     } yield ()
   }
 */
+
+  test("observing mode: create in an existing observation") {
+
+    val update = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query = """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+          filter
+          fpu
+          centralWavelength {
+            nanometers
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301",
+                "filter": "G_PRIME",
+                "fpu": "LONG_SLIT_0_25",
+                "centralWavelength": {
+                  "nanometers": 234.560
+                }
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("observing mode: (fail to) create in an existing observation") {
+
+    val update = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+        }
+      }
+    """
+
+    val query = """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+          filter
+          fpu
+          centralWavelength {
+            nanometers
+          }
+        }
+      }
+    """
+
+    val expected =  "A centralWavelength is required in order to create a GMOS North Long Slit observing mode.".asLeft
+    oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("observing mode: update existing") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query = """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301"
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: R831_G5302
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "R831_G5302"
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: update existing, all fields") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+          explicitXBin: FOUR
+          explicitYBin: FOUR
+          explicitAmpReadMode: FAST
+          explicitAmpGain: HIGH
+          explicitRoi: CCD2
+          explicitWavelengthDithers: [
+            { nanometers: -7.5 },
+            { nanometers:  7.1 },
+            { nanometers:  7.1 },
+            { nanometers: -7.5 }
+          ],
+          explicitSpatialOffsets: [
+            { arcseconds: -10.0 },
+            { arcseconds:  10.0 },
+            { arcseconds:  10.0 },
+            { arcseconds: -10.0 }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+          filter
+          fpu
+          centralWavelength {
+            nanometers
+          }
+          explicitXBin
+          explicitYBin
+          explicitAmpReadMode
+          explicitAmpGain
+          explicitRoi
+          explicitWavelengthDithers {
+            picometers
+          }
+          explicitSpatialOffsets {
+            arcseconds
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301",
+                "filter": "G_PRIME",
+                "fpu": "LONG_SLIT_0_25",
+                "centralWavelength": {
+                  "nanometers": 234.560
+                },
+                "explicitXBin": "FOUR",
+                "explicitYBin": "FOUR",
+                "explicitAmpReadMode": "FAST",
+                "explicitAmpGain": "HIGH",
+                "explicitRoi": "CCD2",
+                "explicitWavelengthDithers": [
+                  { "picometers": -7500 },
+                  { "picometers":  7100 },
+                  { "picometers":  7100 },
+                  { "picometers": -7500 }
+                ],
+                "explicitSpatialOffsets": [
+                  { "arcseconds": -10.000000 },
+                  { "arcseconds":  10.000000 },
+                  { "arcseconds":  10.000000 },
+                  { "arcseconds": -10.000000 }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val update1 =
+      """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: R831_G5302
+          filter: R_PRIME
+          fpu: LONG_SLIT_0_50
+          centralWavelength: {
+            nanometers: 654.321
+          }
+          explicitXBin: ONE
+          explicitYBin: ONE
+          explicitAmpReadMode: SLOW
+          explicitAmpGain: LOW
+          explicitRoi: TOP_SPECTRUM
+          explicitWavelengthDithers: [
+            { nanometers: -10 },
+            { nanometers:  10 }
+          ],
+          explicitSpatialOffsets: [
+            { arcseconds: -2.0 },
+            { arcseconds:  2.0 },
+            { arcseconds:  2.0 },
+            { arcseconds: -2.0 }
+          ]
+        }
+      }
+    """
+    val expected1 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "R831_G5302",
+                "filter": "R_PRIME",
+                "fpu": "LONG_SLIT_0_50",
+                "centralWavelength": {
+                  "nanometers": 654.321
+                },
+                "explicitXBin": "ONE",
+                "explicitYBin": "ONE",
+                "explicitAmpReadMode": "SLOW",
+                "explicitAmpGain": "LOW",
+                "explicitRoi": "TOP_SPECTRUM",
+                "explicitWavelengthDithers": [
+                  { "picometers": -10000 },
+                  { "picometers":  10000 }
+                ],
+                "explicitSpatialOffsets": [
+                  { "arcseconds": -2.000000 },
+                  { "arcseconds":  2.000000 },
+                  { "arcseconds":  2.000000 },
+                  { "arcseconds": -2.000000 }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  test("observing mode: delete existing") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query = """
+      observingMode {
+        mode
+        gmosNorthLongSlit {
+          grating
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "mode": "GMOS_NORTH_LONG_SLIT",
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301"
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: null
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": null
+          }
+        ]
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
 
 }
 

@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
@@ -44,6 +45,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
@@ -52,6 +54,7 @@ import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.HourAngleRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
@@ -62,20 +65,24 @@ import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
-trait ObservationService[F[_]] {
+sealed trait ObservationService[F[_]] {
   import ObservationService._
 
   def createObservation(
     programId: Program.Id,
-    SET:       ObservationPropertiesInput
+    SET:       ObservationPropertiesInput.Create
   ): F[Result[Observation.Id]]
 
   def selectObservations(
     which: AppliedFragment
   ): F[List[Observation.Id]]
 
+  def selectObservingModes(
+    which: List[Observation.Id]
+  ): F[Map[Option[ObservingModeType], List[Observation.Id]]]
+
   def updateObservations(
-    SET:   ObservationPropertiesInput,
+    SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
   ): F[Result[List[Observation.Id]]]
 
@@ -129,21 +136,33 @@ object ObservationService {
   ): ObservationService[F] =
     new ObservationService[F] {
 
+      lazy val observingModeServices: ObservingModeServices[F] =
+        ObservingModeServices.fromSession(session)
+
       override def createObservation(
-        programId:   Program.Id,
-        SET:         ObservationPropertiesInput
+        programId: Program.Id,
+        SET:       ObservationPropertiesInput.Create
       ): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
-          Statements
-            .insertObservationAs(user, programId, SET)
-            .flatTraverse { af =>
-              session.prepare(af.fragment.query(observation_id)).use { pq =>
-                pq.option(af.argument).map {
-                  case Some(oid) => Result(oid)
-                  case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+          session.transaction.use { xa =>
+            Statements
+              .insertObservationAs(user, programId, SET)
+              .flatTraverse { af =>
+                session.prepare(af.fragment.query(observation_id)).use { pq =>
+                  pq.option(af.argument).map {
+                    case Some(oid) => Result(oid)
+                    case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                  }
+                }.flatMap { rOid =>
+
+                  val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
+                  (rOid, rOptF).parMapN { (oid, optF) =>
+                    optF.fold(oid.pure[F]) { f => f(List(oid), xa).as(oid) }
+                  }.sequence
+
                 }
               }
-            }
+          }
         }
 
       override def selectObservations(
@@ -153,20 +172,99 @@ object ObservationService {
           pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
+      override def selectObservingModes(
+        which: List[Observation.Id]
+      ): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(Applicative[F].pure(Map.empty)) { oids =>
+            val af = Statements.selectObservingModes(oids)
+            session.prepare(af.fragment.query(observation_id ~ observing_mode_type.opt)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList.map {
+                _.groupBy(_._2).view.mapValues(_.unzip._1).toMap
+              }
+            }
+          }
+
+      private def updateObservingModeType(
+        newMode: Option[ObservingModeType],
+        which:   List[Observation.Id]
+      ): F[Unit] = {
+        val af = Statements.updateObservingModeType(newMode, which)
+        session.prepare(af.fragment.command).use { pq =>
+          pq.execute(af.argument).void
+        }
+      }
+
+      private def updateObservingModes(
+        nEdit:           Nullable[ObservingModeInput.Edit],
+        rObservationIds: Result[List[Observation.Id]],
+        xa:              Transaction[F]
+      ): F[Result[List[Observation.Id]]] =
+
+        (rObservationIds.toOption, nEdit.toOptionOption).mapN { (oids, oEdit) =>
+
+          for {
+            m <- selectObservingModes(oids)
+            _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
+            r <- m.toList.traverse { case (existingMode, matchingOids) =>
+              (existingMode, oEdit) match {
+                case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
+                  // update existing
+                  observingModeServices.updateFunction(edit).traverse(f => f(matchingOids, xa))
+
+                case (Some(ex), Some(edit)) =>
+                  for {
+                    // delete existing
+                    _ <- observingModeServices.deleteFunction(ex)(matchingOids, xa)
+
+                    // create new
+                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, xa))
+                  } yield r
+
+                case (None,    Some(edit)) =>
+                  // create new
+                  observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, xa))
+
+                case (Some(ex), None) =>
+                  // delete existing
+                  observingModeServices.deleteFunction(ex)(matchingOids, xa).as(Result.unit)
+
+                case _  =>
+                  // do nothing
+                  Result.unit.pure[F]
+              }
+
+            }.map(_.sequence.void)
+
+          } yield r
+
+        }.fold(rObservationIds.pure[F]) { _.map(_ *> rObservationIds) }
+
+
       override def updateObservations(
-        SET:   ObservationPropertiesInput,
+        SET:   ObservationPropertiesInput.Edit,
         which: AppliedFragment
       ): F[Result[List[Observation.Id]]] =
-        Statements.updateObservations(SET, which).traverse { af =>
-          session.prepare(af.fragment.query(observation_id)).use { pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList
-          }
-        }.recoverWith {
-           case SqlState.CheckViolation(ex) =>
-             Result.failure(constraintViolationMessage(ex)).pure[F]
-         }
-    }
+        Trace[F].span("updateObservation") {
+          session.transaction.use { xa =>
+            for {
+              r <- Statements.updateObservations(SET, which).traverse { af =>
+                     session.prepare(af.fragment.query(observation_id)).use { pq =>
+                       pq.stream(af.argument, chunkSize = 1024).compile.toList
+                     }
+                   }.flatMap { rObservationIds =>
+                     updateObservingModes(SET.observingMode, rObservationIds, xa)
 
+                   }.recoverWith {
+                     case SqlState.CheckViolation(ex) =>
+                       Result.failure(constraintViolationMessage(ex)).pure[F]
+                   }
+              _ <- r.toOption.fold(xa.rollback)(_ => xa.commit)
+            } yield r
+          }
+        }
+    }
 
   object Statements {
 
@@ -175,7 +273,7 @@ object ObservationService {
     def insertObservationAs(
       user:      User,
       programId: Program.Id,
-      SET:       ObservationPropertiesInput
+      SET:       ObservationPropertiesInput.Create
     ): Result[AppliedFragment] =
       for {
         eb <- SET.targetEnvironment.flatMap(_.explicitBase.toOption).flatTraverse(_.create)
@@ -184,16 +282,17 @@ object ObservationService {
         insertObservationAs(
           user,
           programId,
-          SET.subtitle.toOption,
+          SET.subtitle,
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.New),
           SET.activeStatus.getOrElse(ObsActiveStatus.Active),
-          SET.visualizationTime.toOption,
+          SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
-          SET.scienceRequirements
+          SET.scienceRequirements,
+          SET.observingMode.flatMap(_.observingModeType)
         )
 
     def insertObservationAs(
@@ -208,7 +307,8 @@ object ObservationService {
       posAngle:            Angle,
       explicitBase:        Option[Coordinates],
       constraintSet:       ConstraintSet,
-      scienceRequirements: Option[ScienceRequirementsInput]
+      scienceRequirements: Option[ScienceRequirementsInput],
+      modeType:            Option[ObservingModeType]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -242,7 +342,8 @@ object ObservationService {
            spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ~
            spectroscopy.flatMap(_.focalPlane.toOption)                              ~
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ~
-           spectroscopy.flatMap(_.capability.toOption)
+           spectroscopy.flatMap(_.capability.toOption)                              ~
+           modeType
         )
       }
 
@@ -255,33 +356,34 @@ object ObservationService {
     }
 
     val InsertObservation: Fragment[
-      Program.Id             ~
-      Option[NonEmptyString] ~
-      Existence              ~
-      ObsStatus              ~
-      ObsActiveStatus        ~
-      Option[Timestamp]      ~
-      PosAngleConstraintMode ~
-      Angle                  ~
-      Option[RightAscension] ~
-      Option[Declination]    ~
-      CloudExtinction        ~
-      ImageQuality           ~
-      SkyBackground          ~
-      WaterVapor             ~
-      Option[PosBigDecimal]  ~
-      Option[PosBigDecimal]  ~
-      Option[BigDecimal]     ~
-      Option[BigDecimal]     ~
-      ScienceMode            ~
-      Option[Wavelength]     ~
-      Option[PosInt]         ~
-      Option[PosBigDecimal]  ~
-      Option[Wavelength]     ~
-      Option[Wavelength]     ~
-      Option[FocalPlane]     ~
-      Option[Angle]          ~
-      Option[SpectroscopyCapabilities]
+      Program.Id                       ~
+      Option[NonEmptyString]           ~
+      Existence                        ~
+      ObsStatus                        ~
+      ObsActiveStatus                  ~
+      Option[Timestamp]                ~
+      PosAngleConstraintMode           ~
+      Angle                            ~
+      Option[RightAscension]           ~
+      Option[Declination]              ~
+      CloudExtinction                  ~
+      ImageQuality                     ~
+      SkyBackground                    ~
+      WaterVapor                       ~
+      Option[PosBigDecimal]            ~
+      Option[PosBigDecimal]            ~
+      Option[BigDecimal]               ~
+      Option[BigDecimal]               ~
+      ScienceMode                      ~
+      Option[Wavelength]               ~
+      Option[PosInt]                   ~
+      Option[PosBigDecimal]            ~
+      Option[Wavelength]               ~
+      Option[Wavelength]               ~
+      Option[FocalPlane]               ~
+      Option[Angle]                    ~
+      Option[SpectroscopyCapabilities] ~
+      Option[ObservingModeType]
     ] =
       sql"""
         INSERT INTO t_observation (
@@ -311,7 +413,8 @@ object ObservationService {
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
-          c_spec_capability
+          c_spec_capability,
+          c_observing_mode_type
         )
         SELECT
           $program_id,
@@ -340,8 +443,17 @@ object ObservationService {
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
-          ${spectroscopy_capabilities.opt}
+          ${spectroscopy_capabilities.opt},
+          ${observing_mode_type.opt}
       """
+
+    def selectObservingModes(
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      void"SELECT c_observation_id, c_observing_mode_type FROM t_observation " |+|
+        void"WHERE c_observation_id IN ("                                      |+|
+          observationIds.map(sql"$observation_id").intercalate(void", ")       |+|
+        void")"
 
     def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {
 
@@ -360,7 +472,7 @@ object ObservationService {
         case Nullable.Null   => Result(List(upRa(none), upDec(none)))
         case Nullable.Absent => Result(Nil)
         case NonNull(value)  =>
-          (value.ra.map(r => upRa(r.some)).toList ++ value.dec.map(d => upDec(d.some)).toList) match {
+          value.ra.map(r => upRa(r.some)).toList ++ value.dec.map(d => upDec(d.some)).toList match {
             case Nil => Result.failure("At least one of ra or dec must be specified for an edit")
             case lst => Result(lst)
           }
@@ -444,7 +556,7 @@ object ObservationService {
 
     }
 
-    def updates(SET: ObservationPropertiesInput): Result[Option[NonEmptyList[AppliedFragment]]] = {
+    def updates(SET: ObservationPropertiesInput.Edit): Result[Option[NonEmptyList[AppliedFragment]]] = {
       val upExistence         = sql"c_existence = $existence"
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upStatus            = sql"c_status = $obs_status"
@@ -494,7 +606,7 @@ object ObservationService {
     }
 
     def updateObservations(
-      SET:   ObservationPropertiesInput,
+      SET:   ObservationPropertiesInput.Edit,
       which: AppliedFragment
     ): Result[AppliedFragment] = {
 
@@ -507,6 +619,16 @@ object ObservationService {
       updates(SET).map(_.fold(which)(update))
 
     }
+
+    def updateObservingModeType(
+      newMode: Option[ObservingModeType],
+      which:   List[Observation.Id]
+    ): AppliedFragment = {
+      void"UPDATE t_observation " |+|
+        void"SET " |+| sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void" " |+|
+        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
+    }
+
 
   }
 

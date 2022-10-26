@@ -12,14 +12,15 @@ import table.ObservationView
 import table.ProgramTable
 
 trait ObservationMapping[F[_]]
-  extends ObservationView[F] with ProgramTable[F]  {
+  extends ObservationView[F]
+     with ProgramTable[F]  {
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
       tpe = ObservationType,
       fieldMappings = List(
         SqlField("id", ObservationView.Id, key = true),
-        SqlField("programId", ObservationView.ProgramId, hidden=true),
+        SqlField("programId", ObservationView.ProgramId, hidden = true),
         SqlField("existence", ObservationView.Existence, hidden = true),
         SqlField("subtitle", ObservationView.Subtitle),
         SqlField("status", ObservationView.Status),
@@ -29,6 +30,7 @@ trait ObservationMapping[F[_]]
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
         SqlObject("scienceRequirements"),
+        SqlObject("observingMode"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
       )
     )

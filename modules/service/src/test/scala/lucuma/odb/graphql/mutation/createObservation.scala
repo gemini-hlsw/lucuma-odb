@@ -14,13 +14,24 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.model.GuestUser
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.ServiceUser
+import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.PosAngleConstraintMode
@@ -34,10 +45,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
 
   extension (ac: ACursor)
     def downPath(p: String*): ACursor =
-      p.toList match {
-        case Nil    => ac
-        case h :: t => ac.downField(h).downPath(t*)
-      }
+      p.foldLeft(ac) { (aCursor, field) => aCursor.downField(field) }
 
     def liftIO[A: Decoder]: IO[A] =
       ac.as[A].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
@@ -45,16 +53,17 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     def downIO[A: Decoder](p: String*): IO[A] =
       downPath(p*).liftIO[A]
 
-  val pi       = TestUsers.Standard.pi(nextId, nextId)
-  val pi2      = TestUsers.Standard.pi(nextId, nextId)
-  val pi3      = TestUsers.Standard.pi(nextId, nextId)
-  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
-  val staff    = TestUsers.Standard.staff(nextId, nextId)
-  val admin    = TestUsers.Standard.admin(nextId, nextId)
-  val guest    = TestUsers.guest(nextId)
-  val service  = TestUsers.service(nextId)
+  val pi: StandardUser     = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
+  val pi3: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
+  val ngo: StandardUser    = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val staff: StandardUser  = TestUsers.Standard.staff(nextId, nextId)
+  val admin: StandardUser  = TestUsers.Standard.admin(nextId, nextId)
+  val guest: GuestUser     = TestUsers.guest(nextId)
+  val service: ServiceUser = TestUsers.service(nextId)
 
-  lazy val validUsers = List(pi, pi2, pi3, ngo, staff, admin, guest, service)
+  lazy val validUsers: List[User] =
+    List(pi, pi2, pi3, ngo, staff, admin, guest, service)
 
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs) // TODO: something cheaper
@@ -650,6 +659,248 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
+  test("[general] specify gmos north long slit observing mode at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  grating: B1200_G5301
+                  filter: G_PRIME
+                  fpu: LONG_SLIT_0_25
+                  centralWavelength: {
+                    nanometers: 234.56
+                  }
+                }
+              }
+            }
+          }) {
+            observation {
+              observingMode {
+                gmosNorthLongSlit {
+                  grating
+                  filter
+                  fpu
+                  centralWavelength {
+                    nanometers
+                  }
+                  xBin,
+                  yBin,
+                  explicitYBin
+                  defaultYBin
+                  initialGrating
+                  initialFilter
+                  initialFpu
+                  initialCentralWavelength {
+                    nanometers
+                  }
+                }
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+        assertIO(
+          (longSlit.downIO[GmosNorthGrating]("grating"),
+           longSlit.downIO[Option[GmosNorthFilter]]("filter"),
+           longSlit.downIO[GmosNorthFpu]("fpu"),
+           longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[GmosYBinning]("yBin"),
+           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           longSlit.downIO[GmosYBinning]("defaultYBin"),
+           longSlit.downIO[GmosNorthGrating]("initialGrating"),
+           longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
+           longSlit.downIO[GmosNorthFpu]("initialFpu"),
+           longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+          ).tupled,
+          (GmosNorthGrating.B1200_G5301,
+           Some(GmosNorthFilter.GPrime),
+           GmosNorthFpu.LongSlit_0_25,
+           234.56,
+           GmosXBinning.One, // Using IQ 2.0 and point source
+           GmosYBinning.Two,
+           Option.empty[GmosYBinning],
+           GmosYBinning.Two,
+           GmosNorthGrating.B1200_G5301,
+           Some(GmosNorthFilter.GPrime),
+           GmosNorthFpu.LongSlit_0_25,
+           234.56
+          )
+        )
+
+      }
+    }
+  }
+
+  test("[general] specify gmos north long slit observing mode (with optional explicit parameters) at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            observingMode: {
+              gmosNorthLongSlit: {
+                grating: B1200_G5301
+                filter: G_PRIME
+                fpu: LONG_SLIT_0_25
+                centralWavelength: {
+                  nanometers: 234.56
+                }
+                explicitXBin: FOUR
+                explicitYBin: FOUR
+                explicitAmpReadMode: FAST
+                explicitAmpGain: HIGH
+                explicitRoi: CCD2
+                explicitWavelengthDithers: [
+                  { nanometers: -7.5},
+                  { nanometers:  7.1},
+                  { nanometers:  7.1},
+                  { nanometers: -7.5}
+                ],
+                explicitSpatialOffsets: [
+                  { arcseconds: -10.0 },
+                  { arcseconds:  10.0 },
+                  { arcseconds:  10.0 },
+                  { arcseconds: -10.0 }
+                ]
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              gmosNorthLongSlit {
+                xBin
+                explicitXBin
+                defaultXBin
+                yBin
+                explicitYBin
+                defaultYBin
+                ampReadMode
+                explicitAmpReadMode
+                defaultAmpReadMode
+                ampGain
+                explicitAmpGain
+                defaultAmpGain
+                roi
+                explicitRoi
+                defaultRoi
+                wavelengthDithers {
+                  nanometers
+                }
+                explicitWavelengthDithers {
+                  nanometers
+                }
+                defaultWavelengthDithers {
+                  nanometers
+                }
+                spatialOffsets {
+                  arcseconds
+                }
+                explicitSpatialOffsets {
+                  microarcseconds
+                  arcseconds
+                }
+                defaultSpatialOffsets {
+                  arcseconds
+                }
+              }
+            }
+          }
+        }
+      }
+    """).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+        assertIO(
+          (longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           longSlit.downIO[GmosXBinning]("defaultXBin"),
+           longSlit.downIO[GmosYBinning]("yBin"),
+           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           longSlit.downIO[GmosYBinning]("defaultYBin"),
+           longSlit.downIO[GmosAmpReadMode]("ampReadMode"),
+           longSlit.downIO[Option[GmosAmpReadMode]]("explicitAmpReadMode"),
+           longSlit.downIO[GmosAmpReadMode]("defaultAmpReadMode"),
+           longSlit.downIO[GmosAmpGain]("ampGain"),
+           longSlit.downIO[Option[GmosAmpGain]]("explicitAmpGain"),
+           longSlit.downIO[GmosAmpGain]("defaultAmpGain"),
+           longSlit.downIO[GmosRoi]("roi"),
+           longSlit.downIO[Option[GmosRoi]]("explicitRoi"),
+           longSlit.downIO[GmosRoi]("defaultRoi"),
+           IO(longSlit.downField("wavelengthDithers").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitWavelengthDithers").values.map(_.toList)),
+           IO(longSlit.downField("defaultWavelengthDithers").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
+           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
+          ).tupled,
+          (GmosXBinning.Four,
+           Some(GmosXBinning.Four),
+           GmosXBinning.One,
+           GmosYBinning.Four,
+           Some(GmosYBinning.Four),
+           GmosYBinning.Two,
+           GmosAmpReadMode.Fast,
+           Some(GmosAmpReadMode.Fast),
+           GmosAmpReadMode.Slow,
+           GmosAmpGain.High,
+           Some(GmosAmpGain.High),
+           GmosAmpGain.Low,
+           GmosRoi.Ccd2,
+           Some(GmosRoi.Ccd2),
+           GmosRoi.FullFrame,
+           List(
+             json"""{ "nanometers": -7.5 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers": -7.5 }"""
+           ),
+           Some(List(
+             json"""{ "nanometers": -7.5 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers":  7.1 }""",
+             json"""{ "nanometers": -7.5 }"""
+           )),
+           List(
+             json"""{ "nanometers": 0.0 }""",
+             json"""{ "nanometers": 5.0 }""",
+             json"""{ "nanometers": 5.0 }""",
+             json"""{ "nanometers": 0.0 }"""
+           ),
+           List(
+             json"""{ "arcseconds": -10.0}""",
+             json"""{ "arcseconds":  10.0}""",
+             json"""{ "arcseconds":  10.0}""",
+             json"""{ "arcseconds": -10.0}"""
+           ),
+           Some(List(
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }"""
+           )),
+           List(
+             json"""{ "arcseconds":  0.0}""",
+             json"""{ "arcseconds": 15.0}""",
+             json"""{ "arcseconds": 15.0}""",
+             json"""{ "arcseconds":  0.0}"""
+           )
+          )
+        )
+
+      }
+    }
+  }
+
   test("[general] created observation should have specified position angle constraint") {
     createProgramAs(pi).flatMap { pid =>
       query(pi, s"""
@@ -809,7 +1060,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
       }
     }
   }
-
+  
   // TODO: more access control tests
 
 }

@@ -112,7 +112,7 @@ create table t_focal_plane (
 
 insert into t_focal_plane values ('single_slit', 'Single Slit', 'Single Slit');
 insert into t_focal_plane values ('multiple_slit', 'Multiple Slit', 'Multiple Slit');
-insert into t_focal_plane values ('ifu', 'IFU', 'Intregal Field Unit');
+insert into t_focal_plane values ('ifu', 'IFU', 'Integral Field Unit');
 
 -- SCIENCE REQUIREMENTS: SPECTROSCOPY CAPABILITIES
 
@@ -125,6 +125,13 @@ create table t_spectroscopy_capabilities (
 insert into t_spectroscopy_capabilities values ('nod_and_shuffle', 'Nod and Shuffle', 'Nod and Shuffle');
 insert into t_spectroscopy_capabilities values ('polarimetry', 'Polarimetry', 'Polarimetry');
 insert into t_spectroscopy_capabilities values ('coronagraphy', 'Coronagraphy', 'Coronagraphy');
+
+-- OBSERVING MODE
+
+create type e_observing_mode_type as enum(
+  'gmos_north_long_slit',
+  'gmos_south_long_slit'
+);
 
 -- OBSERVATIONS
 
@@ -199,16 +206,21 @@ create table t_observation (
   constraint spectroscopy_signal_to_noise_positive
   check (c_spec_signal_to_noise > 0),
 
+  -- observing mode
+  c_observing_mode_type e_observing_mode_type null default null,
+
   --
 
   unique (c_observation_id, c_instrument),
+  unique (c_observation_id, c_observing_mode_type),
   unique (c_program_id, c_observation_id)
 );
 comment on table t_observation is 'Observations.';
 
 create view v_observation as
   select *,
-  case when c_explicit_ra    is not null then c_observation_id end as c_explicit_base_id,
-  case when c_air_mass_min   is not null then c_observation_id end as c_air_mass_id,
-  case when c_hour_angle_min is not null then c_observation_id end as c_hour_angle_id
+  case when c_explicit_ra         is not null then c_observation_id end as c_explicit_base_id,
+  case when c_air_mass_min        is not null then c_observation_id end as c_air_mass_id,
+  case when c_hour_angle_min      is not null then c_observation_id end as c_hour_angle_id,
+  case when c_observing_mode_type is not null then c_observation_id end as c_observing_mode_id
   from t_observation
