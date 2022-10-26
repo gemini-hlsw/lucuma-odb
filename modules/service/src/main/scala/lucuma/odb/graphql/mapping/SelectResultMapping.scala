@@ -83,6 +83,34 @@ object SelectResultMapping {
 
   }
 
+  def mutationResult(child: Query, limit: Int)(transform: Query => Query): Result[Query] = {
+
+    // Find the "matches" node under the main "targets" query and add all our filtering
+    // and whatnot down in there, wrapping with a transform that removes the last row from the
+    // final results. See an `SelectResultMapping` to see how `hasMore` works.
+    def transformMatches(q: Query): Result[Query] =
+      Query.mapSomeFields(q) {
+        case Select("matches", Nil, child) =>
+          Result(Select("matches", Nil, TransformCursor(Take(limit), transform(child))))
+      }
+
+    // If we're selecting "matches" then continue by transforming the child query, otherwise
+    // punt because there's really no point in doing such a selection.
+    if !Query.hasField(child, "matches") 
+    then Result.failure("Field `matches` must be selected.") // meh
+    else
+      transformMatches(child).map { child =>
+        Environment(
+          Env(
+            SelectResultMapping.LimitKey -> limit,
+            SelectResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
+          ),
+          child
+        )
+      }
+
+  }
+
 }
 
 trait SelectResultMapping[F[_]] extends BaseMapping[F] {

@@ -295,6 +295,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdatePrograms =
     MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
+      import input.*
 
       // Our predicate for selecting programs to update
       val filterPredicate = and(List(
@@ -307,16 +308,23 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
 
-      // We want to order the returned programs by id
-      def orderByPid(child: Query) =
-        OrderBy(OrderSelections(List(OrderSelection[Program.Id](ProgramType / "id"))), child)
+      def query(pids: List[Program.Id]): Result[Query] =
+        val limit = LIMIT.foldLeft(1000)(_ min _.value)
+        SelectResultMapping.mutationResult(child, limit) { q =>           
+          FilterOrderByOffsetLimit(
+            pred = Some(Predicates.program.id.in(pids)).filter(_ => pids.nonEmpty),
+            oss = Some(List(
+              OrderSelection[Program.Id](ProgramType / "id")
+            )),
+            offset = None,
+            limit = Some(if (pids.isEmpty) then 0 else limit + 1), // Select one extra row here.
+            child = q
+          )
+        }
 
       // Update the specified programs and then return a query for the affected programs.
       idSelect.flatTraverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).map {
-          case Nil  => Result(orderByPid(Limit(0, child)))
-          case pids => Result(orderByPid(Filter(Predicates.program.id.in(pids), child)))
-        } recover {
+        programService.use(_.updatePrograms(input.SET, which)).map(query).recover {
           case ProposalService.ProposalUpdateException.CreationFailed =>
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
           case ProposalService.ProposalUpdateException.InconsistentUpdate =>

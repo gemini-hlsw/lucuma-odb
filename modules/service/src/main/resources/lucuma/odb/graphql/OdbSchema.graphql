@@ -1731,7 +1731,7 @@ type Mutation {
   updatePrograms(
     # Parameters for updating existing programs.
     input: UpdateProgramsInput!
-  ): [Program!]! #TODO: UpdateProgramsResult!
+  ): ProgramSelectResult! #TODO: UpdateProgramsResult!
 
   # Updates existing targets
   updateTargets(
