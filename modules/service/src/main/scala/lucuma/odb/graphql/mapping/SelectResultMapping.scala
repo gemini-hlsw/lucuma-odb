@@ -91,20 +91,23 @@ trait SelectResultMapping[F[_]] extends BaseMapping[F] {
     val bogus = col("<bogus root column>", int8)
   }
 
-  private def selectResultMapping(tpe: Type, keyColumn: ColumnRef, joins: Seq[Join]): ObjectMapping =
+  def topLevelSelectResultMapping(tpe: Type): ObjectMapping =
+    ObjectMapping(
+      tpe = tpe,
+      fieldMappings = List(
+        SqlObject("matches"),
+        CursorField("hasMore", SelectResultMapping.hasMore),
+        SqlField("<key>", root.bogus, hidden = true) // n.b. no key = true here
+      )
+    )
+  def nestedSelectResultMapping(tpe: Type, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
     ObjectMapping(
       tpe = tpe,
       fieldMappings = List(
         SqlObject("matches", joins: _*),
         CursorField("hasMore", SelectResultMapping.hasMore),
-        SqlField("<key>", keyColumn, key = true, hidden = true)
+        SqlField("<key>", parentKeyColumn, key = true, hidden = true)
       )
     )
-
-  def topLevelSelectResultMapping(tpe: Type): ObjectMapping =
-    selectResultMapping(tpe, root.bogus, Nil)
-
-  def nestedSelectResultMapping(tpe: Type, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
-    selectResultMapping(tpe, parentKeyColumn, joins)
 
 }
