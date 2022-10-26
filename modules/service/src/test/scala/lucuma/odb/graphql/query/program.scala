@@ -12,6 +12,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
 import lucuma.core.model.Observation
+import io.circe.Json
 
 class program extends OdbSuite {
 
@@ -56,7 +57,7 @@ class program extends OdbSuite {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  test("any user can read their own programs".ignore) {
+  test("any user can read their own programs") {
     List(guest, pi, service).traverse { user =>
       val name = s"${user.displayName}'s Science Program"
       createProgram(user, name).flatMap { id =>
@@ -112,7 +113,7 @@ class program extends OdbSuite {
     }
   }
 
-  test("guest and standard user can't see each others' programs".ignore) {
+  test("guest and standard user can't see each others' programs") {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
@@ -156,7 +157,7 @@ class program extends OdbSuite {
     }
   }
 
-  test("service user can see anyone's programs".ignore) {
+  test("service user can see anyone's programs") {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
@@ -211,7 +212,46 @@ class program extends OdbSuite {
               json"""
                 {
                   "program": {
-                    "id": $pid
+                    "id": $pid,
+                    "observations" : {
+                      "matches": ${oids.map{id => Json.obj("id" -> id.asJson)}}
+                    }
+                  }
+                }
+              """
+            )
+        )      
+      }
+    }
+  }
+
+  test("program / observations (with limit)") {
+    createProgram(pi, "program with some observations").flatMap { pid =>
+      createObservation(pi, pid).replicateA(3).flatMap { oids =>
+        expect(
+          user = pi,
+          query = 
+             s"""
+              query {
+                program(programId: "$pid") {
+                  id
+                  observations(LIMIT: 2) {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            Right(
+              json"""
+                {
+                  "program": {
+                    "id": $pid,
+                    "observations" : {
+                      "matches": ${oids.take(2).map{id => Json.obj("id" -> id.asJson)}}
+                    }
                   }
                 }
               """

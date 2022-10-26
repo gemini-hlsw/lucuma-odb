@@ -17,8 +17,8 @@ trait ObservationSelectResultMapping[F[_]]
 
   lazy val ObservationSelectResultMapping: TypeMapping =
     SwitchMapping(ObservationSelectResultType, List(
-      (QueryType, "observations",  topLevelSelectResultMapping(ObservationSelectResultType)),
+      // (QueryType, "observations",  topLevelSelectResultMapping(ObservationSelectResultType)),
       (ProgramType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)))
-    ))
+    ), Some(topLevelSelectResultMapping(ObservationSelectResultType)))
     
 }

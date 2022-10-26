@@ -201,7 +201,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       ))
     MappedQuery(
       Filter(whereObservation, Select("id", Nil, Query.Empty)),
-      Cursor.Context(ObservationType)
+      Cursor.Context(QueryType, List("observations"), List("observations"), List(ObservationType))
     ).map(_.fragment)
   }
 
@@ -305,7 +305,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
       // An applied fragment that selects all program ids that satisfy `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(ProgramType)).map(_.fragment)
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
 
       // We want to order the returned programs by id
       def orderByPid(child: Query) =

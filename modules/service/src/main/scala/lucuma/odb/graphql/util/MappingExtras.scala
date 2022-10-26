@@ -33,15 +33,20 @@ trait MappingExtras[F[_]] extends Mapping[F] {
     ) extends TypeMapping {
 
       def apply(ctx: Context): Option[ObjectMapping] = {
+        // println(s"*** ctx.tpe.underlyingObject.exists(_ =:= tpe) => ${ctx.tpe.underlyingObject.exists(_ =:= tpe)}")
         if ctx.tpe.underlyingObject.exists(_ =:= tpe)
-        then (ctx.typePath.lift(1), ctx.path.headOption).tupled.flatMap { (t, s) =>
-          t.underlyingObject.flatMap { tʹ =>
-            val r = lookup.collectFirst {
-              case (t2, s2, om) if t2 =:= tʹ && s2 == s =>
-                om
+        then {
+          // println(s"*** ctx.typePath.lift(1) ==> ${ctx.typePath.lift(1)}")
+          // println(s"*** ctx.path.headOption ==> ${ctx.path.headOption}")
+          (ctx.typePath.lift(1), ctx.path.headOption).tupled.flatMap { (t, s) =>
+            t.underlyingObject.flatMap { tʹ =>
+              val r = lookup.collectFirst {
+                case (t2, s2, om) if t2 =:= tʹ && s2 == s =>
+                  om
+              }
+              // println(s"*** $t, $s => $r")
+              r
             }
-            // println(s"*** $t, $s => $r")
-            r
           }
         }
         else None
