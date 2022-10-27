@@ -11,6 +11,7 @@ import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
+import cats.kernel.Order
 import cats.syntax.all.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
@@ -20,8 +21,10 @@ import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -102,6 +105,36 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             rInput.map(input => Environment(Env("input" -> input), Select(fieldName, Nil, child)))
       }
   }
+
+  def mutationResultSubquery[A: Order](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
+    val limitʹ = limit.foldLeft(1000)(_ min _.value)
+    ResultMapping.mutationResult(child, limitʹ, collectionField) { q =>           
+      FilterOrderByOffsetLimit(
+        pred = Some(predicate),
+        oss = Some(List(order)),
+        offset = None,
+        limit = Some(limitʹ + 1), // Select one extra row here.
+        child = q
+      )
+    }
+
+  def observationResultSubquery(oids: List[Observation.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = Predicates.observation.id.in(oids),
+      order = OrderSelection[Observation.Id](ObservationType / "id"),
+      limit = limit,
+      collectionField = "observations",
+      child          
+    )
+
+  def programResultSubquery(oids: List[Program.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = Predicates.program.id.in(oids),
+      order = OrderSelection[Program.Id](ProgramType / "id"),
+      limit = limit,
+      collectionField = "programs",
+      child          
+    )
 
   // Field definitions
 
@@ -211,27 +244,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
-      // Our new subquery
-      def query(oids: List[Observation.Id]): Result[Query] =
-        val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
-        ResultMapping.mutationResult(child, limit, "observations") { q =>           
-          FilterOrderByOffsetLimit(
-            pred = Some(Predicates.observation.id.in(oids)),
-            oss = Some(List(
-              OrderSelection[Observation.Id](ObservationType / "id")
-            )),
-            offset = None,
-            limit = Some(limit + 1), // Select one extra row here.
-            child = q
-          )
-        }
-
       val selectObservations: F[Result[(List[Observation.Id], Query)]] =
         idSelect.traverse { which =>
           observationService.use { svc =>
             svc.selectObservations(which)            
           } 
-        } .map(r => r.flatMap(oids => query(oids).tupleLeft(oids)))
+        } map { r => 
+          r.flatMap { oids => 
+            observationResultSubquery(oids, input.LIMIT, child)
+              .tupleLeft(oids)
+          }
+        }
 
       def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
         NonEmptyList.fromList(oids).traverse { os =>
@@ -259,27 +282,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
-      // Our new subquery
-      def query(oids: List[Observation.Id]): Result[Query] =
-        val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
-        ResultMapping.mutationResult(child, limit, "observations") { q =>           
-          FilterOrderByOffsetLimit(
-            pred = Some(Predicates.observation.id.in(oids)),
-            oss = Some(List(
-              OrderSelection[Observation.Id](ObservationType / "id")
-            )),
-            offset = None,
-            limit = Some(limit + 1), // Select one extra row here.
-            child = q
-          )
-        }
-
       val updateObservations: F[Result[(List[Observation.Id], Query)]] =
         idSelect.flatTraverse { which =>
           observationService.use { svc =>
             svc
               .updateObservations(input.SET, which)
-              .map(r => r.flatMap(oids => query(oids).tupleLeft(oids)))
+              .map { r => 
+                r.flatMap { oids => 
+                  observationResultSubquery(oids, input.LIMIT, child)
+                    .tupleLeft(oids)
+                }
+              }
           }
         }
 
@@ -315,24 +328,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
 
-      // Our new subquery
-      def query(pids: List[Program.Id]): Result[Query] =
-        val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
-        ResultMapping.mutationResult(child, limit, "programs") { q =>           
-          FilterOrderByOffsetLimit(
-            pred = Some(Predicates.program.id.in(pids)),
-            oss = Some(List(
-              OrderSelection[Program.Id](ProgramType / "id")
-            )),
-            offset = None,
-            limit = Some(limit + 1), // Select one extra row here.
-            child = q
-          )
-        }
-
       // Update the specified programs and then return a query for the affected programs.
       idSelect.flatTraverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).map(query).recover {
+        programService.use(_.updatePrograms(input.SET, which)).map(programResultSubquery(_, input.LIMIT, child)).recover {
           case ProposalService.ProposalUpdateException.CreationFailed =>
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
           case ProposalService.ProposalUpdateException.InconsistentUpdate =>
