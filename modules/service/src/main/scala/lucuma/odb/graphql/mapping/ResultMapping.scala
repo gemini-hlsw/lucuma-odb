@@ -14,14 +14,13 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
 import io.circe.Encoder
 import lucuma.odb.graphql.BaseMapping
-import lucuma.odb.graphql.mapping.SelectResultMapping
 import skunk.codec.numeric.int8
 
-object SelectResultMapping {
+object ResultMapping {
 
   // keys for things we expect to find in the environment
-  val LimitKey = "selectResultLimit"
-  val AliasKey = "selectResultAlias"
+  val LimitKey = "resultLimit"
+  val AliasKey = "resultAlias"
 
   private def hasMore(collectionField: String)(c: Cursor): Result[Boolean] =
     for
@@ -73,8 +72,8 @@ object SelectResultMapping {
         Select(field, Nil,
           Environment(
             Env(
-              SelectResultMapping.LimitKey -> limit,
-              SelectResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
+              ResultMapping.LimitKey -> limit,
+              ResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
             ),
             child
           )
@@ -102,8 +101,8 @@ object SelectResultMapping {
       transformMatches(child).map { child =>
         Environment(
           Env(
-            SelectResultMapping.LimitKey -> limit,
-            SelectResultMapping.AliasKey -> Query.fieldAlias(child, collectionField),
+            ResultMapping.LimitKey -> limit,
+            ResultMapping.AliasKey -> Query.fieldAlias(child, collectionField),
           ),
           child
         )
@@ -113,40 +112,29 @@ object SelectResultMapping {
 
 }
 
-trait SelectResultMapping[F[_]] extends BaseMapping[F] {
+trait ResultMapping[F[_]] extends BaseMapping[F] {
 
   private object root extends RootDef {
     val bogus = col("<bogus root column>", int8)
   }
 
-  def topLevelSelectResultMapping(tpe: Type): ObjectMapping =
+  private def resultMapping(tpe: Type, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
     ObjectMapping(
       tpe = tpe,
       fieldMappings = List(
-        SqlObject("matches"),
-        CursorField("hasMore", SelectResultMapping.hasMore("matches")),
-        SqlField("<key>", root.bogus, hidden = true) // n.b. no key = true here
+        SqlObject(collectionField, joins: _*),
+        CursorField("hasMore", ResultMapping.hasMore(collectionField)),
+        SqlField("<key>", parentKeyColumn, key = (parentKeyColumn ne root.bogus), hidden = true)
       )
     )
+
+  def topLevelSelectResultMapping(tpe: Type): ObjectMapping =
+    resultMapping(tpe, "matches", root.bogus)
 
   def nestedSelectResultMapping(tpe: Type, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
-    ObjectMapping(
-      tpe = tpe,
-      fieldMappings = List(
-        SqlObject("matches", joins: _*),
-        CursorField("hasMore", SelectResultMapping.hasMore("matches")),
-        SqlField("<key>", parentKeyColumn, key = true, hidden = true)
-      )
-    )
+    resultMapping(tpe, "matches", parentKeyColumn, joins: _*)
 
   def updateResultMapping(tpe: Type, collectionField: String): ObjectMapping =
-    ObjectMapping(
-      tpe = tpe,
-      fieldMappings = List(
-        SqlObject(collectionField),
-        CursorField("hasMore", SelectResultMapping.hasMore(collectionField)),
-        SqlField("<key>", root.bogus, hidden = true) // n.b. no key = true here
-      )
-    )
+    resultMapping(tpe, collectionField, root.bogus)
 
 }

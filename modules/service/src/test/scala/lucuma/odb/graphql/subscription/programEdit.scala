@@ -224,7 +224,9 @@ class programEdit extends OdbSuite {
                   WHERE: { id: { EQ: "$id" } }
                   SET: { name: "foo2" }
                 }) {
-                  id
+                  programs {
+                    id
+                  }
                 }
               }
               """

@@ -10,7 +10,7 @@ import skunk.codec.numeric.int8
 
 import scala.tools.util.PathResolver.Environment
 
-trait TargetSelectResultMapping[F[_]] extends SelectResultMapping[F] {
+trait TargetSelectResultMapping[F[_]] extends ResultMapping[F] {
 
   lazy val TargetSelectResultMapping: ObjectMapping =
     topLevelSelectResultMapping(TargetSelectResultType)

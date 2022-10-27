@@ -105,7 +105,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(1000)(_ min _.value)
-          SelectResultMapping.selectResult("observations", child, limit) { q =>
+          ResultMapping.selectResult("observations", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(and(List(
                 OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
@@ -160,7 +160,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(1000)(_ min _.value)
-          SelectResultMapping.selectResult("programs", child, limit) { q =>           
+          ResultMapping.selectResult("programs", child, limit) { q =>           
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
@@ -211,7 +211,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(1000)(_ min _.value)
-          SelectResultMapping.selectResult("targets", child, limit) { q =>
+          ResultMapping.selectResult("targets", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
