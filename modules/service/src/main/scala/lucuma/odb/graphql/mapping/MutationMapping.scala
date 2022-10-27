@@ -205,23 +205,33 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     ).map(_.fragment)
   }
 
-    private lazy val UpdateAsterisms: MutationField =
+  private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
 
       val idSelect: Result[AppliedFragment] =
         observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
+      // Our new subquery
+      def query(oids: List[Observation.Id]): Result[Query] =
+        val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
+        ResultMapping.mutationResult(child, limit, "observations") { q =>           
+          FilterOrderByOffsetLimit(
+            pred = Some(Predicates.observation.id.in(oids)),
+            oss = Some(List(
+              OrderSelection[Observation.Id](ObservationType / "id")
+            )),
+            offset = None,
+            limit = Some(limit + 1), // Select one extra row here.
+            child = q
+          )
+        }
+
       val selectObservations: F[Result[(List[Observation.Id], Query)]] =
         idSelect.traverse { which =>
           observationService.use { svc =>
-            svc
-              .selectObservations(which)
-              .fproduct {
-                case Nil => Limit(0, child)
-                case ids => Filter(Predicates.observation.id.in(ids), child)
-              }
-          }
-        }
+            svc.selectObservations(which)            
+          } 
+        } .map(r => r.flatMap(oids => query(oids).tupleLeft(oids)))
 
       def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
         NonEmptyList.fromList(oids).traverse { os =>

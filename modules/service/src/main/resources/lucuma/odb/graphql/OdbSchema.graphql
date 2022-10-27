@@ -1711,9 +1711,7 @@ type Mutation {
   updateAsterisms(
     # Bulk update asterism
     input: UpdateAsterismsInput!
-  ): [Observation!]!
-# TODO: UpdateAsterismsResult
-#  ): UpdateAsterismsResult!
+ ): UpdateAsterismsResult!
 
   updateDatasets(
     # Parameters for editing existing datasets
