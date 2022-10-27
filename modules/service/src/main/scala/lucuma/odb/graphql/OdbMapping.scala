@@ -119,6 +119,7 @@ object OdbMapping {
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
           with TargetSelectResultMapping[F]
+          with UpdateAsterismsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UserMapping[F]
@@ -196,6 +197,7 @@ object OdbMapping {
               TargetEnvironmentMapping,
               TargetMapping,
               TargetSelectResultMapping,
+              UpdateAsterismsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
               UserMapping,
