@@ -26,27 +26,26 @@ trait MappingExtras[F[_]] extends Mapping[F] {
       
   /**
     * A dispatching `TypeMapping` that selects a different underlying mapping based on the GraphQL
-    * `Type` and field name, with an optional fallback.
+    * `Type` and field name.
     */
-    case class SwitchMapping(tpe: Type, lookup: List[(Type, String, ObjectMapping)], default: Option[ObjectMapping] = None)(
+    case class SwitchMapping(tpe: Type, lookup: List[(Type, String, ObjectMapping)])(
       using val pos: SourcePos
     ) extends TypeMapping {
 
-      def apply(ctx: Context): Option[ObjectMapping] = {
-        if ctx.tpe.underlyingObject.exists(_ =:= tpe)
-        then {
-          (ctx.typePath.lift(1), ctx.path.headOption).tupled.flatMap { (t, s) =>
-            t.underlyingObject.flatMap { tʹ =>
-              val r = lookup.collectFirst {
-                case (t2, s2, om) if t2 =:= tʹ && s2 == s =>
-                  om
+      def apply(cx: Context): Option[ObjectMapping] =
+        Option.when(cx.tpe.underlyingObject.exists(_ =:= tpe)) { // if it's our type
+          cx.path.headOption.flatMap { fieldName =>
+            cx.typePath
+              .lift(1)                // parent type
+              .getOrElse(cx.rootTpe)  // otherwise root type (Query, Mutation, Subscription)
+              .underlyingObject
+              .flatMap { parentType =>
+                lookup.collectFirst {
+                  case (tpe, `fieldName`, om) if tpe =:= parentType => om // mapping from our table
+                }
               }
-              r
-            }
           }
-        }
-        else None
-      } orElse default
+        } .flatten
 
     }
 

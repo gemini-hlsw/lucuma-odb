@@ -16,8 +16,12 @@ trait ObservationSelectResultMapping[F[_]]
   extends ObservationView[F] with ProgramTable[F] with ResultMapping[F] {
 
   lazy val ObservationSelectResultMapping: TypeMapping =
-    SwitchMapping(ObservationSelectResultType, List(
-      (ProgramType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)))
-    ), Some(topLevelSelectResultMapping(ObservationSelectResultType)))
+    SwitchMapping(
+      ObservationSelectResultType, 
+      List(
+        (QueryType, "observations", topLevelSelectResultMapping(ObservationSelectResultType)),
+        (ProgramType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId))),
+      )
+    )
     
 }
