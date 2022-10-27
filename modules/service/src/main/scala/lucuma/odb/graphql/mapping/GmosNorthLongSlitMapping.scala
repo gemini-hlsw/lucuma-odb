@@ -79,7 +79,7 @@ trait GmosNorthLongSlitMapping[F[_]]
       parseCsvBigDecimals(s).map(toWavelengthDitherJson).asJson
 
     def defaultWavelengthDithers(g: GmosNorthGrating): Json =
-      GmosLongSlitMath.defaultWavelengthDithersGN(g).map(q => toWavelengthDitherJson(q.value)).asJson
+      GmosLongSlitMath.defaultWavelengthDithersNorth(g).map(q => toWavelengthDitherJson(q.value)).asJson
 
     def toOffsetQJson(arcsec: BigDecimal): Json =
       json"""

@@ -39,7 +39,7 @@ trait ObservingModeMapping[F[_]]
         SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 
         SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitTable.Common.ObservationId)),
-//        SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitTable.ObservationId)
+        SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitTable.Common.ObservationId))
       )
     )
 
