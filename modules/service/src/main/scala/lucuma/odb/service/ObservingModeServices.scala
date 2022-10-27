@@ -47,7 +47,8 @@ object ObservingModeServices {
         input: ObservingModeInput.Create
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         List(
-          input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth)
+          input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
+          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode creation parameters were provided.")
@@ -59,7 +60,7 @@ object ObservingModeServices {
       ): (List[Observation.Id], Transaction[F]) => F[Unit] =
         mode match {
           case ObservingModeType.GmosNorthLongSlit => gmosLongSlitService.deleteNorth
-          case ObservingModeType.GmosSouthLongSlit => throw new RuntimeException("Not implemented") // TODO
+          case ObservingModeType.GmosSouthLongSlit => gmosLongSlitService.deleteSouth
         }
 
       override def updateFunction(
