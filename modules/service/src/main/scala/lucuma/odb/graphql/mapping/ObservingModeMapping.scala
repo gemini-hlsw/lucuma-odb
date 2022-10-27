@@ -27,7 +27,7 @@ import table._
 
 trait ObservingModeMapping[F[_]]
   extends ObservationView[F]
-     with GmosNorthLongSlitTable[F] { this: SkunkMapping[F] =>
+     with GmosLongSlitTable[F] { this: SkunkMapping[F] =>
 
   lazy val ObservingModeMapping: ObjectMapping =
     ObjectMapping(
@@ -38,7 +38,7 @@ trait ObservingModeMapping[F[_]]
         FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
         SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 
-        SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitTable.ObservationId)),
+        SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitTable.Common.ObservationId)),
 //        SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitTable.ObservationId)
       )
     )
