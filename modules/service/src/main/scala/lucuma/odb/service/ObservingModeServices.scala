@@ -67,7 +67,8 @@ object ObservingModeServices {
         input: ObservingModeInput.Edit
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         List(
-          input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth)
+          input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
+          input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
@@ -78,7 +79,8 @@ object ObservingModeServices {
         input: ObservingModeInput.Edit
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         List(
-          input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth))
+          input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
+          input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth))
         ).flattenOption match {
           case List(f) => f
           case Nil     => Result.failure("No observing mode edit parameters were provided.")

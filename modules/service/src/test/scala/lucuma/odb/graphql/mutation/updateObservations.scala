@@ -1253,6 +1253,152 @@ class updateObservations extends OdbSuite
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
+  test("observing mode: switch mode types") {
+
+    val update0 =
+      """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query0 =
+      """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301"
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val update1 =
+      """
+      observingMode: {
+        gmosSouthLongSlit: {
+          grating: R831_G5322
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query1 =
+      """
+      observingMode {
+        gmosSouthLongSlit {
+          grating
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosSouthLongSlit": {
+                "grating": "R831_G5322"
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query0, expected0), (update1, query1, expected1)))
+  }
+
+  test("observing mode: (fail to) switch mode types") {
+
+    val update0 =
+      """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query0 =
+      """
+      observingMode {
+        gmosNorthLongSlit {
+          grating
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": [
+          {
+            "observingMode": {
+              "gmosNorthLongSlit": {
+                "grating": "B1200_G5301"
+              }
+            }
+          }
+        ]
+      }
+    """.asRight
+
+    val update1 =
+      """
+      observingMode: {
+        gmosSouthLongSlit: {
+          grating: R831_G5322
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+        }
+      }
+    """
+
+    val query1 =
+      """
+      observingMode {
+        gmosSouthLongSlit {
+          grating
+        }
+      }
+    """
+
+    val expected1 = "A centralWavelength is required in order to create a GMOS South Long Slit observing mode.".asLeft
+
+    multiUpdateTest(pi, List((update0, query0, expected0), (update1, query1, expected1)))
+  }
+
   test("observing mode: delete existing") {
 
     val update0 = """

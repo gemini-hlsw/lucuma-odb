@@ -21,6 +21,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
@@ -171,8 +172,8 @@ object GmosLongSlitInput {
       explicitSpatialOffsets: Nullable[List[Q]]
     ) {
 
-      def toCreate: Result[Create.Common] =
-        required(centralWavelength, "centralWavelength").map { w =>
+      def toCreate(site: Site): Result[Create.Common] =
+        required(site, centralWavelength, "centralWavelength").map { w =>
           Create.Common(
             w,
             explicitXBin.toOption,
@@ -194,8 +195,14 @@ object GmosLongSlitInput {
 
     }
 
-    private def required[A](oa: Option[A], itemName: String): Result[A] =
-      Result.fromOption(oa, s"A $itemName is required in order to create a GMOS North Long Slit observing mode.")
+    private def required[A](site: Site, oa: Option[A], itemName: String): Result[A] = {
+      val siteName = site match {
+        case Site.GN => "North"
+        case Site.GS => "South"
+      }
+          
+      Result.fromOption(oa, s"A $itemName is required in order to create a GMOS ${siteName} Long Slit observing mode.")
+    }
 
     final case class North(
       grating: Option[GmosNorthGrating],
@@ -209,9 +216,9 @@ object GmosLongSlitInput {
 
       val toCreate: Result[Create.North] =
         for {
-          g <- required(grating, "grating")
-          u <- required(fpu, "fpu")
-          c <- common.toCreate
+          g <- required(Site.GN, grating, "grating")
+          u <- required(Site.GN, fpu, "fpu")
+          c <- common.toCreate(Site.GN)
         } yield Create.North(g, filter.toOption, u, c)
 
     }
@@ -264,9 +271,9 @@ object GmosLongSlitInput {
 
       val toCreate: Result[Create.South] =
         for {
-          g <- required(grating, "grating")
-          u <- required(fpu, "fpu")
-          c <- common.toCreate
+          g <- required(Site.GS, grating, "grating")
+          u <- required(Site.GS, fpu, "fpu")
+          c <- common.toCreate(Site.GS)
         } yield Create.South(g, filter.toOption, u, c)
 
     }
