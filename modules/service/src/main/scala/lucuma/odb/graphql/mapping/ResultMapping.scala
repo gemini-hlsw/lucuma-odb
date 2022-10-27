@@ -44,45 +44,7 @@ object ResultMapping {
     def mapSomeFields(query: Query)(f: PartialFunction[Query, Result[Query]]): Result[Query] = 
       self.mapFields(query)(f.applyOrElse(_, Result.apply))
 
-  /**
-   * Transform a top-level `Select(field, ..., child)` that yields a SelectResult with a specified
-   * `limit` into the proper form. The "matches" subselect's child is passed to `transform`, which
-   * is how you add filter, ordering, limit (MUST BE `limit + 1`!) and so on as if it were a
-   * top-level query without the SelectResult structure. See `TargetMapping` for instance, for an 
-   * example. Note that this will fail if there is no "matches" subquery. Supporting such queries
-   * would complicate things and isn't really necessary.
-   */
-  def selectResult(field: String, child: Query, limit: Int)(transform: Query => Query): Result[Query] = {
-
-    // Find the "matches" node under the main "targets" query and add all our filtering
-    // and whatnot down in there, wrapping with a transform that removes the last row from the
-    // final results. See an `SelectResultMapping` to see how `hasMore` works.
-    def transformMatches(q: Query): Result[Query] =
-      Query.mapSomeFields(q) {
-        case Select("matches", Nil, child) =>
-          Result(Select("matches", Nil, TransformCursor(Take(limit), transform(child))))
-      }
-
-    // If we're selecting "matches" then continue by transforming the child query, otherwise
-    // punt because there's really no point in doing such a selection.
-    if !Query.hasField(child, "matches") 
-    then Result.failure("Field `matches` must be selected.") // meh
-    else
-      transformMatches(child).map { child =>
-        Select(field, Nil,
-          Environment(
-            Env(
-              ResultMapping.LimitKey -> limit,
-              ResultMapping.AliasKey -> Query.fieldAlias(child, "matches"),
-            ),
-            child
-          )
-        )
-      }
-
-  }
-
-  def mutationResult(child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] = {
+  private def result(field: Option[String], child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] = {
 
     // Find the "matches" node under the main "targets" query and add all our filtering
     // and whatnot down in there, wrapping with a transform that removes the last row from the
@@ -99,16 +61,23 @@ object ResultMapping {
     then Result.failure(s"Field `$collectionField` must be selected.") // meh
     else
       transformMatches(child).map { child =>
-        Environment(
-          Env(
-            ResultMapping.LimitKey -> limit,
-            ResultMapping.AliasKey -> Query.fieldAlias(child, collectionField),
-          ),
-          child
-        )
+        val env = Environment(
+            Env(
+              ResultMapping.LimitKey -> limit,
+              ResultMapping.AliasKey -> Query.fieldAlias(child, collectionField),
+            ),
+            child
+          )
+        field.fold(env)(Select(_, Nil, env))
       }
 
   }
+
+  def selectResult(field: String, child: Query, limit: Int)(transform: Query => Query): Result[Query] = 
+    result(Some(field), child, limit, "matches")(transform)
+
+  def mutationResult(child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] =
+    result(None, child, limit, collectionField)(transform)
 
 }
 
