@@ -17,7 +17,6 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val linkUserResult = LinkUserResultPredicates(Path.from(LinkUserResultType))
     val observation = ObservationPredicates(Path.from(ObservationType))
     val program = ProgramPredicates(Path.from(ProgramType))
-    val programSelectResult = ProgramSelectResultPredicates(Path.from(ProgramSelectResultType))
     val programEdit = ProgramEditPredicates(Path.from(ProgramEditType))
     val proposalClass = ProposalClassPredicates(Path.from(ProposalClassType))
     val setAllocationResult = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
