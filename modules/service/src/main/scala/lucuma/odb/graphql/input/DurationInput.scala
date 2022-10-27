@@ -26,12 +26,6 @@ object DurationInput {
   val Minutes         = BigDecimalBinding.map(getMinutes)
   val Hours           = BigDecimalBinding.map(getHours)
 
-  def oneOrFail(all: Option[Duration]*): Result[Duration] =
-    all.toList.flatten match {
-      case List(w) => Result(w)
-      case _       => Result.failure("Expected exactly one of microseconds, milliarcseconds, milliseconds, seconds, minutes, or hours.")
-    }
-
   val Binding: Matcher[Duration] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -43,7 +37,13 @@ object DurationInput {
       ) =>
         (rMicroseconds, rMilliseconds, rSeconds, rMinutes, rHours).parTupled.flatMap {
           case (microseconds, milliseconds, seconds, minutes, hours) =>
-            oneOrFail(microseconds, milliseconds, seconds, minutes, hours)
+            oneOrFail(
+              microseconds -> "microseconds",
+              milliseconds -> "milliseconds",
+              seconds      -> "seconds",
+              minutes      -> "minutes",
+              hours        -> "hours"
+            )
         }
     }
 }
