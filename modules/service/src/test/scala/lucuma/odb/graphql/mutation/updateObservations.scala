@@ -948,13 +948,15 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
-          filter
-          fpu
-          centralWavelength {
-            nanometers
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+            filter
+            fpu
+            centralWavelength {
+              nanometers
+            }
           }
         }
       }
@@ -963,20 +965,22 @@ class updateObservations extends OdbSuite
     val expected =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301",
-                "filter": "G_PRIME",
-                "fpu": "LONG_SLIT_0_25",
-                "centralWavelength": {
-                  "nanometers": 234.560
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301",
+                  "filter": "G_PRIME",
+                  "fpu": "LONG_SLIT_0_25",
+                  "centralWavelength": {
+                    "nanometers": 234.560
+                  }
                 }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -996,13 +1000,15 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
-          filter
-          fpu
-          centralWavelength {
-            nanometers
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+            filter
+            fpu
+            centralWavelength {
+              nanometers
+            }
           }
         }
       }
@@ -1028,9 +1034,11 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+          }
         }
       }
     """
@@ -1038,15 +1046,17 @@ class updateObservations extends OdbSuite
     val expected0 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301"
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1061,15 +1071,17 @@ class updateObservations extends OdbSuite
     val expected1 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "R831_G5302"
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "R831_G5302"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1109,24 +1121,26 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
-          filter
-          fpu
-          centralWavelength {
-            nanometers
-          }
-          explicitXBin
-          explicitYBin
-          explicitAmpReadMode
-          explicitAmpGain
-          explicitRoi
-          explicitWavelengthDithers {
-            picometers
-          }
-          explicitSpatialOffsets {
-            arcseconds
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+            filter
+            fpu
+            centralWavelength {
+              nanometers
+            }
+            explicitXBin
+            explicitYBin
+            explicitAmpReadMode
+            explicitAmpGain
+            explicitRoi
+            explicitWavelengthDithers {
+              picometers
+            }
+            explicitSpatialOffsets {
+              arcseconds
+            }
           }
         }
       }
@@ -1135,37 +1149,39 @@ class updateObservations extends OdbSuite
     val expected0 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301",
-                "filter": "G_PRIME",
-                "fpu": "LONG_SLIT_0_25",
-                "centralWavelength": {
-                  "nanometers": 234.560
-                },
-                "explicitXBin": "FOUR",
-                "explicitYBin": "FOUR",
-                "explicitAmpReadMode": "FAST",
-                "explicitAmpGain": "HIGH",
-                "explicitRoi": "CCD2",
-                "explicitWavelengthDithers": [
-                  { "picometers": -7500 },
-                  { "picometers":  7100 },
-                  { "picometers":  7100 },
-                  { "picometers": -7500 }
-                ],
-                "explicitSpatialOffsets": [
-                  { "arcseconds": -10.000000 },
-                  { "arcseconds":  10.000000 },
-                  { "arcseconds":  10.000000 },
-                  { "arcseconds": -10.000000 }
-                ]
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301",
+                  "filter": "G_PRIME",
+                  "fpu": "LONG_SLIT_0_25",
+                  "centralWavelength": {
+                    "nanometers": 234.560
+                  },
+                  "explicitXBin": "FOUR",
+                  "explicitYBin": "FOUR",
+                  "explicitAmpReadMode": "FAST",
+                  "explicitAmpGain": "HIGH",
+                  "explicitRoi": "CCD2",
+                  "explicitWavelengthDithers": [
+                    { "picometers": -7500 },
+                    { "picometers":  7100 },
+                    { "picometers":  7100 },
+                    { "picometers": -7500 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ]
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1200,35 +1216,37 @@ class updateObservations extends OdbSuite
     val expected1 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "R831_G5302",
-                "filter": "R_PRIME",
-                "fpu": "LONG_SLIT_0_50",
-                "centralWavelength": {
-                  "nanometers": 654.321
-                },
-                "explicitXBin": "ONE",
-                "explicitYBin": "ONE",
-                "explicitAmpReadMode": "SLOW",
-                "explicitAmpGain": "LOW",
-                "explicitRoi": "TOP_SPECTRUM",
-                "explicitWavelengthDithers": [
-                  { "picometers": -10000 },
-                  { "picometers":  10000 }
-                ],
-                "explicitSpatialOffsets": [
-                  { "arcseconds": -2.000000 },
-                  { "arcseconds":  2.000000 },
-                  { "arcseconds":  2.000000 },
-                  { "arcseconds": -2.000000 }
-                ]
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "R831_G5302",
+                  "filter": "R_PRIME",
+                  "fpu": "LONG_SLIT_0_50",
+                  "centralWavelength": {
+                    "nanometers": 654.321
+                  },
+                  "explicitXBin": "ONE",
+                  "explicitYBin": "ONE",
+                  "explicitAmpReadMode": "SLOW",
+                  "explicitAmpGain": "LOW",
+                  "explicitRoi": "TOP_SPECTRUM",
+                  "explicitWavelengthDithers": [
+                    { "picometers": -10000 },
+                    { "picometers":  10000 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ]
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1251,10 +1269,12 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        mode
-        gmosNorthLongSlit {
-          grating
+      observations {
+        observingMode {
+          mode
+          gmosNorthLongSlit {
+            grating
+          }
         }
       }
     """
@@ -1262,16 +1282,18 @@ class updateObservations extends OdbSuite
     val expected0 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "mode": "GMOS_NORTH_LONG_SLIT",
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301"
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "mode": "GMOS_NORTH_LONG_SLIT",
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1282,11 +1304,13 @@ class updateObservations extends OdbSuite
     val expected1 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": null
-          }
-        ]
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": null
+            }
+          ]
+        }
       }
     """.asRight
 
