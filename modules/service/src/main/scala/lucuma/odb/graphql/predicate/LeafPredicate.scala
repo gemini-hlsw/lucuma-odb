@@ -18,6 +18,6 @@ class LeafPredicates[A](path: Path) {
     GtEql(path, Const(a))
 
   def in(as: List[A])(using Eq[A]): Predicate =
-    if (as.isEmpty) False else In(path, as) // N.B. `In` can't handle an empty list
+    In(path, as)
 
 }

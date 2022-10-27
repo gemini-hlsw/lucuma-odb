@@ -249,29 +249,27 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
+      // Our new subquery
+      def query(oids: List[Observation.Id]): Result[Query] =
+        val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
+        ResultMapping.mutationResult(child, limit, "observations") { q =>           
+          FilterOrderByOffsetLimit(
+            pred = Some(Predicates.observation.id.in(oids)),
+            oss = Some(List(
+              OrderSelection[Observation.Id](ObservationType / "id")
+            )),
+            offset = None,
+            limit = Some(limit + 1), // Select one extra row here.
+            child = q
+          )
+        }
+
       val updateObservations: F[Result[(List[Observation.Id], Query)]] =
         idSelect.flatTraverse { which =>
           observationService.use { svc =>
             svc
               .updateObservations(input.SET, which)
-              .map(_.fproduct {
-
-                // When there are no selected ids, return a Query which matches
-                // nothing (i.e., no results for the update).
-
-                // "In" Predicate is used in the normal case where there is
-                // at least one matching observation id.  But "In" requires a
-                // non-empty list (eventually) so we need to catch the Nil
-                // case.
-
-                // Produces "Unable to map query":
-                // case Nil => Filter(False, child)
-
-                // Work around using a zero limit
-                case Nil => Limit(0, child)
-
-                case ids => Filter(Predicates.observation.id.in(ids), child)
-              })
+              .map(r => r.flatMap(oids => query(oids).tupleLeft(oids)))
           }
         }
 

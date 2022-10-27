@@ -1724,9 +1724,7 @@ type Mutation {
   updateObservations(
     # Parameters for editing existing observations.
     input: UpdateObservationsInput!
-  ): [Observation!]!
-#  TODO: UpdateObservationsResult
-#  ): UpdateObservationsResult!
+  ): UpdateObservationsResult!
 
   updatePrograms(
     # Parameters for updating existing programs.
