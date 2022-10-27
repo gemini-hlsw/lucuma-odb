@@ -6,13 +6,11 @@ package lucuma.odb.graphql
 import edu.gemini.grackle.Schema
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
-import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
      with SchemaSemigroup[F]
-     with MutationCompanionOps[F]
      with MappingExtras[F] {
 
   // TODO: auto-generate this
@@ -75,6 +73,7 @@ trait BaseMapping[F[_]]
   lazy val ObservationType                     = schema.ref("Observation")
   lazy val ObservingModeType                   = schema.ref("ObservingMode")
   lazy val ObservingModeTypeType               = schema.ref("ObservingModeType")
+  lazy val ObservationSelectResultType         = schema.ref("ObservationSelectResult")
   lazy val ObsStatusType                       = schema.ref("ObsStatus")
   lazy val pType                               = schema.ref("p")
   lazy val ParallaxType                        = schema.ref("Parallax")
@@ -88,6 +87,7 @@ trait BaseMapping[F[_]]
   lazy val PosIntType                          = schema.ref("PosInt")
   lazy val ProgramEditType                     = schema.ref("ProgramEdit")
   lazy val ProgramIdType                       = schema.ref("ProgramId")
+  lazy val ProgramSelectResultType             = schema.ref("ProgramSelectResult")
   lazy val ProgramType                         = schema.ref("Program")
   lazy val ProgramUserRoleType                 = schema.ref("ProgramUserRole")
   lazy val ProperMotionDeclinationType         = schema.ref("ProperMotionDeclination")
@@ -96,6 +96,7 @@ trait BaseMapping[F[_]]
   lazy val ProposalClassType                   = schema.ref("ProposalClass")
   lazy val ProposalType                        = schema.ref("Proposal")
   lazy val qType                               = schema.ref("qType")
+  lazy val QueryType                           = schema.ref("Query")
   lazy val QueueType                           = schema.ref("Queue")
   lazy val RadialVelocityType                  = schema.ref("RadialVelocity")
   lazy val RightAscensionType                  = schema.ref("RightAscension")
@@ -110,9 +111,13 @@ trait BaseMapping[F[_]]
   lazy val TacCategoryType                     = schema.ref("TacCategory")
   lazy val TargetEnvironmentType               = schema.ref("TargetEnvironment")
   lazy val TargetIdType                        = schema.ref("TargetId")
+  lazy val TargetSelectResultType              = schema.ref("TargetSelectResult")
   lazy val TargetType                          = schema.ref("Target")
   lazy val TimestampType                       = schema.ref("Timestamp")
   lazy val ToOActivationType                   = schema.ref("ToOActivation")
+  lazy val UpdateAsterismsResultType           = schema.ref("UpdateAsterismsResult")
+  lazy val UpdateObservationsResultType        = schema.ref("UpdateObservationsResult")
+  lazy val UpdateProgramsResultType            = schema.ref("UpdateProgramsResult")
   lazy val UserIdType                          = schema.ref("UserId")
   lazy val UserTypeType                        = schema.ref("UserType")
   lazy val WaterVaporType                      = schema.ref("WaterVapor")

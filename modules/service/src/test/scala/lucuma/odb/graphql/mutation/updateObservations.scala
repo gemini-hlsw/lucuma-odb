@@ -69,15 +69,19 @@ class updateObservations extends OdbSuite
                 id: { EQ: "o-9999" }
               }
             }) {
-              constraintSet {
-                cloudExtinction
+              observations {
+                constraintSet {
+                  cloudExtinction
+                }
               }
             }
           }
         """,
         expected =json"""
           {
-            "updateObservations": [ ]
+            "updateObservations": {
+              "observations": []
+            }
           }
         """.asRight
       )
@@ -98,19 +102,23 @@ class updateObservations extends OdbSuite
         }
       """,
       query = """
-        constraintSet {
-          cloudExtinction
+        observations {
+          constraintSet {
+            cloudExtinction
+          }
         }
       """,
       expected = json"""
         {
-          "updateObservations": [
-            {
-              "constraintSet": {
-                "cloudExtinction": "ONE_POINT_ZERO"
+          "updateObservations": {
+            "observations": [
+              {
+                "constraintSet": {
+                  "cloudExtinction": "ONE_POINT_ZERO"
+                }
               }
-            }
-          ]
+            ]
+          }
         }
       """.asRight
     )
@@ -129,29 +137,33 @@ class updateObservations extends OdbSuite
         }
       """,
       query = """
-        constraintSet {
-          elevationRange {
-            airMass {
-              min
-              max
+        observations {
+          constraintSet {
+            elevationRange {
+              airMass {
+                min
+                max
+              }
             }
           }
         }
       """,
       expected = json"""
         {
-          "updateObservations": [
-            {
-              "constraintSet": {
-                "elevationRange": {
-                  "airMass": {
-                    "min": 1.10,
-                    "max": 2.00
+          "updateObservations": {
+            "observations": [
+              {
+                "constraintSet": {
+                  "elevationRange": {
+                    "airMass": {
+                      "min": 1.10,
+                      "max": 2.00
+                    }
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       """.asRight
       )
@@ -171,11 +183,13 @@ class updateObservations extends OdbSuite
         }
       """,
       query = """
-        constraintSet {
-          elevationRange {
-            airMass {
-              min
-              max
+        observations {
+          constraintSet {
+            elevationRange {
+              airMass {
+                min
+                max
+              }
             }
           }
         }
@@ -199,34 +213,38 @@ class updateObservations extends OdbSuite
         }
       """,
       query = """
-        constraintSet {
-          elevationRange {
-            airMass {
-              min
-              max
-            }
-            hourAngle {
-              minHours
-              maxHours
+        observations {
+          constraintSet {
+            elevationRange {
+              airMass {
+                min
+                max
+              }
+              hourAngle {
+                minHours
+                maxHours
+              }
             }
           }
         }
       """,
       expected = json"""
         {
-          "updateObservations": [
-            {
-              "constraintSet": {
-                "elevationRange": {
-                  "airMass": null,
-                  "hourAngle": {
-                    "minHours": -1.00,
-                    "maxHours": 1.00
+          "updateObservations": {
+            "observations": [
+              {
+                "constraintSet": {
+                  "elevationRange": {
+                    "airMass": null,
+                    "hourAngle": {
+                      "minHours": -1.00,
+                      "maxHours": 1.00
+                    }
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       """.asRight
     )
@@ -250,15 +268,17 @@ class updateObservations extends OdbSuite
         }
       """,
       query = """
-        constraintSet {
-          elevationRange {
-            airMass {
-              min
-              max
-            }
-            hourAngle {
-              minHours
-              maxHours
+        observations {
+          constraintSet {
+            elevationRange {
+              airMass {
+                min
+                max
+              }
+              hourAngle {
+                minHours
+                maxHours
+              }
             }
           }
         }
@@ -281,29 +301,33 @@ class updateObservations extends OdbSuite
         }
       """,
       query = """
-        targetEnvironment {
-          explicitBase {
-            ra { hours }
-            dec { degrees }
+        observations {
+          targetEnvironment {
+            explicitBase {
+              ra { hours }
+              dec { degrees }
+            }
           }
         }
       """,
       expected = json"""
         {
-          "updateObservations": [
-            {
-              "targetEnvironment": {
-                "explicitBase": {
-                  "ra": {
-                    "hours": 1.0
-                  },
-                  "dec": {
-                    "degrees": 2.0
+          "updateObservations": {
+            "observations": [
+              {
+                "targetEnvironment": {
+                  "explicitBase": {
+                    "ra": {
+                      "hours": 1.0
+                    },
+                    "dec": {
+                      "degrees": 2.0
+                    }
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       """.asRight
     )
@@ -320,26 +344,30 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      targetEnvironment {
-        asterism {
-          id
+      observations {
+        targetEnvironment {
+          asterism {
+            id
+          }
         }
       }
     """
 
     def expected(tid: Target.Id) = json"""
       {
-        "updateObservations": [
-          {
-            "targetEnvironment": {
-              "asterism": [
-                {
-                  "id": ${tid.show}
-                }
-              ]
+        "updateObservations": {
+          "observations": [
+            {
+              "targetEnvironment": {
+                "asterism": [
+                  {
+                    "id": ${tid.show}
+                  }
+                ]
+              }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -362,22 +390,26 @@ class updateObservations extends OdbSuite
       """
 
     val query = """
-      targetEnvironment {
-        asterism {
-          id
+      observations {
+        targetEnvironment {
+          asterism {
+            id
+          }
         }
       }
     """
 
     def expected(tids: Target.Id*) = json"""
       {
-        "updateObservations": [
-          {
-            "targetEnvironment": {
-              "asterism": ${tids.map(tid => json"""{ "id": ${tid.asJson} }""").asJson}
+        "updateObservations": {
+          "observations": [
+            {
+              "targetEnvironment": {
+                "asterism": ${tids.map(tid => json"""{ "id": ${tid.asJson} }""").asJson}
+              }
             }
+          ]
           }
-        ]
       }
     """.asRight
 
@@ -413,49 +445,55 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      targetEnvironment {
-        explicitBase {
-          ra { hours }
-          dec { degrees }
+      observations {
+        targetEnvironment {
+          explicitBase {
+            ra { hours }
+            dec { degrees }
+          }
         }
       }
     """
 
     val expected1 = json"""
       {
-        "updateObservations": [
-          {
-            "targetEnvironment": {
-              "explicitBase": {
-                "ra": {
-                  "hours": 1.0
-                },
-                "dec": {
-                  "degrees": 2.0
+        "updateObservations": {
+          "observations": [
+            {
+              "targetEnvironment": {
+                "explicitBase": {
+                  "ra": {
+                    "hours": 1.0
+                  },
+                  "dec": {
+                    "degrees": 2.0
+                  }
                 }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
     val expected2 = json"""
       {
-        "updateObservations": [
-          {
-            "targetEnvironment": {
-              "explicitBase": {
-                "ra": {
-                  "hours": 3.0
-                },
-                "dec": {
-                  "degrees": 2.0
+        "updateObservations": {
+          "observations": [
+            {
+              "targetEnvironment": {
+                "explicitBase": {
+                  "ra": {
+                    "hours": 3.0
+                  },
+                  "dec": {
+                    "degrees": 2.0
+                  }
                 }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -486,42 +524,48 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      targetEnvironment {
-        explicitBase {
-          ra { hours }
-          dec { degrees }
+      observations {
+        targetEnvironment {
+          explicitBase {
+            ra { hours }
+            dec { degrees }
+          }
         }
       }
     """
 
     val expected1 = json"""
       {
-        "updateObservations": [
-          {
-            "targetEnvironment": {
-              "explicitBase": {
-                "ra": {
-                  "hours": 1.0
-                },
-                "dec": {
-                  "degrees": 2.0
+        "updateObservations": {
+          "observations": [
+            {
+              "targetEnvironment": {
+                "explicitBase": {
+                  "ra": {
+                    "hours": 1.0
+                  },
+                  "dec": {
+                    "degrees": 2.0
+                  }
                 }
               }
             }
+          ]
           }
-        ]
       }
     """.asRight
 
     val expected2 = json"""
       {
-        "updateObservations": [
-          {
-            "targetEnvironment": {
-              "explicitBase": null
+        "updateObservations": {
+          "observations": [
+            {
+              "targetEnvironment": {
+                "explicitBase": null
+              }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -545,10 +589,12 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      targetEnvironment {
-        explicitBase {
-          ra { hours }
-          dec { degrees }
+      observations {
+        targetEnvironment {
+          explicitBase {
+            ra { hours }
+            dec { degrees }
+          }
         }
       }
     """
@@ -569,15 +615,17 @@ class updateObservations extends OdbSuite
       visualizationTime: "2022-08-30 17:18:00"
     """
 
-    val query    = "visualizationTime"
+    val query    = "observations { visualizationTime }"
 
     val expected = json"""
       {
-        "updateObservations": [
-          {
-            "visualizationTime": "2022-08-30 17:18:00"
-          }
-        ]
+        "updateObservations": {
+          "observations": [
+            {
+              "visualizationTime": "2022-08-30 17:18:00"
+            }
+          ]
+        }
       }
     """.asRight
 
@@ -590,15 +638,17 @@ class updateObservations extends OdbSuite
       visualizationTime: "2022-08-30 17:18:00"
     """
 
-    val query = "visualizationTime"
+    val query = "observations { visualizationTime }"
 
     val expected = json"""
       {
-        "updateObservations": [
-          {
-            "visualizationTime": "2022-08-30 17:18:00"
-          }
-        ]
+        "updateObservations": {
+          "observations": [
+            {
+              "visualizationTime": "2022-08-30 17:18:00"
+            }
+          ]
+        }
       }
     """.asRight
 
@@ -615,25 +665,29 @@ class updateObservations extends OdbSuite
       visualizationTime: null
     """
 
-    val query    = "visualizationTime"
+    val query    = "observations { visualizationTime }"
 
     val expected0 = json"""
       {
-        "updateObservations": [
-          {
-            "visualizationTime": "2022-08-30 17:18:00"
-          }
-        ]
+        "updateObservations": {
+          "observations": [
+            {
+              "visualizationTime": "2022-08-30 17:18:00"
+            }
+          ]
+        }
       }
     """.asRight
 
     val expected1 = json"""
       {
-        "updateObservations": [
-          {
-            "visualizationTime": null
-          }
-        ]
+        "updateObservations": {
+          "observations": [
+            {
+              "visualizationTime": null
+            }
+          ]
+        }
       }
     """.asRight
 
@@ -653,48 +707,52 @@ class updateObservations extends OdbSuite
       """,
       query =
         """
-        posAngleConstraint {
-          mode
-          angle {
-            microarcseconds
-            microseconds
-            milliarcseconds
-            milliseconds
-            arcseconds
-            seconds
-            arcminutes
-            minutes
-            degrees
-            hours
-            dms
-            hms
+        observations {
+          posAngleConstraint {
+            mode
+            angle {
+              microarcseconds
+              microseconds
+              milliarcseconds
+              milliseconds
+              arcseconds
+              seconds
+              arcminutes
+              minutes
+              degrees
+              hours
+              dms
+              hms
+            }
           }
         }
       """,
       expected =
         json"""
         {
-          "updateObservations": [
-            {
-              "posAngleConstraint": {
-                "mode": "ALLOW_FLIP",
-                "angle": {
-                  "microarcseconds": 54000000000,
-                  "microseconds": 3600000000,
-                  "milliarcseconds": 54000000,
-                  "milliseconds": 3600000,
-                  "arcseconds": 54000,
-                  "seconds": 3600,
-                  "arcminutes": 900,
-                  "minutes": 60,
-                  "degrees": 15,
-                  "hours": 1,
-                  "dms": "15:00:00.000000",
-                  "hms": "01:00:00.000000"
+          "updateObservations": {
+            "observations": [
+              {
+                "posAngleConstraint": {
+                  "mode": "ALLOW_FLIP",
+                  "angle": {
+                    "microarcseconds": 54000000000,
+                    "microseconds": 3600000000,
+                    "milliarcseconds": 54000000,
+                    "milliseconds": 3600000,
+                    "arcseconds": 54000,
+                    "seconds": 3600,
+                    "arcminutes": 900,
+                    "minutes": 60,
+                    "degrees": 15,
+                    "hours": 1,
+                    "dms": "15:00:00.000000",
+                    "hms": "01:00:00.000000"
+                  }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       """.asRight
     )
@@ -717,48 +775,52 @@ class updateObservations extends OdbSuite
     """
 
     val query: String = """
-      scienceRequirements {
-        mode
-        spectroscopy {
-          wavelength { nanometers }
-          resolution
-          signalToNoise
-          signalToNoiseAt { nanometers }
-          wavelengthCoverage { nanometers }
-          focalPlane
-          focalPlaneAngle { arcseconds }
-          capability
+      observations {
+        scienceRequirements {
+          mode
+          spectroscopy {
+            wavelength { nanometers }
+            resolution
+            signalToNoise
+            signalToNoiseAt { nanometers }
+            wavelengthCoverage { nanometers }
+            focalPlane
+            focalPlaneAngle { arcseconds }
+            capability
+          }
         }
       }
     """
 
     val expected: Json = json"""
       {
-        "updateObservations": [
-          {
-            "scienceRequirements": {
-              "mode": "SPECTROSCOPY",
-              "spectroscopy": {
-                "wavelength": {
-                  "nanometers": 400.000
-                },
-                "resolution": 10,
-                "signalToNoise": 75.00,
-                "signalToNoiseAt": {
-                  "nanometers": 410.000
-                },
-                "wavelengthCoverage": {
-                  "nanometers": 0.010
-                },
-                "focalPlane": "SINGLE_SLIT",
-                "focalPlaneAngle": {
-                  "arcseconds": 5
-                },
-                "capability": "NOD_AND_SHUFFLE"
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "SPECTROSCOPY",
+                "spectroscopy": {
+                  "wavelength": {
+                    "nanometers": 400.000
+                  },
+                  "resolution": 10,
+                  "signalToNoise": 75.00,
+                  "signalToNoiseAt": {
+                    "nanometers": 410.000
+                  },
+                  "wavelengthCoverage": {
+                    "nanometers": 0.010
+                  },
+                  "focalPlane": "SINGLE_SLIT",
+                  "focalPlaneAngle": {
+                    "arcseconds": 5
+                  },
+                  "capability": "NOD_AND_SHUFFLE"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """
 
@@ -790,23 +852,27 @@ class updateObservations extends OdbSuite
           }
         """,
         query = """
-          scienceRequirements {
-            spectroscopy {
-              focalPlane
+          observations {
+            scienceRequirements {
+              spectroscopy {
+                focalPlane
+              }
             }
           }
         """,
         expected = json"""
           {
-            "updateObservations": [
-              {
-                "scienceRequirements": {
-                  "spectroscopy": {
-                    "focalPlane": null
+            "updateObservations": {
+              "observations": [
+                {
+                  "scienceRequirements": {
+                    "spectroscopy": {
+                      "focalPlane": null
+                    }
                   }
                 }
-              }
-            ]
+              ]
+            }
           }
         """.asRight
       )
@@ -815,7 +881,7 @@ class updateObservations extends OdbSuite
 
   /*
 
-  [ERROR] lucuma-odb-test - Error computing GraphQL response.
+  [ERROR] lucuma-odb-test - Error computing GraphQL respon.ignorese.
   java.lang.AssertionError: assertion failed
     at get @ skunk.util.Pool$.free$1(Pool.scala:148)
     at get @ skunk.util.Pool$.free$1(Pool.scala:148)
@@ -825,7 +891,7 @@ class updateObservations extends OdbSuite
     at unsafeRunSync @ munit.CatsEffectFixturesPlatform$$anon$1.beforeAll(CatsEffectFixturesPlatform.scala:41)
     at *> @ skunk.net.SSLNegotiation$.negotiateSSL(SSLNegotiation.scala:49)
 
-  test("delete science requirements spectroscopy wavelength") {
+  test("delete science requirements spectroscopy wavelength".ignore) {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -882,13 +948,15 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
-          filter
-          fpu
-          centralWavelength {
-            nanometers
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+            filter
+            fpu
+            centralWavelength {
+              nanometers
+            }
           }
         }
       }
@@ -897,20 +965,22 @@ class updateObservations extends OdbSuite
     val expected =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301",
-                "filter": "G_PRIME",
-                "fpu": "LONG_SLIT_0_25",
-                "centralWavelength": {
-                  "nanometers": 234.560
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301",
+                  "filter": "G_PRIME",
+                  "fpu": "LONG_SLIT_0_25",
+                  "centralWavelength": {
+                    "nanometers": 234.560
+                  }
                 }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -930,13 +1000,15 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
-          filter
-          fpu
-          centralWavelength {
-            nanometers
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+            filter
+            fpu
+            centralWavelength {
+              nanometers
+            }
           }
         }
       }
@@ -962,9 +1034,11 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+          }
         }
       }
     """
@@ -972,15 +1046,17 @@ class updateObservations extends OdbSuite
     val expected0 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301"
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -995,15 +1071,17 @@ class updateObservations extends OdbSuite
     val expected1 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "R831_G5302"
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "R831_G5302"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1043,24 +1121,26 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        gmosNorthLongSlit {
-          grating
-          filter
-          fpu
-          centralWavelength {
-            nanometers
-          }
-          explicitXBin
-          explicitYBin
-          explicitAmpReadMode
-          explicitAmpGain
-          explicitRoi
-          explicitWavelengthDithers {
-            picometers
-          }
-          explicitSpatialOffsets {
-            arcseconds
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+            filter
+            fpu
+            centralWavelength {
+              nanometers
+            }
+            explicitXBin
+            explicitYBin
+            explicitAmpReadMode
+            explicitAmpGain
+            explicitRoi
+            explicitWavelengthDithers {
+              picometers
+            }
+            explicitSpatialOffsets {
+              arcseconds
+            }
           }
         }
       }
@@ -1069,37 +1149,39 @@ class updateObservations extends OdbSuite
     val expected0 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301",
-                "filter": "G_PRIME",
-                "fpu": "LONG_SLIT_0_25",
-                "centralWavelength": {
-                  "nanometers": 234.560
-                },
-                "explicitXBin": "FOUR",
-                "explicitYBin": "FOUR",
-                "explicitAmpReadMode": "FAST",
-                "explicitAmpGain": "HIGH",
-                "explicitRoi": "CCD2",
-                "explicitWavelengthDithers": [
-                  { "picometers": -7500 },
-                  { "picometers":  7100 },
-                  { "picometers":  7100 },
-                  { "picometers": -7500 }
-                ],
-                "explicitSpatialOffsets": [
-                  { "arcseconds": -10.000000 },
-                  { "arcseconds":  10.000000 },
-                  { "arcseconds":  10.000000 },
-                  { "arcseconds": -10.000000 }
-                ]
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301",
+                  "filter": "G_PRIME",
+                  "fpu": "LONG_SLIT_0_25",
+                  "centralWavelength": {
+                    "nanometers": 234.560
+                  },
+                  "explicitXBin": "FOUR",
+                  "explicitYBin": "FOUR",
+                  "explicitAmpReadMode": "FAST",
+                  "explicitAmpGain": "HIGH",
+                  "explicitRoi": "CCD2",
+                  "explicitWavelengthDithers": [
+                    { "picometers": -7500 },
+                    { "picometers":  7100 },
+                    { "picometers":  7100 },
+                    { "picometers": -7500 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ]
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1134,35 +1216,37 @@ class updateObservations extends OdbSuite
     val expected1 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "gmosNorthLongSlit": {
-                "grating": "R831_G5302",
-                "filter": "R_PRIME",
-                "fpu": "LONG_SLIT_0_50",
-                "centralWavelength": {
-                  "nanometers": 654.321
-                },
-                "explicitXBin": "ONE",
-                "explicitYBin": "ONE",
-                "explicitAmpReadMode": "SLOW",
-                "explicitAmpGain": "LOW",
-                "explicitRoi": "TOP_SPECTRUM",
-                "explicitWavelengthDithers": [
-                  { "picometers": -10000 },
-                  { "picometers":  10000 }
-                ],
-                "explicitSpatialOffsets": [
-                  { "arcseconds": -2.000000 },
-                  { "arcseconds":  2.000000 },
-                  { "arcseconds":  2.000000 },
-                  { "arcseconds": -2.000000 }
-                ]
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "R831_G5302",
+                  "filter": "R_PRIME",
+                  "fpu": "LONG_SLIT_0_50",
+                  "centralWavelength": {
+                    "nanometers": 654.321
+                  },
+                  "explicitXBin": "ONE",
+                  "explicitYBin": "ONE",
+                  "explicitAmpReadMode": "SLOW",
+                  "explicitAmpGain": "LOW",
+                  "explicitRoi": "TOP_SPECTRUM",
+                  "explicitWavelengthDithers": [
+                    { "picometers": -10000 },
+                    { "picometers":  10000 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ]
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1185,10 +1269,12 @@ class updateObservations extends OdbSuite
     """
 
     val query = """
-      observingMode {
-        mode
-        gmosNorthLongSlit {
-          grating
+      observations {
+        observingMode {
+          mode
+          gmosNorthLongSlit {
+            grating
+          }
         }
       }
     """
@@ -1196,16 +1282,18 @@ class updateObservations extends OdbSuite
     val expected0 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": {
-              "mode": "GMOS_NORTH_LONG_SLIT",
-              "gmosNorthLongSlit": {
-                "grating": "B1200_G5301"
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "mode": "GMOS_NORTH_LONG_SLIT",
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     """.asRight
 
@@ -1216,11 +1304,13 @@ class updateObservations extends OdbSuite
     val expected1 =
       json"""
       {
-        "updateObservations": [
-          {
-            "observingMode": null
-          }
-        ]
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": null
+            }
+          ]
+        }
       }
     """.asRight
 

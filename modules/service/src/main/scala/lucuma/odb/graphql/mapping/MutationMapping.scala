@@ -6,10 +6,12 @@ package mapping
 
 import cats.Applicative
 import cats.data.Ior
+import cats.data.Nested
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
+import cats.kernel.Order
 import cats.syntax.all.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
@@ -19,8 +21,10 @@ import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -37,7 +41,6 @@ import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.util.MutationCompanionOps
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
@@ -50,7 +53,7 @@ import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
 
-trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
+trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
@@ -81,17 +84,57 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
     def Elaborator: PartialFunction[Select, Result[Query]]
-    def FieldMapping: SqlRoot
+    def FieldMapping: RootEffect
   }
   private object MutationField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
       new MutationField {
-        val FieldMapping = SqlRoot(fieldName, mutation = Mutation.simple((child, env) => env.getR[I]("input").flatTraverse(f(_, child))))
+        val FieldMapping =
+          RootEffect.computeQuery(fieldName) { (query, tpe, env) =>
+            query match {
+              case Environment(x, Select(y, z, child)) =>
+                Nested(env.getR[I]("input").flatTraverse(i => f(i, child)))
+                  .map(q => Environment(x, Select(y, z, q)))
+                  .value
+              case _ =>
+                Result.failure(s"Unexpected: $query").pure[F]
+            }
+          }
         val Elaborator =
           case Select(`fieldName`, List(inputBinding("input", rInput)), child) =>
             rInput.map(input => Environment(Env("input" -> input), Select(fieldName, Nil, child)))
       }
   }
+
+  def mutationResultSubquery[A: Order](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
+    val limitʹ = limit.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+    ResultMapping.mutationResult(child, limitʹ, collectionField) { q =>           
+      FilterOrderByOffsetLimit(
+        pred = Some(predicate),
+        oss = Some(List(order)),
+        offset = None,
+        limit = Some(limitʹ + 1), // Select one extra row here.
+        child = q
+      )
+    }
+
+  def observationResultSubquery(oids: List[Observation.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = Predicates.observation.id.in(oids),
+      order = OrderSelection[Observation.Id](ObservationType / "id"),
+      limit = limit,
+      collectionField = "observations",
+      child          
+    )
+
+  def programResultSubquery(pids: List[Program.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = Predicates.program.id.in(pids),
+      order = OrderSelection[Program.Id](ProgramType / "id"),
+      limit = limit,
+      collectionField = "programs",
+      child          
+    )
 
   // Field definitions
 
@@ -189,17 +232,13 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
         WHERE.getOrElse(True)
       ))
-
-    Result.fromOption(
-      MappedQuery(
-        Filter(whereObservation, Select("id", Nil, Query.Empty)),
-        Cursor.Context(ObservationType)
-      ).map(_.fragment),
-      "Could not construct a subquery for the provided WHERE condition."
-    )
+    MappedQuery(
+      Filter(whereObservation, Select("id", Nil, Query.Empty)),
+      Cursor.Context(QueryType, List("observations"), List("observations"), List(ObservationType))
+    ).map(_.fragment)
   }
 
-    private lazy val UpdateAsterisms: MutationField =
+  private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
 
       val idSelect: Result[AppliedFragment] =
@@ -208,12 +247,12 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
       val selectObservations: F[Result[(List[Observation.Id], Query)]] =
         idSelect.traverse { which =>
           observationService.use { svc =>
-            svc
-              .selectObservations(which)
-              .fproduct {
-                case Nil => Limit(0, child)
-                case ids => Filter(Predicates.observation.id.in(ids), child)
-              }
+            svc.selectObservations(which)            
+          } 
+        } map { r => 
+          r.flatMap { oids => 
+            observationResultSubquery(oids, input.LIMIT, child)
+              .tupleLeft(oids)
           }
         }
 
@@ -248,24 +287,12 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
           observationService.use { svc =>
             svc
               .updateObservations(input.SET, which)
-              .map(_.fproduct {
-
-                // When there are no selected ids, return a Query which matches
-                // nothing (i.e., no results for the update).
-
-                // "In" Predicate is used in the normal case where there is
-                // at least one matching observation id.  But "In" requires a
-                // non-empty list (eventually) so we need to catch the Nil
-                // case.
-
-                // Produces "Unable to map query":
-                // case Nil => Filter(False, child)
-
-                // Work around using a zero limit
-                case Nil => Limit(0, child)
-
-                case ids => Filter(Predicates.observation.id.in(ids), child)
-              })
+              .map { r => 
+                r.flatMap { oids => 
+                  observationResultSubquery(oids, input.LIMIT, child)
+                    .tupleLeft(oids)
+                }
+              }
           }
         }
 
@@ -299,21 +326,11 @@ trait MutationMapping[F[_]: MonadCancelThrow] extends Predicates[F] {
 
       // An applied fragment that selects all program ids that satisfy `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        Result.fromOption(
-          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(ProgramType)).map(_.fragment),
-          "Could not construct a subquery for the provided WHERE condition." // shouldn't happen
-        )
-
-      // We want to order the returned programs by id
-      def orderByPid(child: Query) =
-        OrderBy(OrderSelections(List(OrderSelection[Program.Id](ProgramType / "id"))), child)
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
 
       // Update the specified programs and then return a query for the affected programs.
       idSelect.flatTraverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).map {
-          case Nil  => Result(orderByPid(Limit(0, child)))
-          case pids => Result(orderByPid(Filter(Predicates.program.id.in(pids), child)))
-        } recover {
+        programService.use(_.updatePrograms(input.SET, which)).map(programResultSubquery(_, input.LIMIT, child)).recover {
           case ProposalService.ProposalUpdateException.CreationFailed =>
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
           case ProposalService.ProposalUpdateException.InconsistentUpdate =>

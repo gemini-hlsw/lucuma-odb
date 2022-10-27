@@ -90,18 +90,64 @@ class targets extends OdbSuite {
                   }
                 }
               ) {
-                id
+                hasMore
+                matches {
+                  id
+                }
               }
             }
           """,
           expected =
             Right(Json.obj(
-              "targets" -> Json.fromValues {
-                tids.map { id =>
-                  Json.obj("id" -> id.asJson)
+              "targets" -> Json.obj(
+                "hasMore" -> Json.False,
+                "matches" -> Json.fromValues(
+                    tids.map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )              
+        )
+      }
+    }
+  }
+
+  test("simple target selection with limit (more)") {
+    createProgram(pi).flatMap { pid =>
+      createTarget(pi, pid).replicateA(5).flatMap { tids =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: {
+                  programId: {
+                    EQ: ${pid.asJson}
+                  }
+                }
+                LIMIT: 3
+              ) {
+                hasMore
+                matches {
+                  id
                 }
               }
-            ))
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "targets" -> Json.obj(
+                "hasMore" -> Json.True,
+                "matches" -> Json.fromValues(
+                    tids.take(3).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )              
         )
       }
     }
@@ -123,18 +169,25 @@ class targets extends OdbSuite {
                 OFFSET: ${tids(3).asJson}
                 LIMIT: 3
               ) {
-                id
+                hasMore
+                matches {
+                  id
+                }
               }
             }
           """,
           expected =
             Right(Json.obj(
-              "targets" -> Json.fromValues {
-                tids.drop(3).take(3).map { id =>
-                  Json.obj("id" -> id.asJson)
-                }
-              }
-            ))
+              "targets" -> Json.obj(
+                "hasMore" -> Json.True,
+                "matches" -> Json.fromValues(
+                    tids.drop(3).take(3).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )
         )
       }
     }
@@ -157,17 +210,21 @@ class targets extends OdbSuite {
                   }
                 }
               ) {
-                id
+                matches {
+                  id
+                }
               }
             }
           """,
           expected =
             Right(Json.obj(
-              "targets" -> Json.fromValues {
-                tids.filterNot(_ === tids(3)).map { id =>
-                  Json.obj("id" -> id.asJson)
+              "targets" -> Json.obj(
+                "matches" -> Json.fromValues {
+                  tids.filterNot(_ === tids(3)).map { id =>
+                    Json.obj("id" -> id.asJson)
+                  }
                 }
-              }
+              )
             ))
         )
       }

@@ -174,11 +174,14 @@ class programEdit extends OdbSuite {
     import Group2._
     subscription(
       user = service,
-      query =
+      query = // N.B. if we don't select something from the value we'll hit a problem
         """
           subscription {
             programEdit {
               id
+              value {
+                id
+              }
             }
           }
         """,
@@ -221,7 +224,9 @@ class programEdit extends OdbSuite {
                   WHERE: { id: { EQ: "$id" } }
                   SET: { name: "foo2" }
                 }) {
-                  id
+                  programs {
+                    id
+                  }
                 }
               }
               """
