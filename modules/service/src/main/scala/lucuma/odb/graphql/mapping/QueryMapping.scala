@@ -104,7 +104,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-          val limit = LIMIT.foldLeft(1000)(_ min _.value)
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
           ResultMapping.selectResult("observations", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(and(List(
@@ -159,7 +159,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-          val limit = LIMIT.foldLeft(1000)(_ min _.value)
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
           ResultMapping.selectResult("programs", child, limit) { q =>           
             FilterOrderByOffsetLimit(
               pred = Some(
@@ -210,7 +210,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-          val limit = LIMIT.foldLeft(1000)(_ min _.value)
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
           ResultMapping.selectResult("targets", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(

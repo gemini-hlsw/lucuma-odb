@@ -107,7 +107,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   }
 
   def mutationResultSubquery[A: Order](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
-    val limitʹ = limit.foldLeft(1000)(_ min _.value)
+    val limitʹ = limit.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
     ResultMapping.mutationResult(child, limitʹ, collectionField) { q =>           
       FilterOrderByOffsetLimit(
         pred = Some(predicate),
@@ -127,9 +127,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       child          
     )
 
-  def programResultSubquery(oids: List[Program.Id], limit: Option[NonNegInt], child: Query) =
+  def programResultSubquery(pids: List[Program.Id], limit: Option[NonNegInt], child: Query) =
     mutationResultSubquery(
-      predicate = Predicates.program.id.in(oids),
+      predicate = Predicates.program.id.in(pids),
       order = OrderSelection[Program.Id](ProgramType / "id"),
       limit = limit,
       collectionField = "programs",

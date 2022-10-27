@@ -61,7 +61,7 @@ trait ProgramMapping[F[_]]
           NonNegIntBinding.Option("LIMIT", rLIMIT),
         ), child) =>
           (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
-            val limit = lim.fold(1000)(_.value)
+            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
             ResultMapping.selectResult("observations", child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
