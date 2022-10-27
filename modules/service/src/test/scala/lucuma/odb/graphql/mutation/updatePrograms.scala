@@ -44,7 +44,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
               }
             ) {
               hasMore
-              matches {
+              programs {
                 id
                 name
               }
@@ -56,7 +56,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           {
             "updatePrograms": {
               "hasMore": false,
-              "matches": [
+              "programs": [
                 {
                   "id": $pid,
                   "name": "new name"
@@ -89,7 +89,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 includeDeleted: true
               }
             ) {
-              matches {
+              programs {
                 id
                 existence
               }
@@ -100,7 +100,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           json"""
           {
             "updatePrograms": {
-              "matches": [
+              "programs": [
                 {
                   "id": $pid,
                   "existence": ${Existence.Deleted:Existence}
@@ -135,7 +135,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   title
@@ -183,7 +183,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   title
@@ -207,7 +207,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid,
                     "proposal" : {
@@ -266,7 +266,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
               }
             }
@@ -276,7 +276,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid
                   }
@@ -316,7 +316,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   title
@@ -335,7 +335,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid,
                     "proposal" : {
@@ -396,7 +396,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
               }
             }
@@ -406,7 +406,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid
                   }
@@ -438,7 +438,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   proposalClass {
@@ -455,7 +455,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid,
                     "proposal" : {
@@ -506,7 +506,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
               }
             }
@@ -516,7 +516,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid
                   }
@@ -548,7 +548,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   proposalClass {
@@ -602,7 +602,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
               }
             }
@@ -612,7 +612,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           Right(json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid
                   }
@@ -648,7 +648,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   proposalClass {
@@ -670,7 +670,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid,
                     "proposal" : {
@@ -714,7 +714,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 name
               }
@@ -725,7 +725,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : ${pids(0)},
                     "name" : "updated"
@@ -780,7 +780,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
               }
             }
@@ -790,7 +790,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid1
                   }
@@ -830,7 +830,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                 }
               }
             ) {
-              matches {
+              programs {
                 id
                 proposal {
                   proposalClass {
@@ -851,7 +851,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
           json"""
             {
               "updatePrograms" : {
-                "matches": [
+                "programs": [
                   {
                     "id" : $pid1,
                     "proposal" : {

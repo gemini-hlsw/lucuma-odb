@@ -115,6 +115,7 @@ trait BaseMapping[F[_]]
   lazy val TargetType                          = schema.ref("Target")
   lazy val TimestampType                       = schema.ref("Timestamp")
   lazy val ToOActivationType                   = schema.ref("ToOActivation")
+  lazy val UpdateProgramsResultType            = schema.ref("UpdateProgramsResult")
   lazy val UserIdType                          = schema.ref("UserId")
   lazy val UserTypeType                        = schema.ref("UserType")
   lazy val WaterVaporType                      = schema.ref("WaterVapor")

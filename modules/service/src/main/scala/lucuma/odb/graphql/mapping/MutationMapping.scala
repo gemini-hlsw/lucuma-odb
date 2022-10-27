@@ -295,7 +295,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdatePrograms =
     MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
-      import input.*
 
       // Our predicate for selecting programs to update
       val filterPredicate = and(List(
@@ -309,15 +308,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
 
       def query(pids: List[Program.Id]): Result[Query] =
-        val limit = LIMIT.foldLeft(1000)(_ min _.value)
-        SelectResultMapping.mutationResult(child, limit) { q =>           
+        val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
+        SelectResultMapping.mutationResult(child, limit, "programs") { q =>           
           FilterOrderByOffsetLimit(
-            pred = Some(Predicates.program.id.in(pids)).filter(_ => pids.nonEmpty),
+            pred = Some(Predicates.program.id.in(pids)),
             oss = Some(List(
               OrderSelection[Program.Id](ProgramType / "id")
             )),
             offset = None,
-            limit = Some(if (pids.isEmpty) then 0 else limit + 1), // Select one extra row here.
+            limit = Some(limit + 1), // Select one extra row here.
             child = q
           )
         }
