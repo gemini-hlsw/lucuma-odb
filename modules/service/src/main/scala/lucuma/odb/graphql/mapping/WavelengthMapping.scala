@@ -43,8 +43,10 @@ trait WavelengthMapping[F[_]]
     PrefixedMapping(
       tpe = WavelengthType,
       mappings = List(
-        List("centralWavelength")        -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.CentralWavelength),
-        List("initialCentralWavelength") -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.InitialCentralWavelength),
+        List("gmosNorthLongSlit", "centralWavelength")        -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.CentralWavelength),
+        List("gmosNorthLongSlit", "initialCentralWavelength") -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.InitialCentralWavelength),
+        List("gmosSouthLongSlit", "centralWavelength")        -> wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.CentralWavelength),
+        List("gmosSouthLongSlit", "initialCentralWavelength") -> wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.InitialCentralWavelength),
         List("wavelength")               -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.Wavelength),
         List("signalToNoiseAt")          -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.SignalToNoiseAt),
         List("wavelengthCoverage")       -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.WavelengthCoverage)
