@@ -18,6 +18,9 @@ import skunk.codec.numeric.int8
 
 object ResultMapping {
 
+  /** Maximum (and default) page limit. */
+  val MaxLimit = 1000
+
   // keys for things we expect to find in the environment
   val LimitKey = "resultLimit"
   val AliasKey = "resultAlias"
