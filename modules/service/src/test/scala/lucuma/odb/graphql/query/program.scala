@@ -6,7 +6,10 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.circe.literal._
+import io.circe.syntax._
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
@@ -34,6 +37,24 @@ class program extends OdbSuite {
         """
     ) map { json =>
       json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
+    }
+
+  def createObservation(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                id
+              }
+            }
+          }        """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
   test("any user can read their own programs") {
@@ -168,5 +189,76 @@ class program extends OdbSuite {
     }
   }
 
+  test("program / observations (simple)") {
+    createProgram(pi, "program with some observations").flatMap { pid =>
+      createObservation(pi, pid).replicateA(3).flatMap { oids =>
+        expect(
+          user = pi,
+          query = 
+             s"""
+              query {
+                program(programId: "$pid") {
+                  id
+                  observations() {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            Right(
+              json"""
+                {
+                  "program": {
+                    "id": $pid,
+                    "observations" : {
+                      "matches": ${oids.map{id => Json.obj("id" -> id.asJson)}}
+                    }
+                  }
+                }
+              """
+            )
+        )      
+      }
+    }
+  }
+
+  test("program / observations (with limit)") {
+    createProgram(pi, "program with some observations").flatMap { pid =>
+      createObservation(pi, pid).replicateA(3).flatMap { oids =>
+        expect(
+          user = pi,
+          query = 
+             s"""
+              query {
+                program(programId: "$pid") {
+                  id
+                  observations(LIMIT: 2) {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected =
+            Right(
+              json"""
+                {
+                  "program": {
+                    "id": $pid,
+                    "observations" : {
+                      "matches": ${oids.take(2).map{id => Json.obj("id" -> id.asJson)}}
+                    }
+                  }
+                }
+              """
+            )
+        )      
+      }
+    }
+  }
 
 }

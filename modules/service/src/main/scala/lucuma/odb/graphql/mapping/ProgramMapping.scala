@@ -31,7 +31,8 @@ trait ProgramMapping[F[_]]
      with ProgramUserTable[F]
      with ProposalTable[F]
      with ObservationView[F]
-     with Predicates[F] {
+     with Predicates[F]
+     with ResultMapping[F] {
 
   def user: User
 
@@ -46,7 +47,7 @@ trait ProgramMapping[F[_]]
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
         SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
         SqlObject("plannedTime"),
-        SqlObject("observations", Join(ProgramTable.Id, ObservationView.ProgramId)),
+        SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
       ),
     )
@@ -59,15 +60,20 @@ trait ProgramMapping[F[_]]
           ObservationIdBinding.Option("OFFSET", rOFFSET),
           NonNegIntBinding.Option("LIMIT", rLIMIT),
         ), child) =>
-          (rIncludeDeleted, rOFFSET, rLIMIT).parMapN { (includeDeleted, OFFSET, _) =>
-            Select("observations", Nil,
-              Filter(and(List(
-                Predicates.observation.existence.includeDeleted(includeDeleted),
-                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
-              )),
-              child
+          (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
+            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+            ResultMapping.selectResult("observations", child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  Predicates.observation.existence.includeDeleted(includeDeleted),
+                  OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+                ))),
+                oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
+                offset = None,
+                limit = Some(limit + 1),  
+                q
               )
-            )
+            }              
           }
       }
     )

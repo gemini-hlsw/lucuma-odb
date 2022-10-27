@@ -1711,9 +1711,7 @@ type Mutation {
   updateAsterisms(
     # Bulk update asterism
     input: UpdateAsterismsInput!
-  ): [Observation!]!
-# TODO: UpdateAsterismsResult
-#  ): UpdateAsterismsResult!
+ ): UpdateAsterismsResult!
 
   updateDatasets(
     # Parameters for editing existing datasets
@@ -1724,14 +1722,12 @@ type Mutation {
   updateObservations(
     # Parameters for editing existing observations.
     input: UpdateObservationsInput!
-  ): [Observation!]!
-#  TODO: UpdateObservationsResult
-#  ): UpdateObservationsResult!
+  ): UpdateObservationsResult!
 
   updatePrograms(
     # Parameters for updating existing programs.
     input: UpdateProgramsInput!
-  ): [Program!]! #TODO: UpdateProgramsResult!
+  ): UpdateProgramsResult!
 
   # Updates existing targets
   updateTargets(
@@ -4500,7 +4496,7 @@ type Program {
 
     # Limits the result to at most this number of matches (but never more than 1000).
     LIMIT: NonNegInt
-  ): [Observation!]! # ObservationSelectResult!
+  ): ObservationSelectResult!
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
@@ -4708,8 +4704,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): [Observation!]!
-   #ObservationSelectResult!
+  ): ObservationSelectResult!
 
   # Metadata for `enum Partner`
   partnerMeta: [PartnerMeta!]!
@@ -4733,7 +4728,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): [Program!]! #ProgramSelectResult!
+  ): ProgramSelectResult!
 
   # Observations grouped by commonly held science mode
   observingModeGroup(
@@ -4820,7 +4815,7 @@ type Query {
 
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
-  ): [Target!]! #TargetSelectResult!
+  ): TargetSelectResult!
 }
 
 # Queue observing at Gemini

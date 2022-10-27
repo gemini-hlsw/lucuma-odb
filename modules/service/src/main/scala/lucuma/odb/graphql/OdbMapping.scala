@@ -93,6 +93,7 @@ object OdbMapping {
           with NonsiderealMapping[F]
           with ObservationMapping[F]
           with ObservingModeMapping[F]
+          with ObservationSelectResultMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
@@ -100,6 +101,7 @@ object OdbMapping {
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
+          with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
@@ -116,6 +118,10 @@ object OdbMapping {
           with SubscriptionMapping[F]
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
+          with TargetSelectResultMapping[F]
+          with UpdateAsterismsResultMapping[F]
+          with UpdateObservationsResultMapping[F]
+          with UpdateProgramsResultMapping[F]
           with UserMapping[F]
           with WavelengthMapping[F]
         {
@@ -166,6 +172,7 @@ object OdbMapping {
               NonsiderealMapping,
               ObservationMapping,
               ObservingModeMapping,
+              ObservationSelectResultMapping,
               ParallaxMapping,
               PartnerMetaMapping,
               PartnerSplitMapping,
@@ -173,6 +180,7 @@ object OdbMapping {
               PosAngleConstraintMapping,
               ProgramMapping,
               ProgramEditMapping,
+              ProgramSelectResultMapping,
               ProgramUserMapping,
               ProperMotionDeclinationMapping,
               ProperMotionMapping,
@@ -188,6 +196,10 @@ object OdbMapping {
               SubscriptionMapping,
               TargetEnvironmentMapping,
               TargetMapping,
+              TargetSelectResultMapping,
+              UpdateAsterismsResultMapping,
+              UpdateObservationsResultMapping,
+              UpdateProgramsResultMapping,
               UserMapping,
               WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings

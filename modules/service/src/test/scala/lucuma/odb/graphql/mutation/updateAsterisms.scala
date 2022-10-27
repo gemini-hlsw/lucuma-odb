@@ -163,10 +163,12 @@ trait UpdateAsterismOps { this: OdbSuite =>
               id: { IN: [ ${oids.map(_.show).mkString("\"", "\",\"", "\"")} ] }
             }
           }) {
-            id
-            targetEnvironment {
-              asterism {
-                id
+            observations {
+              id
+              targetEnvironment {
+                asterism {
+                  id
+                }
               }
             }
           }
@@ -175,24 +177,26 @@ trait UpdateAsterismOps { this: OdbSuite =>
       expected =
         json"""
         {
-          "updateAsterisms":
-            ${exp.map { case (oid, ts) =>
-              json"""
-                {
-                   "id": ${oid.asJson},
-                   "targetEnvironment": {
-                     "asterism":
-                       ${ts.map { tid =>
-                         json"""
-                           {
-                             "id": ${tid.asJson}
-                           }
-                         """
-                       }}
-                   }
-                }
-              """
+          "updateAsterisms": {
+            "observations": 
+              ${exp.map { case (oid, ts) =>
+                json"""
+                  {
+                    "id": ${oid.asJson},
+                    "targetEnvironment": {
+                      "asterism":
+                        ${ts.map { tid =>
+                          json"""
+                            {
+                              "id": ${tid.asJson}
+                            }
+                          """
+                        }}
+                    }
+                  }
+                """
             }}
+          }
         }
       """.asRight
     )
