@@ -42,12 +42,6 @@ object WavelengthDitherInput {
   val Micrometers: Matcher[Quantity[Int, Picometer]] =
     matchToPm("micrometer", scale=6)
 
-  def oneOrFail(all: Option[Quantity[Int, Picometer]]*): Result[Quantity[Int, Picometer]] =
-    all.toList.flatten match {
-      case List(w) => Result(w)
-      case _        => Result.failure("Expected exactly one of picometers, angstroms, nanometers, or micrometers.")
-    }
-
   val Binding: Matcher[Quantity[Int, Picometer]] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -58,7 +52,12 @@ object WavelengthDitherInput {
       ) =>
         (rPicometers, rAngstroms, rNanometers, rMicrometers).parTupled.flatMap {
           case (picometers, angstroms, nanometers, micrometers) =>
-            oneOrFail(picometers, angstroms, nanometers, micrometers)
+            oneOrFail(
+              picometers  -> "picometers",
+              angstroms   -> "angstroms",
+              nanometers  -> "nanometers",
+              micrometers -> "micrometers"
+            )
         }
     }
 

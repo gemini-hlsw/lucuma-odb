@@ -43,8 +43,10 @@ object ObservingModeInput {
       ) =>
         (rGmosNorthLongSlit, rGmosSouthLongSlit).parTupled.flatMap {
           case (gmosNorthLongSlit, gmosSouthLongSlit) =>
-            oneOrFail((gmosNorthLongSlit, "gmosNorthLongSlit"), (gmosSouthLongSlit, "gmosSouthLongSlit"))
-              .as(Create(gmosNorthLongSlit, gmosSouthLongSlit))
+            oneOrFail(
+              gmosNorthLongSlit -> "gmosNorthLongSlit",
+              gmosSouthLongSlit -> "gmosSouthLongSlit"
+            ).as(Create(gmosNorthLongSlit, gmosSouthLongSlit))
 
         }
     }
@@ -57,8 +59,10 @@ object ObservingModeInput {
       ) =>
         (rGmosNorthLongSlit, rGmosSouthLongSlit).parTupled.flatMap {
           case (gmosNorthLongSlit, gmosSouthLongSlit) =>
-            oneOrFail((gmosNorthLongSlit, "gmosNorthLongSlit"), (gmosSouthLongSlit, "gmosSouthLongSlit"))
-              .as(Edit(gmosNorthLongSlit, gmosSouthLongSlit))
+            oneOrFail(
+              gmosNorthLongSlit -> "gmosNorthLongSlit",
+              gmosSouthLongSlit -> "gmosSouthLongSlit"
+            ).as(Edit(gmosNorthLongSlit, gmosSouthLongSlit))
         }
     }
 
