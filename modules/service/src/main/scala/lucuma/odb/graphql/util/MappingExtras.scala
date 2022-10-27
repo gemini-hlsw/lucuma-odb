@@ -3,14 +3,14 @@
 
 package lucuma.odb.graphql.util
 
+import cats.syntax.all._
+import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.Type
 import io.circe.Encoder
+import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
-import edu.gemini.grackle.Type
-import org.tpolecat.sourcepos.SourcePos
-import edu.gemini.grackle.Cursor.Context
-import cats.syntax.all._
 
 trait MappingExtras[F[_]] extends Mapping[F] {
 

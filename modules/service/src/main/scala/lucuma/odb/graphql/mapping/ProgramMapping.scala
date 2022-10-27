@@ -32,7 +32,7 @@ trait ProgramMapping[F[_]]
      with ProposalTable[F]
      with ObservationView[F]
      with Predicates[F]
-     with SelectResultMapping[F] {
+     with ResultMapping[F] {
 
   def user: User
 
@@ -62,7 +62,7 @@ trait ProgramMapping[F[_]]
         ), child) =>
           (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
             val limit = lim.fold(1000)(_.value)
-            SelectResultMapping.selectResult("observations", child, limit) { q =>
+            ResultMapping.selectResult("observations", child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
                   Predicates.observation.existence.includeDeleted(includeDeleted),

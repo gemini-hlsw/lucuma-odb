@@ -307,9 +307,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
 
+      // Our new subquery
       def query(pids: List[Program.Id]): Result[Query] =
         val limit = input.LIMIT.foldLeft(1000)(_ min _.value)
-        SelectResultMapping.mutationResult(child, limit, "programs") { q =>           
+        ResultMapping.mutationResult(child, limit, "programs") { q =>           
           FilterOrderByOffsetLimit(
             pred = Some(Predicates.program.id.in(pids)),
             oss = Some(List(
