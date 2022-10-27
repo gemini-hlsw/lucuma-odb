@@ -6,12 +6,12 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
-import lucuma.odb.graphql.table.GmosNorthLongSlitTable
+import lucuma.odb.graphql.table.GmosLongSlitTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
 
 trait WavelengthMapping[F[_]]
-  extends GmosNorthLongSlitTable[F]
+  extends GmosLongSlitTable[F]
      with ObservationView[F] {
 
   private def wavelengthMapping(
@@ -43,8 +43,8 @@ trait WavelengthMapping[F[_]]
     PrefixedMapping(
       tpe = WavelengthType,
       mappings = List(
-        List("centralWavelength")        -> wavelengthMapping(GmosNorthLongSlitTable.ObservationId, GmosNorthLongSlitTable.CentralWavelength),
-        List("initialCentralWavelength") -> wavelengthMapping(GmosNorthLongSlitTable.ObservationId, GmosNorthLongSlitTable.InitialCentralWavelength),        
+        List("centralWavelength")        -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.CentralWavelength),
+        List("initialCentralWavelength") -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.InitialCentralWavelength),
         List("wavelength")               -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.Wavelength),
         List("signalToNoiseAt")          -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.SignalToNoiseAt),
         List("wavelengthCoverage")       -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.WavelengthCoverage)

@@ -44,7 +44,7 @@ import scala.collection.immutable.SortedMap
 import scala.reflect.ClassTag
 
 trait GmosNorthLongSlitMapping[F[_]]
-  extends GmosNorthLongSlitTable[F] { this: SkunkMapping[F] =>
+  extends GmosLongSlitTable[F] { this: SkunkMapping[F] =>
 
   lazy val GmosNorthLongSlitMapping: ObjectMapping = {
 
@@ -99,7 +99,7 @@ trait GmosNorthLongSlitMapping[F[_]]
     ObjectMapping(
       tpe = GmosNorthLongSlitType,
       fieldMappings = List(
-        SqlField("observationId", GmosNorthLongSlitTable.ObservationId, key = true, hidden = true),
+        SqlField("observationId", GmosNorthLongSlitTable.Common.ObservationId, key = true, hidden = true),
 
         SqlField("grating", GmosNorthLongSlitTable.Grating),
         SqlField("filter",  GmosNorthLongSlitTable.Filter),
@@ -125,7 +125,7 @@ trait GmosNorthLongSlitMapping[F[_]]
           ),
 
         // (optional) `explicitXBin` is tied to a table value and is just a lookup
-        SqlField("explicitXBin", GmosNorthLongSlitTable.XBin),
+        SqlField("explicitXBin", GmosNorthLongSlitTable.Common.XBin),
 
         // ---------------------
         // yBin
@@ -136,34 +136,34 @@ trait GmosNorthLongSlitMapping[F[_]]
         // (optional) `explicitYBin` is tied to a table value and is just a lookup
         explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin"),
         CursorField[GmosYBinning]("defaultYBin", _ => Result(GmosLongSlitMath.DefaultYBinning)),
-        SqlField("explicitYBin", GmosNorthLongSlitTable.YBin),
+        SqlField("explicitYBin", GmosNorthLongSlitTable.Common.YBin),
 
         // ---------------------
         // ampReadMode
         // ---------------------
         explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode"),
         CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(GmosLongSlitMath.DefaultAmpReadMode)),
-        SqlField("explicitAmpReadMode", GmosNorthLongSlitTable.AmpReadMode),
+        SqlField("explicitAmpReadMode", GmosNorthLongSlitTable.Common.AmpReadMode),
 
         // ---------------------
         // ampGain
         // ---------------------
         explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain"),
         CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(GmosLongSlitMath.DefaultAmpGain)),
-        SqlField("explicitAmpGain", GmosNorthLongSlitTable.AmpGain),
+        SqlField("explicitAmpGain", GmosNorthLongSlitTable.Common.AmpGain),
 
         // ---------------------
         // roi
         // ---------------------
         explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi"),
         CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitMath.DefaultRoi)),
-        SqlField("explicitRoi", GmosNorthLongSlitTable.Roi),
+        SqlField("explicitRoi", GmosNorthLongSlitTable.Common.Roi),
 
         // ---------------------
         // wavelengthDithers
         // ---------------------
 
-        SqlField("wavelengthDithersString", GmosNorthLongSlitTable.WavelengthDithers, hidden = true),
+        SqlField("wavelengthDithersString", GmosNorthLongSlitTable.Common.WavelengthDithers, hidden = true),
 
         CursorFieldJson(
           "wavelengthDithers",
@@ -198,7 +198,7 @@ trait GmosNorthLongSlitMapping[F[_]]
         // spatialOffsets
         // ---------------------
 
-        SqlField("spatialOffsetsString", GmosNorthLongSlitTable.SpatialOffsets, hidden = true),
+        SqlField("spatialOffsetsString", GmosNorthLongSlitTable.Common.SpatialOffsets, hidden = true),
 
         CursorFieldJson("spatialOffsets",
           cursor =>
