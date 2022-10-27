@@ -14,40 +14,52 @@ import lucuma.odb.graphql.binding.*
 object ObservingModeInput {
 
   final case class Create(
-    gmosNorthLongSlit: Option[GmosLongSlitInput.Create.North]
+    gmosNorthLongSlit: Option[GmosLongSlitInput.Create.North],
+    gmosSouthLongSlit: Option[GmosLongSlitInput.Create.South]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
+        .orElse(gmosSouthLongSlit.map(_.observingModeType))
 
   }
 
   final case class Edit(
-    gmosNorthLongSlit: Option[GmosLongSlitInput.Edit.North]
+    gmosNorthLongSlit: Option[GmosLongSlitInput.Edit.North],
+    gmosSouthLongSlit: Option[GmosLongSlitInput.Edit.South]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
+        .orElse(gmosSouthLongSlit.map(_.observingModeType))
 
   }
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
-        // TODO: when we add GMOS South, then we need to make the input at most one defined
         GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
-        ("gmosSouthLongSlit", _)
+        GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit)
       ) =>
-        rGmosNorthLongSlit.map(Create.apply)
+        (rGmosNorthLongSlit, rGmosSouthLongSlit).parTupled.flatMap {
+          case (gmosNorthLongSlit, gmosSouthLongSlit) =>
+            oneOrFail((gmosNorthLongSlit, "gmosNorthLongSlit"), (gmosSouthLongSlit, "gmosSouthLongSlit"))
+              .as(Create(gmosNorthLongSlit, gmosSouthLongSlit))
+
+        }
     }
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap {
       case List(
         GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
-        ("gmosSouthLongSlit", _)
+        GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit)
       ) =>
-        rGmosNorthLongSlit.map(Edit.apply)
+        (rGmosNorthLongSlit, rGmosSouthLongSlit).parTupled.flatMap {
+          case (gmosNorthLongSlit, gmosSouthLongSlit) =>
+            oneOrFail((gmosNorthLongSlit, "gmosNorthLongSlit"), (gmosSouthLongSlit, "gmosSouthLongSlit"))
+              .as(Edit(gmosNorthLongSlit, gmosSouthLongSlit))
+        }
     }
 
 }

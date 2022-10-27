@@ -29,7 +29,7 @@ object DurationInput {
   def oneOrFail(all: Option[Duration]*): Result[Duration] =
     all.toList.flatten match {
       case List(w) => Result(w)
-      case _       => Result.failure("Expected exactly one of microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms, fromLong, fromDecimal.")
+      case _       => Result.failure("Expected exactly one of microseconds, milliarcseconds, milliseconds, seconds, minutes, or hours.")
     }
 
   val Binding: Matcher[Duration] =
