@@ -70,7 +70,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-          ObservingModeInput.CreateBinding.Option("observingMode", rObservingMode),
+          ObservingModeInput.Create.Binding.Option("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence)
         ) =>
           (rSubtitle,
@@ -114,7 +114,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
-          ObservingModeInput.EditBinding.Nullable("observingMode", rObservingMode),
+          ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence)
         ) =>
           (rSubtitle,
