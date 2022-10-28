@@ -223,4 +223,21 @@ create view v_observation as
   case when c_air_mass_min        is not null then c_observation_id end as c_air_mass_id,
   case when c_hour_angle_min      is not null then c_observation_id end as c_hour_angle_id,
   case when c_observing_mode_type is not null then c_observation_id end as c_observing_mode_id
-  from t_observation
+  from t_observation;
+
+-- TRIGGER
+
+CREATE OR REPLACE FUNCTION ch_observation_edit()
+  RETURNS trigger AS $$
+DECLARE
+BEGIN
+  PERFORM pg_notify('ch_observation_edit', NEW.c_observation_id || ',' || NEW.c_program_id  || ',' || nextval('s_event_id')::text || ',' || TG_OP);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ch_observation_edit_trigger
+  AFTER INSERT OR UPDATE ON t_observation
+  DEFERRABLE
+  FOR EACH ROW
+  EXECUTE PROCEDURE ch_observation_edit();

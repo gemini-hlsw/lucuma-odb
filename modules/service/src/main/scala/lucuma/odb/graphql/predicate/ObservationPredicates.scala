@@ -14,6 +14,6 @@ import lucuma.odb.data.Existence
 
 class ObservationPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")
-  lazy val id = LeafPredicates[Observation.Id](path / "id")
-  lazy val program = new ProgramPredicates(path / "program")
+  lazy val id        = LeafPredicates[Observation.Id](path / "id")
+  lazy val program   = new ProgramPredicates(path / "program")
 }
