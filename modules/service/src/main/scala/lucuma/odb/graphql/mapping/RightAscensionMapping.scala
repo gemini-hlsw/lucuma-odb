@@ -41,14 +41,12 @@ trait RightAscensionMapping[F[_]] extends ObservationView[F] with TargetView[F] 
       )
     )
 
-  lazy val RightAscensionMapping =
-    PrefixedMapping(
-      tpe = RightAscensionType,
-      mappings = List(
-        // Observation
-        List("explicitBase", "ra") -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
-        // Target
-        List("sidereal", "ra") -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra)
+  lazy val RightAscensionMapping: TypeMapping =
+    SwitchMapping(
+      RightAscensionType,
+      List(
+        (CoordinatesType, "ra", rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra)),
+        (SiderealType,    "ra", rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra))
       )
     )
 
