@@ -26,11 +26,6 @@ object WavelengthInput {
   val Nanometers  = BigDecimalBinding.rmap(PartialFunction.fromFunction(getNanometers))
   val Micrometers = BigDecimalBinding.rmap(PartialFunction.fromFunction(getMicrometers))
 
-  def oneOrFail(all: Option[Wavelength]*): Result[Wavelength] =
-    all.toList.flatten match {
-      case List(w) => Result(w)
-      case _       => Result.failure("Expected exactly one of picometers, angstroms, nanometers, micrometers.")
-    }
 
   val Binding: Matcher[Wavelength] =
     ObjectFieldsBinding.rmap {
@@ -42,7 +37,12 @@ object WavelengthInput {
       ) =>
         (rPicometers, rAngstroms, rNanometers, rMicrometers).parTupled.flatMap {
           case (picometers, angstroms, nanometers, micrometers) =>
-            oneOrFail(picometers, angstroms, nanometers, micrometers)
+            oneOrFail(
+              picometers  -> "picometers",
+              angstroms   -> "angstroms",
+              nanometers  -> "nanometers",
+              micrometers -> "micrometers"
+            )
         }
     }
 }

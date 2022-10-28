@@ -20,11 +20,15 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Observation
@@ -658,50 +662,59 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] specify gmos north long slit observing mode at observation creation") {
-    createProgramAs(pi).flatMap { pid =>
-      query(pi, s"""
-        mutation {
-          createObservation(input: {
-            programId: ${pid.asJson}
-            SET: {
-              observingMode: {
-                gmosNorthLongSlit: {
-                  grating: B1200_G5301
-                  filter: G_PRIME
-                  fpu: LONG_SLIT_0_25
-                  centralWavelength: {
-                    nanometers: 234.56
-                  }
+  private def siteName(site: Site): String =
+    site match {
+      case Site.GN => "North"
+      case Site.GS => "South"
+    }
+
+  private def createObsWithObservingMode(pid: Program.Id, site: Site, grating: String): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            observingMode: {
+              gmos${siteName(site)}LongSlit: {
+                grating: $grating
+                filter: G_PRIME
+                fpu: LONG_SLIT_0_25
+                centralWavelength: {
+                  nanometers: 234.56
                 }
               }
             }
-          }) {
-            observation {
-              observingMode {
-                gmosNorthLongSlit {
-                  grating
-                  filter
-                  fpu
-                  centralWavelength {
-                    nanometers
-                  }
-                  xBin,
-                  yBin,
-                  explicitYBin
-                  defaultYBin
-                  initialGrating
-                  initialFilter
-                  initialFpu
-                  initialCentralWavelength {
-                    nanometers
-                  }
+          }
+        }) {
+          observation {
+            observingMode {
+              gmos${siteName(site)}LongSlit {
+                grating
+                filter
+                fpu
+                centralWavelength {
+                  nanometers
+                }
+                xBin,
+                yBin,
+                explicitYBin
+                defaultYBin
+                initialGrating
+                initialFilter
+                initialFpu
+                initialCentralWavelength {
+                  nanometers
                 }
               }
             }
           }
         }
-      """).flatMap { js =>
+      }
+    """
+
+  test("[general] specify gmos north long slit observing mode at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301")).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
         assertIO(
@@ -737,17 +750,53 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
     }
   }
 
-  test("[general] specify gmos north long slit observing mode (with optional explicit parameters) at observation creation") {
+  test("[general] specify gmos south long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi,
-        s"""
+      query(pi, createObsWithObservingMode(pid, Site.GS, "B1200_G5321")).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosSouthLongSlit")
+
+        assertIO(
+          (longSlit.downIO[GmosSouthGrating]("grating"),
+           longSlit.downIO[Option[GmosSouthFilter]]("filter"),
+           longSlit.downIO[GmosSouthFpu]("fpu"),
+           longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[GmosYBinning]("yBin"),
+           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           longSlit.downIO[GmosYBinning]("defaultYBin"),
+           longSlit.downIO[GmosSouthGrating]("initialGrating"),
+           longSlit.downIO[Option[GmosSouthFilter]]("initialFilter"),
+           longSlit.downIO[GmosSouthFpu]("initialFpu"),
+           longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+          ).tupled,
+          (GmosSouthGrating.B1200_G5321,
+           Some(GmosSouthFilter.GPrime),
+           GmosSouthFpu.LongSlit_0_25,
+           234.56,
+           GmosXBinning.One, // Using IQ 2.0 and point source
+           GmosYBinning.Two,
+           Option.empty[GmosYBinning],
+           GmosYBinning.Two,
+           GmosSouthGrating.B1200_G5321,
+           Some(GmosSouthFilter.GPrime),
+           GmosSouthFpu.LongSlit_0_25,
+           234.56
+          )
+        )
+
+      }
+    }
+  }
+
+  private def createObsWithObservingModeExplicit(pid: Program.Id, site: Site, grating: String): String =
+    s"""
       mutation {
         createObservation(input: {
           programId: ${pid.asJson}
           SET: {
             observingMode: {
-              gmosNorthLongSlit: {
-                grating: B1200_G5301
+              gmos${siteName(site)}LongSlit: {
+                grating: $grating
                 filter: G_PRIME
                 fpu: LONG_SLIT_0_25
                 centralWavelength: {
@@ -776,7 +825,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
         }) {
           observation {
             observingMode {
-              gmosNorthLongSlit {
+              gmos${siteName(site)}LongSlit {
                 xBin
                 explicitXBin
                 defaultXBin
@@ -816,8 +865,12 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           }
         }
       }
-    """).flatMap { js =>
-        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+    """
+
+  private def testObservingModeExplicitParams(site: Site, grating: String): IO[Unit] = {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, createObsWithObservingModeExplicit(pid, site, grating)).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", s"gmos${siteName(site)}LongSlit")
 
         assertIO(
           (longSlit.downIO[GmosXBinning]("xBin"),
@@ -896,6 +949,59 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           )
         )
 
+      }
+    }
+  }
+
+  test("[general] specify gmos north long slit observing mode (with optional explicit parameters) at observation creation") {
+    testObservingModeExplicitParams(Site.GN, "B1200_G5301")
+  }
+
+  test("[general] specify gmos south long slit observing mode (with optional explicit parameters) at observation creation") {
+    testObservingModeExplicitParams(Site.GS, "B1200_G5321")
+  }
+
+  test("[general] can't create an observation with two observing modes") {
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit") {
+        query(pi,
+          s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    grating: B1200_G5301
+                    fpu: LONG_SLIT_0_25
+                    centralWavelength: {
+                      nanometers: 234.56
+                    }
+                  }
+                  gmosSouthLongSlit: {
+                    grating: B1200_G5321
+                    fpu: LONG_SLIT_0_25
+                    centralWavelength: {
+                      nanometers: 234.56
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthLongSlit {
+                    grating
+                  }
+                  gmosSouthLongSlit {
+                    grating
+                  }
+                }
+              }
+            }
+          }
+          """
+        )
       }
     }
   }

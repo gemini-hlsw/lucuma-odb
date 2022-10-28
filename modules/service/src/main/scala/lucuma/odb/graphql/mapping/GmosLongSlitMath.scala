@@ -19,6 +19,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
@@ -53,8 +54,13 @@ object GmosLongSlitMath {
   val zeroNm: Quantity[BigDecimal, Nanometer] =
     Quantity[Nanometer](BigDecimal(0))
     
-  def defaultWavelengthDithersGN(grating: GmosNorthGrating): List[Quantity[BigDecimal, Nanometer]] = {
+  def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[Quantity[BigDecimal, Nanometer]] = {
     val deltaNm = Δλ(Site.GN, grating.dispersion)
+    List(zeroNm, deltaNm, deltaNm, zeroNm)
+  }
+
+  def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[Quantity[BigDecimal, Nanometer]] = {
+    val deltaNm = Δλ(Site.GS, grating.dispersion)
     List(zeroNm, deltaNm, deltaNm, zeroNm)
   }
 
