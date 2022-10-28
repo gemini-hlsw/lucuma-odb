@@ -93,4 +93,19 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     )
   }
 
+  test("trigger for all observations as service user") {
+    import Group2._
+    subscriptionExpect(
+      user      = service,
+      query     = subtitleSubscriptionQuery,
+      mutations =
+        Right(
+          createProgram(guest,   "foo").flatMap(createObservation(guest,   "foo subtitle", _)) >>
+          createProgram(pi,      "bar").flatMap(createObservation(pi,      "bar subtitle", _)) >>
+          createProgram(service, "baz").flatMap(createObservation(service, "baz subtitle", _))
+        ),
+      expected  = List(created("foo subtitle"), created("bar subtitle"), created("baz subtitle"))
+    )
+  }
+
 }
