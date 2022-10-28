@@ -39,17 +39,17 @@ trait WavelengthMapping[F[_]]
 
   import ObservationView.ScienceRequirements.Spectroscopy
   
-  lazy val WavelengthMapping: PrefixedMapping =
-    PrefixedMapping(
-      tpe = WavelengthType,
-      mappings = List(
-        List("gmosNorthLongSlit", "centralWavelength")        -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.CentralWavelength),
-        List("gmosNorthLongSlit", "initialCentralWavelength") -> wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.InitialCentralWavelength),
-        List("gmosSouthLongSlit", "centralWavelength")        -> wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.CentralWavelength),
-        List("gmosSouthLongSlit", "initialCentralWavelength") -> wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.InitialCentralWavelength),
-        List("wavelength")               -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.Wavelength),
-        List("signalToNoiseAt")          -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.SignalToNoiseAt),
-        List("wavelengthCoverage")       -> wavelengthMapping(ObservationView.Id,                   Spectroscopy.WavelengthCoverage)
+  lazy val WavelengthMapping: TypeMapping =
+    SwitchMapping(
+      WavelengthType,
+      List(
+        (GmosNorthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.CentralWavelength)),
+        (GmosNorthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.InitialCentralWavelength)),
+        (GmosSouthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.CentralWavelength)),
+        (GmosSouthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.InitialCentralWavelength)),
+        (SpectroscopyScienceRequirementsType, "wavelength",               wavelengthMapping(ObservationView.Id, Spectroscopy.Wavelength)),
+        (SpectroscopyScienceRequirementsType, "signalToNoiseAt",          wavelengthMapping(ObservationView.Id, Spectroscopy.SignalToNoiseAt)),
+        (SpectroscopyScienceRequirementsType, "wavelengthCoverage",       wavelengthMapping(ObservationView.Id, Spectroscopy.WavelengthCoverage))
       )
     )
 }
