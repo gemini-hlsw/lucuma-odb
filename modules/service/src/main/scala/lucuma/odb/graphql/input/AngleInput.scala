@@ -40,12 +40,6 @@ object AngleInput {
   val DMS             = StringBinding.emap(getDMS)
   val HMS             = StringBinding.emap(getHMS)
 
-  def oneOrFail(all: Option[Angle]*): Result[Angle] =
-    all.toList.flatten match {
-      case List(w) => Result(w)
-      case _       => Result.failure("Expected exactly one of microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms.")
-    }
-
   val Binding: Matcher[Angle] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -64,7 +58,20 @@ object AngleInput {
       ) =>
         (rMicroarcseconds, rMicroseconds, rMilliarcseconds, rMilliseconds, rArcSeconds, rSeconds, rArcMinutes, rMinutes, rDegrees, rHours, rDMS, rHMS).parTupled.flatMap {
           case (microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms) =>
-            oneOrFail(microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms)
+            oneOrFail(
+              microarcseconds -> "microarcseconds",
+              microseconds    -> "microseconds",
+              milliarcseconds -> "milliarcseconds",
+              milliseconds    -> "milliseconds",
+              arcseconds      -> "arcseconds",
+              seconds         -> "seconds",
+              arcminutes      -> "arcminutes",
+              minutes         -> "minutes",
+              degrees         -> "degrees",
+              hours           -> "hours",
+              dms             -> "dms",
+              hms             -> "hms"
+            )
         }
     }
 }

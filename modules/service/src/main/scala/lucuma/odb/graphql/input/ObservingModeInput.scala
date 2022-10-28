@@ -14,40 +14,63 @@ import lucuma.odb.graphql.binding.*
 object ObservingModeInput {
 
   final case class Create(
-    gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Create]
+    gmosNorthLongSlit: Option[GmosLongSlitInput.Create.North],
+    gmosSouthLongSlit: Option[GmosLongSlitInput.Create.South]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
+        .orElse(gmosSouthLongSlit.map(_.observingModeType))
+
+  }
+
+  object Create {
+
+    val Binding: Matcher[Create] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
+          GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit)
+        ) =>
+          (rGmosNorthLongSlit, rGmosSouthLongSlit).parTupled.flatMap {
+            case (gmosNorthLongSlit, gmosSouthLongSlit) =>
+              oneOrFail(
+                gmosNorthLongSlit -> "gmosNorthLongSlit",
+                gmosSouthLongSlit -> "gmosSouthLongSlit"
+              ).as(Create(gmosNorthLongSlit, gmosSouthLongSlit))
+
+          }
+      }
 
   }
 
   final case class Edit(
-    gmosNorthLongSlit: Option[GmosNorthLongSlitInput.Edit]
+    gmosNorthLongSlit: Option[GmosLongSlitInput.Edit.North],
+    gmosSouthLongSlit: Option[GmosLongSlitInput.Edit.South]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
+        .orElse(gmosSouthLongSlit.map(_.observingModeType))
 
   }
 
-  val CreateBinding: Matcher[Create] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        // TODO: when we add GMOS South, then we need to make the input at most one defined
-        GmosNorthLongSlitInput.CreateBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
-        ("gmosSouthLongSlit", _)
-      ) =>
-        rGmosNorthLongSlit.map(Create.apply)
-    }
+  object Edit {
 
-  val EditBinding: Matcher[Edit] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        GmosNorthLongSlitInput.EditBinding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
-        ("gmosSouthLongSlit", _)
-      ) =>
-        rGmosNorthLongSlit.map(Edit.apply)
-    }
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
+          GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit)
+        ) =>
+          (rGmosNorthLongSlit, rGmosSouthLongSlit).parTupled.flatMap {
+            case (gmosNorthLongSlit, gmosSouthLongSlit) =>
+              oneOrFail(
+                gmosNorthLongSlit -> "gmosNorthLongSlit",
+                gmosSouthLongSlit -> "gmosSouthLongSlit"
+              ).as(Edit(gmosNorthLongSlit, gmosSouthLongSlit))
+          }
+      }
 
+  }
 }

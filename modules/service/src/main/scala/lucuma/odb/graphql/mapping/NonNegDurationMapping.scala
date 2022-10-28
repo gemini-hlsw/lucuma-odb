@@ -17,18 +17,16 @@ import java.time.Duration
 
 trait NonNegDurationMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] {
 
-  lazy val NonNegDurationMapping =
-    PrefixedMapping(
-      tpe = NonNegDurationType,
-      mappings = List(
-        // Program
-        List("plannedTime", "pi")        -> nonNegDurationMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
-        List("plannedTime", "uncharged") -> nonNegDurationMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
-        List("plannedTime", "execution") -> nonNegDurationMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
-        // Proposal
-        List("totalTime") -> nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        // Allocation
-        List("duration") -> nonNegDurationMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
+  lazy val NonNegDurationMapping: TypeMapping =
+    SwitchMapping(
+      NonNegDurationType,
+      List(
+        (PlannedTimeSummaryType, "pi",        nonNegDurationMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id)),
+        (PlannedTimeSummaryType, "uncharged", nonNegDurationMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id)),
+        (PlannedTimeSummaryType, "execution", nonNegDurationMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id)),
+        (IntensiveType,          "totalTime", nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId)),
+        (LargeProgramType,       "totalTime", nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId)),
+        (AllocationType,         "duration",  nonNegDurationMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner)),
       ),
     )
 

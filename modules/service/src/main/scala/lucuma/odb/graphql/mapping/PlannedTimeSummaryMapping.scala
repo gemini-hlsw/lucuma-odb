@@ -25,9 +25,7 @@ import table._
 trait PlannedTimeSummaryMapping[F[_]]
   extends ProgramTable[F] { this: SkunkMapping[F] =>
 
-  lazy val PlannedTimeSummaryType = schema.ref("PlannedTimeSummary")
-
-  lazy val PlannedTimeSummaryMapping =
+  lazy val PlannedTimeSummaryMapping: TypeMapping =
     ObjectMapping(
       tpe = PlannedTimeSummaryType,
       fieldMappings = List(
