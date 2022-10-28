@@ -23,6 +23,7 @@ import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
 import lucuma.odb.graphql.mapping._
+import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
@@ -40,7 +41,8 @@ import scala.io.Source
 object OdbMapping {
 
   case class Topics[F[_]](
-    program: Topic[F, ProgramTopic.Element]
+    program:     Topic[F, ProgramTopic.Element],
+    observation: Topic[F, ObservationTopic.Element]
   )
 
   object Topics {
@@ -49,7 +51,8 @@ object OdbMapping {
         sup <- Supervisor[F]
         ses <- pool
         pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
-      } yield Topics(pro)
+        obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
+      } yield Topics(pro, obs)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -91,6 +94,7 @@ object OdbMapping {
           with MutationMapping[F]
           with NonNegDurationMapping[F]
           with NonsiderealMapping[F]
+          with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservingModeMapping[F]
           with ObservationSelectResultMapping[F]
@@ -171,6 +175,7 @@ object OdbMapping {
               MutationMapping,
               NonNegDurationMapping,
               NonsiderealMapping,
+              ObservationEditMapping,
               ObservationMapping,
               ObservingModeMapping,
               ObservationSelectResultMapping,

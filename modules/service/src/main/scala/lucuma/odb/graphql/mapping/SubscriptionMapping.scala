@@ -20,6 +20,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
+import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
@@ -36,6 +37,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
   private lazy val subscriptionFields: List[SubscriptionField] =
     List(
+      ObservationEdit,
       ProgramEdit,
     )
 
@@ -83,5 +85,24 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         ))
     }
 
+  private val ObservationEdit =
+    SubscriptionField("observationEdit", ObservationEditInput.Binding.Option) { (input, child) =>
+      topics
+        .observation
+        .subscribe(1024)
+        .filter { e =>
+          e.canRead(user) &&
+          input.flatMap(_.programId).forall(_ === e.programId) &&
+          input.flatMap(_.observationId).forall(_ === e.observationId)
+        }
+        .map { e =>
+          Result(
+            Environment(
+              Env("id" -> e.eventId, "editType" -> e.editType),
+              Unique(Filter(Predicates.observationEdit.value.id.eql(e.observationId), child))
+            )
+          )
+        }
+    }
 }
 
