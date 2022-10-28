@@ -40,14 +40,12 @@ trait DeclinationMapping[F[_]] extends ObservationView[F] with TargetView[F] {
       )
     )
 
-  lazy val DeclinationMapping =
-    PrefixedMapping(
-      tpe = DeclinationType,
-      mappings = List(
-        // Observation
-        List("explicitBase", "dec") -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
-        // Target
-        List("sidereal", "dec") -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec)
+  lazy val DeclinationMapping: TypeMapping =
+    SwitchMapping(
+      DeclinationType,
+      List(
+        (CoordinatesType, "dec", declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec)),
+        (SiderealType,    "dec", declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec))
       )
     )
 
