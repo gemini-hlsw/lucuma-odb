@@ -5,18 +5,22 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.effect.IO
+import cats.syntax.show.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.util.Gid
 
 import scala.concurrent.duration._
 
 
 trait SubscriptionUtils { self: OdbSuite =>
 
+  // try to behave nicely on weak CI machines
+  private val sleep: IO[Unit] =
+    IO.sleep(500.millis)
+
   def createProgram(user: User, name: String): IO[Program.Id] =
-    IO.sleep(500.millis) >> // try to behave nicely on weak CI machines
+    sleep >>
       query(
         user  = user,
         query =
@@ -34,13 +38,13 @@ trait SubscriptionUtils { self: OdbSuite =>
       }
 
   def createObservation(user: User, subtitle: String, pid: Program.Id): IO[Observation.Id] =
-    IO.sleep(500.millis) >>
+    sleep >>
       query(
         user  = user,
         query =
           s"""
             mutation {
-              createObservation(input: { programId: "${Gid[Program.Id].show(pid)}", SET: { subtitle: "$subtitle" }}) {
+              createObservation(input: { programId: "${pid.show}", SET: { subtitle: "$subtitle" }}) {
                 observation {
                   id
                 }
@@ -50,4 +54,28 @@ trait SubscriptionUtils { self: OdbSuite =>
       ).map { json =>
         json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
       }
+
+  def updateObservation(user: User, subtitle: String, pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    sleep >>
+      query(
+        user    = user,
+        query   =
+          s"""
+            mutation {
+              updateObservations(input: {
+                programId: "${pid.show}",
+                SET: {
+                  subtitle: "${subtitle}"
+                },
+                WHERE: {
+                  id: { EQ: "${oid.show}" }
+                }
+              }) {
+                observations {
+                  id
+                }
+              }
+            }
+          """
+      ).void
 }
