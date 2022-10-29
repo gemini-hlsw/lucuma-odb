@@ -4,9 +4,11 @@
 package lucuma.odb.graphql
 package subscription
 
+import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
-import io.circe.literal.*
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 
@@ -30,10 +32,21 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       Group2.pi, Group2.guest, Group2.service
     )
 
-  val subtitleSubscriptionQuery: String =
-    """
+  def subtitleSubscription(
+    pid: Option[Program.Id],
+    oid: Option[Observation.Id]
+  ): String = {
+    val args: String =
+      (pid, oid) match {
+        case (Some(p), Some(o)) => s"""(input: { programId: "${p.show}", observationId: "${o.show}" } )"""
+        case (Some(p), None   ) => s"""(input: { programId: "${p.show}" } )"""
+        case (None,    Some(o)) => s"""(input: { observationId: "${o.show}" } )"""
+        case (None,    None   ) => ""
+      }
+
+    s"""
       subscription {
-        observationEdit {
+        observationEdit$args {
           editType
           value {
             subtitle
@@ -41,6 +54,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         }
       }
     """
+  }
 
   def observationEdit(
     editType: EditType,
@@ -66,7 +80,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     List(pi, guest, service).traverse { user =>
       subscriptionExpect(
         user      = user,
-        query     = subtitleSubscriptionQuery,
+        query     = subtitleSubscription(None, None),
         mutations =
           Right(
             createProgram(user, "foo").flatMap { pid =>
@@ -82,7 +96,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     import Group2._
     subscriptionExpect(
       user      = guest,
-      query     = subtitleSubscriptionQuery,
+      query     = subtitleSubscription(None, None),
       mutations =
         Right(
           createProgram(guest,   "foo").flatMap(createObservation(guest,   "foo subtitle", _)) >>
@@ -97,7 +111,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     import Group2._
     subscriptionExpect(
       user      = service,
-      query     = subtitleSubscriptionQuery,
+      query     = subtitleSubscription(None, None),
       mutations =
         Right(
           createProgram(guest,   "foo").flatMap(createObservation(guest,   "foo subtitle", _)) >>
@@ -106,6 +120,47 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         ),
       expected  = List(created("foo subtitle"), created("bar subtitle"), created("baz subtitle"))
     )
+  }
+
+  test("trigger for one particular observation") {
+    import Group1._
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      oid0 <- createObservation(pi, "obs 0", pid)
+      oid1 <- createObservation(pi, "obs 1", pid)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = subtitleSubscription(None, Some(oid1)),
+        mutations =
+          Right(
+            updateObservation(pi, "obs 0 - edit", pid, oid0) >>
+              updateObservation(pi, "obs 1 - edit", pid, oid1)
+          ),
+        expected  = List(updated("obs 1 - edit"))
+      )
+    } yield ()
+  }
+
+
+  test("trigger for one particular program") {
+    import Group1._
+
+    for {
+      pid0 <- createProgram(pi, "prog 0")
+      pid1 <- createProgram(pi, "prog 1")
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = subtitleSubscription(Some(pid0), None),
+        mutations =
+          Right(
+            createObservation(pi, "prog 0 - edit", pid0) >>
+              createObservation(pi, "obs 1 - edit", pid1)
+          ),
+        expected  = List(created("prog 0 - edit"))
+      )
+    } yield ()
+
   }
 
 }
