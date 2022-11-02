@@ -1767,7 +1767,7 @@ input NonsiderealInput {
 }
 
 # Event sent when a new object is created or updated
-type ObservationEdit implements Event {
+type ObservationEdit { #implements Event {
   # Type of edit
   editType: EditType!
 
@@ -2254,11 +2254,7 @@ type Subscription {
   # that program.
   #
   observationEdit(
-    # Observation ID
-    observationId: ObservationId
-
-    # Program ID
-    programId: ProgramId
+    input: ObservationEditInput
   ): ObservationEdit!
 
   #
@@ -2284,6 +2280,12 @@ type Subscription {
     # Program ID
     programId: ProgramId
   ): TargetEdit!
+}
+
+input ObservationEditInput {
+  observationId: ObservationId
+
+  programId: ProgramId
 }
 
 input ProgramEditInput {

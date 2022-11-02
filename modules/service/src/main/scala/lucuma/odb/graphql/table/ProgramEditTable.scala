@@ -11,6 +11,7 @@ import skunk.codec.all._
 
 trait ProgramEditTable[F[_]] extends BaseMapping[F] {
 
+  // TODO: is this used for anything?
   object ProgramEditTable extends TableDef("t_program_event") {
     val EventId   = col("c_event_id", int8)
     val EditType  = col("c_edit_type", edit_type)

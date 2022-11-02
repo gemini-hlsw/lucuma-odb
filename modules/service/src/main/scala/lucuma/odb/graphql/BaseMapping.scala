@@ -69,6 +69,7 @@ trait BaseMapping[F[_]]
   lazy val NonNegLongType                      = schema.ref("NonNegLong")
   lazy val NonsiderealType                     = schema.ref("Nonsidereal")
   lazy val ObsActiveStatusType                 = schema.ref("ObsActiveStatus")
+  lazy val ObservationEditType                 = schema.ref("ObservationEdit")
   lazy val ObservationIdType                   = schema.ref("ObservationId")
   lazy val ObservationType                     = schema.ref("Observation")
   lazy val ObservingModeType                   = schema.ref("ObservingMode")
