@@ -14,13 +14,14 @@ trait Predicates[F[_]] extends BaseMapping[F] {
    * constructing filters, etc.
    */
   object Predicates {
-    val linkUserResult = LinkUserResultPredicates(Path.from(LinkUserResultType))
-    val observation = ObservationPredicates(Path.from(ObservationType))
-    val program = ProgramPredicates(Path.from(ProgramType))
-    val programEdit = ProgramEditPredicates(Path.from(ProgramEditType))
-    val proposalClass = ProposalClassPredicates(Path.from(ProposalClassType))
+    val linkUserResult      = LinkUserResultPredicates(Path.from(LinkUserResultType))
+    val observation         = ObservationPredicates(Path.from(ObservationType))
+    val observationEdit     = ObservationEditPredicates(Path.from(ObservationEditType))
+    val program             = ProgramPredicates(Path.from(ProgramType))
+    val programEdit         = ProgramEditPredicates(Path.from(ProgramEditType))
+    val proposalClass       = ProposalClassPredicates(Path.from(ProposalClassType))
     val setAllocationResult = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
-    val target = TargetPredicates(Path.from(TargetType))
+    val target              = TargetPredicates(Path.from(TargetType))
   }
 
 }

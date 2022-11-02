@@ -33,8 +33,8 @@ object ProgramTopic {
    */
   case class Element(
     programId: Program.Id,
-    eventId: Long,
-    editType: EditType,
+    eventId:   Long,
+    editType:  EditType,
     users:     List[User.Id],
     // TODO: time allocation
   ) {
@@ -53,9 +53,9 @@ object ProgramTopic {
         case Array(_pid, _eid, _tg_op) =>
           (Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption, EditType.fromTgOp(_tg_op)).tupled match {
             case Some(tuple) => Stream(tuple)
-            case None        => Stream.exec(Logger[F].warn(s"Invalid progran and/or event: $n"))
+            case None        => Stream.exec(Logger[F].warn(s"Invalid program and/or event: $n"))
           }
-        case _ => Stream.exec(Logger[F].warn(s"Invalid progran and/or event: $n"))
+        case _ => Stream.exec(Logger[F].warn(s"Invalid program and/or event: $n"))
       }
     }
 
@@ -89,7 +89,7 @@ object ProgramTopic {
     for {
       top <- Topic[F, Element]
       els  = elements(s, maxQueued).through(top.publish)
-      _   <- sup.supervise(els.compile.drain.onError { case e => Logger[F].error(e)("Stream crashed!") } >> Logger[F].info("Stream terminated.") )
+      _   <- sup.supervise(els.compile.drain.onError { case e => Logger[F].error(e)("Program Event Stream crashed!") } >> Logger[F].info("Program Event Stream terminated.") )
       _   <- Logger[F].info("Started topic for ch_program_edit")
     } yield top
 
