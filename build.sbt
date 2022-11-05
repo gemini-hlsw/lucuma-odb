@@ -1,4 +1,4 @@
-val catsTimeVersion            = "0.5.0"
+val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.3"
 val cirisVersion               = "2.4.0"
 val clueVersion                = "0.23.1"
