@@ -225,4 +225,49 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     )
   }
 
+  // TODO: minimize this 
+  test("edit event should show up, even if we don't look at the value".ignore) {
+    import Group2._
+    subscriptionExpect(
+      user = service,
+      query =
+        """
+          subscription {
+            programEdit {
+              editType
+              id
+            }
+          }
+        """,
+      mutations =
+        Right(
+          createProgram(guest, "foo").flatMap { id =>
+            IO.sleep(1.second) >> // give time to see the creation before we do an update
+            query(
+              service,
+              s"""
+              mutation {
+                updatePrograms(input: {
+                  WHERE: { id: { EQ: "$id" } }
+                  SET: { name: "foo2" }
+                }) {
+                  programs {
+                    id
+                  }
+                }
+              }
+              """
+            )
+          } >>
+          createProgram(service, "baz").void
+        ),
+      expected =
+        List(
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo2" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
+        )
+    )
+  }
+
 }
