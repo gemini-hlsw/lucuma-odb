@@ -67,17 +67,17 @@ jobs:
 
       - name: Check headers and formatting
         if: matrix.java == 'temurin@17'
-        run: sbt '++${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
+        run: sbt '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
 
       - name: Test
-        run: sbt '++${{ matrix.scala }}' test
+        run: sbt '++ ${{ matrix.scala }}' test
 
       - name: Check scalafix lints
         if: matrix.java == 'temurin@17'
-        run: sbt '++${{ matrix.scala }}' 'scalafixAll --check'
+        run: sbt '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
       - name: Aggregate coverage reports
-        run: sbt '++${{ matrix.scala }}' coverageReport coverageAggregate
+        run: sbt '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
       - name: Upload code coverage data
         run: 'bash <(curl -s https://codecov.io/bash)'
