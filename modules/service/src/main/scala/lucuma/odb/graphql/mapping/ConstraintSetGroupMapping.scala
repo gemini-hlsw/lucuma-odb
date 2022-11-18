@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.all._
-import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
@@ -21,8 +20,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
-import table.ObservationView
 import lucuma.odb.graphql.table.ConstraintSetGroupView
+
+import table.ObservationView
 import binding._
 import input._
 import table._
