@@ -6,12 +6,12 @@ package lucuma.odb.graphql.mapping
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Result
 import lucuma.odb.graphql.BaseMapping
+import lucuma.odb.graphql.table.ConstraintSetGroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import skunk.codec.numeric.int8
 
 import scala.tools.util.PathResolver.Environment
-import lucuma.odb.graphql.table.ConstraintSetGroupView
 
 trait ObservationSelectResultMapping[F[_]] 
   extends ConstraintSetGroupView[F] with ObservationView[F] with ProgramTable[F] with ResultMapping[F] {

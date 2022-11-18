@@ -12,6 +12,7 @@ import lucuma.core.model.User
 import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
+import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
@@ -22,7 +23,6 @@ import org.typelevel.log4cats.Logger
 import skunk.Session
 
 import scala.concurrent.duration._
-import lucuma.odb.service.UserService
 
 object GraphQLRoutes {
 
