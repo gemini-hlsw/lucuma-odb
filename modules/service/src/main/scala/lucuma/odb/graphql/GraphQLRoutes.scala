@@ -22,6 +22,7 @@ import org.typelevel.log4cats.Logger
 import skunk.Session
 
 import scala.concurrent.duration._
+import lucuma.odb.service.UserService
 
 object GraphQLRoutes {
 
@@ -37,6 +38,7 @@ object GraphQLRoutes {
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     ttl:      FiniteDuration,
+    userSvc:  UserService[F],
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
       Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
@@ -52,6 +54,9 @@ object GraphQLRoutes {
                   {
                     for {
                       user <- OptionT(client.get(a))
+                      // If the user has never hit the ODB using http then there will be no user
+                      // entry in the database. So go ahead and [re]canonicalize here to be sure.
+                      _    <- OptionT.liftF(userSvc.canonicalizeUser(user))
                       map  <- OptionT.liftF(OdbMapping(pool, monitor, user, topics))
                       svc   = new GrackleGraphQLService(map)
                     } yield svc

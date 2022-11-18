@@ -116,10 +116,9 @@ object Main extends IOApp {
     for {
       pool       <- databasePoolResource[F](databaseConfig)
       ssoClient  <- ssoClientResource
-      // channels   <- OdbMapping.Channels(pool)
       userSvc    <- pool.map(UserService.fromSession(_))
       middleware <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
-      routes     <- GraphQLRoutes(ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL)
+      routes     <- GraphQLRoutes(ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
     } yield { wsb =>
       middleware(routes(wsb))
     }

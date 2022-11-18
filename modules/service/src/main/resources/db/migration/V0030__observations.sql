@@ -171,6 +171,22 @@ create table t_observation (
   c_hour_angle_min     d_hour_angle        null        default null,
   c_hour_angle_max     d_hour_angle        null        default null,
 
+  -- a column we can use to identify and join with distinct observing conditions in this program
+  c_conditions_key     text not null generated always as (
+    immutable_concat_ws(
+      ',',
+      c_program_id,
+      c_cloud_extinction,
+      c_image_quality,
+      c_sky_background,
+      c_water_vapor,
+      coalesce(c_air_mass_min::text, 'null'),
+      coalesce(c_air_mass_max::text, 'null'),
+      coalesce(c_hour_angle_min::text, 'null'),
+      coalesce(c_hour_angle_max::text, 'null')
+    )
+   ) stored,
+
   -- observing conditions: both air mass fields are defined or neither are defined
   constraint air_mass_neither_or_both
   check (num_nulls(c_air_mass_min, c_air_mass_max) <> 1),
@@ -216,6 +232,8 @@ create table t_observation (
   unique (c_program_id, c_observation_id)
 );
 comment on table t_observation is 'Observations.';
+
+create index on t_observation (c_conditions_key);
 
 create view v_observation as
   select *,
