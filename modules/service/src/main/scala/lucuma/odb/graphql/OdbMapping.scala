@@ -79,6 +79,8 @@ object OdbMapping {
           with AllocationMapping[F]
           with AngleMapping[F]
           with CatalogInfoMapping[F]
+          with ConstraintSetGroupMapping[F]
+          with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
           with CreateObservationResultMapping[F]
@@ -160,6 +162,8 @@ object OdbMapping {
               AllocationMapping,
               AngleMapping,
               CatalogInfoMapping,
+              ConstraintSetGroupMapping,
+              ConstraintSetGroupSelectResultMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
               CreateObservationResultMapping,
@@ -214,6 +218,7 @@ object OdbMapping {
           override val selectElaborator: SelectElaborator =
             SelectElaborator(
               List(
+                ConstraintSetGroupElaborator,
                 MutationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,

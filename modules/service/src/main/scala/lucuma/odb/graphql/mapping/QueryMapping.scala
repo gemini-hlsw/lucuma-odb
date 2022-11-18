@@ -43,6 +43,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
+        SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
         SqlObject("observation"),
         SqlObject("observations"),
@@ -56,6 +57,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
+      ConstraintSetGroup,
       FilterTypeMeta,
       Observation,
       Observations,
@@ -69,6 +71,35 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   def user: User
 
   // Elaborators below
+
+  private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = {
+    case Select("constraintSetGroup", List(
+      ProgramIdBinding("programId", rProgramId),
+      _, // TODO: WHERE
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    ), child) =>
+      (rProgramId, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, LIMIT, includeDeleted) =>
+        val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+        ResultMapping.selectResult("constraintSetGroup", child, limit) { q =>         
+          FilterOrderByOffsetLimit(
+            pred = Some(
+              and(List(
+                Predicates.constraintSetGroup.programId.eql(pid),
+                // Predicates.constraintSetGroup.programId.existence.includeDeleted(includeDeleted),
+                // Predicates.constraintSetGroup.programId.isVisibleTo(user),
+              ))
+            ),
+            oss = Some(List(
+              OrderSelection[String](ConstraintSetGroupType / "key")
+            )),
+            offset = None,
+            limit = Some(limit + 1), // Select one extra row here.
+            child = q
+          )
+        }
+      }
+  }
 
   private lazy val FilterTypeMeta: PartialFunction[Select, Result[Query]] =
     case Select("filterTypeMeta", Nil, child) =>
@@ -98,16 +129,18 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
     {
       case Select("observations", List(
+        ProgramIdBinding.Option("programId", rPid),
         WhereObservationBinding.Option("WHERE", rWHERE),
         ObservationIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       ), child) =>
-        (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+        (rPid, rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
           ResultMapping.selectResult("observations", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(and(List(
+                pid.map(Predicates.observation.program.id.eql).getOrElse(True),
                 OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
                 Predicates.observation.existence.includeDeleted(includeDeleted),
                 Predicates.observation.program.isVisibleTo(user),

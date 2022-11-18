@@ -4695,6 +4695,9 @@ type Query {
 
   # Selects the first `LIMIT` matching observations based on the provided `WHERE` parameter, if any.
   observations(
+
+    programId: ProgramId
+
     # Filters the selection of observations.
     WHERE: WhereObservation
 

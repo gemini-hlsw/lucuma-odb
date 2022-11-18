@@ -11,9 +11,10 @@ import lucuma.odb.graphql.table.ProgramTable
 import skunk.codec.numeric.int8
 
 import scala.tools.util.PathResolver.Environment
+import lucuma.odb.graphql.table.ConstraintSetGroupView
 
 trait ObservationSelectResultMapping[F[_]] 
-  extends ObservationView[F] with ProgramTable[F] with ResultMapping[F] {
+  extends ConstraintSetGroupView[F] with ObservationView[F] with ProgramTable[F] with ResultMapping[F] {
 
   lazy val ObservationSelectResultMapping: TypeMapping =
     SwitchMapping(
@@ -21,6 +22,7 @@ trait ObservationSelectResultMapping[F[_]]
       List(
         (QueryType, "observations", topLevelSelectResultMapping(ObservationSelectResultType)),
         (ProgramType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId))),
+        (ConstraintSetGroupType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key))),
       )
     )
     
