@@ -133,7 +133,7 @@ class observations extends OdbSuite {
             query {
               observations(LIMIT: 1) {
                 matches {
-                  itc {
+                  itc(useCache: true) {
                     exposureTime {
                       seconds
                     }

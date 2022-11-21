@@ -4,12 +4,10 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Applicative
 import cats.data.Ior
 import cats.data.Nested
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
