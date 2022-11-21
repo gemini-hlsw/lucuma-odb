@@ -14,10 +14,14 @@ import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Cursor.Context
+import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import edu.gemini.grackle.sql.SqlMapping
 import fs2.concurrent.Topic
+import io.circe.literal.*
 import lucuma.core.model.User
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.FilterTypeEnumType
@@ -89,6 +93,7 @@ object OdbMapping {
           with FilterTypeMetaMapping[F]
           with GmosLongSlitMapping[F]
           with HourAngleRangeMapping[F]
+//          with ItcSuccessMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
@@ -171,6 +176,7 @@ object OdbMapping {
               GmosNorthLongSlitMapping,
               GmosSouthLongSlitMapping,
               HourAngleRangeMapping,
+//              ItcSuccessMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonNegDurationMapping,
@@ -216,6 +222,7 @@ object OdbMapping {
               List(
                 MutationElaborator,
                 ProgramElaborator,
+                ObservationElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
                 QueryElaborator,
@@ -233,6 +240,33 @@ object OdbMapping {
             super.fetch(fragment, codecs)
           }
 
+          // dummy for now
+          override def itcQuery(
+            tpe: Type,
+            useCache: Boolean
+          ): F[Result[Cursor]] =
+            // Simulated ITC call result.
+            Applicative[F].pure(
+              Result(
+                CirceCursor(
+                  Context(tpe),
+                  json"""{
+                    "exposureTime": {
+                       "microsceconds": 10000000,
+                       "milliseconds": 10000,
+                       "seconds": 10,
+                       "minutes": 0.16666667,
+                       "hours": 0.00277778,
+                       "iso": "PT10.0S"
+                    },
+                    "exposures": 11,
+                    "signalToNoise": 77.7
+                  }""",
+                  None,
+                  Env.empty
+                )
+              )
+            )
         }
       }
     }

@@ -59,6 +59,7 @@ trait BaseMapping[F[_]]
   lazy val InstrumentType                      = schema.ref("Instrument")
   lazy val IntensiveType                       = schema.ref("Intensive")
   lazy val IntPercentType                      = schema.ref("IntPercent")
+  lazy val ItcSuccessType                      = schema.ref("ItcSuccess")
   lazy val LargeProgramType                    = schema.ref("LargeProgram")
   lazy val LinkUserResultType                  = schema.ref("LinkUserResult")
   lazy val LongType                            = schema.ref("Long")

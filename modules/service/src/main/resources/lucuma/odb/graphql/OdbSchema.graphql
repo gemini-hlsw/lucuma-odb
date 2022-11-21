@@ -4151,6 +4151,7 @@ type Intensive implements ProposalClass {
   totalTime: NonNegDuration!
 }
 
+# N.B. These values will come from a remote server, not the database directly.
 type ItcSuccess {
   exposureTime: NonNegDuration!
   exposures: NonNegInt!
@@ -4329,7 +4330,7 @@ type Observation {
   # The science configuration
   observingMode: ObservingMode
 
-  # ITC execution results
+  # Gathers the parameters and calls the ITC, returning the ITC execution results.
   itc(
     # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
     useCache: Boolean! = true

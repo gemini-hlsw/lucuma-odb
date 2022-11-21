@@ -123,4 +123,48 @@ class observations extends OdbSuite {
       }
     }
   }
+
+  test("temp itc call test") {
+    createProgram(pi2).flatMap { pid =>
+      createObservation(pi2, pid).flatMap { oid =>
+        expect(
+          user  = pi2,
+          query = s"""
+            query {
+              observations(LIMIT: 1) {
+                matches {
+                  itc {
+                    exposureTime {
+                      seconds
+                    }
+                    exposures
+                    signalToNoise
+                  }
+                }
+              }
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "observations" -> Json.obj(
+                "matches" -> Json.fromValues(
+                  List(
+                    Json.obj(
+                      "itc" -> Json.obj(
+                        "exposureTime" -> Json.obj(
+                          "seconds" -> 10.asJson
+                        ),
+                        "exposures" -> 11.asJson,
+                        "signalToNoise" -> 77.7.asJson
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      }
+    }
+  }
 }

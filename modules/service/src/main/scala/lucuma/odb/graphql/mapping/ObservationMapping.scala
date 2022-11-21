@@ -5,8 +5,15 @@ package lucuma.odb.graphql
 
 package mapping
 
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.*
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Type
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.binding.BooleanBinding
 
 import table.ObservationView
 import table.ProgramTable
@@ -27,12 +34,33 @@ trait ObservationMapping[F[_]]
         SqlField("activeStatus", ObservationView.ActiveStatus),
         SqlField("visualizationTime", ObservationView.VisualizationTime),
         SqlObject("posAngleConstraint"),
+        SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
         SqlObject("scienceRequirements"),
         SqlObject("observingMode"),
-        SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
+        RootEffect.computeCursor("itc") { (_, tpe, env) =>
+          val useCache = env.get[Boolean]("useCache").getOrElse(true)
+          itcQuery(tpe, useCache)
+        }
       )
+    )
+
+  def itcQuery(tpe: Type, useCache: Boolean): F[Result[Cursor]]
+
+  lazy val ObservationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
+    Map(
+      ObservationType -> {
+        case Select("itc", List(
+          BooleanBinding("useCache", rUseCache)
+        ), child) =>
+          rUseCache.map { useCache =>
+            Environment(
+              Env("useCache" -> useCache),
+              Select("itc", Nil, child)
+            )
+          }
+      }
     )
 
 }
