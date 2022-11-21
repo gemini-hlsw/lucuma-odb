@@ -124,16 +124,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         // .flatTap(_ => Resource.eval(IO.println("  • Server started.")))
     }
 
-  private def transactionalClient(user: User)(svr: Server): Resource[IO, TransactionalClient[IO, Nothing]] =
+  private def transactionalClient(user: User)(svr: Server): IO[TransactionalClient[IO, Nothing]] =
     for {
       xbe <- JdkHttpClient.simple[IO].map(Http4sBackend[IO](_))
       uri  = svr.baseUri / "odb"
-      xc  <- Resource.eval(TransactionalClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, Gid[User.Id].fromString.reverseGet(user.id)))))(Async[IO], xbe, Logger[IO]))
+      xc  <- TransactionalClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, Gid[User.Id].fromString.reverseGet(user.id)))))(Async[IO], xbe, Logger[IO])
     } yield xc
 
   private def streamingClient(user: User)(svr: Server): Resource[IO, ApolloWebSocketClient[IO, Nothing]] =
     for {
-      sbe <- JdkWSClient.simple[IO].map(Http4sWSBackend[IO](_))
+      sbe <- Resource.eval(JdkWSClient.simple[IO].map(Http4sWSBackend[IO](_)))
       uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
       sc  <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[IO], Logger[IO], sbe))
       ps   = Map("Authorization" -> Json.fromString(s"Bearer ${Gid[User.Id].fromString.reverseGet(user.id)}"))
@@ -164,7 +164,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     def connection(user: User): Server => Resource[IO, TransactionalClient[IO, Nothing]] =
       this match {
-        case ClientOption.Http => transactionalClient(user)
+        case ClientOption.Http => s => Resource.eval(transactionalClient(user)(s))
         case ClientOption.Ws   => streamingClient(user)
       }
 
