@@ -246,27 +246,24 @@ object OdbMapping {
             useCache: Boolean
           ): F[Result[Cursor]] =
             // Simulated ITC call result.
-            Applicative[F].pure(
-              Result(
-                CirceCursor(
-                  Context(tpe),
-                  json"""{
-                    "exposureTime": {
-                       "microsceconds": 10000000,
-                       "milliseconds": 10000,
-                       "seconds": 10,
-                       "minutes": 0.16666667,
-                       "hours": 0.00277778,
-                       "iso": "PT10.0S"
-                    },
-                    "exposures": 11,
-                    "signalToNoise": 77.7
-                  }""",
-                  None,
-                  Env.empty
-                )
+            Result(
+              circeCursor(
+                tpe,
+                Env.empty,
+                json"""{
+                  "exposureTime": {
+                     "microsceconds": 10000000,
+                     "milliseconds": 10000,
+                     "seconds": 10,
+                     "minutes": 0.16666667,
+                     "hours": 0.00277778,
+                     "iso": "PT10.0S"
+                  },
+                  "exposures": 11,
+                  "signalToNoise": 77.7
+                }"""
               )
-            )
+            ).pure[F]
         }
       }
     }

@@ -10,7 +10,7 @@ import lucuma.odb.graphql.table.ObservationView
 
 
 // This is an experiment.  It seems like this shouldn't be needed and in any
-// case this is doesn't work.
+// case this doesn't work.
 trait ItcSuccessMapping[F[_]]
   extends ObservationView[F] { this: SkunkMapping[F] =>
 
