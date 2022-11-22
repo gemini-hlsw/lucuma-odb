@@ -4331,10 +4331,11 @@ type Observation {
   observingMode: ObservingMode
 
   # Gathers the parameters and calls the ITC, returning the ITC execution results.
-  itc(
-    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
-    useCache: Boolean! = true
-  ): ItcSuccess
+#  itc(
+#    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+#    useCache: Boolean! = true
+#  ): ItcSuccess
+  itc: ItcSuccess
 
   # Manual instrument configuration
   manualConfig: ManualConfig

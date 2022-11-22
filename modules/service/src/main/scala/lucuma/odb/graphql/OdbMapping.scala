@@ -222,7 +222,7 @@ object OdbMapping {
               List(
                 MutationElaborator,
                 ProgramElaborator,
-                ObservationElaborator,
+//                ObservationElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
                 QueryElaborator,
@@ -240,7 +240,7 @@ object OdbMapping {
             super.fetch(fragment, codecs)
           }
 
-          // dummy for now
+          // dummy (and unused) for now
           override def itcQuery(
             tpe: Type,
             useCache: Boolean

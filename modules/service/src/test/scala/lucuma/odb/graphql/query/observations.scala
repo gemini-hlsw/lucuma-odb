@@ -124,29 +124,16 @@ class observations extends OdbSuite {
     }
   }
 
-  test("temp itc call test") {
-    createProgram(pi2).flatMap { pid =>
-      createObservation(pi2, pid).flatMap { oid =>
-        expect(
-          user  = pi2,
-          query = s"""
-            query {
+  /*
               observations(LIMIT: 1) {
                 matches {
-                  itc(useCache: true) {
-                    exposureTime {
-                      seconds
-                    }
-                    exposures
-                    signalToNoise
-                  }
+                  id
                 }
               }
-            }
-          """,
-          expected =
-            Right(Json.obj(
-              "observations" -> Json.obj(
+*/
+
+  /*
+                "observations" -> Json.obj(
                 "matches" -> Json.fromValues(
                   List(
                     Json.obj(
@@ -159,6 +146,37 @@ class observations extends OdbSuite {
                       )
                     )
                   )
+                )
+              )
+*/
+
+  test("temp itc call test") {
+    createProgram(pi2).flatMap { pid =>
+      createObservation(pi2, pid).flatMap { oid =>
+        expect(
+          user  = pi2,
+          query = s"""
+            query {
+              observation(observationId: ${oid.toString.asJson}) {
+                itc {
+                  exposureTime {
+                    seconds
+                  }
+                  exposures
+                  signalToNoise
+                }
+              }
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "observation" -> Json.obj(
+                "itc" -> Json.obj(
+                  "exposureTime" -> Json.obj(
+                    "seconds" -> 10.asJson
+                  ),
+                  "exposures" -> 11.asJson,
+                  "signalToNoise" -> 77.7.asJson
                 )
               )
             )
