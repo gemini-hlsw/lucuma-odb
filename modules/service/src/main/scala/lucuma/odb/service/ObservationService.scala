@@ -8,7 +8,16 @@ import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Sync
-import cats.syntax.all.*
+import cats.syntax.apply.*
+import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
+import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
+import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
+import cats.syntax.option.*
+import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Problem
 import edu.gemini.grackle.Result
@@ -33,7 +42,10 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
+import lucuma.core.model.ElevationRange.AirMass
+import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
+import lucuma.core.model.ElevationRange.AirMass.max
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Observation
@@ -86,10 +98,22 @@ sealed trait ObservationService[F[_]] {
     which: AppliedFragment
   ): F[Result[List[Observation.Id]]]
 
+  def selectItcParams(
+    programId: Program.Id,
+    which:     List[Observation.Id]
+  ): F[Map[Observation.Id, ObservationService.ItcParams]]
+
 }
 
 
 object ObservationService {
+
+  final case class ItcParams(
+    constraints:     ConstraintSet,
+    signalToNoise:   PosBigDecimal,
+    signalToNoiseAt: Option[Wavelength],
+    observingMode:   ObservingModeType
+  )
 
   final case class DatabaseConstraint(
     constraint: String,
@@ -132,12 +156,10 @@ object ObservationService {
 
   def fromSessionAndUser[F[_]: Sync: Trace](
     session: Session[F],
-    user:    User
+    user:    User,
+    observingModeServices: ObservingModeServices[F]
   ): ObservationService[F] =
     new ObservationService[F] {
-
-      lazy val observingModeServices: ObservingModeServices[F] =
-        ObservingModeServices.fromSession(session)
 
       override def createObservation(
         programId: Program.Id,
@@ -264,10 +286,23 @@ object ObservationService {
             } yield r
           }
         }
+
+      override def selectItcParams(
+        programId: Program.Id,
+        which:     List[Observation.Id]
+      ): F[Map[Observation.Id, ItcParams]] =
+        NonEmptyList.fromList(which).fold(Applicative[F].pure(Map.empty[Observation.Id, ItcParams])) { oids =>
+          val (af, decoder) = Statements.selectItcParams(user, programId, oids)
+          session
+            .prepare(af.fragment.query(decoder))
+            .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
+            .map(_.collect { case (oid, Some(itc)) => (oid, itc) }.toMap)
+        }
     }
 
   object Statements {
 
+    import ProgramService.Statements.existsUserAccess
     import ProgramService.Statements.whereUserAccess
 
     def insertObservationAs(
@@ -454,6 +489,80 @@ object ObservationService {
         void"WHERE c_observation_id IN ("                                      |+|
           observationIds.map(sql"$observation_id").intercalate(void", ")       |+|
         void")"
+
+    val elevation_range: Decoder[ElevationRange] = {
+      (air_mass_range_value.opt   ~
+       air_mass_range_value.opt   ~
+       hour_angle_range_value.opt ~
+       hour_angle_range_value.opt
+      ).emap { case (((am_min, am_max), ha_min), ha_max) =>
+
+        val am = (am_min, am_max).traverseN { case (min, max) =>
+          for {
+            n <- DecimalValue.from(min.value)
+            x <- DecimalValue.from(max.value)
+            a <- AirMass.fromOrderedDecimalValues.getOption((n, x)).toRight(s"airmass min and max out of order: ($min, $max)")
+          } yield a
+        }
+
+        val ha = (ha_min, ha_max).traverseN { case (min, max) =>
+          for {
+            n <- DecimalHour.from(min)
+            x <- DecimalHour.from(max)
+            h <- HourAngle.fromOrderedDecimalHours.getOption((n, x)).toRight(s"hour angle min and max out of order: ($min, $max)")
+          } yield h
+        }
+
+        for {
+          a <- am
+          h <- ha
+          e <- a.orElse(h).toRight("Undefined elevation range")
+        } yield e
+      }
+    }
+
+    val conditions_set: Decoder[ConstraintSet] =
+      (image_quality    ~
+       cloud_extinction ~
+       sky_background   ~
+       water_vapor      ~
+       elevation_range
+      ).gmap[ConstraintSet]
+
+    val itc_params_opt: Decoder[Option[ItcParams]] =
+      (conditions_set ~ signal_to_noise.opt ~ wavelength_pm.opt ~ observing_mode_type.opt)
+        .map { case (((cs, s2n), w), om) =>
+          for {
+            s <- s2n
+            m <- om
+          } yield ItcParams(cs, s, w, m)
+        }
+
+    def selectItcParams(
+      user:      User,
+      programId: Program.Id,
+      which:     NonEmptyList[Observation.Id]
+    ): (AppliedFragment, Decoder[(Observation.Id, Option[ItcParams])]) =
+      (void"""
+        SELECT
+          c_observation_id,
+          c_image_quality,
+          c_cloud_extinction,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_spec_signal_to_noise,
+          c_spec_signal_to_noiseAt,
+          c_observing_mode_type
+        FROM t_observation
+        WHERE c_observation_id IN (""" |+|
+          which.map(sql"$observation_id").intercalate(void", ") |+|
+        void")" |+| existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af },
+        (observation_id ~ itc_params_opt)
+      )
 
     def posAngleConstraintUpdates(in: PosAngleConstraintInput): List[AppliedFragment] = {
 

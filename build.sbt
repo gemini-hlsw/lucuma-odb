@@ -22,6 +22,7 @@ val natchezVersion             = "0.1.6"
 val postgresVersion            = "42.5.1"
 val skunkVersion               = "0.3.2"
 val lucumaSsoVersion           = "0.4.4"
+val lucumaItcVersion           = "0.3"
 val testcontainersScalaVersion = "0.40.12"
 
 enablePlugins(NoPublishPlugin)
@@ -42,6 +43,7 @@ lazy val service = project
       "com.monovore"   %% "decline"                         % declineVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
+      "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
       "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,

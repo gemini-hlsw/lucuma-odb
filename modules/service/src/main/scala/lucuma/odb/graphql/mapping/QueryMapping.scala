@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.effect.Resource
 import cats.effect.kernel.Par
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
@@ -26,6 +27,7 @@ import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.service.ItcClientService
 import lucuma.odb.instances.given
 
 import scala.reflect.ClassTag
@@ -38,6 +40,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProgramMapping[F]
    with ObservationMapping[F] =>
 
+  def itcClientService: Resource[F, ItcClientService[F]]
 
   lazy val QueryMapping =
     ObjectMapping(
