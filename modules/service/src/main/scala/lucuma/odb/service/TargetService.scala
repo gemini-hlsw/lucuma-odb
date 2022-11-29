@@ -3,15 +3,19 @@
 
 package lucuma.odb.service
 
-import cats.effect.MonadCancelThrow
+import cats.Applicative
+import cats.data.NonEmptyList
+import cats.effect.Sync
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
+import lucuma.core.math.RadialVelocity
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
+import lucuma.core.model.SourceProfile
 import lucuma.core.model.StandardRole.Admin
 import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
@@ -25,6 +29,7 @@ import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.instances.SourceProfileCodec.given
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
+import skunk.Decoder
 import skunk.Session
 import skunk.circe.codec.all._
 import skunk.codec.all._
@@ -33,9 +38,16 @@ import skunk.implicits._
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse
   def createTarget(pid: Program.Id, input: TargetPropertiesInput): F[CreateTargetResponse]
+
+  def selectItcParams(targetIds: List[Target.Id]): F[Map[Target.Id, TargetService.ItcParams]]
 }
 
 object TargetService {
+
+  final case class ItcParams(
+    sourceProfile:  SourceProfile,
+    radialVelocity: RadialVelocity
+  )
 
   sealed trait CreateTargetResponse
   object CreateTargetResponse {
@@ -45,7 +57,7 @@ object TargetService {
   }
   import CreateTargetResponse._
 
-    def fromSession[F[_]: MonadCancelThrow](s: Session[F], u: User): TargetService[F] =
+    def fromSession[F[_]: Sync](s: Session[F], u: User): TargetService[F] =
       new TargetService[F] {
         import Statements._
 
@@ -65,10 +77,41 @@ object TargetService {
           }
         }
 
+        override def selectItcParams(targetIds: List[Target.Id]): F[Map[Target.Id, ItcParams]] =
+          NonEmptyList.fromList(targetIds).fold(Applicative[F].pure(Map.empty[Target.Id, ItcParams])) { tids =>
+            val (af, decoder) = Statements.selectItcParams(tids)
+            s.prepare(af.fragment.query(decoder))
+             .use(_.stream(af.argument, 64).compile.to(List))
+             .map(_.collect { case (tid, Some(itc)) => (tid, itc) }.toMap)
+           }
+
       }
 
 
   object Statements {
+
+    val itc_params_opt: Decoder[Option[ItcParams]] =
+      (radial_velocity.opt ~ json).map { case (rv, sp) =>
+        (sp.as[SourceProfile].toOption, rv).mapN { (s, r) => ItcParams(s, r) }
+      }
+
+    def selectItcParams(
+      which: NonEmptyList[Target.Id]
+    ): (AppliedFragment, Decoder[(Target.Id, Option[ItcParams])]) =
+      (void"""
+        SELECT
+          c_target_id,
+          c_sid_rv,
+          c_source_profile
+        FROM
+          t_target
+        WHERE
+          c_target_id IN (""" |+|
+            which.map(sql"${target_id}").intercalate(void", ") |+|
+          void")",
+       (target_id ~ itc_params_opt)
+      )
+
 
     import ProgramService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
 

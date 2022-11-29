@@ -25,6 +25,11 @@ import skunk.implicits.*
 
 trait AsterismService[F[_]] {
 
+  def selectAsterism(
+    programId:      Program.Id,
+    observationIds: NonEmptyList[Observation.Id]
+  ): F[Map[Observation.Id, List[Target.Id]]]
+
   /**
    * Inserts (program, observation, target) triplets covering all combinations.
    * In other words, every observation in `observationIds` will be given all
@@ -46,7 +51,7 @@ trait AsterismService[F[_]] {
   ): F[Result[Unit]]
 
   /**
-   * Replaces the existing asterisms assocaited with the given observation ids
+   * Replaces the existing asterisms associated with the given observation ids
    * (if any) with the given targets.  This is essentially a delete followed
    * by an insert.
    */
@@ -77,27 +82,26 @@ object AsterismService {
   ): String =
     s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
 
-
-  /*
-  create table t_asterism_target (
-
-    c_program_id     d_program_id     not null,
-    c_observation_id d_observation_id not null,
-    c_target_id      d_target_id      not null,
-
-    foreign key (c_program_id, c_observation_id) references t_observation(c_program_id, c_observation_id),
-    foreign key (c_program_id, c_target_id)      references t_target(c_program_id, c_target_id),
-    constraint t_asterism_target_pkey primary key (c_program_id, c_observation_id, c_target_id)
-
-  )
-  */
-
   def fromSessionAndUser[F[_]: Sync](
     session: Session[F],
     user:    User
   ): AsterismService[F] =
 
     new AsterismService[F] {
+
+      override def selectAsterism(
+        programId:      Program.Id,
+        observationIds: NonEmptyList[Observation.Id]
+      ): F[Map[Observation.Id, List[Target.Id]]] = {
+        val (af, decoder) = Statements.selectLinksAs(user, programId, observationIds)
+        session.prepare(af.fragment.query(decoder)).use { p =>
+          p.stream(af.argument, 64)
+           .compile
+           .toList
+           .map(_.groupMap(_._1)(_._2))
+        }
+      }
+
       override def insertAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
@@ -159,6 +163,23 @@ object AsterismService {
   object Statements {
 
     import ProgramService.Statements.{existsUserAccess, whereUserAccess}
+
+    def selectLinksAs(
+      user:           User,
+      programId:      Program.Id,
+      observationIds: NonEmptyList[Observation.Id]
+    ): (AppliedFragment, Decoder[(Observation.Id, Target.Id)]) =
+      (void"""
+        SELECT
+          c_observation_id,
+          c_target_id
+        FROM
+          t_asterism_target
+        WHERE """ |+| programIdEqual(programId)               |+|
+          void""" AND """ |+| observationIdIn(observationIds) |+|
+          andExistsUserAccess(user, programId),
+        observation_id ~ target_id
+      )
 
     def insertLinksAs(
       user:           User,

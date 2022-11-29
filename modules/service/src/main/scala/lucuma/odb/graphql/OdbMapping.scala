@@ -31,7 +31,9 @@ import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
+import lucuma.odb.service.ItcClientService
 import lucuma.odb.service.ObservationService
+import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.TargetService
 import natchez.Trace
@@ -152,13 +154,25 @@ object OdbMapping {
             pool.map(AsterismService.fromSessionAndUser(_, user))
 
           override val observationService: Resource[F, ObservationService[F]] =
-            pool.map(ObservationService.fromSessionAndUser(_, user))
+            pool.map { s =>
+              val oms = ObservingModeServices.fromSession(s)
+              ObservationService.fromSessionAndUser(s, user, oms)
+            }
 
           override val programService: Resource[F, ProgramService[F]] =
             pool.map(ProgramService.fromSessionAndUser(_, user))
 
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
+
+          override val itcClientService: Resource[F, ItcClientService[F]] =
+            pool.map { s =>
+              val m = ObservingModeServices.fromSession(s)
+              val o = ObservationService.fromSessionAndUser(s, user, m)
+              val a = AsterismService.fromSessionAndUser(s, user)
+              val t = TargetService.fromSession(s, user)
+              ItcClientService.fromSession(s, user, o, m, a, t)
+            }
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
