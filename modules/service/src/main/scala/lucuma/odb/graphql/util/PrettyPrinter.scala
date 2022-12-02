@@ -1,0 +1,123 @@
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql.util
+
+import edu.gemini.grackle.Query
+import org.typelevel.paiges.Doc
+import org.typelevel.paiges.Doc.{ text, space, char, intercalate, line, str }
+import edu.gemini.grackle.Query.*
+import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.Term
+import edu.gemini.grackle.PathTerm
+import edu.gemini.grackle.Cursor.Env.EmptyEnv
+import edu.gemini.grackle.Cursor.Env.NonEmptyEnv
+import edu.gemini.grackle.Predicate.ToLowerCase.apply
+
+/** Paiges combinators for Grackle queries. */
+object PrettyPrinter {
+
+  object Paren:
+    val Open = char('(')
+    val Close = char(')')
+
+  object Bracket:
+    val Open = char('[')
+    val Close = char(']')
+
+  val Comma = char(',')
+
+  def prop(key: String, value: Doc): Doc =
+    (text(key) + char(':') + space + value)
+
+  def elems(ds: List[Doc], delim: Doc = Comma): Doc =
+    intercalate(Comma + line, ds).grouped
+
+  def quoted(s: String): Doc =
+    char('"') + text(s) + char('"')
+
+  def obj(name: String, ps: (String, Doc)*): Doc =
+    obj(name, ps.map(prop): _*)
+
+  def obj(name: String, vs: Doc*)(using DummyImplicit): Doc =
+    elems(vs.toList).tightBracketBy(text(name) + Paren.Open, Paren.Close)
+
+  def query(q: Query): Doc =
+    q match
+ 
+      case Select(name, args, child) => 
+        var props = List("name" -> quoted(name))
+        if args.nonEmpty then props :+= "args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close)
+        if child != Query.Empty then props :+= "child" -> query(child)
+        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
+ 
+      case Group(queries)                  => obj("Group", queries.map(query):_*)
+      case Unique(child)                   => obj("Unique", query(child))
+      case Filter(pred, child)             => obj("Filter", "pred" -> predicate(pred), "child" -> query(child))
+      case Component(mapping, join, child) => obj("Component", "mapping" -> str("<mapping>"), "join" -> str("<function>") , "child" -> query(child))
+      case Introspect(schema, child)       => obj("Introspect", "schema" -> str("<schema>"), "child" -> query(child))
+      case Defer(join, child, rootTpe)     => obj("Defer", "join" -> str("<function>"), "child" -> query(child), "rootTpe" -> str(rootTpe))
+      case Environment(e, child)           => obj("Environment", "env" -> env(e), "child" -> query(child))
+      case Wrap(name, child)               => obj("Wrap", "name" -> quoted(name), "child" -> query(child))
+      case Rename(name, child)             => obj("Rename", "name" -> quoted(name), "child" -> query(child))
+      case UntypedNarrow(tpnme, child)     => obj("UntypedNarrow", "tpname" -> quoted(tpnme), "child" -> query(child))
+      case Narrow(subtpe, child)           => obj("Narrow", "subtpe" -> str(subtpe), "child" -> query(child))
+      case Skip(sense, cond, child)        => obj("Skip", "sense" -> str(sense), "cond" -> str(cond), "child" -> query(child))
+      case Limit(num, child)               => obj("Limit", "num" -> str(num), "child" -> query(child))
+      case Offset(num, child)              => obj("Offset", "num" -> str(num), "child" -> query(child))
+      case OrderBy(selections, child)      => obj("OrderBy", "selections" -> orderSelections(selections), "child" -> query(child))
+      case Count(name, child)              => obj("Limit", "name" -> quoted(name), "child" -> query(child))
+      case TransformCursor(f, child)       => obj("TransformCursor", "f" -> text("<function>"), "child" -> query(child))
+      case Skipped                         => text("Skipped")
+      case Empty                           => text("Empty")
+    
+  def binding(b: Binding): Doc =
+    obj("Binding", "name" -> quoted(b.name), "value" -> str(b.value))
+
+  def env(e: Env): Doc =
+    e match
+      case EmptyEnv => text("{}")
+      case NonEmptyEnv(kvs) => elems(kvs.toList.map((k, v) => prop(k, str(v)))).tightBracketBy(char('{'), char('}'))
+    
+  def orderSelections(sel: OrderSelections): Doc =
+    elems(sel.selections.map(orderSelection)).tightBracketBy(Bracket.Open, Bracket.Close)
+
+  def orderSelection[A](sel: OrderSelection[A]): Doc =
+    obj("OrderSelection", "term" -> term(sel.term), "ascending" -> str(sel.ascending), "nullsLast" -> str(sel.nullsLast))
+
+  def predicate(pred: Predicate): Doc =
+    pred match
+      case Predicate.And(x, y)             => obj("And", predicate(x), predicate(y))
+      case Predicate.AndB(x, y)            => obj("AndB", term(x), term(y))
+      case Predicate.Contains(a, as)       => obj("Contains", term(a), term(as))
+      case Predicate.Eql(x, y)             => obj("Eql", term(x), term(y))
+      case Predicate.False                 => text("False")
+      case Predicate.Gt(x, y)              => obj("Gt", term(x), term(y))
+      case Predicate.GtEql(x, y)           => obj("GtEql", term(x), term(y))
+      case Predicate.In(t, ts)             => obj("In", term(t), elems(ts.map(str)).tightBracketBy(Bracket.Open, Bracket.Close))
+      case Predicate.IsNull(x, isNull)     => obj("IsNull", term(x), str(isNull))
+      case Predicate.Lt(x, y)              => obj("Lt", term(x), term(y))
+      case Predicate.LtEql(x, y)           => obj("LtEql", term(x), term(y))
+      case Predicate.Matches(x, r)         => obj("Matches", term(x), str(r))
+      case Predicate.NEql(x, y)            => obj("NEql", term(x), term(y))
+      case Predicate.Not(x)                => obj("Not", predicate(x))
+      case Predicate.NotB(x)               => obj("NotB", term(x))
+      case Predicate.Or(x, y)              => obj("Or", predicate(x), predicate(y))
+      case Predicate.OrB(x, y)             => obj("OrB", term(x), term(y))
+      case Predicate.StartsWith(x, prefix) => obj("StartsWith", term(x), quoted(prefix))
+      case Predicate.True                  => text("True")
+      case p                               => text(s"<Predicate:${p.getClass.getSimpleName}>")
+
+  def term[A](t: Term[A]): Doc =
+    t match
+      case p: Predicate => predicate(p) // Predicate <: Term[Boolean]
+      case PathTerm.ListPath(ss) => obj("ListPath", ss.map(quoted): _*)
+      case PathTerm.UniquePath(ss) => obj("UniquePath", ss.map(quoted): _*)
+      case Predicate.Const(a: String) => obj("Const", quoted(a))
+      case Predicate.Const(a) => obj("Const", str(a))
+      case Predicate.ToLowerCase(x) => obj("ToLowerCase", term(x))
+      case Predicate.ToUpperCase(x) => obj("ToUpperCase", term(x))
+      case t => text(s"<Term:${t.getClass.getSimpleName}>")
+
+}

@@ -4,9 +4,8 @@
 package lucuma.odb.graphql.predicate
 
 import edu.gemini.grackle.Path
-import lucuma.core.model.Program
 
-class ConstraintSetGroupPredicates(path: Path) {
-  val programId = LeafPredicates[Program.Id](path / "programId")
-  val observations = ObservationSelectResultPredicates(path / "observations")
+case class ObservationSelectResultPredicates(path: Path) {
+  val hasMore = LeafPredicates[Boolean](path / "hasMore")
+  val matches = ObservationPredicates(path / "matches")
 }

@@ -23,6 +23,7 @@ val postgresVersion            = "42.5.0"
 val skunkVersion               = "0.3.2"
 val lucumaSsoVersion           = "0.4.3"
 val testcontainersScalaVersion = "0.40.11"
+val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
 
@@ -67,6 +68,7 @@ lazy val service = project
       "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
       "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
+      "org.typelevel"  %% "paiges-core"                     % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
     reStart / envVars += "PORT" -> "8082",
