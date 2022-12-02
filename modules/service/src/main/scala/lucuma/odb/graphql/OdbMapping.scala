@@ -37,6 +37,9 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
+import edu.gemini.grackle.Cursor.Env
+import io.circe.Json
+import fs2.Stream
 
 object OdbMapping {
 
@@ -227,7 +230,11 @@ object OdbMapping {
               ).combineAll
             )
 
-          // Override `fetch` to log the query. This is optional.
+          // Override `defaultRootCursor` to log the GraphQL query. This is optional.
+          override def defaultRootCursor(query: Query, tpe: Type, env: Env): F[Result[(Query, Cursor)]] =
+            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") *> super.defaultRootCursor(query, tpe, env)
+
+          // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)

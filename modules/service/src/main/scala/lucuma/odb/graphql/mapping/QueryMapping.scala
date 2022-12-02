@@ -72,34 +72,38 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   // Elaborators below
 
-  private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = {
-    case Select("constraintSetGroup", List(
-      ProgramIdBinding("programId", rProgramId),
-      _, // TODO: WHERE
-      NonNegIntBinding.Option("LIMIT", rLIMIT),
-      BooleanBinding("includeDeleted", rIncludeDeleted)
-    ), child) =>
-      (rProgramId, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, LIMIT, includeDeleted) =>
-        val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-        ResultMapping.selectResult("constraintSetGroup", child, limit) { q =>         
-          FilterOrderByOffsetLimit(
-            pred = Some(
-              and(List(
-                Predicates.constraintSetGroup.programId.eql(pid),
-                // Predicates.constraintSetGroup.programId.existence.includeDeleted(includeDeleted),
-                // Predicates.constraintSetGroup.programId.isVisibleTo(user),
-              ))
-            ),
-            oss = Some(List(
-              OrderSelection[String](ConstraintSetGroupType / "key")
-            )),
-            offset = None,
-            limit = Some(limit + 1), // Select one extra row here.
-            child = q
-          )
+  private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = 
+    val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations")
+    {
+      case Select("constraintSetGroup", List(
+        ProgramIdBinding("programId", rProgramId),
+        WhereObservationBinding.Option("WHERE", rWHERE),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      ), child) =>
+        (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult("constraintSetGroup", child, limit) { q =>         
+            FilterOrderByOffsetLimit(
+              pred = Some(
+                and(List(
+                  WHERE.getOrElse(True),
+                  Predicates.constraintSetGroup.programId.eql(pid),
+                  Predicates.constraintSetGroup.observations.matches.existence.includeDeleted(includeDeleted),
+                  Predicates.constraintSetGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
+                  Predicates.constraintSetGroup.observations.matches.program.isVisibleTo(user),
+                ))
+              ),
+              oss = Some(List(
+                OrderSelection[String](ConstraintSetGroupType / "key")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
         }
-      }
-  }
+    }
 
   private lazy val FilterTypeMeta: PartialFunction[Select, Result[Query]] =
     case Select("filterTypeMeta", Nil, child) =>
