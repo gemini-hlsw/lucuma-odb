@@ -421,12 +421,14 @@ input FluxDensity {
 input FluxDensityContinuumIntegratedInput {
   value: PosBigDecimal!
   units: FluxDensityContinuumIntegratedUnits!
+  error: PosBigDecimal
 }
 
 # A flux density continuum value with surface units
 input FluxDensityContinuumSurfaceInput {
   value: PosBigDecimal!
   units: FluxDensityContinuumSurfaceUnits!
+  error: PosBigDecimal
 }
 
 # Create or edit a gaussian source.  Specify both "fwhm" and "spectralDefinition" when creating a new Gaussian.
@@ -3328,6 +3330,7 @@ type FixedExposureMode {
 type FluxDensityContinuumIntegrated {
   value: PosBigDecimal!
   units: FluxDensityContinuumIntegratedUnits!
+  error: PosBigDecimal
 }
 
 # Flux density continuum integrated units
@@ -3342,6 +3345,7 @@ enum FluxDensityContinuumIntegratedUnits {
 type FluxDensityContinuumSurface {
   value: PosBigDecimal!
   units: FluxDensityContinuumSurfaceUnits!
+  error: PosBigDecimal
 }
 
 # Flux density continuum surface units

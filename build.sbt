@@ -47,6 +47,7 @@ lazy val service = project
       "io.circe"       %% "circe-parser"                    % circeVersion,
       "io.circe"       %% "circe-literal"                   % circeVersion,
       "io.circe"       %% "circe-refined"                   % circeVersion,
+      "io.circe"       %% "circe-testing"                   % circeVersion               % Test,
       "is.cir"         %% "ciris"                           % cirisVersion,
       "org.flywaydb"   %  "flyway-core"                     % flywayVersion,
       "org.http4s"     %% "http4s-jdk-http-client"          % http4sJdkHttpClientVersion,
