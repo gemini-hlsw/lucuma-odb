@@ -12,12 +12,15 @@ import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
+import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import edu.gemini.grackle.sql.SqlMapping
+import fs2.Stream
 import fs2.concurrent.Topic
+import io.circe.Json
 import lucuma.core.model.User
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.FilterTypeEnumType
@@ -37,9 +40,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
-import edu.gemini.grackle.Cursor.Env
-import io.circe.Json
-import fs2.Stream
 
 object OdbMapping {
 

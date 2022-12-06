@@ -3,17 +3,22 @@
 
 package lucuma.odb.graphql.util
 
-import edu.gemini.grackle.Query
-import org.typelevel.paiges.Doc
-import org.typelevel.paiges.Doc.{ text, space, char, intercalate, line, str }
-import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Term
-import edu.gemini.grackle.PathTerm
 import edu.gemini.grackle.Cursor.Env.EmptyEnv
 import edu.gemini.grackle.Cursor.Env.NonEmptyEnv
+import edu.gemini.grackle.PathTerm
+import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.ToLowerCase.apply
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.*
+import edu.gemini.grackle.Term
+import org.typelevel.paiges.Doc
+import org.typelevel.paiges.Doc.char
+import org.typelevel.paiges.Doc.intercalate
+import org.typelevel.paiges.Doc.line
+import org.typelevel.paiges.Doc.space
+import org.typelevel.paiges.Doc.str
+import org.typelevel.paiges.Doc.text
 
 /** Paiges combinators for Grackle queries. */
 object PrettyPrinter {
