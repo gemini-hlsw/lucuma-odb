@@ -46,6 +46,7 @@ import lucuma.core.model.UnnormalizedSED.Quasar
 import lucuma.core.model.UnnormalizedSED.StellarLibrary
 import lucuma.core.model.UnnormalizedSED.UserDefined
 import lucuma.core.util.Enumerated
+import lucuma.core.util.*
 
 import scala.collection.immutable.SortedMap
 
@@ -120,7 +121,7 @@ trait SourceProfileCodecHelper {
         v <- c.downField("value").as[N]
         u <- c.downField("units").as[Units Of T]
         e <- c.downField("error").as[Option[N]]
-      } yield lucuma.core.math.dimensional.tag[T](Measure[N](v, u, e))
+      } yield tag[T](Measure[N](v, u, e))
   }
 
   // Map entry (A, B) with named keys
@@ -216,7 +217,7 @@ trait SourceProfileCodecHelper {
 
     def apply(c: HCursor): Decoder.Result[BandNormalized[T]] =
       for {
-        s <- c.downField("sed").as[UnnormalizedSED]
+        s <- c.downField("sed").as[Option[UnnormalizedSED]]
         b <- decodeBrightnessMap(c.downField("brightnesses"))
       } yield BandNormalized(s, b)
 

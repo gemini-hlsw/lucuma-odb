@@ -12,7 +12,7 @@ val http4sJdkHttpClientVersion = "0.8.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.5"
 val log4catsVersion            = "2.5.0"
-val lucumaCoreVersion          = "0.58.0"
+val lucumaCoreVersion          = "0.60.0"
 val lucumaGraphQLRoutesVersion = "0.5.5"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -43,6 +43,7 @@ lazy val service = project
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
       "io.circe"       %% "circe-parser"                    % circeVersion,
       "io.circe"       %% "circe-literal"                   % circeVersion,
