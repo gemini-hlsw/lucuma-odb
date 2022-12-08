@@ -150,7 +150,7 @@ trait GmosLongSlitMapping[F[_]]
             "defaultXBin",
             fpu => GmosLongSlitMath.xbinNorth(
               fpu,
-              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V), SortedMap.empty)),
+              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V).some, SortedMap.empty)),
               /*placeholder*/ ImageQuality.TwoPointZero,  // so the FPU size is the effective slit width for now
               PosDouble.unsafeFrom(2.0)
             )
@@ -252,7 +252,7 @@ trait GmosLongSlitMapping[F[_]]
             "defaultXBin",
             fpu => GmosLongSlitMath.xbinSouth(
               fpu,
-              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V), SortedMap.empty)),
+              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V).some, SortedMap.empty)),
               /*placeholder*/ ImageQuality.TwoPointZero,  // so the FPU size is the effective slit width for now
               PosDouble.unsafeFrom(2.0)
             )

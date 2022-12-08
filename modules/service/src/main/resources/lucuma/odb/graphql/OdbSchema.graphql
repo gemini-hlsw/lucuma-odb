@@ -102,18 +102,18 @@ input BandBrightnessSurfaceInput {
   error: BigDecimal
 }
 
-# Create or edit a band normalized value with integrated magnitude units.  Specify both "sed" and "brightnesses" when creating a new BandNormalizedIntegrated.
+# Create or edit a band normalized value with integrated magnitude units.  Specify at least "brightnesses" when creating a new BandNormalizedIntegrated.
 input BandNormalizedIntegratedInput {
-  # The sed field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
+  # The sed field is optional and nullable
   sed: UnnormalizedSedInput
 
   # The brightnesses field is required when creating a new instance of BandNormalizedIntegrated, but optional when editing
   brightnesses: [BandBrightnessIntegratedInput!]
 }
 
-# Create or edit a band normalized value with surface magnitude units.  Specify both "sed" and "brightnesses" when creating a new BandNormalizedSurface.
+# Create or edit a band normalized value with surface magnitude units.  Specify at least "brightnesses" when creating a new BandNormalizedSurface.
 input BandNormalizedSurfaceInput {
-  # The sed field is required when creating a new instance of BandNormalizedSurface, but optional when editing
+  # The sed field is optional and nullable
   sed: UnnormalizedSedInput
 
   # The brightnesses field is required when creating a new instance of BandNormalizedSurface, but optional when editing
