@@ -12,19 +12,22 @@ import edu.gemini.grackle.Result
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
 import lucuma.core.math.units._
+import lucuma.core.util.*
 import lucuma.odb.graphql.binding._
 
 object ProperMotionComponentInput {
 
   object RA {
-    val Binding = binding[VelocityAxis.RA]
+    val Binding: Matcher[ProperMotion.RA] =
+      binding[VelocityAxis.RA]
   }
 
   object Dec {
-    val Binding = binding[VelocityAxis.Dec]
+    val Binding: Matcher[ProperMotion.Dec] =
+      binding[VelocityAxis.Dec]
   }
 
-  private def binding[A]: Matcher[ProperMotion.AngularVelocityComponent[A]] =
+  private def binding[A]: Matcher[ProperMotion.AngularVelocity Of A] =
     ObjectFieldsBinding.rmap {
       case List(
         LongBinding.Option("microarcsecondsPerYear", rMicroarcsecondsPerYear),
@@ -35,7 +38,7 @@ object ProperMotionComponentInput {
         (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ).parTupled.flatMap {
           case (microarcsecondsPerYear, milliarcsecondsPerYear) =>
             List(microarcsecondsPerYear, milliarcsecondsPerYear).flatten match {
-              case List(a) => Result(ProperMotion.AngularVelocityComponent(a))
+              case List(a) => Result(ProperMotion.AngularVelocity(a).tag[A])
               case as => Result.failure(s"Expected exactly one proper motion component format; found ${as.length}.")
             }
         }
