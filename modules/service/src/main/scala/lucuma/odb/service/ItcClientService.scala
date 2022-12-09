@@ -10,7 +10,9 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import edu.gemini.grackle.Result
 import lucuma.core.enums.Band
-import lucuma.core.math.BrightnessUnits.{BrightnessMeasure, Integrated, Surface}
+import lucuma.core.math.BrightnessUnits.BrightnessMeasure
+import lucuma.core.math.BrightnessUnits.Integrated
+import lucuma.core.math.BrightnessUnits.Surface
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -19,9 +21,9 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyModeInput
+import skunk.Session
 
 import scala.collection.immutable.SortedMap
-import skunk.Session
 
 
 /*

@@ -8,9 +8,9 @@ import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Sync
-import cats.syntax.apply.*
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -43,9 +43,9 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass
-import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
 import lucuma.core.model.ElevationRange.AirMass.max
+import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Observation

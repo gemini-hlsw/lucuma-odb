@@ -27,8 +27,8 @@ import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.service.ItcClientService
 import lucuma.odb.instances.given
+import lucuma.odb.service.ItcClientService
 
 import scala.reflect.ClassTag
 

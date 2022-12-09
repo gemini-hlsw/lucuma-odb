@@ -29,8 +29,8 @@ import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ItcClientService
-import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ObservationService
+import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.TargetService
 import natchez.Trace
