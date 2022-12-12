@@ -49,23 +49,23 @@ object BandNormalizedInput {
         brightnesses.Option("brightnesses", rBrightnesses),
       ) =>
         (rSed, rBrightnesses).parTupled.flatMap {
-          case (Some(sed), Some(brightnesses)) => Result(BandNormalized(sed, brightnesses))
-          case _                               => Result.failure("Both sed and brightness are required.")
+          case (sed, Some(brightnesses)) => Result(BandNormalized(sed, brightnesses))
+          case _                         => Result.failure("Brightness is required.")
         }
     }
 
   def editBinding[A](
     brightnesses: Matcher[SortedMap[Band, BrightnessMeasure[A]]]
-    ): Matcher[BandNormalized[A] => Result[BandNormalized[A]]] =
+  ): Matcher[BandNormalized[A] => Result[BandNormalized[A]]] =
     ObjectFieldsBinding.rmap {
       case List(
-        UnnormalizedSedInput.Binding.Option("sed", rSed),
+        UnnormalizedSedInput.Binding.Nullable("sed", rSed),
         brightnesses.Option("brightnesses", rBrightnesses),
       ) =>
         (rSed, rBrightnesses).parTupled.flatMap {
           case (sed, brightnesses) =>
             Result { a0 =>
-              val a1 = sed.foldLeft(a0)((a, b) => a.copy(sed = b))
+              val a1 = sed.fold(a0.copy(sed = none), a0, b => a0.copy(sed = b.some))
               val a2 = brightnesses.foldLeft(a1)((a, b) => a.copy(brightnesses = b))
               Result(a2)
             }

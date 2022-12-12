@@ -7,6 +7,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
+import io.circe.syntax._
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -21,7 +22,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
-import lucuma.odb.graphql.instances.SourceProfileEncoder
+import lucuma.odb.graphql.instances.SourceProfileCodec.given
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Session
@@ -51,8 +52,8 @@ object TargetService {
         override def createTarget(pid: Program.Id, input: TargetPropertiesInput): F[CreateTargetResponse] = {
           val insert: AppliedFragment =
             input.tracking match {
-              case Left(s) => insertSiderealFragment(pid, input.name, s, SourceProfileEncoder.EncoderSourceProfile(input.sourceProfile))
-              case Right(n) => insertNonsiderealFragment(pid, input.name, n, SourceProfileEncoder.EncoderSourceProfile(input.sourceProfile))
+              case Left(s) => insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
+              case Right(n) => insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
             }
           val where = whereFragment(pid, u)
           val appl  = insert |+| void" " |+| where

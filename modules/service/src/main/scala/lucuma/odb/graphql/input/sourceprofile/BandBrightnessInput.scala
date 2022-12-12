@@ -10,6 +10,7 @@ import edu.gemini.grackle.Result
 import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.dimensional._
+import lucuma.core.util.*
 import lucuma.odb.graphql.binding._
 
 object BandBrightnessInput {

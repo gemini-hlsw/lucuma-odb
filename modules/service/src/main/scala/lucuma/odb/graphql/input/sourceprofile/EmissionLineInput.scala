@@ -9,8 +9,8 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.Wavelength
 import lucuma.core.math.dimensional.Measure
-import lucuma.core.math.dimensional.Of
 import lucuma.core.model.EmissionLine
+import lucuma.core.util.*
 import lucuma.odb.graphql.binding._
 
 object EmissionLineInput {
