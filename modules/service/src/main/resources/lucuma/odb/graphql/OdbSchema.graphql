@@ -2653,8 +2653,6 @@ type Angle {
 }
 
 type AsterismGroup {
-  # IDs of observations that use the same constraints
-  observationIds: [ObservationId!]!
 
   # Observations associated with the common value
   observations(
@@ -2914,8 +2912,6 @@ type ConstraintSet {
 }
 
 type ConstraintSetGroup {
-  # IDs of observations that use the same constraints
-  observationIds: [ObservationId!]!
 
   # Observations associated with the common value
   observations(
@@ -4699,6 +4695,9 @@ type Query {
 
   # Selects the first `LIMIT` matching observations based on the provided `WHERE` parameter, if any.
   observations(
+
+    programId: ProgramId
+
     # Filters the selection of observations.
     WHERE: WhereObservation
 
@@ -5500,8 +5499,6 @@ type TargetEnvironmentGroupSelectResult {
 }
 
 type TargetGroup {
-  # IDs of observations that use the same constraints
-  observationIds: [ObservationId!]!
 
   # Observations associated with the common value
   observations(

@@ -12,12 +12,15 @@ import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
+import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import edu.gemini.grackle.sql.SqlMapping
+import fs2.Stream
 import fs2.concurrent.Topic
+import io.circe.Json
 import lucuma.core.model.User
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.FilterTypeEnumType
@@ -79,6 +82,8 @@ object OdbMapping {
           with AllocationMapping[F]
           with AngleMapping[F]
           with CatalogInfoMapping[F]
+          with ConstraintSetGroupMapping[F]
+          with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
           with CreateObservationResultMapping[F]
@@ -160,6 +165,8 @@ object OdbMapping {
               AllocationMapping,
               AngleMapping,
               CatalogInfoMapping,
+              ConstraintSetGroupMapping,
+              ConstraintSetGroupSelectResultMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
               CreateObservationResultMapping,
@@ -214,6 +221,7 @@ object OdbMapping {
           override val selectElaborator: SelectElaborator =
             SelectElaborator(
               List(
+                ConstraintSetGroupElaborator,
                 MutationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,
@@ -222,7 +230,11 @@ object OdbMapping {
               ).combineAll
             )
 
-          // Override `fetch` to log the query. This is optional.
+          // Override `defaultRootCursor` to log the GraphQL query. This is optional.
+          override def defaultRootCursor(query: Query, tpe: Type, env: Env): F[Result[(Query, Cursor)]] =
+            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") *> super.defaultRootCursor(query, tpe, env)
+
+          // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
             Logger[F].info {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
