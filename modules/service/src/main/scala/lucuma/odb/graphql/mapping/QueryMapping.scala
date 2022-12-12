@@ -40,7 +40,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProgramMapping[F]
    with ObservationMapping[F] =>
 
-  def itcClientService: Resource[F, ItcClientService[F]]
+//  def itcClientService: Resource[F, ItcClientService[F]]
 
   lazy val QueryMapping =
     ObjectMapping(

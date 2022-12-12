@@ -161,14 +161,14 @@ object OdbMapping {
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
 
-          override val itcClientService: Resource[F, ItcClientService[F]] =
-            for {
-              o <- observationService
-              m <- observingModeServices
-              a <- asterismService
-              t <- targetService
-              i <- pool.map(s => ItcClientService.fromSession(s, user, o, m, a, t))
-            } yield i
+//          override val itcClientService: Resource[F, ItcClientService[F]] =
+//            for {
+//              o <- observationService
+//              m <- observingModeServices
+//              a <- asterismService
+//              t <- targetService
+//              i <- pool.map(s => ItcClientService.fromSession(s, user, o, m, a, t))
+//            } yield i
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
