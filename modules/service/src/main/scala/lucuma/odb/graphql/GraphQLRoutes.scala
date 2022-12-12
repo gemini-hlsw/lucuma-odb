@@ -12,6 +12,7 @@ import lucuma.core.model.User
 import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
+import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
@@ -37,6 +38,7 @@ object GraphQLRoutes {
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     ttl:      FiniteDuration,
+    userSvc:  UserService[F],
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
       Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
@@ -52,6 +54,9 @@ object GraphQLRoutes {
                   {
                     for {
                       user <- OptionT(client.get(a))
+                      // If the user has never hit the ODB using http then there will be no user
+                      // entry in the database. So go ahead and [re]canonicalize here to be sure.
+                      _    <- OptionT.liftF(userSvc.canonicalizeUser(user))
                       map  <- OptionT.liftF(OdbMapping(pool, monitor, user, topics))
                       svc   = new GrackleGraphQLService(map)
                     } yield svc

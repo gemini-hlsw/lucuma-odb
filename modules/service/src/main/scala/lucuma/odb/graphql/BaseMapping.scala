@@ -22,6 +22,8 @@ trait BaseMapping[F[_]]
   lazy val ClassicalType                       = schema.ref("Classical")
   lazy val CloudExtinctionType                 = schema.ref("CloudExtinction")
   lazy val ConstraintSetType                   = schema.ref("ConstraintSet")
+  lazy val ConstraintSetGroupType              = schema.ref("ConstraintSetGroup")
+  lazy val ConstraintSetGroupSelectResultType  = schema.ref("ConstraintSetGroupSelectResult")
   lazy val CoordinatesType                     = schema.ref("Coordinates")
   lazy val CreateObservationResultType         = schema.ref("CreateObservationResult")
   lazy val CreateProgramResultType             = schema.ref("CreateProgramResult")
