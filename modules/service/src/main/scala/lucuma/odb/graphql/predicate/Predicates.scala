@@ -23,6 +23,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val setAllocationResult = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
     val target              = TargetPredicates(Path.from(TargetType))
     val constraintSetGroup  = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
+    val targetGroup         = TargetGroupPredicates(Path.from(TargetGroupType))
   }
 
 }
