@@ -167,11 +167,8 @@ object OdbMapping {
 
           override val itcClientService: Resource[F, ItcClientService[F]] =
             pool.map { s =>
-              val m = ObservingModeServices.fromSession(s)
-              val o = ObservationService.fromSessionAndUser(s, user, m)
-              val a = AsterismService.fromSessionAndUser(s, user)
-              val t = TargetService.fromSession(s, user)
-              ItcClientService.fromSession(s, user, o, m, a, t)
+              val oms = ObservingModeServices.fromSession(s)
+              ItcClientService.fromSession(s, user, oms)
             }
 
           // Our combined type mappings
