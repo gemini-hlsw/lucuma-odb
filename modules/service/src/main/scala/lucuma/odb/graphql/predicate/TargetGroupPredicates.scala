@@ -7,6 +7,6 @@ import edu.gemini.grackle.Path
 import lucuma.core.model.Program
 
 class TargetGroupPredicates(path: Path) {
-  val programId = LeafPredicates[Program.Id](path / "programId")
+  val program = ProgramPredicates(path / "program")
   val observations = ObservationSelectResultPredicates(path / "observations")
 }

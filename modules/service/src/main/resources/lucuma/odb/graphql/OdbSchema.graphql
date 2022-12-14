@@ -5514,6 +5514,11 @@ type TargetGroup {
 
   # Commonly held value across the observations
   target: Target!
+
+  # Link back to program, temporary, to avoid some mapping issues.
+  # Please don't use this in API calls.
+  program: Program! @deprecated 
+
 }
 
 # The matching targetGroup results, limited to a maximum of 1000 entries.

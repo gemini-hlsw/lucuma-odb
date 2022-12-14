@@ -27,7 +27,7 @@ import input._
 import table._
 
 trait TargetGroupMapping[F[_]]
-  extends TargetView[F] with AsterismTargetTable[F] with ObservationView[F]
+  extends TargetView[F] with ProgramTable[F] with AsterismTargetTable[F] with ObservationView[F]
      with Predicates[F] {
 
   lazy val TargetGroupMapping =
@@ -35,11 +35,8 @@ trait TargetGroupMapping[F[_]]
       tpe = TargetGroupType,
       fieldMappings = List(
         SqlField("key", TargetView.TargetId, key = true, hidden = true),
-        SqlField("programId", TargetView.ProgramId),
-        SqlObject("observations", 
-          Join(TargetView.TargetId, AsterismTargetTable.TargetId), 
-          Join(AsterismTargetTable.ObservationId, ObservationView.Id)
-        ),
+        SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
+        SqlObject("observations"),
         SqlObject("target"),
       )
     )
