@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Applicative
+import cats.ApplicativeError
 import cats.Monoid
 import cats.data.NonEmptyList
 import cats.effect.std.Supervisor
@@ -22,13 +23,16 @@ import fs2.Stream
 import fs2.concurrent.Topic
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.itc.client.ItcResult
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
+import lucuma.odb.graphql.instances.ItcResultEncoder.given
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
@@ -181,25 +185,30 @@ object OdbMapping {
             pid:      Program.Id,
             oid:      Observation.Id,
             useCache: Boolean
-          ): F[Json] =
+          ): F[Json] = {
+
+            def toJson(res: List[ItcResult]): F[Json] =
+              res.partitionMap {
+                case ItcResult.Error(msg)           => msg.asLeft[ItcResult.Success]
+                case s @ ItcResult.Success(_, _, _) => s.asRight[String]
+              }.bimap(_.headOption, _.maxByOption(_.exposureTime.value)) match {
+                case (_, Some(success)) => success.asJson.pure[F]
+                case (Some(error), _)   => new RuntimeException(s"Could not obtain ITC results: $error").raiseError[F, Json]
+                case _                  => Json.Null.pure[F]
+              }
+
             itcClientService.use { s =>
-              val m = s.selectSpectroscopyInput(
-                pid,
-                List(oid)
-              )
-              json"""{
-                "exposureTime": {
-                   "microsceconds": 10000000,
-                   "milliseconds": 10000,
-                   "seconds": 10,
-                   "minutes": 0.16666667,
-                   "hours": 0.00277778,
-                   "iso": "PT10.0S"
-                },
-                "exposures": 11,
-                "signalToNoise": 77.7
-              }""".pure[F]
+              for {
+                m <- s.selectSpectroscopyInput(pid, List(oid))
+                r <- m.get(oid).toList.flatTraverse {
+                  _.traverse(itcClient.spectroscopy(_, useCache))
+                   .map(_.toList.flatMap(_.result.toList))
+                }
+                j <- toJson(r)
+              } yield j
+
             }
+          }
 
 
           // Our combined type mappings
