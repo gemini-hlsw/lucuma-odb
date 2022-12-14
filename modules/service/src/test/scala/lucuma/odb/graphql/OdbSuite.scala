@@ -4,9 +4,9 @@
 package lucuma.odb.graphql
 
 import cats.data.OptionT
-import cats.effect._
+import cats.effect.*
 import cats.effect.std.Supervisor
-import cats.implicits._
+import cats.implicits.*
 import clue.ApolloWebSocketClient
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
@@ -16,10 +16,17 @@ import clue.http4s.Http4sBackend
 import clue.http4s.Http4sWSBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
+import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.util.Gid
+import lucuma.itc.client.ItcClient
+import lucuma.itc.client.ItcResult
+import lucuma.itc.client.ItcVersions
+import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.sso.client.SsoClient
@@ -33,7 +40,7 @@ import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
-import org.http4s.{Uri => Http4sUri, _}
+import org.http4s.{Uri as Http4sUri, *}
 import org.slf4j
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
@@ -42,7 +49,7 @@ import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
@@ -90,6 +97,22 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def authorization(jwt: String): Authorization =
     Authorization(Credentials.Token(Bearer, jwt))
 
+  private def itcClient: ItcClient[IO] =
+    new ItcClient[IO] {
+      override def spectroscopy(input: SpectroscopyModeInput, useCache: Boolean): IO[SpectroscopyResult] =
+        SpectroscopyResult(
+          ItcVersions("foo", "bar".some),
+          ItcResult.Success(
+            NonNegDuration.unsafeFrom(java.time.Duration.ofSeconds(10)),
+            NonNegInt.unsafeFrom(11),
+            input.signalToNoise
+          ).some
+        ).pure[IO]
+
+      override def versions: IO[ItcVersions] =
+        ItcVersions("foo", "bar".some).pure[IO]
+    }
+
   private def ssoClient: SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User] {
       def find(req: Request[IO]): IO[Option[User]] = OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
@@ -110,6 +133,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         password = container.password,
         database = container.databaseName,
       ),
+      itcClient.pure[Resource[IO, *]],
       ssoClient.pure[Resource[IO, *]],
       "unused"
     ).map(_.map(_.orNotFound))

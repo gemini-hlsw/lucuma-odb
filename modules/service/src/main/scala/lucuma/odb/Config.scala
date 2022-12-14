@@ -155,8 +155,6 @@ object Config {
   private def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name) or prop(name)
 
-//    envOrProp("ODB_ITC_ROOT").as[Uri],
-
   val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     envOrProp("ODB_ITC_ROOT").as[Uri],
