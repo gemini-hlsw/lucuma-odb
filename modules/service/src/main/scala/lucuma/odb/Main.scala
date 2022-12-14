@@ -13,6 +13,7 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import lucuma.core.model.User
+import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
@@ -25,6 +26,7 @@ import org.flywaydb.core.api.output.MigrateResult
 import org.http4s._
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.implicits._
+import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.server._
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
@@ -95,8 +97,8 @@ object Main extends IOApp {
   def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
     Honeycomb.entryPoint(ServiceName) { cb =>
       Sync[F].delay {
-        cb.setWriteKey(config.hcWriteKey)
-        cb.setDataset(config.hcDataset)
+        cb.setWriteKey(config.honeycomb.writeKey)
+        cb.setDataset(config.honeycomb.dataset)
         cb.build()
       }
     }
@@ -105,20 +107,22 @@ object Main extends IOApp {
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-    routesResource(config.database, config.ssoClient, config.domain)
+    routesResource(config.database, config.itcClient, config.ssoClient, config.domain)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     databaseConfig:    Config.Database,
+    itcClientResource: Resource[F, ItcClient[F]],
     ssoClientResource: Resource[F, SsoClient[F, User]],
     domain:            String,
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool       <- databasePoolResource[F](databaseConfig)
+      itcClient  <- itcClientResource
       ssoClient  <- ssoClientResource
       userSvc    <- pool.map(UserService.fromSession(_))
       middleware <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
-      routes     <- GraphQLRoutes(ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
+      routes     <- GraphQLRoutes(itcClient, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
     } yield { wsb =>
       middleware(routes(wsb))
     }
