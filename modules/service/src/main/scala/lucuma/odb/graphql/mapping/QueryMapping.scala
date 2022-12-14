@@ -255,14 +255,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
               pred = Some(
                 and(List(
                   WHERE.getOrElse(True),
-                  Predicates.targetGroup.programId.eql(pid),
-                  Predicates.targetGroup.observations.matches.existence.includeDeleted(includeDeleted),
-                  Predicates.targetGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
-                  Predicates.targetGroup.observations.matches.program.isVisibleTo(user),
+                  Predicates.targetGroup.program.id.eql(pid),
+                  Predicates.targetGroup.program.existence.includeDeleted(includeDeleted),
+                  Predicates.targetGroup.program.isVisibleTo(user),
                 ))
               ),
               oss = Some(List(
-                OrderSelection[String](TargetGroupType / "key")
+                OrderSelection[lucuma.core.model.Target.Id](TargetGroupType / "key")
               )),
               offset = None,
               limit = Some(limit + 1), // Select one extra row here.
