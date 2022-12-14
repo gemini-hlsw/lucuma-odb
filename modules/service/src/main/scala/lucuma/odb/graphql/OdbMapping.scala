@@ -21,7 +21,11 @@ import edu.gemini.grackle.sql.SqlMapping
 import fs2.Stream
 import fs2.concurrent.Topic
 import io.circe.Json
+import io.circe.literal.*
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
@@ -72,10 +76,11 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database: Resource[F, Session[F]],
-    monitor:  SkunkMonitor[F],
-    user0:    User,
-    topics0:  Topics[F],
+    database:  Resource[F, Session[F]],
+    monitor:   SkunkMonitor[F],
+    user0:     User,
+    topics0:   Topics[F],
+    itcClient: ItcClient[F]
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
@@ -170,6 +175,32 @@ object OdbMapping {
               val oms = ObservingModeServices.fromSession(s)
               ItcClientService.fromSession(s, user, oms)
             }
+
+          override def itcQuery(
+            path:     Path,
+            pid:      Program.Id,
+            oid:      Observation.Id,
+            useCache: Boolean
+          ): F[Json] =
+            itcClientService.use { s =>
+              val m = s.selectSpectroscopyInput(
+                pid,
+                List(oid)
+              )
+              json"""{
+                "exposureTime": {
+                   "microsceconds": 10000000,
+                   "milliseconds": 10000,
+                   "seconds": 10,
+                   "minutes": 0.16666667,
+                   "hours": 0.00277778,
+                   "iso": "PT10.0S"
+                },
+                "exposures": 11,
+                "signalToNoise": 77.7
+              }""".pure[F]
+            }
+
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =

@@ -4325,12 +4325,6 @@ type Observation {
   # The science configuration
   observingMode: ObservingMode
 
-  # ITC execution results
-  itc(
-    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
-    useCache: Boolean! = true
-  ): ItcSuccess
-
   # Manual instrument configuration
   manualConfig: ManualConfig
 
@@ -4686,6 +4680,16 @@ type Query {
 
   # Metadata for `enum FilterType`
   filterTypeMeta: [FilterTypeMeta!]!
+
+  # ITC execution results
+  itc(
+    programId:     ProgramId!
+
+    observationId: ObservationId!
+
+    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    useCache: Boolean! = true
+  ): ItcSuccess
 
   # Returns the observation with the given id, if any.
   observation(

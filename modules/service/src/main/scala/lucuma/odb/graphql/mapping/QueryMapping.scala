@@ -19,6 +19,8 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.Json
+import io.circe.literal.*
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
@@ -42,12 +44,27 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   def itcClientService: Resource[F, ItcClientService[F]]
 
-  lazy val QueryMapping =
+  def itcQuery(
+    path:     Path,
+    pid:      lucuma.core.model.Program.Id,
+    oid:      lucuma.core.model.Observation.Id,
+    useCache: Boolean
+  ): F[Json]
+
+  lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
         SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
+        RootEffect.computeJson("itc") { (_, path, env) =>
+          val useCache = env.get[Boolean]("useCache").getOrElse(true)
+          (env.getR[lucuma.core.model.Program.Id]("programId"),
+           env.getR[lucuma.core.model.Observation.Id]("observationId")
+          ).parTupled.traverse { case (p, o) =>
+            itcQuery(path, p, o, useCache)
+          }
+        },
         SqlObject("observation"),
         SqlObject("observations"),
         SqlObject("partnerMeta"),
@@ -63,6 +80,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     List(
       ConstraintSetGroup,
       FilterTypeMeta,
+      Itc,
       Observation,
       Observations,
       PartnerMeta,
@@ -115,6 +133,19 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Result(Select("filterTypeMeta", Nil,
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
       ))
+
+  private lazy val Itc: PartialFunction[Select, Result[Query]] =
+    case Select("itc", List(
+      ProgramIdBinding("programId", rPid),
+      ObservationIdBinding("observationId", rOid),
+      BooleanBinding("useCache", rUseCache)
+    ), child) =>
+      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, useCache) =>
+        Environment(
+          Env("programId" -> pid, "observationId" -> oid, "useCache" -> useCache),
+          Select("itc", Nil, child)
+        )
+      }
 
   private lazy val Observation: PartialFunction[Select, Result[Query]] =
     case Select("observation", List(
