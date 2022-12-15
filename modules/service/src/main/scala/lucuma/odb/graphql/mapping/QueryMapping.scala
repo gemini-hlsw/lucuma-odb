@@ -51,6 +51,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("program"),
         SqlObject("programs"),
         SqlObject("target"),
+        SqlObject("targetGroup"),
         SqlObject("targets"),
       )
     )
@@ -65,6 +66,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Program,
       Programs,
       Target,
+      TargetGroup,
       Targets,
     ).foldMap(pf => Map(QueryType -> pf))
 
@@ -236,6 +238,38 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           )
         )
       }
+
+  private lazy val TargetGroup: PartialFunction[Select, Result[Query]] = 
+    val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations")
+    {
+      case Select("targetGroup", List(
+        ProgramIdBinding("programId", rProgramId),
+        WhereObservationBinding.Option("WHERE", rWHERE),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      ), child) =>
+        (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult("targetGroup", child, limit) { q =>         
+            FilterOrderByOffsetLimit(
+              pred = Some(
+                and(List(
+                  WHERE.getOrElse(True),
+                  Predicates.targetGroup.program.id.eql(pid),
+                  Predicates.targetGroup.program.existence.includeDeleted(includeDeleted),
+                  Predicates.targetGroup.program.isVisibleTo(user),
+                ))
+              ),
+              oss = Some(List(
+                OrderSelection[lucuma.core.model.Target.Id](TargetGroupType / "key")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
+        }
+    }
 
   private lazy val Targets: PartialFunction[Select, Result[Query]] = {
     val WhereTargetInputBinding = WhereTargetInput.binding(Path.from(TargetType))
