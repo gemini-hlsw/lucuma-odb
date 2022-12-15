@@ -25,11 +25,6 @@ import skunk.implicits.*
 
 trait AsterismService[F[_]] {
 
-  def selectAsterism(
-    programId:      Program.Id,
-    observationIds: NonEmptyList[Observation.Id]
-  ): F[Map[Observation.Id, List[Target.Id]]]
-
   /**
    * Inserts (program, observation, target) triplets covering all combinations.
    * In other words, every observation in `observationIds` will be given all
@@ -88,19 +83,6 @@ object AsterismService {
   ): AsterismService[F] =
 
     new AsterismService[F] {
-
-      override def selectAsterism(
-        programId:      Program.Id,
-        observationIds: NonEmptyList[Observation.Id]
-      ): F[Map[Observation.Id, List[Target.Id]]] = {
-        val (af, decoder) = Statements.selectLinksAs(user, programId, observationIds)
-        session.prepare(af.fragment.query(decoder)).use { p =>
-          p.stream(af.argument, 64)
-           .compile
-           .toList
-           .map(_.groupMap(_._1)(_._2))
-        }
-      }
 
       override def insertAsterism(
         programId:      Program.Id,
@@ -163,23 +145,6 @@ object AsterismService {
   object Statements {
 
     import ProgramService.Statements.{existsUserAccess, whereUserAccess}
-
-    def selectLinksAs(
-      user:           User,
-      programId:      Program.Id,
-      observationIds: NonEmptyList[Observation.Id]
-    ): (AppliedFragment, Decoder[(Observation.Id, Target.Id)]) =
-      (void"""
-        SELECT
-          c_observation_id,
-          c_target_id
-        FROM
-          t_asterism_target
-        WHERE """ |+| programIdEqual(programId)               |+|
-          void""" AND """ |+| observationIdIn(observationIds) |+|
-          andExistsUserAccess(user, programId),
-        observation_id ~ target_id
-      )
 
     def insertLinksAs(
       user:           User,
