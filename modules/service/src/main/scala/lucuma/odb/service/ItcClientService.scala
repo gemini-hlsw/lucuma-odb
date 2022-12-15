@@ -148,7 +148,7 @@ object ItcClientService {
     import ProgramService.Statements.existsUserAccess
 
     private val source_profile: Decoder[SourceProfile] =
-      json.emap { sp =>
+      jsonb.emap { sp =>
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
