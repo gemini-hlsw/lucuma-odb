@@ -127,6 +127,8 @@ object OdbMapping {
           with SubscriptionMapping[F]
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
+          with TargetGroupMapping[F]
+          with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateObservationsResultMapping[F]
@@ -208,6 +210,8 @@ object OdbMapping {
               SiderealMapping,
               SubscriptionMapping,
               TargetEnvironmentMapping,
+              TargetGroupMapping,
+              TargetGroupSelectResultMapping,
               TargetMapping,
               TargetSelectResultMapping,
               UpdateAsterismsResultMapping,
@@ -226,13 +230,15 @@ object OdbMapping {
                 ProgramElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
+                TargetGroupElaborator,
                 QueryElaborator,
               ).combineAll
             )
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
           override def defaultRootCursor(query: Query, tpe: Type, env: Env): F[Result[(Query, Cursor)]] =
-            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") *> super.defaultRootCursor(query, tpe, env)
+            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >> 
+            super.defaultRootCursor(query, tpe, env)
 
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
