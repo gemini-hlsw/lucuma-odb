@@ -17,6 +17,7 @@ import clue.http4s.Http4sWSBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.NonNegDuration
@@ -97,20 +98,27 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def authorization(jwt: String): Authorization =
     Authorization(Credentials.Token(Bearer, jwt))
 
+  val FakeItcVersions: ItcVersions =
+    ItcVersions("foo", "bar".some)
+
+  val FakeItcResult: ItcResult.Success =
+    ItcResult.Success(
+      NonNegDuration.unsafeFrom(java.time.Duration.ofSeconds(10)),
+      NonNegInt.unsafeFrom(11),
+      PosBigDecimal.unsafeFrom(50.0)
+    )
+
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
+
       override def spectroscopy(input: SpectroscopyModeInput, useCache: Boolean): IO[SpectroscopyResult] =
         SpectroscopyResult(
-          ItcVersions("foo", "bar".some),
-          ItcResult.Success(
-            NonNegDuration.unsafeFrom(java.time.Duration.ofSeconds(10)),
-            NonNegInt.unsafeFrom(11),
-            input.signalToNoise
-          ).some
+          FakeItcVersions,
+          FakeItcResult.some
         ).pure[IO]
 
       override def versions: IO[ItcVersions] =
-        ItcVersions("foo", "bar".some).pure[IO]
+        FakeItcVersions.pure[IO]
     }
 
   private def ssoClient: SsoClient[IO, User] =
