@@ -3,11 +3,10 @@
 
 package lucuma.odb.graphql.instances
 
-import lucuma.itc.client.ItcResult
-
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax._
+import lucuma.itc.client.ItcResult
 
 import java.time.Duration
 

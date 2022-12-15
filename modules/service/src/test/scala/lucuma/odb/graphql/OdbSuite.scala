@@ -41,7 +41,7 @@ import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
-import org.http4s.{Uri as Http4sUri, *}
+import org.http4s.{Uri => Http4sUri, _}
 import org.slf4j
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
