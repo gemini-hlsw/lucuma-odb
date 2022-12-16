@@ -8,7 +8,9 @@ import _root_.skunk.Session
 import cats.Applicative
 import cats.ApplicativeError
 import cats.Monoid
+import cats.data.EitherNel
 import cats.data.NonEmptyList
+import cats.data.ValidatedNel
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
@@ -26,10 +28,14 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcResult
+import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
+import lucuma.odb.graphql.client.Itc
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
 import lucuma.odb.graphql.instances.ItcResultEncoder.given
@@ -187,27 +193,12 @@ object OdbMapping {
             useCache: Boolean
           ): F[Json] = {
 
-            def toJson(res: List[ItcResult]): F[Json] =
-              res.partitionMap {
-                case ItcResult.Error(msg)           => msg.asLeft[ItcResult.Success]
-                case s @ ItcResult.Success(_, _, _) => s.asRight[String]
-              }.bimap(_.headOption, _.maxByOption(_.exposureTime.value)) match {
-                case (_, Some(success)) => success.asJson.pure[F]
-                case (Some(error), _)   => new RuntimeException(s"Could not obtain ITC results: $error").raiseError[F, Json]
-                case _                  => Json.Null.pure[F]
-              }
+            import lucuma.odb.graphql.instances.ItcResultEncoder._
 
-            itcClientService.use { s =>
-              for {
-                m <- s.selectSpectroscopyInput(pid, List(oid))
-                r <- m.get(oid).toList.flatTraverse {
-                  _.traverse(itcClient.spectroscopy(_, useCache))
-                   .map(_.toList.flatMap(_.result.toList))
-                }
-                j <- toJson(r)
-              } yield j
-
-            }
+            Itc
+              .fromClientAndService(itcClient, itcClientService)
+              .queryOne(pid, oid, useCache)
+              .map(_.asJson)
           }
 
 

@@ -4147,11 +4147,43 @@ type Intensive implements ProposalClass {
   totalTime: NonNegDuration!
 }
 
+enum ItcResultStatus {
+
+  # A successful result
+  SUCCESS
+
+  # Could not calculate the result because not all the required parameters are
+  # present
+  MISSING_PARAMS
+
+  # A failure in the remote ITC service
+  SERVICE_ERROR
+
+}
+
 type ItcSuccess {
-  exposureTime: NonNegDuration!
-  exposures: NonNegInt!
+  exposureTime:  NonNegDuration!
+  exposures:     NonNegInt!
   signalToNoise: PosBigDecimal!
 }
+
+type ItcTargetResult {
+  targetId:      TargetId!
+  status:        ItcResultStatus!
+  missingParams: [String!]
+  serviceError:  String
+  success:       ItcSuccess
+}
+
+type ItcObservationResult {
+  programId:     ProgramId!
+  observationId: ObservationId!
+  status:        ItcResultStatus!
+  missingParams: [String!]
+  selected:      ItcTargetResult
+  all:           [ItcTargetResult!]
+}
+
 
 # Large program observing at Gemini
 type LargeProgram implements ProposalClass {
@@ -4689,7 +4721,7 @@ type Query {
 
     # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
     useCache: Boolean! = true
-  ): ItcSuccess
+  ): ItcObservationResult
 
   # Returns the observation with the given id, if any.
   observation(

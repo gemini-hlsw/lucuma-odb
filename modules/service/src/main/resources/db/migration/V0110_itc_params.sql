@@ -17,14 +17,10 @@ SELECT
   t.c_source_profile
 FROM
   t_observation o
-INNER JOIN t_asterism_target a
+LEFT JOIN t_asterism_target a
   ON o.c_observation_id = a.c_observation_id
-INNER JOIN t_target t
+LEFT JOIN t_target t
   ON a.c_target_id      = t.c_target_id
-WHERE
-      o.c_spec_signal_to_noise IS NOT NULL
-  AND o.c_observing_mode_type  IS NOT NULL
-  AND t.c_sid_rv               IS NOT NULL
 ORDER BY
   o.c_observation_id,
   t.c_target_id
