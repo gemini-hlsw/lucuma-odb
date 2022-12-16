@@ -3,10 +3,11 @@
 
 package lucuma.odb.graphql.instances
 
+import cats.data.NonEmptySet
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax._
-import lucuma.itc.client.ItcResult
+import lucuma.odb.graphql.client.Itc
 
 import java.time.Duration
 
@@ -18,8 +19,43 @@ object ItcResultEncoder extends ItcResultEncoder
  * ItcResult Encoder matching the ODB Schema.
  */
 trait ItcResultEncoder {
+  private val MissingParams: String = "MISSING_PARAMS"
+  private val ServiceError:  String = "SERVICE_ERROR"
+  private val Success:       String = "SUCCESS"
 
-  given Encoder[ItcResult.Success] with {
+  private def targetResultStatus(r: Itc.TargetResult): String =
+    r.result.fold(_ => MissingParams, _ => ServiceError, _ => Success)
+
+  given Encoder[Itc.Param] =
+    Encoder.instance(_.stringValue.asJson)
+
+  given [A: Encoder]: Encoder[NonEmptySet[A]] =
+    Encoder.instance(_.toNonEmptyList.toList.asJson)
+
+  given Encoder[Itc.TargetResult] with {
+    def apply(r: Itc.TargetResult): Json =
+      Json.obj(
+        "targetId"      -> r.targetId.asJson,
+        "status"        -> targetResultStatus(r).asJson,
+        "missingParams" -> r.result.missing.map(_.params).asJson,
+        "serviceError"  -> r.result.serviceError.map(_.message).asJson,
+        "success"       -> r.result.success.asJson
+      )
+  }
+
+  given Encoder[Itc.ObservationResult] with {
+    def apply(r: Itc.ObservationResult): Json =
+      Json.obj(
+        "programId"     -> r.programId.asJson,
+        "observationId" -> r.observationId.asJson,
+        "status"        -> r.value.fold(_ => MissingParams, z => targetResultStatus(z.focus)).asJson,
+        "missingParams" -> r.value.left.toOption.map(_.params).asJson,
+        "selected"      -> r.value.toOption.map(_.focus).asJson,
+        "all"           -> r.value.toOption.toList.flatMap(_.toList).asJson
+      )
+  }
+
+  given Encoder[Itc.Result.Success] with {
 
     def duration(d: Duration): Json = {
 
@@ -47,7 +83,7 @@ trait ItcResultEncoder {
     }
 
 
-    def apply(r: ItcResult.Success): Json =
+    def apply(r: Itc.Result.Success): Json =
       Json.obj(
         "exposureTime"  -> duration(r.exposureTime.value),
         "exposures"     -> r.exposures.value.asJson,

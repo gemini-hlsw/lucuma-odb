@@ -5,13 +5,18 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.data.NonEmptyList
+import cats.data.ValidatedNel
 import cats.effect.Sync
 import cats.syntax.applicative.*
+import cats.syntax.apply.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
+import cats.syntax.validated.*
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.enums.Band
@@ -55,7 +60,7 @@ trait ItcClientService[F[_]] {
   def selectSpectroscopyInput(
     programId: Program.Id,
     which:     List[Observation.Id]
-  ): F[Map[Observation.Id, NonEmptyList[SpectroscopyModeInput]]]
+  ): F[Map[Observation.Id, ValidatedNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]]
 
 }
 
@@ -72,7 +77,7 @@ object ItcClientService {
       private def spectroscopy(
         o: ItcParams,
         m: ObservingModeServices.ItcParams,
-      ): Option[SpectroscopyModeInput] = {
+      ): ValidatedNel[String, (Target.Id, SpectroscopyModeInput)] = {
 
         def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[Band] =
           bMap.minByOption { case (b, _) =>
@@ -80,67 +85,86 @@ object ItcClientService {
           }.map(_._1)
 
         def band: Option[Band] =
-          SourceProfile
-            .integratedBrightnesses
-            .getOption(o.sourceProfile)
-            .flatMap(bMap => extractBand[Integrated](m.wavelength, bMap))
-            .orElse(
-              SourceProfile
-                .surfaceBrightnesses
-                .getOption(o.sourceProfile)
-                .flatMap(bMap => extractBand[Surface](m.wavelength, bMap))
-            )
+          o.sourceProfile.flatMap { sp =>
+            SourceProfile
+              .integratedBrightnesses
+              .getOption(sp)
+              .flatMap(bMap => extractBand[Integrated](m.wavelength, bMap))
+              .orElse(
+                SourceProfile
+                  .surfaceBrightnesses
+                  .getOption(sp)
+                  .flatMap(bMap => extractBand[Surface](m.wavelength, bMap))
+              )
+          }
 
-        band.map { b =>
-          SpectroscopyModeInput(
-            m.wavelength,
-            o.signalToNoise,
-            o.signalToNoiseAt,
-            o.sourceProfile,
-            b,
-            o.radialVelocity,
-            o.constraints,
-            m.mode
-          )
+        (o.signalToNoise.toValidNel("signal to noise"),
+         o.targetId.toValidNel("target")
+        ).tupled.andThen { case (s2n, tid) =>
+          // these dependent on having a target in the first place
+          (band.toValidNel(s"${tid.toString}: brightness measure"),
+           o.radialVelocity.toValidNel(s"${tid.toString}: radial velocity"),
+           o.sourceProfile.toValidNel(s"${tid.toString}: source profile")
+          ).mapN { case (b, rv, sp) => (
+            tid,
+            SpectroscopyModeInput(
+              m.wavelength,
+              s2n,
+              o.signalToNoiseAt,
+              sp,
+              b,
+              rv,
+              o.constraints,
+              m.mode
+            )
+          )}
         }
       }
 
       override def selectSpectroscopyInput(
         programId: Program.Id,
         which:     List[Observation.Id]
-      ): F[Map[Observation.Id, NonEmptyList[SpectroscopyModeInput]]] =
+      ): F[Map[Observation.Id, ValidatedNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]] =
         for {
-          p <- selectItcParams(programId, which)
-          m <- mService.selectItcParams(p.toList.map(_.map(_.head.observingMode)))
+          p  <- selectItcParams(programId, which)  // List[ItcParams]
+          oms = p.collect { case ItcParams(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
+          m  <- mService.selectItcParams(oms)      // Map[Observation.Id, ObservingModeServices.ItcParams]
         } yield
-          p.foldLeft(Map.empty[Observation.Id, NonEmptyList[SpectroscopyModeInput]]) { case (res, (oid, itcList)) =>
-            m.get(oid).fold(res) { modeParams =>
-              itcList
-                .traverse { itcParams => spectroscopy(itcParams, modeParams) }
-                .fold(res)(nel => res.updated(oid, nel))
-            }
-          }
+          p.map { itcParams =>
+            val oid = itcParams.observationId
+            (oid,
+             m.get(oid).toValidNel("observing mode").andThen { om =>
+               spectroscopy(itcParams, om) // ValidatedNel[String, (Target.Id, SpectroscopyModeInput)]
+             }
+            )
+          }.groupMap(_._1)(_._2)  // Map[Observation.Id, List[ValidatedNel[String, (Target.Id, SpectroscopyModeInput)]]]
+           .view
+           .mapValues(_.sequence.map(NonEmptyList.fromListUnsafe))
+           .toMap
 
       private def selectItcParams(
         programId: Program.Id,
         which:     List[Observation.Id]
-      ): F[Map[Observation.Id, NonEmptyList[ItcParams]]] =
-        NonEmptyList.fromList(which).fold(Applicative[F].pure(Map.empty[Observation.Id, NonEmptyList[ItcParams]])) { oids =>
-          val (af, decoder) = Statements.selectItcParams(user, programId, oids)
-          session
-            .prepare(af.fragment.query(decoder))
-            .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
-            .map(_.groupMap(_._1)(_._2).view.mapValues(ps => NonEmptyList.fromListUnsafe(ps)).toMap)
-        }
+      ): F[List[ItcParams]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(List.empty[ItcParams].pure[F]) { oids =>
+            val (af, decoder) = Statements.selectItcParams(user, programId, oids)
+            session
+              .prepare(af.fragment.query(decoder))
+              .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
+          }
     }
 
   final case class ItcParams(
+    observationId:   Observation.Id,
     constraints:     ConstraintSet,
-    signalToNoise:   PosBigDecimal,
+    signalToNoise:   Option[PosBigDecimal],
     signalToNoiseAt: Option[Wavelength],
-    observingMode:   ObservingModeType,
-    radialVelocity:  RadialVelocity,
-    sourceProfile:   SourceProfile
+    observingMode:   Option[ObservingModeType],
+    targetId:        Option[Target.Id],
+    radialVelocity:  Option[RadialVelocity],
+    sourceProfile:   Option[SourceProfile]
   )
 
   object Statements {
@@ -153,19 +177,21 @@ object ItcClientService {
       }
 
     private val itc_params: Decoder[ItcParams] =
-      (constraint_set       ~
-       signal_to_noise      ~
-       wavelength_pm.opt    ~
-       observing_mode_type  ~
-       radial_velocity      ~
-       source_profile
+      (observation_id          ~
+       constraint_set          ~
+       signal_to_noise.opt     ~
+       wavelength_pm.opt       ~
+       observing_mode_type.opt ~
+       target_id.opt           ~
+       radial_velocity.opt     ~
+       source_profile.opt
       ).gmap[ItcParams]
 
     def selectItcParams(
       user:      User,
       programId: Program.Id,
       which:     NonEmptyList[Observation.Id]
-    ): (AppliedFragment, Decoder[(Observation.Id, ItcParams)]) =
+    ): (AppliedFragment, Decoder[ItcParams]) =
       (void"""
         SELECT
           c_observation_id,
@@ -180,6 +206,7 @@ object ItcClientService {
           c_spec_signal_to_noise,
           c_spec_signal_to_noise_at,
           c_observing_mode_type,
+          c_target_id,
           c_sid_rv,
           c_source_profile
         FROM v_itc_params
@@ -187,7 +214,7 @@ object ItcClientService {
           c_observation_id IN (""" |+|
             which.map(sql"$observation_id").intercalate(void", ") |+|
           void")" |+| existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af },
-        (observation_id ~ itc_params)
+        itc_params
       )
 
   }

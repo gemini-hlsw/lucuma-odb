@@ -169,10 +169,15 @@ class itc extends OdbSuite {
           s"""
             query {
               itc(programId: "$pid", observationId: "$oid") {
-                exposureTime {
-                  seconds
+                status
+                selected {
+                  success {
+                    exposureTime {
+                      seconds
+                    }
+                    exposures
+                  }
                 }
-                exposures
               }
             }
           """,
@@ -180,10 +185,15 @@ class itc extends OdbSuite {
           json"""
             {
                "itc": {
-                 "exposureTime": {
-                   "seconds": ${FakeItcResult.exposureTime.value.getSeconds}
-                 },
-                 "exposures": ${FakeItcResult.exposures.value}
+                 "status": "SUCCESS",
+                 "selected": {
+                   "success": {
+                     "exposureTime": {
+                       "seconds": ${FakeItcResult.exposureTime.value.getSeconds}
+                     },
+                     "exposures": ${FakeItcResult.exposures.value}
+                   }
+                 }
                }
             }
           """
