@@ -30,7 +30,7 @@ import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.service.ItcClientService
+import lucuma.odb.service.ItcInputService
 
 import scala.reflect.ClassTag
 
@@ -42,7 +42,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProgramMapping[F]
    with ObservationMapping[F] =>
 
-  def itcClientService: Resource[F, ItcClientService[F]]
+  def itcClientService: Resource[F, ItcInputService[F]]
 
   def itcQuery(
     path:     Path,

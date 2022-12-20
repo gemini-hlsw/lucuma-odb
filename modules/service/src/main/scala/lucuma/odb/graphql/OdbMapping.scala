@@ -45,7 +45,7 @@ import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
-import lucuma.odb.service.ItcClientService
+import lucuma.odb.service.ItcInputService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
@@ -180,10 +180,10 @@ object OdbMapping {
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
 
-          override val itcClientService: Resource[F, ItcClientService[F]] =
+          override val itcClientService: Resource[F, ItcInputService[F]] =
             pool.map { s =>
               val oms = ObservingModeServices.fromSession(s)
-              ItcClientService.fromSession(s, user, oms)
+              ItcInputService.fromSession(s, user, oms)
             }
 
           override def itcQuery(

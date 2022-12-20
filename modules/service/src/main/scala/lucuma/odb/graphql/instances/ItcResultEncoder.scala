@@ -26,9 +26,6 @@ trait ItcResultEncoder {
   private def status(r: Itc.TargetResult): String =
     r.result.fold(_ => MissingParams, _ => ServiceError, _ => Success)
 
-  private def typename(r: Itc.TargetResult): String =
-    r.result.fold(_ => "ItcMissingParams", _ => "ItcServiceError", _ => "ItcSuccess")
-
   given Encoder[Itc.Param] =
     Encoder.instance(_.stringValue.asJson)
 
@@ -39,7 +36,6 @@ trait ItcResultEncoder {
     def apply(r: Itc.TargetResult): Json =
       Json.fromFields(
         List(
-//          "__typename" -> typename(r).asJson,
           "status"     -> status(r).asJson,
           "targetId"   -> r.targetId.asJson
         ) ++ r.result.fold(
