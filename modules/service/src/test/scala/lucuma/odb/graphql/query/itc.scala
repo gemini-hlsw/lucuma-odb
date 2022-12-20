@@ -162,20 +162,31 @@ class itc extends OdbSuite {
     } yield (p, o, t)
 
   test("simple itc") {
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { case (pid, oid, tid) =>
       expect(
         user = user,
         query =
           s"""
             query {
               itc(programId: "$pid", observationId: "$oid") {
-                status
-                selected {
-                  success {
+                programId
+                observationId
+                result {
+                  __typename
+                  status
+                  ... on ItcSuccess {
+                    targetId
                     exposureTime {
                       seconds
                     }
                     exposures
+                    signalToNoise
+                  }
+                }
+                all {
+                  status
+                  ... on ItcSuccess {
+                    targetId
                   }
                 }
               }
@@ -185,15 +196,24 @@ class itc extends OdbSuite {
           json"""
             {
                "itc": {
-                 "status": "SUCCESS",
-                 "selected": {
-                   "success": {
-                     "exposureTime": {
-                       "seconds": ${FakeItcResult.exposureTime.value.getSeconds}
-                     },
-                     "exposures": ${FakeItcResult.exposures.value}
+                 "programId": $pid,
+                 "observationId": $oid,
+                 "result": {
+                   "__typename": "ItcSuccess",
+                   "status": "SUCCESS",
+                   "targetId": $tid,
+                   "exposureTime": {
+                     "seconds": ${FakeItcResult.exposureTime.value.getSeconds}
+                   },
+                   "exposures": ${FakeItcResult.exposures.value},
+                   "signalToNoise": ${FakeItcResult.signalToNoise.value}
+                 },
+                 "all": [
+                   {
+                     "status": "SUCCESS",
+                     "targetId": $tid
                    }
-                 }
+                 ]
                }
             }
           """

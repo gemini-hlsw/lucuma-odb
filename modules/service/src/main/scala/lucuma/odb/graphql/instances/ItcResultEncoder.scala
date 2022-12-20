@@ -23,8 +23,11 @@ trait ItcResultEncoder {
   private val ServiceError:  String = "SERVICE_ERROR"
   private val Success:       String = "SUCCESS"
 
-  private def targetResultStatus(r: Itc.TargetResult): String =
+  private def status(r: Itc.TargetResult): String =
     r.result.fold(_ => MissingParams, _ => ServiceError, _ => Success)
+
+  private def typename(r: Itc.TargetResult): String =
+    r.result.fold(_ => "ItcMissingParams", _ => "ItcServiceError", _ => "ItcSuccess")
 
   given Encoder[Itc.Param] =
     Encoder.instance(_.stringValue.asJson)
@@ -34,12 +37,24 @@ trait ItcResultEncoder {
 
   given Encoder[Itc.TargetResult] with {
     def apply(r: Itc.TargetResult): Json =
-      Json.obj(
-        "targetId"      -> r.targetId.asJson,
-        "status"        -> targetResultStatus(r).asJson,
-        "missingParams" -> r.result.missing.map(_.params).asJson,
-        "serviceError"  -> r.result.serviceError.map(_.message).asJson,
-        "success"       -> r.result.success.asJson
+      Json.fromFields(
+        List(
+//          "__typename" -> typename(r).asJson,
+          "status"     -> status(r).asJson,
+          "targetId"   -> r.targetId.asJson
+        ) ++ r.result.fold(
+          m => List(
+            "params" -> m.params.asJson
+          ),
+          e => List(
+            "message" -> e.message.asJson
+          ),
+          s => List(
+            "exposureTime"  -> s.exposureTime.value.asJson,
+            "exposures"     -> s.exposures.value.asJson,
+            "signalToNoise" -> s.signalToNoise.value.asJson
+          )
+        )
       )
   }
 
@@ -48,16 +63,21 @@ trait ItcResultEncoder {
       Json.obj(
         "programId"     -> r.programId.asJson,
         "observationId" -> r.observationId.asJson,
-        "status"        -> r.value.fold(_ => MissingParams, z => targetResultStatus(z.focus)).asJson,
-        "missingParams" -> r.value.left.toOption.map(_.params).asJson,
-        "selected"      -> r.value.toOption.map(_.focus).asJson,
+        "result"        ->
+          r.value.fold(
+            m => Json.obj(
+              "__typename" -> "ItcMissingParams".asJson,
+              "status"     -> MissingParams.asJson,
+              "params"     -> m.params.asJson
+            ),
+            z => z.focus.asJson
+          ),
         "all"           -> r.value.toOption.toList.flatMap(_.toList).asJson
       )
   }
 
-  given Encoder[Itc.Result.Success] with {
-
-    def duration(d: Duration): Json = {
+  given Encoder[Duration] with {
+    def apply(d: Duration): Json = {
 
       import java.math.RoundingMode.DOWN
       import java.time.temporal.ChronoUnit.MICROS
@@ -81,13 +101,6 @@ trait ItcResultEncoder {
         "iso"          -> d2.toString.asJson
       )
     }
-
-
-    def apply(r: Itc.Result.Success): Json =
-      Json.obj(
-        "exposureTime"  -> duration(r.exposureTime.value),
-        "exposures"     -> r.exposures.value.asJson,
-        "signalToNoise" -> r.signalToNoise.value.asJson
-      )
   }
+
 }

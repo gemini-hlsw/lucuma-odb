@@ -4147,7 +4147,18 @@ type Intensive implements ProposalClass {
   totalTime: NonNegDuration!
 }
 
-enum ItcResultStatus {
+type ItcResultSet {
+  programId:     ProgramId!
+  observationId: ObservationId!
+  result:        ItcResult!
+  all:           [ItcResult!]
+}
+
+interface ItcResult {
+  status: ItcStatus!
+}
+
+enum ItcStatus {
 
   # A successful result
   SUCCESS
@@ -4161,27 +4172,24 @@ enum ItcResultStatus {
 
 }
 
-type ItcSuccess {
+type ItcSuccess implements ItcResult {
+  status:        ItcStatus!
+  targetId:      TargetId!
   exposureTime:  NonNegDuration!
   exposures:     NonNegInt!
   signalToNoise: PosBigDecimal!
 }
 
-type ItcTargetResult {
-  targetId:      TargetId!
-  status:        ItcResultStatus!
-  missingParams: [String!]
-  serviceError:  String
-  success:       ItcSuccess
+type ItcMissingParams implements ItcResult {
+  status:   ItcStatus!
+  targetId: TargetId
+  params:   [String!]!
 }
 
-type ItcObservationResult {
-  programId:     ProgramId!
-  observationId: ObservationId!
-  status:        ItcResultStatus!
-  missingParams: [String!]
-  selected:      ItcTargetResult
-  all:           [ItcTargetResult!]
+type ItcServiceError implements ItcResult {
+  status:   ItcStatus!
+  targetId: TargetId!
+  message:  String!
 }
 
 
@@ -4721,7 +4729,7 @@ type Query {
 
     # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
     useCache: Boolean! = true
-  ): ItcObservationResult
+  ): ItcResultSet
 
   # Returns the observation with the given id, if any.
   observation(
