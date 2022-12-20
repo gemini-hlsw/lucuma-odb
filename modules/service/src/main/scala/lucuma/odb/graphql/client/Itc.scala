@@ -31,18 +31,25 @@ import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.odb.service.ItcInputService
 import lucuma.odb.util.NonEmptyListExtensions.*
 
+/**
+ * The ITC client combines the input parameter lookup and the actual remote
+ * call to the ITC service in a single method.
+ */
 sealed trait Itc[F[_]] {
+  import Itc.ObservationResult
+
   def queryOne(
     programId:     Program.Id,
     observationId: Observation.Id,
     useCache:      Boolean
-  ): F[Option[Itc.ObservationResult]]
+  ): F[Option[ObservationResult]]
 
   def queryAll(
     programId:      Program.Id,
     observationIds: List[Observation.Id],
     useCache:       Boolean
-  ): F[List[Itc.ObservationResult]]
+  ): F[List[ObservationResult]]
+
 }
 
 
