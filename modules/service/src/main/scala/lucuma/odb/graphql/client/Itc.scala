@@ -5,9 +5,9 @@ package lucuma.odb.graphql.client
 
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
+import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.NonEmptySet
-import cats.data.ValidatedNel
 import cats.effect.MonadCancel
 import cats.effect.Resource
 import cats.syntax.applicative.*
@@ -28,7 +28,7 @@ import lucuma.core.model.Target
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
-import lucuma.odb.service.ItcClientService
+import lucuma.odb.service.ItcInputService
 import lucuma.odb.util.NonEmptyListExtensions.*
 
 sealed trait Itc[F[_]] {
@@ -118,7 +118,9 @@ object Itc {
           case (Missing(_), _)                                => -1
           case (_, Missing(_))                                =>  1
           case (Success(_, at, ac, _), Success(_, bt, bc, _)) =>
-            at.value.multipliedBy(ac.value).compareTo(bt.value.multipliedBy(bc.value))
+            at.value
+              .multipliedBy(ac.value)
+              .compareTo(bt.value.multipliedBy(bc.value))
         }
 
     }
@@ -160,7 +162,7 @@ object Itc {
 
   def fromClientAndService[F[_]](
     client:  ItcClient[F],
-    service: Resource[F, ItcClientService[F]]
+    service: Resource[F, ItcInputService[F]]
   )(implicit ev: MonadCancel[F, Throwable]): Itc[F] =
     new Itc[F] {
 
@@ -180,8 +182,8 @@ object Itc {
 
         service.use { s =>
           s.selectSpectroscopyInput(programId, observationIds).flatMap { m =>
-             m.toList.traverse { case (oid, v) => // (Observation.Id, ValidatedNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]])
-               callForObservation(programId, oid, v, useCache)
+             m.toList.traverse { case (oid, e) => // (Observation.Id, EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]])
+               callForObservation(programId, oid, e, useCache)
              }
           }
         }
@@ -189,11 +191,11 @@ object Itc {
       def callForObservation(
         pid:      Program.Id,
         oid:      Observation.Id,
-        v:        ValidatedNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]],
+        e:        EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]],
         useCache: Boolean
       ): F[ObservationResult] =
 
-        v.fold(
+        e.fold(
           ps => ObservationResult.missing(pid, oid, ps).pure[F],
           _.traverse { case (tid, si) => // (Target.Id, SpectroscopyModeInput)
             callForTarget(tid, si, useCache)

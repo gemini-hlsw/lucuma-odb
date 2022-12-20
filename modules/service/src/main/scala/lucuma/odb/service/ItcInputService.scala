@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Applicative
+import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.ValidatedNel
 import cats.effect.Sync
@@ -55,24 +56,27 @@ final case class SpectroscopyModeInput(
 )
 */
 
-trait ItcClientService[F[_]] {
+/**
+ * A database query service to gather input parameters to send to the ITC.
+ */
+trait ItcInputService[F[_]] {
 
   def selectSpectroscopyInput(
     programId: Program.Id,
     which:     List[Observation.Id]
-  ): F[Map[Observation.Id, ValidatedNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]]
+  ): F[Map[Observation.Id, EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]]
 
 }
 
-object ItcClientService {
+object ItcInputService {
 
   def fromSession[F[_]: Sync](
     session:  Session[F],
     user:     User,
     mService: ObservingModeServices[F]
-  ): ItcClientService[F] =
+  ): ItcInputService[F] =
 
-    new ItcClientService[F] {
+    new ItcInputService[F] {
 
       private def spectroscopy(
         o: ItcParams,
@@ -124,7 +128,7 @@ object ItcClientService {
       override def selectSpectroscopyInput(
         programId: Program.Id,
         which:     List[Observation.Id]
-      ): F[Map[Observation.Id, ValidatedNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]] =
+      ): F[Map[Observation.Id, EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]] =
         for {
           p  <- selectItcParams(programId, which)  // List[ItcParams]
           oms = p.collect { case ItcParams(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
@@ -139,7 +143,7 @@ object ItcClientService {
             )
           }.groupMap(_._1)(_._2)  // Map[Observation.Id, List[ValidatedNel[String, (Target.Id, SpectroscopyModeInput)]]]
            .view
-           .mapValues(_.sequence.map(NonEmptyList.fromListUnsafe))
+           .mapValues(_.sequence.toEither.map(NonEmptyList.fromListUnsafe))
            .toMap
 
       private def selectItcParams(
