@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptyList
 import cats.effect.IO
+import cats.syntax.traverse.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -36,7 +38,7 @@ class itc extends OdbSuite {
       json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
     }
 
-  def createObservation(pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+  def createObservation(pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     query(
       user  = user,
       query =
@@ -150,19 +152,31 @@ class itc extends OdbSuite {
            }
          }
       """
-    ).map { json =>
-      json.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+    ).map(
+      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+    )
+
+  def setup(targetCount: Int = 1): IO[(Program.Id, Observation.Id, List[Target.Id])] =
+    for {
+      p  <- createProgram
+      ts <- (1 to targetCount).toList.traverse(_ => createTarget(p))
+      o  <- createObservation(p, ts)
+    } yield (p, o, ts)
+
+  def setup1: IO[(Program.Id, Observation.Id, Target.Id)] =
+    setup(1).map {
+      case (pid, oid, List(tid)) => (pid, oid, tid)
+      case _                     => sys.error("Expected a single target")
     }
 
-  val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
-    for {
-      p <- createProgram
-      t <- createTarget(p)
-      o <- createObservation(p, t)
-    } yield (p, o, t)
+  def setup2: IO[(Program.Id, Observation.Id, Target.Id, Target.Id)] =
+    setup(2).map {
+      case (pid, oid, List(tid0, tid1)) => (pid, oid, tid0, tid1)
+      case _                            => sys.error("Expected two targets")
+    }
 
-  test("simple itc") {
-    setup.flatMap { case (pid, oid, tid) =>
+  test("success, one target") {
+    setup1.flatMap { case (pid, oid, tid) =>
       expect(
         user = user,
         query =
@@ -222,4 +236,47 @@ class itc extends OdbSuite {
     }
   }
 
+  test("success, two targets") {
+    setup2.flatMap { case (pid, oid, tid0, tid1) =>
+      expect(
+        user = user,
+        query =
+          s"""
+            query {
+              itc(programId: "$pid", observationId: "$oid") {
+                result {
+                  ... on ItcSuccess {
+                    targetId
+                  }
+                }
+                all {
+                  ... on ItcSuccess {
+                    targetId
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+               "itc": {
+                 "result": {
+                   "targetId": $tid1
+                 },
+                 "all": [
+                   {
+                     "targetId": $tid0
+                   },
+                   {
+                     "targetId": $tid1
+                   }
+                 ]
+               }
+            }
+          """
+        )
+      )
+    }
+  }
 }

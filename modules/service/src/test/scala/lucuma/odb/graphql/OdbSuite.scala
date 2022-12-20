@@ -18,6 +18,8 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import io.circe.Decoder
+import io.circe.Encoder
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.NonNegDuration
@@ -50,6 +52,7 @@ import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
+import java.time.Duration
 import scala.concurrent.duration.*
 
 /**
@@ -93,7 +96,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def validUsers: List[User]
 
-  val Bearer = CIString("Bearer")
+  val Bearer: AuthScheme = CIString("Bearer")
 
   def authorization(jwt: String): Authorization =
     Authorization(Credentials.Token(Bearer, jwt))
@@ -103,7 +106,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   val FakeItcResult: ItcResult.Success =
     ItcResult.Success(
-      NonNegDuration.unsafeFrom(java.time.Duration.ofSeconds(10)),
+      NonNegDuration.unsafeFrom(Duration.ofSeconds(10)),
       NonNegInt.unsafeFrom(11),
       PosBigDecimal.unsafeFrom(50.0)
     )
@@ -177,8 +180,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   ) extends GraphQLOperation[Nothing] {
     type Data       = Json
     type Variables  = Json
-    val varEncoder  = implicitly
-    val dataDecoder = implicitly
+    val varEncoder: Encoder[Variables] = implicitly
+    val dataDecoder: Decoder[Data]     = implicitly
   }
 
   private lazy val serverFixture: Fixture[Server] =

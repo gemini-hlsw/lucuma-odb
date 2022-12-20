@@ -43,19 +43,6 @@ import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
 
-
-/*
-final case class SpectroscopyModeInput(
-  wavelength:     Wavelength,
-  signalToNoise:  PosBigDecimal,
-  sourceProfile:  SourceProfile,
-  band:           Band,
-  radialVelocity: RadialVelocity,
-  constraints:    ConstraintSet,
-  mode:           InstrumentMode
-)
-*/
-
 /**
  * A database query service to gather input parameters to send to the ITC.
  */
@@ -105,7 +92,7 @@ object ItcInputService {
         (o.signalToNoise.toValidNel("signal to noise"),
          o.targetId.toValidNel("target")
         ).tupled.andThen { case (s2n, tid) =>
-          // these dependent on having a target in the first place
+          // these are dependent on having a target in the first place
           (band.toValidNel(s"${tid.toString}: brightness measure"),
            o.radialVelocity.toValidNel(s"${tid.toString}: radial velocity"),
            o.sourceProfile.toValidNel(s"${tid.toString}: source profile")
