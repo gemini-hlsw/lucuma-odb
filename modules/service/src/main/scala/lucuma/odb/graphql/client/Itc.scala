@@ -219,7 +219,7 @@ object Itc {
 
         service.use { s =>
           s.selectSpectroscopyInput(programId, observationIds).flatMap { m =>
-             m.toList.traverse { case (oid, e) => // (Observation.Id, EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]])
+             m.toList.traverse { case (oid, e) =>
                callForObservation(programId, oid, e, useCache)
              }
           }
@@ -234,7 +234,7 @@ object Itc {
 
         e.fold(
           ps => ResultSet.missing(pid, oid, ps).pure[F],
-          _.traverse { case (tid, si) => // (Target.Id, SpectroscopyModeInput)
+          _.traverse { case (tid, si) =>
             callForTarget(tid, si, useCache)
           }.map(ResultSet.fromResults(pid, oid, _))
         )
