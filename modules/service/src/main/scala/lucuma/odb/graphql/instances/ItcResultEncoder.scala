@@ -23,8 +23,8 @@ trait ItcResultEncoder {
   private val ServiceError:  String = "SERVICE_ERROR"
   private val Success:       String = "SUCCESS"
 
-  private def status(r: Itc.TargetResult): String =
-    r.result.fold(_ => MissingParams, _ => ServiceError, _ => Success)
+  private def status(r: Itc.Result): String =
+    r.fold(_ => MissingParams, _ => ServiceError, _ => Success)
 
   given Encoder[Itc.Param] =
     Encoder.instance(_.stringValue.asJson)
@@ -32,20 +32,20 @@ trait ItcResultEncoder {
   given [A: Encoder]: Encoder[NonEmptySet[A]] =
     Encoder.instance(_.toNonEmptyList.toList.asJson)
 
-  given Encoder[Itc.TargetResult] with {
-    def apply(r: Itc.TargetResult): Json =
+  given Encoder[Itc.Result] with {
+    def apply(r: Itc.Result): Json =
       Json.fromFields(
-        List(
-          "status"     -> status(r).asJson,
-          "targetId"   -> r.targetId.asJson
-        ) ++ r.result.fold(
+        ("status" -> status(r).asJson) :: r.fold(
           m => List(
-            "params" -> m.params.asJson
+            "targetId" -> m.targetId.asJson,
+            "params"   -> m.params.asJson
           ),
           e => List(
-            "message" -> e.message.asJson
+            "targetId" -> e.targetId.asJson,
+            "message"  -> e.message.asJson
           ),
           s => List(
+            "targetId"      -> s.targetId.asJson,
             "exposureTime"  -> s.exposureTime.value.asJson,
             "exposures"     -> s.exposures.value.asJson,
             "signalToNoise" -> s.signalToNoise.value.asJson
@@ -54,17 +54,16 @@ trait ItcResultEncoder {
       )
   }
 
-  given Encoder[Itc.ObservationResult] with {
-    def apply(r: Itc.ObservationResult): Json =
+  given Encoder[Itc.ResultSet] with {
+    def apply(r: Itc.ResultSet): Json =
       Json.obj(
         "programId"     -> r.programId.asJson,
         "observationId" -> r.observationId.asJson,
         "result"        ->
           r.value.fold(
             m => Json.obj(
-              "__typename" -> "ItcMissingParams".asJson,
-              "status"     -> MissingParams.asJson,
-              "params"     -> m.params.asJson
+              "status"  -> MissingParams.asJson,
+              "params"  -> m.params.asJson
             ),
             z => z.focus.asJson
           ),

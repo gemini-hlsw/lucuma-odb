@@ -36,19 +36,19 @@ import lucuma.odb.util.NonEmptyListExtensions.*
  * call to the ITC service in a single method.
  */
 sealed trait Itc[F[_]] {
-  import Itc.ObservationResult
+  import Itc.ResultSet
 
   def queryOne(
     programId:     Program.Id,
     observationId: Observation.Id,
     useCache:      Boolean
-  ): F[Option[ObservationResult]]
+  ): F[Option[ResultSet]]
 
   def queryAll(
     programId:      Program.Id,
     observationIds: List[Observation.Id],
     useCache:       Boolean
-  ): F[List[ObservationResult]]
+  ): F[List[ResultSet]]
 
 }
 
@@ -79,30 +79,34 @@ object Itc {
       sf: Result.Success      => A
     ): A =
       this match {
-        case m @ Result.Missing(_)          => mf(m)
-        case e @ Result.ServiceError(_, _)  => ef(e)
-        case s @ Result.Success(_, _, _, _) => sf(s)
+        case m @ Result.Missing(_, _)          => mf(m)
+        case e @ Result.ServiceError(_, _, _)  => ef(e)
+        case s @ Result.Success(_, _, _, _, _) => sf(s)
       }
 
   }
 
   object Result {
     final case class Missing(
-      params: NonEmptySet[Param]
+      targetId: Option[Target.Id],
+      params:   NonEmptySet[Param]
     ) extends Result
 
     final case class ServiceError(
-      input:   SpectroscopyModeInput,
-      message: String
+      targetId: Target.Id,
+      input:    SpectroscopyModeInput,
+      message:  String
     ) extends Result
 
     def serviceError(
-      input:   SpectroscopyModeInput,
-      message: String
+      targetId: Target.Id,
+      input:    SpectroscopyModeInput,
+      message:  String
     ): Result =
-      ServiceError(input, message)
+      ServiceError(targetId, input, message)
 
     final case class Success(
+      targetId:      Target.Id,
       input:         SpectroscopyModeInput,
       exposureTime:  NonNegDuration,
       exposures:     NonNegInt,
@@ -110,61 +114,52 @@ object Itc {
     ) extends Result
 
     def success(
+      targetId:      Target.Id,
       input:         SpectroscopyModeInput,
       exposureTime:  NonNegDuration,
       exposures:     NonNegInt,
       signalToNoise: PosBigDecimal
     ): Result =
-      Success(input, exposureTime, exposures, signalToNoise)
+      Success(targetId, input, exposureTime, exposures, signalToNoise)
 
-    given Order[Result] with {
-      def compare(x: Result, y: Result): Int =
-        (x, y) match {
-          case (ServiceError(_, _), _)                        => -1
-          case (_, ServiceError(_, _))                        =>  1
-          case (Missing(_), _)                                => -1
-          case (_, Missing(_))                                =>  1
-          case (Success(_, at, ac, _), Success(_, bt, bc, _)) =>
-            at.value
-              .multipliedBy(ac.value)
-              .compareTo(bt.value.multipliedBy(bc.value))
-        }
-
-    }
+    val SelectionOrder: Order[Result] =
+      Order.from {
+        case (Missing(_, _), _)                                   => -1
+        case (_, Missing(_, _))                                   =>  1
+        case (ServiceError(_, _, _), _)                           => -1
+        case (_, ServiceError(_, _, _))                           =>  1
+        case (Success(_, _, at, ac, _), Success(_, _, bt, bc, _)) =>
+          at.value
+            .multipliedBy(ac.value)
+            .compareTo(bt.value.multipliedBy(bc.value))
+      }
   }
 
-  final case class TargetResult(
-    targetId: Target.Id,
-    result:   Result
-  )
-
-  object TargetResult {
-    given Order[TargetResult] =
-      Order.by { tr => (tr.result, tr.targetId) }
-
-  }
-
-  final case class ObservationResult(
+  /**
+   * Results for all the targets in an observation's asterism.  The summary or
+   * selected result for the set as a whole is the focus of the `value` zipper.
+   */
+  final case class ResultSet(
     programId:     Program.Id,
     observationId: Observation.Id,
-    value:         Either[Result.Missing, Zipper[TargetResult]]
+    value:         Either[Result.Missing, Zipper[Result]]
   )
 
-  object ObservationResult {
+  object ResultSet {
 
     def missing(
       pid: Program.Id,
       oid: Observation.Id,
       ps:  NonEmptyList[Param]
-    ): ObservationResult =
-      ObservationResult(pid, oid, Result.Missing(ps.toNes).asLeft)
+    ): ResultSet =
+      ResultSet(pid, oid, Result.Missing(none, ps.toNes).asLeft)
 
-    def fromTargets(
+    def fromResults(
       pid: Program.Id,
       oid: Observation.Id,
-      ts:  NonEmptyList[TargetResult]
-    ): ObservationResult =
-      ObservationResult(pid, oid, ts.focusMax.asRight)
+      rs:  NonEmptyList[Result]
+    ): ResultSet =
+      ResultSet(pid, oid, rs.focusMax(Result.SelectionOrder).asRight)
   }
 
   def fromClientAndService[F[_]](
@@ -177,7 +172,7 @@ object Itc {
         programId:     Program.Id,
         observationId: Observation.Id,
         useCache:      Boolean
-      ): F[Option[ObservationResult]] =
+      ): F[Option[ResultSet]] =
         queryAll(programId, List(observationId), useCache)
           .map(_.find(_.observationId === observationId))
 
@@ -185,7 +180,7 @@ object Itc {
         programId:      Program.Id,
         observationIds: List[Observation.Id],
         useCache:       Boolean
-      ): F[List[ObservationResult]] =
+      ): F[List[ResultSet]] =
 
         service.use { s =>
           s.selectSpectroscopyInput(programId, observationIds).flatMap { m =>
@@ -200,13 +195,13 @@ object Itc {
         oid:      Observation.Id,
         e:        EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]],
         useCache: Boolean
-      ): F[ObservationResult] =
+      ): F[ResultSet] =
 
         e.fold(
-          ps => ObservationResult.missing(pid, oid, ps).pure[F],
+          ps => ResultSet.missing(pid, oid, ps).pure[F],
           _.traverse { case (tid, si) => // (Target.Id, SpectroscopyModeInput)
             callForTarget(tid, si, useCache)
-          }.map(ObservationResult.fromTargets(pid, oid, _))
+          }.map(ResultSet.fromResults(pid, oid, _))
         )
 
 
@@ -214,15 +209,12 @@ object Itc {
         tid:      Target.Id,
         input:    SpectroscopyModeInput,
         useCache: Boolean
-      ): F[TargetResult] =
+      ): F[Result] =
         client.spectroscopy(input, useCache).map { sr =>
-          TargetResult(
-            tid,
-            sr.result.fold(Result.serviceError(input, "ITC Service returned nothing.")) {
-              case ItcResult.Error(msg)       => Result.serviceError(input, msg)
-              case ItcResult.Success(t, c, s) => Result.success(input, t, c, s)
-            }
-          )
+          sr.result.fold(Result.serviceError(tid, input, "ITC Service returned nothing.")) {
+            case ItcResult.Error(msg)       => Result.serviceError(tid, input, msg)
+            case ItcResult.Success(t, c, s) => Result.success(tid, input, t, c, s)
+          }
         }
 
     }
