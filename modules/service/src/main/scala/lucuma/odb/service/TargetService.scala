@@ -7,7 +7,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -52,7 +52,7 @@ object TargetService {
         override def createTarget(pid: Program.Id, input: TargetPropertiesInput): F[CreateTargetResponse] = {
           val insert: AppliedFragment =
             input.tracking match {
-              case Left(s) => insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
+              case Left(s)  => insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
               case Right(n) => insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
             }
           val where = whereFragment(pid, u)

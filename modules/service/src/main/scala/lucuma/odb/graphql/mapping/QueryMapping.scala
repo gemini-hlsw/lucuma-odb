@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.effect.Resource
 import cats.effect.kernel.Par
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
@@ -18,6 +19,8 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.Json
+import io.circe.literal.*
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
@@ -27,6 +30,7 @@ import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
+import lucuma.odb.service.ItcInputService
 
 import scala.reflect.ClassTag
 
@@ -38,13 +42,29 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProgramMapping[F]
    with ObservationMapping[F] =>
 
+  def itcClientService: Resource[F, ItcInputService[F]]
 
-  lazy val QueryMapping =
+  def itcQuery(
+    path:     Path,
+    pid:      lucuma.core.model.Program.Id,
+    oid:      lucuma.core.model.Observation.Id,
+    useCache: Boolean
+  ): F[Json]
+
+  lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
         SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
+        RootEffect.computeJson("itc") { (_, path, env) =>
+          val useCache = env.get[Boolean]("useCache").getOrElse(true)
+          (env.getR[lucuma.core.model.Program.Id]("programId"),
+           env.getR[lucuma.core.model.Observation.Id]("observationId")
+          ).parTupled.traverse { case (p, o) =>
+            itcQuery(path, p, o, useCache)
+          }
+        },
         SqlObject("observation"),
         SqlObject("observations"),
         SqlObject("partnerMeta"),
@@ -60,6 +80,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     List(
       ConstraintSetGroup,
       FilterTypeMeta,
+      Itc,
       Observation,
       Observations,
       PartnerMeta,
@@ -112,6 +133,19 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Result(Select("filterTypeMeta", Nil,
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
       ))
+
+  private lazy val Itc: PartialFunction[Select, Result[Query]] =
+    case Select("itc", List(
+      ProgramIdBinding("programId", rPid),
+      ObservationIdBinding("observationId", rOid),
+      BooleanBinding("useCache", rUseCache)
+    ), child) =>
+      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, useCache) =>
+        Environment(
+          Env("programId" -> pid, "observationId" -> oid, "useCache" -> useCache),
+          Select("itc", Nil, child)
+        )
+      }
 
   private lazy val Observation: PartialFunction[Select, Result[Query]] =
     case Select("observation", List(

@@ -6,8 +6,11 @@ package lucuma.odb.graphql
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Applicative
+import cats.ApplicativeError
 import cats.Monoid
+import cats.data.EitherNel
 import cats.data.NonEmptyList
+import cats.data.ValidatedNel
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
@@ -21,17 +24,30 @@ import edu.gemini.grackle.sql.SqlMapping
 import fs2.Stream
 import fs2.concurrent.Topic
 import io.circe.Json
+import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.itc.client.ItcClient
+import lucuma.itc.client.ItcResult
+import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
+import lucuma.odb.graphql.client.Itc
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
+import lucuma.odb.graphql.instances.ItcResultEncoder.given
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
+import lucuma.odb.service.ItcInputService
 import lucuma.odb.service.ObservationService
+import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.TargetService
 import natchez.Trace
@@ -70,10 +86,11 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database: Resource[F, Session[F]],
-    monitor:  SkunkMonitor[F],
-    user0:    User,
-    topics0:  Topics[F],
+    database:  Resource[F, Session[F]],
+    monitor:   SkunkMonitor[F],
+    user0:     User,
+    topics0:   Topics[F],
+    itcClient: ItcClient[F]
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
@@ -152,13 +169,38 @@ object OdbMapping {
             pool.map(AsterismService.fromSessionAndUser(_, user))
 
           override val observationService: Resource[F, ObservationService[F]] =
-            pool.map(ObservationService.fromSessionAndUser(_, user))
+            pool.map { s =>
+              val oms = ObservingModeServices.fromSession(s)
+              ObservationService.fromSessionAndUser(s, user, oms)
+            }
 
           override val programService: Resource[F, ProgramService[F]] =
             pool.map(ProgramService.fromSessionAndUser(_, user))
 
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
+
+          override val itcClientService: Resource[F, ItcInputService[F]] =
+            pool.map { s =>
+              val oms = ObservingModeServices.fromSession(s)
+              ItcInputService.fromSession(s, user, oms)
+            }
+
+          override def itcQuery(
+            path:     Path,
+            pid:      Program.Id,
+            oid:      Observation.Id,
+            useCache: Boolean
+          ): F[Json] = {
+
+            import lucuma.odb.graphql.instances.ItcResultEncoder._
+
+            Itc
+              .fromClientAndService(itcClient, itcClientService)
+              .queryOne(pid, oid, useCache)
+              .map(_.asJson)
+          }
+
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
