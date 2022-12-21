@@ -4147,11 +4147,59 @@ type Intensive implements ProposalClass {
   totalTime: NonNegDuration!
 }
 
-type ItcSuccess {
-  exposureTime: NonNegDuration!
-  exposures: NonNegInt!
+# Contains the result of calling the ITC for a particular observation.  Since
+# the observation may contain multiple targets, there may be multiple results.
+# The "result" field contains the selected, representative, result for all
+# targets.  If there are multiple successful results, this will be the one that
+# prescribes the longest observation. If there is a mix of failures and
+# successes, the overall "result" will be a failure. The "all" field contains
+# results for all targets regardless.
+type ItcResultSet {
+  programId:     ProgramId!
+  observationId: ObservationId!
+  result:        ItcResult!
+  all:           [ItcResult!]
+}
+
+# A single ITC call result.
+interface ItcResult {
+  status: ItcStatus!
+}
+
+enum ItcStatus {
+
+  # A successful result
+  SUCCESS
+
+  # Could not calculate the result because not all the required parameters are
+  # present
+  MISSING_PARAMS
+
+  # A failure in the remote ITC service
+  SERVICE_ERROR
+
+}
+
+type ItcSuccess implements ItcResult {
+  status:        ItcStatus!
+  targetId:      TargetId!
+  exposureTime:  NonNegDuration!
+  exposures:     NonNegInt!
   signalToNoise: PosBigDecimal!
 }
+
+type ItcMissingParams implements ItcResult {
+  status:   ItcStatus!
+  targetId: TargetId
+  params:   [String!]!
+}
+
+type ItcServiceError implements ItcResult {
+  status:   ItcStatus!
+  targetId: TargetId!
+  message:  String!
+}
+
 
 # Large program observing at Gemini
 type LargeProgram implements ProposalClass {
@@ -4324,12 +4372,6 @@ type Observation {
 
   # The science configuration
   observingMode: ObservingMode
-
-  # ITC execution results
-  itc(
-    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
-    useCache: Boolean! = true
-  ): ItcSuccess
 
   # Manual instrument configuration
   manualConfig: ManualConfig
@@ -4686,6 +4728,16 @@ type Query {
 
   # Metadata for `enum FilterType`
   filterTypeMeta: [FilterTypeMeta!]!
+
+  # ITC execution results
+  itc(
+    programId:     ProgramId!
+
+    observationId: ObservationId!
+
+    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    useCache: Boolean! = true
+  ): ItcResultSet
 
   # Returns the observation with the given id, if any.
   observation(

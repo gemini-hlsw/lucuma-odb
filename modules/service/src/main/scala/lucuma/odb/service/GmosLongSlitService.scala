@@ -38,6 +38,14 @@ import skunk.implicits.*
 
 trait GmosLongSlitService[F[_]] {
 
+  def selectNorth(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, GmosLongSlitInput.Create.North]]
+
+  def selectSouth(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, GmosLongSlitInput.Create.South]]
+
   def insertNorth(
     input: GmosLongSlitInput.Create.North
   )(
@@ -85,6 +93,60 @@ object GmosLongSlitService {
   ): GmosLongSlitService[F] =
 
     new GmosLongSlitService[F] {
+
+      val common: Decoder[GmosLongSlitInput.Create.Common] =
+        (wavelength_pm          ~
+         gmos_x_binning.opt     ~
+         gmos_y_binning.opt     ~
+         gmos_amp_read_mode.opt ~
+         gmos_amp_gain.opt      ~
+         gmos_roi.opt           ~
+         text.opt               ~
+         text.opt
+        ).emap { case (((((((w, x), y), arm), ag), roi), owd), osd) =>
+          for {
+            wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
+            spatialDithers    <- osd.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as a spatial offsets list."))
+          } yield GmosLongSlitInput.Create.Common(w, x, y, arm, ag, roi, wavelengthDithers, spatialDithers)
+        }
+
+      val north: Decoder[GmosLongSlitInput.Create.North] =
+        (gmos_north_grating     ~
+         gmos_north_filter.opt  ~
+         gmos_north_fpu         ~
+         common
+        ).gmap[GmosLongSlitInput.Create.North]
+
+      val south: Decoder[GmosLongSlitInput.Create.South] =
+        (gmos_south_grating     ~
+         gmos_south_filter.opt  ~
+         gmos_south_fpu         ~
+         common
+        ).gmap[GmosLongSlitInput.Create.South]
+
+      private def select[A](
+        which:   List[Observation.Id],
+        f:       NonEmptyList[Observation.Id] => AppliedFragment,
+        decoder: Decoder[A]
+      ): F[Map[Observation.Id, A]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(Applicative[F].pure(Map.empty)) { oids =>
+            val af = f(oids)
+            session.prepare(af.fragment.query(observation_id ~ decoder)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.toMap)
+            }
+          }
+
+      override def selectNorth(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, GmosLongSlitInput.Create.North]] =
+        select(which, Statements.selectGmosNorthLongSlit, north)
+
+      override def selectSouth(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, GmosLongSlitInput.Create.South]] =
+        select(which, Statements.selectGmosSouthLongSlit, south)
 
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepare(af.fragment.command).use { pq =>
@@ -138,6 +200,43 @@ object GmosLongSlitService {
     }
 
   object Statements {
+
+    private def selectGmosLongSlit(
+      table: String,
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_grating,
+          c_filter,
+          c_fpu,
+          c_central_wavelength,
+          c_xbin,
+          c_ybin,
+          c_amp_read_mode,
+          c_amp_gain,
+          c_roi,
+          c_wavelength_dithers,
+          c_spatial_offsets
+        FROM
+          #$table
+      """(Void) |+|
+      void"""
+        WHERE
+          c_observation_id IN ("""                                        |+|
+            observationIds.map(sql"$observation_id").intercalate(void",") |+|
+          void")"
+
+    def selectGmosNorthLongSlit(
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      selectGmosLongSlit("t_gmos_north_long_slit", observationIds)
+
+    def selectGmosSouthLongSlit(
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      selectGmosLongSlit("t_gmos_south_long_slit", observationIds)
 
     val InsertGmosNorthLongSlit: Fragment[
       Observation.Id          ~

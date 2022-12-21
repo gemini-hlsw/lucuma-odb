@@ -46,7 +46,7 @@ trait AsterismService[F[_]] {
   ): F[Result[Unit]]
 
   /**
-   * Replaces the existing asterisms assocaited with the given observation ids
+   * Replaces the existing asterisms associated with the given observation ids
    * (if any) with the given targets.  This is essentially a delete followed
    * by an insert.
    */
@@ -77,27 +77,13 @@ object AsterismService {
   ): String =
     s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
 
-
-  /*
-  create table t_asterism_target (
-
-    c_program_id     d_program_id     not null,
-    c_observation_id d_observation_id not null,
-    c_target_id      d_target_id      not null,
-
-    foreign key (c_program_id, c_observation_id) references t_observation(c_program_id, c_observation_id),
-    foreign key (c_program_id, c_target_id)      references t_target(c_program_id, c_target_id),
-    constraint t_asterism_target_pkey primary key (c_program_id, c_observation_id, c_target_id)
-
-  )
-  */
-
   def fromSessionAndUser[F[_]: Sync](
     session: Session[F],
     user:    User
   ): AsterismService[F] =
 
     new AsterismService[F] {
+
       override def insertAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],

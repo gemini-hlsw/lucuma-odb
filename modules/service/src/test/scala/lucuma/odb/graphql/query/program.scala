@@ -12,7 +12,6 @@ import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 class program extends OdbSuite {
 
@@ -20,7 +19,7 @@ class program extends OdbSuite {
   val guest    = TestUsers.guest(2)
   val service  = TestUsers.service(3)
 
-  val validUsers = List(pi, guest, service).toList
+  val validUsers = List(pi, guest, service)
 
   def createProgram(user: User, name: String): IO[Program.Id] =
     query(
