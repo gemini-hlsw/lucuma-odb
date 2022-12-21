@@ -117,18 +117,18 @@ object ItcInputService {
         which:     List[Observation.Id]
       ): F[Map[Observation.Id, EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]] =
         for {
-          p  <- selectItcParams(programId, which)  // List[ItcParams]
+          p  <- selectItcParams(programId, which)
           oms = p.collect { case ItcParams(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
-          m  <- mService.selectItcParams(oms)      // Map[Observation.Id, ObservingModeServices.ItcParams]
+          m  <- mService.selectItcParams(oms)
         } yield
           p.map { itcParams =>
             val oid = itcParams.observationId
             (oid,
              m.get(oid).toValidNel(none[Target.Id] -> "observing mode").andThen { om =>
-               spectroscopy(itcParams, om) // ValidatedNel[(Option[Target.Id], String), (Target.Id, SpectroscopyModeInput)]
+               spectroscopy(itcParams, om)
              }
             )
-          }.groupMap(_._1)(_._2)  // Map[Observation.Id, List[ValidatedNel[(Option[Target.Id], String), (Target.Id, SpectroscopyModeInput)]]]
+          }.groupMap(_._1)(_._2)
            .view
            .mapValues(_.sequence.toEither.map(NonEmptyList.fromListUnsafe))
            .toMap
