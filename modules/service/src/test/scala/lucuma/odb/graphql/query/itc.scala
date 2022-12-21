@@ -262,7 +262,7 @@ class itc extends OdbSuite {
             {
                "itc": {
                  "result": {
-                   "targetId": $tid1
+                   "targetId": $tid0
                  },
                  "all": [
                    {
