@@ -62,6 +62,10 @@ object Itc {
       p
   }
 
+  /**
+   * Result of an ITC lookup for a single target of an observation, ignoring
+   * any other targets that an observation might have.
+   */
   sealed trait Result extends Product with Serializable {
 
     val missing: Option[Result.Missing] =
@@ -87,11 +91,26 @@ object Itc {
   }
 
   object Result {
+
+    /**
+     * One or more required parameters are missing, preventing the ITC service
+     * from being consulted.
+     */
     final case class Missing(
       targetId: Option[Target.Id],
       params:   NonEmptySet[Param]
     ) extends Result
 
+    def missing(
+      targetId: Option[Target.Id],
+      params:   NonEmptySet[Param]
+    ): Result =
+      Missing(targetId, params)
+
+    /**
+     * The ITC service was called but did not return a successful result.  The
+     * `message` field may contain more information.
+     */
     final case class ServiceError(
       targetId: Target.Id,
       input:    SpectroscopyModeInput,
@@ -105,6 +124,9 @@ object Itc {
     ): Result =
       ServiceError(targetId, input, message)
 
+    /**
+     * Successful ITC service call results.
+     */
     final case class Success(
       targetId:      Target.Id,
       input:         SpectroscopyModeInput,
@@ -122,6 +144,13 @@ object Itc {
     ): Result =
       Success(targetId, input, exposureTime, exposures, signalToNoise)
 
+    /**
+     * An `Order` definition used to select a single Result for an observation
+     * when it has multiple targets.  In general, we want the result in which
+     * calls for the longest observation.  // TODO: verify
+     *
+     * N.B., not implicit because this isn't a total ordering.
+     */
     val SelectionOrder: Order[Result] =
       Order.from {
         case (Missing(_, _), _)                                   => -1
@@ -142,7 +171,7 @@ object Itc {
   final case class ResultSet(
     programId:     Program.Id,
     observationId: Observation.Id,
-    value:         Either[Result.Missing, Zipper[Result]]
+    value:         Zipper[Result]
   )
 
   object ResultSet {
@@ -150,16 +179,22 @@ object Itc {
     def missing(
       pid: Program.Id,
       oid: Observation.Id,
-      ps:  NonEmptyList[Param]
+      ps:  NonEmptyList[(Option[Target.Id], Param)]
     ): ResultSet =
-      ResultSet(pid, oid, Result.Missing(none, ps.toNes).asLeft)
+      fromResults(
+        pid,
+        oid,
+        ps.groupMapReduceNem(_._1) { case (_, p) => NonEmptySet.one(p) }
+          .toNel
+          .map { case (tid, ps) => Result.missing(tid, ps) }
+      )
 
     def fromResults(
       pid: Program.Id,
       oid: Observation.Id,
       rs:  NonEmptyList[Result]
     ): ResultSet =
-      ResultSet(pid, oid, rs.focusMax(Result.SelectionOrder).asRight)
+      ResultSet(pid, oid, rs.focusMax(Result.SelectionOrder))
   }
 
   def fromClientAndService[F[_]](
@@ -184,7 +219,7 @@ object Itc {
 
         service.use { s =>
           s.selectSpectroscopyInput(programId, observationIds).flatMap { m =>
-             m.toList.traverse { case (oid, e) => // (Observation.Id, EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]])
+             m.toList.traverse { case (oid, e) => // (Observation.Id, EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]])
                callForObservation(programId, oid, e, useCache)
              }
           }
@@ -193,7 +228,7 @@ object Itc {
       def callForObservation(
         pid:      Program.Id,
         oid:      Observation.Id,
-        e:        EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]],
+        e:        EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]],
         useCache: Boolean
       ): F[ResultSet] =
 

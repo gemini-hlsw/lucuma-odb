@@ -59,15 +59,8 @@ trait ItcResultEncoder {
       Json.obj(
         "programId"     -> r.programId.asJson,
         "observationId" -> r.observationId.asJson,
-        "result"        ->
-          r.value.fold(
-            m => Json.obj(
-              "status"  -> MissingParams.asJson,
-              "params"  -> m.params.asJson
-            ),
-            z => z.focus.asJson
-          ),
-        "all"           -> r.value.toOption.toList.flatMap(_.toList).asJson
+        "result"        -> r.value.focus.asJson,
+        "all"           -> r.value.toList.asJson
       )
   }
 

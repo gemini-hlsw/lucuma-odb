@@ -279,4 +279,273 @@ class itc extends OdbSuite {
       )
     }
   }
+
+  test("observation missing observingMode") {
+    def createObservation(pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
+      query(
+        user  = user,
+        query =
+        s"""
+           mutation {
+             createObservation(input: {
+               programId: ${pid.asJson},
+               SET: {
+                 constraintSet: {
+                   cloudExtinction: POINT_ONE,
+                   imageQuality: POINT_ONE,
+                   skyBackground: DARKEST
+                 },
+                 targetEnvironment: {
+                   asterism: [ ${tid.asJson} ]
+                 },
+                 scienceRequirements: {
+                   mode: SPECTROSCOPY,
+                   spectroscopy: {
+                     wavelength: {
+                       nanometers: 500
+                     },
+                     resolution: 100,
+                     signalToNoise: 100.0,
+                     wavelengthCoverage: {
+                       nanometers: 20
+                     },
+                     focalPlane: SINGLE_SLIT,
+                     focalPlaneAngle: {
+                       microarcseconds: 0
+                     }
+                   }
+                 }
+               }
+             }) {
+               observation {
+                 id
+               }
+             }
+           }
+        """
+      ).map { json =>
+        json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+      }
+
+    for {
+      p <- createProgram
+      t <- createTarget(p)
+      o <- createObservation(p, t)
+      r <- expect(
+        user = user,
+        query =
+          s"""
+            query {
+              itc(programId: "$p", observationId: "$o") {
+                result {
+                  status
+                  ... on ItcMissingParams {
+                    targetId
+                    params
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+               "itc": {
+                 "result": {
+                   "status": "MISSING_PARAMS",
+                   "targetId": null,
+                   "params": [
+                     "observing mode"
+                   ]
+                 }
+               }
+            }
+          """
+        )
+      )
+    } yield r
+  }
+
+  test("observation missing targets") {
+    def createObservation(pid: Program.Id): IO[Observation.Id] =
+      query(
+        user  = user,
+        query =
+        s"""
+           mutation {
+             createObservation(input: {
+               programId: ${pid.asJson},
+               SET: {
+                 constraintSet: {
+                   cloudExtinction: POINT_ONE,
+                   imageQuality: POINT_ONE,
+                   skyBackground: DARKEST
+                 },
+                 scienceRequirements: {
+                   mode: SPECTROSCOPY,
+                   spectroscopy: {
+                     wavelength: {
+                       nanometers: 500
+                     },
+                     resolution: 100,
+                     signalToNoise: 100.0,
+                     wavelengthCoverage: {
+                       nanometers: 20
+                     },
+                     focalPlane: SINGLE_SLIT,
+                     focalPlaneAngle: {
+                       microarcseconds: 0
+                     }
+                   }
+                 },
+                 observingMode: {
+                   gmosNorthLongSlit: {
+                     grating: R831_G5302,
+                     filter: R_PRIME,
+                     fpu: LONG_SLIT_0_50,
+                     centralWavelength: {
+                       nanometers: 500
+                     }
+                   }
+                 }
+               }
+             }) {
+               observation {
+                 id
+               }
+             }
+           }
+        """
+      ).map { json =>
+        json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+      }
+
+    for {
+      p <- createProgram
+      o <- createObservation(p)
+      r <- expect(
+        user = user,
+        query =
+          s"""
+            query {
+              itc(programId: "$p", observationId: "$o") {
+                result {
+                  status
+                  ... on ItcMissingParams {
+                    targetId
+                    params
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+               "itc": {
+                 "result": {
+                   "status": "MISSING_PARAMS",
+                   "targetId": null,
+                   "params": [
+                     "target"
+                   ]
+                 }
+               }
+            }
+          """
+        )
+      )
+    } yield r
+  }
+
+  test("target missing rv and brightness") {
+
+    def createTarget(pid: Program.Id): IO[Target.Id] =
+      query(
+        user  = user,
+        query =
+        s"""
+           mutation {
+             createTarget(input: {
+               programId: ${pid.asJson},
+               SET: {
+                 name: "V1647 Orionis"
+                 sidereal: {
+                   ra: { hms: "05:46:13.137" },
+                   dec: { dms: "-00:06:04.89" },
+                   epoch: "J2000.0",
+                   properMotion: {
+                     ra: {
+                       milliarcsecondsPerYear: 0.918
+                     },
+                     dec: {
+                       milliarcsecondsPerYear: -1.057
+                     },
+                   },
+                   parallax: {
+                     milliarcseconds: 2.422
+                   }
+                 },
+                 sourceProfile: {
+                   point: {
+                     bandNormalized: {
+                       sed: {
+                         stellarLibrary: O5_V
+                       },
+                       brightnesses: [
+                       ]
+                     }
+                   }
+                 }
+               }
+             }) {
+               target {
+                 id
+               }
+             }
+           }
+        """
+      ).map(
+        _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+      )
+
+    for {
+      p <- createProgram
+      t <- createTarget(p)
+      o <- createObservation(p, List(t))
+      r <- expect(
+        user = user,
+        query =
+          s"""
+            query {
+              itc(programId: "$p", observationId: "$o") {
+                result {
+                  status
+                  ... on ItcMissingParams {
+                    targetId
+                    params
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+               "itc": {
+                 "result": {
+                   "status": "MISSING_PARAMS",
+                   "targetId": $t,
+                   "params": [
+                     "brightness measure",
+                     "radial velocity"
+                   ]
+                 }
+               }
+            }
+          """
+        )
+      )
+    } yield r
+  }
 }

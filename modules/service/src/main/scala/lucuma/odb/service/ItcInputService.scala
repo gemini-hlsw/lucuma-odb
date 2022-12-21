@@ -51,7 +51,7 @@ trait ItcInputService[F[_]] {
   def selectSpectroscopyInput(
     programId: Program.Id,
     which:     List[Observation.Id]
-  ): F[Map[Observation.Id, EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]]
+  ): F[Map[Observation.Id, EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]]
 
 }
 
@@ -68,7 +68,7 @@ object ItcInputService {
       private def spectroscopy(
         o: ItcParams,
         m: ObservingModeServices.ItcParams,
-      ): ValidatedNel[String, (Target.Id, SpectroscopyModeInput)] = {
+      ): ValidatedNel[(Option[Target.Id], String), (Target.Id, SpectroscopyModeInput)] = {
 
         def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[Band] =
           bMap.minByOption { case (b, _) =>
@@ -89,15 +89,15 @@ object ItcInputService {
               )
           }
 
-        (o.signalToNoise.toValidNel("signal to noise"),
-         o.targetId.toValidNel("target")
+        (o.signalToNoise.toValidNel(none[Target.Id] -> "signal to noise"),
+         o.targetId.toValidNel(none[Target.Id] -> "target")
         ).tupled.andThen { case (s2n, tid) =>
           // these are dependent on having a target in the first place
-          (band.toValidNel(s"${tid.toString}: brightness measure"),
-           o.radialVelocity.toValidNel(s"${tid.toString}: radial velocity"),
-           o.sourceProfile.toValidNel(s"${tid.toString}: source profile")
-          ).mapN { case (b, rv, sp) => (
-            tid,
+          (band.toValidNel(tid.some -> "brightness measure"),
+           o.radialVelocity.toValidNel(tid.some -> "radial velocity"),
+           o.sourceProfile.toValidNel(tid.some -> "source profile")
+          ).mapN { case (b, rv, sp) =>
+            tid ->
             SpectroscopyModeInput(
               m.wavelength,
               s2n,
@@ -108,14 +108,14 @@ object ItcInputService {
               o.constraints,
               m.mode
             )
-          )}
+          }
         }
       }
 
       override def selectSpectroscopyInput(
         programId: Program.Id,
         which:     List[Observation.Id]
-      ): F[Map[Observation.Id, EitherNel[String, NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]] =
+      ): F[Map[Observation.Id, EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]] =
         for {
           p  <- selectItcParams(programId, which)  // List[ItcParams]
           oms = p.collect { case ItcParams(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
@@ -124,11 +124,11 @@ object ItcInputService {
           p.map { itcParams =>
             val oid = itcParams.observationId
             (oid,
-             m.get(oid).toValidNel("observing mode").andThen { om =>
-               spectroscopy(itcParams, om) // ValidatedNel[String, (Target.Id, SpectroscopyModeInput)]
+             m.get(oid).toValidNel(none[Target.Id] -> "observing mode").andThen { om =>
+               spectroscopy(itcParams, om) // ValidatedNel[(Option[Target.Id], String), (Target.Id, SpectroscopyModeInput)]
              }
             )
-          }.groupMap(_._1)(_._2)  // Map[Observation.Id, List[ValidatedNel[String, (Target.Id, SpectroscopyModeInput)]]]
+          }.groupMap(_._1)(_._2)  // Map[Observation.Id, List[ValidatedNel[(Option[Target.Id], String), (Target.Id, SpectroscopyModeInput)]]]
            .view
            .mapValues(_.sequence.toEither.map(NonEmptyList.fromListUnsafe))
            .toMap
