@@ -66,7 +66,18 @@ object Itc {
    * Result of an ITC lookup for a single target of an observation, ignoring
    * any other targets that an observation might have.
    */
-  sealed trait Result extends Product with Serializable {
+  enum Result {
+
+    def fold[A](
+      mf: Missing      => A,
+      ef: ServiceError => A,
+      sf: Success      => A
+    ): A =
+      this match {
+        case m @ Missing(_, _)          => mf(m)
+        case e @ ServiceError(_, _, _)  => ef(e)
+        case s @ Success(_, _, _, _, _) => sf(s)
+      }
 
     val missing: Option[Result.Missing] =
       fold(_.some, _ => none, _ => none)
@@ -77,72 +88,38 @@ object Itc {
     val success: Option[Result.Success] =
       fold(_ => none, _ => none, _.some)
 
-    def fold[A](
-      mf: Result.Missing      => A,
-      ef: Result.ServiceError => A,
-      sf: Result.Success      => A
-    ): A =
-      this match {
-        case m @ Result.Missing(_, _)          => mf(m)
-        case e @ Result.ServiceError(_, _, _)  => ef(e)
-        case s @ Result.Success(_, _, _, _, _) => sf(s)
-      }
-
-  }
-
-  object Result {
-
     /**
      * One or more required parameters are missing, preventing the ITC service
      * from being consulted.
      */
-    final case class Missing(
+    case Missing(
       targetId: Option[Target.Id],
       params:   NonEmptySet[Param]
-    ) extends Result
-
-    def missing(
-      targetId: Option[Target.Id],
-      params:   NonEmptySet[Param]
-    ): Result =
-      Missing(targetId, params)
+    )
 
     /**
      * The ITC service was called but did not return a successful result.  The
      * `message` field may contain more information.
      */
-    final case class ServiceError(
+    case ServiceError(
       targetId: Target.Id,
       input:    SpectroscopyModeInput,
       message:  String
-    ) extends Result
-
-    def serviceError(
-      targetId: Target.Id,
-      input:    SpectroscopyModeInput,
-      message:  String
-    ): Result =
-      ServiceError(targetId, input, message)
+    )
 
     /**
      * Successful ITC service call results.
      */
-    final case class Success(
+    case Success(
       targetId:      Target.Id,
       input:         SpectroscopyModeInput,
       exposureTime:  NonNegDuration,
       exposures:     NonNegInt,
       signalToNoise: PosBigDecimal
-    ) extends Result
+    )
+  }
 
-    def success(
-      targetId:      Target.Id,
-      input:         SpectroscopyModeInput,
-      exposureTime:  NonNegDuration,
-      exposures:     NonNegInt,
-      signalToNoise: PosBigDecimal
-    ): Result =
-      Success(targetId, input, exposureTime, exposures, signalToNoise)
+  object Result {
 
     /**
      * An `Order` definition used to select a single Result for an observation
@@ -162,6 +139,7 @@ object Itc {
             .multipliedBy(ac.value)
             .compareTo(bt.value.multipliedBy(bc.value))
       }
+
   }
 
   /**
@@ -186,7 +164,7 @@ object Itc {
         oid,
         ps.groupMapReduceNem(_._1) { case (_, p) => NonEmptySet.one(p) }
           .toNel
-          .map { case (tid, ps) => Result.missing(tid, ps) }
+          .map { case (tid, ps) => Result.Missing(tid, ps) }
       )
 
     def fromResults(
@@ -246,9 +224,9 @@ object Itc {
         useCache: Boolean
       ): F[Result] =
         client.spectroscopy(input, useCache).map { sr =>
-          sr.result.fold(Result.serviceError(tid, input, "ITC Service returned nothing.")) {
-            case ItcResult.Error(msg)       => Result.serviceError(tid, input, msg)
-            case ItcResult.Success(t, c, s) => Result.success(tid, input, t, c, s)
+          sr.result.fold(Result.ServiceError(tid, input, "ITC Service returned nothing.")) {
+            case ItcResult.Error(msg)       => Result.ServiceError(tid, input, msg)
+            case ItcResult.Success(t, c, s) => Result.Success(tid, input, t, c, s)
           }
         }
 
