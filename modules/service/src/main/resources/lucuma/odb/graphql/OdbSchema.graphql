@@ -2654,6 +2654,8 @@ type Angle {
 
 type AsterismGroup {
 
+  program: Program!
+
   # Observations associated with the common value
   observations(
     # Set to true to include deleted values

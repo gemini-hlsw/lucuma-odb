@@ -11,6 +11,7 @@ import cats.syntax.all._
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Cursor.ListTransformCursor
+import edu.gemini.grackle.ListType
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -55,6 +56,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     ObjectMapping(
       tpe = QueryType,
       fieldMappings = List(
+        SqlObject("asterismGroup"),
         SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
         RootEffect.computeJson("itc") { (_, path, env) =>
@@ -78,6 +80,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
+      AsterismGroup,
       ConstraintSetGroup,
       FilterTypeMeta,
       Itc,
@@ -95,8 +98,38 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   // Elaborators below
 
+  private lazy val AsterismGroup: PartialFunction[Select, Result[Query]] = 
+    val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches")
+    {
+      case Select("asterismGroup", List(
+        ProgramIdBinding("programId", rProgramId),
+        WhereObservationBinding.Option("WHERE", rWHERE),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      ), child) =>
+        (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult("asterismGroup", child, limit) { q =>         
+            FilterOrderByOffsetLimit(
+              pred = Some(
+                and(List(
+                  WHERE.getOrElse(True),
+                  Predicates.asterismGroup.program.id.eql(pid),
+                  Predicates.asterismGroup.program.existence.includeDeleted(includeDeleted),
+                  Predicates.asterismGroup.program.isVisibleTo(user),
+                ))
+              ),
+              oss = None,
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
+        }
+    }
+
   private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = 
-    val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations")
+    val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
     {
       case Select("constraintSetGroup", List(
         ProgramIdBinding("programId", rProgramId),
@@ -274,7 +307,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
 
   private lazy val TargetGroup: PartialFunction[Select, Result[Query]] = 
-    val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations")
+    val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches")
     {
       case Select("targetGroup", List(
         ProgramIdBinding("programId", rProgramId),

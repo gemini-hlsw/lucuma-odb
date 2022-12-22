@@ -16,6 +16,8 @@ trait BaseMapping[F[_]]
   // TODO: auto-generate this
   lazy val AirMassRangeType                    = schema.ref("AirMassRange")
   lazy val AllocationType                      = schema.ref("Allocation")
+  lazy val AsterismGroupType                   = schema.ref("AsterismGroup")
+  lazy val AsterismGroupSelectResultType       = schema.ref("AsterismGroupSelectResult")
   lazy val AngleType                           = schema.ref("Angle")
   lazy val BigDecimalType                      = schema.ref("BigDecimal")
   lazy val CatalogInfoType                     = schema.ref("CatalogInfo")
