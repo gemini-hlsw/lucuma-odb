@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs._
+import skunk.circe.codec.all._
 import skunk.codec.all._
 
 trait ObservationView[F[_]] extends BaseMapping[F] {
@@ -19,6 +20,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val Status: ColumnRef            = col("c_status",             obs_status)
       val ActiveStatus: ColumnRef      = col("c_active_status",      obs_active_status)
       val VisualizationTime: ColumnRef = col("c_visualization_time", data_timestamp.opt)
+      val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
 
       object PosAngleConstraint {
         val Mode: ColumnRef            = col("c_pac_mode",  pac_mode.embedded)

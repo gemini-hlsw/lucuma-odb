@@ -12,4 +12,43 @@ create table t_asterism_target (
   foreign key (c_program_id, c_target_id)      references t_target(c_program_id, c_target_id),
   constraint t_asterism_target_pkey primary key (c_program_id, c_observation_id, c_target_id)
 
-)
+);
+
+-- Whenever we insert, update or delete a row in t_asterism_target, update the t_asterism column
+-- in t_observation so we can use it for the asterism group business below.
+CREATE OR REPLACE FUNCTION asterism_update()
+  RETURNS trigger AS $$
+DECLARE
+  obsid d_observation_id;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    obsid := OLD.c_observation_id;
+  ELSE
+    obsid := NEW.c_observation_id;
+  END IF;
+  update t_observation a 
+  set c_asterism_group = coalesce(
+    -- ensure that the lists are sorted so we can compare them
+    (select to_json(array_agg(b.c_target_id order by b.c_target_id))::jsonb
+    from t_asterism_target b
+    where a.c_observation_id = b.c_observation_id),
+    '[]'::jsonb
+  )
+  where a.c_observation_id = obsid;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER asterism_update
+  AFTER INSERT OR UPDATE OR DELETE ON t_asterism_target
+  DEFERRABLE
+  FOR EACH ROW
+  EXECUTE PROCEDURE asterism_update();
+
+-- A view keyed on program id and asterism group, with a link to one observation in the group,
+-- through which we can get to the targets.
+create view v_asterism_group as
+  select c_program_id, c_asterism_group, min(c_observation_id)::d_observation_id c_example_observation_id 
+  from t_observation 
+  group by c_program_id, c_asterism_group;
+

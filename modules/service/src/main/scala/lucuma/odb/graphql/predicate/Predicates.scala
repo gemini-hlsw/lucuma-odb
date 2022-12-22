@@ -24,6 +24,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val target              = TargetPredicates(Path.from(TargetType))
     val constraintSetGroup  = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
     val targetGroup         = TargetGroupPredicates(Path.from(TargetGroupType))
+    val asterismGroup       = AsterismGroupPredicates(Path.from(AsterismGroupType))
   }
 
 }

@@ -81,6 +81,8 @@ object OdbMapping {
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
+          with AsterismGroupMapping[F]
+          with AsterismGroupSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
@@ -166,6 +168,8 @@ object OdbMapping {
               AirMassRangeMapping,
               AllocationMapping,
               AngleMapping,
+              AsterismGroupMapping,
+              AsterismGroupSelectResultMapping,
               CatalogInfoMapping,
               ConstraintSetGroupMapping,
               ConstraintSetGroupSelectResultMapping,

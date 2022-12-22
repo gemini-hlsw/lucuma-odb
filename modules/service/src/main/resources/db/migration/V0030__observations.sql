@@ -225,7 +225,8 @@ create table t_observation (
   -- observing mode
   c_observing_mode_type e_observing_mode_type null default null,
 
-  --
+  -- asterism group (computed by a trigger on t_asterism_target)
+  c_asterism_group jsonb not null default '[]'::jsonb,
 
   unique (c_observation_id, c_instrument),
   unique (c_observation_id, c_observing_mode_type),
