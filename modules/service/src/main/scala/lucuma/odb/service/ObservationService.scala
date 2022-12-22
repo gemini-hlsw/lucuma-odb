@@ -8,7 +8,16 @@ import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Sync
-import cats.syntax.all.*
+import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
+import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
+import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
+import cats.syntax.option.*
+import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Problem
 import edu.gemini.grackle.Result
@@ -91,6 +100,13 @@ sealed trait ObservationService[F[_]] {
 
 object ObservationService {
 
+  final case class ItcParams(
+    constraints:     ConstraintSet,
+    signalToNoise:   PosBigDecimal,
+    signalToNoiseAt: Option[Wavelength],
+    observingMode:   ObservingModeType
+  )
+
   final case class DatabaseConstraint(
     constraint: String,
     message:    String
@@ -132,12 +148,10 @@ object ObservationService {
 
   def fromSessionAndUser[F[_]: Sync: Trace](
     session: Session[F],
-    user:    User
+    user:    User,
+    observingModeServices: ObservingModeServices[F]
   ): ObservationService[F] =
     new ObservationService[F] {
-
-      lazy val observingModeServices: ObservingModeServices[F] =
-        ObservingModeServices.fromSession(session)
 
       override def createObservation(
         programId: Program.Id,
@@ -264,10 +278,12 @@ object ObservationService {
             } yield r
           }
         }
+
     }
 
   object Statements {
 
+    import ProgramService.Statements.existsUserAccess
     import ProgramService.Statements.whereUserAccess
 
     def insertObservationAs(

@@ -4,9 +4,9 @@
 package lucuma.odb.graphql
 
 import cats.data.OptionT
-import cats.effect._
+import cats.effect.*
 import cats.effect.std.Supervisor
-import cats.implicits._
+import cats.implicits.*
 import clue.ApolloWebSocketClient
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
@@ -16,10 +16,20 @@ import clue.http4s.Http4sBackend
 import clue.http4s.Http4sWSBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosBigDecimal
+import io.circe.Decoder
+import io.circe.Encoder
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
+import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.util.Gid
+import lucuma.itc.client.ItcClient
+import lucuma.itc.client.ItcResult
+import lucuma.itc.client.ItcVersions
+import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.sso.client.SsoClient
@@ -42,7 +52,8 @@ import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration._
+import java.time.Duration
+import scala.concurrent.duration.*
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
@@ -85,10 +96,33 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def validUsers: List[User]
 
-  val Bearer = CIString("Bearer")
+  val Bearer: AuthScheme = CIString("Bearer")
 
   def authorization(jwt: String): Authorization =
     Authorization(Credentials.Token(Bearer, jwt))
+
+  val FakeItcVersions: ItcVersions =
+    ItcVersions("foo", "bar".some)
+
+  val FakeItcResult: ItcResult.Success =
+    ItcResult.Success(
+      NonNegDuration.unsafeFrom(Duration.ofSeconds(10)),
+      NonNegInt.unsafeFrom(11),
+      PosBigDecimal.unsafeFrom(50.0)
+    )
+
+  private def itcClient: ItcClient[IO] =
+    new ItcClient[IO] {
+
+      override def spectroscopy(input: SpectroscopyModeInput, useCache: Boolean): IO[SpectroscopyResult] =
+        SpectroscopyResult(
+          FakeItcVersions,
+          FakeItcResult.some
+        ).pure[IO]
+
+      override def versions: IO[ItcVersions] =
+        FakeItcVersions.pure[IO]
+    }
 
   private def ssoClient: SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User] {
@@ -110,6 +144,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         password = container.password,
         database = container.databaseName,
       ),
+      itcClient.pure[Resource[IO, *]],
       ssoClient.pure[Resource[IO, *]],
       "unused"
     ).map(_.map(_.orNotFound))
@@ -145,8 +180,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   ) extends GraphQLOperation[Nothing] {
     type Data       = Json
     type Variables  = Json
-    val varEncoder  = implicitly
-    val dataDecoder = implicitly
+    val varEncoder: Encoder[Variables] = implicitly
+    val dataDecoder: Decoder[Data]     = implicitly
   }
 
   private lazy val serverFixture: Fixture[Server] =
