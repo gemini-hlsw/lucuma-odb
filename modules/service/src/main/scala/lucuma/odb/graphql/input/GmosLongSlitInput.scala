@@ -26,13 +26,35 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.units.Picometer
+import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
 
+import scala.util.Try
 import scala.util.control.Exception.*
 
 object GmosLongSlitInput {
+
+  val WavelengthDithersFormat: Format[String, List[Quantity[Int, Picometer]]] =
+    Format(
+      s => Try(
+        s.split(",").toList.map { d =>
+          Quantity[Picometer](BigDecimal(d).bigDecimal.movePointRight(3).intValueExact)
+        }
+      ).toOption,
+      _.map(w => BigDecimal(w.value).bigDecimal.movePointLeft(3).toPlainString).intercalate(",")
+    )
+
+  val SpatialOffsetsFormat: Format[String, List[Q]] =
+    Format(
+      s => Try(
+        s.split(",").toList.map { q =>
+          Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
+        }
+      ).toOption,
+      _.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")
+    )
 
   object Create {
 
@@ -49,10 +71,10 @@ object GmosLongSlitInput {
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
-        explicitλDithers.map(GmosLongSlitInput.formattedλDithers)
+        explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
       val formattedSpatialOffsets: Option[String] =
-        explicitSpatialOffsets.map(GmosLongSlitInput.formattedSpatialOffsets)
+        explicitSpatialOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     }
 
@@ -188,10 +210,10 @@ object GmosLongSlitInput {
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Nullable[String] =
-        explicitλDithers.map(GmosLongSlitInput.formattedλDithers)
+        explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
       val formattedSpatialOffsets: Nullable[String] =
-        explicitSpatialOffsets.map(GmosLongSlitInput.formattedSpatialOffsets)
+        explicitSpatialOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     }
 
@@ -315,11 +337,6 @@ object GmosLongSlitInput {
     }    
   }
 
-  private def formattedλDithers(in: List[Quantity[Int, Picometer]]): String =
-    in.map(w => BigDecimal(w.value).bigDecimal.movePointLeft(3).toPlainString).intercalate(",")
-
-  private def formattedSpatialOffsets(in: List[Q]): String =
-    in.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")
 
   private val NorthData: Matcher[(
     Option[GmosNorthGrating],

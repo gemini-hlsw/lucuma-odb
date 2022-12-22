@@ -2,11 +2,11 @@ val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.3"
 val cirisVersion               = "3.0.0"
 val clueVersion                = "0.23.1"
-val declineVersion             = "2.4.0"
+val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
-val flywayVersion              = "9.10.0"
+val flywayVersion              = "9.10.2"
 val grackleVersion             = "0.10.0"
-val http4sBlazeVersion         = "0.23.12"
+val http4sBlazeVersion         = "0.23.13"
 val http4sEmberVersion         = "0.23.16"
 val http4sJdkHttpClientVersion = "0.8.0"
 val jwtVersion                 = "5.0.0"
@@ -22,6 +22,7 @@ val natchezVersion             = "0.1.6"
 val postgresVersion            = "42.5.1"
 val skunkVersion               = "0.3.2"
 val lucumaSsoVersion           = "0.4.4"
+val lucumaItcVersion           = "0.3"
 val testcontainersScalaVersion = "0.40.12"
 val paigesVersion              = "0.4.2"
 
@@ -43,6 +44,7 @@ lazy val service = project
       "com.monovore"   %% "decline"                         % declineVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
+      "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
       "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,

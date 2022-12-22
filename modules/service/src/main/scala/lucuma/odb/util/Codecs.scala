@@ -30,6 +30,8 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ElevationRange.AirMass
+import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -66,6 +68,17 @@ trait Codecs {
 
   val air_mass_range_value: Codec[PosBigDecimal] =
     numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
+
+  val air_mass_range: Codec[AirMass] =
+    (air_mass_range_value ~ air_mass_range_value).eimap { case (min, max) =>
+      for {
+        n <- AirMass.DecimalValue.from(min.value)
+        x <- AirMass.DecimalValue.from(max.value)
+        a <- AirMass.fromOrderedDecimalValues.getOption((n, x)).toRight(s"air mass min and max out of order: ($min, $max)")
+      } yield a
+    } { a =>
+      (PosBigDecimal.unsafeFrom(a.min.value), PosBigDecimal.unsafeFrom(a.max.value))
+    }
 
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
@@ -108,6 +121,17 @@ trait Codecs {
 
   val hour_angle_range_value: Codec[BigDecimal] =
     numeric(3, 2)
+
+  val hour_angle_range: Codec[HourAngle] =
+    (hour_angle_range_value ~ hour_angle_range_value).eimap { case (min, max) =>
+      for {
+        n <- HourAngle.DecimalHour.from(min)
+        x <- HourAngle.DecimalHour.from(max)
+        h <- HourAngle.fromOrderedDecimalHours.getOption((n, x)).toRight(s"hour angle min and max out of order: ($min, $max)")
+      } yield h
+    } { h =>
+      (h.minHours.value, h.maxHours.value)
+    }
 
   val image_quality: Codec[ImageQuality] =
     enumerated[ImageQuality](Type.varchar)
@@ -220,6 +244,24 @@ trait Codecs {
       pm => Wavelength.fromPicometers.getOption(pm).toRight(s"Invalid wavelength, must be positive pm: $pm"))(
       Wavelength.fromPicometers.reverseGet
     )
+
+  // Not so atomic ...
+
+  val elevation_range: Codec[ElevationRange] =
+    (air_mass_range.opt ~ hour_angle_range.opt).eimap { case (am, ha) =>
+      am.orElse(ha).toRight("Undefined elevation range")
+    } { e =>
+      (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
+    }
+
+  val constraint_set: Codec[ConstraintSet] =
+    (image_quality    ~
+     cloud_extinction ~
+     sky_background   ~
+     water_vapor      ~
+     elevation_range
+    ).gimap[ConstraintSet]
+
 }
 
 object Codecs extends Codecs

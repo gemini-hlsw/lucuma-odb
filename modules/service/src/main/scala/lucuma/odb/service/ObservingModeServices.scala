@@ -4,16 +4,24 @@
 package lucuma.odb.service
 
 import cats.effect.Sync
+import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Result
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
+import lucuma.itc.client.GmosFpu
+import lucuma.itc.client.InstrumentMode
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
 import skunk.Session
 import skunk.Transaction
 
 sealed trait ObservingModeServices[F[_]] {
+
+  def selectItcParams(
+    which: List[(Observation.Id, ObservingModeType)]
+  ): F[Map[Observation.Id, ObservingModeServices.ItcParams]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -35,6 +43,11 @@ sealed trait ObservingModeServices[F[_]] {
 
 object ObservingModeServices {
 
+  final case class ItcParams(
+    wavelength: Wavelength,
+    mode:       InstrumentMode
+  )
+
   def fromSession[F[_]: Sync](
     session: Session[F]
   ): ObservingModeServices[F] =
@@ -42,6 +55,34 @@ object ObservingModeServices {
 
       lazy val gmosLongSlitService: GmosLongSlitService[F] =
         GmosLongSlitService.fromSession(session)
+
+      override def selectItcParams(
+        which: List[(Observation.Id, ObservingModeType)]
+      ): F[Map[Observation.Id, ItcParams]] = {
+        import ObservingModeType.*
+
+        which.groupMap(_._2)(_._1).toList.traverse {
+          case (GmosNorthLongSlit, oids) =>
+            gmosLongSlitService
+              .selectNorth(oids)
+              .map(_.view.mapValues { gn =>
+                ItcParams(
+                  gn.common.centralWavelength,
+                  InstrumentMode.GmosNorth(gn.grating, gn.filter, GmosFpu.North.builtin(gn.fpu))
+                )
+              }.toMap)
+
+          case (GmosSouthLongSlit, oids) =>
+            gmosLongSlitService
+              .selectSouth(oids)
+              .map(_.view.mapValues { gs =>
+                ItcParams(
+                  gs.common.centralWavelength,
+                  InstrumentMode.GmosSouth(gs.grating, gs.filter, GmosFpu.South.builtin(gs.fpu))
+                )
+              }.toMap)
+        }.map(_.fold(Map.empty[Observation.Id, ItcParams])(_ ++ _))
+      }
 
       override def createFunction(
         input: ObservingModeInput.Create
