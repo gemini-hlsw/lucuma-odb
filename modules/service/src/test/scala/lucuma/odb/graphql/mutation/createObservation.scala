@@ -25,6 +25,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -44,6 +45,7 @@ import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.AsterismService
 
 import java.time.LocalDateTime
+import scala.collection.immutable.SortedMap
 
 class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
 
@@ -668,21 +670,34 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
       case Site.GS => "South"
     }
 
-  private def createObsWithObservingMode(pid: Program.Id, site: Site, grating: String): String =
+  private def createObsWithObservingMode(
+    pid:      Program.Id,
+    site:     Site,
+    grating:  String,
+    fpu:      String = "LONG_SLIT_0_25",
+    iq:       ImageQuality = ImageQuality.TwoPointZero,
+    asterism: List[Target.Id] = Nil
+  ): String =
     s"""
       mutation {
         createObservation(input: {
           programId: ${pid.asJson}
           SET: {
+            constraintSet: {
+              imageQuality: ${iq.tag.toUpperCase}
+            }
             observingMode: {
               gmos${siteName(site)}LongSlit: {
                 grating: $grating
                 filter: G_PRIME
-                fpu: LONG_SLIT_0_25
+                fpu: $fpu
                 centralWavelength: {
                   nanometers: 234.56
                 }
               }
+            }
+            targetEnvironment: {
+              asterism: [ ${asterism.map(_.asJson).mkString(", ")} ]
             }
           }
         }) {
@@ -735,7 +750,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56,
-           GmosXBinning.One, // Using IQ 2.0 and point source
+           GmosXBinning.Two,
            GmosYBinning.Two,
            Option.empty[GmosYBinning],
            GmosYBinning.Two,
@@ -746,6 +761,63 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           )
         )
 
+      }
+    }
+  }
+
+  test("[general] specify gmos north long slit with calculated xbin") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "Biff",
+        """
+          sourceProfile: {
+            gaussian: {
+              fwhm: {
+                microarcseconds: 647200
+              }
+              spectralDefinition: {
+                bandNormalized: {
+                  sed: {
+                    stellarLibrary: B5_III
+                  }
+                  brightnesses: []
+                }
+              }
+            }
+          }
+        """.stripMargin
+      ).flatMap { tid =>
+        query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.PointOne, asterism = List(tid))).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+          assertIO(
+            (longSlit.downIO[GmosNorthGrating]("grating"),
+              longSlit.downIO[Option[GmosNorthFilter]]("filter"),
+              longSlit.downIO[GmosNorthFpu]("fpu"),
+              longSlit.downIO[Double]("centralWavelength", "nanometers"),
+              longSlit.downIO[GmosXBinning]("xBin"),
+              longSlit.downIO[GmosYBinning]("yBin"),
+              longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+              longSlit.downIO[GmosYBinning]("defaultYBin"),
+              longSlit.downIO[GmosNorthGrating]("initialGrating"),
+              longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
+              longSlit.downIO[GmosNorthFpu]("initialFpu"),
+              longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+            ).tupled,
+            (GmosNorthGrating.B1200_G5301,
+              Some(GmosNorthFilter.GPrime),
+              GmosNorthFpu.LongSlit_5_00,
+              234.56,
+              GmosXBinning.Four,  // (5" slit min (0.647200" fwhm max 0.1" IQ)) = 647200, 647200 microarcsec / 80900 microarcsec = 8, 8 / binning 4 = 2, 2 > 2.0 sampling size
+              GmosYBinning.Two,
+              Option.empty[GmosYBinning],
+              GmosYBinning.Two,
+              GmosNorthGrating.B1200_G5301,
+              Some(GmosNorthFilter.GPrime),
+              GmosNorthFpu.LongSlit_5_00,
+              234.56
+            )
+          )
+        }
       }
     }
   }
@@ -773,7 +845,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
            Some(GmosSouthFilter.GPrime),
            GmosSouthFpu.LongSlit_0_25,
            234.56,
-           GmosXBinning.One, // Using IQ 2.0 and point source
+           GmosXBinning.Two,
            GmosYBinning.Two,
            Option.empty[GmosYBinning],
            GmosYBinning.Two,
@@ -897,7 +969,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
           ).tupled,
           (GmosXBinning.Four,
            Some(GmosXBinning.Four),
-           GmosXBinning.One,
+           GmosXBinning.Two,
            GmosYBinning.Four,
            Some(GmosYBinning.Four),
            GmosYBinning.Two,
@@ -1165,7 +1237,7 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
       }
     }
   }
-  
+
   // TODO: more access control tests
 
 }
@@ -1189,7 +1261,20 @@ trait CreateObservationOps { this: OdbSuite =>
   def createEmptyTargetAs(
     user: User,
     pid:  Program.Id,
-    name: String
+    name: String,
+    sourceProfile: String =
+      """
+        sourceProfile: {
+          point: {
+            bandNormalized: {
+              sed: {
+                stellarLibrary: B5_III
+              }
+              brightnesses: []
+            }
+          }
+        }
+      """
   ): IO[Target.Id] =
     query(
       user,
@@ -1204,16 +1289,7 @@ trait CreateObservationOps { this: OdbSuite =>
                   ra: { hours: "0.0" }
                   dec: { degrees: "0.0" }
                 }
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        stellarLibrary: B5_III
-                      }
-                      brightnesses: []
-                    }
-                  }
-                }
+                $sourceProfile
               }
             }
           ) {
