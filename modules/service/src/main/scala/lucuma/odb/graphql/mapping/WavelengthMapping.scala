@@ -6,12 +6,12 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
-import lucuma.odb.graphql.table.GmosLongSlitTable
+import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
 
 trait WavelengthMapping[F[_]]
-  extends GmosLongSlitTable[F]
+  extends GmosLongSlitView[F]
      with ObservationView[F] {
 
   private def wavelengthMapping(
@@ -43,10 +43,10 @@ trait WavelengthMapping[F[_]]
     SwitchMapping(
       WavelengthType,
       List(
-        (GmosNorthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.CentralWavelength)),
-        (GmosNorthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosNorthLongSlitTable.Common.ObservationId, GmosNorthLongSlitTable.Common.InitialCentralWavelength)),
-        (GmosSouthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.CentralWavelength)),
-        (GmosSouthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosSouthLongSlitTable.Common.ObservationId, GmosSouthLongSlitTable.Common.InitialCentralWavelength)),
+        (GmosNorthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength)),
+        (GmosNorthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength)),
+        (GmosSouthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.CentralWavelength)),
+        (GmosSouthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.InitialCentralWavelength)),
         (SpectroscopyScienceRequirementsType, "wavelength",               wavelengthMapping(ObservationView.Id, Spectroscopy.Wavelength)),
         (SpectroscopyScienceRequirementsType, "signalToNoiseAt",          wavelengthMapping(ObservationView.Id, Spectroscopy.SignalToNoiseAt)),
         (SpectroscopyScienceRequirementsType, "wavelengthCoverage",       wavelengthMapping(ObservationView.Id, Spectroscopy.WavelengthCoverage))
