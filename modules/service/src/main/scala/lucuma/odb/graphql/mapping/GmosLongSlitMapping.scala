@@ -36,6 +36,7 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
+import lucuma.odb.graphql.instances.SourceProfileCodec.given
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 
@@ -44,7 +45,7 @@ import scala.collection.immutable.SortedMap
 import scala.reflect.ClassTag
 
 trait GmosLongSlitMapping[F[_]]
-  extends GmosLongSlitTable[F] { this: SkunkMapping[F] =>
+  extends GmosLongSlitView[F] { this: SkunkMapping[F] =>
 
   private def explicitOrElseDefault[A: ClassTag : io.circe.Encoder](
     name:          String,
@@ -53,10 +54,11 @@ trait GmosLongSlitMapping[F[_]]
   ): CursorField[A] =
     CursorField[A](
       name,
-      cursor =>
-        (cursor.field(explicitField, None).flatMap(_.as[Option[A]]),
-          cursor.field(defaultField, None).flatMap(_.as[A])
-        ).parMapN(_.getOrElse(_)),
+      cursor => {
+        (cursor.fieldAs[Option[A]](explicitField),
+          cursor.fieldAs[A](defaultField)
+        ).parMapN(_.getOrElse(_))
+      },
       List(explicitField, defaultField)
     )
 
@@ -120,22 +122,29 @@ trait GmosLongSlitMapping[F[_]]
 
     val defaultSpatialOffsets: FieldMapping =
       CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+
+    val imageQuality: FieldMapping =
+      SqlField("imageQuality", cc.ImageQuality, hidden = true)
+
+    val sourceProfile: FieldMapping =
+      SqlField("sourceProfile", cc.SourceProfile, hidden = true)
+
   }
 
   lazy val GmosNorthLongSlitMapping: ObjectMapping = {
 
     import GmosLongSlitMapping._
 
-    val common = new CommonFieldMappings(GmosNorthLongSlitTable.Common)
+    val common = new CommonFieldMappings(GmosNorthLongSlitView.Common)
 
     ObjectMapping(
       tpe = GmosNorthLongSlitType,
       fieldMappings = List(
-        SqlField("observationId", GmosNorthLongSlitTable.Common.ObservationId, key = true, hidden = true),
+        SqlField("observationId", GmosNorthLongSlitView.Common.ObservationId, key = true, hidden = true),
 
-        SqlField("grating", GmosNorthLongSlitTable.Grating),
-        SqlField("filter",  GmosNorthLongSlitTable.Filter),
-        SqlField("fpu",     GmosNorthLongSlitTable.Fpu),
+        SqlField("grating", GmosNorthLongSlitView.Grating),
+        SqlField("filter",  GmosNorthLongSlitView.Filter),
+        SqlField("fpu",     GmosNorthLongSlitView.Fpu),
         SqlObject("centralWavelength"),
 
         // ---------------------
@@ -144,17 +153,20 @@ trait GmosLongSlitMapping[F[_]]
 
         common.xBin,
 
-        // TODO: a function of FPU, target SourceProfile, and ImageQuality
-        FieldRef[GmosNorthFpu]("fpu")
-          .as(
-            "defaultXBin",
-            fpu => GmosLongSlitMath.xbinNorth(
-              fpu,
-              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V).some, SortedMap.empty)),
-              /*placeholder*/ ImageQuality.TwoPointZero,  // so the FPU size is the effective slit width for now
-              PosDouble.unsafeFrom(2.0)
-            )
-          ),
+        CursorField[GmosXBinning](
+          "defaultXBin",
+          cursor =>
+            for {
+              fpu <- cursor.fieldAs[GmosNorthFpu]("fpu")
+              iq  <- cursor.fieldAs[ImageQuality]("imageQuality")
+              j   <- cursor.fieldAs[Option[Json]]("sourceProfile")
+              sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
+            } yield
+              sp.fold(GmosXBinning.Two) { sourceProfile =>  // TODO: What should the real default be if there is no target
+                GmosLongSlitMath.xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+              },
+          List("fpu", "imageQuality", "sourceProfile")
+        ),
 
         common.explicitXBin,
 
@@ -211,14 +223,20 @@ trait GmosLongSlitMapping[F[_]]
         common.defaultSpatialOffsets,
 
         // ---------------------
+        // hidden view fields
+        // ---------------------
+        common.imageQuality,
+        common.sourceProfile,
+
+        // ---------------------
         // initialValues
         // ---------------------
 
         // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
         // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
-        SqlField("initialGrating", GmosNorthLongSlitTable.InitialGrating),
-        SqlField("initialFilter",  GmosNorthLongSlitTable.InitialFilter),
-        SqlField("initialFpu",     GmosNorthLongSlitTable.InitialFpu),
+        SqlField("initialGrating", GmosNorthLongSlitView.InitialGrating),
+        SqlField("initialFilter",  GmosNorthLongSlitView.InitialFilter),
+        SqlField("initialFpu",     GmosNorthLongSlitView.InitialFpu),
         SqlObject("initialCentralWavelength")
       )
     )
@@ -228,16 +246,16 @@ trait GmosLongSlitMapping[F[_]]
 
     import GmosLongSlitMapping._
 
-    val common = new CommonFieldMappings(GmosSouthLongSlitTable.Common)
+    val common = new CommonFieldMappings(GmosSouthLongSlitView.Common)
 
     ObjectMapping(
       tpe = GmosSouthLongSlitType,
       fieldMappings = List(
-        SqlField("observationId", GmosSouthLongSlitTable.Common.ObservationId, key = true, hidden = true),
+        SqlField("observationId", GmosSouthLongSlitView.Common.ObservationId, key = true, hidden = true),
 
-        SqlField("grating", GmosSouthLongSlitTable.Grating),
-        SqlField("filter",  GmosSouthLongSlitTable.Filter),
-        SqlField("fpu",     GmosSouthLongSlitTable.Fpu),
+        SqlField("grating", GmosSouthLongSlitView.Grating),
+        SqlField("filter",  GmosSouthLongSlitView.Filter),
+        SqlField("fpu",     GmosSouthLongSlitView.Fpu),
         SqlObject("centralWavelength"),
 
         // ---------------------
@@ -246,17 +264,20 @@ trait GmosLongSlitMapping[F[_]]
 
         common.xBin,
 
-        // TODO: a function of FPU, target SourceProfile, and ImageQuality
-        FieldRef[GmosSouthFpu]("fpu")
-          .as(
-            "defaultXBin",
-            fpu => GmosLongSlitMath.xbinSouth(
-              fpu,
-              /*placeholder*/ SourceProfile.Point(SpectralDefinition.BandNormalized(UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.O5V).some, SortedMap.empty)),
-              /*placeholder*/ ImageQuality.TwoPointZero,  // so the FPU size is the effective slit width for now
-              PosDouble.unsafeFrom(2.0)
-            )
-          ),
+        CursorField[GmosXBinning](
+          "defaultXBin",
+          cursor =>
+            for {
+              fpu <- cursor.fieldAs[GmosSouthFpu]("fpu")
+              iq  <- cursor.fieldAs[ImageQuality]("imageQuality")
+              j   <- cursor.fieldAs[Option[Json]]("sourceProfile")
+              sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
+            } yield
+              sp.fold(GmosXBinning.Two) { sourceProfile =>
+                GmosLongSlitMath.xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+              },
+          List("fpu", "imageQuality", "sourceProfile")
+        ),
 
         common.explicitXBin,
 
@@ -313,14 +334,20 @@ trait GmosLongSlitMapping[F[_]]
         common.defaultSpatialOffsets,
 
         // ---------------------
+        // hidden view fields
+        // ---------------------
+        common.imageQuality,
+        common.sourceProfile,
+
+        // ---------------------
         // initialValues
         // ---------------------
 
         // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
         // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
-        SqlField("initialGrating", GmosSouthLongSlitTable.InitialGrating),
-        SqlField("initialFilter",  GmosSouthLongSlitTable.InitialFilter),
-        SqlField("initialFpu",     GmosSouthLongSlitTable.InitialFpu),
+        SqlField("initialGrating", GmosSouthLongSlitView.InitialGrating),
+        SqlField("initialFilter",  GmosSouthLongSlitView.InitialFilter),
+        SqlField("initialFpu",     GmosSouthLongSlitView.InitialFpu),
         SqlObject("initialCentralWavelength")
       )
     )
