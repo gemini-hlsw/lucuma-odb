@@ -5,8 +5,12 @@ package lucuma.odb.sequence.data
 
 import cats.data.State
 import cats.syntax.option.*
-import lucuma.core.enums.{GcalContinuum, GcalDiffuser, GcalFilter, GcalShutter}
-import lucuma.core.math.{Angle, Offset}
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
+import lucuma.core.math.Angle
+import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
 
 /**

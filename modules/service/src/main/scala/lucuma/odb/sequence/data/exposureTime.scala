@@ -3,8 +3,9 @@
 
 package lucuma.odb.sequence.data
 
-import java.time.Duration
 import lucuma.core.model.NonNegDuration
+
+import java.time.Duration
 
 opaque type SciExposureTime = NonNegDuration
 
