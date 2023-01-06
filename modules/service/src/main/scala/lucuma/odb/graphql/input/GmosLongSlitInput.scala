@@ -10,6 +10,7 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
 import edu.gemini.grackle.Result
+import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -21,15 +22,19 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
+import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Picometer
+import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.sequence.data.gmos.longslit.GmosLongSlitConfig
 
 import scala.util.Try
 import scala.util.control.Exception.*
@@ -56,6 +61,13 @@ object GmosLongSlitInput {
       _.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")
     )
 
+  sealed trait Create[G, F, U] {
+    def grating: G
+    def filter:  Option[F]
+    def fpu:     U
+    def common:  Create.Common
+  }
+
   object Create {
 
     final case class Common(
@@ -78,15 +90,48 @@ object GmosLongSlitInput {
 
     }
 
+    private abstract class AbstractLongSlitConfig[G, F, U](c: Create[G, F, U]) extends GmosLongSlitConfig[G, F, U] {
+      override def grating: G = c.grating
+      override def filter: Option[F] = c.filter
+      override def fpu: U = c.fpu
+      override def centralWavelength: Wavelength = c.common.centralWavelength
+
+      override def explicitXBin: Option[GmosXBinning] = c.common.explicitXBin
+      override def explicitYBin: Option[GmosYBinning] = c.common.explicitYBin
+      override def explicitAmpReadMode: Option[GmosAmpReadMode] = c.common.explicitAmpReadMode
+      override def explicitAmpGain: Option[GmosAmpGain] = c.common.explicitAmpGain
+      override def explicitRoi: Option[GmosRoi] = c.common.explicitRoi
+      override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
+        // TODO: change this in Common to WavelengthDither
+        c.common.explicitλDithers.map(_.map(WavelengthDither.picometers.get))
+
+      override def explicitSpatialOffsets: Option[List[Q]] = c.common.explicitSpatialOffsets
+    }
+
+
     final case class North(
       grating: GmosNorthGrating,
       filter:  Option[GmosNorthFilter],
       fpu:     GmosNorthFpu,
       common:  Common
-    ) {
+    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
 
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
+
+      def toGmosLongSlit: GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+        new AbstractLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](this) {
+
+          override def defaultXBin(
+            sourceProfile: SourceProfile,
+            imageQuality:  ImageQuality,
+            sampling:      PosDouble
+          ): GmosXBinning =
+            GmosLongSlitConfig.xbinNorth(this.fpu, sourceProfile, imageQuality, sampling)
+
+          override def defaultWavelengthDithers: List[WavelengthDither] =
+            GmosLongSlitConfig.defaultWavelengthDithersNorth(this.grating)
+        }  
 
     }
 
@@ -133,11 +178,24 @@ object GmosLongSlitInput {
       filter:  Option[GmosSouthFilter],
       fpu:     GmosSouthFpu,
       common:  Common
-    ) {
+    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
 
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
 
+      def toGmosLongSlit: GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+        new AbstractLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](this) {
+
+          override def defaultXBin(
+            sourceProfile: SourceProfile,
+            imageQuality:  ImageQuality,
+            sampling:      PosDouble
+          ): GmosXBinning =
+            GmosLongSlitConfig.xbinSouth(this.fpu, sourceProfile, imageQuality, sampling)
+
+          override def defaultWavelengthDithers: List[WavelengthDither] =
+            GmosLongSlitConfig.defaultWavelengthDithersSouth(this.grating)
+        }  
     }
 
     object South {
