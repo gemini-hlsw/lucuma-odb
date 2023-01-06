@@ -1,9 +1,7 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql
-
-package mapping
+package lucuma.odb.sequence.data.gmos.longslit
 
 import cats.Order
 import cats.syntax.order.*
@@ -25,13 +23,98 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
+import lucuma.core.math.Offset.Q
+import lucuma.core.math.Wavelength
+import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
 import lucuma.core.math.units.NanometersPerPixel
+import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
 import spire.math.Rational
 
-object GmosLongSlitMath {
+trait GmosLongSlitConfig[G, F, U] {
+
+  def grating: G
+
+  def filter: Option[F]
+
+  def fpu: U
+
+  def centralWavelength: Wavelength
+
+
+  def xBin(
+    sourceProfile: SourceProfile,
+    imageQuality:  ImageQuality,
+    sampling:      PosDouble
+  ): GmosXBinning =
+    explicitXBin.getOrElse(defaultXBin(sourceProfile, imageQuality, sampling))
+
+  def defaultXBin(
+    sourceProfile: SourceProfile,
+    imageQuality:  ImageQuality,
+    sampling:      PosDouble
+  ): GmosXBinning
+
+  def explicitXBin: Option[GmosXBinning]
+
+
+  def yBin: GmosYBinning =
+    explicitYBin.getOrElse(defaultYBin)
+
+  def defaultYBin: GmosYBinning =
+    GmosLongSlitConfig.DefaultYBinning
+
+  def explicitYBin: Option[GmosYBinning]
+
+
+  def ampReadMode: GmosAmpReadMode =
+    explicitAmpReadMode.getOrElse(defaultAmpReadMode)
+
+  def defaultAmpReadMode: GmosAmpReadMode =
+    GmosLongSlitConfig.DefaultAmpReadMode
+
+  def explicitAmpReadMode: Option[GmosAmpReadMode]
+
+
+  def ampGain: GmosAmpGain =
+    explicitAmpGain.getOrElse(defaultAmpGain)
+
+  def defaultAmpGain: GmosAmpGain =
+    GmosLongSlitConfig.DefaultAmpGain
+
+  def explicitAmpGain: Option[GmosAmpGain]
+
+
+  def roi: GmosRoi =
+    explicitRoi.getOrElse(defaultRoi)
+
+  def defaultRoi: GmosRoi =
+    GmosLongSlitConfig.DefaultRoi
+
+  def explicitRoi: Option[GmosRoi]
+
+
+  def wavelengthDithers: List[WavelengthDither] =
+    explicitWavelengthDithers.getOrElse(defaultWavelengthDithers)
+
+  def defaultWavelengthDithers: List[WavelengthDither]
+
+  def explicitWavelengthDithers: Option[List[WavelengthDither]]
+
+
+  def spatialOffsets: List[Q] =
+    explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
+
+  def defaultSpatialOffsets: List[Q] =
+    GmosLongSlitConfig.DefaultSpatialOffsets
+
+  def explicitSpatialOffsets: Option[List[Q]]
+
+}
+
+object GmosLongSlitConfig {
 
   val DefaultAmpReadMode: GmosAmpReadMode =
     GmosAmpReadMode.Slow
@@ -51,25 +134,12 @@ object GmosLongSlitMath {
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)
 
-  val zeroNm: Quantity[BigDecimal, Nanometer] =
-    Quantity[Nanometer](BigDecimal(0))
-    
-  def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[Quantity[BigDecimal, Nanometer]] = {
-    val deltaNm = Δλ(Site.GN, grating.dispersion)
-    List(zeroNm, deltaNm, deltaNm, zeroNm)
-  }
-
-  def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[Quantity[BigDecimal, Nanometer]] = {
-    val deltaNm = Δλ(Site.GS, grating.dispersion)
-    List(zeroNm, deltaNm, deltaNm, zeroNm)
-  }
-
-  val DefaultSpatialOffsets: List[Quantity[BigDecimal, ArcSecond]] =
+  val DefaultSpatialOffsets: List[Q] =
     List(
-      Quantity[ArcSecond](BigDecimal(0)),
-      Quantity[ArcSecond](BigDecimal(15)),
-      Quantity[ArcSecond](BigDecimal(15)),
-      Quantity[ArcSecond](BigDecimal(0))
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(0)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(15)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(15)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(0))
     )
 
   /**
@@ -141,11 +211,23 @@ object GmosLongSlitMath {
    *
    * @param dispersion - dispersion in nm/pix (see https://www.gemini.edu/sciops/instruments/gmos/spectroscopy-overview/gratings)
    */
-  def Δλ(site: Site, dispersion: Quantity[Rational, NanometersPerPixel]): Quantity[BigDecimal, Nanometer] = {
+  def Δλ(site: Site, dispersion: Quantity[Rational, NanometersPerPixel]): WavelengthDither = {
     val d = dispersion.value.toDouble
     val g = gapSize(site).value.value
     val v = d * g * 2.0 // raw value, which we round to nearest 5 nm
-    Quantity[Nanometer](BigDecimal(((v / 5.0).round * 5.0).toInt))
+    WavelengthDither.picometers.get(
+      Quantity[Picometer](((v / 5.0).round * 5.0).toInt * 1000)
+    )
+  }
+
+  def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[WavelengthDither] = {
+    val delta = Δλ(Site.GN, grating.dispersion)
+    List(WavelengthDither.Zero, delta, delta, WavelengthDither.Zero)
+  }
+
+  def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[WavelengthDither] = {
+    val delta = Δλ(Site.GS, grating.dispersion)
+    List(WavelengthDither.Zero, delta, delta, WavelengthDither.Zero)
   }
 
 }
