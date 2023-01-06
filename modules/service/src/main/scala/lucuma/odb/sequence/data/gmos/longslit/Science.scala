@@ -12,12 +12,22 @@ import cats.syntax.option._
 import coulomb.Quantity
 import eu.timepit.refined.auto._
 import eu.timepit.refined.types.all.PosDouble
-import lucuma.core.enums.{GmosGratingOrder, GmosNorthFilter, GmosNorthFpu, GmosNorthGrating, GmosSouthFilter, GmosSouthFpu, GmosSouthGrating, ImageQuality}
-import lucuma.core.math.{Offset, Wavelength, WavelengthDither}
+import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.ImageQuality
+import lucuma.core.math.Offset
+import lucuma.core.math.Wavelength
+import lucuma.core.math.WavelengthDither
 import lucuma.core.math.syntax.int._
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.DynamicConfig.{GmosNorth, GmosSouth}
+import lucuma.core.model.sequence.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.optics.syntax.lens._
 import lucuma.core.optics.syntax.optional._
