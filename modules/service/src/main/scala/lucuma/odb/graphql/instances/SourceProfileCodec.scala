@@ -338,7 +338,7 @@ trait SourceProfileCodecHelper {
     def apply(c: HCursor): Decoder.Result[Wavelength] =
       c.downField("picometers").as[Int].flatMap { pm =>
         Wavelength
-          .fromPicometers
+          .intPicometers
           .getOption(pm)
           .toRight(DecodingFailure(s"Invalid wavelength picometers value: $pm", c.history))
       }
