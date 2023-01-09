@@ -18,6 +18,14 @@ import monocle.Lens
 import monocle.Optional
 import monocle.macros.GenIso
 
+/**
+ * Abstracts the optics for updating GMOS dynamic (changing) configurations,
+ * enabling sequence state changes to be written once for GMOS north and south.
+ * @tparam D dynamic configuration type (i.e., GMOS North or GMOS South)
+ * @tparam G grating type
+ * @tparam F filter type
+ * @tparam U FPU type
+ */
 trait DynamicOptics[D, G, F, U] {
   def exposure:      Lens[D, NonNegDuration]
   def readout:       Lens[D, GmosCcdMode]

@@ -90,6 +90,13 @@ object GmosLongSlitInput {
 
     }
 
+    /**
+     * A GMOS Long Slit configuration implementation based on input parameters.
+     * @param c common input parameters
+     * @tparam G grating type
+     * @tparam F filter type
+     * @tparam U FPU type
+     */
     private abstract class AbstractLongSlitConfig[G, F, U](c: Create[G, F, U]) extends GmosLongSlitConfig[G, F, U] {
       override def grating: G = c.grating
       override def filter: Option[F] = c.filter
@@ -119,6 +126,9 @@ object GmosLongSlitInput {
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
 
+      /**
+       * Creates a GmosLongSlitConfig based on input parameters.
+       */
       def toGmosLongSlit: GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
         new AbstractLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](this) {
 
@@ -183,6 +193,9 @@ object GmosLongSlitInput {
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
 
+      /**
+       * Creates a GmosLongSlitConfig based on input parameters.
+       */
       def toGmosLongSlit: GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
         new AbstractLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](this) {
 

@@ -7,6 +7,9 @@ import lucuma.core.model.sequence.StepConfig
 import monocle.Focus
 import monocle.Lens
 
+/**
+ * The complete instrument and step configuration, without a step id.
+ */
 final case class ProtoStep[D](
   instrumentConfig: D,
   stepConfig:       StepConfig
