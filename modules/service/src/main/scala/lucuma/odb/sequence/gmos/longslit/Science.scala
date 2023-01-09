@@ -1,17 +1,15 @@
 // Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.data
-package gmos
-package longslit
+package lucuma.odb.sequence.gmos.longslit
 
 import cats.data.NonEmptyList
-import cats.syntax.either._
-import cats.syntax.eq._
-import cats.syntax.option._
+import cats.syntax.either.*
+import cats.syntax.eq.*
+import cats.syntax.option.*
 import coulomb.Quantity
-import eu.timepit.refined.auto._
-import eu.timepit.refined.types.all.PosDouble
+import eu.timepit.refined.auto.*
+import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -23,15 +21,21 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.syntax.int._
+import lucuma.core.math.syntax.int.*
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.GmosFpuMask
-import lucuma.core.optics.syntax.lens._
-import lucuma.core.optics.syntax.optional._
+import lucuma.core.optics.syntax.lens.*
+import lucuma.core.optics.syntax.optional.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.data.SciExposureTime
+import lucuma.odb.sequence.data.SequenceState
+import lucuma.odb.sequence.gmos.DynamicOptics
+import lucuma.odb.sequence.gmos.GmosNorthInitialDynamicConfig
+import lucuma.odb.sequence.gmos.GmosSouthInitialDynamicConfig
 
 import scala.collection.immutable.LazyList
 
@@ -56,21 +60,23 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
   ): LazyList[Science.Atom[D]] = {
 
     val λ    = mode.centralWavelength
-    val p0   = Offset.P(0.arcsec)
-    val Δλs  = mode.wavelengthDithers
-    val qs   = mode.spatialOffsets
+    val p0   = Offset.P.Zero
+    val Δλs  = LazyList.continually(mode.wavelengthDithers match {
+      case Nil => LazyList(WavelengthDither.Zero)
+      case ws  => ws.to(LazyList)
+    }).flatten
+    val qs   = LazyList.continually(mode.spatialOffsets match {
+      case Nil => LazyList(Offset.Q.Zero)
+      case os  => os.to(LazyList)
+    }).flatten
     val xBin = mode.xBin(sourceProfile, imageQuality, sampling)
 
-    def nextAtom(index: Int, d: D): Science.Atom[D] = {
-      val Δ = Δλs(index % Δλs.length)
-      val q = qs(index % qs.length)
-
+    def nextAtom(index: Int, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
       (for {
         _ <- optics.wavelength := λ.offset(Δ).getOrElse(λ)
         s <- scienceStep(Offset(p0, q))
         f <- flatStep
       } yield Science.Atom(index, s, f)).runA(d).value
-    }
 
     val init: D =
       (for {
@@ -87,9 +93,9 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
         _ <- optics.roi         := mode.roi
       } yield ()).runS(initialConfig).value
 
-    LazyList.unfold((0, init)) { case (i, d) =>
-      val a = nextAtom(i, d)
-      Some((a, (i+1, a.science.instrumentConfig)))
+    LazyList.unfold((0, Δλs, qs, init)) { case (i, wds, sos, d) =>
+      val a = nextAtom(i, wds.head, sos.head, d)
+      Some((a, (i+1, wds.tail, sos.tail, a.science.instrumentConfig)))
     }
   }
 

@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.data.gmos.longslit
+package lucuma.odb.sequence.gmos.longslit
 
 import cats.Order
 import cats.syntax.order.*
@@ -12,10 +12,12 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthDetector
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
@@ -122,6 +124,9 @@ trait GmosLongSlitConfig[G, F, U] {
 }
 
 object GmosLongSlitConfig {
+
+  trait North extends GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
+  trait South extends GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
 
   val DefaultAmpReadMode: GmosAmpReadMode =
     GmosAmpReadMode.Slow

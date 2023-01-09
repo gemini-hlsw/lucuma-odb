@@ -42,7 +42,7 @@ import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.instances.SourceProfileCodec.given
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.sequence.data.gmos.longslit.GmosLongSlitConfig
+import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
 
 import java.math.RoundingMode
 import scala.collection.immutable.SortedMap

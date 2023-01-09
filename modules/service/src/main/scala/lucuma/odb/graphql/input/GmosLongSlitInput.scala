@@ -34,7 +34,7 @@ import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.data.gmos.longslit.GmosLongSlitConfig
+import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
 
 import scala.util.Try
 import scala.util.control.Exception.*
@@ -98,20 +98,22 @@ object GmosLongSlitInput {
      * @tparam U FPU type
      */
     private abstract class AbstractLongSlitConfig[G, F, U](c: Create[G, F, U]) extends GmosLongSlitConfig[G, F, U] {
-      override def grating: G = c.grating
+      override def grating: G        = c.grating
       override def filter: Option[F] = c.filter
-      override def fpu: U = c.fpu
+      override def fpu: U            = c.fpu
       override def centralWavelength: Wavelength = c.common.centralWavelength
 
-      override def explicitXBin: Option[GmosXBinning] = c.common.explicitXBin
-      override def explicitYBin: Option[GmosYBinning] = c.common.explicitYBin
+      override def explicitXBin: Option[GmosXBinning]           = c.common.explicitXBin
+      override def explicitYBin: Option[GmosYBinning]           = c.common.explicitYBin
       override def explicitAmpReadMode: Option[GmosAmpReadMode] = c.common.explicitAmpReadMode
-      override def explicitAmpGain: Option[GmosAmpGain] = c.common.explicitAmpGain
-      override def explicitRoi: Option[GmosRoi] = c.common.explicitRoi
+      override def explicitAmpGain: Option[GmosAmpGain]         = c.common.explicitAmpGain
+      override def explicitRoi: Option[GmosRoi]                 = c.common.explicitRoi
+
       override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
         c.common.explicitλDithers
 
-      override def explicitSpatialOffsets: Option[List[Q]] = c.common.explicitSpatialOffsets
+      override def explicitSpatialOffsets: Option[List[Q]] =
+        c.common.explicitSpatialOffsets
     }
 
 
@@ -128,8 +130,9 @@ object GmosLongSlitInput {
       /**
        * Creates a GmosLongSlitConfig based on input parameters.
        */
-      def toGmosLongSlit: GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-        new AbstractLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](this) {
+      def toGmosLongSlit: GmosLongSlitConfig.North =
+        new AbstractLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](this)
+          with GmosLongSlitConfig.North {
 
           override def defaultXBin(
             sourceProfile: SourceProfile,
@@ -195,8 +198,9 @@ object GmosLongSlitInput {
       /**
        * Creates a GmosLongSlitConfig based on input parameters.
        */
-      def toGmosLongSlit: GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
-        new AbstractLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](this) {
+      def toGmosLongSlit: GmosLongSlitConfig.South =
+        new AbstractLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](this)
+          with GmosLongSlitConfig.South {
 
           override def defaultXBin(
             sourceProfile: SourceProfile,
