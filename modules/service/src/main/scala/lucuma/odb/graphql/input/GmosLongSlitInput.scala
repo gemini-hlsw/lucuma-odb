@@ -41,14 +41,14 @@ import scala.util.control.Exception.*
 
 object GmosLongSlitInput {
 
-  val WavelengthDithersFormat: Format[String, List[Quantity[Int, Picometer]]] =
+  val WavelengthDithersFormat: Format[String, List[WavelengthDither]] =
     Format(
-      s => Try(
-        s.split(",").toList.map { d =>
-          Quantity[Picometer](BigDecimal(d).bigDecimal.movePointRight(3).intValueExact)
-        }
-      ).toOption,
-      _.map(w => BigDecimal(w.value).bigDecimal.movePointLeft(3).toPlainString).intercalate(",")
+      s =>
+        for {
+          ns <- Try(s.split(",").toList.map(BigDecimal.exact)).toOption
+          ws <- ns.traverse(WavelengthDither.decimalNanometers.getOption)
+        } yield ws,
+      _.map(_.toNanometers.value.bigDecimal.toPlainString).intercalate(",")
     )
 
   val SpatialOffsetsFormat: Format[String, List[Q]] =
@@ -77,7 +77,7 @@ object GmosLongSlitInput {
       explicitAmpReadMode:    Option[GmosAmpReadMode],
       explicitAmpGain:        Option[GmosAmpGain],
       explicitRoi:            Option[GmosRoi],
-      explicitλDithers:       Option[List[Quantity[Int, Picometer]]],
+      explicitλDithers:       Option[List[WavelengthDither]],
       explicitSpatialOffsets: Option[List[Q]]
     ) {
 
@@ -109,8 +109,7 @@ object GmosLongSlitInput {
       override def explicitAmpGain: Option[GmosAmpGain] = c.common.explicitAmpGain
       override def explicitRoi: Option[GmosRoi] = c.common.explicitRoi
       override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
-        // TODO: change this in Common to WavelengthDither
-        c.common.explicitλDithers.map(_.map(WavelengthDither.picometers.get))
+        c.common.explicitλDithers
 
       override def explicitSpatialOffsets: Option[List[Q]] = c.common.explicitSpatialOffsets
     }
@@ -261,7 +260,7 @@ object GmosLongSlitInput {
       explicitAmpReadMode:    Nullable[GmosAmpReadMode],
       explicitAmpGain:        Nullable[GmosAmpGain],
       explicitRoi:            Nullable[GmosRoi],
-      explicitλDithers:       Nullable[List[Quantity[Int, Picometer]]],
+      explicitλDithers:       Nullable[List[WavelengthDither]],
       explicitSpatialOffsets: Nullable[List[Q]]
     ) {
 
@@ -419,7 +418,7 @@ object GmosLongSlitInput {
     Nullable[GmosAmpReadMode],
     Nullable[GmosAmpGain],
     Nullable[GmosRoi],
-    Nullable[List[Quantity[Int, Picometer]]],
+    Nullable[List[WavelengthDither]],
     Nullable[List[Q]]
   )] =
     ObjectFieldsBinding.rmap {
@@ -460,7 +459,7 @@ object GmosLongSlitInput {
       Nullable[GmosAmpReadMode],
       Nullable[GmosAmpGain],
       Nullable[GmosRoi],
-      Nullable[List[Quantity[Int, Picometer]]],
+      Nullable[List[WavelengthDither]],
       Nullable[List[Q]]
     )] =
       ObjectFieldsBinding.rmap {
