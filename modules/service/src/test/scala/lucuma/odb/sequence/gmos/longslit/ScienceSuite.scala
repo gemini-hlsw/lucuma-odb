@@ -7,8 +7,6 @@ package longslit
 
 
 import eu.timepit.refined.types.numeric.PosDouble
-
-import java.time.Duration
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -21,6 +19,8 @@ import lucuma.odb.sequence.data.SciExposureTime
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.*
+
+import java.time.Duration
 
 class ScienceSuite extends ScalaCheckSuite {
 

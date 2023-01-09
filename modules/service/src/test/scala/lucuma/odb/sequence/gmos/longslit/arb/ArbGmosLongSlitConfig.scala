@@ -12,12 +12,10 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.arb.ArbGmosLongSlitInput
-
-import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.*
 
 object ArbGmosLongSlitConfig {
 
