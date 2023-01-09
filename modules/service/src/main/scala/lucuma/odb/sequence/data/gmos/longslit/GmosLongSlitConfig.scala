@@ -33,6 +33,13 @@ import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
 import spire.math.Rational
 
+/**
+ * Configuration for the GMOS Long Slit science mode.  Using these parameters, a
+ * GMOS long slit sequence may be generated.
+ * @tparam G grating type
+ * @tparam F filter type
+ * @tparam U FPU type
+ */
 trait GmosLongSlitConfig[G, F, U] {
 
   def grating: G

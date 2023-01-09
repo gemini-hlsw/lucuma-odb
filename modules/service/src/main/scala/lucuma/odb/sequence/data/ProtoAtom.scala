@@ -3,6 +3,11 @@
 
 package lucuma.odb.sequence.data
 
+import cats.data.NonEmptyList
+
+/**
+ * An atom (list of steps) without an id.
+ */
 final case class ProtoAtom[D](
-  steps: ProtoStep[D]
+  steps: NonEmptyList[ProtoStep[D]]
 )
