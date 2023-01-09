@@ -20,15 +20,17 @@ import monocle.macros.GenIso
 
 /**
  * Abstracts the optics for updating GMOS dynamic (changing) configurations,
- * enabling sequence state changes to be written once for GMOS north and south.
+ * enabling sequence state changes from step to step to be written once for
+ * GMOS north and south.
+ *
  * @tparam D dynamic configuration type (i.e., GMOS North or GMOS South)
  * @tparam G grating type
  * @tparam F filter type
  * @tparam U FPU type
  */
 trait DynamicOptics[D, G, F, U] {
-  def exposure:      Lens[D, NonNegDuration]
-  def readout:       Lens[D, GmosCcdMode]
+  def exposure: Lens[D, NonNegDuration]
+  def readout: Lens[D, GmosCcdMode]
 
   lazy val xBin: Lens[D, GmosXBinning] =
     readout andThen GmosCcdMode.xBin
@@ -70,7 +72,10 @@ object DynamicOptics {
       val roi:      Lens[GmosNorth, GmosRoi]        = GmosNorth.roi
 
       private val isoGrating: Iso[GmosGratingConfig.North, (GmosNorthGrating, GmosGratingOrder, Wavelength)] =
-        GenIso.fields[GmosGratingConfig.North]
+        // GenIso.fields[GmosGratingConfig.North] (deprecated, seemingly no replacement)
+        Iso[GmosGratingConfig.North, (GmosNorthGrating, GmosGratingOrder, Wavelength)] { s =>
+          (s.grating, s.order, s.wavelength)
+        } { case (g, o, w) => GmosGratingConfig.North(g, o, w) }
 
       val grating: Lens[GmosNorth, Option[(GmosNorthGrating, GmosGratingOrder, Wavelength)]] =
         Lens[GmosNorth, Option[(GmosNorthGrating, GmosGratingOrder, Wavelength)]](
@@ -94,7 +99,11 @@ object DynamicOptics {
       val roi:      Lens[GmosSouth, GmosRoi]        = GmosSouth.roi
 
       private val isoGrating: Iso[GmosGratingConfig.South, (GmosSouthGrating, GmosGratingOrder, Wavelength)] =
-        GenIso.fields[GmosGratingConfig.South]
+        // GenIso.fields[GmosGratingConfig.South]  (deprecated, seemingly no replacement)
+        Iso[GmosGratingConfig.South, (GmosSouthGrating, GmosGratingOrder, Wavelength)] { s =>
+          (s.grating, s.order, s.wavelength)
+        } { case (g, o, w) => GmosGratingConfig.South(g, o, w) }
+
 
       val grating: Lens[GmosSouth, Option[(GmosSouthGrating, GmosGratingOrder, Wavelength)]] =
         Lens[GmosSouth, Option[(GmosSouthGrating, GmosGratingOrder, Wavelength)]](
