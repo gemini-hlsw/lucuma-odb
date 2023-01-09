@@ -143,6 +143,7 @@ create table t_observation (
   c_program_id         d_program_id        not null    references t_program(c_program_id),
   c_observation_id     d_observation_id    primary key default 'o-' || to_hex(nextval('s_observation_id')),
   c_existence          e_existence         not null    default 'present',
+  c_title              text                not null    default 'Untargeted',
   c_subtitle           text                null        check (length(c_subtitle) > 0),
   c_instrument         d_tag               null        references t_instrument(c_tag),
   c_status             e_obs_status        not null    default 'new',

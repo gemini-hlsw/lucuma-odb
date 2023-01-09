@@ -37,16 +37,16 @@ class targetGroup extends OdbSuite {
       json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
     }
 
-  def createTarget(user: User, pid: Program.Id): IO[Target.Id] =
+  def createTarget(user: User, pid: Program.Id, name: String = "blah"): IO[Target.Id] =
     query(
       user = user,
       query =
         s"""
           mutation {
             createTarget(input: {
-              programId: "p-100"
+              programId: "$pid"
               SET: {
-                name: "my name"
+                name: "$name"
                 sourceProfile: {
                   point: {
                     bandNormalized:{
@@ -200,5 +200,56 @@ class targetGroup extends OdbSuite {
     }
   }
 
+  test("targets group should be reflected in observation title") {
+    List(pi).traverse { user =>
+      for {
+        pid  <- createProgram(user)
+        tids <- List("foo", "bar", "baz", "qux", "quux").traverse(createTarget(user, pid, _))
+        oid1 <- createObservation(user, pid, tids(0), tids(1))
+        oid2 <- createObservation(user, pid, tids(1), tids(2), tids(3))
+        oid3 <- createObservation(user, pid, tids(2))
+        oid4 <- createObservation(user, pid)
+        _  <- expect(
+          user = user,
+          query =
+            s"""
+              query {
+                observations(programId: ${pid.asJson}) {
+                  matches {
+                    id
+                    title
+                  }
+                }
+              }
+            """,
+          expected = Right(
+            json"""
+              {
+                "observations" : {
+                  "matches" : [
+                    {
+                      "id" : $oid1,
+                      "title" : "foo, bar"
+                    },
+                    {
+                      "id" : $oid2,
+                      "title" : "bar, baz, qux"
+                    },
+                    {
+                      "id" : $oid3,
+                      "title" : "baz"
+                    },
+                    {
+                      "id" : $oid4,
+                      "title" : "Untargeted"
+                    }
+                  ]
+                }
+              }"""
+          )
+        )
+      } yield true
+    }
+  }
 
 }

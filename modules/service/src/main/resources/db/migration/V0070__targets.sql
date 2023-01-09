@@ -105,3 +105,41 @@ create view v_target as
   from t_target;
 
 
+CREATE OR REPLACE FUNCTION target_update()
+  RETURNS trigger AS $$
+DECLARE
+  tid d_target_id;
+BEGIN
+  tid := NEW.c_target_id;
+
+  -- update the titles of observations that use this target
+  if (OLD.c_name != NEW.c_name) THEN
+    update t_observation a 
+    set c_title = (
+      select array_to_string(
+        coalesce(
+            array_agg(coalesce(t.c_name, 'Unnamed') order by t.c_target_id), 
+            array['Untargeted']
+        ), 
+        ', '
+      )
+      from t_asterism_target b
+      join t_target t on b.c_target_id = t.c_target_id
+      where a.c_observation_id = b.c_observation_id
+    )
+    where a.c_observation_id in (
+      select c_observation_id
+      from t_asterism_target
+      where c_target_id = tid
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ch_target_edit_trigger
+  AFTER UPDATE ON t_target
+  DEFERRABLE
+  FOR EACH ROW
+  EXECUTE PROCEDURE target_update();
