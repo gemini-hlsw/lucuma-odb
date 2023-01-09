@@ -22,6 +22,7 @@ trait ObservationMapping[F[_]]
         SqlField("id", ObservationView.Id, key = true),
         SqlField("programId", ObservationView.ProgramId, hidden = true),
         SqlField("existence", ObservationView.Existence, hidden = true),
+        SqlField("title", ObservationView.Title),
         SqlField("subtitle", ObservationView.Subtitle),
         SqlField("status", ObservationView.Status),
         SqlField("activeStatus", ObservationView.ActiveStatus),

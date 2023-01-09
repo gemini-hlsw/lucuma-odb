@@ -33,6 +33,17 @@ BEGIN
     from t_asterism_target b
     where a.c_observation_id = b.c_observation_id),
     '[]'::jsonb
+  ), c_title = (
+    select array_to_string(
+      coalesce(
+          array_agg(coalesce(t.c_name, 'Unnamed') order by t.c_target_id), 
+          array['Untargeted']
+      ), 
+      ', '
+    )
+    from t_asterism_target b
+    join t_target t on b.c_target_id = t.c_target_id
+    where a.c_observation_id = b.c_observation_id
   )
   where a.c_observation_id = obsid;
   RETURN NEW;
