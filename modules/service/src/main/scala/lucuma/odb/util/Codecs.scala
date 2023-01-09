@@ -241,8 +241,8 @@ trait Codecs {
 
   val wavelength_pm: Codec[Wavelength] =
     int4.eimap(
-      pm => Wavelength.fromPicometers.getOption(pm).toRight(s"Invalid wavelength, must be positive pm: $pm"))(
-      Wavelength.fromPicometers.reverseGet
+      pm => Wavelength.intPicometers.getOption(pm).toRight(s"Invalid wavelength, must be positive pm: $pm"))(
+      Wavelength.intPicometers.reverseGet
     )
 
   // Not so atomic ...
