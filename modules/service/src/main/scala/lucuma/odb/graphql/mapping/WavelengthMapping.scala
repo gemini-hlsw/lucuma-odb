@@ -43,13 +43,13 @@ trait WavelengthMapping[F[_]]
     SwitchMapping(
       WavelengthType,
       List(
-        (GmosNorthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength)),
-        (GmosNorthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength)),
-        (GmosSouthLongSlitType,               "centralWavelength",        wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.CentralWavelength)),
-        (GmosSouthLongSlitType,               "initialCentralWavelength", wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.InitialCentralWavelength)),
-        (SpectroscopyScienceRequirementsType, "wavelength",               wavelengthMapping(ObservationView.Id, Spectroscopy.Wavelength)),
-        (SpectroscopyScienceRequirementsType, "signalToNoiseAt",          wavelengthMapping(ObservationView.Id, Spectroscopy.SignalToNoiseAt)),
-        (SpectroscopyScienceRequirementsType, "wavelengthCoverage",       wavelengthMapping(ObservationView.Id, Spectroscopy.WavelengthCoverage))
+        GmosNorthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength),
+        GmosNorthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength),
+        GmosSouthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.CentralWavelength),
+        GmosSouthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.InitialCentralWavelength),
+        SpectroscopyScienceRequirementsType / "wavelength"         -> wavelengthMapping(ObservationView.Id, Spectroscopy.Wavelength),
+        SpectroscopyScienceRequirementsType / "signalToNoiseAt"    -> wavelengthMapping(ObservationView.Id, Spectroscopy.SignalToNoiseAt),
+        SpectroscopyScienceRequirementsType / "wavelengthCoverage" -> wavelengthMapping(ObservationView.Id, Spectroscopy.WavelengthCoverage),
       )
     )
 }

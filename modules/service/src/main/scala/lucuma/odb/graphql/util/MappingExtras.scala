@@ -3,9 +3,11 @@
 
 package lucuma.odb.graphql.util
 
+import cats.Eq
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.Path
 import edu.gemini.grackle.Type
 import io.circe.Encoder
 import org.tpolecat.sourcepos.SourcePos
@@ -13,6 +15,10 @@ import org.tpolecat.sourcepos.SourcePos
 import scala.reflect.ClassTag
 
 trait MappingExtras[F[_]] extends Mapping[F] {
+
+  given Eq[Path] with
+    def eqv(a: Path, b: Path) =
+      a.rootTpe =:= b.rootTpe && a.path === b.path
 
   object FieldRef {
     def apply[A](underlyingField: String): Partial[A] =
@@ -28,24 +34,22 @@ trait MappingExtras[F[_]] extends Mapping[F] {
     * A dispatching `TypeMapping` that selects a different underlying mapping based on the GraphQL
     * `Type` and field name.
     */
-    case class SwitchMapping(tpe: Type, lookup: List[(Type, String, ObjectMapping)])(
+    case class SwitchMapping(tpe: Type, lookup: List[(Path, ObjectMapping)])(
       using val pos: SourcePos
     ) extends TypeMapping {
 
-      def apply(cx: Context): Option[ObjectMapping] =
-        Option.when(cx.tpe.underlyingObject.exists(_ =:= tpe)) { // if it's our type
-          cx.path.headOption.flatMap { fieldName =>
-            cx.typePath
-              .lift(1)                // parent type
-              .getOrElse(cx.rootTpe)  // otherwise root type (Query, Mutation, Subscription)
-              .underlyingObject
-              .flatMap { parentType =>
-                lookup.collectFirst {
-                  case (tpe, `fieldName`, om) if tpe =:= parentType => om // mapping from our table
-                }
-              }
-          }
-        } .flatten
+      def apply(cx: Context): Option[ObjectMapping] = {
+
+        // All paths that lead here; i.e., Query / "foo" / "bar"; FooType / "bar", BarType
+        val allPaths: List[Path] = 
+          (cx.rootTpe :: cx.typePath.reverse)          // All the types we traversed
+            .map(_.underlying)                         // with List/Nullable removed
+            .zip(cx.path.reverse.tails)                // zipped with the (remaining) path to where we are now
+            .map { (t, p) => Path.from(t).prepend(p) } // turned into Path objects.
+        
+        lookup.collectFirst { case (p, m) if allPaths.exists(_ === p) => m }
+
+      }
 
     }
 

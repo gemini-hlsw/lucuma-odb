@@ -44,8 +44,8 @@ trait DeclinationMapping[F[_]] extends ObservationView[F] with TargetView[F] {
     SwitchMapping(
       DeclinationType,
       List(
-        (CoordinatesType, "dec", declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec)),
-        (SiderealType,    "dec", declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec))
+        CoordinatesType / "dec" -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
+        SiderealType / "dec"    -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
       )
     )
 

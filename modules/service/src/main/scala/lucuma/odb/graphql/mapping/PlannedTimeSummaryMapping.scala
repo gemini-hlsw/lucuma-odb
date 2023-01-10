@@ -23,13 +23,19 @@ import input._
 import table._
 
 trait PlannedTimeSummaryMapping[F[_]]
-  extends ProgramTable[F] { this: SkunkMapping[F] =>
+  extends ProgramTable[F] with ObservationView[F] {
 
   lazy val PlannedTimeSummaryMapping: TypeMapping =
+    SwitchMapping(PlannedTimeSummaryType, List(
+      ProgramType / "plannedTimeSummary"     -> plannedTimeSummaryMapping(ProgramTable.Id),
+      ObservationType / "plannedTimeSummary" -> plannedTimeSummaryMapping(ObservationView.Id),
+    ))
+
+  private def plannedTimeSummaryMapping(keyColumnRef: ColumnRef): ObjectMapping =
     ObjectMapping(
       tpe = PlannedTimeSummaryType,
       fieldMappings = List(
-        SqlField("id", ProgramTable.Id, key = true, hidden = true),
+        SqlField("id", keyColumnRef, key = true, hidden = true),
         SqlObject("pi"),
         SqlObject("execution"),
         SqlObject("uncharged"),
