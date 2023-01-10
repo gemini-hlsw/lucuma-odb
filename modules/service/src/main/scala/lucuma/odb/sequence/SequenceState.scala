@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.data
+package lucuma.odb.sequence
 
 import cats.data.State
 import cats.syntax.option.*
@@ -12,6 +12,7 @@ import lucuma.core.enums.GcalShutter
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
+import lucuma.odb.sequence.data.ProtoStep
 
 /**
  * Sequence generation helper trait.
