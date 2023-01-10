@@ -18,11 +18,11 @@ trait ObservationSelectResultMapping[F[_]]
     SwitchMapping(
       ObservationSelectResultType, 
       List(
-        (QueryType, "observations", topLevelSelectResultMapping(ObservationSelectResultType)),
-        (ProgramType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId))),
-        (ConstraintSetGroupType, "observations", nestedSelectResultMapping(ObservationSelectResultType, ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key))),
-        (TargetGroupType, "observations", nestedSelectResultMapping(ObservationSelectResultType, TargetView.TargetId, Join(TargetView.TargetId, AsterismTargetTable.TargetId), Join(AsterismTargetTable.ObservationId, ObservationView.Id))),
-        (AsterismGroupType, "observations", nestedSelectResultMapping(ObservationSelectResultType, AsterismGroupView.AsterismGroup, Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup))),
+        QueryType / "observations"              -> topLevelSelectResultMapping(ObservationSelectResultType),
+        ProgramType / "observations"            -> nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)),
+        ConstraintSetGroupType / "observations" -> nestedSelectResultMapping(ObservationSelectResultType, ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
+        TargetGroupType / "observations"        -> nestedSelectResultMapping(ObservationSelectResultType, TargetView.TargetId, Join(TargetView.TargetId, AsterismTargetTable.TargetId), Join(AsterismTargetTable.ObservationId, ObservationView.Id)),
+        AsterismGroupType / "observations"      -> nestedSelectResultMapping(ObservationSelectResultType, AsterismGroupView.AsterismGroup, Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
       )
     )
     
