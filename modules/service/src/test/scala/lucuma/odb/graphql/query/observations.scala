@@ -123,4 +123,62 @@ class observations extends OdbSuite {
       }
     }
   }
+
+  test("simple observation selection, including planned time") {
+    createProgram(pi2).flatMap { pid =>
+      createObservation(pi2, pid).flatMap { oid =>
+        expect(
+          user = pi2,
+          query = s"""
+            query {
+              observations(WHERE: { id: { EQ: "$oid" }}) {
+                hasMore
+                matches {
+                  id
+                  plannedTime {
+                    pi {
+                      seconds
+                    }
+                    uncharged {
+                      seconds
+                    }
+                    execution {
+                      seconds
+                    }
+                  }
+                }
+              }
+            }
+          """,
+        expected =
+          Right(
+            json"""
+              {
+                "observations" : {
+                  "hasMore" : false,
+                  "matches" : [
+                    {
+                      "id" : $oid,
+                      "plannedTime" : {
+                        "pi" : {
+                          "seconds" : 0
+                        },
+                        "uncharged" : {
+                          "seconds" : 0
+                        },
+                        "execution" : {
+                          "seconds" : 0
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )              
+      }
+    }
+  }
+
 }
