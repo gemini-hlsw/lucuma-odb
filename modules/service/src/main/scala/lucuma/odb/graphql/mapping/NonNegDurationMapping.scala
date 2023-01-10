@@ -21,12 +21,12 @@ trait NonNegDurationMapping[F[_]] extends AllocationTable[F] with ProgramTable[F
     SwitchMapping(
       NonNegDurationType,
       List(
-        (PlannedTimeSummaryType, "pi",        nonNegDurationMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id)),
-        (PlannedTimeSummaryType, "uncharged", nonNegDurationMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id)),
-        (PlannedTimeSummaryType, "execution", nonNegDurationMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id)),
-        (IntensiveType,          "totalTime", nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId)),
-        (LargeProgramType,       "totalTime", nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId)),
-        (AllocationType,         "duration",  nonNegDurationMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner)),
+        PlannedTimeSummaryType / "pi"        -> nonNegDurationMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
+        PlannedTimeSummaryType / "uncharged" -> nonNegDurationMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
+        PlannedTimeSummaryType / "execution" -> nonNegDurationMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
+        IntensiveType / "totalTime"          -> nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        LargeProgramType / "totalTime"       -> nonNegDurationMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        AllocationType / "duration"          -> nonNegDurationMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
       ),
     )
 
