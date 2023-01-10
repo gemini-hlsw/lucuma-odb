@@ -11,3 +11,5 @@ import cats.data.NonEmptyList
 final case class ProtoAtom[D](
   steps: NonEmptyList[ProtoStep[D]]
 )
+
+
