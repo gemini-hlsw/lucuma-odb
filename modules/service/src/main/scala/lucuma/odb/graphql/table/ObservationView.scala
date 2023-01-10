@@ -23,6 +23,12 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val VisualizationTime: ColumnRef = col("c_visualization_time", data_timestamp.opt)
       val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
 
+      object PlannedTime {
+        val Pi        = col("c_pts_pi", interval)
+        val Uncharged = col("c_pts_uncharged", interval)
+        val Execution = col("c_pts_execution", interval)
+      }
+
       object PosAngleConstraint {
         val Mode: ColumnRef            = col("c_pac_mode",  pac_mode.embedded)
         val Angle: ColumnRef           = col("c_pac_angle", angle_µas.embedded)
@@ -78,6 +84,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         val ObservingModeType: ColumnRef = col("c_observing_mode_type", observing_mode_type.embedded)
         
       }
+
     }
 
 }

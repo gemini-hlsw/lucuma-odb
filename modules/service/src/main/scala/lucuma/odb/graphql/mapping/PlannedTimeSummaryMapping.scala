@@ -27,8 +27,8 @@ trait PlannedTimeSummaryMapping[F[_]]
 
   lazy val PlannedTimeSummaryMapping: TypeMapping =
     SwitchMapping(PlannedTimeSummaryType, List(
-      ProgramType / "plannedTimeSummary"     -> plannedTimeSummaryMapping(ProgramTable.Id),
-      ObservationType / "plannedTimeSummary" -> plannedTimeSummaryMapping(ObservationView.Id),
+      ProgramType / "plannedTime"     -> plannedTimeSummaryMapping(ProgramTable.Id),
+      ObservationType / "plannedTime" -> plannedTimeSummaryMapping(ObservationView.Id),
     ))
 
   private def plannedTimeSummaryMapping(keyColumnRef: ColumnRef): ObjectMapping =
