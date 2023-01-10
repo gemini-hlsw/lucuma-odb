@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -48,9 +49,7 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
     λ:            Wavelength
   ): Acquisition.Steps[D] = {
 
-    def filter: F = acqFilters.toList.minBy { f =>
-      (λ.toPicometers.value.value - wavelength(f).toPicometers.value.value).abs
-    }
+    def filter: F = acqFilters.toList.minBy { f => λ.diff(wavelength(f)).abs }
 
     eval {
       for {
