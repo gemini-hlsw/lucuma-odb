@@ -45,8 +45,8 @@ trait RightAscensionMapping[F[_]] extends ObservationView[F] with TargetView[F] 
     SwitchMapping(
       RightAscensionType,
       List(
-        (CoordinatesType, "ra", rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra)),
-        (SiderealType,    "ra", rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra))
+        CoordinatesType / "ra" -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
+        SiderealType / "ra"    -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
       )
     )
 

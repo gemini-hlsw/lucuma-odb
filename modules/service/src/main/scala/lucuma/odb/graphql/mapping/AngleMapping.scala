@@ -49,8 +49,8 @@ trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
     SwitchMapping(
       AngleType,
       List(
-        (PosAngleConstraintType,              "angle",           angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle)),
-        (SpectroscopyScienceRequirementsType, "focalPlaneAngle", angleMapping(ObservationView.Id, ObservationView.ScienceRequirements.Spectroscopy.FocalPlaneAngle))
+        PosAngleConstraintType / "angle"                        -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
+        SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(ObservationView.Id, ObservationView.ScienceRequirements.Spectroscopy.FocalPlaneAngle),
       )
     )
 }
