@@ -16,6 +16,14 @@ pull_request_rules:
   - status-success=Build and Test (ubuntu-latest, 3.2.1, temurin@17)
   actions:
     merge: {}
+- name: Label sequence PRs
+  conditions:
+  - files~=^modules/sequence/
+  actions:
+    label:
+      add:
+      - sequence
+      remove: []
 - name: Label service PRs
   conditions:
   - files~=^modules/service/

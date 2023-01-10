@@ -11,10 +11,7 @@ import coulomb.syntax.withUnit
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.Wavelength
-import lucuma.core.math.units.Angstrom
-import lucuma.core.math.units.Micrometer
-import lucuma.core.math.units.Nanometer
-import lucuma.core.math.units.Picometer
+import lucuma.core.math.WavelengthDither
 import lucuma.core.optics.Format
 import lucuma.odb.graphql.binding.*
 
@@ -23,26 +20,24 @@ import scala.util.control.Exception.*
 
 object WavelengthDitherInput {
 
-  val Picometers: Matcher[Quantity[Int, Picometer]] =
-    IntBinding.map(_.withUnit[Picometer])
+  val Picometers: Matcher[WavelengthDither] =
+    IntBinding.map(WavelengthDither.intPicometers.get)
 
-  private def matchToPm(name: String, scale: Int): Matcher[Quantity[Int, Picometer]] =
+  private def matchDecimal(name: String, f: Format[BigDecimal, WavelengthDither]): Matcher[WavelengthDither] =
     BigDecimalBinding.emap { bd =>
-      nonFatalCatch.either(
-        bd.bigDecimal.movePointRight(scale).setScale(0, RoundingMode.HALF_UP).intValueExact()
-      ).bimap(_ => s"Invalid wavelength dither in $name", _.withUnit[Picometer])
+      f.getOption(bd).toRight(s"Invalid wavelength dither in $name")
     }
 
-  val Angstroms: Matcher[Quantity[Int, Picometer]] =
-    matchToPm("angstrom", 2)
+  val Angstroms: Matcher[WavelengthDither] =
+    matchDecimal("angstrom", WavelengthDither.decimalAngstroms)
 
-  val Nanometers: Matcher[Quantity[Int, Picometer]] =
-    matchToPm("nanometer", 3)
+  val Nanometers: Matcher[WavelengthDither] =
+    matchDecimal("nanometer", WavelengthDither.decimalNanometers)
 
-  val Micrometers: Matcher[Quantity[Int, Picometer]] =
-    matchToPm("micrometer", scale=6)
+  val Micrometers: Matcher[WavelengthDither] =
+    matchDecimal("micrometer", WavelengthDither.decimalMicrometers)
 
-  val Binding: Matcher[Quantity[Int, Picometer]] =
+  val Binding: Matcher[WavelengthDither] =
     ObjectFieldsBinding.rmap {
       case List(
         Picometers.Option("picometers", rPicometers),
