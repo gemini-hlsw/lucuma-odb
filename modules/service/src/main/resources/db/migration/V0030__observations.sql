@@ -150,6 +150,11 @@ create table t_observation (
   c_active_status      e_obs_active_status not null    default 'active',
   c_visualization_time timestamp           null        default null,
 
+  -- planned time summary
+  c_pts_pi        interval not null default '0h',
+  c_pts_uncharged interval not null default '0h',
+  c_pts_execution interval not null default '0h',
+  
   -- position angle constraint
   c_pac_mode           e_pac_mode          not null    default 'unbounded',
   c_pac_angle          d_angle_µas         not null    default 0,
