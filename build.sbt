@@ -33,8 +33,21 @@ ThisBuild / Test / parallelExecution := false
 ThisBuild / scalaVersion       := "3.2.1"
 ThisBuild / crossScalaVersions := Seq("3.2.1")
 
+lazy val sequence = project
+  .in(file("modules/sequence"))
+  .settings(
+    name := "lucuma-odb-sequence",
+    libraryDependencies ++= Seq(
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+      "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
+    )
+  )
+
 lazy val service = project
   .in(file("modules/service"))
+  .dependsOn(sequence)
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",

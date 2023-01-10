@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.mapping
 
 import cats.syntax.all.*
+import coulomb.*
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
@@ -30,6 +31,8 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.math.Offset.Q
+import lucuma.core.math.WavelengthDither
+import lucuma.core.math.units.Nanometer
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -39,6 +42,7 @@ import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.instances.SourceProfileCodec.given
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
 
 import java.math.RoundingMode
 import scala.collection.immutable.SortedMap
@@ -70,19 +74,19 @@ trait GmosLongSlitMapping[F[_]]
     val explicitXBin: FieldMapping        = SqlField("explicitXBin", cc.XBin)
 
     val yBin: FieldMapping                = explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin")
-    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(GmosLongSlitMath.DefaultYBinning))
+    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(GmosLongSlitConfig.DefaultYBinning))
     val explicitYBin: FieldMapping        = SqlField("explicitYBin", cc.YBin)
 
     val ampReadMode: FieldMapping         = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
-    val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(GmosLongSlitMath.DefaultAmpReadMode))
+    val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(GmosLongSlitConfig.DefaultAmpReadMode))
     val explicitAmpReadMode: FieldMapping = SqlField("explicitAmpReadMode", cc.AmpReadMode)
 
     val ampGain: FieldMapping             = explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain")
-    val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(GmosLongSlitMath.DefaultAmpGain))
+    val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(GmosLongSlitConfig.DefaultAmpGain))
     val explicitAmpGain: FieldMapping     = SqlField("explicitAmpGain", cc.AmpGain)
 
     val roi: FieldMapping                 = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
-    val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitMath.DefaultRoi))
+    val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitConfig.DefaultRoi))
     val explicitRoi: FieldMapping         = SqlField("explicitRoi", cc.Roi)
 
     val wavelengthDithersString: FieldMapping   =
@@ -163,7 +167,7 @@ trait GmosLongSlitMapping[F[_]]
               sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
             } yield
               sp.fold(GmosXBinning.Two) { sourceProfile =>  // TODO: What should the real default be if there is no target
-                GmosLongSlitMath.xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+                GmosLongSlitConfig.xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
               },
           List("fpu", "imageQuality", "sourceProfile")
         ),
@@ -274,7 +278,7 @@ trait GmosLongSlitMapping[F[_]]
               sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
             } yield
               sp.fold(GmosXBinning.Two) { sourceProfile =>
-                GmosLongSlitMath.xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+                GmosLongSlitConfig.xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
               },
           List("fpu", "imageQuality", "sourceProfile")
         ),
@@ -359,38 +363,50 @@ object GmosLongSlitMapping {
   private def parseCsvBigDecimals(s: String): List[BigDecimal] =
     s.split(',').toList.map(n => BigDecimal(n.trim))
 
-  private def toWavelengthDitherJson(nm: BigDecimal): Json =
+  private def toWavelengthDitherJson(wd: WavelengthDither): Json = {
+    val pm: Int = wd.toPicometers.value
+
     json"""
-   {
-     "picometers":  ${nm.bigDecimal.movePointRight(3).setScale(0, RoundingMode.HALF_UP).longValue},
-     "angstroms":   ${nm.bigDecimal.movePointRight(1).setScale(2, RoundingMode.HALF_UP)},
-     "nanometers":  ${nm.bigDecimal.setScale(3, RoundingMode.HALF_UP)},
-     "micrometers": ${nm.bigDecimal.movePointLeft(3).setScale(6, RoundingMode.HALF_UP)}
-   }
-  """
+      {
+        "picometers":  $pm,
+        "angstroms":   ${BigDecimal(pm, 2)},
+        "nanometers":  ${BigDecimal(pm, 3)},
+        "micrometers": ${BigDecimal(pm, 6)}
+     }
+    """
+  }
 
   private def decodeWavelengthDithers(s: String): Json =
-    parseCsvBigDecimals(s).map(toWavelengthDitherJson).asJson
+    parseCsvBigDecimals(s).map(bd => toWavelengthDitherJson(WavelengthDither.nanometers.unsafeGet(Quantity[Nanometer](bd)))).asJson
 
   private def defaultWavelengthDithersNorthJson(g: GmosNorthGrating): Json =
-    GmosLongSlitMath.defaultWavelengthDithersNorth(g).map(q => toWavelengthDitherJson(q.value)).asJson
+    GmosLongSlitConfig.defaultWavelengthDithersNorth(g).map(q => toWavelengthDitherJson(q)).asJson
 
   private def defaultWavelengthDithersSouthJson(g: GmosSouthGrating): Json =
-    GmosLongSlitMath.defaultWavelengthDithersSouth(g).map(q => toWavelengthDitherJson(q.value)).asJson
+    GmosLongSlitConfig.defaultWavelengthDithersSouth(g).map(q => toWavelengthDitherJson(q)).asJson
 
-  private def toOffsetQJson(arcsec: BigDecimal): Json =
+  private def toOffsetQJson(q: Q): Json = {
+    val micro: Long =
+      Q.signedDecimalArcseconds
+       .get(q)
+       .bigDecimal
+       .movePointRight(6)
+       .setScale(0, RoundingMode.HALF_UP)
+       .longValue
+
     json"""
-   {
-     "microarcseconds": ${arcsec.bigDecimal.movePointRight(6).setScale(0, RoundingMode.HALF_UP).longValue},
-     "milliarcseconds": ${arcsec.bigDecimal.movePointRight(3).setScale(3, RoundingMode.HALF_UP)},
-     "arcseconds":      ${arcsec.bigDecimal.setScale(6, RoundingMode.HALF_UP)}
-   }
-"""
+     {
+       "microarcseconds": $micro,
+       "milliarcseconds": ${BigDecimal(micro, 3)},
+       "arcseconds":      ${BigDecimal(micro, 6)}
+     }
+    """
+  }
 
   private def decodeSpatialOffsets(s: String): Json =
-    parseCsvBigDecimals(s).map(toOffsetQJson).asJson
+    parseCsvBigDecimals(s).map(arcsec => toOffsetQJson(Q.signedDecimalArcseconds.reverseGet(arcsec))).asJson
 
   private val defaultSpatialOffsetsJson: Json =
-    GmosLongSlitMath.DefaultSpatialOffsets.map(q => toOffsetQJson(q.value)).asJson
+    GmosLongSlitConfig.DefaultSpatialOffsets.map(q => toOffsetQJson(q)).asJson
 
 }
