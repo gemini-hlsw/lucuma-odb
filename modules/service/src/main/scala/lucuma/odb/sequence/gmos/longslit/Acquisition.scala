@@ -30,8 +30,8 @@ import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
 import lucuma.core.syntax.time.*
 import lucuma.odb.sequence.SequenceState
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.AcqExposureTime
+import lucuma.odb.sequence.data.ProtoStep
 
 import scala.collection.immutable.LazyList
 
