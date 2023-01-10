@@ -42,8 +42,7 @@ import spire.math.Rational
  * @tparam F filter type
  * @tparam U FPU type
  */
-trait GmosLongSlitConfig[G, F, U] {
-
+sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
   def grating: G
 
   def filter: Option[F]
@@ -124,9 +123,56 @@ trait GmosLongSlitConfig[G, F, U] {
 }
 
 object GmosLongSlitConfig {
+  final case class North(
+    grating:             GmosNorthGrating,
+    filter:              Option[GmosNorthFilter],
+    fpu:                 GmosNorthFpu,
+    centralWavelength:   Wavelength,
+    explicitXBin:        Option[GmosXBinning]    = None,
+    explicitYBin:        Option[GmosYBinning]    = None,
+    explicitAmpReadMode: Option[GmosAmpReadMode] = None,
+    explicitAmpGain:     Option[GmosAmpGain]     = None,
+    explicitRoi:         Option[GmosRoi]         = None,
+    explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
+    explicitSpatialOffsets:    Option[List[Q]]                = None
+  ) extends GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
 
-  trait North extends GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
-  trait South extends GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
+    override def defaultXBin(
+      sourceProfile: SourceProfile,
+      imageQuality:  ImageQuality,
+      sampling:      PosDouble
+    ): GmosXBinning =
+      xbinNorth(fpu, sourceProfile, imageQuality, sampling)
+
+    override def defaultWavelengthDithers: List[WavelengthDither] =
+      defaultWavelengthDithersNorth(this.grating)
+
+  }
+  final case class South(
+    grating:             GmosSouthGrating,
+    filter:              Option[GmosSouthFilter],
+    fpu:                 GmosSouthFpu,
+    centralWavelength:   Wavelength,
+    explicitXBin:        Option[GmosXBinning]    = None,
+    explicitYBin:        Option[GmosYBinning]    = None,
+    explicitAmpReadMode: Option[GmosAmpReadMode] = None,
+    explicitAmpGain:     Option[GmosAmpGain]     = None,
+    explicitRoi:         Option[GmosRoi]         = None,
+    explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
+    explicitSpatialOffsets:    Option[List[Q]]                = None
+  ) extends GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
+
+    override def defaultXBin(
+      sourceProfile: SourceProfile,
+      imageQuality:  ImageQuality,
+      sampling:      PosDouble
+    ): GmosXBinning =
+      xbinSouth(fpu, sourceProfile, imageQuality, sampling)
+
+    override def defaultWavelengthDithers: List[WavelengthDither] =
+      defaultWavelengthDithersSouth(this.grating)
+
+  }
 
   val DefaultAmpReadMode: GmosAmpReadMode =
     GmosAmpReadMode.Slow
@@ -231,7 +277,6 @@ object GmosLongSlitConfig {
       Quantity[Picometer](((v / 5.0).round * 5.0).toInt * 1000)
     )
   }
-
   def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[WavelengthDither] = {
     val delta = Δλ(Site.GN, grating.dispersion)
     List(WavelengthDither.Zero, delta, delta, WavelengthDither.Zero)

@@ -31,7 +31,6 @@ import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
-import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.sequence.SequenceState
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
