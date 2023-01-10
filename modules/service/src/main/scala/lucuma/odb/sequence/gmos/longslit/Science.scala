@@ -1,7 +1,9 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos.longslit
+package lucuma.odb.sequence
+package gmos
+package longslit
 
 import cats.data.NonEmptyList
 import cats.syntax.either.*
@@ -30,12 +32,9 @@ import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.SequenceState
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
-import lucuma.odb.sequence.data.SequenceState
-import lucuma.odb.sequence.gmos.DynamicOptics
-import lucuma.odb.sequence.gmos.GmosNorthInitialDynamicConfig
-import lucuma.odb.sequence.gmos.GmosSouthInitialDynamicConfig
 
 import scala.collection.immutable.LazyList
 

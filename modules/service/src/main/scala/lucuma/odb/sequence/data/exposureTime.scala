@@ -3,6 +3,7 @@
 
 package lucuma.odb.sequence.data
 
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.NonNegDuration
 
 import java.time.Duration
@@ -13,7 +14,9 @@ object SciExposureTime {
   
   extension (expTime: SciExposureTime) {
     def duration: NonNegDuration = expTime
-    
+
+    def *(that: NonNegInt): SciExposureTime =
+      NonNegDuration.unsafeFrom(expTime.value.multipliedBy(that.value.toLong))
   }
   
   def apply(duration: NonNegDuration): SciExposureTime = duration
@@ -30,6 +33,8 @@ object AcqExposureTime {
   extension (expTime: AcqExposureTime) {
     def duration: NonNegDuration = expTime
 
+    def *(that: NonNegInt): SciExposureTime =
+      NonNegDuration.unsafeFrom(expTime.value.multipliedBy(that.value.toLong))
   }
 
   def apply(duration: NonNegDuration): AcqExposureTime = duration
