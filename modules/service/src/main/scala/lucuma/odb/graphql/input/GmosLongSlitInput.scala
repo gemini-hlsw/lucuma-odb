@@ -90,33 +90,6 @@ object GmosLongSlitInput {
 
     }
 
-    /**
-     * A GMOS Long Slit configuration implementation based on input parameters.
-     * @param c common input parameters
-     * @tparam G grating type
-     * @tparam F filter type
-     * @tparam U FPU type
-     */
-    private abstract class AbstractLongSlitConfig[G, F, U](c: Create[G, F, U]) extends GmosLongSlitConfig[G, F, U] {
-      override def grating: G        = c.grating
-      override def filter: Option[F] = c.filter
-      override def fpu: U            = c.fpu
-      override def centralWavelength: Wavelength = c.common.centralWavelength
-
-      override def explicitXBin: Option[GmosXBinning]           = c.common.explicitXBin
-      override def explicitYBin: Option[GmosYBinning]           = c.common.explicitYBin
-      override def explicitAmpReadMode: Option[GmosAmpReadMode] = c.common.explicitAmpReadMode
-      override def explicitAmpGain: Option[GmosAmpGain]         = c.common.explicitAmpGain
-      override def explicitRoi: Option[GmosRoi]                 = c.common.explicitRoi
-
-      override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
-        c.common.explicitλDithers
-
-      override def explicitSpatialOffsets: Option[List[Q]] =
-        c.common.explicitSpatialOffsets
-    }
-
-
     final case class North(
       grating: GmosNorthGrating,
       filter:  Option[GmosNorthFilter],
@@ -131,19 +104,19 @@ object GmosLongSlitInput {
        * Creates a GmosLongSlitConfig based on input parameters.
        */
       def toGmosLongSlit: GmosLongSlitConfig.North =
-        new AbstractLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](this)
-          with GmosLongSlitConfig.North {
-
-          override def defaultXBin(
-            sourceProfile: SourceProfile,
-            imageQuality:  ImageQuality,
-            sampling:      PosDouble
-          ): GmosXBinning =
-            GmosLongSlitConfig.xbinNorth(this.fpu, sourceProfile, imageQuality, sampling)
-
-          override def defaultWavelengthDithers: List[WavelengthDither] =
-            GmosLongSlitConfig.defaultWavelengthDithersNorth(this.grating)
-        }  
+        GmosLongSlitConfig.North(
+          grating,
+          filter,
+          fpu,
+          common.centralWavelength,
+          common.explicitXBin,
+          common.explicitYBin,
+          common.explicitAmpReadMode,
+          common.explicitAmpGain,
+          common.explicitRoi,
+          common.explicitλDithers,
+          common.explicitSpatialOffsets
+        )
 
     }
 
@@ -199,19 +172,20 @@ object GmosLongSlitInput {
        * Creates a GmosLongSlitConfig based on input parameters.
        */
       def toGmosLongSlit: GmosLongSlitConfig.South =
-        new AbstractLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](this)
-          with GmosLongSlitConfig.South {
+        GmosLongSlitConfig.South(
+          grating,
+          filter,
+          fpu,
+          common.centralWavelength,
+          common.explicitXBin,
+          common.explicitYBin,
+          common.explicitAmpReadMode,
+          common.explicitAmpGain,
+          common.explicitRoi,
+          common.explicitλDithers,
+          common.explicitSpatialOffsets
+        )
 
-          override def defaultXBin(
-            sourceProfile: SourceProfile,
-            imageQuality:  ImageQuality,
-            sampling:      PosDouble
-          ): GmosXBinning =
-            GmosLongSlitConfig.xbinSouth(this.fpu, sourceProfile, imageQuality, sampling)
-
-          override def defaultWavelengthDithers: List[WavelengthDither] =
-            GmosLongSlitConfig.defaultWavelengthDithersSouth(this.grating)
-        }  
     }
 
     object South {
