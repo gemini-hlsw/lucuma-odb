@@ -226,6 +226,9 @@ class observations extends OdbSuite {
                     wavelengthCoverage: {
                       angstroms: 99
                     }
+                    focalPlaneAngle: {
+                      arcseconds: 666
+                    }
                   }
                 }
               }
@@ -263,6 +266,9 @@ class observations extends OdbSuite {
                         wavelengthCoverage {
                           picometers
                         }
+                        focalPlaneAngle {
+                          milliarcseconds
+                        }
                       }
                     }
                   }
@@ -286,6 +292,9 @@ class observations extends OdbSuite {
                           },
                           "wavelengthCoverage" : {
                             "picometers" : 9900
+                          },
+                          "focalPlaneAngle" : {
+                            "milliarcseconds" : 666000
                           }
                         }
                       }
@@ -296,7 +305,8 @@ class observations extends OdbSuite {
                         "spectroscopy" : {
                           "wavelength" : null,
                           "signalToNoiseAt" : null,
-                          "wavelengthCoverage" : null
+                          "wavelengthCoverage" : null,
+                          "focalPlaneAngle" : null
                         }
                       }
                     }

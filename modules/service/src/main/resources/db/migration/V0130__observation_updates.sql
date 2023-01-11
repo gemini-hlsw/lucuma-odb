@@ -8,5 +8,6 @@ create or replace view v_observation as
   case when c_observing_mode_type      is not null then c_observation_id end as c_observing_mode_id,
   case when c_spec_wavelength          is not null then c_observation_id end as c_spec_wavelength_id,          -- this is new
   case when c_spec_signal_to_noise_at  is not null then c_observation_id end as c_spec_signal_to_noise_at_id,  -- this is new
-  case when c_spec_wavelength_coverage is not null then c_observation_id end as c_spec_wavelength_coverage_id  -- this is new
+  case when c_spec_wavelength_coverage is not null then c_observation_id end as c_spec_wavelength_coverage_id, -- this is new
+  case when c_spec_focal_plane_angle   is not null then c_observation_id end as c_spec_focal_plane_angle_id    -- this is new
   from t_observation;
