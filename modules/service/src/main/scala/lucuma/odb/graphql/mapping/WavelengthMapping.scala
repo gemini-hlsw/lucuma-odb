@@ -49,7 +49,7 @@ trait WavelengthMapping[F[_]]
         GmosSouthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.InitialCentralWavelength),
         SpectroscopyScienceRequirementsType / "wavelength"         -> wavelengthMapping(Spectroscopy.Wavelength.SyntheticId, Spectroscopy.Wavelength.Value),
         SpectroscopyScienceRequirementsType / "signalToNoiseAt"    -> wavelengthMapping(Spectroscopy.SignalToNoiseAt.SyntheticId, Spectroscopy.SignalToNoiseAt.Value),
-        SpectroscopyScienceRequirementsType / "wavelengthCoverage" -> wavelengthMapping(ObservationView.Id, Spectroscopy.WavelengthCoverage),
+        SpectroscopyScienceRequirementsType / "wavelengthCoverage" -> wavelengthMapping(Spectroscopy.WavelengthCoverage.SyntheticId, Spectroscopy.WavelengthCoverage.Value),
       )
     )
 }

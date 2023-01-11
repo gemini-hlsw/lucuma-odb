@@ -223,6 +223,9 @@ class observations extends OdbSuite {
                     signalToNoiseAt: {
                       angstroms: 71
                     }
+                    wavelengthCoverage: {
+                      angstroms: 99
+                    }
                   }
                 }
               }
@@ -257,6 +260,9 @@ class observations extends OdbSuite {
                         signalToNoiseAt {
                           picometers
                         }
+                        wavelengthCoverage {
+                          picometers
+                        }
                       }
                     }
                   }
@@ -277,16 +283,20 @@ class observations extends OdbSuite {
                           },
                           "signalToNoiseAt" : {
                             "picometers" : 7100
+                          },
+                          "wavelengthCoverage" : {
+                            "picometers" : 9900
                           }
                         }
                       }
                     },
                     {
-                      "id" :$oid2,
+                      "id" : $oid2,
                       "scienceRequirements" : {
                         "spectroscopy" : {
                           "wavelength" : null,
-                          "signalToNoiseAt" : null
+                          "signalToNoiseAt" : null,
+                          "wavelengthCoverage" : null
                         }
                       }
                     }
