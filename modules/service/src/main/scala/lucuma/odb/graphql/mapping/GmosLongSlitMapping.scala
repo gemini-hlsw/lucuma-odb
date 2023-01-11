@@ -39,9 +39,9 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
-import lucuma.odb.graphql.instances.SourceProfileCodec.given
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
 
 import java.math.RoundingMode
