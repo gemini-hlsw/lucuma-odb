@@ -181,7 +181,7 @@ class observations extends OdbSuite {
     }
   }
 
-  def createObservationWithSpecRequirementsWithoutWavelength(user: User, pid: Program.Id): IO[Observation.Id] =
+  def createObservationWithNullSpecRequirements(user: User, pid: Program.Id): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -205,7 +205,7 @@ class observations extends OdbSuite {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  def createObservationWithSpecRequirementsWithWavelength(user: User, pid: Program.Id): IO[Observation.Id] =
+  def createObservationWithDefinedSpecRequirements(user: User, pid: Program.Id): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -219,6 +219,9 @@ class observations extends OdbSuite {
                   spectroscopy: {
                     wavelength: {
                       angstroms: 42
+                    }
+                    signalToNoiseAt: {
+                      angstroms: 71
                     }
                   }
                 }
@@ -234,9 +237,9 @@ class observations extends OdbSuite {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  test("select observations with science requirements containing null and non-null wavelengths") {
+  test("select observations with science requirements containing null and non-null embeds") {
     createProgram(pi).flatMap { pid =>
-      (createObservationWithSpecRequirementsWithWavelength(pi, pid), createObservationWithSpecRequirementsWithoutWavelength(pi, pid))
+      (createObservationWithDefinedSpecRequirements(pi, pid), createObservationWithNullSpecRequirements(pi, pid))
         .tupled
         .flatMap { (oid1, oid2) => 
           expect(
@@ -249,6 +252,9 @@ class observations extends OdbSuite {
                     scienceRequirements {
                       spectroscopy {
                         wavelength {
+                          picometers
+                        }
+                        signalToNoiseAt {
                           picometers
                         }
                       }
@@ -268,15 +274,19 @@ class observations extends OdbSuite {
                         "spectroscopy" : {
                           "wavelength" : {
                             "picometers" : 4200
+                          },
+                          "signalToNoiseAt" : {
+                            "picometers" : 7100
                           }
                         }
                       }
                     },
                     {
-                      "id" : $oid2,
+                      "id" :$oid2,
                       "scienceRequirements" : {
                         "spectroscopy" : {
-                          "wavelength" : null
+                          "wavelength" : null,
+                          "signalToNoiseAt" : null
                         }
                       }
                     }
