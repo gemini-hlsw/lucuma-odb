@@ -67,7 +67,10 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         val Mode: ColumnRef = col("c_science_mode", science_mode.embedded)
 
         object Spectroscopy {
-          val Wavelength: ColumnRef         = col("c_spec_wavelength",          wavelength_pm.embedded)
+          object Wavelength {
+            val SyntheticId: ColumnRef      = col("c_spec_wavelength_id",       observation_id.embedded)
+            val Value: ColumnRef            = col("c_spec_wavelength",          wavelength_pm.embedded)
+          }
           val Resolution: ColumnRef         = col("c_spec_resolution",          pos_int.opt)
           val SignalToNoise: ColumnRef      = col("c_spec_signal_to_noise",     signal_to_noise.opt)
           val SignalToNoiseAt: ColumnRef    = col("c_spec_signal_to_noise_at",  wavelength_pm.embedded)

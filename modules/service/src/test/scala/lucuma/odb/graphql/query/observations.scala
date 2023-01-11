@@ -181,4 +181,113 @@ class observations extends OdbSuite {
     }
   }
 
+  def createObservationWithSpecRequirementsWithoutWavelength(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  mode: SPECTROSCOPY
+                }
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+          """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def createObservationWithSpecRequirementsWithWavelength(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  mode: SPECTROSCOPY
+                  spectroscopy: {
+                    wavelength: {
+                      angstroms: 42
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+          """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  test("select observations with science requirements containing null and non-null wavelengths") {
+    createProgram(pi).flatMap { pid =>
+      (createObservationWithSpecRequirementsWithWavelength(pi, pid), createObservationWithSpecRequirementsWithoutWavelength(pi, pid))
+        .tupled
+        .flatMap { (oid1, oid2) => 
+          expect(
+            user = pi,
+            query = s"""
+              query {
+                observations(programId: "$pid") {
+                  matches {
+                    id
+                    scienceRequirements {
+                      spectroscopy {
+                        wavelength {
+                          picometers
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+              {
+                "observations" : {
+                  "matches" : [
+                    {
+                      "id" : $oid1,
+                      "scienceRequirements" : {
+                        "spectroscopy" : {
+                          "wavelength" : {
+                            "picometers" : 4200
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id" : $oid2,
+                      "scienceRequirements" : {
+                        "spectroscopy" : {
+                          "wavelength" : null
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+              """
+            )
+          )
+        }
+    }
+  }
+
 }
