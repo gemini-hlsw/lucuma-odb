@@ -45,12 +45,14 @@ trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
       )
     )
 
+  import ObservationView.ScienceRequirements.Spectroscopy
+
   lazy val AngleMapping: TypeMapping =
     SwitchMapping(
       AngleType,
       List(
         PosAngleConstraintType / "angle"                        -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
-        SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(ObservationView.Id, ObservationView.ScienceRequirements.Spectroscopy.FocalPlaneAngle),
+        SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(Spectroscopy.FocalPlaneAngle.SyntheticId, Spectroscopy.FocalPlaneAngle.Value),
       )
     )
 }

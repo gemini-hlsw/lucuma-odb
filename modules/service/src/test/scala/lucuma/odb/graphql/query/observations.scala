@@ -181,4 +181,143 @@ class observations extends OdbSuite {
     }
   }
 
+  def createObservationWithNullSpecRequirements(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  mode: SPECTROSCOPY
+                }
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+          """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def createObservationWithDefinedSpecRequirements(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  mode: SPECTROSCOPY
+                  spectroscopy: {
+                    wavelength: {
+                      angstroms: 42
+                    }
+                    signalToNoiseAt: {
+                      angstroms: 71
+                    }
+                    wavelengthCoverage: {
+                      angstroms: 99
+                    }
+                    focalPlaneAngle: {
+                      arcseconds: 666
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+          """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  test("select observations with science requirements containing null and non-null embeds") {
+    createProgram(pi).flatMap { pid =>
+      (createObservationWithDefinedSpecRequirements(pi, pid), createObservationWithNullSpecRequirements(pi, pid))
+        .tupled
+        .flatMap { (oid1, oid2) => 
+          expect(
+            user = pi,
+            query = s"""
+              query {
+                observations(programId: "$pid") {
+                  matches {
+                    id
+                    scienceRequirements {
+                      spectroscopy {
+                        wavelength {
+                          picometers
+                        }
+                        signalToNoiseAt {
+                          picometers
+                        }
+                        wavelengthCoverage {
+                          picometers
+                        }
+                        focalPlaneAngle {
+                          milliarcseconds
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+              {
+                "observations" : {
+                  "matches" : [
+                    {
+                      "id" : $oid1,
+                      "scienceRequirements" : {
+                        "spectroscopy" : {
+                          "wavelength" : {
+                            "picometers" : 4200
+                          },
+                          "signalToNoiseAt" : {
+                            "picometers" : 7100
+                          },
+                          "wavelengthCoverage" : {
+                            "picometers" : 9900
+                          },
+                          "focalPlaneAngle" : {
+                            "milliarcseconds" : 666000
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id" : $oid2,
+                      "scienceRequirements" : {
+                        "spectroscopy" : {
+                          "wavelength" : null,
+                          "signalToNoiseAt" : null,
+                          "wavelengthCoverage" : null,
+                          "focalPlaneAngle" : null
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+              """
+            )
+          )
+        }
+    }
+  }
+
 }
