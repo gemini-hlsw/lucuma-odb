@@ -242,6 +242,7 @@ comment on table t_observation is 'Observations.';
 
 create index on t_observation (c_conditions_key);
 
+-- N.B. this view is replaced in V0130
 create view v_observation as
   select *,
   case when c_explicit_ra         is not null then c_observation_id end as c_explicit_base_id,
