@@ -33,21 +33,33 @@ ThisBuild / Test / parallelExecution := false
 ThisBuild / scalaVersion       := "3.2.1"
 ThisBuild / crossScalaVersions := Seq("3.2.1")
 
-lazy val sequence = project
-  .in(file("modules/sequence"))
+lazy val schema = project
+  .in(file("modules/schema"))
   .settings(
-    name := "lucuma-odb-sequence",
+    name := "lucuma-odb-schema",
     libraryDependencies ++= Seq(
+      "io.circe"       %% "circe-parser"                    % circeVersion,
+      "io.circe"       %% "circe-literal"                   % circeVersion,
+      "io.circe"       %% "circe-refined"                   % circeVersion,
+      "io.circe"       %% "circe-testing"                   % circeVersion               % Test,
       "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
+      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
     )
+  )
+
+lazy val sequence = project
+  .in(file("modules/sequence"))
+  .dependsOn(schema % "compile->test")
+  .settings(
+    name := "lucuma-odb-sequence"
   )
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(sequence)
+  .dependsOn(sequence % "compile->test")
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
@@ -59,12 +71,6 @@ lazy val service = project
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
-      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
-      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
-      "io.circe"       %% "circe-parser"                    % circeVersion,
-      "io.circe"       %% "circe-literal"                   % circeVersion,
-      "io.circe"       %% "circe-refined"                   % circeVersion,
-      "io.circe"       %% "circe-testing"                   % circeVersion               % Test,
       "is.cir"         %% "ciris"                           % cirisVersion,
       "org.flywaydb"   %  "flyway-core"                     % flywayVersion,
       "org.http4s"     %% "http4s-jdk-http-client"          % http4sJdkHttpClientVersion,
@@ -78,13 +84,11 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,
       "com.dimafeng"   %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
       "edu.gemini"     %% "clue-http4s"                     % clueVersion                % Test,
-      "io.circe"       %% "circe-literal"                   % circeVersion               % Test,
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
       "org.typelevel"  %% "cats-time"                       % catsTimeVersion,
       "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
-      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
       "org.typelevel"  %% "paiges-core"                     % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),

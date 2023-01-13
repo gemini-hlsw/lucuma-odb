@@ -22,7 +22,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
-import lucuma.odb.graphql.instances.SourceProfileCodec.given
+import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Session
