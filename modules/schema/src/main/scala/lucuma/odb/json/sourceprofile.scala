@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql.instances
+package lucuma.odb.json
 
 import cats.data.NonEmptyMap
 import cats.instances.order._
@@ -50,31 +50,11 @@ import lucuma.core.util.*
 
 import scala.collection.immutable.SortedMap
 
-object SourceProfileCodec extends SourceProfileCodec
-
 trait SourceProfileCodec {
 
-  import SourceProfileCodecHelper._
-  import SourceProfileCodecHelper.given
-
-  // type SourceProfile
-  given Codec[SourceProfile] with {
-    def apply(sp: SourceProfile): Json =
-      sp match {
-        case SourceProfile.Point(sd)   => Json.obj("point"   -> sd.asJson)
-        case SourceProfile.Uniform(sd) => Json.obj("uniform" -> sd.asJson)
-        case g: SourceProfile.Gaussian => Json.obj("gaussian" -> g.asJson)
-      }
-
-    def apply(c: HCursor): Decoder.Result[SourceProfile] =
-      c.downField("point").as[SpectralDefinition[Integrated]].map(SourceProfile.Point(_))    orElse
-        c.downField("uniform").as[SpectralDefinition[Surface]].map(SourceProfile.Uniform(_)) orElse
-        c.downField("gaussian").as[SourceProfile.Gaussian]
-  }
-
-}
-
-trait SourceProfileCodecHelper {
+  import angle.given
+  import numeric.given
+  import wavelength.given
 
   // SpectralDefinition[T]
   given [T](using Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Codec[SpectralDefinition[T]] with {
@@ -277,74 +257,22 @@ trait SourceProfileCodecHelper {
 
   }
 
-  given Codec[PosBigDecimal] =
-    Codec[BigDecimal].iemap(PosBigDecimal.from)(_.value)
-
-  given Codec[BigDecimal] with {
-    def apply(d: BigDecimal): Json =
-      d.bigDecimal.toPlainString.asJson
-
-    def apply(c: HCursor): Decoder.Result[BigDecimal] =
-      Decoder[String].apply(c).flatMap { s =>
-        Either.catchNonFatal(BigDecimal(s)).leftMap { _ =>
-          DecodingFailure(s"Could not decode $s as a decimal value", c.history)
-        }
+  // type SourceProfile
+  given Codec[SourceProfile] with {
+    def apply(sp: SourceProfile): Json =
+      sp match {
+        case SourceProfile.Point(sd)   => Json.obj("point"   -> sd.asJson)
+        case SourceProfile.Uniform(sd) => Json.obj("uniform" -> sd.asJson)
+        case g: SourceProfile.Gaussian => Json.obj("gaussian" -> g.asJson)
       }
-  }
 
-  given Codec[Angle] with {
-
-    def apply(a: Angle): Json = {
-
-      val ha = Angle.hourAngle.get(a)
-
-      def convertAngle(div: Int): Json =
-        (BigDecimal(a.toMicroarcseconds) / div).asJson
-
-      def convertHourAngle(div: Int): Json =
-        (BigDecimal(ha.toMicroseconds) / div).asJson
-
-      Json.obj(
-        "microarcseconds" -> a.toMicroarcseconds.asJson,
-        "microseconds"    -> ha.toMicroseconds.asJson,
-        "milliarcseconds" -> convertAngle(1_000),
-        "milliseconds"    -> convertHourAngle(1_000),
-        "arcseconds"      -> convertAngle(1_000_000),
-        "seconds"         -> convertHourAngle(1_000_000),
-        "arcminutes"      -> convertAngle(60 * 1_000_000),
-        "minutes"         -> convertHourAngle(60 * 1_000_000),
-        "degrees"         -> convertAngle(3_600 * 1_000_000),
-        "hours"           -> convertHourAngle(3_600 * 1_000_000),
-        "hms"             -> HourAngle.HMS(ha).format.asJson,
-        "dms"             -> Angle.dms.get(a).format.asJson
-      )
-    }
-
-    def apply(c: HCursor): Decoder.Result[Angle] =
-      c.downField("microarcseconds").as[Long].map(Angle.fromMicroarcseconds)
-
-  }
-
-
-  given Codec[Wavelength] with {
-    def apply(w: Wavelength): Json =
-      Json.obj(
-        "picometers"  -> w.toPicometers.value.value.asJson,
-        "angstroms"   -> Wavelength.decimalAngstroms.reverseGet(w).asJson,
-        "nanometers"  -> Wavelength.decimalNanometers.reverseGet(w).asJson,
-        "micrometers" -> Wavelength.decimalMicrometers.reverseGet(w).asJson,
-      )
-
-    def apply(c: HCursor): Decoder.Result[Wavelength] =
-      c.downField("picometers").as[Int].flatMap { pm =>
-        Wavelength
-          .intPicometers
-          .getOption(pm)
-          .toRight(DecodingFailure(s"Invalid wavelength picometers value: $pm", c.history))
-      }
+    def apply(c: HCursor): Decoder.Result[SourceProfile] =
+      c.downField("point").as[SpectralDefinition[Integrated]].map(SourceProfile.Point(_))    orElse
+        c.downField("uniform").as[SpectralDefinition[Surface]].map(SourceProfile.Uniform(_)) orElse
+        c.downField("gaussian").as[SourceProfile.Gaussian]
   }
 
 }
 
-object SourceProfileCodecHelper extends SourceProfileCodecHelper
+object sourceprofile extends SourceProfileCodec
 
