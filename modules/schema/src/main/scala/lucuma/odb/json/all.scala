@@ -3,8 +3,26 @@
 
 package lucuma.odb.json
 
-object all
-  extends AngleCodec
-     with NumericCodecs
-     with SourceProfileCodec
-     with WavelengthCodec
+object all {
+
+  trait UniversalCodecs
+    extends GmosCodec
+       with NumericCodec
+       with SourceProfileCodec
+       with StepConfigCodec
+
+  object query
+    extends angle.QueryCodec
+       with offset.QueryCodec
+       with time.QueryCodec
+       with wavelength.QueryCodec
+       with UniversalCodecs
+
+  object transport
+    extends angle.TransportCodec
+       with offset.TransportCodec
+       with time.TransportCodec
+       with wavelength.TransportCodec
+       with UniversalCodecs
+
+}

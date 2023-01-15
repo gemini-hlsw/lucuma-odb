@@ -52,39 +52,41 @@ import scala.collection.immutable.SortedMap
 
 trait SourceProfileCodec {
 
-  import angle.given
+  import angle.decoder.given
   import numeric.given
-  import wavelength.given
+  import wavelength.decoder.given
 
   // SpectralDefinition[T]
-  given [T](using Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Codec[SpectralDefinition[T]] with {
-    def apply(sd: SpectralDefinition[T]): Json =
+  given [T](using Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Decoder[SpectralDefinition[T]] =
+    Decoder.instance { c =>
+      c.downField("bandNormalized").as[BandNormalized[T]] orElse
+        c.downField("emissionLines").as[EmissionLines[T]]
+    }
+
+  given [T](using Encoder[Wavelength], Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Encoder[SpectralDefinition[T]] =
+    Encoder.instance { (sd: SpectralDefinition[T]) =>
       Json.obj(
         sd match {
           case bn: BandNormalized[T] => "bandNormalized" -> bn.asJson
           case el: EmissionLines[T]  => "emissionLines"  -> el.asJson
         }
       )
+    }
 
-    def apply(c: HCursor): Decoder.Result[SpectralDefinition[T]] =
-      c.downField("bandNormalized").as[BandNormalized[T]] orElse
-        c.downField("emissionLines").as[EmissionLines[T]]
+  given Decoder[SourceProfile.Gaussian] =
+    Decoder.instance { c =>
+      for {
+        f <- c.downField("fwhm").as[Angle]
+        s <- Decoder[SpectralDefinition[Integrated]].apply(c)
+      } yield SourceProfile.Gaussian(f, s)
+    }
 
-  }
-
-  given Codec[SourceProfile.Gaussian] with {
-    def apply(g: SourceProfile.Gaussian): Json =
+  given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile.Gaussian] =
+    Encoder.instance { (g: SourceProfile.Gaussian) =>
       g.spectralDefinition
        .asJson
        .mapObject(_.add("fwhm", g.fwhm.asJson))
-
-    def apply(c: HCursor): Decoder.Result[SourceProfile.Gaussian] =
-      for {
-        f <- c.downField("fwhm").as[Angle]
-        s <- Codec[SpectralDefinition[Integrated]].apply(c)
-      } yield SourceProfile.Gaussian(f, s)
-
-  }
+    }
 
 
   // Measure[N] Of T
@@ -105,43 +107,36 @@ trait SourceProfileCodec {
   }
 
   // Map entry (A, B) with named keys
-  private def entryCodec[A: Codec, B: Encoder: Decoder](
+  private def entryDecoder[A: Decoder, B: Decoder](
     aKey: String,
     bKey: String
-  ): Codec[(A, B)] =
-    new Codec[(A, B)] {
-      def apply(entry: (A, B)): Json =
-        Json.obj(
-          aKey -> entry._1.asJson,
-          bKey -> entry._2.asJson
-        )
-
-      def apply(c: HCursor): Decoder.Result[(A, B)] =
-        for {
-          a <- c.downField(aKey).as[A]
-          b <- c.downField(bKey).as[B]
-        } yield (a, b)
+  ): Decoder[(A, B)] =
+    Decoder.instance[(A, B)] { c =>
+      for {
+        a <- c.downField(aKey).as[A]
+        b <- c.downField(bKey).as[B]
+      } yield (a, b)
     }
 
-  val CodecFluxDensityEntry: Codec[(Wavelength, PosBigDecimal)] =
-    entryCodec("wavelength", "density")
+  private def entryEncoder[A: Encoder, B: Encoder](
+    aKey: String,
+    bKey: String
+  ): Encoder[(A, B)] =
+    Encoder.instance[(A, B)] { (entry: (A, B)) =>
+      Json.obj(
+        aKey -> entry._1.asJson,
+        bKey -> entry._2.asJson
+      )
+    }
 
-  given Codec[UnnormalizedSED] with {
-    def apply(sed: UnnormalizedSED): Json =
-      sed match {
-        case StellarLibrary(librarySpectrum)          => Json.obj("stellarLibrary"  -> librarySpectrum.asJson)
-        case CoolStarModel(temperature)               => Json.obj("coolStar"        -> temperature.asJson) // todo: tag
-        case Galaxy(galaxySpectrum)                   => Json.obj("galaxy"          -> galaxySpectrum.asJson)
-        case Planet(planetSpectrum)                   => Json.obj("planet"          -> planetSpectrum.asJson)
-        case Quasar(quasarSpectrum)                   => Json.obj("quasar"          -> quasarSpectrum.asJson)
-        case HIIRegion(hiiRegionSpectrum)             => Json.obj("hiiRegion"       -> hiiRegionSpectrum.asJson)
-        case PlanetaryNebula(planetaryNebulaSpectrum) => Json.obj("planetaryNebula" -> planetaryNebulaSpectrum.asJson)
-        case PowerLaw(index)                          => Json.obj("powerLaw"        -> index.asJson)
-        case BlackBody(temperature)                   => Json.obj("blackBodyTempK"  -> temperature.value.value.asJson)
-        case UserDefined(fluxDensities)               => Json.obj("fluxDensities"   -> fluxDensities.toSortedMap.toList.map(CodecFluxDensityEntry.apply).asJson)
-      }
+  val DecoderFluxDensityEntry: Decoder[(Wavelength, PosBigDecimal)] =
+    entryDecoder("wavelength", "density")
 
-    def apply(c: HCursor): Decoder.Result[UnnormalizedSED] = {
+  def EncoderFluxDensityEntry(using Encoder[Wavelength]): Encoder[(Wavelength, PosBigDecimal)] =
+    entryEncoder("wavelength", "density")
+
+  given Decoder[UnnormalizedSED] =
+    Decoder.instance { c =>
       def decode[A: Enumerated](n: String)(f: A => UnnormalizedSED): Decoder.Result[UnnormalizedSED] =
         c.downField(n).as[A].map(f)
 
@@ -157,13 +152,28 @@ trait SourceProfileCodec {
         c.downField("fluxDensities")
          .values
          .toRight(DecodingFailure("fluxDensities should hold an array of values", c.history))
-         .flatMap(_.toList.traverse(json => CodecFluxDensityEntry(json.hcursor)).map(SortedMap.from))
+         .flatMap(_.toList.traverse(json => DecoderFluxDensityEntry(json.hcursor)).map(SortedMap.from))
          .flatMap(m => NonEmptyMap.fromMap(m).toRight(DecodingFailure("At least one flux density entry is required for a user defined SED", c.history)))
          .map(UserDefined(_))                                                                orElse
         DecodingFailure(s"Could not decode SED: ${c.focus.map(_.spaces2)}", c.history).asLeft[UnnormalizedSED]
     }
 
-  }
+
+  given (using Encoder[Wavelength]): Encoder[UnnormalizedSED] =
+    Encoder.instance { (sed: UnnormalizedSED) =>
+      sed match {
+        case StellarLibrary(librarySpectrum)          => Json.obj("stellarLibrary"  -> librarySpectrum.asJson)
+        case CoolStarModel(temperature)               => Json.obj("coolStar"        -> temperature.asJson) // todo: tag
+        case Galaxy(galaxySpectrum)                   => Json.obj("galaxy"          -> galaxySpectrum.asJson)
+        case Planet(planetSpectrum)                   => Json.obj("planet"          -> planetSpectrum.asJson)
+        case Quasar(quasarSpectrum)                   => Json.obj("quasar"          -> quasarSpectrum.asJson)
+        case HIIRegion(hiiRegionSpectrum)             => Json.obj("hiiRegion"       -> hiiRegionSpectrum.asJson)
+        case PlanetaryNebula(planetaryNebulaSpectrum) => Json.obj("planetaryNebula" -> planetaryNebulaSpectrum.asJson)
+        case PowerLaw(index)                          => Json.obj("powerLaw"        -> index.asJson)
+        case BlackBody(temperature)                   => Json.obj("blackBodyTempK"  -> temperature.value.value.asJson)
+        case UserDefined(fluxDensities)               => Json.obj("fluxDensities"   -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson)
+      }
+    }
 
   def CodecBandBrightness[T](using Enumerated[Units Of Brightness[T]]): Codec[(Band, BrightnessMeasure[T])] =
     new Codec[(Band, BrightnessMeasure[T])] {
@@ -180,7 +190,7 @@ trait SourceProfileCodec {
         } yield (b, m)
     }
 
-  given [T](using Enumerated[Units Of Brightness[T]]): Codec[BandNormalized[T]] with {
+  given [T](using Enumerated[Units Of Brightness[T]]): Decoder[BandNormalized[T]] = {
 
     def decodeBrightnessMap(c: ACursor): Decoder.Result[SortedMap[Band, BrightnessMeasure[T]]] =
       c.values.fold(SortedMap.empty[Band, BrightnessMeasure[T]].asRight) {
@@ -189,56 +199,61 @@ trait SourceProfileCodec {
          .map(SortedMap.from)
       }
 
-    def apply(bn: BandNormalized[T]): Json =
-      Json.obj(
-        "brightnesses" -> bn.brightnesses.toList.map(CodecBandBrightness[T](_)).asJson,
-        "sed"          -> bn.sed.asJson,
-      )
-
-    def apply(c: HCursor): Decoder.Result[BandNormalized[T]] =
+    Decoder.instance { c =>
       for {
         s <- c.downField("sed").as[Option[UnnormalizedSED]]
         b <- decodeBrightnessMap(c.downField("brightnesses"))
       } yield BandNormalized(s, b)
-
+    }
   }
 
-  given [T](using Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Codec[EmissionLines[T]] with {
+  given [T](using Encoder[Wavelength], Enumerated[Units Of Brightness[T]]): Encoder[BandNormalized[T]] =
+    Encoder.instance { (bn: BandNormalized[T]) =>
+      Json.obj(
+        "brightnesses" -> bn.brightnesses.toList.map(CodecBandBrightness[T](_)).asJson,
+        "sed"          -> bn.sed.asJson
+      )
+    }
+
+  given [T](using Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Decoder[EmissionLines[T]] = {
 
     def decodeLinesMap(c: ACursor): Decoder.Result[SortedMap[Wavelength, EmissionLine[T]]] =
       c.values.fold(SortedMap.empty[Wavelength, EmissionLine[T]].asRight) {
         _.toList
-         .traverse(json => CodecWavelengthLine[T](json.hcursor))
+         .traverse(json => DecoderWavelengthLine[T](json.hcursor))
          .map(SortedMap.from)
       }
 
-    def apply(el: EmissionLines[T]): Json =
-      Json.obj(
-        "lines"                -> el.lines.toList.map(CodecWavelengthLine[T].apply(_)).asJson,
-        "fluxDensityContinuum" -> el.fluxDensityContinuum.asJson
-      )
-
-    def apply(c: HCursor): Decoder.Result[EmissionLines[T]] =
+    Decoder.instance { c =>
       for {
         l <- decodeLinesMap(c.downField("lines"))
         f <- c.downField("fluxDensityContinuum").as[Measure[PosBigDecimal] Of FluxDensityContinuum[T]]
       } yield EmissionLines(l, f)
-
+    }
   }
 
-  def CodecWavelengthLine[T](using Enumerated[Units Of LineFlux[T]]): Codec[(Wavelength, EmissionLine[T])] =
-    new Codec[(Wavelength, EmissionLine[T])] {
-      def apply(waveLine: (Wavelength, EmissionLine[T])): Json =
-        waveLine
-          ._2
-          .asJson
-          .mapObject(_.add("wavelength", waveLine._1.asJson))
+  given [T](using Encoder[Wavelength], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Encoder[EmissionLines[T]] =
+    Encoder.instance { (el: EmissionLines[T]) =>
+      Json.obj(
+        "lines"                -> el.lines.toList.map(EncoderWavelengthLine[T].apply(_)).asJson,
+        "fluxDensityContinuum" -> el.fluxDensityContinuum.asJson
+      )
+    }
 
-      def apply(c: HCursor): Decoder.Result[(Wavelength, EmissionLine[T])] =
-        for {
-          w <- c.downField("wavelength").as[Wavelength]
-          e <- Codec[EmissionLine[T]].apply(c)
-        } yield (w, e)
+  def DecoderWavelengthLine[T](using Enumerated[Units Of LineFlux[T]]): Decoder[(Wavelength, EmissionLine[T])] =
+    Decoder.instance { c =>
+      for {
+        w <- c.downField("wavelength").as[Wavelength]
+        e <- Codec[EmissionLine[T]].apply(c)
+      } yield (w, e)
+    }
+
+  def EncoderWavelengthLine[T](using Encoder[Wavelength], Enumerated[Units Of LineFlux[T]]): Encoder[(Wavelength, EmissionLine[T])] =
+    Encoder.instance { (waveLine: (Wavelength, EmissionLine[T])) =>
+      waveLine
+        ._2
+        .asJson
+        .mapObject(_.add("wavelength", waveLine._1.asJson))
     }
 
   given [T](using Enumerated[Units Of LineFlux[T]]): Codec[EmissionLine[T]] with {
@@ -258,19 +273,21 @@ trait SourceProfileCodec {
   }
 
   // type SourceProfile
-  given Codec[SourceProfile] with {
-    def apply(sp: SourceProfile): Json =
+  given Decoder[SourceProfile] =
+    Decoder.instance { c =>
+      c.downField("point").as[SpectralDefinition[Integrated]].map(SourceProfile.Point(_))    orElse
+        c.downField("uniform").as[SpectralDefinition[Surface]].map(SourceProfile.Uniform(_)) orElse
+        c.downField("gaussian").as[SourceProfile.Gaussian]
+    }
+
+  given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile] =
+    Encoder.instance { (sp: SourceProfile) =>
       sp match {
         case SourceProfile.Point(sd)   => Json.obj("point"   -> sd.asJson)
         case SourceProfile.Uniform(sd) => Json.obj("uniform" -> sd.asJson)
         case g: SourceProfile.Gaussian => Json.obj("gaussian" -> g.asJson)
       }
-
-    def apply(c: HCursor): Decoder.Result[SourceProfile] =
-      c.downField("point").as[SpectralDefinition[Integrated]].map(SourceProfile.Point(_))    orElse
-        c.downField("uniform").as[SpectralDefinition[Surface]].map(SourceProfile.Uniform(_)) orElse
-        c.downField("gaussian").as[SourceProfile.Gaussian]
-  }
+    }
 
 }
 
