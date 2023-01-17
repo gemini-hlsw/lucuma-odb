@@ -35,6 +35,7 @@ import lucuma.core.model.User
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.json.angle.decoder.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.util.Codecs.*
 import skunk.*

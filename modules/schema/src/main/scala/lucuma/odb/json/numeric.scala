@@ -14,7 +14,7 @@ import io.circe.refined._
 import io.circe.syntax._
 
 
-trait NumericCodecs {
+trait NumericCodec {
 
   given Codec[PosBigDecimal] =
     Codec[BigDecimal].iemap(PosBigDecimal.from)(_.value)
@@ -33,4 +33,4 @@ trait NumericCodecs {
 
 }
 
-object numeric extends NumericCodecs
+object numeric extends NumericCodec

@@ -1,0 +1,68 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.json
+
+import cats.syntax.eq.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.*
+import io.circe.Codec
+import io.circe.Decoder
+import io.circe.Encoder
+import io.circe.Json
+import io.circe.testing.ArbitraryInstances
+import io.circe.testing.CodecTests
+import lucuma.core.math.Angle
+import lucuma.core.math.arb.ArbAngle.*
+import munit.DisciplineSuite
+import org.scalacheck.Arbitrary
+import org.scalacheck.Prop
+import org.scalacheck.Prop.*
+
+abstract class AngleSuite(using Encoder[Angle]) extends DisciplineSuite with ArbitraryInstances {
+
+  import angle.decoder.given
+
+  checkAll("AngleCodec", CodecTests[Angle].codec)
+
+  val angleKeys: Set[String] =
+    Set(
+      "microarcseconds",
+      "milliarcseconds",
+      "arcseconds",
+      "arcminutes",
+      "degrees",
+      "dms"
+    )
+
+  test("all `angle` angle encoders produce the same angle") {
+    conversionTest[Angle](angleKeys)
+  }
+
+}
+
+class AngleQuerySuite extends AngleSuite(using
+  angle.query.Encoder_Angle
+) {
+
+  val timeKeys: Set[String] =
+    Set(
+      "microseconds",
+      "milliseconds",
+      "seconds",
+      "minutes",
+      "hours",
+      "hms"
+    )
+
+  import angle.query.given
+
+  test("all `time` angle encoders produce the same angle") {
+    conversionTest[Angle](timeKeys)
+  }
+
+}
+
+class AngleTransportSuite extends AngleSuite(using
+  angle.transport.Encoder_Angle
+)
