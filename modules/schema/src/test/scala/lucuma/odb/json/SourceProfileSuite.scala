@@ -9,10 +9,12 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.arb.ArbSourceProfile
 import munit.DisciplineSuite
 
-class SourceProfileCodecSuite extends DisciplineSuite with ArbitraryInstances {
+class SourceProfileSuite extends DisciplineSuite with ArbitraryInstances {
 
   import ArbSourceProfile.given
+  import angle.query.given
   import sourceprofile.given
+  import wavelength.query.given
 
   checkAll("SourceProfileCodec", CodecTests[SourceProfile].codec)
 

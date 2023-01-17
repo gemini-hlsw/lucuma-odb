@@ -41,7 +41,9 @@ import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
+import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
 
 import java.math.RoundingMode
