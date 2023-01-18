@@ -2848,8 +2848,8 @@ enum CatalogName {
   # CatalogName Simbad
   SIMBAD
 
-  # CatalogName Horizon
-  HORIZON
+  # CatalogName Import
+  IMPORT
 
   # CatalogName Gaia
   GAIA

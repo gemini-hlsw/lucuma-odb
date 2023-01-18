@@ -60,6 +60,11 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
                     parallax: {
                       microarcseconds: "123456"
                     }
+                    catalogInfo: {
+                      name: SIMBAD
+                      id: "arbitrary"
+                      objectType: "also arbitrary"
+                    }
                   }
                   sourceProfile: {
                     point: {
@@ -138,7 +143,11 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
                       "microarcseconds": 123456,
                       "milliarcseconds": 123.456
                     },
-                    "catalogInfo": null
+                    "catalogInfo": {
+                      "name" : "SIMBAD",
+                      "id" : "arbitrary",
+                      "objectType" : "also arbitrary"
+                    }
                   },
                   "nonsidereal": null
                 }

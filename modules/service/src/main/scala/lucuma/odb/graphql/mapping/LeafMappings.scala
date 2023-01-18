@@ -14,6 +14,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
+import lucuma.core.enums.CatalogName
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.FocalPlane
@@ -62,6 +63,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
   lazy val LeafMappings: List[TypeMapping] =
     List(
       LeafMapping[BigDecimal](BigDecimalType),
+      LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
