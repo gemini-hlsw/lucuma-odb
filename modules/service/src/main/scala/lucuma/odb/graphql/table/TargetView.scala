@@ -44,7 +44,7 @@ trait TargetView[F[_]] extends BaseMapping[F] {
         val SyntheticId = col("c_sid_catalog_info_id", target_id.embedded)
         val Name        = col("c_sid_catalog_name", catalog_name.embedded)
         val Id          = col("c_sid_catalog_id", varchar.embedded)
-        val ObjectType  = col("c_sid_catalog_object_type", varchar.embedded)
+        val ObjectType  = col("c_sid_catalog_object_type", varchar.opt)
       }
       object ProperMotion {
         val SyntheticId = col("c_sid_pm_id", target_id.embedded)

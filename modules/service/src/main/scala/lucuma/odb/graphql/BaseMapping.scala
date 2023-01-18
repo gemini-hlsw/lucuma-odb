@@ -21,6 +21,7 @@ trait BaseMapping[F[_]]
   lazy val AngleType                           = schema.ref("Angle")
   lazy val BigDecimalType                      = schema.ref("BigDecimal")
   lazy val CatalogInfoType                     = schema.ref("CatalogInfo")
+  lazy val CatalogNameType                     = schema.ref("CatalogName")
   lazy val ClassicalType                       = schema.ref("Classical")
   lazy val CloudExtinctionType                 = schema.ref("CloudExtinction")
   lazy val ConstraintSetType                   = schema.ref("ConstraintSet")
