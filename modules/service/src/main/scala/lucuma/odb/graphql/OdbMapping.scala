@@ -116,7 +116,6 @@ object OdbMapping {
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
-          with NonNegDurationMapping[F]
           with NonsiderealMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
@@ -149,6 +148,7 @@ object OdbMapping {
           with TargetGroupMapping[F]
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
+          with TimeSpanMapping[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
@@ -228,7 +228,6 @@ object OdbMapping {
               HourAngleRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
-              NonNegDurationMapping,
               NonsiderealMapping,
               ObservationEditMapping,
               ObservationMapping,
@@ -260,6 +259,7 @@ object OdbMapping {
               TargetGroupSelectResultMapping,
               TargetMapping,
               TargetSelectResultMapping,
+              TimeSpanMapping,
               UpdateAsterismsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,

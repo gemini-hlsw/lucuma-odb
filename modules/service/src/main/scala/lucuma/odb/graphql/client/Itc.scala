@@ -25,6 +25,7 @@ import lucuma.core.model.NonNegDuration
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.util.TimeSpan
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
@@ -113,7 +114,7 @@ object Itc {
     case Success(
       targetId:      Target.Id,
       input:         SpectroscopyModeInput,
-      exposureTime:  NonNegDuration,
+      exposureTime:  TimeSpan,
       exposures:     NonNegInt,
       signalToNoise: PosBigDecimal
     )
@@ -135,9 +136,9 @@ object Itc {
         case (ServiceError(_, _, _), _)                           => -1
         case (_, ServiceError(_, _, _))                           =>  1
         case (Success(_, _, at, ac, _), Success(_, _, bt, bc, _)) =>
-          at.value
-            .multipliedBy(ac.value)
-            .compareTo(bt.value.multipliedBy(bc.value))
+          (BigInt(at.toMicroseconds) * ac.value).compareTo(
+            BigInt(bt.toMicroseconds) * bc.value
+          )
       }
 
   }
@@ -226,7 +227,7 @@ object Itc {
         client.spectroscopy(input, useCache).map { sr =>
           sr.result.fold(Result.ServiceError(tid, input, "ITC Service returned nothing.")) {
             case ItcResult.Error(msg)       => Result.ServiceError(tid, input, msg)
-            case ItcResult.Success(t, c, s) => Result.Success(tid, input, t, c, s)
+            case ItcResult.Success(t, c, s) => Result.Success(tid, input, TimeSpan.FromDuration.getOption(t.value).getOrElse(TimeSpan.Min), c, s)
           }
         }
 

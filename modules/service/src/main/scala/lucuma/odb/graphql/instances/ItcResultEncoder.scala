@@ -7,6 +7,7 @@ import cats.data.NonEmptySet
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax._
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.client.Itc
 import lucuma.odb.json.time
 
@@ -50,7 +51,7 @@ trait ItcResultEncoder {
           ),
           s => List(
             "targetId"      -> s.targetId.asJson,
-            "exposureTime"  -> s.exposureTime.value.asJson,
+            "exposureTime"  -> s.exposureTime.asJson,
             "exposures"     -> s.exposures.value.asJson,
             "signalToNoise" -> s.signalToNoise.value.asJson
           )

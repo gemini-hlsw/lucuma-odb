@@ -136,7 +136,7 @@ object ProposalService {
             List(
               tb.minPercentTime.map(sql"c_min_percent = $int_percent"),
               tb.minPercentTotalTime.map(sql"c_min_percent_total = $int_percent"),
-              tb.totalTime.map(_.value).map(sql"c_total_time = $interval"),
+              tb.totalTime.map(sql"c_total_time = $time_span"),
             ).flatten
         }
 
@@ -199,7 +199,7 @@ object ProposalService {
           ${tag},
           ${int_percent},
           ${int_percent.opt},
-          ${interval.opt}
+          ${time_span.opt}
         )
       """.command
          .contramap {
@@ -212,7 +212,7 @@ object ProposalService {
               ppi.proposalClass.fold(_.tag, _.tag) ~
               ppi.proposalClass.fold(_.minPercentTime, _.minPercentTime) ~
               ppi.proposalClass.toOption.map(_.minPercentTotalTime) ~
-              ppi.proposalClass.toOption.map(_.totalTime.value)
+              ppi.proposalClass.toOption.map(_.totalTime)
          }
 
     /** Insert proposals into all programs lacking one, based on the t_program_update temporary table. */
@@ -238,7 +238,7 @@ object ProposalService {
           ${tag.opt},
           ${int_percent.opt},
           ${int_percent.opt},
-          ${interval.opt}
+          ${time_span.opt}
         FROM t_program_update
         WHERE c_has_proposal = false
         RETURNING c_program_id
@@ -252,7 +252,7 @@ object ProposalService {
               ppi.proposalClass.map(_.fold(_.tag, _.tag)) ~
               ppi.proposalClass.flatMap(_.fold(_.minPercentTime, _.minPercentTime)) ~
               ppi.proposalClass.flatMap(_.toOption.flatMap(_.minPercentTotalTime)) ~
-              ppi.proposalClass.flatMap(_.toOption.flatMap(_.totalTime.map(_.value)))
+              ppi.proposalClass.flatMap(_.toOption.flatMap(_.totalTime))
          }
 
     def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =

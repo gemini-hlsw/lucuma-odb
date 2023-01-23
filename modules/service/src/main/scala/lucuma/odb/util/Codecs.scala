@@ -35,6 +35,7 @@ import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -226,6 +227,12 @@ trait Codecs {
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
+
+  val time_span: Codec[TimeSpan] =
+    interval.eimap(
+      µs => TimeSpan.FromDuration.getOption(µs).toRight(s"Invalid TimeSpan, must be non-negative µs <  9,223,372,036,854,775,807 µs: $µs"))(
+      TimeSpan.FromDuration.reverseGet
+    )
 
   val too_activation: Codec[ToOActivation] =
     enumerated(Type("e_too_activation"))

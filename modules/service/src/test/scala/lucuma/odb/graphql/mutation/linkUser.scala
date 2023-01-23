@@ -11,6 +11,8 @@ import io.circe.syntax._
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -83,7 +85,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
   test("[coi] ngo user can add coi to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
+      setAllocationAs(admin, pid, Tag("ca"), 42.hourTimeSpan) >>
       linkCoiAs(ngo, pi2.id -> pid)
     }
   }
@@ -154,7 +156,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
   test("[observer] ngo user can add observer to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
+      setAllocationAs(admin, pid, Tag("ca"), 42.hourTimeSpan) >>
       linkObserverAs(ngo, pi2.id -> pid)
     }
   }
@@ -200,7 +202,7 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
   test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Tag("ca"), Duration.ofHours(42)) >>
+      setAllocationAs(admin, pid, Tag("ca"), 42.hourTimeSpan) >>
       interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
         linkStaffSupportAs(ngo, pi2.id -> pid)
       }
