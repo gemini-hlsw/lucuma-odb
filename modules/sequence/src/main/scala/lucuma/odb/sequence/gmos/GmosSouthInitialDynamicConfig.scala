@@ -13,6 +13,7 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.GmosCcdMode
+import lucuma.core.util.TimeSpan
 
 trait GmosSouthInitialDynamicConfig {
 
@@ -23,7 +24,7 @@ trait GmosSouthInitialDynamicConfig {
    */
   val initialConfig: GmosSouth =
     GmosSouth(
-      exposure = NonNegDuration.zero.value,
+      exposure = TimeSpan.Min,
       readout  = GmosCcdMode(
         GmosXBinning.One,
         GmosYBinning.One,

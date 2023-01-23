@@ -6,12 +6,12 @@ package lucuma.odb.sequence.gmos
 import cats.syntax.functor.*
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
-import lucuma.core.model.NonNegDuration
 import lucuma.core.model.sequence.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.GmosCcdMode
 import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.model.sequence.GmosGratingConfig
+import lucuma.core.util.TimeSpan
 import monocle.Focus
 import monocle.Iso
 import monocle.Lens
@@ -29,7 +29,7 @@ import monocle.macros.GenIso
  * @tparam U FPU type
  */
 trait DynamicOptics[D, G, F, U] {
-  def exposure: Lens[D, NonNegDuration]
+  def exposure: Lens[D, TimeSpan]
   def readout: Lens[D, GmosCcdMode]
 
   lazy val xBin: Lens[D, GmosXBinning] =
@@ -60,16 +60,12 @@ trait DynamicOptics[D, G, F, U] {
 
 object DynamicOptics {
 
-  // Need to update lucuma-core exposure time to NonNegDuration. Until then ...
-  private val duration: Iso[java.time.Duration, NonNegDuration] =
-    Iso(NonNegDuration.unsafeFrom)(_.value)
-
   val North: DynamicOptics[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     new DynamicOptics[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
-      val exposure: Lens[GmosNorth, NonNegDuration] = GmosNorth.exposure andThen duration
-      val readout:  Lens[GmosNorth, GmosCcdMode]    = GmosNorth.readout
-      val dtax:     Lens[GmosNorth, GmosDtax]       = GmosNorth.dtax
-      val roi:      Lens[GmosNorth, GmosRoi]        = GmosNorth.roi
+      val exposure: Lens[GmosNorth, TimeSpan]    = GmosNorth.exposure
+      val readout:  Lens[GmosNorth, GmosCcdMode] = GmosNorth.readout
+      val dtax:     Lens[GmosNorth, GmosDtax]    = GmosNorth.dtax
+      val roi:      Lens[GmosNorth, GmosRoi]     = GmosNorth.roi
 
       private val isoGrating: Iso[GmosGratingConfig.North, (GmosNorthGrating, GmosGratingOrder, Wavelength)] =
         // GenIso.fields[GmosGratingConfig.North] (deprecated, seemingly no replacement)
@@ -93,10 +89,10 @@ object DynamicOptics {
 
   val South: DynamicOptics[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
     new DynamicOptics[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
-      val exposure: Lens[GmosSouth, NonNegDuration] = GmosSouth.exposure andThen duration
-      val readout:  Lens[GmosSouth, GmosCcdMode]    = GmosSouth.readout
-      val dtax:     Lens[GmosSouth, GmosDtax]       = GmosSouth.dtax
-      val roi:      Lens[GmosSouth, GmosRoi]        = GmosSouth.roi
+      val exposure: Lens[GmosSouth, TimeSpan]    = GmosSouth.exposure
+      val readout:  Lens[GmosSouth, GmosCcdMode] = GmosSouth.readout
+      val dtax:     Lens[GmosSouth, GmosDtax]    = GmosSouth.dtax
+      val roi:      Lens[GmosSouth, GmosRoi]     = GmosSouth.roi
 
       private val isoGrating: Iso[GmosGratingConfig.South, (GmosSouthGrating, GmosGratingOrder, Wavelength)] =
         // GenIso.fields[GmosGratingConfig.South]  (deprecated, seemingly no replacement)
