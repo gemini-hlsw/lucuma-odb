@@ -4,43 +4,48 @@
 package lucuma.odb.sequence.data
 
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.model.NonNegDuration
+import lucuma.core.util.TimeSpan
 
 import java.time.Duration
 
-opaque type SciExposureTime = NonNegDuration
+opaque type SciExposureTime = TimeSpan
 
 object SciExposureTime {
   
   extension (expTime: SciExposureTime) {
-    def duration: NonNegDuration = expTime
+    def timeSpan: TimeSpan = expTime
 
     def *(that: NonNegInt): SciExposureTime =
-      NonNegDuration.unsafeFrom(expTime.value.multipliedBy(that.value.toLong))
+      TimeSpan.unsafeFromMicroseconds(
+        expTime.toMicroseconds * that.value
+      )
+
   }
   
-  def apply(duration: NonNegDuration): SciExposureTime = duration
+  def apply(timeSpan: TimeSpan): SciExposureTime = timeSpan
 
   def fromDuration(duration: Duration): Option[SciExposureTime] =
-    NonNegDuration.unapply(duration)
-      
+    TimeSpan.FromDuration.getOption(duration)
+
 }
 
-opaque type AcqExposureTime = NonNegDuration
+opaque type AcqExposureTime = TimeSpan
 
 object AcqExposureTime {
 
   extension (expTime: AcqExposureTime) {
-    def duration: NonNegDuration = expTime
+    def timeSpan: TimeSpan = expTime
 
-    def *(that: NonNegInt): SciExposureTime =
-      NonNegDuration.unsafeFrom(expTime.value.multipliedBy(that.value.toLong))
+    def *(that: NonNegInt): AcqExposureTime =
+      TimeSpan.unsafeFromMicroseconds(
+        expTime.toMicroseconds * that.value
+      )
   }
 
-  def apply(duration: NonNegDuration): AcqExposureTime = duration
+  def apply(timeSpan: TimeSpan): AcqExposureTime = timeSpan
 
   def fromDuration(duration: Duration): Option[AcqExposureTime] =
-    NonNegDuration.unapply(duration)
+    TimeSpan.FromDuration.getOption(duration)
       
 }
 
