@@ -16,7 +16,6 @@ import io.circe.syntax._
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 
-import java.math.RoundingMode.HALF_UP
 import java.time.temporal.ChronoUnit.MICROS
 import scala.util.Try
 
