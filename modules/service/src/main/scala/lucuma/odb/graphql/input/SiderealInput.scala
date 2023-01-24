@@ -12,19 +12,46 @@ import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.binding._
-
-final case class SiderealInput(
-  ra: Option[RightAscension],
-  dec: Option[Declination],
-  epoch: Option[Epoch],
-  properMotion: Option[ProperMotion],
-  radialVelocity: Option[RadialVelocity],
-  parallax: Option[Parallax],
-  catalogInfo: Option[CatalogInfoInput]
-)
+import lucuma.odb.data.Nullable
 
 object SiderealInput {
-  val Binding: Matcher[SiderealInput] =
+
+  final case class Create(
+    ra: Option[RightAscension],
+    dec: Option[Declination],
+    epoch: Option[Epoch],
+    properMotion: Option[ProperMotion],
+    radialVelocity: Option[RadialVelocity],
+    parallax: Option[Parallax],
+    catalogInfo: Option[CatalogInfoInput]
+  )
+
+  final case class Edit(
+    ra: Nullable[RightAscension],
+    dec: Nullable[Declination],
+    epoch: Nullable[Epoch],
+    properMotion: Nullable[ProperMotion],
+    radialVelocity: Nullable[RadialVelocity],
+    parallax: Nullable[Parallax],
+    catalogInfo: Nullable[CatalogInfoInput]
+  )
+
+  val EditBinding: Matcher[Edit] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        RightAscensionInput.Binding.Nullable("ra", rRa),
+        DeclinationInput.Binding.Nullable("dec", rDec),
+        EpochBinding.Nullable("epoch", rEpoch),
+        ProperMotionInput.Binding.Nullable("properMotion", rProperMotion),
+        RadialVelocityInput.Binding.Nullable("radialVelocity", rRadialVelocity),
+        ParallaxModelInput.Binding.Nullable("parallax", rParallax),
+        CatalogInfoInput.Binding.Nullable("catalogInfo", rCatalogInfo)
+      ) =>
+        (rRa, rDec, rEpoch, rProperMotion, rRadialVelocity, rParallax, rCatalogInfo).parMapN {
+          Edit(_, _, _, _, _, _, _)
+        }
+    }
+  val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
         RightAscensionInput.Binding.Option("ra", rRa),
@@ -36,7 +63,7 @@ object SiderealInput {
         CatalogInfoInput.Binding.Option("catalogInfo", rCatalogInfo)
       ) =>
         (rRa, rDec, rEpoch, rProperMotion, rRadialVelocity, rParallax, rCatalogInfo).parMapN {
-          SiderealInput(_, _, _, _, _, _, _)
+          Create(_, _, _, _, _, _, _)
         }
     }
 }

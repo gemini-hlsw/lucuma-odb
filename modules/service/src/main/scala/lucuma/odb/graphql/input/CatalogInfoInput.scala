@@ -17,6 +17,8 @@ final case class CatalogInfoInput(
 
 object CatalogInfoInput {
 
+  val Empty = CatalogInfoInput(None, None, None)
+
   val CatalogNameBinding = enumeratedBinding[CatalogName]
 
   val Binding = ObjectFieldsBinding.rmap {
