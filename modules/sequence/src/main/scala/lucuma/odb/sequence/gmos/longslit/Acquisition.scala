@@ -15,7 +15,6 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric._
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
-import lucuma.refined.*
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -40,6 +39,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.SequenceState
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.refined.*
 
 import scala.collection.immutable.LazyList
 
