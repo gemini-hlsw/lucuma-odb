@@ -8,4 +8,4 @@ import skunk._
 import skunk.data.Completion
 
 extension [F[_]: MonadCancelThrow](s: Session[F]) def executeCommand(af: AppliedFragment): F[Completion] =
-  s.prepare(af.fragment.command).use(_.execute(af.argument))
+  s.prepareR(af.fragment.command).use(_.execute(af.argument))

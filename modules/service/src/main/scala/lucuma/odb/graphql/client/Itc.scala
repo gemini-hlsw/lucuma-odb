@@ -227,7 +227,7 @@ object Itc {
         client.spectroscopy(input, useCache).map { sr =>
           sr.result.fold(Result.ServiceError(tid, input, "ITC Service returned nothing.")) {
             case ItcResult.Error(msg)       => Result.ServiceError(tid, input, msg)
-            case ItcResult.Success(t, c, s) => Result.Success(tid, input, TimeSpan.FromDuration.getOption(t.value).getOrElse(TimeSpan.Min), c, s)
+            case ItcResult.Success(t, c, s) => Result.Success(tid, input, t, c, s)
           }
         }
 

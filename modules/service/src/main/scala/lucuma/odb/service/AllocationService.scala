@@ -41,7 +41,7 @@ object AllocationService {
       def setAllocation(input: SetAllocationInput): F[SetAllocationResponse] =
         user.role.access match {
           case Staff | Admin | Service =>
-            s.prepare(Statements.SetAllocation.command).use { ps =>
+            s.prepareR(Statements.SetAllocation.command).use { ps =>
               ps.execute(input.programId ~ input.partner ~ input.duration).as(SetAllocationResponse.Success)
             }
           case _ => Applicative[F].pure(SetAllocationResponse.NotAuthorized(user))
