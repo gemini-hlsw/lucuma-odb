@@ -11,6 +11,8 @@ import io.circe.syntax._
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.OdbSuite
 
@@ -31,7 +33,7 @@ class setAllocation extends OdbSuite with CreateProgramOps with SetAllocationOps
     List(guest, pi, ngo).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         interceptGraphQL(s"User ${user.id} is not authorized to perform this action") {
-          setAllocationAs(user, pid, Tag("CA"), Duration.ofHours(42))
+          setAllocationAs(user, pid, Tag("CA"), 42.hourTimeSpan)
         }
       }
     }
@@ -40,7 +42,7 @@ class setAllocation extends OdbSuite with CreateProgramOps with SetAllocationOps
   test("admin, staff, service can set (and update) allocation in any program") {
     createProgramAs(pi).flatMap { pid =>
       List((admin, 2L), (staff, 3L), (service, 4L)).traverse { case (user, hours) =>
-        setAllocationAs(user, pid, Tag("US"), Duration.ofHours(hours))
+        setAllocationAs(user, pid, Tag("US"), TimeSpan.fromHours(hours).get)
       }
     }
   }
@@ -53,7 +55,7 @@ trait SetAllocationOps { this: OdbSuite =>
     user: User,
     pid: Program.Id,
     partner: Tag,
-    duration: Duration,
+    duration: TimeSpan,
   ): IO[Unit] =
     expect(
       user = user,
@@ -85,8 +87,8 @@ trait SetAllocationOps { this: OdbSuite =>
             "allocation" : {
               "partner":  ${partner.asJson},
               "duration": {
-                "microseconds": ${duration.toNanos / 1000L},
-                "milliseconds": ${duration.toMillis},
+                "microseconds": ${duration.toMicroseconds},
+                "milliseconds": ${duration.toMilliseconds},
                 "seconds": ${duration.toSeconds},
                 "minutes": ${duration.toMinutes},
                 "hours": ${duration.toHours}

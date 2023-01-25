@@ -161,13 +161,13 @@ class observations extends OdbSuite {
                       "id" : $oid,
                       "plannedTime" : {
                         "pi" : {
-                          "seconds" : 0
+                          "seconds" : 0.000000
                         },
                         "uncharged" : {
-                          "seconds" : 0
+                          "seconds" : 0.000000
                         },
                         "execution" : {
-                          "seconds" : 0
+                          "seconds" : 0.000000
                         }
                       }
                     }

@@ -14,7 +14,7 @@ trait AllocationTable[F[_]] extends BaseMapping[F] {
   object AllocationTable extends TableDef("t_allocation") {
     val ProgramId = col("c_program_id", program_id)
     val Partner = col("c_partner", tag)
-    val Duration = col("c_duration", interval)
+    val Duration = col("c_duration", time_span)
   }
 
 }

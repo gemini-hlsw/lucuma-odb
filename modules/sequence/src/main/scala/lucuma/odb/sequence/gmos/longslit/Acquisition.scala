@@ -9,7 +9,12 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric._
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.NonNegLong
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -29,10 +34,12 @@ import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.model.syntax.nonnegduration.*
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
-import lucuma.core.syntax.time.*
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.SequenceState
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.refined.*
 
 import scala.collection.immutable.LazyList
 
@@ -53,7 +60,7 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
 
     eval {
       for {
-        _  <- optics.exposure      := exposureTime.duration
+        _  <- optics.exposure      := exposureTime.timeSpan
         _  <- optics.filter        := filter.some
         _  <- optics.fpu           := none[GmosFpuMask[U]]
         _  <- optics.grating       := none[(G, GmosGratingOrder, Wavelength)]
@@ -62,14 +69,14 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
         _  <- optics.roi           := GmosRoi.Ccd2
         s0 <- scienceStep(0.arcsec, 0.arcsec)
 
-        _  <- optics.exposure      := NonNegDuration.unsafeFrom(20.seconds)
+        _  <- optics.exposure      := 20.secondTimeSpan
         _  <- optics.fpu           := GmosFpuMask.Builtin(fpu).some
         _  <- optics.xBin          := GmosXBinning.One
         _  <- optics.yBin          := GmosYBinning.One
         _  <- optics.roi           := GmosRoi.CentralStamp
         s1 <- scienceStep(10.arcsec, 0.arcsec)
 
-        _  <- optics.exposure      := (exposureTime * NonNegInt.unsafeFrom(4)).duration
+        _  <- optics.exposure      := (exposureTime * NonNegInt.unsafeFrom(4)).timeSpan
         s2 <- scienceStep(0.arcsec, 0.arcsec)
 
       } yield Acquisition.Steps(s0, s1, s2)

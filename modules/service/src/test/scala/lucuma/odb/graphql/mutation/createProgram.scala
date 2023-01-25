@@ -234,7 +234,7 @@ class createProgram extends OdbSuite {
                       "minPercentTime" : 40,
                       "minPercentTotalTime" : 20,
                       "totalTime" : {
-                        "hours" : 1.23,
+                        "hours" : 1.230000,
                         "iso" : "PT1H13M48S"
                       }
                     },

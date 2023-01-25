@@ -34,8 +34,8 @@ import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.GmosCcdMode
 import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.model.sequence.GmosGratingConfig
+import lucuma.core.util.TimeSpan
 
-import java.time.Duration
 
 trait GmosCodec {
 
@@ -92,7 +92,7 @@ trait GmosCodec {
   given Decoder[GmosNorth] =
     Decoder.instance { c =>
       for {
-        e <- c.downField("exposure").as[Duration]
+        e <- c.downField("exposure").as[TimeSpan]
         r <- c.downField("readout").as[GmosCcdMode]
         x <- c.downField("dtax").as[GmosDtax]
         i <- c.downField("roi").as[GmosRoi]
@@ -105,7 +105,7 @@ trait GmosCodec {
   given Decoder[GmosSouth] =
     Decoder.instance { c =>
       for {
-        e <- c.downField("exposure").as[Duration]
+        e <- c.downField("exposure").as[TimeSpan]
         r <- c.downField("readout").as[GmosCcdMode]
         x <- c.downField("dtax").as[GmosDtax]
         i <- c.downField("roi").as[GmosRoi]
@@ -164,7 +164,7 @@ trait GmosCodec {
       )
     }
 
-  given (using Encoder[Duration], Encoder[Wavelength]): Encoder[GmosNorth] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[GmosNorth] =
     Encoder.instance { (a: GmosNorth) =>
       Json.obj(
         "exposure"      -> a.exposure.asJson,
@@ -177,7 +177,7 @@ trait GmosCodec {
       )
     }
 
-  given (using Encoder[Duration], Encoder[Wavelength]): Encoder[GmosSouth] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[GmosSouth] =
     Encoder.instance { (a: GmosSouth) =>
       Json.obj(
         "exposure"      -> a.exposure.asJson,

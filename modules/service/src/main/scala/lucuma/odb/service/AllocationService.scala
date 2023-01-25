@@ -12,11 +12,11 @@ import lucuma.core.model.Access.Staff
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
 import skunk._
-import skunk.codec.temporal.interval
 import skunk.implicits._
 
 import java.time.Duration
@@ -41,8 +41,8 @@ object AllocationService {
       def setAllocation(input: SetAllocationInput): F[SetAllocationResponse] =
         user.role.access match {
           case Staff | Admin | Service =>
-            s.prepare(Statements.SetAllocation.command).use { ps =>
-              ps.execute(input.programId ~ input.partner ~ input.duration.value).as(SetAllocationResponse.Success)
+            s.prepareR(Statements.SetAllocation.command).use { ps =>
+              ps.execute(input.programId ~ input.partner ~ input.duration).as(SetAllocationResponse.Success)
             }
           case _ => Applicative[F].pure(SetAllocationResponse.NotAuthorized(user))
         }
@@ -51,12 +51,12 @@ object AllocationService {
 
   object Statements {
 
-    val SetAllocation: Fragment[Program.Id ~ Tag ~ Duration] =
+    val SetAllocation: Fragment[Program.Id ~ Tag ~ TimeSpan] =
         sql"""
           INSERT INTO t_allocation (c_program_id, c_partner, c_duration)
-          VALUES ($program_id, $tag, $interval)
+          VALUES ($program_id, $tag, $time_span)
           ON CONFLICT (c_program_id, c_partner) DO UPDATE
-          SET c_duration = $interval
+          SET c_duration = $time_span
         """.contramap { case p ~ t ~ d => p ~ t ~ d ~ d }
 
   }

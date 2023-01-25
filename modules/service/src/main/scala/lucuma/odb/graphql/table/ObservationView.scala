@@ -24,9 +24,9 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
 
       object PlannedTime {
-        val Pi        = col("c_pts_pi", interval)
-        val Uncharged = col("c_pts_uncharged", interval)
-        val Execution = col("c_pts_execution", interval)
+        val Pi        = col("c_pts_pi", time_span)
+        val Uncharged = col("c_pts_uncharged", time_span)
+        val Execution = col("c_pts_execution", time_span)
       }
 
       object PosAngleConstraint {

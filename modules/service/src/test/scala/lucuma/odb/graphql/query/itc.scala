@@ -13,6 +13,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 
 class itc extends OdbSuite {
 
@@ -217,7 +218,7 @@ class itc extends OdbSuite {
                    "status": "SUCCESS",
                    "targetId": $tid,
                    "exposureTime": {
-                     "seconds": ${FakeItcResult.exposureTime.value.getSeconds}
+                     "seconds": 10.000000
                    },
                    "exposures": ${FakeItcResult.exposures.value},
                    "signalToNoise": ${FakeItcResult.signalToNoise.value}

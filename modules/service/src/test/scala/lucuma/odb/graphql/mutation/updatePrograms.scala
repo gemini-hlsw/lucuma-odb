@@ -678,7 +678,7 @@ class updatePrograms extends OdbSuite with CreateProgramOps {
                         "minPercentTime" : 40,
                         "minPercentTotalTime" : 10,
                         "totalTime" : {
-                          "hours" : 10.5,
+                          "hours" : 10.500000,
                           "iso" : "PT10H30M"
                         }
                       }
