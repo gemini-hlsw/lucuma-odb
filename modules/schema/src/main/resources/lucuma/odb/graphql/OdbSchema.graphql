@@ -408,7 +408,7 @@ input FixedExposureModeInput {
   count: NonNegInt!
 
   # exposure time
-  time: TimeSpan!
+  time: TimeSpanInput!
 }
 
 # Flux density entry
