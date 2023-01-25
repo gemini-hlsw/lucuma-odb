@@ -112,7 +112,7 @@ object ProgramService {
         Trace[F].span("insertProgram") {
           s.transaction.use { xa =>
             val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
-            s.prepare(Statements.InsertProgram).use(_.unique(SETʹ.name ~ user)).flatTap { pid =>
+            s.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name ~ user)).flatTap { pid =>
               SETʹ.proposal.traverse { proposalInput =>
                 proposalService.insertProposal(proposalInput, pid, xa)
               }
@@ -132,7 +132,7 @@ object ProgramService {
           case None     =>  Monad[F].pure(LinkUserResponse.NotAuthorized(user))
           case Some(af) =>
             val stmt = sql"${af.fragment} RETURNING c_program_id, c_user_id".query(program_id ~ user_id)
-            s.prepare(stmt).use { pq =>
+            s.prepareR(stmt).use { pq =>
               pq.option(af.argument).map {
                 case Some(pid ~ uid) => LinkUserResponse.Success(pid, uid)
                 case None            => LinkUserResponse.NotAuthorized(user)
@@ -151,13 +151,13 @@ object ProgramService {
           // several times later on in the transaction.
           val setup: F[Unit] = {
             val af = Statements.createProgramUpdateTempTable(where)
-            s.prepare(af.fragment.command).use(_.execute(af.argument)).void
+            s.prepareR(af.fragment.command).use(_.execute(af.argument)).void
           }
 
           // Update programs
           val updatePrograms: F[List[Program.Id]] =
             Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
-              s.prepare(af.fragment.query(program_id)).use { ps =>
+              s.prepareR(af.fragment.query(program_id)).use { ps =>
                 ps.stream(af.argument, 1024)
                   .compile
                   .toList

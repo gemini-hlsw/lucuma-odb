@@ -90,7 +90,7 @@ object AsterismService {
         targetIds:      NonEmptyList[Target.Id]
       ): F[Result[Unit]] = {
         val af = Statements.insertLinksAs(user, programId, observationIds, targetIds)
-        session.prepare(af.fragment.command).use { p =>
+        session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument)
             .as(Result.unit)
             .recoverWith {
@@ -105,7 +105,7 @@ object AsterismService {
         observationIds: NonEmptyList[Observation.Id]
       ): F[Result[Unit]] =
         val af = Statements.deleteAllLinksAs(user, programId, observationIds)
-        session.prepare(af.fragment.command).use { p =>
+        session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument).as(Result.unit)
         }
 
@@ -135,7 +135,7 @@ object AsterismService {
         ADD.fold(Result.unit.pure[F])(insertAsterism(programId, observationIds, _)) *>
           DELETE.fold(Result.unit.pure[F]) { tids =>
             val af = Statements.deleteLinksAs(user, programId, observationIds, tids)
-            session.prepare(af.fragment.command).use { p =>
+            session.prepareR(af.fragment.command).use { p =>
               p.execute(af.argument).as(Result.unit)
             }
           }

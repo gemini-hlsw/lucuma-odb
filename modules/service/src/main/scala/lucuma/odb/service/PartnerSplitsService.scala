@@ -46,18 +46,18 @@ object PartnerSplitsService {
     new PartnerSplitsService[F] {
 
       def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id, xa: Transaction[F]): F[Unit] =
-        s.prepare(Statements.insertSplits(splits)).use(_.execute(pid ~ splits)).void
+        s.prepareR(Statements.insertSplits(splits)).use(_.execute(pid ~ splits)).void
 
       def updateSplits(splits: Map[Tag, IntPercent], xa: Transaction[F]): F[List[Program.Id]] = {
 
         // First delete all the splits for these programs.
         val a: F[List[Program.Id]] =
-          s.prepare(Statements.DeleteSplits).use(_.stream(Void, 1024).compile.toList)
+          s.prepareR(Statements.DeleteSplits).use(_.stream(Void, 1024).compile.toList)
 
         // Then insert the new ones
         val b: F[List[Program.Id]] = {
           val af = Statements.insertManySplits(splits)
-          s.prepare(af.fragment.query(program_id)).use(_.stream(af.argument, 1024).compile.toList)
+          s.prepareR(af.fragment.query(program_id)).use(_.stream(af.argument, 1024).compile.toList)
         }
 
         // And combine the returned id lists (they should be the same though)

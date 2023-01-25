@@ -59,7 +59,7 @@ object TargetService {
             }
           val where = whereFragment(pid, u)
           val appl  = insert |+| void" " |+| where
-          s.prepare(appl.fragment.query(target_id)).use { ps =>
+          s.prepareR(appl.fragment.query(target_id)).use { ps =>
             ps.option(appl.argument).map {
               case Some(tid) => Success(tid)
               case None      => NotAuthorized(u)

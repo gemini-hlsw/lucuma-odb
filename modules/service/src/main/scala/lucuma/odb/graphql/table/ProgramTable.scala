@@ -17,9 +17,9 @@ trait ProgramTable[F[_]] extends BaseMapping[F] {
     val Existence = col("c_existence", existence)
     val Name      = col("c_name", text_nonempty.opt)
     object PlannedTime {
-      val Pi        = col("c_pts_pi", interval)
-      val Uncharged = col("c_pts_uncharged", interval)
-      val Execution = col("c_pts_execution", interval)
+      val Pi        = col("c_pts_pi", time_span)
+      val Uncharged = col("c_pts_uncharged", time_span)
+      val Execution = col("c_pts_execution", time_span)
     }
   }
 

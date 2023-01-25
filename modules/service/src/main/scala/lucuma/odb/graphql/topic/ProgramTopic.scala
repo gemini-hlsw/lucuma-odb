@@ -74,7 +74,7 @@ object ProgramTopic {
     maxQueued: Int,
   ): Stream[F, Element] =
     for {
-      pq    <- Stream.resource(s.prepare(SelectProgramUsers))
+      pq    <- Stream.resource(s.prepareR(SelectProgramUsers))
       pid   <- updates(s, maxQueued)
       users <- Stream.eval(pq.stream(pid._1, 1024).compile.toList)
       elem   = Element(pid._1, pid._2, pid._3, users)

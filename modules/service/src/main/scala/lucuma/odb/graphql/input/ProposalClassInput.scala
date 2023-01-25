@@ -10,7 +10,7 @@ import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
-import lucuma.core.model.NonNegDuration
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
@@ -28,7 +28,7 @@ object ProposalClassInput {
       tag: Tag,
       minPercentTime: Option[IntPercent]
     ) {
-      def asCreate = minPercentTime.map(Create(tag, _))
+      def asCreate: Option[Create] = minPercentTime.map(Create(tag, _))
     }
 
     private val DataBinding: Matcher[Option[IntPercent]] =
@@ -54,24 +54,24 @@ object ProposalClassInput {
       tag: Tag,
       minPercentTime: IntPercent,
       minPercentTotalTime: IntPercent,
-      totalTime: NonNegDuration,
+      totalTime: TimeSpan,
     )
 
     case class Edit(
       tag: Tag,
       minPercentTime: Option[IntPercent],
       minPercentTotalTime: Option[IntPercent],
-      totalTime: Option[NonNegDuration]
+      totalTime: Option[TimeSpan]
      ) {
       def asCreate = (minPercentTime, minPercentTotalTime, totalTime).mapN(Create(tag, _, _, _))
     }
 
-    private val DataBinding: Matcher[(Option[IntPercent], Option[IntPercent], Option[NonNegDuration])] =
+    private val DataBinding: Matcher[(Option[IntPercent], Option[IntPercent], Option[TimeSpan])] =
       ObjectFieldsBinding.rmap {
         case List(
           IntPercentBinding.Option("minPercentTime", rMinPercentTime),
           IntPercentBinding.Option("minPercentTotalTime", rMinPercentTotalTime),
-          NonNegDurationInput.Binding.Option("totalTime", rTotalTime),
+          TimeSpanInput.Binding.Option("totalTime", rTotalTime),
         ) =>
           (rMinPercentTime, rMinPercentTotalTime, rTotalTime).parTupled
       }

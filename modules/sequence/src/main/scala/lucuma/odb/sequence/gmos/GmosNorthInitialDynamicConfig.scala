@@ -10,9 +10,9 @@ import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.model.NonNegDuration
 import lucuma.core.model.sequence.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.GmosCcdMode
+import lucuma.core.util.TimeSpan
 
 trait GmosNorthInitialDynamicConfig {
 
@@ -23,7 +23,7 @@ trait GmosNorthInitialDynamicConfig {
    */
   val initialConfig: GmosNorth =
     GmosNorth(
-      exposure = NonNegDuration.zero.value,
+      exposure = TimeSpan.Min,
       readout  = GmosCcdMode(
         GmosXBinning.One,
         GmosYBinning.One,

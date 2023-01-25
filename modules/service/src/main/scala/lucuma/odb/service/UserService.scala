@@ -37,17 +37,17 @@ object UserService {
 
       def canonicalizeGuestUser(gu: GuestUser): F[Unit] =
         Trace[F].span("canonicalizeGuestUser") {
-          s.prepare(CanonicalizeGuestUser).use(_.execute(gu)).void
+          s.prepareR(CanonicalizeGuestUser).use(_.execute(gu)).void
         }
 
       def canonicalizeServiceUser(su: ServiceUser): F[Unit] =
         Trace[F].span("canonicalizeServiceUser") {
-          s.prepare(CanonicalizeServiceUser).use(_.execute(su)).void
+          s.prepareR(CanonicalizeServiceUser).use(_.execute(su)).void
         }
 
       def canonicalizeStandardUser(su: StandardUser): F[Unit] =
         Trace[F].span("canonicalizeStandardUser") {
-          s.prepare(CanonicalizeStandardUser).use(_.execute(su)).void
+          s.prepareR(CanonicalizeStandardUser).use(_.execute(su)).void
         }
 
     }

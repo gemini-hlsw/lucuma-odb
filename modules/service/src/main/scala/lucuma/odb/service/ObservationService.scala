@@ -162,7 +162,7 @@ object ObservationService {
             Statements
               .insertObservationAs(user, programId, SET)
               .flatTraverse { af =>
-                session.prepare(af.fragment.query(observation_id)).use { pq =>
+                session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.option(af.argument).map {
                     case Some(oid) => Result(oid)
                     case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
@@ -182,7 +182,7 @@ object ObservationService {
       override def selectObservations(
         which: AppliedFragment
       ): F[List[Observation.Id]] =
-        session.prepare(which.fragment.query(observation_id)).use { pq =>
+        session.prepareR(which.fragment.query(observation_id)).use { pq =>
           pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
@@ -193,7 +193,7 @@ object ObservationService {
           .fromList(which)
           .fold(Applicative[F].pure(Map.empty)) { oids =>
             val af = Statements.selectObservingModes(oids)
-            session.prepare(af.fragment.query(observation_id ~ observing_mode_type.opt)).use { pq =>
+            session.prepareR(af.fragment.query(observation_id ~ observing_mode_type.opt)).use { pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList.map {
                 _.groupBy(_._2).view.mapValues(_.unzip._1).toMap
               }
@@ -205,7 +205,7 @@ object ObservationService {
         which:   List[Observation.Id]
       ): F[Unit] = {
         val af = Statements.updateObservingModeType(newMode, which)
-        session.prepare(af.fragment.command).use { pq =>
+        session.prepareR(af.fragment.command).use { pq =>
           pq.execute(af.argument).void
         }
       }
@@ -264,7 +264,7 @@ object ObservationService {
           session.transaction.use { xa =>
             for {
               r <- Statements.updateObservations(SET, which).traverse { af =>
-                     session.prepare(af.fragment.query(observation_id)).use { pq =>
+                     session.prepareR(af.fragment.query(observation_id)).use { pq =>
                        pq.stream(af.argument, chunkSize = 1024).compile.toList
                      }
                    }.flatMap { rObservationIds =>

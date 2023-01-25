@@ -24,6 +24,7 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcResult
@@ -106,7 +107,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   val FakeItcResult: ItcResult.Success =
     ItcResult.Success(
-      NonNegDuration.unsafeFrom(Duration.ofSeconds(10)),
+      10.secTimeSpan,
       NonNegInt.unsafeFrom(11),
       PosBigDecimal.unsafeFrom(50.0)
     )

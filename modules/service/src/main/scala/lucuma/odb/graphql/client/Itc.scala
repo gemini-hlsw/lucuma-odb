@@ -25,6 +25,7 @@ import lucuma.core.model.NonNegDuration
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.util.TimeSpan
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
@@ -113,7 +114,7 @@ object Itc {
     case Success(
       targetId:      Target.Id,
       input:         SpectroscopyModeInput,
-      exposureTime:  NonNegDuration,
+      exposureTime:  TimeSpan,
       exposures:     NonNegInt,
       signalToNoise: PosBigDecimal
     )
@@ -135,9 +136,9 @@ object Itc {
         case (ServiceError(_, _, _), _)                           => -1
         case (_, ServiceError(_, _, _))                           =>  1
         case (Success(_, _, at, ac, _), Success(_, _, bt, bc, _)) =>
-          at.value
-            .multipliedBy(ac.value)
-            .compareTo(bt.value.multipliedBy(bc.value))
+          (BigInt(at.toMicroseconds) * ac.value).compareTo(
+            BigInt(bt.toMicroseconds) * bc.value
+          )
       }
 
   }
