@@ -66,7 +66,7 @@ object ProposalService {
       lazy val partnerSplitsService = PartnerSplitsService.fromSession(s)
 
       def insertProposal(SET: ProposalInput.Create, pid: Program.Id, xa: Transaction[F]): F[Unit] =
-        s.prepare(Statements.InsertProposal).use(_.execute(pid ~ SET)) >>
+        s.prepareR(Statements.InsertProposal).use(_.execute(pid ~ SET)) >>
         partnerSplitsService.insertSplits(SET.partnerSplits, pid, xa)
 
       def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]] = {
@@ -74,7 +74,7 @@ object ProposalService {
         // Update existing proposals. This will fail if SET.asCreate.isEmpty and there is a class mismatch.
         val update: F[List[Program.Id]] =
           Statements.updateProposals(SET).fold(Nil.pure[F]) { af =>
-            s.prepare(af.fragment.query(program_id)).use { ps =>
+            s.prepareR(af.fragment.query(program_id)).use { ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
@@ -86,7 +86,7 @@ object ProposalService {
 
         // Insert new proposals. This will fail if there's not enough information.
         val insert: F[List[Program.Id]] =
-          s.prepare(Statements.InsertProposals).use { ps =>
+          s.prepareR(Statements.InsertProposals).use { ps =>
             ps.stream(SET, 1024)
               .compile
               .toList

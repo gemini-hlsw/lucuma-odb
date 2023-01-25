@@ -133,7 +133,7 @@ object GmosLongSlitService {
           .fromList(which)
           .fold(Applicative[F].pure(Map.empty)) { oids =>
             val af = f(oids)
-            session.prepare(af.fragment.query(observation_id ~ decoder)).use { pq =>
+            session.prepareR(af.fragment.query(observation_id ~ decoder)).use { pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.toMap)
             }
           }
@@ -149,7 +149,7 @@ object GmosLongSlitService {
         select(which, Statements.selectGmosSouthLongSlit, south)
 
       private def exec(af: AppliedFragment): F[Unit] =
-        session.prepare(af.fragment.command).use { pq =>
+        session.prepareR(af.fragment.command).use { pq =>
           pq.execute(af.argument).void
         }
 

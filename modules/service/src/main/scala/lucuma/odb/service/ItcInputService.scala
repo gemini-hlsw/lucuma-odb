@@ -143,7 +143,7 @@ object ItcInputService {
           .fold(List.empty[ItcParams].pure[F]) { oids =>
             val (af, decoder) = Statements.selectItcParams(user, programId, oids)
             session
-              .prepare(af.fragment.query(decoder))
+              .prepareR(af.fragment.query(decoder))
               .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           }
     }
