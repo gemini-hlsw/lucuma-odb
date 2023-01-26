@@ -45,6 +45,7 @@ import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Session
 import skunk.Void
+import skunk.SqlState
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
@@ -68,6 +69,7 @@ object TargetService {
   enum UpdateTargetsResponse:
     case Success(selected: List[Target.Id])
     case SourceProfileUpdatesFailed(problems: NonEmptyChain[Problem])
+    case TrackingSwitchFailed(problem: String)
 
   def fromSession[F[_]: Concurrent](s: Session[F], u: User): TargetService[F] =
     new TargetService[F] {
@@ -122,17 +124,23 @@ object TargetService {
             } .compile.toList.map(_.sequence).flatMap { r =>
 
               // If any source profile updates failed then roll back.
-              r match
+              r match {
                 case Ior.Left(ps)    => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 case Ior.Both(ps, _) => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 case Ior.Right(ids)  => UpdateTargetsResponse.Success(ids).pure[F]
-
+              }
+              
             }
 
           }
-        }
 
-      } // TODO: .recover { ... } for various constraint violations
+      } recover {
+          case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
+            UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
+      }
+
+
+    }
 
   object Statements {
 
@@ -287,7 +295,8 @@ object TargetService {
           properMotionUpdates(sid.properMotion) ++
           catalogInfoUpdates(sid.catalogInfo) ++
           List(
-            // and set the nonsidereal tracking fields to null
+            // set the type, and set inapplicable tracking fields to null
+            void"c_type = 'sidereal'",
             void"c_nsid_des = null",
             void"c_nsid_key_type = null",
             void"c_nsid_key = null",
@@ -298,7 +307,8 @@ object TargetService {
             sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
             sql"c_nsid_key = $text".apply(EphemerisKey.fromString.reverseGet(ek)),
           ) ++ List(
-            // and set the sidereal tracking fields to null
+            // set the type, and set inapplicable tracking fields to null
+            void"c_type = 'nonsidereal'",
             void"c_sid_ra = null",
             void"c_sid_dec = null",
             void"c_sid_epoch = null",
@@ -308,7 +318,7 @@ object TargetService {
             void"c_sid_parallax = null",
             void"c_sid_catalog_name = null",
             void"c_sid_catalog_id = null",
-            void"c_sid_catalog_object_typ = null",
+            void"c_sid_catalog_object_type = null",
           )
       }
       
