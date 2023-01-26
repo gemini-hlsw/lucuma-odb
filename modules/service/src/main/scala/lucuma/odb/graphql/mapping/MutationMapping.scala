@@ -40,6 +40,7 @@ import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
+import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
@@ -64,7 +65,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       SetAllocation,
       UpdateAsterisms,
       UpdateObservations,
-      UpdatePrograms
+      UpdatePrograms,
+      UpdateTargets
     )
 
   lazy val MutationMapping: ObjectMapping =
@@ -335,6 +337,38 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
           case ProposalService.ProposalUpdateException.InconsistentUpdate =>
             Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+        }
+      }
+
+    }
+
+  def targetResultSubquery(pids: List[Target.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = Predicates.target.id.in(pids),
+      order = OrderSelection[Target.Id](TargetType / "id"),
+      limit = limit,
+      collectionField = "targets",
+      child          
+    )
+
+  private lazy val UpdateTargets =
+    MutationField("updateTargets", UpdateTargetsInput.binding(Path.from(TargetType))) { (input, child) =>
+
+      // Our predicate for selecting targets to update
+      val filterPredicate = and(List(
+        Predicates.target.program.isWritableBy(user),
+        Predicates.target.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+        input.WHERE.getOrElse(True)
+      ))
+
+      // An applied fragment that selects all target ids that satisfy `filterPredicate`
+      val idSelect: Result[AppliedFragment] =
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).map(_.fragment)
+
+      // Update the specified targets and then return a query for the affected targets.
+      idSelect.flatTraverse { which =>
+        targetService.use(_.updateTargets(input.SET, which)).flatMap {
+          case Ior.Right(ids) => targetResultSubquery(ids, input.LIMIT, child).pure[F]
         }
       }
 
