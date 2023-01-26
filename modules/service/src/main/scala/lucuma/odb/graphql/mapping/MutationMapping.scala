@@ -49,6 +49,7 @@ import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalService
 import lucuma.odb.service.TargetService
+import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
@@ -66,7 +67,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateAsterisms,
       UpdateObservations,
       UpdatePrograms,
-      UpdateTargets
+      UpdateTargets,
     )
 
   lazy val MutationMapping: ObjectMapping =
@@ -342,7 +343,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
     }
 
-  def targetResultSubquery(pids: List[Target.Id], limit: Option[NonNegInt], child: Query) =
+  def targetResultSubquery(pids: List[Target.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
       predicate = Predicates.target.id.in(pids),
       order = OrderSelection[Target.Id](TargetType / "id"),
@@ -365,10 +366,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       val idSelect: Result[AppliedFragment] =
         MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).map(_.fragment)
 
-      // Update the specified targets and then return a query for the affected targets.
+      // Update the specified targets and then return a query for the affected targets (or an error)
       idSelect.flatTraverse { which =>
-        targetService.use(_.updateTargets(input.SET, which)).flatMap {
-          case Ior.Right(ids) => targetResultSubquery(ids, input.LIMIT, child).pure[F]
+        targetService.use(_.updateTargets(input.SET, which)).map {
+          case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
+          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => problems.leftIor
         }
       }
 

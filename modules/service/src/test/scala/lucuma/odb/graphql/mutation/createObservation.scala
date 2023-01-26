@@ -1288,6 +1288,7 @@ trait CreateObservationOps { this: OdbSuite =>
                 sidereal: {
                   ra: { hours: "0.0" }
                   dec: { degrees: "0.0" }
+                  epoch: "J2000.000"
                 }
                 $sourceProfile
               }

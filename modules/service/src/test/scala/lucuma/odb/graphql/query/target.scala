@@ -52,6 +52,7 @@ class target extends OdbSuite {
                   sidereal: {
                     ra: { degrees: "12.345" }
                     dec: { degrees: "45.678" }
+                    epoch: "J2000.000"
                   }
                   sourceProfile: {
                     point: {
