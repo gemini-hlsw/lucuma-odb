@@ -127,6 +127,7 @@ trait BaseMapping[F[_]]
   lazy val UpdateAsterismsResultType           = schema.ref("UpdateAsterismsResult")
   lazy val UpdateObservationsResultType        = schema.ref("UpdateObservationsResult")
   lazy val UpdateProgramsResultType            = schema.ref("UpdateProgramsResult")
+  lazy val UpdateTargetsResultType             = schema.ref("UpdateTargetsResult")
   lazy val UserIdType                          = schema.ref("UserId")
   lazy val UserTypeType                        = schema.ref("UserType")
   lazy val WaterVaporType                      = schema.ref("WaterVapor")

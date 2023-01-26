@@ -13,6 +13,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
 
 class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
+  import createTarget.FullTargetGraph
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
@@ -233,10 +234,10 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
     }
   }
 
+}
 
 
-
-
+object createTarget {
 
   /** The entire target model, as a return value, excluding target ID. */
   val FullTargetGraph =
@@ -339,5 +340,3 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
      """
 
 }
-
-

@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
+import edu.gemini.grackle.Result
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
@@ -17,9 +18,9 @@ import lucuma.odb.graphql.binding._
 object SiderealInput {
 
   final case class Create(
-    ra: Option[RightAscension],
-    dec: Option[Declination],
-    epoch: Option[Epoch],
+    ra: RightAscension,
+    dec: Declination,
+    epoch: Epoch,
     properMotion: Option[ProperMotion],
     radialVelocity: Option[RadialVelocity],
     parallax: Option[Parallax],
@@ -51,6 +52,7 @@ object SiderealInput {
           Edit(_, _, _, _, _, _, _)
         }
     }
+    
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -62,8 +64,12 @@ object SiderealInput {
         ParallaxModelInput.Binding.Option("parallax", rParallax),
         CatalogInfoInput.Binding.Option("catalogInfo", rCatalogInfo)
       ) =>
-        (rRa, rDec, rEpoch, rProperMotion, rRadialVelocity, rParallax, rCatalogInfo).parMapN {
-          Create(_, _, _, _, _, _, _)
+        (rRa, rDec, rEpoch, rProperMotion, rRadialVelocity, rParallax, rCatalogInfo).parTupled.flatMap {
+          (ra, dec, epoch, pm, rv, px, ci) =>
+            (ra, dec, epoch) match {
+              case (Some(r), Some(d), Some(e)) => Result(Create(r, d, e, pm, rv, px, ci))
+              case _ => Result.failure("RA, Dec, and Epoch must all be specified on target creation.")            
+            }          
         }
     }
 }

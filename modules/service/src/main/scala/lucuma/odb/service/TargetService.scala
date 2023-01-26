@@ -3,10 +3,13 @@
 
 package lucuma.odb.service
 
+import cats.data.Ior
+import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.effect.*
 import cats.syntax.all._
+import edu.gemini.grackle.Problem
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
@@ -47,9 +50,9 @@ import skunk.codec.all._
 import skunk.implicits._
 
 trait TargetService[F[_]] {
-  import TargetService.CreateTargetResponse
+  import TargetService.{ CreateTargetResponse, UpdateTargetsResponse }
   def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse]
-  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[Result[List[Target.Id]]]
+  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse]
 }
 
 object TargetService {
@@ -62,62 +65,74 @@ object TargetService {
   }
   import CreateTargetResponse._
 
-    def fromSession[F[_]: Concurrent](s: Session[F], u: User): TargetService[F] =
-      new TargetService[F] {
+  enum UpdateTargetsResponse:
+    case Success(selected: List[Target.Id])
+    case SourceProfileUpdatesFailed(problems: NonEmptyChain[Problem])
 
-        override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse] = {
-          val insert: AppliedFragment =
-            input.tracking match {
-              case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
-              case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
+  def fromSession[F[_]: Concurrent](s: Session[F], u: User): TargetService[F] =
+    new TargetService[F] {
+
+      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse] = {
+        val insert: AppliedFragment =
+          input.tracking match {
+            case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
+            case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
+          }
+        val where = Statements.whereFragment(pid, u)
+        val appl  = insert |+| void" " |+| where
+        s.prepareR(appl.fragment.query(target_id)).use { ps =>
+          ps.option(appl.argument).map {
+            case Some(tid) => Success(tid)
+            case None      => NotAuthorized(u)
+          } // todo: catch key violation to indicate ProgramNotFound
+        }
+      }
+
+      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse] =
+        s.transaction.use { xa =>
+
+        // Updates that don't concern source profile
+        val nonSourceProfileUpdates: Stream[F, Target.Id] = {
+          val update = Statements.updateTargets(input, which)
+          Stream.resource(s.prepareR(update.fragment.query(target_id))).flatMap { ps =>
+            ps.stream(update.argument, 1024)
+          }          
+        }
+
+        input.sourceProfile match {
+          case None =>
+
+            // We're not updating the source profile, so we're basically done
+            nonSourceProfileUpdates.compile.toList.map(UpdateTargetsResponse.Success(_))
+
+          case Some(fun) =>
+
+            // Here we must (embarrassingly) update each source profile individually, but we can
+            // save a little bit of overhaed by preparing the statements once and reusing them.
+            Stream.resource((
+              s.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(json)),
+              s.prepareR(sql"update c_source_profile set c_source_profile = $json where c_target_id = $target_id".command)
+            ).tupled).flatMap { (read, update) =>
+              nonSourceProfileUpdates.evalMap { tid =>
+                read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
+                  case Left(err) => Result.failure(err.getMessage).pure[F]
+                  case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid)).as(Result(tid))
+                }
+              }
+            } .compile.toList.map(_.sequence).flatMap { r =>
+
+              // If any source profile updates failed then roll back.
+              r match
+                case Ior.Left(ps)    => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                case Ior.Both(ps, _) => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                case Ior.Right(ids)  => UpdateTargetsResponse.Success(ids).pure[F]
+
             }
-          val where = Statements.whereFragment(pid, u)
-          val appl  = insert |+| void" " |+| where
-          s.prepareR(appl.fragment.query(target_id)).use { ps =>
-            ps.option(appl.argument).map {
-              case Some(tid) => Success(tid)
-              case None      => NotAuthorized(u)
-            } // todo: catch key violation to indicate ProgramNotFound
+
           }
         }
 
-        def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[Result[List[Target.Id]]] =
-          s.transaction.use { xa =>
-
-          // Updates that don't concern source profile
-          val nonSourceProfileUpdates: Stream[F, Target.Id] = {
-            val update = Statements.updateTargets(input, which)
-            Stream.resource(s.prepare(update.fragment.query(target_id))).flatMap { ps =>
-              ps.stream(update.argument, 1024)
-            }          
-          }
-
-          input.sourceProfile match {
-            case None =>
-
-              // We're not updating the source profile, so we're basically done
-              nonSourceProfileUpdates.compile.toList.map(Result.apply)
-
-            case Some(fun) =>
-
-              // Here we must (embarrassingly) update each source profile individually, but we can
-              // save a little bit of overhaed by preparing the statements once and reusing them.
-              Stream.resource((
-                s.prepare(sql"select c_source_profile from t_target where c_target_id = $target_id".query(json)),
-                s.prepare(sql"update c_source_profile set c_source_profile = $json where c_target_id = $target_id".command)
-              ).tupled).flatMap { (read, update) =>
-                nonSourceProfileUpdates.evalMap { tid =>
-                  read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
-                    case Left(err) => Result.failure(err.getMessage).pure[F]
-                    case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid)).as(Result(tid))
-                  }
-                }
-              } .compile.toList.map(_.sequence)
-
-            }
-          }
-
-      }
+      } // TODO: .recover { ... } for various constraint violations
 
   object Statements {
 
@@ -150,9 +165,9 @@ object TargetService {
           $program_id,
           $text_nonempty,
           'sidereal',
-          ${right_ascension.opt},
-          ${declination.opt},
-          ${epoch.opt},
+          ${right_ascension},
+          ${declination},
+          ${epoch},
           ${int8.opt},
           ${int8.opt},
           ${radial_velocity.opt},
@@ -229,7 +244,7 @@ object TargetService {
     }
 
     extension [A](n: Nullable[A]) def asUpdate(column: String, e: Encoder[A]): Option[AppliedFragment] =
-      n.foldPresent(_.fold(void"null")(sql"$e")).map(sql"#$column"(Void) |+| _)
+      n.foldPresent(_.fold(void"null")(sql"$e")).map(sql"#$column = "(Void) |+| _)
 
     extension [A](n: Option[A]) def asUpdate(column: String, e: Encoder[A]): AppliedFragment =
       n.fold(sql"#$column = null"(Void))(sql"#$column = $e")
@@ -263,9 +278,9 @@ object TargetService {
       tracking match {
         case Left(sid)   => 
           List(
-            sid.ra.asUpdate("t_sid_ra", right_ascension),
-            sid.dec.asUpdate("t_sid_dec", declination),
-            sid.epoch.asUpdate("t_sid_epoch", epoch),
+            sid.ra.asUpdate("c_sid_ra", right_ascension),
+            sid.dec.asUpdate("c_sid_dec", declination),
+            sid.epoch.asUpdate("c_sid_epoch", epoch),
             sid.radialVelocity.asUpdate("c_sid_rv", radial_velocity),          
             sid.parallax.asUpdate("c_sid_parallax", parallax),
           ).flatten ++
@@ -301,7 +316,7 @@ object TargetService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.name.asUpdate("c_name", text_nonempty),
+          SET.name.map(sql"c_name = $text_nonempty"),
         ).flatten ++
         SET.tracking.toList.flatMap(trackingUpdates)
       )    

@@ -39,6 +39,7 @@ import lucuma.odb.graphql.client.Itc
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
 import lucuma.odb.graphql.instances.ItcResultEncoder.given
+import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
@@ -56,7 +57,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
-
 object OdbMapping {
 
   case class Topics[F[_]](
@@ -152,6 +152,7 @@ object OdbMapping {
           with UpdateAsterismsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
+          with UpdateTargetsResultMapping[F]
           with UserMapping[F]
           with WavelengthMapping[F]
         {
@@ -263,6 +264,7 @@ object OdbMapping {
               UpdateAsterismsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
+              UpdateTargetsResultMapping,
               UserMapping,
               WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings

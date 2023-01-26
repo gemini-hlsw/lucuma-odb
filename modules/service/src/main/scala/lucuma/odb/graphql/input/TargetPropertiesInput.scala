@@ -26,7 +26,7 @@ object TargetPropertiesInput {
   )
 
   final case class Edit(
-    name: Nullable[NonEmptyString], // can set name to null, oddly
+    name: Option[NonEmptyString],
     tracking: Option[Either[SiderealInput.Edit, EphemerisKey]],
     sourceProfile: Option[SourceProfile => Result[SourceProfile]],
     existence: Option[Existence]
@@ -35,7 +35,7 @@ object TargetPropertiesInput {
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap {
       case List(
-        NonEmptyStringBinding.Nullable("name", rName),
+        NonEmptyStringBinding.NonNullable("name", rName),
         SiderealInput.EditBinding.Option("sidereal", rSidereal),
         NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
         SourceProfileInput.EditBinding.Option("sourceProfile", rSourceProfile),

@@ -53,6 +53,13 @@ trait Matcher[A] { outer =>
     case other       => outer.validate(other).map(data.Nullable.NonNull(_))
   }
 
+  /** A matcher that disallows `NullValue` and treats `AbsentValue` as `None` */
+  lazy val NonNullable: Matcher[Option[A]] = {
+    case NullValue   => Left("cannot be null")
+    case AbsentValue => Right(None)
+    case other       => outer.validate(other).map(Some(_))
+  }
+
   /** A matcher that treats `NullValue` and `AbsentValue` as `None` */
   lazy val Option: Matcher[Option[A]] =
     Nullable.map(_.toOption)
