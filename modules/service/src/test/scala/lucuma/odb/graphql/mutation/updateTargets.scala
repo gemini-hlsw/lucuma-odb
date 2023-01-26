@@ -7,9 +7,7 @@ package mutation
 import io.circe.literal._
 import lucuma.core.model.User
 
-class updateTargets extends OdbSuite
-                            with CreateProgramOps
-                            with CreateObservationOps {
+class updateTargets extends OdbSuite with CreateProgramOps with CreateObservationOps {
 
   import createTarget.FullTargetGraph                            
 
@@ -123,7 +121,7 @@ class updateTargets extends OdbSuite
     }
   }
 
-  test("update tracking (none to sidereal)") {
+  test("update tracking (sidereal -> sidereal)") {
     createProgramAs(pi).flatMap { pid =>
       createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
        expect(
@@ -144,20 +142,6 @@ class updateTargets extends OdbSuite
                 id
                 sidereal {
                   ra { degrees }
-                  dec { degrees }
-                  epoch            
-                  properMotion {
-                    ra { milliarcsecondsPerYear }
-                    dec { milliarcsecondsPerYear }
-                  }
-                  parallax {
-                    milliarcseconds
-                  }
-                  catalogInfo {
-                    name
-                    id
-                    objectType
-                  }
                 }
               }
             }
@@ -169,18 +153,11 @@ class updateTargets extends OdbSuite
               "updateTargets" : {
                 "targets" : [
                   {
-                    "id" : "t-103",
+                    "id" : $tid,
                     "sidereal" : {
                       "ra" : {
                         "degrees" : 42.0
-                      },
-                      "dec" : {
-                        "degrees" : 0.0
-                      },
-                      "epoch" : "J2000.000",
-                      "properMotion" : null,
-                      "parallax" : null,
-                      "catalogInfo" : null
+                      }
                     }
                   }
                 ]
@@ -191,9 +168,296 @@ class updateTargets extends OdbSuite
        )          
       }    
     }
+  }
 
+  test("update tracking (sidereal -> nonsidereal)") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+       expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateTargets(input: {
+              SET: {
+                nonsidereal: {
+                  keyType: COMET
+                  des: "foo"
+                }
+              }
+              WHERE: {
+                id: { EQ: "$tid"}
+              }
+            }) {
+              targets {
+                id
+                sidereal {
+                  ra { degrees }
+                }
+                nonsidereal {
+                  keyType
+                  des
+                  key
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updateTargets" : {
+                "targets" : [
+                  {
+                    "id" : $tid,
+                    "sidereal" : null,
+                    "nonsidereal" : {
+                      "keyType" : "COMET",
+                      "des" : "foo",
+                      "key" : "Comet_foo"
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+       )          
+      }    
+    }
+  }
 
+  test("update tracking (nonsidereal -> sidereal, incomplete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+        // first change to nonsidereal
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  nonsidereal: {
+                    keyType: COMET
+                    des: "foo"
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        ) *>
+        // and now change back, but don't define everything
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sidereal: {
+                    ra: { degrees: 0 }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sidereal {
+                    ra { degrees }
+                    dec { degrees }
+                    epoch
+                  }
+                  nonsidereal {
+                    keyType
+                    des
+                  }
+                }
+              }
+            }
+          """,
+          expected = Left(List("Sidereal targets require RA, Dec, and Epoch to be defined."))
+        )          
+      }    
+    }
+  }
 
+  test("update tracking (nonsidereal -> sidereal)") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+        // first change to nonsidereal
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  nonsidereal: {
+                    keyType: COMET
+                    des: "foo"
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        ) *>
+        // and now change back
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sidereal: {
+                    ra: { degrees: 12 }
+                    dec: { degrees: 67 }
+                    epoch: "J1997.234"
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sidereal {
+                    ra { degrees }
+                    dec { degrees }
+                    epoch
+                  }
+                  nonsidereal {
+                    keyType
+                    des
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sidereal" : {
+                        "ra" : {
+                          "degrees" : 12.0
+                        },
+                        "dec" : {
+                          "degrees" : 67.0
+                        },
+                        "epoch" : "J1997.234"
+                      },
+                      "nonsidereal" : null
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )          
+      }    
+    }
+  }
+
+  test("upate source profile (point/bandNormalized/sed)") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          planetaryNebula: NGC7009
+                        }
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    point {
+                      bandNormalized {
+                        sed {
+                          planetaryNebula
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "point" : {
+                          "bandNormalized" : {
+                            "sed" : {
+                              "planetaryNebula" : "NGC7009"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }            
+            """
+          )
+        )          
+      }    
+    }
   }
 
 }

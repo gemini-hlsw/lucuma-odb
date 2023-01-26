@@ -371,6 +371,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         targetService.use(_.updateTargets(input.SET, which)).map {
           case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
           case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => problems.leftIor
+          case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
         }
       }
 
