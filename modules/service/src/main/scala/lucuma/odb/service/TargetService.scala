@@ -44,8 +44,8 @@ import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Session
-import skunk.Void
 import skunk.SqlState
+import skunk.Void
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
