@@ -3,15 +3,23 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
+import cats.effect.*
 import cats.syntax.all._
+import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Stream
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.math.ProperMotion
+import lucuma.core.model.CatalogInfo
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
+import lucuma.core.model.SiderealTracking
+import lucuma.core.model.SourceProfile
 import lucuma.core.model.StandardRole.Admin
 import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
@@ -19,36 +27,29 @@ import lucuma.core.model.StandardRole.Staff
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.Nullable.*
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
+import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
+import skunk.Encoder
 import skunk.Session
+import skunk.Void
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
-import edu.gemini.grackle.Result
-import lucuma.odb.graphql.input.UpdateTargetsInput
-import cats.data.NonEmptyList
-import lucuma.core.model.SiderealTracking
-import lucuma.odb.data.Nullable
-import skunk.Encoder
-import lucuma.odb.data.Nullable.*
-import skunk.Void
-import lucuma.core.math.ProperMotion
-import lucuma.core.model.CatalogInfo
-import lucuma.odb.graphql.input.CatalogInfoInput
-import lucuma.core.model.SourceProfile
-import cats.effect.*
-import fs2.Stream
 
 trait TargetService[F[_]] {
   import TargetService.CreateTargetResponse
   def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse]
+  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[Result[List[Target.Id]]]
 }
 
 object TargetService {
@@ -255,7 +256,7 @@ object TargetService {
         )
       }
 
-    // When we update tracking, set the opposite tracking field to null.
+    // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
     def trackingUpdates(tracking: Either[SiderealInput.Edit, EphemerisKey]): List[AppliedFragment] =
