@@ -60,6 +60,9 @@ object Main extends IOApp {
             |
             |This is the Lucuma observing database.
             |CORS domain is ${config.domain}.
+            |Running on port ${config.port.value}.
+            |ITC Service at ${config.itcRoot}.
+            |SSO Service at ${config.sso.root}.
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
