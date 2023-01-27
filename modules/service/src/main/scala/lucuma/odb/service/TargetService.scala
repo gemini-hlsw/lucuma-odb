@@ -112,8 +112,8 @@ object TargetService {
             // Here we must (embarrassingly) update each source profile individually, but we can
             // save a little bit of overhaed by preparing the statements once and reusing them.
             Stream.resource((
-              s.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(json)),
-              s.prepareR(sql"update c_source_profile set c_source_profile = $json where c_target_id = $target_id".command)
+              s.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
+              s.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
             ).tupled).flatMap { (read, update) =>
               nonSourceProfileUpdates.evalMap { tid =>
                 read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
