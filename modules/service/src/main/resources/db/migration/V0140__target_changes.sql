@@ -1,4 +1,4 @@
--- if it's a nonsidereal target then RA, Dec, and Epoch must be defined
+-- if it's a sidereal target then RA, Dec, and Epoch must be defined
 alter table t_target
 add constraint ra_dec_epoch_all_defined
 check (
