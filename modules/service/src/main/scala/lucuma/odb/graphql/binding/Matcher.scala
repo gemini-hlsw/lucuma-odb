@@ -71,6 +71,7 @@ trait Matcher[A] { outer =>
       vs.zipWithIndex.traverse { case (v, n) => validate(v).leftMap(s => s"at index $n: $s") }
     }
 
+  /** If this matcher fails, try `other`. */
   def orElse[B](other: Matcher[B]): Matcher[Either[A, B]] = v =>
     outer.validate(v).map(_.asLeft) orElse other.validate(v).map(_.asRight)
 
