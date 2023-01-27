@@ -15,9 +15,9 @@ object SourceProfileInput {
 
   // convenience projections
   implicit class SourceProfileOps(self: SourceProfile) {
-    def point:    Result[Point]    = self match { case a: Point    => Result(a); case _ => Result.failure("Not a point source.") }
-    def uniform:  Result[Uniform]  = self match { case a: Uniform  => Result(a); case _ => Result.failure("Not a uniform source.") }
-    def gaussian: Result[Gaussian] = self match { case a: Gaussian => Result(a); case _ => Result.failure("Not a gaussian source.") }
+    def point:    Result[Point]    = self match { case a: Point    => Result(a); case _ => Result.failure("Not a point source. To change profile type, please provide a full definition.") }
+    def uniform:  Result[Uniform]  = self match { case a: Uniform  => Result(a); case _ => Result.failure("Not a uniform source. To change profile type, please provide a full definition.") }
+    def gaussian: Result[Gaussian] = self match { case a: Gaussian => Result(a); case _ => Result.failure("Not a gaussian source.  To change profile type, please provide a full definition.") }
   }
 
   val CreateBinding: Matcher[SourceProfile] =
@@ -35,19 +35,31 @@ object SourceProfileInput {
         }
     }
 
-  val EditBinding: Matcher[SourceProfile => Result[SourceProfile]] =
+  val EditBinding: Matcher[SourceProfile => Result[SourceProfile]] = {
     ObjectFieldsBinding.rmap {
       case List(
-        SpectralDefinitionInput.Integrated.EditBinding.Option("point", rPoint),
-        SpectralDefinitionInput.Surface.EditBinding.Option("uniform", rUniform),
-        GaussianInput.EditBinding.Option("gaussian", rGaussian),
+        SpectralDefinitionInput.Integrated.CreateOrEditBinding.Option("point", rPoint),
+        SpectralDefinitionInput.Surface.CreateOrEditBinding.Option("uniform", rUniform),
+        GaussianInput.CreateOrEditBinding.Option("gaussian", rGaussian),
       ) =>
         (rPoint, rUniform, rGaussian).parTupled.flatMap {
-          case (Some(f), None, None) => Result(sp => sp.point.flatMap(ps => f(ps.spectralDefinition)).map(Point(_)))
-          case (None, Some(f), None) => Result(sp => sp.uniform.flatMap(us => f(us.spectralDefinition)).map(Uniform(_)))
-          case (None, None, Some(f)) => Result(sp => sp.gaussian.flatMap(gs => f(gs)))
+
+          // If the user provides a full definitiom we can change the source profile
+          case (Some(Left(p)), None, None) => Result(_ => Result(Point(p)))
+          case (None, Some(Left(u)), None) => Result(_ => Result(Uniform(u)))
+          case (None, None, Some(Left(g))) => Result(_ => Result(g))
+
+          // Otherwise we will try to apply an edit, which may fail.
+          case (Some(Right(f)), None, None) => Result(sp => sp.point.flatMap(ps => f(ps.spectralDefinition)).map(Point(_)))
+          case (None, Some(Right(f)), None) => Result(sp => sp.uniform.flatMap(us => f(us.spectralDefinition)).map(Uniform(_)))
+          case (None, None, Some(Right(f))) => Result(sp => sp.gaussian.flatMap(gs => f(gs)))
+
+          // Otherwise we definitely fail.
           case _ => Result.failure("Expected exactly one of point, uniform, or guassian.")
+
         }
     }
+  }
 
 }
+
