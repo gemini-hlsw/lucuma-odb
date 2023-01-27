@@ -226,7 +226,10 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
     }
   }
 
-  test("update tracking (nonsidereal -> sidereal, incomplete)") {
+  // This one works correctly but someone somewhere (I suspect cats-effect Resource) is dumping a
+  // stacktrace for the constraint failure that we handle. So I want to track that down to avoid
+  // a bunch of worrying text in the test output.
+  test("update tracking (nonsidereal -> sidereal, incomplete)".ignore) {
     createProgramAs(pi).flatMap { pid =>
       createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
         // first change to nonsidereal
@@ -397,7 +400,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
     }
   }
 
-  test("upate source profile (point/bandNormalized/sed)") {
+  test("update source profile (point/bandNormalized/sed)") {
     createProgramAs(pi).flatMap { pid =>
       createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
         expect(
@@ -453,6 +456,132 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
                   ]
                 }
               }            
+            """
+          )
+        )          
+      }    
+    }
+  }
+
+  test("update source profile (point -> gaussian, incomplete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    gaussian: {
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      fwhm { degrees }
+                    }
+                    point {
+                      bandNormalized {
+                        sed {
+                          planetaryNebula
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
+        )          
+      }    
+    }
+  }
+
+  test("update source profile (point -> gaussian, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    gaussian: {
+                      fwhm: { degrees: 42 }
+                      spectralDefinition: {
+                        emissionLines: {
+                          lines: []
+                          fluxDensityContinuum: {
+                            value: 1.23
+                            error: 0.0001
+                            units: W_PER_M_SQUARED_PER_UM
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      fwhm { degrees }
+                      emissionLines {
+                        fluxDensityContinuum {
+                          value
+                          units
+                          error
+                        }
+                      }
+                    }
+                    point {
+                      bandNormalized {
+                        sed {
+                          planetaryNebula
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : {
+                          "fwhm" : {
+                            "degrees" : 42.000000
+                          },
+                          "emissionLines" : {
+                            "fluxDensityContinuum" : {
+                              "value" : "1.23",
+                              "units" : "W_PER_M_SQUARED_PER_UM",
+                              "error" : "0.00010"
+                            }
+                          }
+                        },
+                        "point" : null
+                      }
+                    }
+                  ]
+                }
+              }
             """
           )
         )          

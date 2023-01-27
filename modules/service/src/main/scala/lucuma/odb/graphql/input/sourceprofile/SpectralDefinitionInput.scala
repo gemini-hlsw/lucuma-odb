@@ -34,6 +34,9 @@ object SpectralDefinitionInput {
         EmissionLinesInput.Integrated.EditBinding,
       )
 
+    val CreateOrEditBinding =
+      CreateBinding orElse EditBinding
+
   }
 
   object Surface {
@@ -49,6 +52,9 @@ object SpectralDefinitionInput {
         BandNormalizedInput.Surface.EditBinding,
         EmissionLinesInput.Surface.EditBinding,
       )
+
+    val CreateOrEditBinding =
+      CreateBinding orElse EditBinding
 
   }
 

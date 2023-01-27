@@ -118,7 +118,7 @@ object TargetService {
               nonSourceProfileUpdates.evalMap { tid =>
                 read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
                   case Left(err) => Result.failure(err.getMessage).pure[F]
-                  case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid)).as(Result(tid))
+                  case Right(sp) => fun(sp).map(_.asJson).traverse(update.execute(_, tid).as(tid))
                 }
               }
             } .compile.toList.map(_.sequence).flatMap { r =>
