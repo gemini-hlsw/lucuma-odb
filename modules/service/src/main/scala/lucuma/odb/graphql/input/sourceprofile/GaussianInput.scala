@@ -39,4 +39,7 @@ object GaussianInput {
 
     }
 
+  val CreateOrEditBinding =
+    CreateBinding orElse EditBinding
+
 }

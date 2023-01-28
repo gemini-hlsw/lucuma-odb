@@ -57,7 +57,10 @@ class asterismGroup extends OdbSuite {
                     }          
                   }
                 }
-                sidereal: {                  
+                sidereal: {              
+                  ra: { degrees: 0 }    
+                  dec: { degrees: 0 }    
+                  epoch: "J2000.000"
                 }
               }
             }) {
