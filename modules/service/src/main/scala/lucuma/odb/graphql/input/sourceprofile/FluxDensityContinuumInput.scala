@@ -31,16 +31,11 @@ object FluxDensityContinuumInput {
   ): Matcher[Measure[PosBigDecimal] Of FluxDensityContinuum[A]] =
     ObjectFieldsBinding.rmap {
       case List(
-        BigDecimalBinding("value", rValue),
+        PosBigDecimalBinding("value", rValue),
         unitsBinding("units", rUnits),
+        PosBigDecimalBinding.Option("error", rError),
       ) =>
-        (rValue, rUnits).parTupled.flatMap {
-          case (value, units) =>
-            PosBigDecimal.from(value) match {
-              case Left(err) => Result.failure(err)
-              case Right(value) => Result(units.withValueTagged(value))
-            }
-        }
+        (rUnits, rValue, rError).mapN(_.withValueTagged(_, _))
     }
 
 }

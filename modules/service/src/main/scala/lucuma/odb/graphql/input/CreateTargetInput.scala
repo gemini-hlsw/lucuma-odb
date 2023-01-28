@@ -11,7 +11,7 @@ import lucuma.odb.graphql.binding._
 
 case class CreateTargetInput(
   programId: Program.Id,
-  SET: TargetPropertiesInput,
+  SET: TargetPropertiesInput.Create,
 )
 
 object CreateTargetInput {

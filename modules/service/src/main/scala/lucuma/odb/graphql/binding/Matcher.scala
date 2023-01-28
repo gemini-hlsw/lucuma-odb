@@ -53,6 +53,13 @@ trait Matcher[A] { outer =>
     case other       => outer.validate(other).map(data.Nullable.NonNull(_))
   }
 
+  /** A matcher that disallows `NullValue` and treats `AbsentValue` as `None` */
+  lazy val NonNullable: Matcher[Option[A]] = {
+    case NullValue   => Left("cannot be null")
+    case AbsentValue => Right(None)
+    case other       => outer.validate(other).map(Some(_))
+  }
+
   /** A matcher that treats `NullValue` and `AbsentValue` as `None` */
   lazy val Option: Matcher[Option[A]] =
     Nullable.map(_.toOption)
@@ -63,5 +70,9 @@ trait Matcher[A] { outer =>
       // This fast-fails on the first invalid one, which is the best we can do
       vs.zipWithIndex.traverse { case (v, n) => validate(v).leftMap(s => s"at index $n: $s") }
     }
+
+  /** If this matcher fails, try `other`. */
+  def orElse[B](other: Matcher[B]): Matcher[Either[A, B]] = v =>
+    outer.validate(v).map(_.asLeft) orElse other.validate(v).map(_.asRight)
 
 }
