@@ -2258,12 +2258,17 @@ type Subscription {
   # that program.
   #
   targetEdit(
+    input: TargetEditInput
+  ): TargetEdit!
+}
+
+input TargetEditInput {
     # Target ID
     targetId: TargetId
 
     # Program ID
     programId: ProgramId
-  ): TargetEdit!
+
 }
 
 input ObservationEditInput {
@@ -2283,9 +2288,9 @@ input SystemVerificationInput {
 }
 
 # Event sent when a new object is created or updated
-type TargetEdit implements Event {
+type TargetEdit {
   # Type of edit
-  editType: EditType!
+  editType: EditType! 
 
   # Edited object
   value: Target!

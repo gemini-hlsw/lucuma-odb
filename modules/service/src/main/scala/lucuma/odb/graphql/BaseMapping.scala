@@ -115,6 +115,7 @@ trait BaseMapping[F[_]]
   lazy val SpectroscopyScienceRequirementsType = schema.ref("SpectroscopyScienceRequirements")
   lazy val SystemVerificationType              = schema.ref("SystemVerification")
   lazy val TacCategoryType                     = schema.ref("TacCategory")
+  lazy val TargetEditType                      = schema.ref("TargetEdit")
   lazy val TargetEnvironmentType               = schema.ref("TargetEnvironment")
   lazy val TargetGroupSelectResultType         = schema.ref("TargetGroupSelectResult")
   lazy val TargetGroupType                     = schema.ref("TargetGroup")

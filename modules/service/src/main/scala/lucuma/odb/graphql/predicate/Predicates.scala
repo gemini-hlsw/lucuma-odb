@@ -14,6 +14,8 @@ trait Predicates[F[_]] extends BaseMapping[F] {
    * constructing filters, etc.
    */
   object Predicates {
+    val asterismGroup       = AsterismGroupPredicates(Path.from(AsterismGroupType))
+    val constraintSetGroup  = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
     val linkUserResult      = LinkUserResultPredicates(Path.from(LinkUserResultType))
     val observation         = ObservationPredicates(Path.from(ObservationType))
     val observationEdit     = ObservationEditPredicates(Path.from(ObservationEditType))
@@ -22,9 +24,8 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val proposalClass       = ProposalClassPredicates(Path.from(ProposalClassType))
     val setAllocationResult = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
     val target              = TargetPredicates(Path.from(TargetType))
-    val constraintSetGroup  = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
+    val targetEdit          = TargetEditPredicates(Path.from(TargetEditType))
     val targetGroup         = TargetGroupPredicates(Path.from(TargetGroupType))
-    val asterismGroup       = AsterismGroupPredicates(Path.from(AsterismGroupType))
   }
 
 }
