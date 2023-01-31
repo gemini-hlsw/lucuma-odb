@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package subscription
 
+import cats.effect.IO
 import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
@@ -16,11 +17,18 @@ import lucuma.odb.graphql.mutation.CreateObservationOps
 import lucuma.odb.graphql.mutation.CreateProgramOps
 import lucuma.odb.graphql.mutation.createTarget
 
+import scala.concurrent.duration._
+
 class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOps {
 
   val pi = TestUsers.Standard.pi(11, 110)
 
   override def validUsers = List(pi)
+
+  val pause = IO.sleep(300.milli)
+
+  def createTarget(user: User, pid: Program.Id, name: String) =
+    createEmptyTargetAs(user, pid, name) <* pause
 
   def updateTarget(user: User, tid: Target.Id, name: String) =
     expect(
@@ -54,7 +62,7 @@ class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOp
           }
         """
       )
-    )      
+    ) >> pause
 
   def nameSubscription(
     pid: Option[Program.Id],
@@ -105,8 +113,8 @@ class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOp
       query     = nameSubscription(None, None),
       mutations =
         Right(
-          createProgramAs(pi).flatMap(createEmptyTargetAs(pi, _, "target 1")) >>
-          createProgramAs(pi).flatMap(createEmptyTargetAs(pi, _, "target 2"))
+          createProgramAs(pi).flatMap(createTarget(pi, _, "target 1")) >>
+          createProgramAs(pi).flatMap(createTarget(pi, _, "target 2"))
         ),
       expected = List(created("target 1"), created("target 2"))
     )
@@ -120,7 +128,7 @@ class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOp
         Right(
           for {
             pid <- createProgramAs(pi)
-            tid <- createEmptyTargetAs(pi, pid, "old name")
+            tid <- createTarget(pi, pid, "old name")
             _   <- updateTarget(pi, tid, "new name")
           } yield ()
         ),
@@ -135,8 +143,8 @@ class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOp
         query     = nameSubscription(Some(pid), None),
         mutations =
           Right(
-            createEmptyTargetAs(pi, pid, "should see this") >>
-            createProgramAs(pi).flatMap(createEmptyTargetAs(pi, _, "should not see this"))
+            createTarget(pi, pid, "should see this") >>
+            createProgramAs(pi).flatMap(createTarget(pi, _, "should not see this"))
           ),
         expected = List(created("should see this"))
       )
@@ -150,8 +158,8 @@ class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOp
         query     = nameSubscription(Some(pid), None),
         mutations =
           Right(
-            createEmptyTargetAs(pi, pid, "should see this").flatMap(updateTarget(pi, _, "and this")) >>
-            createProgramAs(pi).flatMap(createEmptyTargetAs(pi, _, "should not see this").flatMap(updateTarget(pi, _, "or this")))
+            createTarget(pi, pid, "should see this").flatMap(updateTarget(pi, _, "and this")) >>
+            createProgramAs(pi).flatMap(createTarget(pi, _, "should not see this").flatMap(updateTarget(pi, _, "or this")))
           ),
         expected = List(created("should see this"), updated("and this"))
       )
@@ -160,14 +168,14 @@ class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOp
 
   test("trigger for [only] a specific updated target") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "old name").flatMap { tid =>
+      createTarget(pi, pid, "old name").flatMap { tid =>
         subscriptionExpect(
           user      = pi,
           query     = nameSubscription(None, Some(tid)),
           mutations =
             Right(
               updateTarget(pi, tid, "new name") >>
-              createEmptyTargetAs(pi, pid, "should not see this").flatMap(updateTarget(pi, _, "or this"))
+              createTarget(pi, pid, "should not see this").flatMap(updateTarget(pi, _, "or this"))
             ),
           expected = List(updated("new name"))
         )
