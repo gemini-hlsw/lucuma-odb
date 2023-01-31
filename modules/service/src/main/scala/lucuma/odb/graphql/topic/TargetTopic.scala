@@ -14,8 +14,8 @@ import lucuma.core.model.Access.Ngo
 import lucuma.core.model.Access.Pi
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
-import lucuma.core.model.Target
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid

@@ -8,12 +8,12 @@ import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.model.Target
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
-import lucuma.odb.graphql.mutation.CreateProgramOps
 import lucuma.odb.graphql.mutation.CreateObservationOps
+import lucuma.odb.graphql.mutation.CreateProgramOps
 import lucuma.odb.graphql.mutation.createTarget
 
 class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOps {
