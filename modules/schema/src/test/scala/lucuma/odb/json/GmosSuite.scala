@@ -5,18 +5,24 @@ package lucuma.odb.json
 
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.DynamicConfig
+import lucuma.core.model.sequence.StaticConfig
 import lucuma.core.model.sequence.arb.ArbDynamicConfig
+import lucuma.core.model.sequence.arb.ArbStaticConfig
 import munit.DisciplineSuite
 
 class GmosSuite extends DisciplineSuite with ArbitraryInstances {
 
   import ArbDynamicConfig.*
+  import ArbStaticConfig.*
   import angle.query.given
   import gmos.given
+  import offset.query.given
   import time.query.given
   import wavelength.query.given
 
-  checkAll("GmosCodec", CodecTests[GmosNorth].codec)
+  checkAll("GmosCodec DynamicConfig GmosNorth", CodecTests[DynamicConfig.GmosNorth].codec)
+  checkAll("GmosCodec DynamicConfig GmosSouth", CodecTests[DynamicConfig.GmosSouth].codec)
+  checkAll("GmosCodec StaticConfig GmosNorth",  CodecTests[StaticConfig.GmosNorth].codec)
+  checkAll("GmosCodec StaticConfig GmosSouth",  CodecTests[StaticConfig.GmosSouth].codec)
 }
