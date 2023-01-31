@@ -43,6 +43,7 @@ import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
+import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
@@ -61,7 +62,8 @@ object OdbMapping {
 
   case class Topics[F[_]](
     program:     Topic[F, ProgramTopic.Element],
-    observation: Topic[F, ObservationTopic.Element]
+    observation: Topic[F, ObservationTopic.Element],
+    target:      Topic[F, TargetTopic.Element],
   )
 
   object Topics {
@@ -71,7 +73,8 @@ object OdbMapping {
         ses <- pool
         pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
         obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
-      } yield Topics(pro, obs)
+        tar <- Resource.eval(TargetTopic(ses, 1024, sup))
+      } yield Topics(pro, obs, tar)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -143,6 +146,7 @@ object OdbMapping {
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with SubscriptionMapping[F]
+          with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
           with TargetGroupMapping[F]
@@ -255,6 +259,7 @@ object OdbMapping {
               SetAllocationResultMapping,
               SiderealMapping,
               SubscriptionMapping,
+              TargetEditMapping,
               TargetEnvironmentMapping,
               TargetGroupMapping,
               TargetGroupSelectResultMapping,
