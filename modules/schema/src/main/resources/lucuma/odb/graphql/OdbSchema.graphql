@@ -829,7 +829,8 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
 
   # GMOS North science execution
   science: GmosNorthExecutionSequence!
-  visits: [GmosNorthVisitRecord!]!
+
+  #visits: [GmosNorthVisitRecord!]!
 
   # Instrument type
   instrument: Instrument!
@@ -1203,7 +1204,7 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
 
   # GMOS South science execution
   science: GmosSouthExecutionSequence!
-  visits: [GmosSouthVisitRecord!]!
+  #visits: [GmosSouthVisitRecord!]!
 
   # Instrument type
   instrument: Instrument!
@@ -4791,6 +4792,15 @@ type Query {
   #   # Set to true to include deleted values
   #   includeDeleted: Boolean! = false
   # ): ScienceRequirementsGroupSelectResult!
+
+  sequence(
+    programId:     ProgramId!
+
+    observationId: ObservationId!
+
+    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    useCache: Boolean! = true
+  ): ExecutionConfig
 
   # Retrieves the target with the given id, if it exists
   target(
