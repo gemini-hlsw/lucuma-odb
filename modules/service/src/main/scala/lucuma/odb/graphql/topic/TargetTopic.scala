@@ -14,8 +14,8 @@ import lucuma.core.model.Access.Ngo
 import lucuma.core.model.Access.Pi
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
-import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -26,24 +26,22 @@ import skunk.Query
 import skunk.*
 import skunk.implicits.*
 
-object ObservationTopic {
+object TargetTopic {
 
   /**
-   * @param observationId the id of the observation that was inserted or edited
-   * @param programId the observation's program's id
+   * @param targetId the id of the target that was inserted or edited
+   * @param programId the target's program's id
    * @param eventId serial event id
    * @param editType determines creation vs update
    * @param users users associated with this program
    */
   case class Element(
-    observationId: Observation.Id,
-    programId:     Program.Id,
-    eventId:       Long,
-    editType:      EditType,
-    users:         List[User.Id]
+    targetId:  Target.Id,
+    programId: Program.Id,
+    eventId:   Long,
+    editType:  EditType,
+    users:     List[User.Id]
   ) {
-
-    // Same as ProgramTopic `canRead` ...
 
     def canRead(u: User): Boolean =
       u.role.access match {
@@ -54,16 +52,16 @@ object ObservationTopic {
 
   }
 
-  /** Infinite stream of observation id, program id, event id, and edit type. */
-  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Observation.Id, Program.Id, Long, EditType)] =
-    s.channel(id"ch_observation_edit").listen(maxQueued).flatMap { n =>
+  /** Infinite stream of target id, program id, event id, and edit type. */
+  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Target.Id, Program.Id, Long, EditType)] =
+    s.channel(id"ch_target_edit").listen(maxQueued).flatMap { n =>
       n.value.split(",") match {
         case Array(_oid, _pid, _eid, _tg_op) =>
-          (Gid[Observation.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption, EditType.fromTgOp(_tg_op)).tupled match {
+          (Gid[Target.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption, EditType.fromTgOp(_tg_op)).tupled match {
             case Some(tuple) => Stream(tuple)
-            case None        => Stream.exec(Logger[F].warn(s"Invalid observation and/or event: $n"))
+            case None        => Stream.exec(Logger[F].warn(s"Invalid target and/or event: $n"))
           }
-        case _ => Stream.exec(Logger[F].warn(s"Invalid observation and/or event: $n"))
+        case _ => Stream.exec(Logger[F].warn(s"Invalid target and/or event: $n"))
       }
     }
 
@@ -76,7 +74,7 @@ object ObservationTopic {
       oid   <- updates(s, maxQueued)
       users <- Stream.eval(pq.stream(oid._2, 1024).compile.toList)
       elem   = Element(oid._1, oid._2, oid._3, oid._4, users)
-      _     <- Stream.eval(Logger[F].info(s"ObservationChannel: $elem"))
+      _     <- Stream.eval(Logger[F].info(s"TargetChannel: $elem"))
     } yield elem
 
   def apply[F[_]: Concurrent: Logger](
@@ -87,8 +85,8 @@ object ObservationTopic {
     for {
       top <- Topic[F, Element]
       els  = elements(s, maxQueued).through(top.publish)
-      _   <- sup.supervise(els.compile.drain.onError { case e => Logger[F].error(e)("Observation Event Stream crashed!") } >> Logger[F].info("Observation Event Stream terminated.") )
-      _   <- Logger[F].info("Started topic for ch_observation_edit")
+      _   <- sup.supervise(els.compile.drain.onError { case e => Logger[F].error(e)("Target Event Stream crashed!") } >> Logger[F].info("Target Event Stream terminated.") )
+      _   <- Logger[F].info("Started topic for ch_target_edit")
     } yield top
 
 }
