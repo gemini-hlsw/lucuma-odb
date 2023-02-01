@@ -16,11 +16,12 @@ import io.circe.literal.*
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.core.model.Partner
+import org.checkerframework.checker.units.qual.s
 
 trait DatabaseOperations { this: OdbSuite =>
 
-  def createProgramAs(user: User): IO[Program.Id] =
-    query(user, "mutation { createProgram(input: { SET: { name: null } }) { program { id } } }").flatMap { js =>
+  def createProgramAs(user: User, name: String = null): IO[Program.Id] =
+    query(user, s"mutation { createProgram(input: { SET: { name: ${Option(name).asJson} } }) { program { id } } }").flatMap { js =>
       js.hcursor
         .downField("createProgram")
         .downField("program")
@@ -229,7 +230,7 @@ trait DatabaseOperations { this: OdbSuite =>
     linkNgoSupportAs(user, arrow._1, arrow._2, partner)
 
   def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgramAs) // TODO: something cheaper
+    users.toList.traverse_(createProgramAs(_)) // TODO: something cheaper
 
   def updateAsterisms( 
     user: User,

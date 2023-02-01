@@ -21,23 +21,6 @@ class constraintSetGroup extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  def createProgram(user: User): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: {}) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
   def createObservation(user: User, pid: Program.Id, iq: ImageQuality, sb: SkyBackground): IO[Observation.Id] =
     query(
       user = user,
@@ -65,7 +48,7 @@ class constraintSetGroup extends OdbSuite {
 
   test("constraints should be correctly grouped") {
     List(pi).traverse { user =>
-      createProgram(user).flatMap { pid =>
+      createProgramAs(user).flatMap { pid =>
         def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
         (
           create2(ImageQuality.OnePointFive, SkyBackground.Bright), 
