@@ -55,20 +55,6 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  // def createObservationAs(
-  //   user: User,
-  //   pid: Program.Id
-  // ): IO[Observation.Id] =
-  //   query(user, s"mutation { createObservation(input: { programId: ${pid.asJson} }) { observation { id } } }").flatMap { js =>
-  //     js.hcursor
-  //       .downField("createObservation")
-  //       .downField("observation")
-  //       .downField("id")
-  //       .as[Observation.Id]
-  //       .leftMap(f => new RuntimeException(f.message))
-  //       .liftTo[IO]
-  //   }
-
   def createEmptyTargetAs(
     user: User,
     pid:  Program.Id,
