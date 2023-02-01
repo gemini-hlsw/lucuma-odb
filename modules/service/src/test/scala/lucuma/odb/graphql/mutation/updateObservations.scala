@@ -16,9 +16,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
 
-class updateObservations extends OdbSuite
-                            with CreateProgramOps
-                            with CreateObservationOps
+class updateObservations extends OdbSuite                          
                             with UpdateConstraintSetOps {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)

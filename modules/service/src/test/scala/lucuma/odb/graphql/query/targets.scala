@@ -74,9 +74,6 @@ class targets extends OdbSuite {
       json.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
     }
 
-  def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgram) // TODO: something cheaper
-
   test("simple target selection") {
     createProgram(pi).flatMap { pid =>
       createTarget(pi, pid).replicateA(5).flatMap { tids =>

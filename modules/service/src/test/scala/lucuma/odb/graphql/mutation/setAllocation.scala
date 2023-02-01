@@ -18,7 +18,7 @@ import lucuma.odb.graphql.OdbSuite
 
 import java.time.Duration
 
-class setAllocation extends OdbSuite with CreateProgramOps with SetAllocationOps {
+class setAllocation extends OdbSuite {
 
   val guest    = TestUsers.guest(nextId)
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -46,57 +46,5 @@ class setAllocation extends OdbSuite with CreateProgramOps with SetAllocationOps
       }
     }
   }
-
-}
-
-trait SetAllocationOps { this: OdbSuite =>
-
-  def setAllocationAs(
-    user: User,
-    pid: Program.Id,
-    partner: Tag,
-    duration: TimeSpan,
-  ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          setAllocation(input: {
-            programId: ${pid.asJson}
-            partner:   ${partner.value.toUpperCase}
-            duration:  {
-              hours: "${duration.toHours}"
-            }
-          }) {
-            allocation {
-              partner
-              duration {
-                microseconds
-                milliseconds
-                seconds
-                minutes
-                hours
-              }
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "setAllocation" : {
-            "allocation" : {
-              "partner":  ${partner.asJson},
-              "duration": {
-                "microseconds": ${duration.toMicroseconds},
-                "milliseconds": ${duration.toMilliseconds},
-                "seconds": ${duration.toSeconds},
-                "minutes": ${duration.toMinutes},
-                "hours": ${duration.toHours}
-              }
-            }
-          }
-        }
-      """.asRight
-    )
 
 }
