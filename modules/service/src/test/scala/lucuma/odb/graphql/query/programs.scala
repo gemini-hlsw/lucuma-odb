@@ -22,25 +22,8 @@ class programs extends OdbSuite {
 
   val validUsers = List(pi, pi2, service).toList
 
-  def createProgram(user: User): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: { SET: { name: "${user.displayName}'s Program" } }) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
   test("simple program selection") {
-    createProgram(pi).replicateA(5).flatMap { pids =>
+    createProgramAs(pi).replicateA(5).flatMap { pids =>
       expect(
         user = pi,
         query = s"""
@@ -70,7 +53,7 @@ class programs extends OdbSuite {
   }
 
   test("simple program selection with limit") {
-    createProgram(pi2).replicateA(5).flatMap { pids =>
+    createProgramAs(pi2).replicateA(5).flatMap { pids =>
       expect(
         user = pi2,
         query = s"""
