@@ -34,7 +34,7 @@ import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
+import lucuma.odb.sequence.gmos.longslit.Config
 
 import scala.util.Try
 import scala.util.control.Exception.*
@@ -103,8 +103,8 @@ object GmosLongSlitInput {
       /**
        * Creates a GmosLongSlitConfig based on input parameters.
        */
-      def toGmosLongSlit: GmosLongSlitConfig.North =
-        GmosLongSlitConfig.North(
+      def toGmosLongSlit: Config.GmosNorth =
+        Config.GmosNorth(
           grating,
           filter,
           fpu,
@@ -171,8 +171,8 @@ object GmosLongSlitInput {
       /**
        * Creates a GmosLongSlitConfig based on input parameters.
        */
-      def toGmosLongSlit: GmosLongSlitConfig.South =
-        GmosLongSlitConfig.South(
+      def toGmosLongSlit: Config.GmosSouth =
+        Config.GmosSouth(
           grating,
           filter,
           fpu,

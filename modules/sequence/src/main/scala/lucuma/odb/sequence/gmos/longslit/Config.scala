@@ -42,7 +42,7 @@ import spire.math.Rational
  * @tparam F filter type
  * @tparam U FPU type
  */
-sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
+sealed trait Config[G, F, U] extends Product with Serializable {
   def grating: G
 
   def filter: Option[F]
@@ -72,7 +72,7 @@ sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
     explicitYBin.getOrElse(defaultYBin)
 
   def defaultYBin: GmosYBinning =
-    GmosLongSlitConfig.DefaultYBinning
+    Config.DefaultYBinning
 
   def explicitYBin: Option[GmosYBinning]
 
@@ -81,7 +81,7 @@ sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
     explicitAmpReadMode.getOrElse(defaultAmpReadMode)
 
   def defaultAmpReadMode: GmosAmpReadMode =
-    GmosLongSlitConfig.DefaultAmpReadMode
+    Config.DefaultAmpReadMode
 
   def explicitAmpReadMode: Option[GmosAmpReadMode]
 
@@ -90,7 +90,7 @@ sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
     explicitAmpGain.getOrElse(defaultAmpGain)
 
   def defaultAmpGain: GmosAmpGain =
-    GmosLongSlitConfig.DefaultAmpGain
+    Config.DefaultAmpGain
 
   def explicitAmpGain: Option[GmosAmpGain]
 
@@ -99,7 +99,7 @@ sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
     explicitRoi.getOrElse(defaultRoi)
 
   def defaultRoi: GmosRoi =
-    GmosLongSlitConfig.DefaultRoi
+    Config.DefaultRoi
 
   def explicitRoi: Option[GmosRoi]
 
@@ -116,14 +116,14 @@ sealed trait GmosLongSlitConfig[G, F, U] extends Product with Serializable {
     explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
 
   def defaultSpatialOffsets: List[Q] =
-    GmosLongSlitConfig.DefaultSpatialOffsets
+    Config.DefaultSpatialOffsets
 
   def explicitSpatialOffsets: Option[List[Q]]
 
 }
 
-object GmosLongSlitConfig {
-  final case class North(
+object Config {
+  final case class GmosNorth(
     grating:             GmosNorthGrating,
     filter:              Option[GmosNorthFilter],
     fpu:                 GmosNorthFpu,
@@ -135,7 +135,7 @@ object GmosLongSlitConfig {
     explicitRoi:         Option[GmosRoi]         = None,
     explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
     explicitSpatialOffsets:    Option[List[Q]]                = None
-  ) extends GmosLongSlitConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
+  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
 
     override def defaultXBin(
       sourceProfile: SourceProfile,
@@ -148,7 +148,7 @@ object GmosLongSlitConfig {
       defaultWavelengthDithersNorth(this.grating)
 
   }
-  final case class South(
+  final case class GmosSouth(
     grating:             GmosSouthGrating,
     filter:              Option[GmosSouthFilter],
     fpu:                 GmosSouthFpu,
@@ -160,7 +160,7 @@ object GmosLongSlitConfig {
     explicitRoi:         Option[GmosRoi]         = None,
     explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
     explicitSpatialOffsets:    Option[List[Q]]                = None
-  ) extends GmosLongSlitConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
+  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
 
     override def defaultXBin(
       sourceProfile: SourceProfile,
