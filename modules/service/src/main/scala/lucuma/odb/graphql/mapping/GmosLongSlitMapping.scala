@@ -44,7 +44,7 @@ import lucuma.odb.graphql.table.*
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
-import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
+import lucuma.odb.sequence.gmos.longslit.Config
 
 import java.math.RoundingMode
 import scala.collection.immutable.SortedMap
@@ -76,19 +76,19 @@ trait GmosLongSlitMapping[F[_]]
     val explicitXBin: FieldMapping        = SqlField("explicitXBin", cc.XBin)
 
     val yBin: FieldMapping                = explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin")
-    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(GmosLongSlitConfig.DefaultYBinning))
+    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(Config.DefaultYBinning))
     val explicitYBin: FieldMapping        = SqlField("explicitYBin", cc.YBin)
 
     val ampReadMode: FieldMapping         = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
-    val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(GmosLongSlitConfig.DefaultAmpReadMode))
+    val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(Config.DefaultAmpReadMode))
     val explicitAmpReadMode: FieldMapping = SqlField("explicitAmpReadMode", cc.AmpReadMode)
 
     val ampGain: FieldMapping             = explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain")
-    val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(GmosLongSlitConfig.DefaultAmpGain))
+    val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(Config.DefaultAmpGain))
     val explicitAmpGain: FieldMapping     = SqlField("explicitAmpGain", cc.AmpGain)
 
     val roi: FieldMapping                 = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
-    val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(GmosLongSlitConfig.DefaultRoi))
+    val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(Config.DefaultRoi))
     val explicitRoi: FieldMapping         = SqlField("explicitRoi", cc.Roi)
 
     val wavelengthDithersString: FieldMapping   =
@@ -169,7 +169,7 @@ trait GmosLongSlitMapping[F[_]]
               sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
             } yield
               sp.fold(GmosXBinning.Two) { sourceProfile =>  // TODO: What should the real default be if there is no target
-                GmosLongSlitConfig.xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+                Config.xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
               },
           List("fpu", "imageQuality", "sourceProfile")
         ),
@@ -280,7 +280,7 @@ trait GmosLongSlitMapping[F[_]]
               sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
             } yield
               sp.fold(GmosXBinning.Two) { sourceProfile =>
-                GmosLongSlitConfig.xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+                Config.xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
               },
           List("fpu", "imageQuality", "sourceProfile")
         ),
@@ -382,10 +382,10 @@ object GmosLongSlitMapping {
     parseCsvBigDecimals(s).map(bd => toWavelengthDitherJson(WavelengthDither.nanometers.unsafeGet(Quantity[Nanometer](bd)))).asJson
 
   private def defaultWavelengthDithersNorthJson(g: GmosNorthGrating): Json =
-    GmosLongSlitConfig.defaultWavelengthDithersNorth(g).map(q => toWavelengthDitherJson(q)).asJson
+    Config.defaultWavelengthDithersNorth(g).map(q => toWavelengthDitherJson(q)).asJson
 
   private def defaultWavelengthDithersSouthJson(g: GmosSouthGrating): Json =
-    GmosLongSlitConfig.defaultWavelengthDithersSouth(g).map(q => toWavelengthDitherJson(q)).asJson
+    Config.defaultWavelengthDithersSouth(g).map(q => toWavelengthDitherJson(q)).asJson
 
   private def toOffsetQJson(q: Q): Json = {
     val micro: Long =
@@ -409,6 +409,6 @@ object GmosLongSlitMapping {
     parseCsvBigDecimals(s).map(arcsec => toOffsetQJson(Q.signedDecimalArcseconds.reverseGet(arcsec))).asJson
 
   private val defaultSpatialOffsetsJson: Json =
-    GmosLongSlitConfig.DefaultSpatialOffsets.map(q => toOffsetQJson(q)).asJson
+    Config.DefaultSpatialOffsets.map(q => toOffsetQJson(q)).asJson
 
 }

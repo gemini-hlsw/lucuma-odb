@@ -50,7 +50,7 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
   def optics: DynamicOptics[D, G, F, U]
 
   def compute(
-    mode:          GmosLongSlitConfig[G, F, U],
+    mode:          Config[G, F, U],
     exposureTime:  SciExposureTime,
     sourceProfile: SourceProfile,
     imageQuality:  ImageQuality,

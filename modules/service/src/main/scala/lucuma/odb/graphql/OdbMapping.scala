@@ -275,7 +275,7 @@ object OdbMapping {
                       import lucuma.odb.sequence.data.ProtoStep
                       import lucuma.odb.sequence.data.SciExposureTime
                       import lucuma.odb.sequence.gmos.longslit.Acquisition
-                      import lucuma.odb.sequence.gmos.longslit.GmosLongSlitConfig
+                      import lucuma.odb.sequence.gmos.longslit.Config
                       import lucuma.odb.sequence.gmos.longslit.Science
 
                       import lucuma.odb.json.all.query.given
@@ -300,7 +300,7 @@ object OdbMapping {
                             Science
                               .GmosNorth
                               .compute(
-                                GmosLongSlitConfig.North(g, f, u, in.wavelength), // TODO: okay, we need to read this since the defaults may be overridden (see TODO above)
+                                Config.GmosNorth(g, f, u, in.wavelength), // TODO: okay, we need to read this since the defaults may be overridden (see TODO above)
                                 SciExposureTime(time),
                                 in.sourceProfile,
                                 in.constraints.imageQuality,
@@ -363,7 +363,7 @@ object OdbMapping {
                             Science
                               .GmosSouth
                               .compute(
-                                GmosLongSlitConfig.South(g, f, u, in.wavelength), // TODO: okay, we need to read this since the defaults may be overridden (see TODO above)
+                                Config.GmosSouth(g, f, u, in.wavelength), // TODO: okay, we need to read this since the defaults may be overridden (see TODO above)
                                 SciExposureTime(time),
                                 in.sourceProfile,
                                 in.constraints.imageQuality,

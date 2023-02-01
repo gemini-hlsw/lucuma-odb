@@ -39,7 +39,7 @@ class ScienceSuite extends ScalaCheckSuite {
     SciExposureTime.fromDuration(Duration.ofMinutes(10)).get
 
   def northSequence(
-    ls: GmosLongSlitConfig.North,
+    ls: Config.GmosNorth,
     sp: SourceProfile,
     iq: ImageQuality
   ): LazyList[Science.Atom[GmosNorth]] =
@@ -55,7 +55,7 @@ class ScienceSuite extends ScalaCheckSuite {
   }
 
   property("prefers explicitly set parameters") {
-    forAll { (ls: GmosLongSlitConfig.North, sp: SourceProfile, iq: ImageQuality) =>
+    forAll { (ls: Config.GmosNorth, sp: SourceProfile, iq: ImageQuality) =>
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
@@ -66,7 +66,7 @@ class ScienceSuite extends ScalaCheckSuite {
   }
 
   property("cycles through wavelength dithers") {
-    forAll { (ls: GmosLongSlitConfig.North, sp: SourceProfile, iq: ImageQuality) =>
+    forAll { (ls: Config.GmosNorth, sp: SourceProfile, iq: ImageQuality) =>
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
@@ -88,7 +88,7 @@ class ScienceSuite extends ScalaCheckSuite {
         .andThen(Offset.q)
         .andThen(Offset.Component.angle)
 
-    forAll { (ls: GmosLongSlitConfig.North, sp: SourceProfile, iq: ImageQuality) =>
+    forAll { (ls: Config.GmosNorth, sp: SourceProfile, iq: ImageQuality) =>
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
