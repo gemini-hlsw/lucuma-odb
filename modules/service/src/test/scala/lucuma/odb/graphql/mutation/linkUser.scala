@@ -20,7 +20,7 @@ import lucuma.odb.graphql.OdbSuite
 
 import java.time.Duration
 
-class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
+class linkUser extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
@@ -32,9 +32,6 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
   val service  = TestUsers.service(nextId)
 
   lazy val validUsers = List(pi, pi2, pi3, ngo, staff, admin, guest, service)
-
-  def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgramAs) // TODO: something cheaper
 
   // LINKING A COI
 
@@ -276,71 +273,5 @@ class linkUser extends OdbSuite with CreateProgramOps with LinkUserOps with SetA
       }
     }
   }
-
-}
-
-trait LinkUserOps { this: OdbSuite =>
-
-  def linkAs(
-    user: User,
-    uid: User.Id,
-    pid: Program.Id,
-    role: ProgramUserRole,
-    supportType: Option[ProgramUserSupportType] = None,
-    partner: Option[Partner] = None,
-  ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          linkUser(input: {
-            programId: ${pid.asJson}
-            userId: ${uid.asJson}
-            role: ${role.tag.toUpperCase}
-            supportType: ${supportType.fold("null")(_.tag.toUpperCase)}
-            supportPartner: ${partner.fold("null")(_.tag.toUpperCase)}
-          }) {
-            user {
-              role
-              userId
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "linkUser" : {
-            "user": {
-              "role" : $role,
-              "userId" : $uid
-            }
-          }
-        }
-      """.asRight
-    )
-
-  def linkCoiAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Coi)
-
-  def linkCoiAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkCoiAs(user, arrow._1, arrow._2)
-
-  def linkObserverAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Observer)
-
-  def linkObserverAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkObserverAs(user, arrow._1, arrow._2)
-
-  def linkStaffSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
-
-  def linkStaffSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkStaffSupportAs(user, arrow._1, arrow._2)
-
-  def linkNgoSupportAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partner))
-
-  def linkNgoSupportAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
-    linkNgoSupportAs(user, arrow._1, arrow._2, partner)
 
 }

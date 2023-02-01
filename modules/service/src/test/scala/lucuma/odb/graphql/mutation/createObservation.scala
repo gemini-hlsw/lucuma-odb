@@ -47,7 +47,7 @@ import lucuma.odb.service.AsterismService
 import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
 
-class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps with CreateObservationOps {
+class createObservation extends OdbSuite {
 
   extension (ac: ACursor)
     def downPath(p: String*): ACursor =
@@ -70,9 +70,6 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
 
   lazy val validUsers: List[User] =
     List(pi, pi2, pi3, ngo, staff, admin, guest, service)
-
-  def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgramAs) // TODO: something cheaper
 
   test("[general] default name should be null") {
     createProgramAs(pi).flatMap { pid =>
@@ -1239,73 +1236,5 @@ class createObservation extends OdbSuite with CreateProgramOps with LinkUserOps 
   }
 
   // TODO: more access control tests
-
-}
-
-trait CreateObservationOps { this: OdbSuite =>
-
-  def createObservationAs(
-    user: User,
-    pid: Program.Id
-  ): IO[Observation.Id] =
-    query(user, s"mutation { createObservation(input: { programId: ${pid.asJson} }) { observation { id } } }").flatMap { js =>
-      js.hcursor
-        .downField("createObservation")
-        .downField("observation")
-        .downField("id")
-        .as[Observation.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
-  def createEmptyTargetAs(
-    user: User,
-    pid:  Program.Id,
-    name: String,
-    sourceProfile: String =
-      """
-        sourceProfile: {
-          point: {
-            bandNormalized: {
-              sed: {
-                stellarLibrary: B5_III
-              }
-              brightnesses: []
-            }
-          }
-        }
-      """
-  ): IO[Target.Id] =
-    query(
-      user,
-      s"""
-        mutation {
-          createTarget(
-            input: {
-              programId: ${pid.asJson}
-              SET: {
-                name: "$name"
-                sidereal: {
-                  ra: { hours: "0.0" }
-                  dec: { degrees: "0.0" }
-                  epoch: "J2000.000"
-                }
-                $sourceProfile
-              }
-            }
-          ) {
-            target { id }
-          }
-        }
-      """
-    ).flatMap { js =>
-      js.hcursor
-        .downField("createTarget")
-        .downField("target")
-        .downField("id")
-        .as[Target.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
 
 }

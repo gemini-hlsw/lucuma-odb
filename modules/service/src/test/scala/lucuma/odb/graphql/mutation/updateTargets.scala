@@ -7,7 +7,7 @@ package mutation
 import io.circe.literal._
 import lucuma.core.model.User
 
-class updateTargets extends OdbSuite with CreateProgramOps with CreateObservationOps {
+class updateTargets extends OdbSuite {
 
   import createTarget.FullTargetGraph                            
 

@@ -12,7 +12,7 @@ import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
 
-class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with SetAllocationOps {
+class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -25,9 +25,6 @@ class createTarget extends OdbSuite with CreateProgramOps with LinkUserOps with 
   val service  = TestUsers.service(nextId)
 
   lazy val validUsers = List(pi, pi2, pi3, ngo, staff, admin, guest, service)
-
-  def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgramAs) // TODO: something cheaper
 
   test("[general] create a sidereal target") {
     createProgramAs(pi).flatMap { pid =>

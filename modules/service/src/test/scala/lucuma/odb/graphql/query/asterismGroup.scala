@@ -20,94 +20,94 @@ class asterismGroup extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  def createProgram(user: User): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: {}) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
+  // def createProgram(user: User): IO[Program.Id] =
+  //   query(
+  //     user = user,
+  //     query =
+  //       s"""
+  //         mutation {
+  //           createProgram(input: {}) {
+  //             program {
+  //               id
+  //             }
+  //           }
+  //         }
+  //       """
+  //   ) map { json =>
+  //     json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
+  //   }
 
-  def createTarget(user: User, pid: Program.Id): IO[Target.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createTarget(input: {
-              programId: ${pid.asJson}
-              SET: {
-                name: "my name"
-                sourceProfile: {
-                  point: {
-                    bandNormalized:{
-                      sed: {
-                        coolStar: T600_K
-                      }
-                      brightnesses: []
-                    }          
-                  }
-                }
-                sidereal: {              
-                  ra: { degrees: 0 }    
-                  dec: { degrees: 0 }    
-                  epoch: "J2000.000"
-                }
-              }
-            }) {
-              target {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
-    }
+  // def createTarget(user: User, pid: Program.Id): IO[Target.Id] =
+  //   query(
+  //     user = user,
+  //     query =
+  //       s"""
+  //         mutation {
+  //           createTarget(input: {
+  //             programId: ${pid.asJson}
+  //             SET: {
+  //               name: "my name"
+  //               sourceProfile: {
+  //                 point: {
+  //                   bandNormalized:{
+  //                     sed: {
+  //                       coolStar: T600_K
+  //                     }
+  //                     brightnesses: []
+  //                   }          
+  //                 }
+  //               }
+  //               sidereal: {              
+  //                 ra: { degrees: 0 }    
+  //                 dec: { degrees: 0 }    
+  //                 epoch: "J2000.000"
+  //               }
+  //             }
+  //           }) {
+  //             target {
+  //               id
+  //             }
+  //           }
+  //         }
+  //       """
+  //   ) map { json =>
+  //     json.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+  //   }
 
-  def createObservation(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createObservation(input: {
-            programId: ${pid.asJson},
-              SET: {
-                targetEnvironment: {
-                  asterism: ${tids.asJson}
-                }
-              }
-            }) {
-              observation {
-                id
-              }
-            }
-          }
-        """
-    ).map { json => 
-      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
+  // def createObservation(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+  //   query(
+  //     user = user,
+  //     query =
+  //       s"""
+  //         mutation {
+  //           createObservation(input: {
+  //           programId: ${pid.asJson},
+  //             SET: {
+  //               targetEnvironment: {
+  //                 asterism: ${tids.asJson}
+  //               }
+  //             }
+  //           }) {
+  //             observation {
+  //               id
+  //             }
+  //           }
+  //         }
+  //       """
+  //   ).map { json => 
+  //     json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+  //   }
 
   test("asterisms should be correctly grouped") {
     List(pi).traverse { user =>
       for {
-        pid  <- createProgram(user)
-        tids <- createTarget(user, pid).replicateA(5)
-        oid0 <- createObservation(user, pid, tids(3))
-        oid1 <- createObservation(user, pid, tids(0), tids(1))
-        oid2 <- createObservation(user, pid, tids(0), tids(1))
-        oid3 <- createObservation(user, pid, tids(0), tids(1), tids(2))
-        oid4 <- createObservation(user, pid)
+        pid  <- createProgramAs(user)
+        tids <- createEmptyTargetAs(user, pid).replicateA(5)
+        oid0 <- createObservationAs(user, pid, tids(3))
+        oid1 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid2 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid3 <- createObservationAs(user, pid, tids(0), tids(1), tids(2))
+        oid4 <- createObservationAs(user, pid)
         _  <- expect(
           user = user,
           query =
@@ -210,13 +210,13 @@ class asterismGroup extends OdbSuite {
   test("asterisms should be correctly filtered") {
     List(pi).traverse { user =>
       for {
-        pid  <- createProgram(user)
-        tids <- createTarget(user, pid).replicateA(5)
-        oid0 <- createObservation(user, pid, tids(3))
-        oid1 <- createObservation(user, pid, tids(0), tids(1))
-        oid2 <- createObservation(user, pid, tids(0), tids(1))
-        oid3 <- createObservation(user, pid, tids(0), tids(1), tids(2))
-        oid4 <- createObservation(user, pid)
+        pid  <- createProgramAs(user)
+        tids <- createEmptyTargetAs(user, pid).replicateA(5)
+        oid0 <- createObservationAs(user, pid, tids(3))
+        oid1 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid2 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid3 <- createObservationAs(user, pid, tids(0), tids(1), tids(2))
+        oid4 <- createObservationAs(user, pid)
         _  <- expect(
           user = user,
           query =
