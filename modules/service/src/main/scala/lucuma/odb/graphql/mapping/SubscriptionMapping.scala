@@ -22,6 +22,7 @@ import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
+import lucuma.odb.graphql.input.TargetEditInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
@@ -39,6 +40,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     List(
       ObservationEdit,
       ProgramEdit,
+      TargetEdit,
     )
 
   lazy val SubscriptionMapping =
@@ -104,5 +106,26 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           )
         }
     }
+
+  private val TargetEdit =
+    SubscriptionField("targetEdit", TargetEditInput.Binding.Option) { (input, child) =>
+      topics
+        .target
+        .subscribe(1024)
+        .filter { e =>
+          e.canRead(user) &&
+          input.flatMap(_.programId).forall(_ === e.programId) &&
+          input.flatMap(_.targetId).forall(_ === e.targetId)
+        }
+        .map { e =>
+          Result(
+            Environment(
+              Env("id" -> e.eventId, "editType" -> e.editType),
+              Unique(Filter(Predicates.targetEdit.value.id.eql(e.targetId), child))
+            )
+          )
+        }
+    }
+
 }
 
