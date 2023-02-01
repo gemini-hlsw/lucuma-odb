@@ -4800,7 +4800,7 @@ type Query {
 
     # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
     useCache: Boolean! = true
-  ): ExecutionConfig
+  ): SequenceGenerationResult
 
   # Retrieves the target with the given id, if it exists
   target(
@@ -5037,6 +5037,26 @@ type SequenceEventLocation {
 type SequenceEventPayload {
   # Sequence command
   command: SequenceCommand!
+}
+
+interface SequenceGenerationResult {
+  programId:       ProgramId!
+  observationId:   ObservationId!
+  itcResult:       ItcResultSet!
+}
+
+type SequenceGenerationFailure implements SequenceGenerationResult {
+  programId:     ProgramId!
+  observationId: ObservationId!
+  itcResult:     ItcResultSet!
+  message:       String!
+}
+
+type SequenceGenerationSuccess implements SequenceGenerationResult {
+  programId:       ProgramId!
+  observationId:   ObservationId!
+  itcResult:       ItcResultSet!
+  executionConfig: ExecutionConfig!
 }
 
 # Type of sequence, acquisition or science

@@ -182,6 +182,38 @@ object Itc {
   )(implicit ev: MonadCancel[F, Throwable]): Itc[F] =
     new Itc[F] {
 
+      private def usingService[A](
+        programId:      Program.Id,
+        observationIds: List[Observation.Id]
+      )(f: Itc[F] => F[A]): F[A] =
+        service.use { s =>
+          s.selectSpectroscopyInput(programId, observationIds).flatMap { m =>
+            f(fromClientAndInput[F](client, m))
+          }
+        }
+
+      def queryOne(
+        programId:     Program.Id,
+        observationId: Observation.Id,
+        useCache:      Boolean
+      ): F[Option[ResultSet]] =
+        usingService(programId, List(observationId))(_.queryOne(programId, observationId, useCache))
+
+      def queryAll(
+        programId:      Program.Id,
+        observationIds: List[Observation.Id],
+        useCache:       Boolean
+      ): F[List[ResultSet]] =
+        usingService(programId, observationIds)(_.queryAll(programId, observationIds, useCache))
+
+    }
+
+  def fromClientAndInput[F[_]](
+    client: ItcClient[F],
+    input:  Map[Observation.Id, EitherNel[(Option[Target.Id], String), NonEmptyList[(Target.Id, SpectroscopyModeInput)]]]
+  )(implicit ev: MonadCancel[F, Throwable]): Itc[F] =
+    new Itc[F] {
+
       def queryOne(
         programId:     Program.Id,
         observationId: Observation.Id,
@@ -196,12 +228,8 @@ object Itc {
         useCache:       Boolean
       ): F[List[ResultSet]] =
 
-        service.use { s =>
-          s.selectSpectroscopyInput(programId, observationIds).flatMap { m =>
-             m.toList.traverse { case (oid, e) =>
-               callForObservation(programId, oid, e, useCache)
-             }
-          }
+        input.toList.traverse { case (oid, e) =>
+          callForObservation(programId, oid, e, useCache)
         }
 
       def callForObservation(
@@ -218,7 +246,6 @@ object Itc {
           }.map(ResultSet.fromResults(pid, oid, _))
         )
 
-
       def callForTarget(
         tid:      Target.Id,
         input:    SpectroscopyModeInput,
@@ -232,5 +259,6 @@ object Itc {
         }
 
     }
+
 
 }

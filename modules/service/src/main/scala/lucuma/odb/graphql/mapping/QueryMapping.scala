@@ -52,6 +52,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     useCache: Boolean
   ): F[Json]
 
+  def sequence(
+    path:     Path,
+    pid:      lucuma.core.model.Program.Id,
+    oid:      lucuma.core.model.Observation.Id,
+    useCache: Boolean
+  ): F[Json]
+
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
       tpe = QueryType,
@@ -72,6 +79,14 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("partnerMeta"),
         SqlObject("program"),
         SqlObject("programs"),
+        RootEffect.computeJson("sequence") { (_, path, env) =>
+          val useCache = env.get[Boolean]("useCache").getOrElse(true)
+          (env.getR[lucuma.core.model.Program.Id]("programId"),
+           env.getR[lucuma.core.model.Observation.Id]("observationId")
+          ).parTupled.traverse { case (p, o) =>
+            sequence(path, p, o, useCache)
+          }
+        },
         SqlObject("target"),
         SqlObject("targetGroup"),
         SqlObject("targets"),
@@ -89,6 +104,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       PartnerMeta,
       Program,
       Programs,
+      Sequence,
       Target,
       TargetGroup,
       Targets,
@@ -287,6 +303,19 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
       }
   }
+
+  private lazy val Sequence: PartialFunction[Select, Result[Query]] =
+    case Select("sequence", List(
+      ProgramIdBinding("programId", rPid),
+      ObservationIdBinding("observationId", rOid),
+      BooleanBinding("useCache", rUseCache)
+    ), child) =>
+      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, useCache) =>
+        Environment(
+          Env("programId" -> pid, "observationId" -> oid, "useCache" -> useCache),
+          Select("sequence", Nil, child)
+        )
+      }
 
   private lazy val Target: PartialFunction[Select, Result[Query]] =
     case Select("target", List(
