@@ -23,46 +23,9 @@ class observations extends OdbSuite {
 
   val validUsers = List(pi, pi2, service).toList
 
-  def createProgram(user: User): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: { SET: { name: "${user.displayName}'s Program" } }) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
-
-  def createObservation(user: User, pid: Program.Id): IO[Observation.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-            }) {
-              observation {
-                id
-              }
-            }
-          }        """
-    ) map { json =>
-      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
-
-
   test("simple observation selection") {
-    createProgram(pi).flatMap { pid =>
-      createObservation(pi, pid).replicateA(5).flatMap { oids =>
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).replicateA(5).flatMap { oids =>
         expect(
           user = pi,
           query = s"""
@@ -93,8 +56,8 @@ class observations extends OdbSuite {
   }
 
   test("simple observation selection with limit") {
-    createProgram(pi2).flatMap { pid =>
-      createObservation(pi2, pid).replicateA(5).flatMap { oids =>
+    createProgramAs(pi2).flatMap { pid =>
+      createObservationAs(pi2, pid).replicateA(5).flatMap { oids =>
         expect(
           user = pi2,
           query = s"""
@@ -125,8 +88,8 @@ class observations extends OdbSuite {
   }
 
   test("simple observation selection, including planned time") {
-    createProgram(pi2).flatMap { pid =>
-      createObservation(pi2, pid).flatMap { oid =>
+    createProgramAs(pi2).flatMap { pid =>
+      createObservationAs(pi2, pid).flatMap { oid =>
         expect(
           user = pi2,
           query = s"""
@@ -244,7 +207,7 @@ class observations extends OdbSuite {
     }
 
   test("select observations with science requirements containing null and non-null embeds") {
-    createProgram(pi).flatMap { pid =>
+    createProgramAs(pi).flatMap { pid =>
       (createObservationWithDefinedSpecRequirements(pi, pid), createObservationWithNullSpecRequirements(pi, pid))
         .tupled
         .flatMap { (oid1, oid2) => 
