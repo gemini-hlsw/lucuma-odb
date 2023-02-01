@@ -52,9 +52,11 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-
+import lucuma.odb.graphql.OdbMapping
 import java.time.Duration
 import scala.concurrent.duration.*
+import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.skunk.SkunkMonitor
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
@@ -136,19 +138,33 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         }
     }
 
+  private def databaseConfig: Config.Database =
+    Config.Database(
+      host     = container.containerIpAddress,
+      port     = container.mappedPort(POSTGRESQL_PORT),
+      user     = container.username,
+      password = container.password,
+      database = container.databaseName,
+    )
+
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Main.routesResource(
-      Config.Database(
-        host     = container.containerIpAddress,
-        port     = container.mappedPort(POSTGRESQL_PORT),
-        user     = container.username,
-        password = container.password,
-        database = container.databaseName,
-      ),
+      databaseConfig,
       itcClient.pure[Resource[IO, *]],
       ssoClient.pure[Resource[IO, *]],
       "unused"
     ).map(_.map(_.orNotFound))
+
+  /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
+  def mapping: Resource[IO, Mapping[IO]] =
+    for {
+      db  <- Main.databasePoolResource[IO](databaseConfig)
+      mon  = SkunkMonitor.noopMonitor[IO]
+      usr  = TestUsers.Standard.pi(11, 110)
+      top <- OdbMapping.Topics(db)
+      itc  = itcClient
+      map <- Resource.eval(OdbMapping(db, mon, usr, top, itc))
+    } yield map
 
   private def server: Resource[IO, Server] =
     // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
