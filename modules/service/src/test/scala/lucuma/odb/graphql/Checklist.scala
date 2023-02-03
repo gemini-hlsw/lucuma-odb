@@ -3,16 +3,16 @@
 
 package lucuma.odb.graphql
 
-import edu.gemini.grackle.Mapping
 import cats.effect.IO
 import cats.syntax.all._
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.InterfaceType
-import edu.gemini.grackle.ObjectType
-import edu.gemini.grackle.UnionType
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.InputObjectType
+import edu.gemini.grackle.InterfaceType
+import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.ObjectType
+import edu.gemini.grackle.ScalarType
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.UnionType
 
 class Checklist extends OdbSuite {
   val validUsers = Nil
