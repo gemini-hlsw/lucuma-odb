@@ -13,13 +13,11 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
-import lucuma.odb.graphql.mutation.CreateObservationOps
-import lucuma.odb.graphql.mutation.CreateProgramOps
 import lucuma.odb.graphql.mutation.createTarget
 
 import scala.concurrent.duration._
 
-class targetEdit extends OdbSuite with CreateProgramOps with CreateObservationOps {
+class targetEdit extends OdbSuite {
 
   val pi = TestUsers.Standard.pi(11, 110)
 
