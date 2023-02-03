@@ -16,6 +16,8 @@ import clue.http4s.Http4sBackend
 import clue.http4s.Http4sWSBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import io.circe.Decoder
@@ -33,6 +35,7 @@ import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.Main
+import lucuma.odb.graphql.OdbMapping
 import lucuma.sso.client.SsoClient
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
@@ -52,11 +55,9 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import lucuma.odb.graphql.OdbMapping
+
 import java.time.Duration
 import scala.concurrent.duration.*
-import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.skunk.SkunkMonitor
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
