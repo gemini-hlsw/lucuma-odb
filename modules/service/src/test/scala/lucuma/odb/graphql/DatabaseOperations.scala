@@ -3,19 +3,19 @@
 
 package lucuma.odb.graphql
 
-import lucuma.core.model.User
-import lucuma.core.model.Program
-import lucuma.core.model.Observation
 import cats.effect.IO
-import io.circe.syntax.*
 import cats.syntax.all._
-import lucuma.core.model.Target
-import lucuma.odb.data.Tag
-import lucuma.core.util.TimeSpan
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.model.Observation
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.core.model.Partner
+import lucuma.odb.data.Tag
 import org.checkerframework.checker.units.qual.s
 
 trait DatabaseOperations { this: OdbSuite =>
