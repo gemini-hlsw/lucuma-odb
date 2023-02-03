@@ -26,7 +26,7 @@ class updateAsterisms extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      tid <- createEmptyTargetAs(pi, pid, "Larry")
+      tid <- createTargetAs(pi, pid, "Larry")
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -42,8 +42,8 @@ class updateAsterisms extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      t0  <- createEmptyTargetAs(pi, pid, "Larry")
-      t1  <- createEmptyTargetAs(pi, pid, "Curly")
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -67,8 +67,8 @@ class updateAsterisms extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      t0 <- createEmptyTargetAs(pi, pid, "Larry")
-      t1 <- createEmptyTargetAs(pi, pid, "Curly")
+      t0 <- createTargetAs(pi, pid, "Larry")
+      t1 <- createTargetAs(pi, pid, "Curly")
       _ <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -93,9 +93,9 @@ class updateAsterisms extends OdbSuite {
       pid <- createProgramAs(pi)
       o0 <- createObservationAs(pi, pid)
       o1 <- createObservationAs(pi, pid)
-      t0  <- createEmptyTargetAs(pi, pid, "Larry")
-      t1  <- createEmptyTargetAs(pi, pid, "Curly")
-      t2  <- createEmptyTargetAs(pi, pid, "Moe")
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
+      t2  <- createTargetAs(pi, pid, "Moe")
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,

@@ -561,8 +561,8 @@ class createObservation extends OdbSuite {
 
     for {
       pid <- createProgramAs(pi)
-      t0  <- createEmptyTargetAs(pi, pid, "Biff")
-      t1  <- createEmptyTargetAs(pi, pid, "Henderson")
+      t0  <- createTargetAs(pi, pid, "Biff")
+      t1  <- createTargetAs(pi, pid, "Henderson")
       res <- createObs(pid, t0, t1)
     } yield assertEquals(res, List(t0, t1))
   }
@@ -764,7 +764,7 @@ class createObservation extends OdbSuite {
 
   test("[general] specify gmos north long slit with calculated xbin") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "Biff",
+      createTargetAs(pi, pid, "Biff",
         """
           sourceProfile: {
             gaussian: {

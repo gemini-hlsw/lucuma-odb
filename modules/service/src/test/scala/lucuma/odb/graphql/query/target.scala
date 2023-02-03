@@ -23,7 +23,7 @@ class target extends OdbSuite {
 
   test("pi can select their own target") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).flatMap { tid =>
+      createTargetAs(pi, pid).flatMap { tid =>
         expect(
           user = pi,
           query = s"""
@@ -47,7 +47,7 @@ class target extends OdbSuite {
 
   test("pi can't select another pi's target") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).flatMap { tid =>
+      createTargetAs(pi, pid).flatMap { tid =>
         createUsers(pi2) >>
         expect(
           user = pi2,
@@ -70,7 +70,7 @@ class target extends OdbSuite {
 
   test("service user can select anyone's target") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).flatMap { tid =>
+      createTargetAs(pi, pid).flatMap { tid =>
         createUsers(service) >>
         expect(
           user = service,

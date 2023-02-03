@@ -55,7 +55,7 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  def createEmptyTargetAs(
+  def createTargetAs(
     user: User,
     pid:  Program.Id,
     name: String = "No Name",
