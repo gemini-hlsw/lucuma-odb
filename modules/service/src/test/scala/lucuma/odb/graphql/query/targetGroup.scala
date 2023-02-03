@@ -24,7 +24,7 @@ class targetGroup extends OdbSuite {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)
-        tids <- createEmptyTargetAs(user, pid).replicateA(5)
+        tids <- createTargetAs(user, pid).replicateA(5)
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))
         oid2 <- createObservationAs(user, pid, tids(1), tids(2), tids(3))
         oid3 <- createObservationAs(user, pid, tids(2))
@@ -129,7 +129,7 @@ class targetGroup extends OdbSuite {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)
-        tids <- List("foo", "bar", "baz", "qux", "quux").traverse(createEmptyTargetAs(user, pid, _))
+        tids <- List("foo", "bar", "baz", "qux", "quux").traverse(createTargetAs(user, pid, _))
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))
         oid2 <- createObservationAs(user, pid, tids(1), tids(2), tids(3))
         oid3 <- createObservationAs(user, pid, tids(2))

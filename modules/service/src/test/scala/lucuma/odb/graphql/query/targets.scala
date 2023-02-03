@@ -24,7 +24,7 @@ class targets extends OdbSuite {
 
   test("simple target selection") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).replicateA(5).flatMap { tids =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
         expect(
           user = pi,
           query = s"""
@@ -62,7 +62,7 @@ class targets extends OdbSuite {
 
   test("simple target selection with limit (more)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).replicateA(5).flatMap { tids =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
         expect(
           user = pi,
           query = s"""
@@ -101,7 +101,7 @@ class targets extends OdbSuite {
 
   test("target selection with offset and limit") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).replicateA(10).flatMap { tids =>
+      createTargetAs(pi, pid).replicateA(10).flatMap { tids =>
         expect(
           user = pi,
           query = s"""
@@ -141,7 +141,7 @@ class targets extends OdbSuite {
 
   test("target selection with multiple filters") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid).replicateA(5).flatMap { tids =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
         expect(
           user = pi,
           query = s"""

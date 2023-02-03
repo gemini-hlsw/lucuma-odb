@@ -24,7 +24,7 @@ class asterismGroup extends OdbSuite {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)
-        tids <- createEmptyTargetAs(user, pid).replicateA(5)
+        tids <- createTargetAs(user, pid).replicateA(5)
         oid0 <- createObservationAs(user, pid, tids(3))
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))
         oid2 <- createObservationAs(user, pid, tids(0), tids(1))
@@ -133,7 +133,7 @@ class asterismGroup extends OdbSuite {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)
-        tids <- createEmptyTargetAs(user, pid).replicateA(5)
+        tids <- createTargetAs(user, pid).replicateA(5)
         oid0 <- createObservationAs(user, pid, tids(3))
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))
         oid2 <- createObservationAs(user, pid, tids(0), tids(1))
