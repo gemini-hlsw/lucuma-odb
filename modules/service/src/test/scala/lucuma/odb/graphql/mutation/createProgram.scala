@@ -211,6 +211,20 @@ class createProgram extends OdbSuite {
                         iso
                       }
                     }
+                    ... on LargeProgram {
+                      LPminPercentTime: minPercentTime
+                      LPminPercentTotalTime: minPercentTotalTime
+                      LPtotalTime: totalTime {
+                        hours
+                        iso
+                      }
+                    }
+                    ... on Queue {
+                      QminPercentTime: minPercentTime
+                    }
+                    ... on Classical {
+                      CminPercentTime: minPercentTime
+                    }
                   }
                   toOActivation
                   partnerSplits {

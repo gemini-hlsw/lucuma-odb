@@ -144,8 +144,8 @@ object ProposalClassInput {
       TypeA.createBinding(Tag("poor_weather")),
       TypeA.createBinding(Tag("queue")),
       TypeA.createBinding(Tag("system_verification")),
-      TypeB.createBinding(Tag("intensive")),
       TypeB.createBinding(Tag("large_program")),
+      TypeB.createBinding(Tag("intensive")),
     )
 
   val EditBinding: Matcher[Either[TypeA.Edit, TypeB.Edit]] =
@@ -158,8 +158,8 @@ object ProposalClassInput {
       TypeA.editBinding(Tag("poor_weather")),
       TypeA.editBinding(Tag("queue")),
       TypeA.editBinding(Tag("system_verification")),
-      TypeB.editBinding(Tag("intensive")),
       TypeB.editBinding(Tag("large_program")),
+      TypeB.editBinding(Tag("intensive")),
     )
 
 }
