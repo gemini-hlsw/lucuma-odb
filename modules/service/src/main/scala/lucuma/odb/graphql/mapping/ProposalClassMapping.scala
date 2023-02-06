@@ -69,32 +69,32 @@ trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
 
       def discriminate(cursor: Cursor): Result[Type] =
         cursor.fieldAs[Tag]("discriminator").flatMap {
-          case Tag("classical_type")           => Result(ClassicalType)
-          case Tag("demo_science_type")        => Result(DemoScienceType)
-          case Tag("directors_time_type")      => Result(DirectorsTimeType)
-          case Tag("exchange_type")            => Result(ExchangeType)
-          case Tag("fast_turnaround_type")     => Result(FastTurnaroundType)
-          case Tag("intensive_type")           => Result(IntensiveType)
-          case Tag("large_program_type")       => Result(LargeProgramType)
-          case Tag("poor_weather_type")        => Result(PoorWeatherType)
-          case Tag("queue_type")               => Result(QueueType)
-          case Tag("system_verification_type") => Result(SystemVerificationType)
-          case other                           => Result.failure("ProposalClassMapping: cannot determine type for $other")
+          case Tag("classical")           => Result(ClassicalType)
+          case Tag("demo_science")        => Result(DemoScienceType)
+          case Tag("directors_time")      => Result(DirectorsTimeType)
+          case Tag("exchange")            => Result(ExchangeType)
+          case Tag("fast_turnaround")     => Result(FastTurnaroundType)
+          case Tag("intensive")           => Result(IntensiveType)
+          case Tag("large_program")       => Result(LargeProgramType)
+          case Tag("poor_weather")        => Result(PoorWeatherType)
+          case Tag("queue")               => Result(QueueType)
+          case Tag("system_verification") => Result(SystemVerificationType)
+          case other                      => Result.failure("ProposalClassMapping: cannot determine type for $other")
         }
 
       def narrowPredicate(tpe: Type): Option[Predicate] = {
         def pred(tagName: String) = Some(Predicates.proposalClass.discriminator.eql(Tag(tagName)))
         tpe match
-          case ClassicalType          => pred("classical_type")
-          case DemoScienceType        => pred("demo_science_type")
-          case DirectorsTimeType      => pred("directors_time_type")
-          case ExchangeType           => pred("exchange_type")
-          case FastTurnaroundType     => pred("fast_turnaround_type")
-          case IntensiveType          => pred("intensive_type")
-          case LargeProgramType       => pred("large_program_type")
-          case PoorWeatherType        => pred("poor_weather_type")
-          case QueueType              => pred("queue_type")
-          case SystemVerificationType => pred("system_verification_type")
+          case ClassicalType          => pred("classical")
+          case DemoScienceType        => pred("demo_science")
+          case DirectorsTimeType      => pred("directors_time")
+          case ExchangeType           => pred("exchange")
+          case FastTurnaroundType     => pred("fast_turnaround")
+          case IntensiveType          => pred("intensive")
+          case LargeProgramType       => pred("large_program")
+          case PoorWeatherType        => pred("poor_weather")
+          case QueueType              => pred("queue")
+          case SystemVerificationType => pred("system_verification")
           case _                      => None
         }
 
