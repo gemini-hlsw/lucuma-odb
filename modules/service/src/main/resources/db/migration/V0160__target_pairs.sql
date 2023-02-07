@@ -1,7 +1,6 @@
--- This seems unethical but it's a straightforward to make a data type with a pair
--- of targets, like a CloneTargetResult. When provided with a pair of IDs in its
--- WHERE clause it will compile down to a pair of indexed lookups. Either column
--- can be used as the key in the mapping, assuming you're only selecting one pair.
+
+-- A view that contains every pair of target ids. When joined to the target table
+-- with conditions on the ids it all compiles down to hash lookups, which are fast.
 
 CREATE OR REPLACE VIEW v_target_pairs AS
   SELECT
