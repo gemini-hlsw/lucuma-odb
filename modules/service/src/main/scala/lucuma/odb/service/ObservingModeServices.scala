@@ -19,9 +19,9 @@ import skunk.Transaction
 
 sealed trait ObservingModeServices[F[_]] {
 
-  def selectItcParams(
+  def selectSequenceConfig(
     which: List[(Observation.Id, ObservingModeType)]
-  ): F[Map[Observation.Id, ObservingModeServices.ItcParams]]
+  ): F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -43,10 +43,9 @@ sealed trait ObservingModeServices[F[_]] {
 
 object ObservingModeServices {
 
-  final case class ItcParams(
-    wavelength: Wavelength,
-    mode:       InstrumentMode
-  )
+  type SequenceConfig =
+    lucuma.odb.sequence.gmos.longslit.Config.GmosNorth |
+    lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 
   def fromSession[F[_]: Sync](
     session: Session[F]
@@ -56,32 +55,22 @@ object ObservingModeServices {
       lazy val gmosLongSlitService: GmosLongSlitService[F] =
         GmosLongSlitService.fromSession(session)
 
-      override def selectItcParams(
+      override def selectSequenceConfig(
         which: List[(Observation.Id, ObservingModeType)]
-      ): F[Map[Observation.Id, ItcParams]] = {
+      ): F[Map[Observation.Id, SequenceConfig]] = {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
-              .map(_.view.mapValues { gn =>
-                ItcParams(
-                  gn.common.centralWavelength,
-                  InstrumentMode.GmosNorth(gn.grating, gn.filter, GmosFpu.North.builtin(gn.fpu))
-                )
-              }.toMap)
+              .map(_.view.mapValues(_.toSequenceConfig).toMap)
 
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
-              .map(_.view.mapValues { gs =>
-                ItcParams(
-                  gs.common.centralWavelength,
-                  InstrumentMode.GmosSouth(gs.grating, gs.filter, GmosFpu.South.builtin(gs.fpu))
-                )
-              }.toMap)
-        }.map(_.fold(Map.empty[Observation.Id, ItcParams])(_ ++ _))
+              .map(_.view.mapValues(_.toSequenceConfig).toMap)
+        }.map(_.fold(Map.empty[Observation.Id, SequenceConfig])(_ ++ _))
       }
 
       override def createFunction(

@@ -101,9 +101,9 @@ object GmosLongSlitInput {
         ObservingModeType.GmosNorthLongSlit
 
       /**
-       * Creates a GmosLongSlitConfig based on input parameters.
+       * Creates a GMOS Long Slit sequence config based on input parameters.
        */
-      def toGmosLongSlit: Config.GmosNorth =
+      def toSequenceConfig: Config.GmosNorth =
         Config.GmosNorth(
           grating,
           filter,
@@ -169,9 +169,9 @@ object GmosLongSlitInput {
         ObservingModeType.GmosSouthLongSlit
 
       /**
-       * Creates a GmosLongSlitConfig based on input parameters.
+       * Creates a GMOS Long Slit sequence config based on input parameters.
        */
-      def toGmosLongSlit: Config.GmosSouth =
+      def toSequenceConfig: Config.GmosSouth =
         Config.GmosSouth(
           grating,
           filter,

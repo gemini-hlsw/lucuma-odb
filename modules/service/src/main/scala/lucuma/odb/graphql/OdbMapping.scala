@@ -37,19 +37,19 @@ import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
-import lucuma.odb.graphql.client.Itc
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
-import lucuma.odb.graphql.instances.ItcResultEncoder.given
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
+import lucuma.odb.sequence.Itc
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
-import lucuma.odb.service.ItcInputService
+import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
@@ -190,10 +190,10 @@ object OdbMapping {
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
 
-          override val itcClientService: Resource[F, ItcInputService[F]] =
+          override val generatorParamsService: Resource[F, GeneratorParamsService[F]] =
             pool.map { s =>
               val oms = ObservingModeServices.fromSession(s)
-              ItcInputService.fromSession(s, user, oms)
+              GeneratorParamsService.fromSession(s, user, oms)
             }
 
           override def itcQuery(
@@ -201,14 +201,40 @@ object OdbMapping {
             pid:      Program.Id,
             oid:      Observation.Id,
             useCache: Boolean
-          ): F[Json] = {
+          ): F[Result[Json]] = {
 
-            import lucuma.odb.graphql.instances.ItcResultEncoder._
+            def lookup(params: GeneratorParams): F[Result[Json]] =
+              Itc.fromClient(itcClient).lookup(params, useCache).map {
+                case Left(errors)     =>
+                  Result.failure(errors.map { e =>
+                    s"(Target ${e.targetId}) ${e.message}"
+                  }.intercalate(", "))
 
-            Itc
-              .fromClientAndService(itcClient, itcClientService)
-              .queryOne(pid, oid, useCache)
-              .map(_.asJson)
+                case Right(resultSet) =>
+                  Result(resultSet.asJson)
+              }
+
+            def formatMissing(missing: NonEmptyList[GeneratorParamsService.MissingData]): String = {
+              val params = missing.map { m =>
+                s"* ${m.targetId.fold(""){tid => s"(target ${tid}) "}}${m.paramName}"
+              }.intercalate("\n")
+              s"ITC cannot be queried until the following parameters are defined:\n$params"
+            }
+
+            generatorParamsService.use { gps =>
+              gps
+                .select(pid, oid)
+                .flatMap {
+                  case None =>
+                    Result(Json.Null).pure[F]
+
+                  case Some(Left(missing)) =>
+                    Result.failure(formatMissing(missing)).pure[F]
+
+                  case Some(Right(params)) =>
+                    lookup(params)
+                }
+            }
           }
 
           override def sequence(
@@ -216,13 +242,14 @@ object OdbMapping {
             pid:      Program.Id,
             oid:      Observation.Id,
             useCache: Boolean
-          ): F[Json] = {
-
+          ): F[Result[Json]] = {
+            ???
+            /*
             import lucuma.odb.graphql.instances.ItcResultEncoder.*
             import lucuma.odb.json.sequence.given
 
             Itc
-              .fromClientAndService(itcClient, itcClientService)
+              .fromClientAndService(itcClient, generatorParamsService)
               .queryOne(pid, oid, useCache)
               .map {
                 case None     =>
@@ -287,20 +314,20 @@ object OdbMapping {
                             Acquisition
                               .GmosNorth
                               .compute(
-                                // TODO: replace with GmosNorthFilter.acquisition
+                                // TODO SEQUENCE: replace with GmosNorthFilter.acquisition
                                 NonEmptyList.of(GmosNorthFilter.UPrime, GmosNorthFilter.GPrime, GmosNorthFilter.RPrime, GmosNorthFilter.IPrime, GmosNorthFilter.ZPrime),
                                 u,
                                 AcqExposureTime(10.secTimeSpan),
                                 in.wavelength
                               )
 
-                          // TODO: i think spectroscopy mode input needs to be generalized to get the whole observing mode
+                          // TODO SEQUENCE: i think spectroscopy mode input needs to be generalized to get the whole observing mode
 
                           val sci =
                             Science
                               .GmosNorth
                               .compute(
-                                Config.GmosNorth(g, f, u, in.wavelength), // TODO: okay, we need to read this since the defaults may be overridden (see TODO above)
+                                Config.GmosNorth(g, f, u, in.wavelength), // TODO SEQUENCE: okay, we need to read this since the defaults may be overridden (see TODO above)
                                 SciExposureTime(time),
                                 in.sourceProfile,
                                 in.constraints.imageQuality,
@@ -309,13 +336,13 @@ object OdbMapping {
 
                           def atom(ps: ProtoStep[DynamicConfig.GmosNorth]*): Atom.GmosNorth =
                             Atom.GmosNorth(
-                              Atom.Id.fromUuid(UUID.randomUUID),  // TODO: I know, I know
+                              Atom.Id.fromUuid(UUID.randomUUID),  // TODO SEQUENCE: I know, I know
                               ps.toList.map(step)
                             )
 
                           def step(p: ProtoStep[DynamicConfig.GmosNorth]): Step.GmosNorth =
                             Step.GmosNorth(
-                              Step.Id.fromUuid(UUID.randomUUID),  // TODO: yeah
+                              Step.Id.fromUuid(UUID.randomUUID),  // TODO SEQUENCE: yeah
                               p.instrumentConfig,
                               p.stepConfig,
                               StepTime(TimeSpan.Min, TimeSpan.Min, TimeSpan.Min, TimeSpan.Min, TimeSpan.Min),
@@ -350,20 +377,20 @@ object OdbMapping {
                             Acquisition
                               .GmosSouth
                               .compute(
-                                // TODO: replace with GmosNorthFilter.acquisition
+                                // TODO SEQUENCE: replace with GmosSouthFilter.acquisition
                                 NonEmptyList.of(GmosSouthFilter.UPrime, GmosSouthFilter.GPrime, GmosSouthFilter.RPrime, GmosSouthFilter.IPrime, GmosSouthFilter.ZPrime),
                                 u,
                                 AcqExposureTime(10.secTimeSpan),
                                 in.wavelength
                               )
 
-                          // TODO: i think spectroscopy mode input needs to be generalized to get the whole observing mode
+                          // TODO SEQUENCE: i think spectroscopy mode input needs to be generalized to get the whole observing mode
 
                           val sci =
                             Science
                               .GmosSouth
                               .compute(
-                                Config.GmosSouth(g, f, u, in.wavelength), // TODO: okay, we need to read this since the defaults may be overridden (see TODO above)
+                                Config.GmosSouth(g, f, u, in.wavelength), // TODO SEQUENCE: okay, we need to read this since the defaults may be overridden (see TODO above)
                                 SciExposureTime(time),
                                 in.sourceProfile,
                                 in.constraints.imageQuality,
@@ -372,13 +399,13 @@ object OdbMapping {
 
                           def atom(ps: ProtoStep[DynamicConfig.GmosSouth]*): Atom.GmosSouth =
                             Atom.GmosSouth(
-                              Atom.Id.fromUuid(UUID.randomUUID),  // TODO: I know, I know
+                              Atom.Id.fromUuid(UUID.randomUUID),  // TODO SEQUENCE: I know, I know
                               ps.toList.map(step)
                             )
 
                           def step(p: ProtoStep[DynamicConfig.GmosSouth]): Step.GmosSouth =
                             Step.GmosSouth(
-                              Step.Id.fromUuid(UUID.randomUUID),  // TODO: yeah
+                              Step.Id.fromUuid(UUID.randomUUID),  // TODO SEQUENCE: yeah
                               p.instrumentConfig,
                               p.stepConfig,
                               StepTime(TimeSpan.Min, TimeSpan.Min, TimeSpan.Min, TimeSpan.Min, TimeSpan.Min),
@@ -422,6 +449,7 @@ object OdbMapping {
                   }
                   Json.fromFields(common ::: fields)
               }
+            */
           }
 
           // Our combined type mappings
