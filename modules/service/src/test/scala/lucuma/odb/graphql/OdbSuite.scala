@@ -63,7 +63,7 @@ import scala.concurrent.duration.*
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations {
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =

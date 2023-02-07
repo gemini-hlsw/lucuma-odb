@@ -22,64 +22,9 @@ class targets extends OdbSuite {
 
   val validUsers = List(pi, pi2, service).toList
 
-  def createProgram(user: User): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: { SET: { name: "${user.displayName}'s Program" } }) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
-  def createTarget(user: User, pid: Program.Id): IO[Target.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createTarget(
-              input: {
-                programId: ${pid.asJson}
-                SET: {
-                  name: "Crunchy Target"
-                  sidereal: {
-                    ra: { degrees: "12.345" }
-                    dec: { degrees: "45.678" }
-                    epoch: "J2000.000"
-                  }
-                  sourceProfile: {
-                    point: {
-                      bandNormalized: {
-                        sed: { stellarLibrary: B5_III }
-                        brightnesses: []
-                      }
-                    }
-                  }
-                }
-              }
-            ) {
-              target { id }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
-    }
-
-  def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgram) // TODO: something cheaper
-
   test("simple target selection") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).replicateA(5).flatMap { tids =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
         expect(
           user = pi,
           query = s"""
@@ -116,8 +61,8 @@ class targets extends OdbSuite {
   }
 
   test("simple target selection with limit (more)") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).replicateA(5).flatMap { tids =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
         expect(
           user = pi,
           query = s"""
@@ -155,8 +100,8 @@ class targets extends OdbSuite {
   }
 
   test("target selection with offset and limit") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).replicateA(10).flatMap { tids =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(10).flatMap { tids =>
         expect(
           user = pi,
           query = s"""
@@ -195,8 +140,8 @@ class targets extends OdbSuite {
   }
 
   test("target selection with multiple filters") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).replicateA(5).flatMap { tids =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
         expect(
           user = pi,
           query = s"""

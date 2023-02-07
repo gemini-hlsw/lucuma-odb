@@ -7,7 +7,7 @@ package mutation
 import io.circe.literal._
 import lucuma.core.model.User
 
-class updateTargets extends OdbSuite with CreateProgramOps with CreateObservationOps {
+class updateTargets extends OdbSuite {
 
   import createTarget.FullTargetGraph                            
 
@@ -17,7 +17,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("no updates") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
        expect(
         user = pi,
         query = s"""
@@ -54,7 +54,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
   
   test("update name") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
        expect(
         user = pi,
         query = s"""
@@ -95,7 +95,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update name to null (fails)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
        expect(
         user = pi,
         query = s"""
@@ -123,7 +123,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update tracking (sidereal -> sidereal)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
        expect(
         user = pi,
         query = s"""
@@ -172,7 +172,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update tracking (sidereal -> nonsidereal)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
        expect(
         user = pi,
         query = s"""
@@ -231,7 +231,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
   // a bunch of worrying text in the test output.
   test("update tracking (nonsidereal -> sidereal, incomplete)".ignore) {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
         // first change to nonsidereal
         expect(
           user = pi,
@@ -305,7 +305,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update tracking (nonsidereal -> sidereal)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
         // first change to nonsidereal
         expect(
           user = pi,
@@ -402,7 +402,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update source profile (point/bandNormalized/sed)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
         expect(
           user = pi,
           query = s"""
@@ -465,7 +465,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update source profile (point -> gaussian, incomplete)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
         expect(
           user = pi,
           query = s"""
@@ -506,7 +506,7 @@ class updateTargets extends OdbSuite with CreateProgramOps with CreateObservatio
 
   test("update source profile (point -> gaussian, complete)") {
     createProgramAs(pi).flatMap { pid =>
-      createEmptyTargetAs(pi, pid, "target-1").flatMap { tid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
         expect(
           user = pi,
           query = s"""
