@@ -4,12 +4,12 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.model.Target
-import cats.effect.IO
-import lucuma.core.model.Observation
 import io.circe.syntax.*
+import lucuma.core.model.Observation
+import lucuma.core.model.Target
 
 class cloneTarget extends OdbSuite {
   import createTarget.FullTargetGraph
