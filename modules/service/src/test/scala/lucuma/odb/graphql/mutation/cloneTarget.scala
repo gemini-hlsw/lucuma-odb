@@ -11,8 +11,9 @@ import lucuma.core.model.Target
 class cloneTarget extends OdbSuite {
   import createTarget.FullTargetGraph
 
-  val pi = TestUsers.Standard.pi(nextId, nextId)
-  lazy val validUsers = List(pi)
+  val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
+
+  lazy val validUsers = List(pi, pi2)
 
   test("simple clone") {
     createProgramAs(pi).flatMap { pid =>
@@ -93,6 +94,24 @@ class cloneTarget extends OdbSuite {
   }
 
   test("clone with bogus target id") {
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          cloneTarget(input: {
+            targetId: "t-ffff"
+          }) {
+            newTarget {
+              id
+            }
+          }
+        }
+      """,
+      expected = Left(List("No such target: t-ffff"))
+    )
+  }                
+
+  test("clone with bogus update") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "My Target").flatMap { tid =>
         expect(
@@ -100,7 +119,13 @@ class cloneTarget extends OdbSuite {
           query = s"""
             mutation {
               cloneTarget(input: {
-                targetId: "t-ffff"
+                targetId: "$tid"
+                SET: {
+                  sourceProfile: {
+                    gaussian: {
+                    }
+                  }
+                }
               }) {
                 newTarget {
                   id
@@ -108,7 +133,29 @@ class cloneTarget extends OdbSuite {
               }
             }
           """,
-          expected = Left(List("No such target: t-ffff"))
+          expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
+        )
+      }
+    }
+  }
+
+  test("clone someone else's target") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "My Target").flatMap { tid =>
+        expect(
+          user = pi2, // different user!
+          query = s"""
+            mutation {
+              cloneTarget(input: {
+                targetId: "$tid"
+              }) {
+                newTarget {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Left(List(s"No such target: $tid"))
         )
       }
     }
