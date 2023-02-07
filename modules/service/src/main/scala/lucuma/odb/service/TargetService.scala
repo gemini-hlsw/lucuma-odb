@@ -19,6 +19,7 @@ import lucuma.core.math.ProperMotion
 import lucuma.core.model.CatalogInfo
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.SiderealTracking
@@ -34,6 +35,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.CatalogInfoInput
+import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
@@ -43,17 +45,20 @@ import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Encoder
+import skunk.Query
 import skunk.Session
 import skunk.SqlState
+import skunk.Transaction
 import skunk.Void
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
 
 trait TargetService[F[_]] {
-  import TargetService.{ CreateTargetResponse, UpdateTargetsResponse }
+  import TargetService.{ CloneTargetResponse, CreateTargetResponse, UpdateTargetsResponse }
   def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse]
   def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse]
+  def cloneTarget(input: CloneTargetInput): F[CloneTargetResponse]
 }
 
 object TargetService {
@@ -66,10 +71,18 @@ object TargetService {
   }
   import CreateTargetResponse._
 
-  enum UpdateTargetsResponse:
-    case Success(selected: List[Target.Id])
-    case SourceProfileUpdatesFailed(problems: NonEmptyChain[Problem])
-    case TrackingSwitchFailed(problem: String)
+  sealed trait UpdateTargetsResponse
+  sealed trait UpdateTargetsError extends UpdateTargetsResponse
+  object UpdateTargetsResponse {
+    case class Success(selected: List[Target.Id]) extends UpdateTargetsResponse
+    case class SourceProfileUpdatesFailed(problems: NonEmptyChain[Problem]) extends UpdateTargetsError
+    case class TrackingSwitchFailed(problem: String) extends UpdateTargetsError
+  }
+
+  enum CloneTargetResponse:
+    case Success(oldTargetId: Target.Id, newTargetId: Target.Id)
+    case NoSuchTarget(targetId: Target.Id)
+    case UpdateFailed(problem: UpdateTargetsError)
 
   def fromSession[F[_]: Concurrent](s: Session[F], u: User): TargetService[F] =
     new TargetService[F] {
@@ -92,6 +105,10 @@ object TargetService {
 
       def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse] =
         s.transaction.use { xa =>
+          updateTargetsʹ(xa, input, which)
+        }
+
+      def updateTargetsʹ(xa: Transaction[F], input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse] =
 
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
@@ -132,13 +149,36 @@ object TargetService {
               
             }
 
+          } recover {
+            case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
+              UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      } recover {
-          case SqlState.CheckViolation(ex) if ex.constraintName == Some("ra_dec_epoch_all_defined") =>
-            UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
-      }
+      def cloneTarget(input: CloneTargetInput): F[CloneTargetResponse] =
+        s.transaction.use { xa =>
+          
+          // TODO: need to ensure that the original target is visible to the user          
 
+          val clone: F[Target.Id] =
+            s.prepareR(Statements.cloneTarget).use(_.unique(input.targetId))
+
+          def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] = 
+            input.SET.traverse(updateTargetsʹ(xa, _, sql"$target_id".apply(tid)))
+          
+          def replaceIn(tid: Target.Id): F[Unit] =
+            input.REPLACE_IN.traverse_ { which =>
+              val stmt = Statements.replaceTargetIn(which, input.targetId, tid)
+              s.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))               
+            } 
+
+          clone.flatMap { tid =>
+            update(tid).flatMap {              
+                case Some(err: UpdateTargetsError) => CloneTargetResponse.UpdateFailed(err).pure[F]         
+                case _ => replaceIn(tid) as CloneTargetResponse.Success(input.targetId, tid)
+            }
+          }
+
+        }
 
     }
 
@@ -346,6 +386,58 @@ object TargetService {
       updates(SET).fold(which)(update)
     }
 
+    // an exact clone, except for c_target_id and c_existence (which are defaulted)
+    val cloneTarget: Query[Target.Id, Target.Id] =
+      sql"""
+        INSERT INTO t_target(
+          c_program_id,
+          c_name,
+          c_type,
+          c_sid_ra,
+          c_sid_dec,
+          c_sid_epoch,
+          c_sid_pm_ra,
+          c_sid_pm_dec,
+          c_sid_rv,
+          c_sid_parallax,
+          c_sid_catalog_name,
+          c_sid_catalog_id,
+          c_sid_catalog_object_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_nsid_key,
+          c_source_profile,
+        )
+        SELECT 
+          c_program_id,
+          c_name,
+          c_type,
+          c_sid_ra,
+          c_sid_dec,
+          c_sid_epoch,
+          c_sid_pm_ra,
+          c_sid_pm_dec,
+          c_sid_rv,
+          c_sid_parallax,
+          c_sid_catalog_name,
+          c_sid_catalog_id,
+          c_sid_catalog_object_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_nsid_key,
+          c_source_profile
+        FROM t_target
+        WHERE c_target_id = $target_id
+        RETURNING c_target_id
+      """.query(target_id)
+
+    def replaceTargetIn(which: NonEmptyList[Observation.Id], from: Target.Id, to: Target.Id): AppliedFragment =
+      sql"""
+      UPDATE t_target_asterism
+      SET    c_target_id = $target_id
+      WHERE  c_target_id = $target_id
+      AND    c_observation_id IN (${observation_id.list(which.length)})
+      """.apply(to ~ from ~ which.toList)
   }
 
 }
