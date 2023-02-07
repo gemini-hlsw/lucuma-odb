@@ -158,13 +158,17 @@ object TargetService {
         s.transaction.use { xa =>
           import CloneTargetResponse.*
 
-          // TODO: need to ensure that the original target is visible to the user          
-
-          val clone: F[Option[Target.Id]] =
-            s.prepareR(Statements.cloneTarget).use(_.option(input.targetId))
+          val pid: F[Option[Program.Id]] =
+            s.prepareR(sql"select c_program_id from t_target where c_target_id = $target_id".query(program_id)).use { ps =>
+              ps.option(input.targetId)
+            }
+            
+          def clone(pid: Program.Id): F[Option[Target.Id]] =
+            val stmt = Statements.cloneTarget(pid, input.targetId, u)
+            s.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
 
           def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] = 
-            input.SET.traverse(updateTargetsʹ(xa, _, sql"$target_id".apply(tid)))
+            input.SET.traverse(updateTargetsʹ(xa, _, sql"SELECT $target_id".apply(tid)))
           
           def replaceIn(tid: Target.Id): F[Unit] =
             input.REPLACE_IN.traverse_ { which =>
@@ -172,14 +176,18 @@ object TargetService {
               s.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))               
             } 
 
-          clone.flatMap { 
-            case None => NoSuchTarget(input.targetId).pure[F]
-            case Some(tid) =>
-              update(tid).flatMap {              
-                  case Some(err: UpdateTargetsError) => UpdateFailed(err).pure[F]         
-                  case _ => replaceIn(tid) as Success(input.targetId, tid)
+          pid.flatMap {
+            case None => NoSuchTarget(input.targetId).pure[F] // doesn't exist at all
+            case Some(pid) =>
+              clone(pid).flatMap {
+                case None => NoSuchTarget(input.targetId).pure[F] // not authorized
+                case Some(tid) =>
+                  update(tid).flatMap {              
+                    case Some(err: UpdateTargetsError) => UpdateFailed(err).pure[F]         
+                    case _ => replaceIn(tid) as Success(input.targetId, tid)
+                  }
               }
-            }
+          }
 
         }
 
@@ -390,7 +398,7 @@ object TargetService {
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
-    val cloneTarget: Query[Target.Id, Target.Id] =
+    def cloneTarget(pid: Program.Id, tid: Target.Id, user: User): AppliedFragment =
       sql"""
         INSERT INTO t_target(
           c_program_id,
@@ -431,8 +439,11 @@ object TargetService {
           c_source_profile
         FROM t_target
         WHERE c_target_id = $target_id
+      """.apply(tid) |+|
+      ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      void"""
         RETURNING c_target_id
-      """.query(target_id)
+      """
 
     def replaceTargetIn(which: NonEmptyList[Observation.Id], from: Target.Id, to: Target.Id): AppliedFragment =
       sql"""
