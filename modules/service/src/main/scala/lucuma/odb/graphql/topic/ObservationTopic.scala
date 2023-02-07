@@ -72,9 +72,8 @@ object ObservationTopic {
     maxQueued: Int,
   ): Stream[F, Element] =
     for {
-      pq    <- Stream.resource(s.prepareR(ProgramTopic.SelectProgramUsers))
       oid   <- updates(s, maxQueued)
-      users <- Stream.eval(pq.stream(oid._2, 1024).compile.toList)
+      users <- Stream.eval(ProgramTopic.selectProgramUsers(s, oid._2))
       elem   = Element(oid._1, oid._2, oid._3, oid._4, users)
       _     <- Stream.eval(Logger[F].info(s"ObservationChannel: $elem"))
     } yield elem

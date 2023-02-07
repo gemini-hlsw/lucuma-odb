@@ -183,7 +183,7 @@ object TargetService {
                 case None => NoSuchTarget(input.targetId).pure[F] // not authorized
                 case Some(tid) =>
                   update(tid).flatMap {              
-                    case Some(err: UpdateTargetsError) => UpdateFailed(err).pure[F]         
+                    case Some(err: UpdateTargetsError) => xa.rollback.as(UpdateFailed(err))
                     case _ => replaceIn(tid) as Success(input.targetId, tid)
                   }
               }
@@ -447,7 +447,7 @@ object TargetService {
 
     def replaceTargetIn(which: NonEmptyList[Observation.Id], from: Target.Id, to: Target.Id): AppliedFragment =
       sql"""
-      UPDATE t_target_asterism
+      UPDATE t_asterism_target
       SET    c_target_id = $target_id
       WHERE  c_target_id = $target_id
       AND    c_observation_id IN (${observation_id.list(which.length)})
