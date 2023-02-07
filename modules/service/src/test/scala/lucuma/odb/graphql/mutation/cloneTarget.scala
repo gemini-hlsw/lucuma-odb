@@ -20,17 +20,17 @@ class cloneTarget extends OdbSuite {
         query(
           user = pi,
           query = s"""
-          mutation {
-            cloneTarget(input: {
-              targetId: "$tid"
-            }) {
-              originalTarget $FullTargetGraph
-              newTarget $FullTargetGraph
+            mutation {
+              cloneTarget(input: {
+                targetId: "$tid"
+              }) {
+                originalTarget $FullTargetGraph
+                newTarget $FullTargetGraph
 
-              originalTargetId: originalTarget { id }
-              newTargetId: newTarget { id }
+                originalTargetId: originalTarget { id }
+                newTargetId: newTarget { id }
+              }
             }
-          }
           """
         ).map { json =>
 
@@ -57,21 +57,21 @@ class cloneTarget extends OdbSuite {
         expect(
           user = pi,
           query = s"""
-          mutation {
-            cloneTarget(input: {
-              targetId: "$tid"
-              SET: {
-                name: "New Name"
-              }
-            }) {
-              originalTarget {
-                name
-              }
-              newTarget {
-                name
+            mutation {
+              cloneTarget(input: {
+                targetId: "$tid"
+                SET: {
+                  name: "New Name"
+                }
+              }) {
+                originalTarget {
+                  name
+                }
+                newTarget {
+                  name
+                }
               }
             }
-          }
           """,
           expected = Right(
             json"""
@@ -87,6 +87,28 @@ class cloneTarget extends OdbSuite {
               }
             """
           )
+        )
+      }
+    }
+  }
+
+  test("clone with bogus target id") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "My Target").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneTarget(input: {
+                targetId: "t-ffff"
+              }) {
+                newTarget {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Left(List("No such target: t-ffff"))
         )
       }
     }

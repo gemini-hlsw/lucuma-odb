@@ -156,11 +156,12 @@ object TargetService {
 
       def cloneTarget(input: CloneTargetInput): F[CloneTargetResponse] =
         s.transaction.use { xa =>
-          
+          import CloneTargetResponse.*
+
           // TODO: need to ensure that the original target is visible to the user          
 
-          val clone: F[Target.Id] =
-            s.prepareR(Statements.cloneTarget).use(_.unique(input.targetId))
+          val clone: F[Option[Target.Id]] =
+            s.prepareR(Statements.cloneTarget).use(_.option(input.targetId))
 
           def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] = 
             input.SET.traverse(updateTargetsʹ(xa, _, sql"$target_id".apply(tid)))
@@ -171,12 +172,14 @@ object TargetService {
               s.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))               
             } 
 
-          clone.flatMap { tid =>
-            update(tid).flatMap {              
-                case Some(err: UpdateTargetsError) => CloneTargetResponse.UpdateFailed(err).pure[F]         
-                case _ => replaceIn(tid) as CloneTargetResponse.Success(input.targetId, tid)
+          clone.flatMap { 
+            case None => NoSuchTarget(input.targetId).pure[F]
+            case Some(tid) =>
+              update(tid).flatMap {              
+                  case Some(err: UpdateTargetsError) => UpdateFailed(err).pure[F]         
+                  case _ => replaceIn(tid) as Success(input.targetId, tid)
+              }
             }
-          }
 
         }
 

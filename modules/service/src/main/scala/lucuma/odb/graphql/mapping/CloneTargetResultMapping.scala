@@ -6,10 +6,10 @@ package lucuma.odb.graphql.mapping
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Result
 import lucuma.odb.graphql.BaseMapping
+import lucuma.odb.graphql.table.TargetPairsView
+import lucuma.odb.graphql.table.TargetView
 
 import scala.tools.util.PathResolver.Environment
-import lucuma.odb.graphql.table.TargetView
-import lucuma.odb.graphql.table.TargetPairsView
 
 trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] with TargetView[F] with TargetPairsView[F] {
 
