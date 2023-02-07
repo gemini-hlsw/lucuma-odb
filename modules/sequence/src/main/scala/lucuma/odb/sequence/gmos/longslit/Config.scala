@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.gmos.longslit
 
 import cats.Order
+import cats.syntax.either.*
 import cats.syntax.order.*
 import coulomb.*
 import coulomb.units.accepted.ArcSecond
@@ -123,6 +124,7 @@ sealed trait Config[G, F, U] extends Product with Serializable {
 }
 
 object Config {
+
   final case class GmosNorth(
     grating:             GmosNorthGrating,
     filter:              Option[GmosNorthFilter],
@@ -148,6 +150,7 @@ object Config {
       defaultWavelengthDithersNorth(this.grating)
 
   }
+
   final case class GmosSouth(
     grating:             GmosSouthGrating,
     filter:              Option[GmosSouthFilter],

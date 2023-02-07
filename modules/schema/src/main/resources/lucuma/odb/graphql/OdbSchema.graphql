@@ -4152,49 +4152,16 @@ type Intensive implements ProposalClass {
 # successes, the overall "result" will be a failure. The "all" field contains
 # results for all targets regardless.
 type ItcResultSet {
-  programId:     ProgramId!
-  observationId: ObservationId!
-  result:        ItcResult!
-  all:           [ItcResult!]
+  result: ItcResult!
+  all:    [ItcResult!]
 }
 
 # A single ITC call result.
-interface ItcResult {
-  status: ItcStatus!
-}
-
-enum ItcStatus {
-
-  # A successful result
-  SUCCESS
-
-  # Could not calculate the result because not all the required parameters are
-  # present
-  MISSING_PARAMS
-
-  # A failure in the remote ITC service
-  SERVICE_ERROR
-
-}
-
-type ItcSuccess implements ItcResult {
-  status:        ItcStatus!
+type ItcResult {
   targetId:      TargetId!
   exposureTime:  TimeSpan!
   exposures:     NonNegInt!
   signalToNoise: PosBigDecimal!
-}
-
-type ItcMissingParams implements ItcResult {
-  status:   ItcStatus!
-  targetId: TargetId
-  params:   [String!]!
-}
-
-type ItcServiceError implements ItcResult {
-  status:   ItcStatus!
-  targetId: TargetId!
-  message:  String!
 }
 
 

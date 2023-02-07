@@ -184,25 +184,16 @@ class itc extends OdbSuite {
           s"""
             query {
               itc(programId: "$pid", observationId: "$oid") {
-                programId
-                observationId
                 result {
-                  __typename
-                  status
-                  ... on ItcSuccess {
-                    targetId
-                    exposureTime {
-                      seconds
-                    }
-                    exposures
-                    signalToNoise
+                  targetId
+                  exposureTime {
+                    seconds
                   }
+                  exposures
+                  signalToNoise
                 }
                 all {
-                  status
-                  ... on ItcSuccess {
-                    targetId
-                  }
+                  targetId
                 }
               }
             }
@@ -211,11 +202,7 @@ class itc extends OdbSuite {
           json"""
             {
                "itc": {
-                 "programId": $pid,
-                 "observationId": $oid,
                  "result": {
-                   "__typename": "ItcSuccess",
-                   "status": "SUCCESS",
                    "targetId": $tid,
                    "exposureTime": {
                      "seconds": 10.000000
@@ -225,7 +212,6 @@ class itc extends OdbSuite {
                  },
                  "all": [
                    {
-                     "status": "SUCCESS",
                      "targetId": $tid
                    }
                  ]
@@ -246,14 +232,10 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$pid", observationId: "$oid") {
                 result {
-                  ... on ItcSuccess {
-                    targetId
-                  }
+                  targetId
                 }
                 all {
-                  ... on ItcSuccess {
-                    targetId
-                  }
+                  targetId
                 }
               }
             }
@@ -263,7 +245,7 @@ class itc extends OdbSuite {
             {
                "itc": {
                  "result": {
-                   "targetId": $tid0
+                   "targetId": $tid1
                  },
                  "all": [
                    {
@@ -339,30 +321,15 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$p", observationId: "$o") {
                 result {
-                  status
-                  ... on ItcMissingParams {
-                    targetId
-                    params
-                  }
+                  targetId
                 }
               }
             }
           """,
-        expected = Right(
-          json"""
-            {
-               "itc": {
-                 "result": {
-                   "status": "MISSING_PARAMS",
-                   "targetId": null,
-                   "params": [
-                     "observing mode"
-                   ]
-                 }
-               }
-            }
-          """
-        )
+        expected = Left(List(
+            """ITC cannot be queried until the following parameters are defined:
+            |* observing mode""".stripMargin
+        ))
       )
     } yield r
   }
@@ -431,30 +398,15 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$p", observationId: "$o") {
                 result {
-                  status
-                  ... on ItcMissingParams {
-                    targetId
-                    params
-                  }
+                  targetId
                 }
               }
             }
           """,
-        expected = Right(
-          json"""
-            {
-               "itc": {
-                 "result": {
-                   "status": "MISSING_PARAMS",
-                   "targetId": null,
-                   "params": [
-                     "target"
-                   ]
-                 }
-               }
-            }
-          """
-        )
+        expected = Left(List(
+          """ITC cannot be queried until the following parameters are defined:
+          |* target""".stripMargin
+        ))
       )
     } yield r
   }
@@ -521,31 +473,16 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$p", observationId: "$o") {
                 result {
-                  status
-                  ... on ItcMissingParams {
-                    targetId
-                    params
-                  }
+                  targetId
                 }
               }
             }
           """,
-        expected = Right(
-          json"""
-            {
-               "itc": {
-                 "result": {
-                   "status": "MISSING_PARAMS",
-                   "targetId": $t,
-                   "params": [
-                     "brightness measure",
-                     "radial velocity"
-                   ]
-                 }
-               }
-            }
-          """
-        )
+        expected = Left(List(
+          s"""ITC cannot be queried until the following parameters are defined:
+          |* (target $t) brightness measure
+          |* (target $t) radial velocity""".stripMargin
+        ))
       )
     } yield r
   }

@@ -11,6 +11,7 @@ import lucuma.core.data.Zipper
 
 import scala.annotation.tailrec
 
+// TODO SEQUENCE: this will be available in lucuma core.  delete
 object NonEmptyListExtensions {
 
   extension [A: Order](nel: NonEmptyList[A]) {
