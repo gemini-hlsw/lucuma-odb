@@ -16,6 +16,8 @@ import clue.http4s.Http4sBackend
 import clue.http4s.Http4sWSBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import edu.gemini.grackle.Mapping
+import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import io.circe.Decoder
@@ -33,6 +35,7 @@ import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.Main
+import lucuma.odb.graphql.OdbMapping
 import lucuma.sso.client.SsoClient
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
@@ -136,19 +139,33 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         }
     }
 
+  private def databaseConfig: Config.Database =
+    Config.Database(
+      host     = container.containerIpAddress,
+      port     = container.mappedPort(POSTGRESQL_PORT),
+      user     = container.username,
+      password = container.password,
+      database = container.databaseName,
+    )
+
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Main.routesResource(
-      Config.Database(
-        host     = container.containerIpAddress,
-        port     = container.mappedPort(POSTGRESQL_PORT),
-        user     = container.username,
-        password = container.password,
-        database = container.databaseName,
-      ),
+      databaseConfig,
       itcClient.pure[Resource[IO, *]],
       ssoClient.pure[Resource[IO, *]],
       "unused"
     ).map(_.map(_.orNotFound))
+
+  /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
+  def mapping: Resource[IO, Mapping[IO]] =
+    for {
+      db  <- Main.databasePoolResource[IO](databaseConfig)
+      mon  = SkunkMonitor.noopMonitor[IO]
+      usr  = TestUsers.Standard.pi(11, 110)
+      top <- OdbMapping.Topics(db)
+      itc  = itcClient
+      map <- Resource.eval(OdbMapping(db, mon, usr, top, itc))
+    } yield map
 
   private def server: Resource[IO, Server] =
     // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
