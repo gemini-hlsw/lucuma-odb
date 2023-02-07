@@ -16,9 +16,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
 
-class updateObservations extends OdbSuite
-                            with CreateProgramOps
-                            with CreateObservationOps
+class updateObservations extends OdbSuite                          
                             with UpdateConstraintSetOps {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
@@ -374,7 +372,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      tid <- createEmptyTargetAs(pi, pid, "Biff")
+      tid <- createTargetAs(pi, pid, "Biff")
       _   <- updateObservation(pi, pid, oid, update(tid), query, expected(tid))
     } yield ()
 
@@ -416,9 +414,9 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      t0  <- createEmptyTargetAs(pi, pid, "Larry")
-      t1  <- createEmptyTargetAs(pi, pid, "Curly")
-      t2  <- createEmptyTargetAs(pi, pid, "Moe")
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
+      t2  <- createTargetAs(pi, pid, "Moe")
       _   <- updateObservation(pi, pid, oid, update(t0, t1), query, expected(t0, t1))
       _   <- updateObservation(pi, pid, oid, update(t1, t2), query, expected(t1, t2))
     } yield ()

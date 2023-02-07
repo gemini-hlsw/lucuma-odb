@@ -16,10 +16,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 
-class updateAsterisms extends OdbSuite
-                         with CreateProgramOps
-                         with CreateObservationOps
-                         with UpdateAsterismOps {
+class updateAsterisms extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
 
@@ -29,7 +26,7 @@ class updateAsterisms extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      tid <- createEmptyTargetAs(pi, pid, "Larry")
+      tid <- createTargetAs(pi, pid, "Larry")
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -45,8 +42,8 @@ class updateAsterisms extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      t0  <- createEmptyTargetAs(pi, pid, "Larry")
-      t1  <- createEmptyTargetAs(pi, pid, "Curly")
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -70,8 +67,8 @@ class updateAsterisms extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      t0 <- createEmptyTargetAs(pi, pid, "Larry")
-      t1 <- createEmptyTargetAs(pi, pid, "Curly")
+      t0 <- createTargetAs(pi, pid, "Larry")
+      t1 <- createTargetAs(pi, pid, "Curly")
       _ <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -96,9 +93,9 @@ class updateAsterisms extends OdbSuite
       pid <- createProgramAs(pi)
       o0 <- createObservationAs(pi, pid)
       o1 <- createObservationAs(pi, pid)
-      t0  <- createEmptyTargetAs(pi, pid, "Larry")
-      t1  <- createEmptyTargetAs(pi, pid, "Curly")
-      t2  <- createEmptyTargetAs(pi, pid, "Moe")
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
+      t2  <- createTargetAs(pi, pid, "Moe")
       _   <- updateAsterisms(
         user = pi,
         pid  = pid,
@@ -125,80 +122,5 @@ class updateAsterisms extends OdbSuite
       )
     } yield ()
   }
-
-}
-
-trait UpdateAsterismOps { this: OdbSuite =>
-
-  def updateAsterisms(
-    user: User,
-    pid:  Program.Id,
-    oids: List[Observation.Id],
-    add:  List[Target.Id],
-    del:  List[Target.Id],
-    exp:  List[(Observation.Id, List[Target.Id])]
-  ): IO[Unit] =
-    expect(
-      user = user,
-      query =
-        s"""
-        mutation {
-          updateAsterisms(input: {
-            programId: ${pid.asJson}
-            SET: {
-              ${
-                 add match {
-                   case Nil => ""
-                   case ts  => s"ADD: [ ${ts.map(_.show).mkString("\"", "\",\"", "\"")} ]"
-                 }
-              }
-              ${
-                del match {
-                  case Nil => ""
-                  case ts  => s"DELETE: [ ${ts.map(_.show).mkString("\"", "\",\"", "\"")} ]"
-                }
-              }
-            }
-            WHERE: {
-              id: { IN: [ ${oids.map(_.show).mkString("\"", "\",\"", "\"")} ] }
-            }
-          }) {
-            observations {
-              id
-              targetEnvironment {
-                asterism {
-                  id
-                }
-              }
-            }
-          }
-        }
-      """,
-      expected =
-        json"""
-        {
-          "updateAsterisms": {
-            "observations": 
-              ${exp.map { case (oid, ts) =>
-                json"""
-                  {
-                    "id": ${oid.asJson},
-                    "targetEnvironment": {
-                      "asterism":
-                        ${ts.map { tid =>
-                          json"""
-                            {
-                              "id": ${tid.asJson}
-                            }
-                          """
-                        }}
-                    }
-                  }
-                """
-            }}
-          }
-        }
-      """.asRight
-    )
 
 }

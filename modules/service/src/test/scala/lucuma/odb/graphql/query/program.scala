@@ -21,45 +21,10 @@ class program extends OdbSuite {
 
   val validUsers = List(pi, guest, service)
 
-  def createProgram(user: User, name: String): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: { SET: { name: "$name" } }) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
-  def createObservation(user: User, pid: Program.Id): IO[Observation.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-            }) {
-              observation {
-                id
-              }
-            }
-          }        """
-    ) map { json =>
-      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
-
   test("any user can read their own programs") {
     List(guest, pi, service).traverse { user =>
       val name = s"${user.displayName}'s Science Program"
-      createProgram(user, name).flatMap { id =>
+      createProgramAs(user, name).flatMap { id =>
         expect(
           user = user,
           query =
@@ -116,7 +81,7 @@ class program extends OdbSuite {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
-      createProgram(user, name).flatMap { id =>
+      createProgramAs(user, name).flatMap { id =>
         users.traverse { user2 =>
           expect(
             user = user2,
@@ -160,7 +125,7 @@ class program extends OdbSuite {
     val users = List(guest, pi)
     users.traverse { user =>
       val name = s"${user.displayName}'s Science Program"
-      createProgram(user, name).flatMap { id =>
+      createProgramAs(user, name).flatMap { id =>
         expect(
           user = service,
           query =
@@ -189,8 +154,8 @@ class program extends OdbSuite {
   }
 
   test("program / observations (simple)") {
-    createProgram(pi, "program with some observations").flatMap { pid =>
-      createObservation(pi, pid).replicateA(3).flatMap { oids =>
+    createProgramAs(pi, "program with some observations").flatMap { pid =>
+      createObservationAs(pi, pid).replicateA(3).flatMap { oids =>
         expect(
           user = pi,
           query = 
@@ -225,8 +190,8 @@ class program extends OdbSuite {
   }
 
   test("program / observations (with limit)") {
-    createProgram(pi, "program with some observations").flatMap { pid =>
-      createObservation(pi, pid).replicateA(3).flatMap { oids =>
+    createProgramAs(pi, "program with some observations").flatMap { pid =>
+      createObservationAs(pi, pid).replicateA(3).flatMap { oids =>
         expect(
           user = pi,
           query = 

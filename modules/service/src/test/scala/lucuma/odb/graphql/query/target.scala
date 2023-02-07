@@ -21,64 +21,9 @@ class target extends OdbSuite {
 
   val validUsers = List(pi, pi2, service).toList
 
-  def createProgram(user: User): IO[Program.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createProgram(input: { SET: { name: "${user.displayName}'s Program" } }) {
-              program {
-                id
-              }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
-  def createTarget(user: User, pid: Program.Id): IO[Target.Id] =
-    query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createTarget(
-              input: {
-                programId: ${pid.asJson}
-                SET: {
-                  name: "Crunchy Target"
-                  sidereal: {
-                    ra: { degrees: "12.345" }
-                    dec: { degrees: "45.678" }
-                    epoch: "J2000.000"
-                  }
-                  sourceProfile: {
-                    point: {
-                      bandNormalized: {
-                        sed: { stellarLibrary: B5_III }
-                        brightnesses: []
-                      }
-                    }
-                  }
-                }
-              }
-            ) {
-              target { id }
-            }
-          }
-        """
-    ) map { json =>
-      json.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
-    }
-
-  def createUsers(users: User*): IO[Unit] =
-    users.toList.traverse_(createProgram) // TODO: something cheaper
-
   test("pi can select their own target") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).flatMap { tid =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
         expect(
           user = pi,
           query = s"""
@@ -101,8 +46,8 @@ class target extends OdbSuite {
   }
 
   test("pi can't select another pi's target") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).flatMap { tid =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
         createUsers(pi2) >>
         expect(
           user = pi2,
@@ -124,8 +69,8 @@ class target extends OdbSuite {
   }
 
   test("service user can select anyone's target") {
-    createProgram(pi).flatMap { pid =>
-      createTarget(pi, pid).flatMap { tid =>
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
         createUsers(service) >>
         expect(
           user = service,

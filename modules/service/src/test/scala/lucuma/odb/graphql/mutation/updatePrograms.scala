@@ -14,7 +14,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.OdbSuite
 
-class updatePrograms extends OdbSuite with CreateProgramOps {
+class updatePrograms extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(1, 101)
   val ngo      = TestUsers.Standard.ngo(2, 102, Partner.Ca)
