@@ -406,7 +406,7 @@ object TargetService {
           c_nsid_des,
           c_nsid_key_type,
           c_nsid_key,
-          c_source_profile,
+          c_source_profile
         )
         SELECT 
           c_program_id,
