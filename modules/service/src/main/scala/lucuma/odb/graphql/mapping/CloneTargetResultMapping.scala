@@ -6,16 +6,17 @@ package lucuma.odb.graphql.mapping
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Result
 import lucuma.odb.graphql.BaseMapping
-import skunk.codec.numeric.int8
 
 import scala.tools.util.PathResolver.Environment
+import lucuma.odb.graphql.table.TargetView
 
-trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] {
+trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] with TargetView[F] {
 
   lazy val CloneTargetResultMapping: ObjectMapping =
     ObjectMapping(
       tpe = CloneTargetResultType ,
       fieldMappings = List(
+        SqlField("synthetic-id", TargetView.TargetId, key = true, hidden = true),
         SqlObject("originalTarget"),
         SqlObject("newTarget"),
       )
