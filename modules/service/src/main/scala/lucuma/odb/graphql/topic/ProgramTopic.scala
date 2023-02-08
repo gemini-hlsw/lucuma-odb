@@ -59,24 +59,40 @@ object ProgramTopic {
       }
     }
 
-  def SelectProgramUsers: Query[Program.Id, User.Id] =
-    sql"""
-      select c_pi_user_id from t_program where c_program_id = $program_id
-      and c_pi_user_id is not null
-      union
-      select c_user_id from t_program_user where c_program_id = $program_id
-      """
-      .query(user_id)
-      .contramap(pid => pid ~ pid)
+  // Ok for some reason the stream handling is broken; something may have changed
+  // in fs2 or skunk that releases the portal too early and you get portal not found
+  // asynchronously when doing other things. This is a workaround for now that just
+  // interpolates the strings directly rather than preparing a statement.
+  def selectProgramUsers[F[_]: Concurrent: Logger](
+    s: Session[F],
+    pid: Program.Id,
+  ): F[List[User.Id]] =
+    val q = 
+      sql"""
+        select c_pi_user_id from t_program where c_program_id = '#${pid.toString}'
+        and c_pi_user_id is not null
+        union
+        select c_user_id from t_program_user where c_program_id = '#${pid.toString}'
+        """.query(user_id) 
+    s.execute(q)
+
+  // def SelectProgramUsers: Query[Program.Id, User.Id] =
+  //   sql"""
+  //     select c_pi_user_id from t_program where c_program_id = $program_id
+  //     and c_pi_user_id is not null
+  //     union
+  //     select c_user_id from t_program_user where c_program_id = $program_id
+  //     """
+  //     .query(user_id)
+  //     .contramap(pid => pid ~ pid)
 
   def elements[F[_]: Concurrent: Logger](
     s: Session[F],
     maxQueued: Int,
   ): Stream[F, Element] =
     for {
-      pq    <- Stream.resource(s.prepareR(SelectProgramUsers))
       pid   <- updates(s, maxQueued)
-      users <- Stream.eval(pq.stream(pid._1, 1024).compile.toList)
+      users <- Stream.eval(ProgramTopic.selectProgramUsers(s, pid._1))
       elem   = Element(pid._1, pid._2, pid._3, users)
       _     <- Stream.eval(Logger[F].info(s"ProgramChannel: $elem"))
     } yield elem

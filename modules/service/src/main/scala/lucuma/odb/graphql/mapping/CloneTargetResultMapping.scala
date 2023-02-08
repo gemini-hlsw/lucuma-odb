@@ -1,0 +1,26 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql.mapping
+
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Result
+import lucuma.odb.graphql.BaseMapping
+import lucuma.odb.graphql.table.TargetPairsView
+import lucuma.odb.graphql.table.TargetView
+
+import scala.tools.util.PathResolver.Environment
+
+trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] with TargetView[F] with TargetPairsView[F] {
+
+  lazy val CloneTargetResultMapping: ObjectMapping =
+    ObjectMapping(
+      tpe = CloneTargetResultType ,
+      fieldMappings = List(
+        SqlField("synthetic-id", TargetPairsView.Left, key = true, hidden = true),
+        SqlObject("originalTarget", Join(TargetPairsView.Left, TargetView.TargetId)),
+        SqlObject("newTarget", Join(TargetPairsView.Right, TargetView.TargetId)),
+      )
+    )
+
+}
