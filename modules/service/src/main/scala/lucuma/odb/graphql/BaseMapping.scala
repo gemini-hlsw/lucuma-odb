@@ -23,6 +23,7 @@ trait BaseMapping[F[_]]
   lazy val CatalogInfoType                     = schema.ref("CatalogInfo")
   lazy val CatalogNameType                     = schema.ref("CatalogName")
   lazy val ClassicalType                       = schema.ref("Classical")
+  lazy val CloneTargetResultType               = schema.ref("CloneTargetResult")
   lazy val CloudExtinctionType                 = schema.ref("CloudExtinction")
   lazy val ConstraintSetType                   = schema.ref("ConstraintSet")
   lazy val ConstraintSetGroupType              = schema.ref("ConstraintSetGroup")

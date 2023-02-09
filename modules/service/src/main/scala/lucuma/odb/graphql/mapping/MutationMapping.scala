@@ -31,6 +31,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
@@ -49,7 +50,9 @@ import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalService
 import lucuma.odb.service.TargetService
+import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
@@ -59,6 +62,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
+      CloneTarget,
       CreateObservation,
       CreateProgram,
       CreateTarget,
@@ -140,6 +144,33 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   // Field definitions
+
+  private lazy val CloneTarget: MutationField =
+    import CloneTargetResponse.*
+    import UpdateTargetsResponse.{ SourceProfileUpdatesFailed, TrackingSwitchFailed }
+    MutationField("cloneTarget", CloneTargetInput.Binding) { (input, child) =>
+      targetService.use { svc =>
+        svc.cloneTarget(input).map {          
+
+          // Typical case          
+          case Success(oldTargetId, newTargetId) =>
+            Result(
+              Filter(And(
+                Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
+                Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
+              ), child)
+            )
+          
+          // Failure Cases
+          case NoSuchTarget(targetId) => Result.failure(s"No such target: $targetId")
+          case UpdateFailed(problem)  =>
+            problem match
+              case SourceProfileUpdatesFailed(ps) => ps.leftIor
+              case TrackingSwitchFailed(p)        => Result.failure(p)
+
+        }  
+      }
+    }
 
   private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
