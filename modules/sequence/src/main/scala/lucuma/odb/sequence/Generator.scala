@@ -36,12 +36,6 @@ import java.util.UUID
 
 sealed trait Generator[F[_]] {
 
-//  def itc(
-//    observationId: Observation.Id,
-//    params:        GeneratorParams,
-//    useCache:      Boolean
-//  ): F[EitherNel[Itc.Error, Itc.ResultSet]]
-
   def generate(
     observationId: Observation.Id,
     params:        GeneratorParams,

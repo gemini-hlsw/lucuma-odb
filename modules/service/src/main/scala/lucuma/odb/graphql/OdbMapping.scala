@@ -196,14 +196,36 @@ object OdbMapping {
               GeneratorParamsService.fromSession(s, user, oms)
             }
 
+          private def withGeneratorParams(
+            pid: Program.Id,
+            oid: Observation.Id
+          )(
+            f:   GeneratorParams => F[Result[Json]]
+          ): F[Result[Json]] = {
+            def formatMissing(missing: NonEmptyList[GeneratorParamsService.MissingData]): String = {
+              val params = missing.map { m =>
+                s"* ${m.targetId.fold(""){tid => s"(target $tid) "}}${m.paramName}"
+              }.intercalate("\n")
+              s"ITC cannot be queried until the following parameters are defined:\n$params"
+            }
+
+            generatorParamsService.use(
+              _.select(pid, oid)
+               .flatMap {
+                 case None                => Result(Json.Null).pure[F]
+                 case Some(Left(missing)) => Result.failure(formatMissing(missing)).pure[F]
+                 case Some(Right(params)) => f(params)
+               }
+            )
+          }
+
           override def itcQuery(
             path:     Path,
             pid:      Program.Id,
             oid:      Observation.Id,
             useCache: Boolean
-          ): F[Result[Json]] = {
-
-            def lookup(params: GeneratorParams): F[Result[Json]] =
+          ): F[Result[Json]] =
+            withGeneratorParams(pid, oid) { params =>
               Itc.fromClient(itcClient).lookup(params, useCache).map {
                 case Left(errors)     =>
                   Result.failure(errors.map { e =>
@@ -213,38 +235,17 @@ object OdbMapping {
                 case Right(resultSet) =>
                   Result(resultSet.asJson)
               }
-
-            def formatMissing(missing: NonEmptyList[GeneratorParamsService.MissingData]): String = {
-              val params = missing.map { m =>
-                s"* ${m.targetId.fold(""){tid => s"(target ${tid}) "}}${m.paramName}"
-              }.intercalate("\n")
-              s"ITC cannot be queried until the following parameters are defined:\n$params"
             }
-
-            generatorParamsService.use { gps =>
-              gps
-                .select(pid, oid)
-                .flatMap {
-                  case None =>
-                    Result(Json.Null).pure[F]
-
-                  case Some(Left(missing)) =>
-                    Result.failure(formatMissing(missing)).pure[F]
-
-                  case Some(Right(params)) =>
-                    lookup(params)
-                }
-            }
-          }
 
           override def sequence(
             path:     Path,
             pid:      Program.Id,
             oid:      Observation.Id,
             useCache: Boolean
-          ): F[Result[Json]] = {
-            ???
-          }
+          ): F[Result[Json]] =
+            withGeneratorParams(pid, oid) { params =>
+              ???
+            }
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
