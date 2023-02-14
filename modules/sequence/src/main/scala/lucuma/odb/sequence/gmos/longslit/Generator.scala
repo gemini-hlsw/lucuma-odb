@@ -99,8 +99,7 @@ object Generator {
       IsNotMosPreImaging,
       None
     ),
-    // TODO SEQUENCE: replace with GmosNorthFilter.acquisition
-    NonEmptyList.of(GmosNorthFilter.UPrime, GmosNorthFilter.GPrime, GmosNorthFilter.RPrime, GmosNorthFilter.IPrime, GmosNorthFilter.ZPrime),
+    GmosNorthFilter.acquisition,
     Acquisition.GmosNorth,
     Science.GmosNorth
   )
@@ -112,8 +111,7 @@ object Generator {
       IsNotMosPreImaging,
       None
     ),
-    // TODO SEQUENCE: replace with GmosSouthFilter.acquisition
-    NonEmptyList.of(GmosSouthFilter.UPrime, GmosSouthFilter.GPrime, GmosSouthFilter.RPrime, GmosSouthFilter.IPrime, GmosSouthFilter.ZPrime),
+    GmosSouthFilter.acquisition,
     Acquisition.GmosSouth,
     Science.GmosSouth
   )

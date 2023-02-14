@@ -93,30 +93,6 @@ object Itc {
 
   }
 
-  // TODO SEQUENCE: this will be available in `Zipper` itself in the next core version.
-  extension [A](nel: NonEmptyList[A]) {
-
-    def focusMax(implicit ev: Order[A]): Zipper[A] = {
-      import cats.syntax.order.*
-      focusCompare(_ > _)
-    }
-
-    private def focusCompare(f: (A, A) => Boolean) = {
-
-      @scala.annotation.tailrec
-      def go(cur: Zipper[A], res: Zipper[A]): Zipper[A] =
-        cur.next match {
-          case None    => res
-          case Some(n) => if (f(n.focus, res.focus)) go(n, n) else go(n, res)
-        }
-
-      val init = Zipper.fromNel(nel)
-      go(init, init)
-    }
-
-  }
-
-
   def fromClient[F[_]: Applicative](
     client: ItcClient[F]
   ): Itc[F] =
@@ -149,7 +125,7 @@ object Itc {
             case SpectroscopyResult(_, Some(s @ ItcResult.Success(_, _, _))) =>
               Success(tid, si, s).rightNel
           }
-        }.map(_.sequence.map(nel => ResultSet(nel.focusMax)))
+        }.map(_.sequence.map(nel => ResultSet(Zipper.fromNel(nel).focusMax)))
 
     }
 
