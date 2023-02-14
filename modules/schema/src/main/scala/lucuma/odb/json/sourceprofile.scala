@@ -25,7 +25,11 @@ import io.circe.syntax._
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
 import lucuma.core.math.BrightnessUnits._
+import lucuma.core.math.BrightnessValue
+import lucuma.core.math.FluxDensityContinuumValue
 import lucuma.core.math.HourAngle
+import lucuma.core.math.LineFluxValue
+import lucuma.core.math.LineWidthValue
 import lucuma.core.math.Wavelength
 import lucuma.core.math.dimensional.*
 import lucuma.core.math.units.KilometersPerSecond
@@ -88,6 +92,61 @@ trait SourceProfileCodec {
        .mapObject(_.add("fwhm", g.fwhm.asJson))
     }
 
+  given Codec[BrightnessValue] with {
+    def apply(v: BrightnessValue): Json =
+      v.value.asJson
+
+    def apply(c: HCursor): Decoder.Result[BrightnessValue] =
+      c.as[BigDecimal].flatMap { bd =>
+        BrightnessValue
+          .from(bd)
+          .leftMap(_ => DecodingFailure(s"Illegal brightness value (must be [-30, 100,000,000]): $bd", c.history))
+      }
+  }
+
+  given Codec[FluxDensityContinuumValue] with {
+    def apply(v: FluxDensityContinuumValue): Json =
+      v.value.asJson
+
+    def apply(c: HCursor): Decoder.Result[FluxDensityContinuumValue] =
+      c.as[BigDecimal].flatMap { bd =>
+        FluxDensityContinuumValue
+          .from(bd)
+          .leftMap(_ => DecodingFailure(s"Illegal flux density continuum value (must be [0, 1]): $bd", c.history))
+      }
+  }
+
+  given Codec[LineFluxValue] with {
+    def apply(v: LineFluxValue): Json =
+      v.value.asJson
+
+    def apply(c: HCursor): Decoder.Result[LineFluxValue] =
+      c.as[BigDecimal].flatMap { bd =>
+        LineFluxValue
+          .from(bd)
+          .leftMap(_ => DecodingFailure(s"Illegal line flux value (must be [0, 1]): $bd", c.history))
+      }
+  }
+
+  given Codec[LineWidthValue] with {
+    def apply(v: LineWidthValue): Json =
+      v.value.asJson
+
+    def apply(c: HCursor): Decoder.Result[LineWidthValue] =
+      c.as[BigDecimal].flatMap { bd =>
+        LineWidthValue
+          .from(bd)
+          .leftMap(_ => DecodingFailure(s"Illegal line width value (must be [0, 1,000,000]): $bd", c.history))
+      }
+  }
+
+  given Codec[LineWidthQuantity] with {
+    def apply(v: LineWidthQuantity): Json =
+      v.value.asJson
+
+    def apply(c: HCursor): Decoder.Result[LineWidthQuantity] =
+      c.as[LineWidthValue].map { lwv => Quantity[KilometersPerSecond](lwv) }
+  }
 
   // Measure[N] Of T
   given [N, T](using Codec[N], Enumerated[Units Of T]): Codec[Measure[N] Of T] with {
@@ -160,19 +219,17 @@ trait SourceProfileCodec {
 
 
   given (using Encoder[Wavelength]): Encoder[UnnormalizedSED] =
-    Encoder.instance { (sed: UnnormalizedSED) =>
-      sed match {
-        case StellarLibrary(librarySpectrum)          => Json.obj("stellarLibrary"  -> librarySpectrum.asJson)
-        case CoolStarModel(temperature)               => Json.obj("coolStar"        -> temperature.asJson) // todo: tag
-        case Galaxy(galaxySpectrum)                   => Json.obj("galaxy"          -> galaxySpectrum.asJson)
-        case Planet(planetSpectrum)                   => Json.obj("planet"          -> planetSpectrum.asJson)
-        case Quasar(quasarSpectrum)                   => Json.obj("quasar"          -> quasarSpectrum.asJson)
-        case HIIRegion(hiiRegionSpectrum)             => Json.obj("hiiRegion"       -> hiiRegionSpectrum.asJson)
-        case PlanetaryNebula(planetaryNebulaSpectrum) => Json.obj("planetaryNebula" -> planetaryNebulaSpectrum.asJson)
-        case PowerLaw(index)                          => Json.obj("powerLaw"        -> index.asJson)
-        case BlackBody(temperature)                   => Json.obj("blackBodyTempK"  -> temperature.value.value.asJson)
-        case UserDefined(fluxDensities)               => Json.obj("fluxDensities"   -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson)
-      }
+    Encoder.instance {
+      case StellarLibrary(librarySpectrum)          => Json.obj("stellarLibrary"  -> librarySpectrum.asJson)
+      case CoolStarModel(temperature)               => Json.obj("coolStar"        -> temperature.asJson) // todo: tag
+      case Galaxy(galaxySpectrum)                   => Json.obj("galaxy"          -> galaxySpectrum.asJson)
+      case Planet(planetSpectrum)                   => Json.obj("planet"          -> planetSpectrum.asJson)
+      case Quasar(quasarSpectrum)                   => Json.obj("quasar"          -> quasarSpectrum.asJson)
+      case HIIRegion(hiiRegionSpectrum)             => Json.obj("hiiRegion"       -> hiiRegionSpectrum.asJson)
+      case PlanetaryNebula(planetaryNebulaSpectrum) => Json.obj("planetaryNebula" -> planetaryNebulaSpectrum.asJson)
+      case PowerLaw(index)                          => Json.obj("powerLaw"        -> index.asJson)
+      case BlackBody(temperature)                   => Json.obj("blackBodyTempK"  -> temperature.value.value.asJson)
+      case UserDefined(fluxDensities)               => Json.obj("fluxDensities"   -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson)
     }
 
   def CodecBandBrightness[T](using Enumerated[Units Of Brightness[T]]): Codec[(Band, BrightnessMeasure[T])] =
@@ -227,7 +284,7 @@ trait SourceProfileCodec {
     Decoder.instance { c =>
       for {
         l <- decodeLinesMap(c.downField("lines"))
-        f <- c.downField("fluxDensityContinuum").as[Measure[PosBigDecimal] Of FluxDensityContinuum[T]]
+        f <- c.downField("fluxDensityContinuum").as[FluxDensityContinuumMeasure[T]]
       } yield EmissionLines(l, f)
     }
   }
@@ -260,14 +317,14 @@ trait SourceProfileCodec {
 
     def apply(el: EmissionLine[T]): Json =
       Json.obj(
-        "lineWidth" -> el.lineWidth.value.asJson,
+        "lineWidth" -> el.lineWidth.asJson,
         "lineFlux"  -> el.lineFlux.asJson
       )
 
     def apply(c: HCursor): Decoder.Result[EmissionLine[T]] =
       for {
-        w <- c.downField("lineWidth").as[PosBigDecimal].map(pbd => Quantity[KilometersPerSecond](pbd))
-        f <- c.downField("lineFlux").as[Measure[PosBigDecimal] Of LineFlux[T]]
+        w <- c.downField("lineWidth").as[LineWidthQuantity]
+        f <- c.downField("lineFlux").as[LineFluxMeasure[T]]
       } yield EmissionLine(w, f)
 
   }
@@ -281,12 +338,10 @@ trait SourceProfileCodec {
     }
 
   given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile] =
-    Encoder.instance { (sp: SourceProfile) =>
-      sp match {
-        case SourceProfile.Point(sd)   => Json.obj("point"   -> sd.asJson)
-        case SourceProfile.Uniform(sd) => Json.obj("uniform" -> sd.asJson)
-        case g: SourceProfile.Gaussian => Json.obj("gaussian" -> g.asJson)
-      }
+    Encoder.instance {
+      case SourceProfile.Point(sd)   => Json.obj("point"    -> sd.asJson)
+      case SourceProfile.Uniform(sd) => Json.obj("uniform"  -> sd.asJson)
+      case g: SourceProfile.Gaussian => Json.obj("gaussian" ->  g.asJson)
     }
 
 }

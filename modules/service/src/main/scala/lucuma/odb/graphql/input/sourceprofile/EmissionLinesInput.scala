@@ -58,7 +58,7 @@ object EmissionLinesInput {
 
   def createBinding[A](
     line: Matcher[(Wavelength, EmissionLine[A])],
-    fluxDensityContinuum:  Matcher[Measure[PosBigDecimal] Of FluxDensityContinuum[A]],
+    fluxDensityContinuum:  Matcher[FluxDensityContinuumMeasure[A]],
   ): Matcher[EmissionLines[A]] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -73,7 +73,7 @@ object EmissionLinesInput {
 
   def editBinding[A](
     line: Matcher[(Wavelength, EmissionLine[A])],
-    fluxDensityContinuum:  Matcher[Measure[PosBigDecimal] Of FluxDensityContinuum[A]],
+    fluxDensityContinuum:  Matcher[FluxDensityContinuumMeasure[A]],
   ): Matcher[EmissionLines[A] => EmissionLines[A]] =
     ObjectFieldsBinding.rmap {
       case List(

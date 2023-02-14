@@ -26,12 +26,12 @@ object EmissionLineInput {
   }
 
   def createBinding[A](
-    lineFlux: Matcher[Measure[PosBigDecimal] Of LineFlux[A]]
+    lineFlux: Matcher[LineFluxMeasure[A]]
   ): Matcher[(Wavelength, EmissionLine[A])] =
     ObjectFieldsBinding.rmap {
       case List(
         WavelengthInput.Binding("wavelength", rWavelength),
-        LineWidthInput.Binding.Option("lineWidth", rLineWidth),
+        LineWidthBinding.Option("lineWidth", rLineWidth),
         lineFlux.Option("lineFlux", rLineFlux),
       ) =>
         (rWavelength, rLineWidth, rLineFlux).parTupled.flatMap {
@@ -41,12 +41,12 @@ object EmissionLineInput {
     }
 
   def editBinding[A](
-    lineFlux: Matcher[Measure[PosBigDecimal] Of LineFlux[A]]
+    lineFlux: Matcher[LineFluxMeasure[A]]
   ): Matcher[(Wavelength, EmissionLine[A] => EmissionLine[A])] =
     ObjectFieldsBinding.rmap {
       case List(
         WavelengthInput.Binding("wavelength", rWavelength),
-        LineWidthInput.Binding.Option("lineWidth", rLineWidth),
+        LineWidthBinding.Option("lineWidth", rLineWidth),
         lineFlux.Option("lineFlux", rLineFlux),
       ) =>
         (rWavelength, rLineWidth, rLineFlux).parMapN {
