@@ -31,10 +31,6 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   import time.query.given
   import wavelength.query.given
 
-  // awaiting lucuma-core 0.64 or better where we limit atoms/sequences to 10 by default
-  override val scalaCheckTestParameters: Test.Parameters =
-    Test.Parameters.default.withMaxSize(10)
-
   checkAll("SequenceCodec StepTime",                        CodecTests[StepTime].codec)
   checkAll("SequenceCodec Step GmosNorth",                  CodecTests[Step.GmosNorth].codec)
   checkAll("SequenceCodec Step GmosSouth",                  CodecTests[Step.GmosSouth].codec)
