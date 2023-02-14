@@ -5006,20 +5006,7 @@ type SequenceEventPayload {
   command: SequenceCommand!
 }
 
-interface SequenceGenerationResult {
-  programId:       ProgramId!
-  observationId:   ObservationId!
-  itcResult:       ItcResultSet!
-}
-
-type SequenceGenerationFailure implements SequenceGenerationResult {
-  programId:     ProgramId!
-  observationId: ObservationId!
-  itcResult:     ItcResultSet!
-  message:       String!
-}
-
-type SequenceGenerationSuccess implements SequenceGenerationResult {
+type SequenceGenerationResult {
   programId:       ProgramId!
   observationId:   ObservationId!
   itcResult:       ItcResultSet!
