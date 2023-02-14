@@ -92,53 +92,53 @@ trait SourceProfileCodec {
        .mapObject(_.add("fwhm", g.fwhm.asJson))
     }
 
-  given Codec[BrightnessValue] with {
-    def apply(v: BrightnessValue): Json =
-      v.value.asJson
+  private def refinedBigDecimalCodec[V](
+    name:           String,
+    range:          String,
+    toBigDecimal:   V => BigDecimal,
+    fromBigDecimal: BigDecimal => Either[String, V]
+  ): Codec[V] =
+    new Codec[V] {
+      def apply(v: V): Json =
+        toBigDecimal(v).asJson
 
-    def apply(c: HCursor): Decoder.Result[BrightnessValue] =
-      c.as[BigDecimal].flatMap { bd =>
-        BrightnessValue
-          .from(bd)
-          .leftMap(_ => DecodingFailure(s"Illegal brightness value (must be [-30, 100,000,000]): $bd", c.history))
-      }
-  }
+      def apply(c: HCursor): Decoder.Result[V] =
+        c.as[BigDecimal].flatMap { bd =>
+          fromBigDecimal(bd).leftMap(_ => DecodingFailure(s"Illegal $name value, $bd. Must be in $range", c.history))
+        }
+    }
 
-  given Codec[FluxDensityContinuumValue] with {
-    def apply(v: FluxDensityContinuumValue): Json =
-      v.value.asJson
+  given Codec[BrightnessValue] =
+    refinedBigDecimalCodec[BrightnessValue](
+      "brightness value",
+      "[-30, 100,000,000]",
+      _.value.value,
+      BrightnessValue.from
+    )
 
-    def apply(c: HCursor): Decoder.Result[FluxDensityContinuumValue] =
-      c.as[BigDecimal].flatMap { bd =>
-        FluxDensityContinuumValue
-          .from(bd)
-          .leftMap(_ => DecodingFailure(s"Illegal flux density continuum value (must be [0, 1]): $bd", c.history))
-      }
-  }
+  given Codec[FluxDensityContinuumValue] =
+    refinedBigDecimalCodec[FluxDensityContinuumValue](
+      "flux density continuum value",
+      "[0, 1]",
+      _.value.value,
+      FluxDensityContinuumValue.from
+    )
 
-  given Codec[LineFluxValue] with {
-    def apply(v: LineFluxValue): Json =
-      v.value.asJson
+  given Codec[LineFluxValue] =
+    refinedBigDecimalCodec[LineFluxValue](
+      "line flux value",
+      "[0, 1]",
+      _.value.value,
+      LineFluxValue.from
+    )
 
-    def apply(c: HCursor): Decoder.Result[LineFluxValue] =
-      c.as[BigDecimal].flatMap { bd =>
-        LineFluxValue
-          .from(bd)
-          .leftMap(_ => DecodingFailure(s"Illegal line flux value (must be [0, 1]): $bd", c.history))
-      }
-  }
-
-  given Codec[LineWidthValue] with {
-    def apply(v: LineWidthValue): Json =
-      v.value.asJson
-
-    def apply(c: HCursor): Decoder.Result[LineWidthValue] =
-      c.as[BigDecimal].flatMap { bd =>
-        LineWidthValue
-          .from(bd)
-          .leftMap(_ => DecodingFailure(s"Illegal line width value (must be [0, 1,000,000]): $bd", c.history))
-      }
-  }
+  given Codec[LineWidthValue] =
+    refinedBigDecimalCodec[LineWidthValue](
+      "line width value",
+      "[0, 1,000,000]",
+      _.value.value,
+      LineWidthValue.from
+    )
 
   given Codec[LineWidthQuantity] with {
     def apply(v: LineWidthQuantity): Json =
