@@ -9,6 +9,7 @@ import cats.syntax.all._
 import edu.gemini.grackle.Result
 import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits._
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.dimensional._
 import lucuma.core.util.*
 import lucuma.odb.graphql.binding._
@@ -31,9 +32,9 @@ object BandBrightnessInput {
     ObjectFieldsBinding.rmap {
       case List(
         BandBinding("band", rBand),
-        BigDecimalBinding.Option("value", rValue),
+        BrightnessValueBinding.Option("value", rValue),
         unitsBinding.Option("units", rUnits),
-        BigDecimalBinding.Option("error", rError),
+        BrightnessValueBinding.Option("error", rError)
       ) => (rBand, rValue, rUnits, rError).parTupled.flatMap {
         case (band, Some(value), Some(units), error) =>
           Result((band, units.withValueTagged(value, error)))

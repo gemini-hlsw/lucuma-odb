@@ -17,23 +17,23 @@ import lucuma.odb.graphql.binding._
 object FluxDensityContinuumInput {
 
   object Integrated {
-    val Binding: Matcher[Measure[PosBigDecimal] Of FluxDensityContinuum[Integrated]] =
+    val Binding: Matcher[FluxDensityContinuumMeasure[Integrated]] =
       binding(enumeratedBinding[Units Of FluxDensityContinuum[Integrated]])
   }
 
   object Surface {
-    val Binding: Matcher[Measure[PosBigDecimal] Of FluxDensityContinuum[Surface]] =
+    val Binding: Matcher[FluxDensityContinuumMeasure[Surface]] =
       binding(enumeratedBinding[Units Of FluxDensityContinuum[Surface]])
   }
 
   def binding[A](
     unitsBinding: Matcher[Units Of FluxDensityContinuum[A]]
-  ): Matcher[Measure[PosBigDecimal] Of FluxDensityContinuum[A]] =
+  ): Matcher[FluxDensityContinuumMeasure[A]] =
     ObjectFieldsBinding.rmap {
       case List(
-        PosBigDecimalBinding("value", rValue),
+        FluxDensityContinuumBinding("value", rValue),
         unitsBinding("units", rUnits),
-        PosBigDecimalBinding.Option("error", rError),
+        FluxDensityContinuumBinding.Option("error", rError),
       ) =>
         (rUnits, rValue, rError).mapN(_.withValueTagged(_, _))
     }
