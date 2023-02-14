@@ -45,6 +45,8 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
+import lucuma.odb.json.all.query.given
+import lucuma.odb.sequence.Generator
 import lucuma.odb.sequence.Itc
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.AllocationService
@@ -219,6 +221,11 @@ object OdbMapping {
             )
           }
 
+          private def formatItcErrors(
+            errors: NonEmptyList[Itc.Error]
+          ): String =
+            errors.map { e => s"(Target ${e.targetId}) ${e.message}" }.intercalate(", ")
+
           override def itcQuery(
             path:     Path,
             pid:      Program.Id,
@@ -227,13 +234,8 @@ object OdbMapping {
           ): F[Result[Json]] =
             withGeneratorParams(pid, oid) { params =>
               Itc.fromClient(itcClient).lookup(params, useCache).map {
-                case Left(errors)     =>
-                  Result.failure(errors.map { e =>
-                    s"(Target ${e.targetId}) ${e.message}"
-                  }.intercalate(", "))
-
-                case Right(resultSet) =>
-                  Result(resultSet.asJson)
+                case Left(errors)     => Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
+                case Right(resultSet) => Result(resultSet.asJson)
               }
             }
 
@@ -244,7 +246,22 @@ object OdbMapping {
             useCache: Boolean
           ): F[Result[Json]] =
             withGeneratorParams(pid, oid) { params =>
-              ???
+              import Generator.Result.*
+              Generator.fromClient(itcClient).generate(oid, params, useCache).map {
+                case ItcServiceError(errors) =>
+                  Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
+
+                case InvalidData(msg)        =>
+                  Result.failure(s"The sequence could not be generated: $msg")
+
+                case Success(_, itc, exec)   =>
+                  Result(Json.obj(
+                    "programId"       -> pid.asJson,
+                    "observationId"   -> oid.asJson,
+                    "itcResult"       -> itc.asJson,
+                    "executionConfig" -> exec.asJson
+                  ))
+              }
             }
 
           // Our combined type mappings
