@@ -520,7 +520,7 @@ class updateTargets extends OdbSuite {
                         emissionLines: {
                           lines: []
                           fluxDensityContinuum: {
-                            value: 1.23
+                            value: 0.8
                             error: 0.0001
                             units: W_PER_M_SQUARED_PER_UM
                           }
@@ -570,7 +570,7 @@ class updateTargets extends OdbSuite {
                           },
                           "emissionLines" : {
                             "fluxDensityContinuum" : {
-                              "value" : "1.23",
+                              "value" : "0.8",
                               "units" : "W_PER_M_SQUARED_PER_UM",
                               "error" : "0.00010"
                             }
