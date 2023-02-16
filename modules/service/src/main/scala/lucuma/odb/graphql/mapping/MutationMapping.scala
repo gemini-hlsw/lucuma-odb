@@ -31,6 +31,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -62,6 +63,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
+      CloneObservation,
       CloneTarget,
       CreateObservation,
       CreateProgram,
@@ -144,6 +146,20 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   // Field definitions
+
+  private lazy val CloneObservation: MutationField =
+    MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
+      observationService.use { svc =>
+        svc.cloneObservation(input).map { r =>
+          r.map { oid =>
+            Filter(And(
+              Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
+              Predicates.cloneObservationResult.newObservation.id.eql(oid)
+            ), child)
+          }  
+        }
+      }
+    }
 
   private lazy val CloneTarget: MutationField =
     import CloneTargetResponse.*
