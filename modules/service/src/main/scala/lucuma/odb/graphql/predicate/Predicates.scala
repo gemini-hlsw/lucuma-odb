@@ -14,19 +14,20 @@ trait Predicates[F[_]] extends BaseMapping[F] {
    * constructing filters, etc.
    */
   object Predicates {
-    val asterismGroup       = AsterismGroupPredicates(Path.from(AsterismGroupType))
-    val cloneTargetResult   = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
-    val constraintSetGroup  = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
-    val linkUserResult      = LinkUserResultPredicates(Path.from(LinkUserResultType))
-    val observation         = ObservationPredicates(Path.from(ObservationType))
-    val observationEdit     = ObservationEditPredicates(Path.from(ObservationEditType))
-    val program             = ProgramPredicates(Path.from(ProgramType))
-    val programEdit         = ProgramEditPredicates(Path.from(ProgramEditType))
-    val proposalClass       = ProposalClassPredicates(Path.from(ProposalClassType))
-    val setAllocationResult = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
-    val target              = TargetPredicates(Path.from(TargetType))
-    val targetEdit          = TargetEditPredicates(Path.from(TargetEditType))
-    val targetGroup         = TargetGroupPredicates(Path.from(TargetGroupType))
+    val asterismGroup          = AsterismGroupPredicates(Path.from(AsterismGroupType))
+    val cloneObservationResult = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
+    val cloneTargetResult      = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
+    val constraintSetGroup     = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
+    val linkUserResult         = LinkUserResultPredicates(Path.from(LinkUserResultType))
+    val observation            = ObservationPredicates(Path.from(ObservationType))
+    val observationEdit        = ObservationEditPredicates(Path.from(ObservationEditType))
+    val program                = ProgramPredicates(Path.from(ProgramType))
+    val programEdit            = ProgramEditPredicates(Path.from(ProgramEditType))
+    val proposalClass          = ProposalClassPredicates(Path.from(ProposalClassType))
+    val setAllocationResult    = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
+    val target                 = TargetPredicates(Path.from(TargetType))
+    val targetEdit             = TargetEditPredicates(Path.from(TargetEditType))
+    val targetGroup            = TargetGroupPredicates(Path.from(TargetGroupType))
   }
 
 }

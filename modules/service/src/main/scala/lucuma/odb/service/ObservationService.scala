@@ -60,6 +60,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
 import lucuma.odb.graphql.input.ConstraintSetInput
+import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.HourAngleRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -94,6 +95,10 @@ sealed trait ObservationService[F[_]] {
     SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
   ): F[Result[List[Observation.Id]]]
+
+  def cloneObservation(
+    input: CloneObservationInput
+  ): F[Result[Observation.Id]]
 
 }
 
@@ -278,6 +283,65 @@ object ObservationService {
             } yield r
           }
         }
+
+      def cloneObservation(
+        input: CloneObservationInput
+      ): F[Result[Observation.Id]] = 
+        session.transaction.use { xa =>
+
+          // We need the pid to do access checking, so let's just select it
+          val selPid = sql"select c_program_id from t_observation where c_observation_id = $observation_id"
+          session.prepareR(selPid.query(program_id)).use(_.option(input.observationId)).flatMap {
+
+            case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
+
+            case Some(pid) =>
+
+              // Ok the obs exists, so let's clone its main row in t_observation. If this returns
+              // None then it means the user doesn't have permission to see the obs.
+              val cObsStmt = Statements.cloneObservation(pid, input.observationId, user)
+              val cObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
+              
+              // Ok let's do the clone
+              cObs.flatMap {
+
+                case None => 
+                  // User doesn't have permission to see the obs
+                  Result.failure(s"No such observation: ${input.observationId}").pure[F]
+
+                case Some(oid2) =>
+
+                  // The remaining clone operations yield no results and can't fail (logically, anyway)
+                  val cloneTheRest = 
+                    List(
+                    Statements.cloneAsterism(input.observationId, oid2),
+                    Statements.cloneGmosNorthStatic(input.observationId, oid2),
+                    Statements.cloneGmosNorthDynamic(input.observationId, oid2),
+                    Statements.cloneGmosNorthLongSlit(input.observationId, oid2),
+                  ).traverse_(af => session.prepareR(af.fragment.command).use(_.execute(af.argument)))
+
+                  // Now we need to run the update, if any
+                  val update: F[Result[Observation.Id]] = 
+                    input.SET match
+                      case None    => Result(oid2).pure[F] // nothing to do
+                      case Some(s) => 
+                        updateObservations(s, sql"select $observation_id".apply(oid2))
+                          .map { r =>
+                            // We probably don't need to check this return value, but I feel bad not doing it.
+                            r.flatMap {
+                              case List(`oid2`) => Result(oid2)
+                              case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
+                            }  
+                          }
+
+                  // And put it all together
+                  (cloneTheRest >> update)
+                    .flatTap(r => xa.rollback.whenA(r.isLeft)) // roll back if we have a failing result
+
+              }
+          }
+        }
+      end cloneObservation
 
     }
 
@@ -645,6 +709,212 @@ object ObservationService {
         void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
     }
 
+    /** 
+     * Clone the base slice (just t_observation) and return the new obs id, or none if the original
+     * doesn't exist or isn't accessible.
+     */
+    def cloneObservation(pid: Program.Id, oid: Observation.Id, user: User): AppliedFragment =
+      sql"""
+        INSERT INTO t_observation (
+          c_program_id,
+          c_title,
+          c_subtitle,
+          c_instrument,
+          c_status,
+          c_active_status,
+          c_visualization_time,
+          c_pts_pi,
+          c_pts_uncharged,
+          c_pts_execution,
+          c_pac_mode,
+          c_pac_angle,
+          c_explicit_ra,
+          c_explicit_dec,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_science_mode,
+          c_spec_wavelength,
+          c_spec_resolution,
+          c_spec_signal_to_noise,
+          c_spec_signal_to_noise_at,
+          c_spec_wavelength_coverage,
+          c_spec_focal_plane,
+          c_spec_focal_plane_angle,
+          c_spec_capability,
+          c_observing_mode_type
+        )
+        SELECT 
+          c_program_id,
+          c_title,
+          c_subtitle,
+          c_instrument,
+          c_status,
+          c_active_status,
+          c_visualization_time,
+          c_pts_pi,
+          c_pts_uncharged,
+          c_pts_execution,
+          c_pac_mode,
+          c_pac_angle,
+          c_explicit_ra,
+          c_explicit_dec,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_science_mode,
+          c_spec_wavelength,
+          c_spec_resolution,
+          c_spec_signal_to_noise,
+          c_spec_signal_to_noise_at,
+          c_spec_wavelength_coverage,
+          c_spec_focal_plane,
+          c_spec_focal_plane_angle,
+          c_spec_capability,
+          c_observing_mode_type
+      FROM t_observation
+      WHERE c_observation_id = $observation_id
+      """.apply(oid) |+|
+      ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      void"""
+        RETURNING c_observation_id
+      """
+
+    def cloneAsterism(oldOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
+      sql"""
+        INSERT INTO t_asterism_target (
+          c_program_id,
+          c_observation_id,
+          c_target_id
+        )
+        SELECT 
+          c_program_id,
+          $observation_id,
+          c_target_id
+        FROM t_asterism_target
+        WHERE c_observation_id = $observation_id
+      """.apply(newOid ~ oldOid)
+    
+    def cloneGmosNorthStatic(oldOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
+      sql"""
+        INSERT INTO t_gmos_north_static (
+          c_observation_id,
+          c_instrument,
+          c_detector,
+          c_mos_pre_imaging,
+          c_nod_and_shuffle,
+          c_stage_mode
+        )
+        SELECT 
+          $observation_id,
+          c_instrument,
+          c_detector,
+          c_mos_pre_imaging,
+          c_nod_and_shuffle,
+          c_stage_mode
+        FROM t_gmos_north_static
+        WHERE c_observation_id = $observation_id
+      """.apply(newOid ~ oldOid)
+
+    def cloneGmosNorthDynamic(oldOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
+      sql"""
+        INSERT INTO t_gmos_north_dynamic (
+          c_observation_id,
+          c_instrument,
+          c_index,
+          c_exposure,
+          c_readout_x_binning,
+          c_readout_y_binning,
+          c_readout_amp_count,
+          c_readout_amp_gain,
+          c_readout_amp_read_mode,
+          c_dtax,
+          c_roi,
+          c_grating_disperser,
+          c_grating_order,
+          c_grating_wavelength,
+          c_filter,
+          c_fpu_option,
+          c_fpu_custom_mask_filename,
+          c_fpu_custom_mask_custom_slit_width,
+          c_fpu_fpu
+        )
+        SELECT
+          $observation_id,
+          c_instrument,
+          c_index,
+          c_exposure,
+          c_readout_x_binning,
+          c_readout_y_binning,
+          c_readout_amp_count,
+          c_readout_amp_gain,
+          c_readout_amp_read_mode,
+          c_dtax,
+          c_roi,
+          c_grating_disperser,
+          c_grating_order,
+          c_grating_wavelength,
+          c_filter,
+          c_fpu_option,
+          c_fpu_custom_mask_filename,
+          c_fpu_custom_mask_custom_slit_width,
+          c_fpu_fpu
+        FROM t_gmos_north_dynamic
+        WHERE c_observation_id = $observation_id
+       """.apply(newOid ~ oldOid)
+
+    def cloneGmosNorthLongSlit(oldOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
+      sql"""
+      INSERT INTO t_gmos_north_long_slit (
+        c_observation_id,
+        c_observing_mode_type,
+        c_grating,
+        c_filter,
+        c_fpu,
+        c_central_wavelength,
+        c_xbin,
+        c_ybin,
+        c_amp_read_mode,
+        c_amp_gain,
+        c_roi,
+        c_wavelength_dithers,
+        c_spatial_offsets,
+        c_initial_grating,
+        c_initial_filter,
+        c_initial_fpu,
+        c_initial_central_wavelength
+      )
+      SELECT
+        $observation_id,
+        c_observing_mode_type,
+        c_grating,
+        c_filter,
+        c_fpu,
+        c_central_wavelength,
+        c_xbin,
+        c_ybin,
+        c_amp_read_mode,
+        c_amp_gain,
+        c_roi,
+        c_wavelength_dithers,
+        c_spatial_offsets,
+        c_initial_grating,
+        c_initial_filter,
+        c_initial_fpu,
+        c_initial_central_wavelength
+      FROM t_gmos_north_long_slit
+      WHERE c_observation_id = $observation_id
+      """.apply(newOid ~ oldOid)
 
   }
 

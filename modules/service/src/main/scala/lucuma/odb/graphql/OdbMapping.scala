@@ -110,6 +110,7 @@ object OdbMapping {
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
           with CatalogInfoMapping[F]
+          with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
@@ -275,6 +276,7 @@ object OdbMapping {
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
               CatalogInfoMapping,
+              CloneObservationResultMapping,
               CloneTargetResultMapping,
               ConstraintSetGroupMapping,
               ConstraintSetGroupSelectResultMapping,
