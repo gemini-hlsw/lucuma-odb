@@ -9,6 +9,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Uid
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.util.CommitHash
 
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
@@ -19,10 +20,12 @@ import scala.util.Using
 object SequenceIds {
 
   def namespace(
+    commitHash:    CommitHash,
     observationId: Observation.Id,
     params:        GeneratorParams
   ): UUID =
     toUuid { s =>
+      s.write(commitHash.toByteArray)
       s.writeObject(observationId)
       s.writeObject(params)
     }

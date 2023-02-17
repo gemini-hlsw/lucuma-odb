@@ -29,6 +29,7 @@ import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecution
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 
 import java.io.ObjectOutputStream
@@ -67,7 +68,8 @@ object Generator {
   }
 
   def fromClient[F[_]: Applicative](
-    itcClient: ItcClient[F]
+    commitHash: CommitHash,
+    itcClient:  ItcClient[F]
   ): Generator[F] =
     new Generator[F] {
 
@@ -86,7 +88,7 @@ object Generator {
         useCache:      Boolean
       ): F[Result] = {
 
-        val namespace = SequenceIds.namespace(observationId, params)
+        val namespace = SequenceIds.namespace(commitHash, observationId, params)
 
         params match {
           case GeneratorParams.GmosNorthLongSlit(itcInput, config) =>

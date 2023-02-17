@@ -49,6 +49,7 @@ import lucuma.odb.json.all.query.given
 import lucuma.odb.sequence.Generator
 import lucuma.odb.sequence.Itc
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.GeneratorParamsService
@@ -93,11 +94,12 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database:  Resource[F, Session[F]],
-    monitor:   SkunkMonitor[F],
-    user0:     User,
-    topics0:   Topics[F],
-    itcClient: ItcClient[F]
+    database:   Resource[F, Session[F]],
+    monitor:    SkunkMonitor[F],
+    user0:      User,
+    topics0:    Topics[F],
+    itcClient:  ItcClient[F],
+    commitHash: CommitHash
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
@@ -247,7 +249,7 @@ object OdbMapping {
           ): F[Result[Json]] =
             withGeneratorParams(pid, oid) { params =>
               import Generator.Result.*
-              Generator.fromClient(itcClient).generate(oid, params, useCache).map {
+              Generator.fromClient(commitHash, itcClient).generate(oid, params, useCache).map {
                 case ItcServiceError(errors) =>
                   Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
 
