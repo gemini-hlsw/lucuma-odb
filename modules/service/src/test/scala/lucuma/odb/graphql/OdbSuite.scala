@@ -36,6 +36,7 @@ import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.odb.graphql.OdbMapping
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.sso.client.SsoClient
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
@@ -152,6 +153,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Main.routesResource(
       databaseConfig,
       itcClient.pure[Resource[IO, *]],
+      CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
       "unused"
     ).map(_.map(_.orNotFound))
@@ -164,7 +166,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
       itc  = itcClient
-      map <- Resource.eval(OdbMapping(db, mon, usr, top, itc))
+      map <- Resource.eval(OdbMapping(db, mon, usr, top, itc, CommitHash.Zero))
     } yield map
 
   private def server: Resource[IO, Server] =

@@ -10,6 +10,7 @@ import ciris._
 import com.comcast.ip4s.Port
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
@@ -33,6 +34,7 @@ case class Config(
   honeycomb:  Config.Honeycomb, // Honeycomb config
   database:   Config.Database,  // Database config
   domain:     String,           // Domain, for CORS headers
+  commitHash: CommitHash        // From Heroku Dyno Metadata
 ) {
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -152,6 +154,9 @@ object Config {
   private implicit val port: ConfigDecoder[Int, Port] =
     ConfigDecoder[Int].mapOption("Port")(Port.fromInt)
 
+  private implicit val commitHash: ConfigDecoder[String, CommitHash] =
+    ConfigDecoder[String].mapOption("CommitHash")(CommitHash.FromString.getOption)
+
   private def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name) or prop(name)
 
@@ -163,6 +168,7 @@ object Config {
     Honeycomb.fromCiris,
     Database.fromCiris,
     envOrProp("ODB_DOMAIN"),
+    envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
   ).parMapN(Config.apply)
 
 }
