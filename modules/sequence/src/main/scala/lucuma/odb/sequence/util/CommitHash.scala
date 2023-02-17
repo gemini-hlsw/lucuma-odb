@@ -7,9 +7,10 @@ import cats.Order
 import cats.Show
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import monocle.Prism
+import lucuma.core.optics.Format
 
 import java.util.HexFormat
+import scala.collection.immutable.LazyList
 import scala.util.control.Exception.nonFatalCatch
 
 // TODO: this probably belongs in core
@@ -51,10 +52,16 @@ object CommitHash {
   given Show[CommitHash] =
     Show.show(hexFormat.formatHex)
 
-  given (using ord: Order[Array[Byte]]): Order[CommitHash] =
-    ord
+  given Order[CommitHash] =
+    Order.from { (h0, h1) =>
+      LazyList.from(h0).zip(h1).find {
+        case (a0, a1) => a0 =!= a1
+      }.map {
+        case (a0, a1) => a0 - a1
+      }.getOrElse(0)
+    }
 
-  val FromString: Prism[String, CommitHash] =
-    Prism(parse)(_.format)
+  val FromString: Format[String, CommitHash] =
+    Format(parse, _.format)
 
 }
