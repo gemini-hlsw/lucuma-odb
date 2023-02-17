@@ -31,7 +31,7 @@ object SourceProfileInput {
           case (Some(point), None, None)     => Result(Point(point))
           case (None, Some(uniform), None)   => Result(Uniform(uniform))
           case (None, None, Some(gaussian))  => Result(gaussian)
-          case _                             => Result.failure("Expected exactly one of point, uniform, or guassian.")
+          case _                             => Result.failure("Expected exactly one of point, uniform, or gaussian.")
         }
     }
 
@@ -44,7 +44,7 @@ object SourceProfileInput {
       ) =>
         (rPoint, rUniform, rGaussian).parTupled.flatMap {
 
-          // If the user provides a full definitiom we can change the source profile
+          // If the user provides a full definition we can change the source profile
           case (Some(Left(p)), None, None) => Result(_ => Result(Point(p)))
           case (None, Some(Left(u)), None) => Result(_ => Result(Uniform(u)))
           case (None, None, Some(Left(g))) => Result(_ => Result(g))
@@ -55,7 +55,7 @@ object SourceProfileInput {
           case (None, None, Some(Right(f))) => Result(sp => sp.gaussian.flatMap(gs => f(gs)))
 
           // Otherwise we definitely fail.
-          case _ => Result.failure("Expected exactly one of point, uniform, or guassian.")
+          case _ => Result.failure("Expected exactly one of point, uniform, or gaussian.")
 
         }
     }

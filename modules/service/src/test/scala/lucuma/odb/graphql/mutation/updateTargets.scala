@@ -463,6 +463,85 @@ class updateTargets extends OdbSuite {
     }
   }
 
+  test("update source profile (point/bandNormalized/brightnesses)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        brightnesses: [
+                          {
+                             band: R
+                             value: 15.0
+                             units: VEGA_MAGNITUDE
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    point {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "point" : {
+                          "bandNormalized" : {
+                            "sed" : {
+                              "stellarLibrary" : "B5_III"
+                            },
+                            "brightnesses" : [
+                              {
+                                "band" : "R",
+                                 "value" : "15.0",
+                                 "units" : "VEGA_MAGNITUDE"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
   test("update source profile (point -> gaussian, incomplete)") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1").flatMap { tid =>
