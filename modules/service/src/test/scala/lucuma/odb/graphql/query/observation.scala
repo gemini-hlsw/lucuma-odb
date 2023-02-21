@@ -11,8 +11,8 @@ import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.core.model.Target
+import lucuma.core.model.User
 
 class observation extends OdbSuite {
 
@@ -20,6 +20,66 @@ class observation extends OdbSuite {
   val validUsers = List(pi)
 
   test("can select defaultXBin for obs with multiple targets") {
+
+    def createTarget(pid: Program.Id): IO[Target.Id] =
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+           createTarget(input: {
+             programId: ${pid.asJson},
+             SET: {
+               name: "V1647 Orionis"
+               sidereal: {
+                 ra: { hms: "05:46:13.137" },
+                 dec: { dms: "-00:06:04.89" },
+                 epoch: "J2000.0",
+                 properMotion: {
+                   ra: {
+                     milliarcsecondsPerYear: 0.918
+                   },
+                   dec: {
+                     milliarcsecondsPerYear: -1.057
+                   },
+                 },
+                 radialVelocity: {
+                   kilometersPerSecond: 27.58
+                 },
+                 parallax: {
+                   milliarcseconds: 2.422
+                 }
+               },
+               sourceProfile: {
+                 point: {
+                   bandNormalized: {
+                     sed: {
+                       stellarLibrary: O5_V
+                     },
+                     brightnesses: [
+                       {
+                         band: J,
+                         value: 14.74,
+                         units: VEGA_MAGNITUDE
+                       },
+                       {
+                         band: V,
+                         value: 18.1,
+                         units: VEGA_MAGNITUDE
+                       }
+                     ]
+                   }
+                 }
+               }
+             }
+           }) {
+             target {
+               id
+             }
+           }
+         }
+        
+        """
+      ).map{ j => j.hcursor.downFields("createTarget", "target", "id").require[Target.Id] }
 
     def createObservation(pid: Program.Id, tid1: Target.Id, tid2: Target.Id) =
       query(
@@ -69,8 +129,8 @@ class observation extends OdbSuite {
     val mkStuff: IO[Observation.Id] =
       for {
         pid  <- createProgramAs(pi)
-        tid1 <- createTargetAs(pi, pid, "goo")
-        tid2 <- createTargetAs(pi, pid, "moo")
+        tid1 <- createTarget(pid)
+        tid2 <- createTarget(pid)
         oid  <- createObservation(pid, tid1, tid2)
        } yield oid
 
