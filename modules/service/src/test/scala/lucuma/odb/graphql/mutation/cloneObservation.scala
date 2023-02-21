@@ -27,7 +27,9 @@ class cloneObservation extends OdbSuite {
     # posAngleConstraint
     # plannedTime
       program { id }
-    # targetEnvironment { asterism { id } }
+      targetEnvironment { 
+        asterism $FullTargetGraph
+      }
     # constraintSet
     # scienceRequirements
     # observingMode
@@ -36,7 +38,7 @@ class cloneObservation extends OdbSuite {
     }
   """
 
-  test("simple clone") {
+  test("clones should have the same properties, including asterism") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "Vega").flatMap { tid =>
         createObservationAs(pi, pid, tid).flatMap { oid =>
@@ -49,27 +51,40 @@ class cloneObservation extends OdbSuite {
                 }) {
                   originalObservation $FullObservationGraph
                   newObservation $FullObservationGraph
-
-                  originalObservationId: originalObservation { id }
-                  newObservationId: newObservation { id }
                 }
               }
             """
           ).map { json =>
-
-            // The data fields (i.e., everything but ID) should be the same
             assertEquals(
               json.hcursor.downFields("cloneObservation", "originalObservation").as[Json],
               json.hcursor.downFields("cloneObservation", "newObservation").as[Json]
             )
-
-            // The ids should be different
-            assertNotEquals(
-              json.hcursor.downFields("cloneObservation", "originalObservationId", "Id").as[Observation.Id],
-              json.hcursor.downFields("cloneObservation", "newObservationId", "Id").as[Observation.Id]
-            )
-          
           }
+        }
+      }
+    }
+  }
+
+  test("clones should have different ids") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {
+                observationId: "$oid"
+              }) {
+                originalObservation { id }
+                newObservation { id }
+              }
+            }
+          """
+        ).map { json =>
+          assertNotEquals(
+            json.hcursor.downFields("cloneObservation", "originalObservationId", "Id").as[Observation.Id],
+            json.hcursor.downFields("cloneObservation", "newObservationId", "Id").as[Observation.Id]
+          )          
         }
       }
     }
