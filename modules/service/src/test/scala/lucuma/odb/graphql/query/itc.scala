@@ -15,7 +15,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 
-class itc extends OdbSuite with DatabaseOperations {
+class itc extends OdbSuite with ObservingModeSetupOperations {
 
   val user: User = TestUsers.service(3)
 
@@ -25,129 +25,11 @@ class itc extends OdbSuite with DatabaseOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "ITC Testing")
 
-  def createObservation(pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
-    query(
-      user  = user,
-      query =
-      s"""
-         mutation {
-           createObservation(input: {
-             programId: ${pid.asJson},
-             SET: {
-               constraintSet: {
-                 cloudExtinction: POINT_ONE,
-                 imageQuality: POINT_ONE,
-                 skyBackground: DARKEST
-               },
-               targetEnvironment: {
-                 asterism: ${tids.map(tid => s"\"${tid.toString}\"").mkString("[", ", ", "]")}
-               },
-               scienceRequirements: {
-                 mode: SPECTROSCOPY,
-                 spectroscopy: {
-                   wavelength: {
-                     nanometers: 500
-                   },
-                   resolution: 100,
-                   signalToNoise: 100.0,
-                   wavelengthCoverage: {
-                     nanometers: 20
-                   },
-                   focalPlane: SINGLE_SLIT,
-                   focalPlaneAngle: {
-                     microarcseconds: 0
-                   }
-                 }
-               },
-               observingMode: {
-                 gmosNorthLongSlit: {
-                   grating: R831_G5302,
-                   filter: R_PRIME,
-                   fpu: LONG_SLIT_0_50,
-                   centralWavelength: {
-                     nanometers: 500
-                   }
-                 }
-               }
-             }
-           }) {
-             observation {
-               id
-             }
-           }
-         }
-      """
-    ).map { json =>
-      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
-
-  def createTarget(pid: Program.Id): IO[Target.Id] =
-    query(
-      user  = user,
-      query =
-      s"""
-         mutation {
-           createTarget(input: {
-             programId: ${pid.asJson},
-             SET: {
-               name: "V1647 Orionis"
-               sidereal: {
-                 ra: { hms: "05:46:13.137" },
-                 dec: { dms: "-00:06:04.89" },
-                 epoch: "J2000.0",
-                 properMotion: {
-                   ra: {
-                     milliarcsecondsPerYear: 0.918
-                   },
-                   dec: {
-                     milliarcsecondsPerYear: -1.057
-                   },
-                 },
-                 radialVelocity: {
-                   kilometersPerSecond: 27.58
-                 },
-                 parallax: {
-                   milliarcseconds: 2.422
-                 }
-               },
-               sourceProfile: {
-                 point: {
-                   bandNormalized: {
-                     sed: {
-                       stellarLibrary: O5_V
-                     },
-                     brightnesses: [
-                       {
-                         band: J,
-                         value: 14.74,
-                         units: VEGA_MAGNITUDE
-                       },
-                       {
-                         band: V,
-                         value: 18.1,
-                         units: VEGA_MAGNITUDE
-                       }
-                     ]
-                   }
-                 }
-               }
-             }
-           }) {
-             target {
-               id
-             }
-           }
-         }
-      """
-    ).map(
-      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
-    )
-
   def setup(targetCount: Int = 1): IO[(Program.Id, Observation.Id, List[Target.Id])] =
     for {
       p  <- createProgram
-      ts <- (1 to targetCount).toList.traverse(_ => createTarget(p))
-      o  <- createObservation(p, ts)
+      ts <- (1 to targetCount).toList.traverse(_ => createTargetWithProfileAs(user, p))
+      o  <- createGmosNorthLongslitObservationAs(user, p, ts*)
     } yield (p, o, ts)
 
   def setup1: IO[(Program.Id, Observation.Id, Target.Id)] =
@@ -298,7 +180,7 @@ class itc extends OdbSuite with DatabaseOperations {
 
     for {
       p <- createProgram
-      t <- createTarget(p)
+      t <- createTargetWithProfileAs(user, p)
       o <- createObservation(p, t)
       r <- expect(
         user = user,
@@ -451,7 +333,7 @@ class itc extends OdbSuite with DatabaseOperations {
     for {
       p <- createProgram
       t <- createTarget(p)
-      o <- createObservation(p, List(t))
+      o <- createGmosNorthLongslitObservationAs(user, p, t)
       r <- expect(
         user = user,
         query =
