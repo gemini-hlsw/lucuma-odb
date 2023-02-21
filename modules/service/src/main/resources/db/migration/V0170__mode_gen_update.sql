@@ -1,5 +1,5 @@
 -- A view of the asterism table that only shows one target per observation, chosen arbitrarily for
--- now but we need to have it select the appopriate target for default binning calculations.
+-- now but we need to have it select the appropriate target for default binning calculations.
 CREATE VIEW v_asterism_single_target_for_long_slit AS
 SELECT
    c_program_id,
@@ -39,4 +39,3 @@ LEFT JOIN v_asterism_single_target_for_long_slit a
 LEFT JOIN t_target t
   ON a.c_target_id      = t.c_target_id;
 
-  
