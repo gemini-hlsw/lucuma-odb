@@ -754,8 +754,8 @@ object ObservationService {
           c_title,
           c_subtitle,
           c_instrument,
-          c_status,
-          c_active_status,
+          'new',
+          'active',
           c_visualization_time,
           c_pts_pi,
           c_pts_uncharged,
@@ -798,11 +798,13 @@ object ObservationService {
           c_target_id
         )
         SELECT 
-          c_program_id,
+          t_asterism_target.c_program_id,
           $observation_id,
-          c_target_id
+          t_asterism_target.c_target_id
         FROM t_asterism_target
+        JOIN t_target ON t_target.c_target_id = t_asterism_target.c_target_id
         WHERE c_observation_id = $observation_id
+        AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid ~ oldOid)
     
     def cloneGmosNorthStatic(oldOid: Observation.Id, newOid: Observation.Id): AppliedFragment =

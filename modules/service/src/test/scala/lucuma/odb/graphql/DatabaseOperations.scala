@@ -17,6 +17,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import org.checkerframework.checker.units.qual.s
+import lucuma.odb.data.Existence
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -288,5 +289,41 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """.asRight
     )
+
+  def cloneObservationAs(user: User, oid: Observation.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          cloneObservation(input: {
+            observationId: "$oid"
+          }) {
+            newObservation { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id])
+
+  def updateTargetExistencetAs(user: User, tid: Target.Id, existence: Existence): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: {
+              existence: ${existence.tag.toUpperCase()}
+            }
+            WHERE: {
+              id: { EQ: "$tid"}
+            }
+          }) {
+            targets {
+              id
+              name
+            }
+          }
+        }
+      """
+    ).void
 
 }
