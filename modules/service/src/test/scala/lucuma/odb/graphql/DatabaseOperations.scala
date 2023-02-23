@@ -13,11 +13,11 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Existence
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import org.checkerframework.checker.units.qual.s
-import lucuma.odb.data.Existence
 
 trait DatabaseOperations { this: OdbSuite =>
 

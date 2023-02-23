@@ -59,8 +59,8 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
-import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.CloneObservationInput
+import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.HourAngleRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
