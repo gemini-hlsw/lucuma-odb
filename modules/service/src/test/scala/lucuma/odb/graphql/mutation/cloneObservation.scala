@@ -4,17 +4,17 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.syntax.all._
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
-import lucuma.core.enums.ObsStatus
-import lucuma.core.enums.ObsActiveStatus
 
 class cloneObservation extends OdbSuite {
   import createTarget.FullTargetGraph
