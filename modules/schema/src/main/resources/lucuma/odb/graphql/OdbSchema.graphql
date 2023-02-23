@@ -4626,13 +4626,13 @@ enum QuasarSpectrum {
 
 type Query {
   # All science targets (if any) for the given observation (or environment). Set `includeDeleted` to true to include any deleted targets in the asterism.
-  asterism(
-    # Observation ID
-    observationId: ObservationId!
+  # asterism(
+  #   # Observation ID
+  #   observationId: ObservationId!
 
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): [Target!]!
+  #   # Set to true to include deleted values
+  #   includeDeleted: Boolean! = false
+  # ): [Target!]!
 
   # Observations grouped by commonly held science asterisms
   asterismGroup(
@@ -4762,34 +4762,34 @@ type Query {
   ): ProgramSelectResult!
 
   # Observations grouped by commonly held science mode
-  observingModeGroup(
-    # Program ID
-    programId: ProgramId!
+  # observingModeGroup(
+  #   # Program ID
+  #   programId: ProgramId!
 
-    # Filters the selection of observations.
-    WHERE: WhereObservation
+  #   # Filters the selection of observations.
+  #   WHERE: WhereObservation
 
-    # Limits the result to at most this number of matches (but never more than 1000).
-    LIMIT: NonNegInt
+  #   # Limits the result to at most this number of matches (but never more than 1000).
+  #   LIMIT: NonNegInt
 
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): ObservingModeGroupSelectResult!
+  #   # Set to true to include deleted values
+  #   includeDeleted: Boolean! = false
+  # ): ObservingModeGroupSelectResult!
 
   # Observations grouped by commonly held science requirements
-  scienceRequirementsGroup(
-    # Program ID
-    programId: ProgramId!
+  # scienceRequirementsGroup(
+  #   # Program ID
+  #   programId: ProgramId!
 
-    # Filters the selection of observations.
-    WHERE: WhereObservation
+  #   # Filters the selection of observations.
+  #   WHERE: WhereObservation
 
-    # Limits the result to at most this number of matches (but never more than 1000).
-    LIMIT: NonNegInt
+  #   # Limits the result to at most this number of matches (but never more than 1000).
+  #   LIMIT: NonNegInt
 
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): ScienceRequirementsGroupSelectResult!
+  #   # Set to true to include deleted values
+  #   includeDeleted: Boolean! = false
+  # ): ScienceRequirementsGroupSelectResult!
 
   # Retrieves the target with the given id, if it exists
   target(
@@ -4798,25 +4798,25 @@ type Query {
   ): Target
 
   # Target environment for the given observation (or environment id)
-  targetEnvironment(
-    # Observation ID
-    observationId: ObservationId!
-  ): TargetEnvironment
+  # targetEnvironment(
+  #   # Observation ID
+  #   observationId: ObservationId!
+  # ): TargetEnvironment
 
   # Observations grouped by common target environment
-  targetEnvironmentGroup(
-    # Program ID
-    programId: ProgramId!
+  # targetEnvironmentGroup(
+  #   # Program ID
+  #   programId: ProgramId!
 
-    # Filters the selection of observations.
-    WHERE: WhereObservation
+  #   # Filters the selection of observations.
+  #   WHERE: WhereObservation
 
-    # Limits the result to at most this number of matches (but never more than 1000).
-    LIMIT: NonNegInt
+  #   # Limits the result to at most this number of matches (but never more than 1000).
+  #   LIMIT: NonNegInt
 
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-  ): TargetEnvironmentGroupSelectResult!
+  #   # Set to true to include deleted values
+  #   includeDeleted: Boolean! = false
+  # ): TargetEnvironmentGroupSelectResult!
 
   # Observations grouped by commonly held targets
   targetGroup(
