@@ -4,11 +4,15 @@
 package lucuma.odb.graphql
 package binding
 
+import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 
 object HourAngleBinding {
 
   val Microarcseconds: Matcher[HourAngle] =
+    LongBinding.map(Angle.fromMicroarcseconds).map(Angle.hourAngle.get)
+
+  val Microseconds: Matcher[HourAngle] =
     LongBinding.map(HourAngle.fromMicroseconds)
 
   val Degrees: Matcher[HourAngle] =
