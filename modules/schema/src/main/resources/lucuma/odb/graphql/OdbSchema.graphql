@@ -2039,7 +2039,8 @@ type RecordGmosSouthVisitResult {
 
 # Right Ascension, choose one of the available units
 input RightAscensionInput {
-  microarcseconds: Long
+  microarcseconds: Long @deprecated
+  microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
   hms: HmsString
@@ -4877,7 +4878,11 @@ type RightAscension {
   degrees: BigDecimal!
 
   # Right Ascension (RA) in µas
-  microarcseconds: Long!
+  microarcseconds: Long! @deprecated
+
+  # Right Ascension (RA) in µs
+  microseconds: Long!
+
 }
 
 # Base science mode
