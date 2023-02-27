@@ -392,4 +392,214 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
+  test("explicit wavelength dithers") {
+
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservationWithModeAs(user, p, List(t),
+          """
+            gmosNorthLongSlit: {
+              grating: R831_G5302,
+              filter:  R_PRIME,
+              fpu:     LONG_SLIT_0_50,
+              centralWavelength: { nanometers: 500 },
+              explicitWavelengthDithers: [
+                { nanometers: -5.0 },
+                { nanometers:  0.0 },
+                { nanometers:  5.0 }
+              ]
+            }
+          """
+        )
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, tid) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     science {
+                       nextAtom {
+                         steps {
+                           instrumentConfig {
+                             gratingConfig {
+                               wavelength { nanometers }
+                             }
+                           }
+                         }
+                       }
+                       possibleFuture {
+                         steps {
+                           instrumentConfig {
+                             gratingConfig {
+                               wavelength { nanometers }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "programId": $pid,
+                "executionConfig": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": [
+                        {
+                          "instrumentConfig": {
+                            "gratingConfig": {
+                              "wavelength": {
+                                "nanometers": 495.000
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "instrumentConfig": {
+                            "gratingConfig": {
+                              "wavelength": {
+                                "nanometers": 495.000
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 500.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 500.000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 505.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 505.000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 495.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 495.000
+                                }
+                              }
+                            }
+                          }
+
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 500.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 500.000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 505.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "gratingConfig": {
+                                "wavelength": {
+                                  "nanometers": 505.000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
 }
