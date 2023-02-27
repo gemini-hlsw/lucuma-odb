@@ -74,6 +74,9 @@ object Generator {
     new Generator[F] {
 
       private val itc = Itc.fromClient(itcClient)
+
+      // This is a placeholder.  I'm not sure we'll end up adding step time to
+      // the generated sequence.
       private val StepTimeZero: StepTime = StepTime(
         TimeSpan.Zero,
         TimeSpan.Zero,
@@ -181,7 +184,7 @@ object Generator {
                       SequenceIds.stepId(namespace, sequenceType, atomId, j),
                       s.instrumentConfig,
                       s.stepConfig,
-                      StepTimeZero,
+                      StepTimeZero,        // Placeholder
                       Breakpoint.Disabled
                     )
                   }.toList
