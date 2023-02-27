@@ -112,7 +112,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcResult: ItcResult.Success =
     ItcResult.Success(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(11),
+      NonNegInt.unsafeFrom(6),
       PosBigDecimal.unsafeFrom(50.0)
     )
 

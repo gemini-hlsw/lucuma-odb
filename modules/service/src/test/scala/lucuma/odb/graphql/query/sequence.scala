@@ -22,14 +22,15 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "Sequence Testing")
 
-  def setup: IO[(Program.Id, Observation.Id, Target.Id)] =
-    for {
-      p <- createProgram
-      t <- createTargetWithProfileAs(user, p)
-      o <- createGmosNorthLongslitObservationAs(user, p, t)
-    } yield (p, o, t)
 
   test("simple generation") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongslitObservationAs(user, p, t)
+      } yield (p, o, t)
+
     setup.flatMap { case (pid, oid, tid) =>
       expect(
         user  = user,
@@ -62,6 +63,14 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                              roi,
                              fpu {
                                builtin
+                             }
+                           }
+                           stepConfig {
+                             ... on Science {
+                               offset {
+                                 p { arcseconds }
+                                 q { arcseconds }
+                               }
                              }
                            }
                          }
@@ -107,6 +116,16 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                             },
                             "roi": "CCD2",
                             "fpu": null
+                          },
+                          "stepConfig": {
+                            "offset": {
+                              "p": {
+                                "arcseconds": 0.000000
+                              },
+                              "q": {
+                                "arcseconds": 0.000000
+                              }
+                            }
                           }
                         },
                         {
@@ -121,6 +140,16 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                             "roi": "CENTRAL_STAMP",
                             "fpu": {
                               "builtin": "LONG_SLIT_0_50"
+                            }
+                          },
+                          "stepConfig": {
+                            "offset": {
+                              "p": {
+                                "arcseconds": 10.000000
+                              },
+                              "q": {
+                                "arcseconds": 0.000000
+                              }
                             }
                           }
                         },
@@ -137,6 +166,16 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                             "fpu": {
                               "builtin": "LONG_SLIT_0_50"
                             }
+                          },
+                          "stepConfig": {
+                            "offset": {
+                              "p": {
+                                "arcseconds": 0.000000
+                              },
+                              "q": {
+                                "arcseconds": 0.000000
+                              }
+                            }
                           }
                         }
                       ]
@@ -152,4 +191,205 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
     }
 
   }
+
+
+  test("explicit offsets") {
+
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservationWithModeAs(user, p, List(t),
+          """
+            gmosNorthLongSlit: {
+              grating: R831_G5302,
+              filter:  R_PRIME,
+              fpu:     LONG_SLIT_0_50,
+              centralWavelength: { nanometers: 500 },
+              explicitSpatialOffsets: [
+                { arcseconds: -15.0 },
+                { arcseconds:  15.0 },
+                { arcseconds:  15.0 },
+                { arcseconds: -15.0 }
+              ]
+            }
+          """
+        )
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, tid) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     science {
+                       nextAtom {
+                         steps {
+                           stepConfig {
+                             stepType
+                             ... on Science {
+                               offset {
+                                 q { arcseconds }
+                               }
+                             }
+                           }
+                         }
+                       }
+                       possibleFuture {
+                         steps {
+                           stepConfig {
+                             stepType
+                             ... on Science {
+                               offset {
+                                 q { arcseconds }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "programId": $pid,
+                "executionConfig": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": [
+                        {
+                          "stepConfig": {
+                            "stepType": "SCIENCE",
+                            "offset": {
+                              "q": {
+                                "arcseconds": -15.000000
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "stepConfig": {
+                            "stepType": "GCAL"
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "steps": [
+                          {
+                            "stepConfig": {
+                              "stepType": "GCAL"
+                            }
+                          },
+                          {
+                            "stepConfig": {
+                              "stepType": "SCIENCE",
+                              "offset": {
+                                "q": {
+                                  "arcseconds": 15.000000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "stepConfig": {
+                              "stepType": "SCIENCE",
+                              "offset": {
+                                "q": {
+                                  "arcseconds": 15.000000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "stepConfig": {
+                              "stepType": "GCAL"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "stepConfig": {
+                              "stepType": "GCAL"
+                            }
+                          },
+                          {
+                            "stepConfig": {
+                              "stepType": "SCIENCE",
+                              "offset": {
+                                "q": {
+                                  "arcseconds": -15.000000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "stepConfig": {
+                              "stepType": "SCIENCE",
+                              "offset": {
+                                "q": {
+                                  "arcseconds": -15.000000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "stepConfig": {
+                              "stepType": "GCAL"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps": [
+                          {
+                            "stepConfig": {
+                              "stepType": "GCAL"
+                            }
+                          },
+                          {
+                            "stepConfig": {
+                              "stepType": "SCIENCE",
+                              "offset": {
+                                "q": {
+                                  "arcseconds": 15.000000
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
 }
