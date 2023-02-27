@@ -27,19 +27,6 @@ enum GeneratorParams {
 
 object GeneratorParams {
 
-  // TODO: needs to be put into itc client
-  given Eq[SpectroscopyModeInput] =
-    Eq.by { a => (
-      a.wavelength,
-      a.signalToNoise,
-      a.signalToNoiseAt,
-      a.sourceProfile,
-      a.band,
-      a.radialVelocity,
-      a.constraints,
-      a.mode
-    )}
-
   given Eq[GmosNorthLongSlit] =
     Eq.by { a => (
       a.itc,
