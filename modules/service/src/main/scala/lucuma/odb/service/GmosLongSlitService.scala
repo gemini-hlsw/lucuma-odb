@@ -6,10 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Sync
-import cats.syntax.foldable.*
-import cats.syntax.functor.*
-import cats.syntax.monoid.*
-import cats.syntax.traverse.*
+import cats.syntax.all.*
 import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -83,6 +80,16 @@ trait GmosLongSlitService[F[_]] {
     which: List[Observation.Id],
     xa:    Transaction[F]
   ): F[Unit]
+
+  def cloneNorth(
+    originalId: Observation.Id,
+    newId: Observation.Id,
+  ): F[Unit]
+
+  def cloneSouth(
+    originalId: Observation.Id,
+    newId: Observation.Id,
+  ): F[Unit] 
 
 }
 
@@ -197,6 +204,19 @@ object GmosLongSlitService {
       ): F[Unit] =
         Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
 
+      def cloneNorth(
+        originalId: Observation.Id,
+        newId: Observation.Id,
+      ): F[Unit] =
+        Sync[F].delay(println(s"cloneNorth($originalId -> $newId)")) >>
+        exec(Statements.cloneGmosNorthLongSlit(originalId, newId))
+
+      def cloneSouth(
+        originalId: Observation.Id,
+        newId: Observation.Id,
+      ): F[Unit] =
+        Sync[F].delay(println(s"cloneSouth($originalId -> $newId)")) >>
+        exec(Statements.cloneGmosSouthLongSlit(originalId, newId))      
     }
 
   object Statements {
@@ -506,6 +526,91 @@ object GmosLongSlitService {
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-  }
+    def cloneGmosNorthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+      sql"""
+      INSERT INTO t_gmos_north_long_slit (
+        c_observation_id,
+        c_observing_mode_type,
+        c_grating,
+        c_filter,
+        c_fpu,
+        c_central_wavelength,
+        c_xbin,
+        c_ybin,
+        c_amp_read_mode,
+        c_amp_gain,
+        c_roi,
+        c_wavelength_dithers,
+        c_spatial_offsets,
+        c_initial_grating,
+        c_initial_filter,
+        c_initial_fpu,
+        c_initial_central_wavelength
+      )
+      SELECT
+        $observation_id,
+        c_observing_mode_type,
+        c_grating,
+        c_filter,
+        c_fpu,
+        c_central_wavelength,
+        c_xbin,
+        c_ybin,
+        c_amp_read_mode,
+        c_amp_gain,
+        c_roi,
+        c_wavelength_dithers,
+        c_spatial_offsets,
+        c_initial_grating,
+        c_initial_filter,
+        c_initial_fpu,
+        c_initial_central_wavelength
+      FROM t_gmos_north_long_slit
+      WHERE c_observation_id = $observation_id
+      """.apply(newId ~ originalId)
 
+    def cloneGmosSouthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+      sql"""
+      INSERT INTO t_gmos_south_long_slit (
+        c_observation_id,
+        c_observing_mode_type,
+        c_grating,
+        c_filter,
+        c_fpu,
+        c_central_wavelength,
+        c_xbin,
+        c_ybin,
+        c_amp_read_mode,
+        c_amp_gain,
+        c_roi,
+        c_wavelength_dithers,
+        c_spatial_offsets,
+        c_initial_grating,
+        c_initial_filter,
+        c_initial_fpu,
+        c_initial_central_wavelength
+      )
+      SELECT
+        $observation_id,
+        c_observing_mode_type,
+        c_grating,
+        c_filter,
+        c_fpu,
+        c_central_wavelength,
+        c_xbin,
+        c_ybin,
+        c_amp_read_mode,
+        c_amp_gain,
+        c_roi,
+        c_wavelength_dithers,
+        c_spatial_offsets,
+        c_initial_grating,
+        c_initial_filter,
+        c_initial_fpu,
+        c_initial_central_wavelength
+      FROM t_gmos_south_long_slit
+      WHERE c_observation_id = $observation_id
+      """.apply(newId ~ originalId)
+
+  }
 }

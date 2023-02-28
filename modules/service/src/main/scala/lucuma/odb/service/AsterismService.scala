@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
+import cats.data.NonEmptyMap
 import cats.effect.Sync
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -66,6 +67,11 @@ trait AsterismService[F[_]] {
     ADD:            Option[NonEmptyList[Target.Id]],
     DELETE:         Option[NonEmptyList[Target.Id]]
   ): F[Result[Unit]]
+
+  def cloneAsterism(
+    originalId: Observation.Id,
+    newId: Observation.Id,
+  ): F[Unit]
 
 }
 
@@ -139,6 +145,15 @@ object AsterismService {
               p.execute(af.argument).as(Result.unit)
             }
           }
+
+      override def cloneAsterism(
+        originalId: Observation.Id,
+        newId: Observation.Id,
+      ): F[Unit] =
+        val clone = Statements.clone(originalId, newId)
+        session.prepareR(clone.fragment.command).use { ps =>
+          ps.execute(clone.argument).void
+        }
 
     }
 
@@ -227,6 +242,23 @@ object AsterismService {
         void"AND "  |+| observationIdIn(observationIds) |+|
         andExistsUserAccess(user, programId)
 
+    def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
+      sql"""
+        INSERT INTO t_asterism_target (
+          c_program_id,
+          c_observation_id,
+          c_target_id
+        )
+        SELECT 
+          t_asterism_target.c_program_id,
+          $observation_id,
+          t_asterism_target.c_target_id
+        FROM t_asterism_target
+        JOIN t_target ON t_target.c_target_id = t_asterism_target.c_target_id
+        WHERE c_observation_id = $observation_id
+        AND t_target.c_existence = 'present' -- don't clone references to deleted targets
+      """.apply(newOid ~ originalOid)
+    
   }
 
 }

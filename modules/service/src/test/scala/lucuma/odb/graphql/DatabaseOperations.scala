@@ -18,6 +18,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import org.checkerframework.checker.units.qual.s
+import lucuma.odb.data.ObservingModeType
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -33,6 +34,46 @@ trait DatabaseOperations { this: OdbSuite =>
     }
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationAs(user, pid, ObservingModeType.GmosNorthLongSlit, tids: _*)
+
+  private def scienceRequirementsObject(observingMode: ObservingModeType): String =
+    observingMode match
+      case ObservingModeType.GmosNorthLongSlit |
+           ObservingModeType.GmosSouthLongSlit =>
+        """{
+        mode: SPECTROSCOPY
+        spectroscopy: {
+          wavelength: { nanometers: 500 }
+          resolution: 100
+          signalToNoise: 100.0
+          wavelengthCoverage: { nanometers: 20 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { microarcseconds: 0 }
+        }
+      }"""
+    
+  private def observingModeObject(observingMode: ObservingModeType): String =
+    observingMode match    
+      case ObservingModeType.GmosNorthLongSlit =>
+        """{
+          gmosNorthLongSlit: {
+            grating: R831_G5302
+            filter: R_PRIME
+            fpu: LONG_SLIT_0_50
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
+      case ObservingModeType.GmosSouthLongSlit =>
+        """{
+          gmosSouthLongSlit: {
+            grating: B1200_G5321
+            filter: R_PRIME
+            fpu: LONG_SLIT_0_50
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
+
+  def createObservationAs(user: User, pid: Program.Id, observingMode: ObservingModeType, tids: Target.Id*): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -44,6 +85,8 @@ trait DatabaseOperations { this: OdbSuite =>
                 targetEnvironment: {
                   asterism: ${tids.asJson}
                 }
+                scienceRequirements: ${scienceRequirementsObject(observingMode)}
+                observingMode: ${observingModeObject(observingMode)}
               }
             }) {
               observation {
@@ -325,5 +368,11 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """
     ).void
+
+  def deleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
+    updateTargetExistencetAs(user, tid, Existence.Deleted)
+
+  def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
+    updateTargetExistencetAs(user, tid, Existence.Present)
 
 }
