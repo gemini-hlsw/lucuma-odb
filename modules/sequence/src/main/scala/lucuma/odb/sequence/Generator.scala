@@ -169,20 +169,24 @@ object Generator {
           sequence:     NonEmptyList[ProtoAtom[D]],
           sequenceType: SequenceType
         ): X = {
-          val NonEmptyList(h, t) = sequence.zipWithIndex.map { case (a, i) =>
-            mkAtom(
-              SequenceIds.atomId(namespace, sequenceType, i),
-              a.steps.zipWithIndex.map { case (s, j) =>
-                mkStep(
-                  SequenceIds.stepId(namespace, sequenceType, j),
-                  s.instrumentConfig,
-                  s.stepConfig,
-                  StepTimeZero,
-                  Breakpoint.Disabled
+          val NonEmptyList(h, t) =
+            sequence
+              .zipWithIndex
+              .map(_.map(SequenceIds.atomId(namespace, sequenceType, _)))
+              .map { case (atom, atomId) =>
+                mkAtom(
+                  atomId,
+                  atom.steps.zipWithIndex.map { case (s, j) =>
+                    mkStep(
+                      SequenceIds.stepId(namespace, sequenceType, atomId, j),
+                      s.instrumentConfig,
+                      s.stepConfig,
+                      StepTimeZero,
+                      Breakpoint.Disabled
+                    )
+                  }.toList
                 )
-              }.toList
-            )
-          }
+              }
           mkSequence(h, t)
         }
 

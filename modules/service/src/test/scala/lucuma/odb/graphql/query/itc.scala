@@ -15,7 +15,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 
-class itc extends OdbSuite {
+class itc extends OdbSuite with DatabaseOperations {
 
   val user: User = TestUsers.service(3)
 
@@ -23,21 +23,7 @@ class itc extends OdbSuite {
     List(user)
 
   val createProgram: IO[Program.Id] =
-    query(
-      user  = user,
-      query =
-      s"""
-         mutation {
-           createProgram(input: { SET: { name: "ITC Testing" } }) {
-             program {
-               id
-             }
-           }
-         }
-      """
-    ).map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
+    createProgramAs(user, "ITC Testing")
 
   def createObservation(pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     query(

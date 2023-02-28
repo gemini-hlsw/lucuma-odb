@@ -3,6 +3,7 @@
 
 package lucuma.odb.sequence.gmos.longslit
 
+import cats.Eq
 import cats.Order
 import cats.syntax.either.*
 import cats.syntax.order.*
@@ -151,6 +152,25 @@ object Config {
 
   }
 
+  object GmosNorth {
+
+    given Eq[GmosNorth] =
+      Eq.by { a => (
+        a.grating,
+        a.filter,
+        a.fpu,
+        a.centralWavelength,
+        a.explicitXBin,
+        a.explicitYBin,
+        a.explicitAmpReadMode,
+        a.explicitAmpGain,
+        a.explicitRoi,
+        a.explicitWavelengthDithers,
+        a.explicitSpatialOffsets
+      )}
+
+  }
+
   final case class GmosSouth(
     grating:             GmosSouthGrating,
     filter:              Option[GmosSouthFilter],
@@ -174,6 +194,25 @@ object Config {
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
+
+  }
+
+  object GmosSouth {
+
+    given Eq[GmosSouth] =
+      Eq.by { a => (
+        a.grating,
+        a.filter,
+        a.fpu,
+        a.centralWavelength,
+        a.explicitXBin,
+        a.explicitYBin,
+        a.explicitAmpReadMode,
+        a.explicitAmpGain,
+        a.explicitRoi,
+        a.explicitWavelengthDithers,
+        a.explicitSpatialOffsets
+      )}
 
   }
 
