@@ -8,6 +8,7 @@ object all {
   trait UniversalCodecs
     extends GmosCodec
        with NumericCodec
+       with SequenceCodec
        with SourceProfileCodec
        with StepConfigCodec
 

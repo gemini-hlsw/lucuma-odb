@@ -33,7 +33,7 @@ object ArbGmosLongSlitConfig {
   import ArbOffset.given
   import ArbWavelength.given
   import ArbWavelengthDither.given
-  given Arbitrary[GmosLongSlitConfig.North] =
+  given Arbitrary[Config.GmosNorth] =
     Arbitrary {
       for {
         g <- arbitrary[GmosNorthGrating]
@@ -47,7 +47,7 @@ object ArbGmosLongSlitConfig {
         r <- arbitrary[Option[GmosRoi]]
         d <- arbitrary[Option[List[WavelengthDither]]]
         s <- arbitrary[Option[List[Q]]]
-      } yield GmosLongSlitConfig.North(
+      } yield Config.GmosNorth(
         g,
         f,
         u,
@@ -62,7 +62,7 @@ object ArbGmosLongSlitConfig {
       )
     }
 
-  given Arbitrary[GmosLongSlitConfig.South] =
+  given Arbitrary[Config.GmosSouth] =
     Arbitrary {
       for {
         g <- arbitrary[GmosSouthGrating]
@@ -76,7 +76,7 @@ object ArbGmosLongSlitConfig {
         r <- arbitrary[Option[GmosRoi]]
         d <- arbitrary[Option[List[WavelengthDither]]]
         s <- arbitrary[Option[List[Q]]]
-      } yield GmosLongSlitConfig.South(
+      } yield Config.GmosSouth(
         g,
         f,
         u,

@@ -54,7 +54,11 @@ lazy val sequence = project
   .in(file("modules/sequence"))
   .dependsOn(schema % "compile->test")
   .settings(
-    name := "lucuma-odb-sequence"
+    name := "lucuma-odb-sequence",
+    libraryDependencies ++= Seq(
+      "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
+      "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test
+    )
   )
 
 lazy val service = project
@@ -69,7 +73,6 @@ lazy val service = project
       "com.monovore"   %% "decline"                         % declineVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
-      "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
       "is.cir"         %% "ciris"                           % cirisVersion,
       "org.flywaydb"   %  "flyway-core"                     % flywayVersion,

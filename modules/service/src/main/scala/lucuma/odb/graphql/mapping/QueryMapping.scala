@@ -31,7 +31,7 @@ import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.service.ItcInputService
+import lucuma.odb.service.GeneratorParamsService
 
 import scala.reflect.ClassTag
 
@@ -43,14 +43,21 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProgramMapping[F]
    with ObservationMapping[F] =>
 
-  def itcClientService: Resource[F, ItcInputService[F]]
+  def generatorParamsService: Resource[F, GeneratorParamsService[F]]
 
   def itcQuery(
     path:     Path,
     pid:      lucuma.core.model.Program.Id,
     oid:      lucuma.core.model.Observation.Id,
     useCache: Boolean
-  ): F[Json]
+  ): F[Result[Json]]
+
+  def sequence(
+    path:     Path,
+    pid:      lucuma.core.model.Program.Id,
+    oid:      lucuma.core.model.Observation.Id,
+    useCache: Boolean
+  ): F[Result[Json]]
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
@@ -63,7 +70,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           val useCache = env.get[Boolean]("useCache").getOrElse(true)
           (env.getR[lucuma.core.model.Program.Id]("programId"),
            env.getR[lucuma.core.model.Observation.Id]("observationId")
-          ).parTupled.traverse { case (p, o) =>
+          ).parTupled.flatTraverse { case (p, o) =>
             itcQuery(path, p, o, useCache)
           }
         },
@@ -72,6 +79,14 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("partnerMeta"),
         SqlObject("program"),
         SqlObject("programs"),
+        RootEffect.computeJson("sequence") { (_, path, env) =>
+          val useCache = env.get[Boolean]("useCache").getOrElse(true)
+          (env.getR[lucuma.core.model.Program.Id]("programId"),
+           env.getR[lucuma.core.model.Observation.Id]("observationId")
+          ).parTupled.flatTraverse { case (p, o) =>
+            sequence(path, p, o, useCache)
+          }
+        },
         SqlObject("target"),
         SqlObject("targetGroup"),
         SqlObject("targets"),
@@ -89,6 +104,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       PartnerMeta,
       Program,
       Programs,
+      Sequence,
       Target,
       TargetGroup,
       Targets,
@@ -287,6 +303,19 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
       }
   }
+
+  private lazy val Sequence: PartialFunction[Select, Result[Query]] =
+    case Select("sequence", List(
+      ProgramIdBinding("programId", rPid),
+      ObservationIdBinding("observationId", rOid),
+      BooleanBinding("useCache", rUseCache)
+    ), child) =>
+      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, useCache) =>
+        Environment(
+          Env("programId" -> pid, "observationId" -> oid, "useCache" -> useCache),
+          Select("sequence", Nil, child)
+        )
+      }
 
   private lazy val Target: PartialFunction[Select, Result[Query]] =
     case Select("target", List(
