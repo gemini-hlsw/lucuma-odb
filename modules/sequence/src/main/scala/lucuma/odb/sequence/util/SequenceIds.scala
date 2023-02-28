@@ -30,34 +30,43 @@ object SequenceIds {
       s.writeObject(params)
     }
 
-  def stepId(
-    namespace:    UUID,
-    sequenceType: SequenceType,
-    index:        Int
-  ): Step.Id =
-    createUid[Step.Id](namespace, sequenceType, index)
-
   def atomId(
     namespace:    UUID,
     sequenceType: SequenceType,
     index:        Int
   ): Atom.Id =
-    createUid[Atom.Id](namespace, sequenceType, index)
-
-  private def createUid[A: Uid](
-    namespace:    UUID,
-    sequenceType: SequenceType,
-    index:        Int
-  ): A =
-    Uid[A].isoUuid.reverseGet(
+    Uid[Atom.Id].isoUuid.reverseGet(
       toUuid { s =>
-        s.writeLong(namespace.getMostSignificantBits)
-        s.writeLong(namespace.getLeastSignificantBits)
-        s.writeChar(Uid[A].tag.value)
-        s.writeObject(sequenceType)
+        writeNamespace[Atom.Id](namespace, sequenceType, s)
         s.writeInt(index)
       }
     )
+
+  def stepId(
+    namespace:    UUID,
+    sequenceType: SequenceType,
+    atomId:       Atom.Id,
+    index:        Int
+  ): Step.Id =
+    Uid[Step.Id].isoUuid.reverseGet(
+      toUuid { s =>
+        writeNamespace[Step.Id](namespace, sequenceType, s)
+        s.writeLong(atomId.toUuid.getMostSignificantBits)
+        s.writeLong(atomId.toUuid.getLeastSignificantBits)
+        s.writeInt(index)
+      }
+    )
+
+  private def writeNamespace[A: Uid](
+    namespace:    UUID,
+    sequenceType: SequenceType,
+    out:          ObjectOutputStream
+  ): Unit = {
+    out.writeLong(namespace.getMostSignificantBits)
+    out.writeLong(namespace.getLeastSignificantBits)
+    out.writeChar(Uid[A].tag.value)
+    out.writeObject(sequenceType)
+  }
 
   private def toUuid(
     update: ObjectOutputStream => Unit
