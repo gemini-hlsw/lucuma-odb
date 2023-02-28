@@ -186,7 +186,8 @@ object OdbMapping {
           override val observationService: Resource[F, ObservationService[F]] =
             pool.map { s =>
               val oms = ObservingModeServices.fromSession(s)
-              ObservationService.fromSessionAndUser(s, user, oms)
+              val as  = AsterismService.fromSessionAndUser(s, user)
+              ObservationService.fromSessionAndUser(s, user, oms, as)
             }
 
           override val programService: Resource[F, ProgramService[F]] =

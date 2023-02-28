@@ -39,6 +39,10 @@ sealed trait ObservingModeServices[F[_]] {
     input: ObservingModeInput.Edit
   ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
 
+  def cloneFunction(
+    mode: ObservingModeType
+  ): (Observation.Id, Observation.Id) => F[Unit]
+
 }
 
 object ObservingModeServices {
@@ -116,6 +120,15 @@ object ObservingModeServices {
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
           case _       => Result.failure("Only one observing mode's edit parameters may be provided.")
         }
+
+      override def cloneFunction(
+        mode: ObservingModeType
+      ): (Observation.Id, Observation.Id) => F[Unit] =
+        mode match {
+          case ObservingModeType.GmosNorthLongSlit => gmosLongSlitService.cloneNorth
+          case ObservingModeType.GmosSouthLongSlit => gmosLongSlitService.cloneSouth
+        }
+
     }
 
 }
