@@ -4,16 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table._
-import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
 import edu.gemini.grackle.Predicate.*
-import edu.gemini.grackle.Query.Filter
-import edu.gemini.grackle.Query.Select
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.Result
 import edu.gemini.grackle.Query
-import lucuma.odb.graphql.predicate.Predicates
+import edu.gemini.grackle.Query.Filter
+import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
+import edu.gemini.grackle.Query.Select
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table._
 
 trait AsterismGroupMapping[F[_]] 
   extends AsterismGroupView[F] 
