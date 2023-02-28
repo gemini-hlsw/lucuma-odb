@@ -15,7 +15,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 
-class itc extends OdbSuite {
+class itc extends OdbSuite with ObservingModeSetupOperations {
 
   val user: User = TestUsers.service(3)
 
@@ -23,145 +23,13 @@ class itc extends OdbSuite {
     List(user)
 
   val createProgram: IO[Program.Id] =
-    query(
-      user  = user,
-      query =
-      s"""
-         mutation {
-           createProgram(input: { SET: { name: "ITC Testing" } }) {
-             program {
-               id
-             }
-           }
-         }
-      """
-    ).map { json =>
-      json.hcursor.downFields("createProgram", "program", "id").require[Program.Id]
-    }
-
-  def createObservation(pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
-    query(
-      user  = user,
-      query =
-      s"""
-         mutation {
-           createObservation(input: {
-             programId: ${pid.asJson},
-             SET: {
-               constraintSet: {
-                 cloudExtinction: POINT_ONE,
-                 imageQuality: POINT_ONE,
-                 skyBackground: DARKEST
-               },
-               targetEnvironment: {
-                 asterism: ${tids.map(tid => s"\"${tid.toString}\"").mkString("[", ", ", "]")}
-               },
-               scienceRequirements: {
-                 mode: SPECTROSCOPY,
-                 spectroscopy: {
-                   wavelength: {
-                     nanometers: 500
-                   },
-                   resolution: 100,
-                   signalToNoise: 100.0,
-                   wavelengthCoverage: {
-                     nanometers: 20
-                   },
-                   focalPlane: SINGLE_SLIT,
-                   focalPlaneAngle: {
-                     microarcseconds: 0
-                   }
-                 }
-               },
-               observingMode: {
-                 gmosNorthLongSlit: {
-                   grating: R831_G5302,
-                   filter: R_PRIME,
-                   fpu: LONG_SLIT_0_50,
-                   centralWavelength: {
-                     nanometers: 500
-                   }
-                 }
-               }
-             }
-           }) {
-             observation {
-               id
-             }
-           }
-         }
-      """
-    ).map { json =>
-      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
-
-  def createTarget(pid: Program.Id): IO[Target.Id] =
-    query(
-      user  = user,
-      query =
-      s"""
-         mutation {
-           createTarget(input: {
-             programId: ${pid.asJson},
-             SET: {
-               name: "V1647 Orionis"
-               sidereal: {
-                 ra: { hms: "05:46:13.137" },
-                 dec: { dms: "-00:06:04.89" },
-                 epoch: "J2000.0",
-                 properMotion: {
-                   ra: {
-                     milliarcsecondsPerYear: 0.918
-                   },
-                   dec: {
-                     milliarcsecondsPerYear: -1.057
-                   },
-                 },
-                 radialVelocity: {
-                   kilometersPerSecond: 27.58
-                 },
-                 parallax: {
-                   milliarcseconds: 2.422
-                 }
-               },
-               sourceProfile: {
-                 point: {
-                   bandNormalized: {
-                     sed: {
-                       stellarLibrary: O5_V
-                     },
-                     brightnesses: [
-                       {
-                         band: J,
-                         value: 14.74,
-                         units: VEGA_MAGNITUDE
-                       },
-                       {
-                         band: V,
-                         value: 18.1,
-                         units: VEGA_MAGNITUDE
-                       }
-                     ]
-                   }
-                 }
-               }
-             }
-           }) {
-             target {
-               id
-             }
-           }
-         }
-      """
-    ).map(
-      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
-    )
+    createProgramAs(user, "ITC Testing")
 
   def setup(targetCount: Int = 1): IO[(Program.Id, Observation.Id, List[Target.Id])] =
     for {
       p  <- createProgram
-      ts <- (1 to targetCount).toList.traverse(_ => createTarget(p))
-      o  <- createObservation(p, ts)
+      ts <- (1 to targetCount).toList.traverse(_ => createTargetWithProfileAs(user, p))
+      o  <- createGmosNorthLongslitObservationAs(user, p, ts*)
     } yield (p, o, ts)
 
   def setup1: IO[(Program.Id, Observation.Id, Target.Id)] =
@@ -184,25 +52,16 @@ class itc extends OdbSuite {
           s"""
             query {
               itc(programId: "$pid", observationId: "$oid") {
-                programId
-                observationId
                 result {
-                  __typename
-                  status
-                  ... on ItcSuccess {
-                    targetId
-                    exposureTime {
-                      seconds
-                    }
-                    exposures
-                    signalToNoise
+                  targetId
+                  exposureTime {
+                    seconds
                   }
+                  exposures
+                  signalToNoise
                 }
                 all {
-                  status
-                  ... on ItcSuccess {
-                    targetId
-                  }
+                  targetId
                 }
               }
             }
@@ -211,11 +70,7 @@ class itc extends OdbSuite {
           json"""
             {
                "itc": {
-                 "programId": $pid,
-                 "observationId": $oid,
                  "result": {
-                   "__typename": "ItcSuccess",
-                   "status": "SUCCESS",
                    "targetId": $tid,
                    "exposureTime": {
                      "seconds": 10.000000
@@ -225,7 +80,6 @@ class itc extends OdbSuite {
                  },
                  "all": [
                    {
-                     "status": "SUCCESS",
                      "targetId": $tid
                    }
                  ]
@@ -246,14 +100,10 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$pid", observationId: "$oid") {
                 result {
-                  ... on ItcSuccess {
-                    targetId
-                  }
+                  targetId
                 }
                 all {
-                  ... on ItcSuccess {
-                    targetId
-                  }
+                  targetId
                 }
               }
             }
@@ -263,7 +113,7 @@ class itc extends OdbSuite {
             {
                "itc": {
                  "result": {
-                   "targetId": $tid0
+                   "targetId": $tid1
                  },
                  "all": [
                    {
@@ -330,7 +180,7 @@ class itc extends OdbSuite {
 
     for {
       p <- createProgram
-      t <- createTarget(p)
+      t <- createTargetWithProfileAs(user, p)
       o <- createObservation(p, t)
       r <- expect(
         user = user,
@@ -339,30 +189,15 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$p", observationId: "$o") {
                 result {
-                  status
-                  ... on ItcMissingParams {
-                    targetId
-                    params
-                  }
+                  targetId
                 }
               }
             }
           """,
-        expected = Right(
-          json"""
-            {
-               "itc": {
-                 "result": {
-                   "status": "MISSING_PARAMS",
-                   "targetId": null,
-                   "params": [
-                     "observing mode"
-                   ]
-                 }
-               }
-            }
-          """
-        )
+        expected = Left(List(
+            """ITC cannot be queried until the following parameters are defined:
+            |* observing mode""".stripMargin
+        ))
       )
     } yield r
   }
@@ -431,30 +266,15 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$p", observationId: "$o") {
                 result {
-                  status
-                  ... on ItcMissingParams {
-                    targetId
-                    params
-                  }
+                  targetId
                 }
               }
             }
           """,
-        expected = Right(
-          json"""
-            {
-               "itc": {
-                 "result": {
-                   "status": "MISSING_PARAMS",
-                   "targetId": null,
-                   "params": [
-                     "target"
-                   ]
-                 }
-               }
-            }
-          """
-        )
+        expected = Left(List(
+          """ITC cannot be queried until the following parameters are defined:
+          |* target""".stripMargin
+        ))
       )
     } yield r
   }
@@ -513,7 +333,7 @@ class itc extends OdbSuite {
     for {
       p <- createProgram
       t <- createTarget(p)
-      o <- createObservation(p, List(t))
+      o <- createGmosNorthLongslitObservationAs(user, p, t)
       r <- expect(
         user = user,
         query =
@@ -521,31 +341,16 @@ class itc extends OdbSuite {
             query {
               itc(programId: "$p", observationId: "$o") {
                 result {
-                  status
-                  ... on ItcMissingParams {
-                    targetId
-                    params
-                  }
+                  targetId
                 }
               }
             }
           """,
-        expected = Right(
-          json"""
-            {
-               "itc": {
-                 "result": {
-                   "status": "MISSING_PARAMS",
-                   "targetId": $t,
-                   "params": [
-                     "brightness measure",
-                     "radial velocity"
-                   ]
-                 }
-               }
-            }
-          """
-        )
+        expected = Left(List(
+          s"""ITC cannot be queried until the following parameters are defined:
+          |* (target $t) brightness measure
+          |* (target $t) radial velocity""".stripMargin
+        ))
       )
     } yield r
   }

@@ -21,6 +21,8 @@ import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import edu.gemini.grackle.sql.SqlMapping
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosDouble
 import fs2.Stream
 import fs2.concurrent.Topic
 import io.circe.Json
@@ -35,19 +37,22 @@ import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
-import lucuma.odb.graphql.client.Itc
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
-import lucuma.odb.graphql.instances.ItcResultEncoder.given
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
+import lucuma.odb.json.all.query.given
+import lucuma.odb.sequence.Generator
+import lucuma.odb.sequence.Itc
+import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
-import lucuma.odb.service.ItcInputService
+import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
@@ -89,11 +94,12 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database:  Resource[F, Session[F]],
-    monitor:   SkunkMonitor[F],
-    user0:     User,
-    topics0:   Topics[F],
-    itcClient: ItcClient[F]
+    database:   Resource[F, Session[F]],
+    monitor:    SkunkMonitor[F],
+    user0:      User,
+    topics0:    Topics[F],
+    itcClient:  ItcClient[F],
+    commitHash: CommitHash
   ):  F[Mapping[F]] =
     Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
       database.use(enumSchema(_)).map { enums =>
@@ -188,27 +194,77 @@ object OdbMapping {
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
 
-          override val itcClientService: Resource[F, ItcInputService[F]] =
+          override val generatorParamsService: Resource[F, GeneratorParamsService[F]] =
             pool.map { s =>
               val oms = ObservingModeServices.fromSession(s)
-              ItcInputService.fromSession(s, user, oms)
+              GeneratorParamsService.fromSession(s, user, oms)
             }
+
+          private def withGeneratorParams(
+            pid: Program.Id,
+            oid: Observation.Id
+          )(
+            f:   GeneratorParams => F[Result[Json]]
+          ): F[Result[Json]] = {
+            def formatMissing(missing: NonEmptyList[GeneratorParamsService.MissingData]): String = {
+              val params = missing.map { m =>
+                s"* ${m.targetId.fold(""){tid => s"(target $tid) "}}${m.paramName}"
+              }.intercalate("\n")
+              s"ITC cannot be queried until the following parameters are defined:\n$params"
+            }
+
+            generatorParamsService.use(
+              _.select(pid, oid)
+               .flatMap {
+                 case None                => Result(Json.Null).pure[F]
+                 case Some(Left(missing)) => Result.failure(formatMissing(missing)).pure[F]
+                 case Some(Right(params)) => f(params)
+               }
+            )
+          }
+
+          private def formatItcErrors(
+            errors: NonEmptyList[Itc.Error]
+          ): String =
+            errors.map { e => s"(Target ${e.targetId}) ${e.message}" }.intercalate(", ")
 
           override def itcQuery(
             path:     Path,
             pid:      Program.Id,
             oid:      Observation.Id,
             useCache: Boolean
-          ): F[Json] = {
+          ): F[Result[Json]] =
+            withGeneratorParams(pid, oid) { params =>
+              Itc.fromClient(itcClient).lookup(params, useCache).map {
+                case Left(errors)     => Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
+                case Right(resultSet) => Result(resultSet.asJson)
+              }
+            }
 
-            import lucuma.odb.graphql.instances.ItcResultEncoder._
+          override def sequence(
+            path:     Path,
+            pid:      Program.Id,
+            oid:      Observation.Id,
+            useCache: Boolean
+          ): F[Result[Json]] =
+            withGeneratorParams(pid, oid) { params =>
+              import Generator.Result.*
+              Generator.fromClient(commitHash, itcClient).generate(oid, params, useCache).map {
+                case ItcServiceError(errors) =>
+                  Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
 
-            Itc
-              .fromClientAndService(itcClient, itcClientService)
-              .queryOne(pid, oid, useCache)
-              .map(_.asJson)
-          }
+                case InvalidData(msg)        =>
+                  Result.failure(s"The sequence could not be generated: $msg")
 
+                case Success(_, itc, exec)   =>
+                  Result(Json.obj(
+                    "programId"       -> pid.asJson,
+                    "observationId"   -> oid.asJson,
+                    "itcResult"       -> itc.asJson,
+                    "executionConfig" -> exec.asJson
+                  ))
+              }
+            }
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =

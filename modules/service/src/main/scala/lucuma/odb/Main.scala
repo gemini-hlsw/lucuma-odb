@@ -15,6 +15,7 @@ import fs2.io.net.Network
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.GraphQLRoutes
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
@@ -59,7 +60,11 @@ object Main extends IOApp {
             |╚══════╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝     ╚═════╝ ╚═════╝ ╚═════╝
             |
             |This is the Lucuma observing database.
-            |CORS domain is ${config.domain}.
+            |
+            |CommitHash.: ${config.commitHash.format}
+            |CORS domain: ${config.domain}
+            |ITC Root...: ${config.itcRoot}
+            |Port.......: ${config.port}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -107,12 +112,13 @@ object Main extends IOApp {
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-    routesResource(config.database, config.itcClient, config.ssoClient, config.domain)
+    routesResource(config.database, config.itcClient, config.commitHash, config.ssoClient, config.domain)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     databaseConfig:    Config.Database,
     itcClientResource: Resource[F, ItcClient[F]],
+    commitHash:        CommitHash,
     ssoClientResource: Resource[F, SsoClient[F, User]],
     domain:            String,
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
@@ -122,7 +128,7 @@ object Main extends IOApp {
       ssoClient  <- ssoClientResource
       userSvc    <- pool.map(UserService.fromSession(_))
       middleware <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
-      routes     <- GraphQLRoutes(itcClient, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
+      routes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
     } yield { wsb =>
       middleware(routes(wsb))
     }
