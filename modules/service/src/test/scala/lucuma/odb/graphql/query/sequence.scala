@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -14,21 +15,21 @@ import lucuma.core.model.User
 
 class sequence extends OdbSuite with ObservingModeSetupOperations {
 
+  val pi: User   = TestUsers.Standard.pi(1, 30)
   val user: User = TestUsers.service(3)
 
   override val validUsers: List[User] =
-    List(user)
+    List(pi, user)
 
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "Sequence Testing")
-
 
   test("simple generation") {
     val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongslitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
       } yield (p, o, t)
 
     setup.flatMap { case (pid, oid, tid) =>
@@ -595,6 +596,73 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                   }
                 }
               }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
+  test("user cannot access program") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 executionConfig {
+                   instrument
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": null
+            }
+          """
+        )
+      )
+    }
+
+  }
+
+  test("observation doesn't correspond to program") {
+    val setup: IO[(Program.Id, Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p0 <- createProgramAs(pi, "foo")
+        p1 <- createProgram
+        t  <- createTargetWithProfileAs(user, p1)
+        o  <- createGmosNorthLongSlitObservationAs(user, p1, t)
+      } yield (p0, p1, o, t)
+
+    setup.flatMap { case (pid0, pid1, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid0", observationId: "$oid") {
+                 executionConfig {
+                   instrument
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": null
             }
           """
         )

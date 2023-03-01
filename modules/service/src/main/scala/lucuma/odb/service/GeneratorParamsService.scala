@@ -236,11 +236,14 @@ object GeneratorParamsService {
           c_target_id,
           c_sid_rv,
           c_source_profile
-        FROM v_itc_params
+        FROM v_generator_params
         WHERE
-          c_observation_id IN (""" |+|
+        """ |+|
+          sql"""c_program_id = $program_id""".apply(programId) |+|
+          void""" AND c_observation_id IN (""" |+|
             which.map(sql"$observation_id").intercalate(void", ") |+|
-          void")" |+| existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af },
+          void")" |+|
+          existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af },
         params
       )
 
