@@ -4,6 +4,15 @@
 package lucuma.odb.graphql
 package mapping
 
+import edu.gemini.grackle.Predicate.*
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.Filter
+import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
+import edu.gemini.grackle.Query.Select
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
+import lucuma.odb.data.Existence
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table._
 
 trait AsterismGroupMapping[F[_]] 
@@ -11,7 +20,8 @@ trait AsterismGroupMapping[F[_]]
     with AsterismTargetTable[F]
     with ObservationView[F] 
     with ProgramTable[F]
-    with TargetView[F] {
+    with TargetView[F]
+    with Predicates[F] {
 
   lazy val AsterismGroupMapping: TypeMapping =
     ObjectMapping(
@@ -27,6 +37,22 @@ trait AsterismGroupMapping[F[_]]
         SqlObject("asterism", Join(AsterismGroupView.ExampleObservationId, AsterismTargetTable.ObservationId), Join(AsterismTargetTable.TargetId, TargetView.TargetId)),
 
       )
+    )
+
+  // Make sure the asterism is filtered by existence
+  lazy val AsterismGroupElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
+    Map(
+      AsterismGroupType -> {
+        case Select("asterism", Nil, child) =>
+          Result(
+            Select("asterism", Nil, 
+              Filter(
+                Predicates.target.existence.eql(Existence.Present),
+                child
+              )
+            )
+          )
+      }
     )
 
 }
