@@ -105,10 +105,14 @@ trait SequenceCodec {
       } yield Atom.GmosNorth(i, s)
     }
 
+  private val StepTimeZero: StepTime =
+    StepTime(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero)
+
   given given_Encoder_Atom_GmosNorth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Atom.GmosNorth] =
     Encoder.instance { (a: Atom.GmosNorth) =>
       Json.obj(
         "id"    -> a.id.asJson,
+        "time"  -> StepTimeZero.asJson,
         "steps" -> a.steps.asJson
       )
     }
