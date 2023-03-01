@@ -336,6 +336,7 @@ object OdbMapping {
           override val selectElaborator: SelectElaborator =
             SelectElaborator(
               List(
+                AsterismGroupElaborator,
                 ConstraintSetGroupElaborator,
                 MutationElaborator,
                 ProgramElaborator,
