@@ -52,6 +52,11 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                      }
                      acquisition {
                        nextAtom {
+                         time {
+                           total {
+                             microseconds
+                           }
+                         }
                          steps {
                            instrumentConfig {
                              exposure {
@@ -105,6 +110,11 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                   },
                   "acquisition": {
                     "nextAtom": {
+                      "time": {
+                        "total": {
+                          "microseconds": 0
+                        }
+                      },
                       "steps": [
                         {
                           "instrumentConfig": {
