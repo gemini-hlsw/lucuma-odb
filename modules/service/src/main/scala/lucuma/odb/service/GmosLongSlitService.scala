@@ -208,15 +208,14 @@ object GmosLongSlitService {
         originalId: Observation.Id,
         newId: Observation.Id,
       ): F[Unit] =
-        Sync[F].delay(println(s"cloneNorth($originalId -> $newId)")) >>
         exec(Statements.cloneGmosNorthLongSlit(originalId, newId))
 
       def cloneSouth(
         originalId: Observation.Id,
         newId: Observation.Id,
       ): F[Unit] =
-        Sync[F].delay(println(s"cloneSouth($originalId -> $newId)")) >>
         exec(Statements.cloneGmosSouthLongSlit(originalId, newId))      
+
     }
 
   object Statements {

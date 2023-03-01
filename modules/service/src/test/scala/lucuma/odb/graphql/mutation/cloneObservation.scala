@@ -23,7 +23,8 @@ class cloneObservation extends OdbSuite {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
   lazy val validUsers = List(pi, pi2)
 
-  // properties we expect to be the same
+  // N.B. if we include the asterism here we hit a Grakle bug that's not yet minimized
+  // see 
   val ObservationGraph = s"""
     { 
       title
@@ -33,9 +34,6 @@ class cloneObservation extends OdbSuite {
         cloudExtinction
         imageQuality
         skyBackground
-      }
-      targetEnvironment { 
-        asterism $FullTargetGraph
       }
       scienceRequirements {
         mode
@@ -63,14 +61,14 @@ class cloneObservation extends OdbSuite {
         }
       }
     }
-  """
+    """
 
-  test("clones should have the same properties, including asterism, for all observing modes") {
-    createProgramAs(pi).flatMap { pid =>
-      val t = createTargetAs(pi, pid)
-      (t, t).tupled.flatMap { (tid1, tid2) =>
-        ObservingModeType.values.toList.traverse { obsMode =>
-          createObservationAs(pi, pid, obsMode /*, tid1, tid2 */).flatMap { oid =>
+  test("clones should have the same properties, for all observing modes") {
+    ObservingModeType.values.toList.traverse { obsMode =>
+      createProgramAs(pi).flatMap { pid =>
+        val t = createTargetAs(pi, pid)
+        (t, t).tupled.flatMap { (tid1, tid2) =>
+          createObservationAs(pi, pid, obsMode, tid1, tid2).flatMap { oid =>
             query(
               user = pi,
               query = s"""
@@ -86,14 +84,12 @@ class cloneObservation extends OdbSuite {
             ).map { json =>
               val a = json.hcursor.downFields("cloneObservation", "originalObservation").require[Json]
               val b = json.hcursor.downFields("cloneObservation", "newObservation").require[Json]
-              println(s"original = ${a.spaces2}")
-              println(s"new = ${b.spaces2}")
               assertEquals(a, b)
             }
           }          
         }
       }
-    }
+    }      
   }
 
   test("clones should have different ids".ignore) {
@@ -122,6 +118,57 @@ class cloneObservation extends OdbSuite {
         }
       }
     }
+  }
+
+  test("cloned observation should have the same asterism") {
+
+    val setup =
+      for
+        pid  <- createProgramAs(pi)
+        tid1 <- createTargetAs(pi, pid)
+        tid2 <- createTargetAs(pi, pid)
+        oid1 <- createObservationAs(pi, pid, tid1, tid2)
+        oid2 <- cloneObservationAs(pi, oid1)
+      yield (tid1, tid2, oid2)
+
+    setup.flatMap { (tid1, tid2, oid) =>
+      expect(
+        user = pi,
+        query = 
+          s"""
+          query {
+          observation(observationId: ${oid.asJson}) {
+              id
+              targetEnvironment {
+                asterism {
+                  id
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "observation" : {
+                "id" : $oid,
+                "targetEnvironment" : {
+                  "asterism" : [
+                    {
+                      "id" : $tid1
+                    },
+                    {
+                      "id" : $tid2
+                    }
+                  ]
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
   }
 
   test("cloned asterism should not include deleted targets".ignore) {
