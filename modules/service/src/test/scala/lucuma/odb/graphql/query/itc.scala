@@ -29,7 +29,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     for {
       p  <- createProgram
       ts <- (1 to targetCount).toList.traverse(_ => createTargetWithProfileAs(user, p))
-      o  <- createGmosNorthLongslitObservationAs(user, p, ts*)
+      o  <- createGmosNorthLongSlitObservationAs(user, p, ts*)
     } yield (p, o, ts)
 
   def setup1: IO[(Program.Id, Observation.Id, Target.Id)] =
@@ -195,8 +195,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             }
           """,
         expected = Left(List(
-            """ITC cannot be queried until the following parameters are defined:
-            |* observing mode""".stripMargin
+            "ITC cannot be queried until the following parameters are defined: observing mode"
         ))
       )
     } yield r
@@ -272,8 +271,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             }
           """,
         expected = Left(List(
-          """ITC cannot be queried until the following parameters are defined:
-          |* target""".stripMargin
+          "ITC cannot be queried until the following parameters are defined: target"
         ))
       )
     } yield r
@@ -333,7 +331,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     for {
       p <- createProgram
       t <- createTarget(p)
-      o <- createGmosNorthLongslitObservationAs(user, p, t)
+      o <- createGmosNorthLongSlitObservationAs(user, p, t)
       r <- expect(
         user = user,
         query =
@@ -347,9 +345,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             }
           """,
         expected = Left(List(
-          s"""ITC cannot be queried until the following parameters are defined:
-          |* (target $t) brightness measure
-          |* (target $t) radial velocity""".stripMargin
+          s"ITC cannot be queried until the following parameters are defined: (target $t) brightness measure, (target $t) radial velocity"
         ))
       )
     } yield r
