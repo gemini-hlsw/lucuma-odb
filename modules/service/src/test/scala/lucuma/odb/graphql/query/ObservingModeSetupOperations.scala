@@ -15,7 +15,7 @@ import lucuma.core.model.User
 
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
-  def createGmosNorthLongslitObservationAs(
+  def createGmosNorthLongSlitObservationAs(
     user: User,
     pid:  Program.Id,
     tids: Target.Id*

@@ -208,9 +208,9 @@ object OdbMapping {
           ): F[Result[Json]] = {
             def formatMissing(missing: NonEmptyList[GeneratorParamsService.MissingData]): String = {
               val params = missing.map { m =>
-                s"* ${m.targetId.fold(""){tid => s"(target $tid) "}}${m.paramName}"
-              }.intercalate("\n")
-              s"ITC cannot be queried until the following parameters are defined:\n$params"
+                s"${m.targetId.fold(""){tid => s"(target $tid) "}}${m.paramName}"
+              }.intercalate(", ")
+              s"ITC cannot be queried until the following parameters are defined: $params"
             }
 
             generatorParamsService.use(
