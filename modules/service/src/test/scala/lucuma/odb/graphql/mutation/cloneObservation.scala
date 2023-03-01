@@ -24,7 +24,7 @@ class cloneObservation extends OdbSuite {
   lazy val validUsers = List(pi, pi2)
 
   // N.B. if we include the asterism here we hit a Grakle bug that's not yet minimized
-  // see 
+  // see https://github.com/gemini-hlsw/lucuma-odb/issues/296
   val ObservationGraph = s"""
     { 
       title
