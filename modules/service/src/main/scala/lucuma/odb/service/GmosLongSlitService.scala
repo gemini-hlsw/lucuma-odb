@@ -525,9 +525,13 @@ object GmosLongSlitService {
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-    def cloneGmosNorthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+    private def cloneGmosLongSlit(
+      table: String,
+      originalId: Observation.Id, 
+      newId: Observation.Id
+    ): AppliedFragment =
       sql"""
-      INSERT INTO t_gmos_north_long_slit (
+      INSERT INTO #$table (
         c_observation_id,
         c_observing_mode_type,
         c_grating,
@@ -564,52 +568,15 @@ object GmosLongSlitService {
         c_initial_filter,
         c_initial_fpu,
         c_initial_central_wavelength
-      FROM t_gmos_north_long_slit
+      FROM #$table
       WHERE c_observation_id = $observation_id
       """.apply(newId ~ originalId)
 
+    def cloneGmosNorthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+      cloneGmosLongSlit("t_gmos_north_long_slit", originalId, newId)
+
     def cloneGmosSouthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
-      sql"""
-      INSERT INTO t_gmos_south_long_slit (
-        c_observation_id,
-        c_observing_mode_type,
-        c_grating,
-        c_filter,
-        c_fpu,
-        c_central_wavelength,
-        c_xbin,
-        c_ybin,
-        c_amp_read_mode,
-        c_amp_gain,
-        c_roi,
-        c_wavelength_dithers,
-        c_spatial_offsets,
-        c_initial_grating,
-        c_initial_filter,
-        c_initial_fpu,
-        c_initial_central_wavelength
-      )
-      SELECT
-        $observation_id,
-        c_observing_mode_type,
-        c_grating,
-        c_filter,
-        c_fpu,
-        c_central_wavelength,
-        c_xbin,
-        c_ybin,
-        c_amp_read_mode,
-        c_amp_gain,
-        c_roi,
-        c_wavelength_dithers,
-        c_spatial_offsets,
-        c_initial_grating,
-        c_initial_filter,
-        c_initial_fpu,
-        c_initial_central_wavelength
-      FROM t_gmos_south_long_slit
-      WHERE c_observation_id = $observation_id
-      """.apply(newId ~ originalId)
+      cloneGmosLongSlit("t_gmos_south_long_slit", originalId, newId)
 
   }
 }
