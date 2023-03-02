@@ -68,7 +68,7 @@ class cloneObservation extends OdbSuite {
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
         (t, t).tupled.flatMap { (tid1, tid2) =>
-          createObservationAs(pi, pid, obsMode, tid1, tid2).flatMap { oid =>
+          createObservationAs(pi, pid, Some(obsMode), tid1, tid2).flatMap { oid =>
             query(
               user = pi,
               query = s"""
