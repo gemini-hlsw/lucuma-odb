@@ -13,6 +13,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -32,6 +34,46 @@ trait DatabaseOperations { this: OdbSuite =>
     }
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationAs(user, pid, None, tids: _*)
+
+  private def scienceRequirementsObject(observingMode: ObservingModeType): String =
+    observingMode match
+      case ObservingModeType.GmosNorthLongSlit |
+           ObservingModeType.GmosSouthLongSlit =>
+        """{
+        mode: SPECTROSCOPY
+        spectroscopy: {
+          wavelength: { nanometers: 500 }
+          resolution: 100
+          signalToNoise: 100.0
+          wavelengthCoverage: { nanometers: 20 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { microarcseconds: 0 }
+        }
+      }"""
+    
+  private def observingModeObject(observingMode: ObservingModeType): String =
+    observingMode match    
+      case ObservingModeType.GmosNorthLongSlit =>
+        """{
+          gmosNorthLongSlit: {
+            grating: R831_G5302
+            filter: R_PRIME
+            fpu: LONG_SLIT_0_50
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
+      case ObservingModeType.GmosSouthLongSlit =>
+        """{
+          gmosSouthLongSlit: {
+            grating: B1200_G5321
+            filter: R_PRIME
+            fpu: LONG_SLIT_0_50
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
+
+  def createObservationAs(user: User, pid: Program.Id, observingMode: Option[ObservingModeType] = None, tids: Target.Id*): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -43,6 +85,12 @@ trait DatabaseOperations { this: OdbSuite =>
                 targetEnvironment: {
                   asterism: ${tids.asJson}
                 }
+                ${observingMode.foldMap { m =>
+                  s"""
+                    scienceRequirements: ${scienceRequirementsObject(m)}
+                    observingMode: ${observingModeObject(m)}
+                  """
+                }}
               }
             }) {
               observation {
@@ -288,5 +336,47 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """.asRight
     )
+
+  def cloneObservationAs(user: User, oid: Observation.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          cloneObservation(input: {
+            observationId: "$oid"
+          }) {
+            newObservation { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id])
+
+  def updateTargetExistencetAs(user: User, tid: Target.Id, existence: Existence): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: {
+              existence: ${existence.tag.toUpperCase()}
+            }
+            WHERE: {
+              id: { EQ: "$tid"}
+            }
+          }) {
+            targets {
+              id
+              name
+            }
+          }
+        }
+      """
+    ).void
+
+  def deleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
+    updateTargetExistencetAs(user, tid, Existence.Deleted)
+
+  def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
+    updateTargetExistencetAs(user, tid, Existence.Present)
 
 }
