@@ -92,7 +92,7 @@ class cloneObservation extends OdbSuite {
     }      
   }
 
-  test("clones should have different ids".ignore) {
+  test("clones should have different ids") {
     createProgramAs(pi).flatMap { pid =>
       val t = createTargetAs(pi, pid)
       (t, t).tupled.flatMap { (tid1, tid2) =>
@@ -171,7 +171,7 @@ class cloneObservation extends OdbSuite {
 
   }
 
-  test("cloned asterism should not include deleted targets".ignore) {
+  test("cloned asterism should not include deleted targets") {
 
     val setup =
       for
@@ -221,7 +221,7 @@ class cloneObservation extends OdbSuite {
 
   }
 
-  test("cloned observation should always be present/new/active".ignore) {
+  test("cloned observation should always be present/new/active") {
 
     def updateFields(pid: Program.Id, oid: Observation.Id): IO[Unit] =
       expect(
