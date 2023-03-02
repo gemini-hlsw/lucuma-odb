@@ -59,6 +59,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
+import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.HourAngleRangeInput
@@ -94,6 +95,10 @@ sealed trait ObservationService[F[_]] {
     SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
   ): F[Result[List[Observation.Id]]]
+
+  def cloneObservation(
+    input: CloneObservationInput
+  ): F[Result[Observation.Id]]
 
 }
 
@@ -149,7 +154,8 @@ object ObservationService {
   def fromSessionAndUser[F[_]: Sync: Trace](
     session: Session[F],
     user:    User,
-    observingModeServices: ObservingModeServices[F]
+    observingModeServices: ObservingModeServices[F],
+    asterismService: AsterismService[F]
   ): ObservationService[F] =
     new ObservationService[F] {
 
@@ -278,6 +284,60 @@ object ObservationService {
             } yield r
           }
         }
+
+      def cloneObservation(
+        input: CloneObservationInput
+      ): F[Result[Observation.Id]] = 
+        session.transaction.use { xa =>
+
+          // First we need the pid and observing mode.
+          val selPid = sql"select c_program_id, c_observing_mode_type from t_observation where c_observation_id = $observation_id"
+          session.prepareR(selPid.query(program_id ~ observing_mode_type.opt)).use(_.option(input.observationId)).flatMap {
+
+            case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
+
+            case Some(pid ~ observingMode) =>
+
+              // Ok the obs exists, so let's clone its main row in t_observation. If this returns
+              // None then it means the user doesn't have permission to see the obs.
+              val cObsStmt = Statements.cloneObservation(pid, input.observationId, user)
+              val cObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
+              
+              // Ok let's do the clone
+              cObs.flatMap {
+
+                case None => 
+                  // User doesn't have permission to see the obs
+                  Result.failure(s"No such observation: ${input.observationId}").pure[F]
+
+                case Some(oid2) =>
+
+                  val cloneRelatedItems =
+                    asterismService.cloneAsterism(input.observationId, oid2) >>
+                    observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2))
+
+                  val doUpdate =
+                    input.SET match
+                      case None    => Result(oid2).pure[F] // nothing to do
+                      case Some(s) => 
+                        updateObservations(s, sql"select $observation_id".apply(oid2))
+                          .map { r =>
+                            // We probably don't need to check this return value, but I feel bad not doing it.
+                            r.flatMap {
+                              case List(`oid2`) => Result(oid2)
+                              case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
+                            }  
+                          }
+                          .flatTap { 
+                            r => xa.rollback.whenA(r.isLeft)
+                          }
+
+                  cloneRelatedItems >> doUpdate
+
+              }
+          }
+        }
+      end cloneObservation
 
     }
 
@@ -645,6 +705,86 @@ object ObservationService {
         void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
     }
 
+    /** 
+     * Clone the base slice (just t_observation) and return the new obs id, or none if the original
+     * doesn't exist or isn't accessible.
+     */
+    def cloneObservation(pid: Program.Id, oid: Observation.Id, user: User): AppliedFragment =
+      sql"""
+        INSERT INTO t_observation (
+          c_program_id,
+          c_title,
+          c_subtitle,
+          c_instrument,
+          c_status,
+          c_active_status,
+          c_visualization_time,
+          c_pts_pi,
+          c_pts_uncharged,
+          c_pts_execution,
+          c_pac_mode,
+          c_pac_angle,
+          c_explicit_ra,
+          c_explicit_dec,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_science_mode,
+          c_spec_wavelength,
+          c_spec_resolution,
+          c_spec_signal_to_noise,
+          c_spec_signal_to_noise_at,
+          c_spec_wavelength_coverage,
+          c_spec_focal_plane,
+          c_spec_focal_plane_angle,
+          c_spec_capability,
+          c_observing_mode_type
+        )
+        SELECT 
+          c_program_id,
+          c_title,
+          c_subtitle,
+          c_instrument,
+          'new',
+          'active',
+          c_visualization_time,
+          c_pts_pi,
+          c_pts_uncharged,
+          c_pts_execution,
+          c_pac_mode,
+          c_pac_angle,
+          c_explicit_ra,
+          c_explicit_dec,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_science_mode,
+          c_spec_wavelength,
+          c_spec_resolution,
+          c_spec_signal_to_noise,
+          c_spec_signal_to_noise_at,
+          c_spec_wavelength_coverage,
+          c_spec_focal_plane,
+          c_spec_focal_plane_angle,
+          c_spec_capability,
+          c_observing_mode_type
+      FROM t_observation
+      WHERE c_observation_id = $observation_id
+      """.apply(oid) |+|
+      ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      void"""
+        RETURNING c_observation_id
+      """
 
   }
 
