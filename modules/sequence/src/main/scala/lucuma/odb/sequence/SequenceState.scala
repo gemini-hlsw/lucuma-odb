@@ -4,6 +4,7 @@
 package lucuma.odb.sequence
 
 import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser

@@ -3,9 +3,12 @@
 
 package lucuma.odb.util
 
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
-// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
-
+import cats.data.NonEmptySet
+import cats.syntax.apply.*
+import cats.syntax.either.*
+import cats.syntax.functor.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -13,6 +16,12 @@ import lucuma.core.enums.CatalogName
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
@@ -33,6 +42,8 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.*
+import lucuma.core.model.sequence.StepConfig
+import lucuma.core.math.BoundedInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
@@ -45,10 +56,17 @@ import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
+import scala.util.control.Exception
+import scala.util.matching.Regex
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
+import skunk.implicits.*
+import spire.math.interval.Open
+import spire.math.interval.Closed
+import spire.math.interval.ValueBound
+
 
 // Codecs for some atomic types.
 trait Codecs {
@@ -65,7 +83,46 @@ trait Codecs {
     )
   }
 
-  // -----
+  val bounded_int4: Codec[BoundedInterval[Int]] = {
+    val intPair             = raw"([+-]?\d+),([+-]?\d+)"
+    val OpenOpen: Regex     = raw"\($intPair\)".r
+    val OpenClosed: Regex   = raw"\($intPair\]".r
+    val ClosedOpen: Regex   = raw"\[$intPair\)".r
+    val ClosedClosed: Regex = raw"\[$intPair\]".r
+
+    Codec.simple(
+      { bi =>
+        val lower = bi.lowerBound match {
+          case Open(low)   => s"($low"
+          case Closed(low) => s"[$low"
+        }
+        val upper = bi.upperBound match {
+          case Open(hi)   => s"$hi)"
+          case Closed(hi) => s"$hi]"
+        }
+        s"$lower,$upper"
+      },
+      { s =>
+        def parseInt(s: String): Option[Int] =
+          Exception.nonFatalCatch.opt(s.toInt)
+
+        def mk(l: String, h: String, f: (Int, Int) => Option[BoundedInterval[Int]]): Option[BoundedInterval[Int]] =
+          (parseInt(l), parseInt(h)).flatMapN(f)
+
+        val bi = s match {
+          case OpenOpen(l, h)     => mk(l, h, BoundedInterval.open)
+          case OpenClosed(l, h)   => mk(l, h, BoundedInterval.openLower)
+          case ClosedOpen(l, h)   => mk(l, h, BoundedInterval.openUpper)
+          case ClosedClosed(l, h) => mk(l, h, BoundedInterval.closed)
+          case _                  => none
+        }
+        bi.toRight(s"Invalid BoundedInterval: $s")
+      },
+      Type.int4range
+    )
+  }
+
+
 
   val air_mass_range_value: Codec[PosBigDecimal] =
     numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
@@ -119,6 +176,24 @@ trait Codecs {
 
   val focal_plane: Codec[FocalPlane] =
     enumerated[FocalPlane](Type.varchar)
+
+  val gcal_arc: Codec[GcalArc] =
+    enumerated[GcalArc](Type.varchar)
+
+  val gcal_baseline: Codec[GcalBaselineType] =
+    enumerated[GcalBaselineType](Type.varchar)
+
+  val gcal_continuum: Codec[GcalContinuum] =
+    enumerated[GcalContinuum](Type.varchar)
+
+  val gcal_diffuser: Codec[GcalDiffuser] =
+    enumerated[GcalDiffuser](Type.varchar)
+
+  val gcal_filter: Codec[GcalFilter] =
+    enumerated[GcalFilter](Type.varchar)
+
+  val gcal_shutter: Codec[GcalShutter] =
+    enumerated[GcalShutter](Type.varchar)
 
   val hour_angle_range_value: Codec[BigDecimal] =
     numeric(3, 2)
@@ -252,6 +327,28 @@ trait Codecs {
       Wavelength.intPicometers.reverseGet
     )
 
+  val wavelength_pm_range: Codec[BoundedInterval[Wavelength]] = {
+
+    def to: ValueBound[Int] => Option[ValueBound[Wavelength]] = {
+      case Open(a)   => Wavelength.intPicometers.getOption(a).map(Open(_))
+      case Closed(a) => Wavelength.intPicometers.getOption(a).map(Closed(_))
+    }
+
+    def from: ValueBound[Wavelength] => ValueBound[Int] = {
+      case Open(a)   => Open(Wavelength.intPicometers.reverseGet(a))
+      case Closed(a) => Closed(Wavelength.intPicometers.reverseGet(a))
+    }
+
+    bounded_int4.eimap[BoundedInterval[Wavelength]](bi =>
+      (to(bi.lowerBound), to(bi.upperBound)).flatMapN { case (l, h) =>
+        BoundedInterval.fromBounds(l, h)
+      }.toRight(s"Invalid wavelength bounds: $bi")
+    )(bw =>
+      BoundedInterval.unsafeFromBounds(from(bw.lowerBound), from(bw.upperBound))
+    )
+  }
+
+
   // Not so atomic ...
 
   val elevation_range: Codec[ElevationRange] =
@@ -268,6 +365,40 @@ trait Codecs {
      water_vapor      ~
      elevation_range
     ).gimap[ConstraintSet]
+
+  val step_config_gcal: Codec[StepConfig.Gcal] =
+    (gcal_continuum.opt ~
+     bool               ~
+     bool               ~
+     bool               ~
+     bool               ~
+     gcal_filter        ~
+     gcal_diffuser      ~
+     gcal_shutter
+    ).eimap { case (((((((c, ar), cuar), thar), xe), f), d), s) =>
+
+      val arcs = List(
+        GcalArc.ArArc   -> ar,
+        GcalArc.CuArArc -> cuar,
+        GcalArc.ThArArc -> thar,
+        GcalArc.XeArc   -> xe
+      ).collect { case (arc, true) => arc}
+
+      StepConfig.Gcal.Lamp
+        .fromContinuumOrArcs(c, arcs)
+        .map(StepConfig.Gcal(_, f, d, s))
+
+    } { (gcal: StepConfig.Gcal) =>
+      val arcs = gcal.lamp.toArcsSortedSet
+      gcal.lamp.continuum     ~
+        arcs(GcalArc.ArArc)   ~
+        arcs(GcalArc.CuArArc) ~
+        arcs(GcalArc.ThArArc) ~
+        arcs(GcalArc.XeArc)   ~
+        gcal.filter           ~
+        gcal.diffuser         ~
+        gcal.shutter
+    }
 
 }
 

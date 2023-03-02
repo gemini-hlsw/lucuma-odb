@@ -5,6 +5,7 @@ package lucuma.odb.util
 
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -26,6 +27,9 @@ trait GmosCodecs {
     enumerated(Type.varchar)
 
   val gmos_amp_read_mode: Codec[GmosAmpReadMode] =
+    enumerated(Type.varchar)
+
+  val gmos_disperser_order: Codec[GmosGratingOrder] =
     enumerated(Type.varchar)
 
   val gmos_north_filter: Codec[GmosNorthFilter] =
