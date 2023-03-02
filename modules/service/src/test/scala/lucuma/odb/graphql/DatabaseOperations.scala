@@ -34,7 +34,7 @@ trait DatabaseOperations { this: OdbSuite =>
     }
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createObservationAs(user, pid, ObservingModeType.GmosNorthLongSlit, tids: _*)
+    createObservationAs(user, pid, None, tids: _*)
 
   private def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -73,7 +73,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
 
-  def createObservationAs(user: User, pid: Program.Id, observingMode: ObservingModeType, tids: Target.Id*): IO[Observation.Id] =
+  def createObservationAs(user: User, pid: Program.Id, observingMode: Option[ObservingModeType] = None, tids: Target.Id*): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -85,8 +85,12 @@ trait DatabaseOperations { this: OdbSuite =>
                 targetEnvironment: {
                   asterism: ${tids.asJson}
                 }
-                scienceRequirements: ${scienceRequirementsObject(observingMode)}
-                observingMode: ${observingModeObject(observingMode)}
+                ${observingMode.foldMap { m =>
+                  s"""
+                    scienceRequirements: ${scienceRequirementsObject(m)}
+                    observingMode: ${observingModeObject(m)}
+                  """
+                }}
               }
             }) {
               observation {
