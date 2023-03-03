@@ -129,6 +129,7 @@ trait SequenceCodec {
     Encoder.instance { (a: Atom.GmosSouth) =>
       Json.obj(
         "id"    -> a.id.asJson,
+        "time"  -> StepTimeZero.asJson,
         "steps" -> a.steps.asJson
       )
     }
