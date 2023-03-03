@@ -680,4 +680,53 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
     }
 
   }
+
+  test("cross site execution config") {
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o)
+
+    setup.flatMap { case (pid, oid) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 executionConfig {
+                   ... on GmosSouthExecutionConfig {
+                     science {
+                       nextAtom {
+                         steps {
+                           instrumentConfig {
+                             gratingConfig {
+                               wavelength { nanometers }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "executionConfig": {
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
 }
