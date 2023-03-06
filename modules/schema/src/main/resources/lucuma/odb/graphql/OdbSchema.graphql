@@ -821,6 +821,10 @@ input GmosNorthDynamicInput {
 
 # GMOS North Execution Config
 type GmosNorthExecutionConfig implements ExecutionConfig {
+
+  # Bogus field that makes the structure of this instrument distinct from the others.
+  gmosNorth: Boolean! @deprecated
+
   # GMOS North static configuration
   static: GmosNorthStatic!
 
@@ -1196,6 +1200,10 @@ input GmosSouthDynamicInput {
 
 # GMOS South Execution Config
 type GmosSouthExecutionConfig implements ExecutionConfig {
+
+  # Bogus field that makes the structure of this instrument distinct from the others.
+  gmosSouth: Boolean! @deprecated
+
   # GMOS South static configuration
   static: GmosSouthStatic!
 

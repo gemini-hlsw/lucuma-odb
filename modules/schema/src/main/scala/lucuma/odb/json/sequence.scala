@@ -169,6 +169,7 @@ trait SequenceCodec {
   given given_Decoder_FutureExecutionConfig_GmosNorth: Decoder[FutureExecutionConfig.GmosNorth] =
     Decoder.instance { c =>
       for {
+        _ <- c.downField("gmosNorth").as[Boolean]
         t <- c.downField("static").as[StaticConfig.GmosNorth]
         a <- c.downField("acquisition").as[ExecutionSequence.GmosNorth]
         s <- c.downField("science").as[ExecutionSequence.GmosNorth]
@@ -178,6 +179,7 @@ trait SequenceCodec {
   given given_Encoder_FutureExecutionConfig_GmosNorth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[FutureExecutionConfig.GmosNorth] =
     Encoder.instance { (a: FutureExecutionConfig.GmosNorth) =>
       Json.obj(
+        "gmosNorth"   -> true.asJson,
         "instrument"  -> (Instrument.GmosNorth: Instrument).asJson,
         "static"      -> a.static.asJson,
         "acquisition" -> a.acquisition.asJson,
@@ -188,6 +190,7 @@ trait SequenceCodec {
   given given_Decoder_FutureExecutionConfig_GmosSouth: Decoder[FutureExecutionConfig.GmosSouth] =
     Decoder.instance { c =>
       for {
+        _ <- c.downField("gmosSouth").as[Boolean]
         t <- c.downField("static").as[StaticConfig.GmosSouth]
         a <- c.downField("acquisition").as[ExecutionSequence.GmosSouth]
         s <- c.downField("science").as[ExecutionSequence.GmosSouth]
@@ -197,6 +200,7 @@ trait SequenceCodec {
   given given_Encoder_FutureExecutionConfig_GmosSouth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[FutureExecutionConfig.GmosSouth] =
     Encoder.instance { (a: FutureExecutionConfig.GmosSouth) =>
       Json.obj(
+        "gmosSouth"   -> true.asJson,
         "instrument"  -> (Instrument.GmosSouth: Instrument).asJson,
         "static"      -> a.static.asJson,
         "acquisition" -> a.acquisition.asJson,
