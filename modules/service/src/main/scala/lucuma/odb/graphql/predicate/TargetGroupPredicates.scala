@@ -9,4 +9,5 @@ import lucuma.core.model.Program
 class TargetGroupPredicates(path: Path) {
   val program = ProgramPredicates(path / "program")
   val observations = ObservationSelectResultPredicates(path / "observations")
+  val target = TargetPredicates(path / "target")
 }

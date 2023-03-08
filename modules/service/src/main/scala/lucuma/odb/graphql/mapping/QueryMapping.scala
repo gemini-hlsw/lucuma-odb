@@ -352,7 +352,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 and(List(
                   WHERE.getOrElse(True),
                   Predicates.targetGroup.program.id.eql(pid),
-                  Predicates.targetGroup.program.existence.includeDeleted(includeDeleted),
+                  Predicates.targetGroup.target.existence.includeDeleted(includeDeleted),
                   Predicates.targetGroup.program.isVisibleTo(user),
                 ))
               ),
