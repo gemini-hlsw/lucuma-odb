@@ -4,12 +4,12 @@
 package lucuma.odb.graphql
 package issue.github
 
-import lucuma.core.model.User
 import cats.effect.IO
 import cats.syntax.all.*
-import lucuma.core.model.Target
-import io.circe.literal.*
 import io.circe.Json
+import io.circe.literal.*
+import lucuma.core.model.Target
+import lucuma.core.model.User
 
 // https://github.com/gemini-hlsw/lucuma-odb/issues/307
 class GitHub_307 extends OdbSuite {
