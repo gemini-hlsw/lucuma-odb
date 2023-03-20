@@ -31,7 +31,7 @@ final class GcalParsersSuite extends munit.FunSuite {
       Right(SmartGcalValue(
         PosInt.unsafeFrom(2),
         Gcal(
-          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen),
+          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
           GcalFilter.None,
           GcalDiffuser.Visible,
           GcalShutter.Closed
