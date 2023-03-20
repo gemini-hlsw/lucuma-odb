@@ -4,6 +4,7 @@
 package lucuma.odb.smartgcal.data
 
 import cats.data.NonEmptyList
+import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
 import lucuma.core.enums.GmosAmpGain
@@ -55,6 +56,7 @@ object GmosNorth {
   }
 
   case class TableRow(
+    line:  PosLong,
     key:   TableKey,
     value: SmartGcalValue.Legacy
   )
@@ -86,15 +88,15 @@ object GmosNorth {
     value: SmartGcalValue.Legacy
   ) {
 
-    def tableRows: NonEmptyList[TableRow] =
-      key.tableKeys.map { tk => TableRow(tk, value) }
+    def tableRows(line: PosLong): NonEmptyList[TableRow] =
+      key.tableKeys.map { tk => TableRow(line, tk, value) }
 
   }
 
   object FileEntry {
 
-    def tableRows[F[_]]: Pipe[F, FileEntry, TableRow] =
-      _.flatMap(fe => Stream.emits(fe.tableRows.toList))
+    def tableRows[F[_]]: Pipe[F, (PosLong, FileEntry), TableRow] =
+      _.flatMap { case (line, fe) => Stream.emits(fe.tableRows(line).toList) }
 
   }
 

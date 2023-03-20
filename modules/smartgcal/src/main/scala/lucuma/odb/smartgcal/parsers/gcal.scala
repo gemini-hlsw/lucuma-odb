@@ -22,10 +22,10 @@ trait GcalParsers {
   import util.*
 
   val baselineType: Parser[GcalBaselineType] =
-    enumerated[GcalBaselineType].withContext("Gcal baseline type")
+    oneOfEnumerated[GcalBaselineType].withContext("Gcal baseline type")
 
   val arc: Parser[GcalArc] =
-    mapping(
+    oneOf(
       "Ar arc"   -> GcalArc.ArArc,
       "ThAr arc" -> GcalArc.ThArArc,
       "CuAr arc" -> GcalArc.CuArArc,
@@ -36,7 +36,7 @@ trait GcalParsers {
     arc.repSep(Parser.char(';')).map(_.toNes).withContext("Gcal arcs")
 
   val continuum: Parser[GcalContinuum] =
-    mapping(
+    oneOf(
       "IR grey body - low"  -> GcalContinuum.IrGreyBodyLow,
       "IR grey body - high" -> GcalContinuum.IrGreyBodyHigh,
       "Quartz Halogen"      -> GcalContinuum.QuartzHalogen5W,
@@ -44,13 +44,13 @@ trait GcalParsers {
     ).withContext("Gcal continuum")
 
   val diffuser: Parser[GcalDiffuser] =
-    mapping(
+    oneOf(
       "IR"      -> GcalDiffuser.Ir,
       "Visible" -> GcalDiffuser.Visible
     ).withContext("Gcal diffuser")
 
   val filter: Parser[GcalFilter] =
-    mapping(
+    oneOf(
       "none"         -> GcalFilter.None,
       "None"         -> GcalFilter.None,
       "ND1.0"        -> GcalFilter.Nd10,
@@ -66,7 +66,7 @@ trait GcalParsers {
     ).withContext("Gcal filter")
 
   val shutter: Parser[GcalShutter] =
-    enumerated[GcalShutter].withContext("Gcal shutter")
+    oneOfEnumerated[GcalShutter].withContext("Gcal shutter")
 
   val gcalLamp: Parser[Gcal.Lamp] =
     gcal.arcs.eitherOr(gcal.continuum).map(Gcal.Lamp.fromEither)

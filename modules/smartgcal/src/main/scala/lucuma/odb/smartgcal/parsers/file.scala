@@ -38,9 +38,9 @@ trait SmartGcalFileParsers {
       gcal.baselineType
     ).map { case ((((count, stepConfig), time), coadds), baseline) =>
       SmartGcalValue(
-        count,
         stepConfig,
         baseline,
+        count,
         LegacyInstrumentConfig(
           time,
           coadds

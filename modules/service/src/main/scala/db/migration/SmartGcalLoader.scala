@@ -7,41 +7,33 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import fs2.Pipe
 import fs2.Stream
-import java.io.InputStream
 import org.postgresql.core.BaseConnection
 import skunk.Encoder
 
+import java.io.InputStream
+
+/**
+ * Loads a Smart GCal configuration file into the corresponding table.
+ *
+ * @param table simple description of the database table
+ * @param pipe a function that takes a file name and produces a pipe Byte to
+ *             table rows
+ * @param encoder encodes a table row for ingestion into the table via copy from
+ *                stdin
+ * @tparam A scala data type representing the smart gcal table row for the
+ *           instrument
+ */
 class SmartGcalLoader[A](
-  val relation:          String,
-  val instrumentColumns: List[String],
-  val indexColumns:      List[String],
-  val pipe:              String => Pipe[IO, Byte, A],
-  val encoder:           Encoder[A]
+  val temp:    SmartGcalTable.Temp,
+  val inst:    SmartGcalTable.Inst,
+  val pipe:    String => Pipe[IO, Byte, A],
+  val encoder: Encoder[A]
 ) {
 
-  private val GcalColumns: List[String] =
-    List(
-      "c_step_index",
-      "c_gcal_continuum",
-      "c_gcal_ar_arc",
-      "c_gcal_cuar_arc",
-      "c_gcal_thar_arc",
-      "c_gcal_xe_arc",
-      "c_gcal_filter",
-      "c_gcal_diffuser",
-      "c_gcal_shutter"
-    )
-
-  lazy val tableName: String =
-    s"t_$relation"
-
-  lazy val indexName: String =
-    s"i_$relation"
-
   def load(bc: BaseConnection, files: NonEmptyList[(String, IO[InputStream])]): IO[Unit] = {
-    val cols = GcalColumns ++ instrumentColumns
 
     val r: Resource[IO, InputStream] =
       files
@@ -57,46 +49,28 @@ class SmartGcalLoader[A](
         .lastOrError
 
     for {
-      _  <- bc.ioUpdate(s"DROP INDEX IF EXISTS $indexName")
-      _  <- bc.ioUpdate(s"TRUNCATE TABLE $tableName RESTART IDENTITY")
-      _  <- bc.ioCopyIn(s"COPY $tableName ( ${cols.mkString(", ")} ) FROM STDIN WITH ( DELIMITER '|', NULL 'NULL' )", r)
-      _  <- bc.ioUpdate(s"CREATE INDEX $indexName ON $tableName ( ${indexColumns.mkString(", ")} )")
+
+      // Create and load the temp table
+      _ <- bc.ioUpdate(temp.create)
+      _ <- bc.ioCopyIn(temp.copyFromStdin, r)
+
+      // Prepare and clean the instrument table
+      _ <- bc.ioUpdate(inst.truncate)
+
+      // Insert into t_gcal table from temp
+      _ <- bc.ioUpdate(SmartGcalTable.Gcal.deleteWhereInstrumentEquals(inst.inst))
+      _ <- bc.ioUpdate(SmartGcalTable.Gcal.dropFkeyConstraints)
+      _ <- bc.ioUpdate(SmartGcalTable.Gcal.insertFromTemp(temp.name))
+      _ <- bc.ioUpdate(SmartGcalTable.Gcal.addFkeyConstraints)
+
+      // Insert into instrument table
+      _ <- bc.ioUpdate(inst.dropIndex)
+      _ <- bc.ioUpdate(inst.dropFkeyConstraints)
+      _ <- bc.ioUpdate(inst.insertFromTemp(temp.name))
+      _ <- bc.ioUpdate(inst.addFkeyConstraints)
+      _ <- bc.ioUpdate(inst.createIndex)
+
     } yield ()
   }
 
 }
-
-/*
-TRUNCATE TABLE t_smart_gmos_north RESTART IDENTITY;
-
-DROP INDEX IF EXISTS i_smart_gmos_north;
-
-COPY t_smart_gmos_north (
-  c_step_index,
-  c_gcal_continuum,
-  c_gcal_ar_arc,
-  c_gcal_cuar_arc,
-  c_gcal_thar_arc,
-  c_gcal_xe_arc,
-  c_gcal_filter,
-  c_gcal_diffuser,
-  c_gcal_shutter,
-  c_exposure_time,
-  c_gcal_baseline,
-  c_disperser,
-  c_filter,
-  c_fpu,
-  c_x_binning,
-  c_y_binning,
-  c_wavelength_range,
-  c_amp_gain
-) FROM STDIN WITH (DELIMITER '|', NULL 'NULL');
-0|IrGreyBodyLow|f|f|f|f|Gmos|Ir|Open|5 seconds|Day|B1200_G5301|GPrime|LongSlit_0_25|One|One|[600, 1000)|Low
-\.
-
-CREATE INDEX i_smart_gmos_north ON t_smart_gmos_north (
-  c_disperser,
-  c_filter,
-  c_fpu
-);
-*/

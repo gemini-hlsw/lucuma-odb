@@ -11,6 +11,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CatalogName
 import lucuma.core.enums.CloudExtinction
@@ -33,6 +34,7 @@ import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
+import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
@@ -43,7 +45,6 @@ import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.*
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.math.BoundedInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
@@ -56,16 +57,17 @@ import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
-import scala.util.control.Exception
-import scala.util.matching.Regex
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
 import skunk.implicits.*
-import spire.math.interval.Open
 import spire.math.interval.Closed
+import spire.math.interval.Open
 import spire.math.interval.ValueBound
+
+import scala.util.control.Exception
+import scala.util.matching.Regex
 
 
 // Codecs for some atomic types.
@@ -83,7 +85,7 @@ trait Codecs {
     )
   }
 
-  val bounded_int4: Codec[BoundedInterval[Int]] = {
+  val int4range: Codec[BoundedInterval[Int]] = {
     val intPair             = raw"([+-]?\d+),([+-]?\d+)"
     val OpenOpen: Regex     = raw"\($intPair\)".r
     val OpenClosed: Regex   = raw"\($intPair\]".r
@@ -121,8 +123,6 @@ trait Codecs {
       Type.int4range
     )
   }
-
-
 
   val air_mass_range_value: Codec[PosBigDecimal] =
     numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
@@ -255,6 +255,9 @@ trait Codecs {
   val pos_int: Codec[PosInt] =
     int4.eimap(PosInt.from)(_.value)
 
+  val pos_long: Codec[PosLong] =
+    int8.eimap(PosLong.from)(_.value)
+
   val program_id: Codec[Program.Id] =
     gid[Program.Id]
 
@@ -339,7 +342,7 @@ trait Codecs {
       case Closed(a) => Closed(Wavelength.intPicometers.reverseGet(a))
     }
 
-    bounded_int4.eimap[BoundedInterval[Wavelength]](bi =>
+    int4range.eimap[BoundedInterval[Wavelength]](bi =>
       (to(bi.lowerBound), to(bi.upperBound)).flatMapN { case (l, h) =>
         BoundedInterval.fromBounds(l, h)
       }.toRight(s"Invalid wavelength bounds: $bi")

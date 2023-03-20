@@ -29,7 +29,6 @@ final class GcalParsersSuite extends munit.FunSuite {
     assertEquals(
       legacyValue.parseAll(definition),
       Right(SmartGcalValue(
-        PosInt.unsafeFrom(2),
         Gcal(
           Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
           GcalFilter.None,
@@ -37,6 +36,7 @@ final class GcalParsersSuite extends munit.FunSuite {
           GcalShutter.Closed
         ),
         GcalBaselineType.Night,
+        PosInt.unsafeFrom(2),
         LegacyInstrumentConfig(
           TimeSpan.unsafeFromMicroseconds(4_000_000L),
           PosInt.unsafeFrom(1)
@@ -51,7 +51,6 @@ final class GcalParsersSuite extends munit.FunSuite {
     assertEquals(
       legacyValue.parseAll(definition),
       Right(SmartGcalValue(
-        PosInt.unsafeFrom(2),
         Gcal(
           Gcal.Lamp.fromArcs(NonEmptySet.of(GcalArc.ArArc, GcalArc.XeArc)),
           GcalFilter.Nd45,
@@ -59,6 +58,7 @@ final class GcalParsersSuite extends munit.FunSuite {
           GcalShutter.Open
         ),
         GcalBaselineType.Day,
+        PosInt.unsafeFrom(2),
         LegacyInstrumentConfig(
           TimeSpan.unsafeFromMicroseconds(4_300_000L),
           PosInt.unsafeFrom(1)
