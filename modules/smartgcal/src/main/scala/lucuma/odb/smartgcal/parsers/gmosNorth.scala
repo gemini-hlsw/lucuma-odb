@@ -14,8 +14,8 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.odb.smartgcal.data.GmosNorth.FileKey
 import lucuma.odb.smartgcal.data.GmosNorth.FileEntry
+import lucuma.odb.smartgcal.data.GmosNorth.FileKey
 
 import scala.collection.immutable.ListMap
 
@@ -25,7 +25,7 @@ trait GmosNorthParsers {
 
   val filter: Parser[NonEmptyList[Option[GmosNorthFilter]]] =
     Parser.string("none").as(NonEmptyList.one(none[GmosNorthFilter])) |   // "none" found in existing .csv files
-      pattern(optionMap(ListMap(
+      manyOfOption("None",
         "g_G0301"                   -> GmosNorthFilter.GPrime,
         "r_G0303"                   -> GmosNorthFilter.RPrime,
         "i_G0302"                   -> GmosNorthFilter.IPrime,
@@ -55,10 +55,10 @@ trait GmosNorthParsers {
         "i_G0302 + CaT_G0309"       -> GmosNorthFilter.IPrime_CaT,
         "z_G0304 + CaT_G0309"       -> GmosNorthFilter.ZPrime_CaT,
         "u_G0308"                   -> GmosNorthFilter.UPrime
-      ), "None")).withContext("GMOS North filter")
+      ).withContext("GMOS North filter")
 
   val fpu: Parser[NonEmptyList[Option[GmosNorthFpu]]] =
-    pattern(optionMap(ListMap(
+    manyOfOption("None",
       "Longslit 0.25 arcsec" -> GmosNorthFpu.LongSlit_0_25,
       "Longslit 0.50 arcsec" -> GmosNorthFpu.LongSlit_0_50,
       "Longslit 0.75 arcsec" -> GmosNorthFpu.LongSlit_0_75,
@@ -75,22 +75,22 @@ trait GmosNorthParsers {
       "N and S 1.00 arcsec"  -> GmosNorthFpu.Ns3,
       "N and S 1.50 arcsec"  -> GmosNorthFpu.Ns4,
       "N and S 2.00 arcsec"  -> GmosNorthFpu.Ns5
-    ), "None")).withContext("GMOS North FPU")
+    ).withContext("GMOS North FPU")
 
   val grating: Parser[NonEmptyList[Option[GmosNorthGrating]]] =
-    pattern(optionMap(enumeratedMap[GmosNorthGrating], "Mirror")).withContext("GMOS North grating")
+    manyOfOptionEnumerated[GmosNorthGrating]("Mirror").withContext("GMOS North grating")
 
   val xBinning: Parser[GmosXBinning] =
-    mapping(GmosXBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
+    oneOf(GmosXBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
 
   val yBinning: Parser[GmosYBinning] =
-    mapping(GmosYBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
+    oneOf(GmosYBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
 
   val order: Parser[NonEmptyList[GmosGratingOrder]] =
-    mappingPattern(GmosGratingOrder.all.fproductLeft(_.count.toString)*).withContext("GMOS grating order")
+    manyOf(GmosGratingOrder.all.fproductLeft(_.count.toString)*).withContext("GMOS grating order")
 
   val gain: Parser[NonEmptyList[GmosAmpGain]] =
-    enumeratedPattern[GmosAmpGain].withContext("GMOS amp gain")
+    manyOfEnumerated[GmosAmpGain].withContext("GMOS amp gain")
 
   val fileKey: Parser[FileKey] =
     (

@@ -3,8 +3,6 @@
 
 package lucuma.odb.json
 
-import cats.data.NonEmptySet
-import cats.syntax.apply.*
 import cats.syntax.either.*
 import io.circe.Codec
 import io.circe.Decoder

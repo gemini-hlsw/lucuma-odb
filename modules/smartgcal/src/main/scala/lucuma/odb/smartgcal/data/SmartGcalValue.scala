@@ -10,9 +10,9 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 
 case class SmartGcalValue[A](
-  stepCount:        PosInt,
   gcalConfig:       Gcal,
   baselineType:     GcalBaselineType,
+  stepCount:        PosInt,
   instrumentConfig: A
 )
 
@@ -37,9 +37,9 @@ object SmartGcalValue {
 
   given [A](using Eq[A]): Eq[SmartGcalValue[A]] =
     Eq.by { a => (
-      a.stepCount.value,
       a.gcalConfig,
       a.baselineType,
+      a.stepCount.value,
       a.instrumentConfig
     )}
 

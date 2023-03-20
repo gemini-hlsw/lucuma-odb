@@ -6,19 +6,26 @@ package db.migration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
-import java.io.InputStream
+import lucuma.core.enums.Instrument.GmosNorth
 import lucuma.odb.smartgcal.FileReader
 import lucuma.odb.smartgcal.data.GmosNorth.FileEntry
+import lucuma.odb.smartgcal.data.GmosNorth.TableKey
 import lucuma.odb.smartgcal.data.GmosNorth.TableRow
+import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import skunk.Codec
 import skunk.Encoder
-import skunk.implicits.*
 import skunk.codec.temporal.interval
+import skunk.implicits.*
 
+import java.io.InputStream
+
+/**
+ * Repeatable Smart GCal configuration loader for GMOS North.  Located,
+ * instantiated and executed by flyway.
+ */
 class R__SmartGmosNorth extends SmartGcalMigration[TableRow]("GMOS North") {
 
   val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
@@ -31,53 +38,72 @@ class R__SmartGmosNorth extends SmartGcalMigration[TableRow]("GMOS North") {
 
 object R__SmartGmosNorth {
 
-  val encoder: Encoder[TableRow] =
+  import SmartGcalTable.Col
+
+  given Encoder[SmartGcalValue.LegacyInstrumentConfig] =
+    interval.contramap[SmartGcalValue.LegacyInstrumentConfig] { v =>
+      v.exposureTime.toDuration
+    }
+
+  given Encoder[SmartGcalValue.Legacy] =
+    SmartGcalTable.valueEncoder
+
+  given Encoder[TableKey] =
     (
-      pos_int                 ~
-      step_config_gcal        ~
-      interval                ~
-      gcal_baseline           ~
       gmos_north_grating.opt  ~
       gmos_north_filter.opt   ~
       gmos_north_fpu.opt      ~
       gmos_x_binning          ~
       gmos_y_binning          ~
       wavelength_pm_range     ~
-      gmos_disperser_order      ~
+      gmos_disperser_order    ~
       gmos_amp_gain
-    ).contramap[TableRow] { row =>
-      PosInt.unsafeFrom(1)    ~
-      row.value.gcalConfig    ~
-      row.value.instrumentConfig.exposureTime.toDuration  ~
-      row.value.baselineType  ~
-      row.key.grating         ~
-      row.key.filter          ~
-      row.key.fpu             ~
-      row.key.xBin            ~
-      row.key.yBin            ~
-      row.key.wavelengthRange ~
-      row.key.order           ~
-      row.key.gain
+    ).contramap[TableKey] { k =>
+      k.grating         ~
+      k.filter          ~
+      k.fpu             ~
+      k.xBin            ~
+      k.yBin            ~
+      k.wavelengthRange ~
+      k.order           ~
+      k.gain
     }
 
-  object Loader extends SmartGcalLoader(
-    relation          = "smart_gmos_north",
-    instrumentColumns = List(
-      "c_exposure_time",
-      "c_gcal_baseline",
-      "c_disperser",
-      "c_filter",
-      "c_fpu",
-      "c_x_binning",
-      "c_y_binning",
-      "c_wavelength_range",
-      "c_disperser_order",
-      "c_amp_gain"
-    ),
-    indexColumns = List("c_disperser", "c_filter", "c_fpu"),
-    pipe         = s => FileReader.gmosNorth[IO](s) andThen FileEntry.tableRows[IO],
-    encoder      = encoder
+  val KeyColumns: NonEmptyList[Col] =
+    NonEmptyList.of(
+      Col.fkey("c_disperser", "t_gmos_north_disperser").index,
+      Col.fkey("c_filter", "t_gmos_north_filter").index,
+      Col.fkey("c_fpu", "t_gmos_north_fpu").index,
+      Col.fkey("c_x_binning", "t_gmos_binning"),
+      Col.fkey("c_y_binning", "t_gmos_binning"),
+      Col("c_wavelength_range", "d_wavelength_pm_range"),
+      Col.fkey("c_disperser_order", "t_gmos_disperser_order"),
+      Col.fkey("c_amp_gain", "t_gmos_amp_gain"),
+    )
 
+  def encoder(using k: Encoder[TableKey], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow] =
+    (
+      pos_long ~
+      k        ~
+      v
+    ).contramap[TableRow] { r =>
+      r.line ~
+      r.key  ~
+      r.value
+    }
+
+  val (tmp, inst) = SmartGcalTable.forInstrument(
+    GmosNorth,
+    Col("c_step_order", "int8"),
+    KeyColumns,
+    NonEmptyList.one(Col("c_exposure_time", "interval"))
+  )
+
+  object Loader extends SmartGcalLoader(
+    tmp,
+    inst,
+    pipe    = filename => FileReader.gmosNorth[IO](filename) andThen FileEntry.tableRows[IO],
+    encoder = encoder
   )
 
 }

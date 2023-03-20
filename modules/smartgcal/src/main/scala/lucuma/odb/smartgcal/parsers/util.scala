@@ -21,15 +21,6 @@ import scala.util.matching.Regex
 
 trait UtilityParsers {
 
-  def enumeratedMap[A](using e: Enumerated[A]): Map[String, A] =
-    ListMap.from(e.all.map(a => e.tag(a) -> a))
-
-  def optionMap[A](m: Map[String, A], noneValue: String): Map[String, Option[A]] =
-    ListMap.from(noneValue -> none[A] :: m.view.mapValues(_.some).toList)
-
-  def enumerated[A](using e: Enumerated[A]): Parser[A] =
-    Parser.fromStringMap(enumeratedMap)
-
   private val regex: Regex = "^\\$(?<pattern>.+)".r
   private val splat: Regex = "(?<prefix>.*)\\*$".r
 
@@ -42,7 +33,9 @@ trait UtilityParsers {
    *
    * @see [[https://github.com/gemini-hlsw/ocs/blob/develop/bundle/edu.gemini.pot/src/main/java/edu/gemini/spModel/gemini/calunit/smartgcal/maps/BaseCalibrationMap.java#L29-L72]]
    */
-  def pattern[A](m: Map[String, A]): Parser[NonEmptyList[A]] = {
+  def manyOf[A](kv: (String, A)*): Parser[NonEmptyList[A]] = {
+
+    val m: Map[String, A] = ListMap.from(kv)
 
     def formatNoMatch(prefix: String): String =
       s"$prefix, must match one of the strings: ${m.keys.map(s => s"'$s'").mkString("{", ", ", "}")}"
@@ -73,14 +66,32 @@ trait UtilityParsers {
     }
   }
 
-  def enumeratedPattern[A](using e: Enumerated[A]): Parser[NonEmptyList[A]] =
-    pattern(enumeratedMap[A])
+  def manyOfOption[A](noneValue: String, kv: (String, A)*): Parser[NonEmptyList[Option[A]]] =
+    manyOf(optionKv(noneValue, kv)*)
 
-  def mapping[A](kv: (String, A)*): Parser[A] =
+  def manyOfEnumerated[A](using e: Enumerated[A]): Parser[NonEmptyList[A]] =
+    manyOf(enumeratedKv[A]*)
+
+  def manyOfOptionEnumerated[A](noneValue: String)(using e: Enumerated[A]): Parser[NonEmptyList[Option[A]]] =
+    manyOf(optionKv(noneValue, enumeratedKv[A])*)
+
+  def oneOf[A](kv: (String, A)*): Parser[A] =
     Parser.fromStringMap(ListMap.from(kv))
 
-  def mappingPattern[A](kv: (String, A)*): Parser[NonEmptyList[A]] =
-    pattern(ListMap.from(kv))
+  def oneOfOption[A](noneValue: String, kv: (String, A)*): Parser[Option[A]] =
+    oneOf(optionKv(noneValue, kv)*)
+
+  def oneOfEnumerated[A](using e: Enumerated[A]): Parser[A] =
+    oneOf(enumeratedKv[A]*)
+
+  def oneOfOptionEnumerated[A](noneValue: String)(using e: Enumerated[A]): Parser[Option[A]] =
+    oneOf(optionKv(noneValue, enumeratedKv[A])*)
+
+  private def enumeratedKv[A](using e: Enumerated[A]): Seq[(String, A)] =
+    e.all.fproductLeft(a => e.tag(a))
+
+  private def optionKv[A](noneValue: String, kv: Seq[(String, A)]): Seq[(String, Option[A])] =
+    (noneValue, none[A]) +: kv.map(_.map(_.some))
 
 }
 
