@@ -14,9 +14,10 @@ CREATE TABLE t_gcal_continuum (
     c_long_name  varchar NOT NULL
 );
 
-INSERT INTO t_gcal_continuum VALUES ('IrGreyBodyLow',  'IR grey body - low',  'IR grey body - low');
-INSERT INTO t_gcal_continuum VALUES ('IrGreyBodyHigh', 'IR grey body - high', 'IR grey body - high');
-INSERT INTO t_gcal_continuum VALUES ('QuartzHalogen',  'Quartz Halogen',      'Quartz Halogen');
+INSERT INTO t_gcal_continuum VALUES ('IrGreyBodyLow',    'IR grey body - low',  'IR grey body - low');
+INSERT INTO t_gcal_continuum VALUES ('IrGreyBodyHigh',   'IR grey body - high', 'IR grey body - high');
+INSERT INTO t_gcal_continuum VALUES ('QuartzHalogen5',   '5W Quartz Halogen',   '5W Quartz Halogen');
+INSERT INTO t_gcal_continuum VALUES ('QuartzHalogen100', '100W Quartz Halogen', '100W Quartz Halogen');
 
 CREATE TABLE t_gcal_filter (
     c_tag        d_tag   PRIMARY KEY,

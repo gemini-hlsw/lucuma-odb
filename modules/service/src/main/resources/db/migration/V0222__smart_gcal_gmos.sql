@@ -1,8 +1,8 @@
 
-DELETE FROM t_gmos_north_fpu WHERE c_tag LIKE 'Ifu_';
-INSERT INTO t_gmos_north_fpu values ('Ifu2Slits', 'IFU-2', 'IFU 2 Slits', null, 33500000);
-INSERT INTO t_gmos_north_fpu values ('IfuBlue', 'IFU-B', 'IFU Left Slit (blue)', null, 31750000);
-INSERT INTO t_gmos_north_fpu values ('IfuRed', 'IFU-R', 'IFU Right Slit (red)', null, 35250000);
+
+
+
+
 
 CREATE TABLE t_smart_gmos_north (
   c_smart_id         SERIAL                PRIMARY KEY,

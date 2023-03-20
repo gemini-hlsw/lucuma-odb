@@ -32,7 +32,7 @@ trait GmosNorthParsers {
         "z_G0304"                   -> GmosNorthFilter.ZPrime,
         "Z_G0322"                   -> GmosNorthFilter.Z,
         "Y_G0323"                   -> GmosNorthFilter.Y,
-  //      "ri_G0349"                  -> GmosNorthFilter.,   TODO: Missing in core?
+        "ri_G0349"                  -> GmosNorthFilter.Ri,
         "GG455_G0305"               -> GmosNorthFilter.GG455,
         "OG515_G0306"               -> GmosNorthFilter.OG515,
         "RG610_G0307"               -> GmosNorthFilter.RG610,
@@ -45,8 +45,8 @@ trait GmosNorthParsers {
         "OIIIC_G0319"               -> GmosNorthFilter.OIIIC,
         "HeII_G0320"                -> GmosNorthFilter.HeII,
         "HeIIC_G0321"               -> GmosNorthFilter.HeIIC,
-  //      "OVI_G0345"                 -> GmosNorthFilter.,   TODO: Missing in core?
-  //      "OVIC_G0346"                -> GmosNorthFilter.,
+        "OVI_G0345"                 -> GmosNorthFilter.OVI,
+        "OVIC_G0346"                -> GmosNorthFilter.OVIC,
         "HartmannA_G0313 + r_G0303" -> GmosNorthFilter.HartmannA_RPrime,
         "HartmannB_G0314 + r_G0303" -> GmosNorthFilter.HartmannB_RPrime,
         "g_G0301 + GG455_G0305"     -> GmosNorthFilter.GPrime_GG455,

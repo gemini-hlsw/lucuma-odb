@@ -11,6 +11,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.parser.MiscParsers.comma
 import lucuma.core.util.Enumerated
 
 import java.util.regex.PatternSyntaxException
@@ -64,7 +65,7 @@ trait UtilityParsers {
         case _             => m.get(key).toRight(formatNoMatch(s"Key '$key' not found")).map(NonEmptyList.one)
       }
 
-    Parser.repUntil(char, common.comma).string.flatMap { s =>
+    Parser.repUntil(char, comma).string.flatMap { s =>
       matching(s.trim).fold(
         msg => Parser.failWith[NonEmptyList[A]](msg),
         as  => Parser.pure(as)

@@ -35,13 +35,12 @@ trait GcalParsers {
   val arcs: Parser[NonEmptySet[GcalArc]] =
     arc.repSep(Parser.char(';')).map(_.toNes).withContext("Gcal arcs")
 
-  // TODO: lucuma-core enum needs 5W QH
   val continuum: Parser[GcalContinuum] =
     mapping(
       "IR grey body - low"  -> GcalContinuum.IrGreyBodyLow,
       "IR grey body - high" -> GcalContinuum.IrGreyBodyHigh,
-      "Quartz Halogen"      -> GcalContinuum.QuartzHalogen,
-      "100W Quartz Halogen" -> GcalContinuum.QuartzHalogen
+      "Quartz Halogen"      -> GcalContinuum.QuartzHalogen5W,
+      "100W Quartz Halogen" -> GcalContinuum.QuartzHalogen100W
     ).withContext("Gcal continuum")
 
   val diffuser: Parser[GcalDiffuser] =

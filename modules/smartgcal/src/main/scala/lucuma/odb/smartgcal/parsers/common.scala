@@ -13,7 +13,12 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
+import lucuma.core.parser.MiscParsers.comma
+import lucuma.core.parser.MiscParsers.dash
+import lucuma.core.parser.MiscParsers.int
+import lucuma.core.parser.MiscParsers.maybeWhiteSpace
 import lucuma.core.util.TimeSpan
+//import lucuma.core.util.parser.UtilParsers.posSecondsTimeSpan
 
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -21,39 +26,38 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale.US
 import scala.util.control.Exception.allCatch
 
-// TODO: lucuma-core has a MiscParsers that some of these could go to I suppose
 trait CommonParsers {
 
-  val maybeWhiteSpace: Parser0[Unit] =
-    wsp.rep0.void
+//  val maybeWhiteSpace: Parser0[Unit] =
+//    wsp.rep0.void
 
-  val comma: Parser[Unit] =
-    Parser.char(',').withContext("comma")
+//  val comma: Parser[Unit] =
+//    Parser.char(',').withContext("comma")
 
   val columnSep: Parser[Unit] =
     comma.surroundedBy(maybeWhiteSpace)
 
-  val dash: Parser[Unit] =
-    Parser.char('-').withContext("dash")
+//  val dash: Parser[Unit] =
+//    Parser.char('-').withContext("dash")
 
-  val int: Parser[Int] =
-    Numbers.signedIntString.mapFilter { s => allCatch.opt(s.toInt) }
+//  val int: Parser[Int] =
+//    Numbers.signedIntString.mapFilter { s => allCatch.opt(s.toInt) }
 
-  val posInt: Parser[PosInt] =
-    (Numbers.nonZeroDigit ~ Numbers.digits0)
-      .string
-      .mapFilter { s => allCatch.opt(s.toInt).flatMap(PosInt.unapply) }
-
-  val posBigDecimal: Parser0[PosBigDecimal] =
-    (Numbers.digits0 ~ (Parser.char('.') ~ Numbers.digits).?)
-      .string
-      .mapFilter { s =>
-        allCatch.opt(BigDecimal(s)).flatMap(PosBigDecimal.unapply)
-      }
-
-  val posSeconds: Parser0[TimeSpan] =
-    posBigDecimal.mapFilter(pbd => TimeSpan.fromSeconds(pbd.value))
-
+//  val posInt: Parser[PosInt] =
+//    (Numbers.nonZeroDigit ~ Numbers.digits0)
+//      .string
+//      .mapFilter { s => allCatch.opt(s.toInt).flatMap(PosInt.unapply) }
+//
+//  val posBigDecimal: Parser0[PosBigDecimal] =
+//    (Numbers.digits0 ~ (Parser.char('.') ~ Numbers.digits).?)
+//      .string
+//      .mapFilter { s =>
+//        allCatch.opt(BigDecimal(s)).flatMap(PosBigDecimal.unapply)
+//      }
+//
+//  val posSeconds: Parser0[TimeSpan] =
+//    posBigDecimal.mapFilter(pbd => TimeSpan.fromSeconds(pbd.value))
+//
   val instant: Parser[Instant] =
     val dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss zz", US)
     alpha.rep.string.mapFilter { s =>
@@ -68,7 +72,17 @@ trait CommonParsers {
 
   def wavelengthRange(fromInt: Int => Option[Wavelength]): Parser[BoundedInterval[Wavelength]] =
     (Parser.string("Any") <* maybeWhiteSpace).as(
-      BoundedInterval.unsafeClosed(Wavelength.Min, Wavelength.fromIntPicometers(Int.MaxValue - 1).get)  // TODO: add a max wavelength interval to core
+      // From postgres documentation:
+      //
+      //   The built-in range types int4range, int8range, and daterange all use
+      //   a canonical form that includes the lower bound and excludes the upper
+      //   bound; that is, [).
+      //
+      // This implies that the [1, Int.MaxValue] cannot be used, since it would
+      // be converted to the "canonical" form [1, Int.MaxValue+1) which won't
+      // fit in an int4.
+      //BoundedInterval.unsafeClosed(Wavelength.Min, Wavelength.fromIntPicometers(Int.MaxValue).get)
+      BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.fromIntPicometers(Int.MaxValue).get)
     ) |
       openUpperIntRange.mapFilter { interval =>
         (fromInt(interval.lower), fromInt(interval.upper)).mapN { (low, up) =>
