@@ -12,6 +12,7 @@ import lucuma.core.enums.GcalShutter
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
@@ -66,9 +67,8 @@ trait SequenceState[D] {
       ProtoStep(
         d,
         // TODO: SmartGcal.  This is a placeholder
-        StepConfig.Gcal(
-          GcalContinuum.QuartzHalogen.some,
-          Nil,
+        Gcal(
+          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
           GcalFilter.Nd10,
           GcalDiffuser.Ir,
           GcalShutter.Open
