@@ -20,6 +20,7 @@ import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
@@ -149,9 +150,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       database = container.databaseName,
     )
 
+  private def awsConfig: Config.Aws = 
+    Config.Aws(
+      accessKey = NonEmptyString.unsafeFrom("accessKey"),
+      secretKey = NonEmptyString.unsafeFrom("secretKey"),
+      basePath = NonEmptyString.unsafeFrom("basePath"),
+      bucketName = fs2.aws.s3.models.Models.BucketName(NonEmptyString.unsafeFrom("bucketName")),
+      fileUploadMaxMb = 5
+    )
+
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Main.routesResource(
       databaseConfig,
+      awsConfig,
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
