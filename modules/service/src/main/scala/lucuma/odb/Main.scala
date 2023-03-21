@@ -14,8 +14,10 @@ import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.AttachmentService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
@@ -112,25 +114,28 @@ object Main extends IOApp {
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-    routesResource(config.database, config.itcClient, config.commitHash, config.ssoClient, config.domain)
+    routesResource(config.database, config.aws, config.itcClient, config.commitHash, config.ssoClient, config.domain)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     databaseConfig:    Config.Database,
+    awsConfig:         Config.Aws,
     itcClientResource: Resource[F, ItcClient[F]],
     commitHash:        CommitHash,
     ssoClientResource: Resource[F, SsoClient[F, User]],
     domain:            String,
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
-      pool       <- databasePoolResource[F](databaseConfig)
-      itcClient  <- itcClientResource
-      ssoClient  <- ssoClientResource
-      userSvc    <- pool.map(UserService.fromSession(_))
-      middleware <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
-      routes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
+      pool             <- databasePoolResource[F](databaseConfig)
+      itcClient        <- itcClientResource
+      ssoClient        <- ssoClientResource
+      userSvc          <- pool.map(UserService.fromSession(_))
+      middleware       <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
+      graphQLRoutes    <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
+      attachmentSvc    <- pool.flatMap(ses => AttachmentService.fromConfigAndSession(awsConfig, ses))
+      attachmentRoutes =  AttachmentRoutes.apply[F](attachmentSvc, ssoClient, awsConfig.fileUploadMaxMb)
     } yield { wsb =>
-      middleware(routes(wsb))
+      middleware(attachmentRoutes <+> graphQLRoutes(wsb))
     }
 
   /** A startup action that runs database migrations using Flyway. */

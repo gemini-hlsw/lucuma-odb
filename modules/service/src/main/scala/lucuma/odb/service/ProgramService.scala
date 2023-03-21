@@ -47,6 +47,9 @@ trait ProgramService[F[_]] {
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
   def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]]
 
+  /** Check to see if the user has access to the given program. */
+  def userHasAccess(programId: Program.Id): F[Boolean]
+
 }
 
 object ProgramService {
@@ -173,6 +176,14 @@ object ProgramService {
           // Combie the results
           (setup >> updatePrograms, updateProposals).mapN(_ |+| _)
 
+        }
+
+      def userHasAccess(programId: Program.Id): F[Boolean] =
+        Statements.existsUserAccess(user, programId).fold(true.pure[F]) { af =>
+          val stmt = sql"SELECT ${af.fragment}".query(bool)
+          s.prepareR(stmt).use { pg =>
+            pg.unique(af.argument)
+          }
         }
 
     }

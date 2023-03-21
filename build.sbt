@@ -5,6 +5,7 @@ val clueVersion                = "0.25.1"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.16.1"
+val fs2AwsVersion              = "6.0.0"
 val grackleVersion             = "0.10.3"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.18"
@@ -12,7 +13,7 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.6"
 val log4catsVersion            = "2.5.0"
-val lucumaCoreVersion          = "0.71.0"
+val lucumaCoreVersion          = "0.71.1"
 val lucumaGraphQLRoutesVersion = "0.5.11"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -71,10 +72,12 @@ lazy val service = project
       "ch.qos.logback" %  "logback-classic"                 % logbackVersion,
       "com.monovore"   %% "decline-effect"                  % declineVersion,
       "com.monovore"   %% "decline"                         % declineVersion,
+      "io.laserdisc"   %% "fs2-aws-s3"                         % fs2AwsVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
       "is.cir"         %% "ciris"                           % cirisVersion,
+      "is.cir"         %% "ciris-refined"                   % cirisVersion,
       "org.flywaydb"   %  "flyway-core"                     % flywayVersion,
       "org.http4s"     %% "http4s-jdk-http-client"          % http4sJdkHttpClientVersion,
       "org.http4s"     %% "http4s-blaze-server"             % http4sBlazeVersion,

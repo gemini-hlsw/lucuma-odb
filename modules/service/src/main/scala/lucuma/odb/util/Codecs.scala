@@ -252,6 +252,9 @@ trait Codecs {
       Wavelength.intPicometers.reverseGet
     )
 
+  val attachment_id: Codec[Attachment.Id] =
+    gid[Attachment.Id]
+
   // Not so atomic ...
 
   val elevation_range: Codec[ElevationRange] =
