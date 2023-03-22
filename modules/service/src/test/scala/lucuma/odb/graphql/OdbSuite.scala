@@ -152,10 +152,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   private def awsConfig: Config.Aws = 
     Config.Aws(
-      accessKey = NonEmptyString.unsafeFrom("accessKey"),
-      secretKey = NonEmptyString.unsafeFrom("secretKey"),
-      basePath = NonEmptyString.unsafeFrom("basePath"),
-      bucketName = fs2.aws.s3.models.Models.BucketName(NonEmptyString.unsafeFrom("bucketName")),
+      accessKey       = NonEmptyString.unsafeFrom("accessKey"),
+      secretKey       = NonEmptyString.unsafeFrom("secretKey"),
+      basePath        = NonEmptyString.unsafeFrom("basePath"),
+      bucketName      = fs2.aws.s3.models.Models.BucketName(NonEmptyString.unsafeFrom("bucketName")),
       fileUploadMaxMb = 5
     )
 

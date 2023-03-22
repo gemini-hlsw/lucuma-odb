@@ -83,7 +83,7 @@ object Config {
 
   object Sso {
 
-    val fromCiris: ConfigValue[Effect, Sso] = (
+    lazy val fromCiris: ConfigValue[Effect, Sso] = (
       envOrProp("ODB_SSO_ROOT").as[Uri],
       envOrProp("ODB_SSO_PUBLIC_KEY").as[PublicKey]
     ).parMapN(Sso.apply)
@@ -97,7 +97,7 @@ object Config {
 
   object Honeycomb {
 
-    val fromCiris: ConfigValue[Effect, Honeycomb] = (
+    lazy val fromCiris: ConfigValue[Effect, Honeycomb] = (
       envOrProp("ODB_HONEYCOMB_WRITE_KEY"),
       envOrProp("ODB_HONEYCOMB_DATASET")
     ).parMapN(Honeycomb.apply)
@@ -182,7 +182,7 @@ object Config {
         } 
       }
 
-    val fromCiris: ConfigValue[Effect, Aws] = (
+    lazy val fromCiris: ConfigValue[Effect, Aws] = (
       envOrProp("CLOUDCUBE_ACCESS_KEY_ID").as[NonEmptyString],
       envOrProp("CLOUDCUBE_SECRET_ACCESS_KEY").as[NonEmptyString].redacted,
       envOrProp("CLOUDCUBE_URL").as[Uri].as[Uri.Path].as[NonEmptyString],
@@ -210,7 +210,7 @@ object Config {
   private def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name) or prop(name)
 
-  val fromCiris: ConfigValue[Effect, Config] = (
+  lazy val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     envOrProp("ODB_ITC_ROOT").as[Uri],
     Sso.fromCiris,
