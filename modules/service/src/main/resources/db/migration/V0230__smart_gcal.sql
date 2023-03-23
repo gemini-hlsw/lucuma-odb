@@ -27,7 +27,7 @@ CREATE TABLE t_gcal_filter (
 
 INSERT INTO t_gcal_filter VALUES ('None', 'none',         'none');
 INSERT INTO t_gcal_filter VALUES ('Gmos', 'GMOS balance', 'GMOS balance');
-INSERT INTO t_gcal_filter VALUES ('Nir',  'NIR balance',	'NIR balance');
+INSERT INTO t_gcal_filter VALUES ('Nir',  'NIR balance',  'NIR balance');
 INSERT INTO t_gcal_filter VALUES ('Nd10', 'ND1.0',        'ND1.0');
 INSERT INTO t_gcal_filter VALUES ('Nd20', 'ND2.0',        'ND2.0');
 INSERT INTO t_gcal_filter VALUES ('Nd30', 'ND3.0',        'ND3.0');

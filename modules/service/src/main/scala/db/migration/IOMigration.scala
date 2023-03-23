@@ -24,9 +24,9 @@ trait IOMigration extends JavaMigration {
     (ctx.getConnection match {
       case bc: BaseConnection =>
         for {
-          _ <- IO.println(s"Starting migration: $getDescription")
+          _ <- IO.println(s"Starting migration.: $getDescription")
           t <- Clock[IO].timed(ioMigrate(ctx, bc)).map(_._1)
-          _ <- IO.println(s"Completed migration $getDescription in ${t.toMillis} ms")
+          _ <- IO.println(s"Completed migration: $getDescription in ${t.toMillis} ms")
         } yield ()
       case _                  =>
         IO.raiseError(new RuntimeException("Sorry, expected a postgres BaseConnection"))
