@@ -1,3 +1,6 @@
+-- Smart gcal table for GMOS North.  A search is performed using items from the
+-- search key columns and the corresponding gcal config in t_gcal is retrieved
+-- for the matching row(s).
 CREATE TABLE t_smart_gmos_north (
 
   c_instrument       d_tag NOT NULL,
@@ -11,7 +14,8 @@ CREATE TABLE t_smart_gmos_north (
   -- When there are multiple Gcal configuration values matching the same key,
   -- the step order is used to order them.  If two or more have the same step
   -- order, they may be executed in any order.
-  c_step_order       int8                  NOT NULL DEFAULT 1,
+  c_step_order       int8                  NOT NULL DEFAULT 0,
+  CONSTRAINT check_positive_step_order CHECK (c_step_order > 0),
 
   -- GMOS North Search Key
   c_disperser        d_tag                          REFERENCES t_gmos_north_disperser(c_tag),
@@ -23,7 +27,8 @@ CREATE TABLE t_smart_gmos_north (
   c_disperser_order  d_tag                 NOT NULL REFERENCES t_gmos_disperser_order(c_tag),
   c_amp_gain         d_tag                 NOT NULL REFERENCES t_gmos_amp_gain(c_tag),
 
-  -- Configuration Value
-  c_exposure_time    interval              NOT NULL
+  -- Instrument configuration value, not considered part of the search key.
+  c_exposure_time    interval              NOT NULL,
+  CONSTRAINT check_non_negative_exposure_time CHECK (c_exposure_time >= interval '0 seconds')
 
 );

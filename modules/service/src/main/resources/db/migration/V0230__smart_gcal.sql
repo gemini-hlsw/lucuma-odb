@@ -52,6 +52,9 @@ CREATE TABLE t_gcal_shutter (
 INSERT INTO t_gcal_shutter VALUES ('Open',   'Open',   'Open');
 INSERT INTO t_gcal_shutter VALUES ('Closed', 'Closed', 'Closed');
 
+-- The t_gcal table will hold Gcal configurations for smart gcal lookups.  It is
+-- shared by the smart gcal tables for all instruments.
+
 CREATE TABLE t_gcal (
 
   -- When we reload smart gcal information, we need to delete the corresponding
