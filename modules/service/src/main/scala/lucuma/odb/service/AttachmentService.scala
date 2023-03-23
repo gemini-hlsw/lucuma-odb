@@ -63,7 +63,7 @@ sealed trait AttachmentService[F[_]] {
   def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): F[Unit]
 
   /** Deletes the file from S3 - assumes all validation has already occurred. */
-  def remoteDeleteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit]
+  def deleteRemoteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit]
 }
 
 object AttachmentService {
@@ -128,16 +128,30 @@ object AttachmentService {
     s3R.map(s => (s, S3.create[F](s))).map{ (s3Ops, s3) =>
 
       // We also use this to make sure the file exists and we have read permissions.
-      def getFileSizeFromAws(fileKey: FileKey): F[Long] =
-        s3Ops
-        .headObject(
-          HeadObjectRequest
-            .builder()
-            .bucket(awsConfig.bucketName.value.value)
-            .key(fileKey.value.value)
-            .build
-        )
-        .map(_.contentLength())
+      def getRemoteFileSize(fileKey: FileKey): F[Long] =
+        Trace[F].span("getRemoteFileSize") {
+          s3Ops
+            .headObject(
+              HeadObjectRequest
+                .builder()
+                .bucket(awsConfig.bucketName.value.value)
+                .key(fileKey.value.value)
+                .build
+            )
+            .onError { case e => Trace[F].attachError(e, ("error", true)) }
+            .map(_.contentLength())
+        }
+
+      def uploadRemoteFile(fileKey: FileKey, data: Stream[F, Byte]): F[Long] =
+        Trace[F].span("uploadRemoteFile") {
+          val f = for {
+            ref <- Ref.of(0L)
+            pipe = s3.uploadFileMultipart(awsConfig.bucketName, fileKey, partSize)
+            _    <- data.evalTapChunk(c => ref.update(_ + 1)).through(pipe).compile.drain
+            size <- ref.get
+          } yield size
+          f.onError { case e => Trace[F].attachError(e, ("error", true)) }
+        }
 
       // TODO: eventually will probably want to check for write access for uploading/deleting files.
       def withAccess[A](user: User, programId: Program.Id)(f: F[A]): F[A] = user match {
@@ -169,7 +183,7 @@ object AttachmentService {
         )
       }
 
-      def insertOrUpdateAttachment(
+      def insertOrUpdateAttachmentInDB(
         programId:      Program.Id,
         attachmentType: Tag,
         fileName:       FileName,
@@ -240,7 +254,7 @@ object AttachmentService {
               val fileKey = awsConfig.fileKey(programId, fileName)
               val stream  = s3.readFileMultipart(awsConfig.bucketName, fileKey, partSize)
 
-              getFileSizeFromAws(fileKey) // make sure the file exists and we can read it
+              getRemoteFileSize(fileKey) // make sure the file exists and we can read it
                 .map(_ => stream.asRight)
             )
           }.recover { 
@@ -262,11 +276,8 @@ object AttachmentService {
                 val fileKey = awsConfig.fileKey(programId, fn.value)
 
                 for {
-                  ref <- Ref.of(0)
-                  pipe = s3.uploadFileMultipart(awsConfig.bucketName, fileKey, partSize)
-                  aws <- data.evalTapChunk(c => ref.update(_ + 1)).through(pipe).compile.drain
-                  size <- ref.get
-                  result <- insertOrUpdateAttachment(programId, attachmentType, fn, description, size)
+                  size <- uploadRemoteFile(fileKey, data)
+                  result <- insertOrUpdateAttachmentInDB(programId, attachmentType, fn, description, size)
                 } yield result
               ) 
             }
@@ -276,12 +287,15 @@ object AttachmentService {
           withAccess(user, programId){
             for {
               fileName <- deleteAttachmentFromDB(user, programId, attachmentId)
-              _        <- remoteDeleteFile(programId, fileName)
+              _        <- deleteRemoteFile(programId, fileName)
             } yield ()
           }
         
-        def remoteDeleteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit] =
-          s3.delete(awsConfig.bucketName, awsConfig.fileKey(programId, fileName))
+        def deleteRemoteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit] =
+          Trace[F].span("deleteRemoteFile") {
+            s3.delete(awsConfig.bucketName, awsConfig.fileKey(programId, fileName))
+              .onError { case e => Trace[F].attachError(e, ("error", true)) }
+          }
       }
     }
   }
