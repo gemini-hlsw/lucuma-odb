@@ -18,7 +18,8 @@ import java.io.InputStream
 /**
  * Loads a Smart GCal configuration file into the corresponding table.
  *
- * @param table simple description of the database table
+ * @param temp smart gcal temp table
+ * @param inst smart gcal instrument table
  * @param pipe a function that takes a file name and produces a pipe Byte to
  *             table rows
  * @param encoder encodes a table row for ingestion into the table via copy from
@@ -35,6 +36,9 @@ class SmartGcalLoader[A](
 
   def load(bc: BaseConnection, files: NonEmptyList[(String, IO[InputStream])]): IO[Unit] = {
 
+    // An input stream that reads a configuration file, parses it, then blows it
+    // up into a file that can be copied into a temporary table for populating
+    // the t_gcal and t_smart_{inst} tables.
     val r: Resource[IO, InputStream] =
       files
         .map { case (name, is) => fs2.io.readInputStream(is, ByteChunkSize, closeAfterUse = true).through(pipe(name)) }
