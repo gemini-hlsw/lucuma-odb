@@ -23,9 +23,14 @@ CREATE TABLE t_smart_gmos_north (
   c_fpu              d_tag                          REFERENCES t_gmos_north_fpu(c_tag),
   c_x_binning        d_tag                 NOT NULL REFERENCES t_gmos_binning(c_tag),
   c_y_binning        d_tag                 NOT NULL REFERENCES t_gmos_binning(c_tag),
-  c_wavelength_range d_wavelength_pm_range NOT NULL,
-  c_disperser_order  d_tag                 NOT NULL REFERENCES t_gmos_disperser_order(c_tag),
+  c_wavelength_range d_wavelength_pm_range,
+  c_disperser_order  d_tag                          REFERENCES t_gmos_disperser_order(c_tag),
   c_amp_gain         d_tag                 NOT NULL REFERENCES t_gmos_amp_gain(c_tag),
+
+  CONSTRAINT check_disperser_config CHECK (
+         (c_disperser IS NULL) = (c_wavelength_range IS NULL)
+     AND (c_disperser IS NULL) = (c_disperser_order  IS NULL)
+  ),
 
   -- Instrument configuration value, not considered part of the search key.
   c_exposure_time    interval              NOT NULL,
