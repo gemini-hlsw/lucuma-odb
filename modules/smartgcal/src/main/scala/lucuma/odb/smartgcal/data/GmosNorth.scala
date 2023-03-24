@@ -4,6 +4,7 @@
 package lucuma.odb.smartgcal.data
 
 import cats.data.NonEmptyList
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
@@ -16,44 +17,55 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.GmosGratingConfig
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
 
 object GmosNorth {
 
   case class SearchKey(
-    grating:    Option[GmosNorthGrating],
+    grating:    Option[GmosGratingConfig.North],
     filter:     Option[GmosNorthFilter],
     fpu:        Option[GmosNorthFpu],
     xBin:       GmosXBinning,
     yBin:       GmosYBinning,
-    wavelength: Wavelength,
-    order:      GmosGratingOrder,
     gain:       GmosAmpGain
   )
 
-  case class TableKey(
-    grating:         Option[GmosNorthGrating],
-    filter:          Option[GmosNorthFilter],
-    fpu:             Option[GmosNorthFpu],
-    xBin:            GmosXBinning,
-    yBin:            GmosYBinning,
-    wavelengthRange: BoundedInterval[Wavelength],
+  case class GratingConfigKey(
+    grating:         GmosNorthGrating,
     order:           GmosGratingOrder,
-    gain:            GmosAmpGain
+    wavelengthRange: BoundedInterval[Wavelength]
+  )
+
+  case class TableKey(
+    gratingConfig: Option[GratingConfigKey],
+    filter:        Option[GmosNorthFilter],
+    fpu:           Option[GmosNorthFpu],
+    xBin:          GmosXBinning,
+    yBin:          GmosYBinning,
+    gain:          GmosAmpGain
   ) {
 
-    def format: String = {
-      def quote[A: Enumerated](a: A): String =
-        s"'${a.tag}'"
+    def grating: Option[GmosNorthGrating] =
+      gratingConfig.map(_.grating)
 
-      def quoteOpt[A: Enumerated](a: Option[A]): String =
-        a.fold("NULL")(quote)
+    def order: Option[GmosGratingOrder] =
+      gratingConfig.map(_.order)
 
-      s"${quoteOpt(grating)}, ${quoteOpt(filter)}, ${quoteOpt(fpu)}, ${quote(xBin)}, ${quote(yBin)}, $wavelengthRange, ${quote(order)}, ${quote(gain)}"
-    }
-
+    def wavelengthRange: Option[BoundedInterval[Wavelength]] =
+      gratingConfig.map(_.wavelengthRange)
   }
+//
+//    def format: String = {
+//      def quote[A: Enumerated](a: A): String =
+//        s"'${a.tag}'"
+//
+//      def quoteOpt[A: Enumerated](a: Option[A]): String =
+//        a.fold("NULL")(quote)
+//
+//      s"${quoteOpt(grating)}, ${quoteOpt(filter)}, ${quoteOpt(fpu)}, ${quote(xBin)}, ${quote(yBin)}, $wavelengthRange, ${quote(order)}, ${quote(gain)}"
+//    }
 
   case class TableRow(
     line:  PosLong,
@@ -75,11 +87,11 @@ object GmosNorth {
     def tableKeys: NonEmptyList[TableKey] =
       for {
         g <- gratings
+        c <- g.fold(NonEmptyList.one(none[GratingConfigKey])) { g => orders.map(o => GratingConfigKey(g, o, wavelengthRange).some) }
         f <- filters
         u <- fpus
-        o <- orders
         n <- gains
-      } yield TableKey(g, f, u, xBin, yBin, wavelengthRange, o, n)
+      } yield TableKey(c, f, u, xBin, yBin, n)
 
   }
 

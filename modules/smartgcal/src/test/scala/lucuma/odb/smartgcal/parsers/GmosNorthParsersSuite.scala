@@ -16,21 +16,22 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
+import lucuma.odb.smartgcal.data.GmosNorth.GratingConfigKey
 import lucuma.odb.smartgcal.data.GmosNorth.TableKey
 
 final class GmosNorthParsersSuite extends munit.FunSuite {
 
+  // I added a few filters but failed to update GmosNorthFilter.all :-/
+  // Waiting for lucuma-core.0.72.0 to remove.
+  val allFilters: List[GmosNorthFilter] = {
+    import GmosNorthFilter.*
+
+    List(GPrime, RPrime, IPrime, ZPrime, Z, Y, Ri, GG455, OG515, RG610, CaT, Ha, HaC, DS920, SII, OIII, OIIIC, HeII, HeIIC, OVI, OVIC, HartmannA_RPrime, HartmannB_RPrime, GPrime_GG455, GPrime_OG515, RPrime_RG610, IPrime_CaT, ZPrime_CaT, UPrime)
+  }
+
   test("simple success, key") {
 
     val definition = "$R400.*,$.*one|.*G.*,$.* 0.50 arcsec,4,1,675 - 1200,1,Low"
-
-    // I added a few filters but failed to update GmosNorthFilter.all :-/
-    // When that is done, we can remove this.
-    val allFilters: List[GmosNorthFilter] = {
-      import GmosNorthFilter.*
-
-      List(GPrime, RPrime, IPrime, ZPrime, Z, Y, Ri, GG455, OG515, RG610, CaT, Ha, HaC, DS920, SII, OIII, OIIIC, HeII, HeIIC, OVI, OVIC, HartmannA_RPrime, HartmannB_RPrime, GPrime_GG455, GPrime_OG515, RPrime_RG610, IPrime_CaT, ZPrime_CaT, UPrime)
-    }
 
     // $.*one|.*G.*  Matches all the filters.  Seems like it could have been just "*".
     val filters = NonEmptyList(none, allFilters.map(_.some))
@@ -43,16 +44,47 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
         f <- filters
         u <- fpus
       } yield TableKey(
-        GmosNorthGrating.R400_G5305.some,
+        GratingConfigKey(
+          GmosNorthGrating.R400_G5305,
+          GmosGratingOrder.One,
+          BoundedInterval.unsafeOpenUpper(
+            Wavelength.fromIntNanometers(675).get,
+            Wavelength.fromIntNanometers(1200).get
+          )
+        ).some,
         f,
         u,
         GmosXBinning.Four,
         GmosYBinning.One,
-        BoundedInterval.unsafeOpenUpper(
-          Wavelength.fromIntNanometers(675).get,
-          Wavelength.fromIntNanometers(1200).get
-        ),
-        GmosGratingOrder.One,
+        GmosAmpGain.Low
+      )
+
+    assertEquals(
+      gmosNorth.fileKey.parseAll(definition).map(_.tableKeys),
+      Right(expected)
+    )
+
+  }
+
+  test("No disperser, ignore order and wavelength range") {
+
+    val definition = "Mirror,$.*one|.*G.*,$.* 0.50 arcsec,4,1,675 - 1200,*,Low"
+
+    val filters = NonEmptyList(none, allFilters.map(_.some))
+
+    // Both these are 0.50 arcsec
+    val fpus    = NonEmptyList.of(GmosNorthFpu.LongSlit_0_50.some, GmosNorthFpu.Ns1.some)
+
+    val expected =
+      for {
+        f <- filters
+        u <- fpus
+      } yield TableKey(
+        none,
+        f,
+        u,
+        GmosXBinning.Four,
+        GmosYBinning.One,
         GmosAmpGain.Low
       )
 

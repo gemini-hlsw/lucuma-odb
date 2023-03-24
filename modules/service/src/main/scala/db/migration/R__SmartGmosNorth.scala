@@ -50,13 +50,13 @@ object R__SmartGmosNorth {
 
   given Encoder[TableKey] =
     (
-      gmos_north_grating.opt  ~
-      gmos_north_filter.opt   ~
-      gmos_north_fpu.opt      ~
-      gmos_x_binning          ~
-      gmos_y_binning          ~
-      wavelength_pm_range     ~
-      gmos_disperser_order    ~
+      gmos_north_grating.opt   ~
+      gmos_north_filter.opt    ~
+      gmos_north_fpu.opt       ~
+      gmos_x_binning           ~
+      gmos_y_binning           ~
+      wavelength_pm_range.opt  ~
+      gmos_disperser_order.opt ~
       gmos_amp_gain
     ).contramap[TableKey] { k =>
       k.grating         ~
