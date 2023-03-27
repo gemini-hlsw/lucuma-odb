@@ -181,7 +181,7 @@ trait Codecs {
     enumerated[GcalArc](Type.varchar)
 
   val gcal_baseline: Codec[GcalBaselineType] =
-    enumerated[GcalBaselineType](Type.varchar)
+    enumerated(Type("e_gcal_baseline_type"))
 
   val gcal_continuum: Codec[GcalContinuum] =
     enumerated[GcalContinuum](Type.varchar)
