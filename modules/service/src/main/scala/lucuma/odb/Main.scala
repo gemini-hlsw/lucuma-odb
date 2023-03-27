@@ -135,7 +135,7 @@ object Main extends IOApp {
       attachmentSvc    <- pool.flatMap(ses => AttachmentService.fromConfigAndSession(awsConfig, ses))
       attachmentRoutes =  AttachmentRoutes.apply[F](attachmentSvc, ssoClient, awsConfig.fileUploadMaxMb)
     } yield { wsb =>
-      middleware(attachmentRoutes <+> graphQLRoutes(wsb))
+      middleware(graphQLRoutes(wsb) <+> attachmentRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */
