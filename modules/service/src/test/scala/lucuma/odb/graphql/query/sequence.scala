@@ -5,13 +5,36 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.either.*
+import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.SmartGcalType
+import lucuma.core.math.BoundedInterval
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.util.TimeSpan
+import lucuma.odb.service.SmartGcalService
+import skunk.Session
 
 class sequence extends OdbSuite with ObservingModeSetupOperations {
 
@@ -24,6 +47,35 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "Sequence Testing")
 
+  override def initDb(s: Session[IO]): IO[Unit] = {
+    val srv = SmartGcalService.fromSession(s)
+
+    for {
+      _ <- srv.insertGmosNorth(
+        1,
+        PosLong.unsafeFrom(1L),
+        GmosNorthGrating.R831_G5302.some,
+        GmosNorthFilter.RPrime.some,
+        GmosNorthFpu.LongSlit_0_50.some,
+        GmosXBinning.One,
+        GmosYBinning.Two,
+        BoundedInterval.openUpper(Wavelength.Min, Wavelength.Max),
+        GmosGratingOrder.One.some,
+        GmosAmpGain.Low,
+        Gcal(
+          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+          GcalFilter.Gmos,
+          GcalDiffuser.Ir,
+          GcalShutter.Open
+        ),
+        PosInt.unsafeFrom(1),
+        GcalBaselineType.Night,
+        TimeSpan.unsafeFromMicroseconds(3_000_000L)
+      )
+    } yield ()
+  }
+
+
   test("simple generation") {
     val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
       for {
@@ -32,7 +84,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, tid) =>
+    setup.flatMap { case (pid, oid, _) =>
       expect(
         user  = user,
         query =

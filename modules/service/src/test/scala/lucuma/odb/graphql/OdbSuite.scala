@@ -56,6 +56,7 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import skunk.Session
 
 import java.time.Duration
 import scala.concurrent.duration.*
@@ -78,7 +79,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val it = Iterator.from(1)
 
   /** Generate a new id, impurely. */
-  def nextId = it.next().toLong
+  def nextId: Long = it.next().toLong
 
   val jlogger: slf4j.Logger =
     slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
@@ -231,6 +232,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val All: List[ClientOption] = List(Http, Ws)
   }
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    Main
+      .databasePoolResource[IO](databaseConfig)
+      .flatten
+      .use(initDb)
+      .unsafeRunSync()
+  }
+
+  def initDb(s: Session[IO]): IO[Unit] =
+    IO.unit
 
   def expect(
     user:      User,
