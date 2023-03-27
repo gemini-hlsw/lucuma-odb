@@ -60,7 +60,7 @@ object AttachmentRoutes {
         ssoClient.require(req) { user =>
           attachmentService.getAttachment(user, programId, attachmentId).flatMap {
             case Left(exc)     => exc.toResponse
-            case Right(stream) => Async[F].delay(Response(Status.Ok, body = stream))
+            case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
           }
         }
 

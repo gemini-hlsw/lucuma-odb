@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql
 
-import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
@@ -38,7 +37,6 @@ import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.sso.client.SsoClient
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
@@ -54,7 +52,6 @@ import org.slf4j
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.utility.DockerImageName
-import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -65,7 +62,7 @@ import scala.concurrent.duration.*
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
@@ -100,13 +97,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test")
 
-  def validUsers: List[User]
-
-  val Bearer: AuthScheme = CIString("Bearer")
-
-  def authorization(jwt: String): Authorization =
-    Authorization(Credentials.Token(Bearer, jwt))
-
   val FakeItcVersions: ItcVersions =
     ItcVersions("foo", "bar".some)
 
@@ -128,17 +118,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
       override def versions: IO[ItcVersions] =
         FakeItcVersions.pure[IO]
-    }
-
-  private def ssoClient: SsoClient[IO, User] =
-    new SsoClient.AbstractSsoClient[IO, User] {
-      def find(req: Request[IO]): IO[Option[User]] = OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
-      def get(authorization: Authorization): IO[Option[User]] =
-        authorization match {
-          case Authorization(Credentials.Token(Bearer, s)) =>
-            Gid[User.Id].fromString.getOption(s).flatMap(id => validUsers.find(_.id === id)).pure[IO]
-          case _ => none.pure[IO]
-        }
     }
 
   private def databaseConfig: Config.Database =

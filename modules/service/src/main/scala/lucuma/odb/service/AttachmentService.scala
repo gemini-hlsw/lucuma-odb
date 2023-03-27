@@ -39,7 +39,7 @@ import software.amazon.awssdk.services.s3.S3Configuration
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 
-sealed trait AttachmentService[F[_]] {
+trait AttachmentService[F[_]] {
   import AttachmentService.AttachmentException
 
   /** Retrieves the given file from S3 as a stream. */
@@ -61,9 +61,6 @@ sealed trait AttachmentService[F[_]] {
 
   /** Deletes the file from the database and then removes it from S3. */
   def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): F[Unit]
-
-  /** Deletes the file from S3 - assumes all validation has already occurred. */
-  def deleteRemoteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit]
 }
 
 object AttachmentService {
@@ -153,46 +150,50 @@ object AttachmentService {
           f.onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
 
+      def deleteRemoteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit] =
+        Trace[F].span("deleteRemoteFile") {
+          s3.delete(awsConfig.bucketName, awsConfig.fileKey(programId, fileName))
+            .onError { case e => Trace[F].attachError(e, ("error", true)) }
+        }
+
       // TODO: eventually will probably want to check for write access for uploading/deleting files.
-      def withAccess[A](user: User, programId: Program.Id)(f: F[A]): F[A] = user match {
+      def checkAccess[A](user: User, programId: Program.Id): F[Unit] = user match {
         // guest users not allowed to upload files - at least for now.
         case GuestUser(_) => Async[F].raiseError(AttachmentException.Forbidden)
         case _            =>
           ProgramService.fromSessionAndUser(session, user)
             .userHasAccess(programId)
             .flatMap(hasAccess => 
-              if (hasAccess) f
+              if (hasAccess) Async[F].unit
               else Async[F].raiseError(AttachmentException.Forbidden)
             )
       }
-      
 
-      def isTypeValid(attachmentType: Tag): F[Boolean] = {
+      def checkAttachmentType(attachmentType: Tag): F[Unit] = {
         val af = Statements.existsAttachmentType(attachmentType)
         val stmt = sql"Select ${af.fragment}".query(bool)
         session.prepareR(stmt).use { pg =>
           pg.unique(af.argument)
         }
-      }
-
-      def withValidType[A](attachmentType: Tag)(f: F[A]): F[A] = {
-        isTypeValid(attachmentType).flatMap(isValid =>
-          if (isValid) f
-          else Async[F].raiseError(
-            AttachmentException.InvalidType(s"Invalid attachment type"))
+        .flatMap(isValid =>
+          if (isValid) Async[F].unit
+          else Async[F].raiseError(AttachmentException.InvalidType(s"Invalid attachment type"))
         )
       }
 
       def insertOrUpdateAttachmentInDB(
+        user:           User,
         programId:      Program.Id,
         attachmentType: Tag,
         fileName:       FileName,
         description:    Option[NonEmptyString],
-        fileSize: Long
+        fileSize:       Long
       ): F[Attachment.Id] = 
         Trace[F].span("insertOrUpdateAttachment") {
-          session.prepareR(Statements.InsertOrUpdateAttachment).use(pg =>
-            pg.unique(programId ~ attachmentType ~ fileName.value ~ description ~ fileSize)
+          val af = Statements.insertOrUpdateAttachment(user, programId, attachmentType, fileName.value, description, fileSize)
+          val stmt = af.fragment.query(attachment_id)
+          session.prepareR(stmt).use(pg =>
+            pg.unique(af.argument)
           )
         }
 
@@ -214,7 +215,7 @@ object AttachmentService {
                   NonEmptyString.from(s)
                     .toOption
                     .fold(Async[F].raiseError(AttachmentException.InvalidName("File name is missing")))(
-                      Async[F].delay)
+                      Async[F].pure)
               }
           )
         }
@@ -237,7 +238,7 @@ object AttachmentService {
                   NonEmptyString.from(s)
                     .toOption
                     .fold(Async[F].raiseError(AttachmentException.InvalidName("File name is missing")))(
-                      Async[F].delay)
+                      Async[F].pure)
               }
           )
         }
@@ -249,14 +250,18 @@ object AttachmentService {
           programId:    Program.Id,
           attachmentId: Attachment.Id
         ): F[Either[AttachmentException, Stream[F, Byte]]] =
-          withAccess(user, programId) {
-            getAttachmentFileNameFromDB(user, programId, attachmentId).flatMap(fileName =>
-              val fileKey = awsConfig.fileKey(programId, fileName)
-              val stream  = s3.readFileMultipart(awsConfig.bucketName, fileKey, partSize)
+          session.transaction.use(_ => for {
+              _        <- checkAccess(user, programId)
+              fileName <- getAttachmentFileNameFromDB(user, programId, attachmentId)
+            } yield fileName
+          ).flatMap { fn => 
+            val fileKey = awsConfig.fileKey(programId, fn)
+            val stream  = s3.readFileMultipart(awsConfig.bucketName, fileKey, partSize)
 
-              getRemoteFileSize(fileKey) // make sure the file exists and we can read it
-                .map(_ => stream.asRight)
-            )
+           // Make sure the file exists and we can read it. Otherwise, the stream would have an error
+           // and HTTP4S would just terminate the response with no good response type.
+            getRemoteFileSize(fileKey) 
+              .map(_ => stream.asRight)
           }.recover { 
             case _: NoSuchKeyException  => AttachmentException.FileNotFound.asLeft
             case e: AttachmentException => e.asLeft
@@ -268,42 +273,44 @@ object AttachmentService {
           attachmentType:   Tag,
           fileName:         String, 
           description:      Option[NonEmptyString],
-          data: Stream[F, Byte]): F[Attachment.Id] =
-          withAccess(user, programId) {
-            withValidType(attachmentType) {
-              FileName.fromString(fileName).fold(e => Async[F].raiseError(e), fn =>
-                // TODO: Validate the file extension based on attachment type
-                val fileKey = awsConfig.fileKey(programId, fn.value)
+          data: Stream[F, Byte]
+        ): F[Attachment.Id] =
+          session.transaction.use(_ => for {
+              _ <- checkAccess(user, programId)
+              _ <- checkAttachmentType(attachmentType)
+            } yield ()
+          ).flatMap { _ =>
+            FileName.fromString(fileName).fold(e => Async[F].raiseError(e), fn =>
+              // TODO: Validate the file extension based on attachment type
+              val fileKey = awsConfig.fileKey(programId, fn.value)
 
-                for {
-                  size <- uploadRemoteFile(fileKey, data)
-                  result <- insertOrUpdateAttachmentInDB(programId, attachmentType, fn, description, size)
-                } yield result
-              ) 
-            }
+              for {
+                size   <- uploadRemoteFile(fileKey, data)
+                result <- insertOrUpdateAttachmentInDB(user, programId, attachmentType, fn, description, size)
+              } yield result
+            ) 
           }
 
         def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): F[Unit] = 
-          withAccess(user, programId){
-            for {
+          session.transaction.use(_ => for {
+              _        <- checkAccess(user, programId)
               fileName <- deleteAttachmentFromDB(user, programId, attachmentId)
-              _        <- deleteRemoteFile(programId, fileName)
-            } yield ()
-          }
-        
-        def deleteRemoteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit] =
-          Trace[F].span("deleteRemoteFile") {
-            s3.delete(awsConfig.bucketName, awsConfig.fileKey(programId, fileName))
-              .onError { case e => Trace[F].attachError(e, ("error", true)) }
-          }
+            } yield fileName
+          ).flatMap(fn => deleteRemoteFile(programId, fn))
       }
     }
   }
 
   object Statements {
 
-    val InsertOrUpdateAttachment: 
-      Query[Program.Id ~ Tag ~ NonEmptyString ~ Option[NonEmptyString] ~ Long, Attachment.Id] = 
+    def insertOrUpdateAttachment(
+      user: User,
+      programId: Program.Id,
+      attachmentType: Tag,
+      fileName: NonEmptyString,
+      description: Option[NonEmptyString],
+      fileSize: Long
+    ): AppliedFragment =
       sql"""
         INSERT INTO t_attachment (
           c_program_id,
@@ -311,27 +318,30 @@ object AttachmentService {
           c_file_name,
           c_description,
           c_file_size
-        ) VALUES (
-          ${program_id},
-          ${tag},
-          ${text_nonempty},
+        ) 
+        SELECT 
+          $program_id,
+          $tag,
+          $text_nonempty,
           ${text_nonempty.opt},
-          ${int8}
-        )
+          $int8
+      """.apply(programId ~ attachmentType ~ fileName ~ description ~ fileSize) |+| 
+      ProgramService.Statements.whereUserAccess(user, programId) |+|
+      void"""
         ON CONFLICT (c_program_id, c_file_name) DO UPDATE SET
           c_attachment_type = EXCLUDED.c_attachment_type,
           c_description     = EXCLUDED.c_description,
           c_checked         = false,
           c_file_size       = EXCLUDED.c_file_size
         RETURNING c_attachment_id
-      """.query(attachment_id)
+      """
 
     def getAttachmentFileName(user: User, programId: Program.Id, attachmentId: Attachment.Id): AppliedFragment = {
       sql"""
         SELECT c_file_name
         FROM t_attachment
         WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
-      """.apply(programId, attachmentId) |+|
+      """.apply(programId ~ attachmentId) |+|
         accessFrag(user, programId)
     }
 
