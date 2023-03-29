@@ -38,6 +38,17 @@ import skunk.implicits.*
 
 trait SmartGcalService[F[_]] {
 
+  /**
+   * Selects calibration information corresponding to the given search key and
+   * type.  There can be multiple steps per key.
+   *
+   * @param gn  GMOS North search information
+   * @param sgt SmartGcal type of interest
+   *
+   * @return list of tuples, each corresponding to a calibration step; each
+   *         tuple contains an update to the dynamic config to apply and the
+   *         GCAL unit configuration to use
+   */
   def selectGmosNorth(
     gn:  GmosNorthSearchKey,
     sgt: SmartGcalType
