@@ -34,6 +34,11 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.SmartGcalService
+import lucuma.odb.smartgcal.data.GmosNorth.GratingConfigKey
+import lucuma.odb.smartgcal.data.GmosNorth.TableKey
+import lucuma.odb.smartgcal.data.GmosNorth.TableRow
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
 class sequence extends OdbSuite with ObservingModeSetupOperations {
@@ -48,33 +53,38 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(user, "Sequence Testing")
 
   override def initDb(s: Session[IO]): IO[Unit] = {
-    val srv = SmartGcalService.fromSession(s)
-
-    for {
-      _ <- srv.insertGmosNorth(
-        1,
-        PosLong.unsafeFrom(1L),
-        GmosNorthGrating.R831_G5302.some,
-        GmosNorthFilter.RPrime.some,
-        GmosNorthFpu.LongSlit_0_50.some,
-        GmosXBinning.One,
-        GmosYBinning.Two,
-        BoundedInterval.openUpper(Wavelength.Min, Wavelength.Max),
-        GmosGratingOrder.One.some,
-        GmosAmpGain.Low,
-        Gcal(
-          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-          GcalFilter.Gmos,
-          GcalDiffuser.Ir,
-          GcalShutter.Open
+    val tableRow: TableRow =
+      TableRow(
+        PosLong.unsafeFrom(1),
+        TableKey(
+          GratingConfigKey(
+            GmosNorthGrating.R831_G5302,
+            GmosGratingOrder.One,
+            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+          ).some,
+          GmosNorthFilter.RPrime.some,
+          GmosNorthFpu.LongSlit_0_50.some,
+          GmosXBinning.One,
+          GmosYBinning.Two,
+          GmosAmpGain.Low
         ),
-        PosInt.unsafeFrom(1),
-        GcalBaselineType.Night,
-        TimeSpan.unsafeFromMicroseconds(3_000_000L)
+        SmartGcalValue(
+          Gcal(
+            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+            GcalFilter.Gmos,
+            GcalDiffuser.Ir,
+            GcalShutter.Open
+          ),
+          GcalBaselineType.Night,
+          PosInt.unsafeFrom(1),
+          LegacyInstrumentConfig(
+            TimeSpan.unsafeFromMicroseconds(1_000_000L)
+          )
+        )
       )
-    } yield ()
-  }
 
+    SmartGcalService.fromSession(s).insertGmosNorth(1, tableRow)
+  }
 
   test("simple generation") {
     val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
