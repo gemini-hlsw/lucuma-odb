@@ -26,6 +26,9 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
+import lucuma.odb.smartgcal.data.GmosNorth.{SearchKey => GmosNorthSearchKey}
+import lucuma.odb.smartgcal.data.GmosNorth.{TableKey  => GmosNorthTableKey}
+import lucuma.odb.smartgcal.data.GmosNorth.{TableRow  => GmosNorthTableRow}
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -35,25 +38,16 @@ import skunk.implicits.*
 
 trait SmartGcalService[F[_]] {
 
-  def selectGmosNorth(gn: GmosNorth, sgt: SmartGcalType): F[List[(GmosNorth, Gcal)]]
+  def selectGmosNorth(
+    gn:  GmosNorthSearchKey,
+    sgt: SmartGcalType
+  ): F[List[(GmosNorth => GmosNorth, Gcal)]]
 
   // Insertion is done by a flyway migration and not via this method.  The
   // insert here is for initializing a database for testing.
   def insertGmosNorth(
-    id:           Int,
-    stepOrder:    PosLong,
-    disperser:    Option[GmosNorthGrating],
-    filter:       Option[GmosNorthFilter],
-    fpu:          Option[GmosNorthFpu],
-    xBin:         GmosXBinning,
-    yBin:         GmosYBinning,
-    wavelength:   Option[BoundedInterval[Wavelength]],
-    order:        Option[GmosGratingOrder],
-    ampGain:      GmosAmpGain,
-    gcal:         Gcal,
-    count:        PosInt,
-    baseline:     GcalBaselineType,
-    exposureTime: TimeSpan
+    id:  Int,
+    row: GmosNorthTableRow
   ): F[Unit]
 
 }
@@ -67,9 +61,9 @@ object SmartGcalService {
     new SmartGcalService[F] {
 
       override def selectGmosNorth(
-        gn:  GmosNorth,
+        gn:  GmosNorthSearchKey,
         sgt: SmartGcalType
-      ): F[List[(GmosNorth, Gcal)]] = {
+      ): F[List[(GmosNorth => GmosNorth, Gcal)]] = {
 
         val af = Statements.selectGmosNorth(gn, sgt)
         session
@@ -78,48 +72,36 @@ object SmartGcalService {
           .map {
             _.flatMap { case ((gcal, count), exposureTime) =>
               List.fill(count.value)(
-                GmosNorth.exposure.replace(exposureTime)(gn) -> gcal
+                GmosNorth.exposure.replace(exposureTime) -> gcal
               )
             }
           }
       }
 
       override def insertGmosNorth(
-        id:           Int,
-        stepOrder:    PosLong,
-        disperser:    Option[GmosNorthGrating],
-        filter:       Option[GmosNorthFilter],
-        fpu:          Option[GmosNorthFpu],
-        xBin:         GmosXBinning,
-        yBin:         GmosYBinning,
-        wavelength:   Option[BoundedInterval[Wavelength]],
-        order:        Option[GmosGratingOrder],
-        ampGain:      GmosAmpGain,
-        gcal:         Gcal,
-        count:        PosInt,
-        baseline:     GcalBaselineType,
-        exposureTime: TimeSpan
+        id:  Int,
+        row: GmosNorthTableRow
       ): F[Unit] =
 
         val gn  = session.executeCommand(
           Statements.InsertGmosNorth(
-            Instrument.GmosNorth ~
-            id                   ~
-            stepOrder            ~
-            disperser            ~
-            filter               ~
-            fpu                  ~
-            xBin                 ~
-            yBin                 ~
-            wavelength           ~
-            order                ~
-            ampGain              ~
-            exposureTime
+            Instrument.GmosNorth                         ~
+            id                                           ~
+            row.line                                     ~
+            row.key.gratingConfig.map(_.grating)         ~
+            row.key.filter                               ~
+            row.key.fpu                                  ~
+            row.key.xBin                                 ~
+            row.key.yBin                                 ~
+            row.key.gratingConfig.map(_.wavelengthRange) ~
+            row.key.gratingConfig.map(_.order)           ~
+            row.key.gain                                 ~
+            row.value.instrumentConfig.exposureTime
           )
         ).void
 
         val gc  = session.executeCommand(
-          Statements.InsertGcal(Instrument.GmosNorth ~ id ~ gcal ~ count ~ baseline)
+          Statements.InsertGcal(Instrument.GmosNorth ~ id ~ row.value.gcalConfig ~ row.value.stepCount ~ row.value.baselineType)
         ).void
 
         for {
@@ -132,18 +114,18 @@ object SmartGcalService {
   object Statements {
 
     def selectGmosNorth(
-      gn:  GmosNorth,
+      gn:  GmosNorthSearchKey,
       sgt: SmartGcalType
     ): AppliedFragment = {
       val where = List(
-        sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_north_grating.opt}"(gn.gratingConfig.map(_.grating)),
+        sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_north_grating.opt}"(gn.grating.map(_.grating)),
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_north_filter.opt}"(gn.filter),
-        sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_north_fpu.opt}"(gn.fpu.flatMap(GmosFpuMask.builtin.getOption)),
-        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_disperser_order.opt}"(gn.gratingConfig.map(_.order)),
-        sql"s.c_x_binning = ${gmos_x_binning}"(gn.readout.xBin),
-        sql"s.c_y_binning = ${gmos_y_binning}"(gn.readout.yBin),
-        sql"s.c_amp_gain  = ${gmos_amp_gain}"(gn.readout.ampGain),
-        gn.gratingConfig.map(_.wavelength).fold(void"s.c_wavelength_range IS NULL")(
+        sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_north_fpu.opt}"(gn.fpu),
+        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_disperser_order.opt}"(gn.grating.map(_.order)),
+        sql"s.c_x_binning = ${gmos_x_binning}"(gn.xBin),
+        sql"s.c_y_binning = ${gmos_y_binning}"(gn.yBin),
+        sql"s.c_amp_gain  = ${gmos_amp_gain}"(gn.gain),
+        gn.grating.map(_.wavelength).fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
         ),
         sgt match {

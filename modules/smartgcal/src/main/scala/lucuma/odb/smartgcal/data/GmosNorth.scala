@@ -3,8 +3,10 @@
 
 package lucuma.odb.smartgcal.data
 
+import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
@@ -17,9 +19,16 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.DynamicConfig
+import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.model.sequence.GmosGratingConfig
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
+import lucuma.core.util.TimeSpan
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import monocle.Focus
+import monocle.Lens
+import monocle.Optional
 
 object GmosNorth {
 
@@ -30,13 +39,59 @@ object GmosNorth {
     xBin:       GmosXBinning,
     yBin:       GmosYBinning,
     gain:       GmosAmpGain
-  )
+  ) {
+
+    def format: String = {
+      val g = s"grating: ${grating.fold("None"){g => s"(${g.grating}, ${g.order}, ${g.wavelength.nm.value.value} nm)"}}"
+      val f = s"filter: ${filter.getOrElse("None")}"
+      val u = s"fpu: ${fpu.getOrElse("None")}"
+      s"GmosNorth { $g, $f, $u, binning: ${xBin.count}x${yBin.count}, gain: $gain }"
+    }
+
+  }
+
+  object SearchKey {
+
+    def fromDynamicConfig(gn: DynamicConfig.GmosNorth): SearchKey =
+      SearchKey(
+        gn.gratingConfig,
+        gn.filter,
+        gn.fpu.flatMap(GmosFpuMask.builtin.getOption),
+        gn.readout.xBin,
+        gn.readout.yBin,
+        gn.readout.ampGain
+      )
+
+    given Eq[SearchKey] =
+      Eq.by { k => (
+        k.grating,
+        k.filter,
+        k.fpu,
+        k.xBin,
+        k.yBin,
+        k.gain
+      )}
+
+  }
 
   case class GratingConfigKey(
     grating:         GmosNorthGrating,
     order:           GmosGratingOrder,
     wavelengthRange: BoundedInterval[Wavelength]
   )
+
+  object GratingConfigKey {
+
+    val grating: Lens[GratingConfigKey, GmosNorthGrating] =
+      Focus[GratingConfigKey](_.grating)
+
+    val order: Lens[GratingConfigKey, GmosGratingOrder] =
+      Focus[GratingConfigKey](_.order)
+
+    val wavelengthRange: Lens[GratingConfigKey, BoundedInterval[Wavelength]] =
+      Focus[GratingConfigKey](_.wavelengthRange)
+
+  }
 
   case class TableKey(
     gratingConfig: Option[GratingConfigKey],
@@ -56,22 +111,68 @@ object GmosNorth {
     def wavelengthRange: Option[BoundedInterval[Wavelength]] =
       gratingConfig.map(_.wavelengthRange)
   }
-//
-//    def format: String = {
-//      def quote[A: Enumerated](a: A): String =
-//        s"'${a.tag}'"
-//
-//      def quoteOpt[A: Enumerated](a: Option[A]): String =
-//        a.fold("NULL")(quote)
-//
-//      s"${quoteOpt(grating)}, ${quoteOpt(filter)}, ${quoteOpt(fpu)}, ${quote(xBin)}, ${quote(yBin)}, $wavelengthRange, ${quote(order)}, ${quote(gain)}"
-//    }
+
+  object TableKey {
+
+    val gratingConfig: Lens[TableKey, Option[GratingConfigKey]] =
+      Focus[TableKey](_.gratingConfig)
+
+    val filter: Lens[TableKey, Option[GmosNorthFilter]] =
+      Focus[TableKey](_.filter)
+
+    val fpu: Lens[TableKey, Option[GmosNorthFpu]] =
+      Focus[TableKey](_.fpu)
+
+    val xBin: Lens[TableKey, GmosXBinning] =
+      Focus[TableKey](_.xBin)
+
+    val yBin: Lens[TableKey, GmosYBinning] =
+      Focus[TableKey](_.yBin)
+
+    val gain: Lens[TableKey, GmosAmpGain] =
+      Focus[TableKey](_.gain)
+
+  }
 
   case class TableRow(
     line:  PosLong,
     key:   TableKey,
     value: SmartGcalValue.Legacy
   )
+
+  object TableRow {
+
+    val line: Lens[TableRow, PosLong] =
+      Focus[TableRow](_.line)
+
+    val key: Lens[TableRow, TableKey] =
+      Focus[TableRow](_.key)
+
+    val value: Lens[TableRow, SmartGcalValue.Legacy] =
+      Focus[TableRow](_.value)
+
+    val grating: Optional[TableRow, GmosNorthGrating] =
+      TableRow.key
+        .andThen(TableKey.gratingConfig)
+        .andThen(monocle.std.option.some)
+        .andThen(GratingConfigKey.grating)
+
+    val wavelengthRange: Optional[TableRow, BoundedInterval[Wavelength]] =
+      TableRow.key
+        .andThen(TableKey.gratingConfig)
+        .andThen(monocle.std.option.some)
+        .andThen(GratingConfigKey.wavelengthRange)
+
+    val exposureTime: Lens[TableRow, TimeSpan] =
+      TableRow.value
+        .andThen(SmartGcalValue.instrumentConfig)
+        .andThen(LegacyInstrumentConfig.exposureTime)
+
+    val stepCount: Lens[TableRow, PosInt] =
+      TableRow.value
+        .andThen(SmartGcalValue.stepCount)
+
+  }
 
   case class FileKey(
     gratings:        NonEmptyList[Option[GmosNorthGrating]],

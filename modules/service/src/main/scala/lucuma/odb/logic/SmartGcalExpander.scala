@@ -21,20 +21,22 @@ import lucuma.odb.sequence.data.ProtoExecution
 import lucuma.odb.sequence.data.ProtoSequence
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
+import lucuma.odb.smartgcal.data.GmosNorth.{ SearchKey => GmosNorthSearchKey }
 
 import scala.collection.mutable.ListBuffer
 
 
 trait SmartGcalExpander[F[_]] {
 
-  def expand[S, D](
-    select: (D, SmartGcalType) => F[List[(D, Gcal)]],
+  def expand[K, S, D](
+    toKey:  D => K,
+    select: (K, SmartGcalType) => F[List[(D => D, Gcal)]],
     exec:   ProtoExecution[S, D]
-  ): F[Either[D, ProtoExecution[S, D]]]
+  ): F[Either[K, ProtoExecution[S, D]]]
 
   def expandGmosNorth(
     exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
-  ): F[Either[GmosNorth, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]]
+  ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]]
 
 }
 
@@ -46,25 +48,26 @@ object SmartGcalExpander {
 
     new SmartGcalExpander[F] {
 
-      type Cache[D] = Map[(D, SmartGcalType), NonEmptyList[(D, Gcal)]]
+      type Cache[K, D] = Map[(K, SmartGcalType), NonEmptyList[(D => D, Gcal)]]
 
-      def emptyCache[D]: Cache[D] =
+      def emptyCache[K, D]: Cache[K, D] =
         Map.empty
 
-      override def expand[S, D](
-        select: (D, SmartGcalType) => F[List[(D, Gcal)]],
+      override def expand[K, S, D](
+        toKey:  D => K,
+        select: (K, SmartGcalType) => F[List[(D => D, Gcal)]],
         exec:   ProtoExecution[S, D]
-      ): F[Either[D, ProtoExecution[S, D]]] =
-        expandSequence(select)(emptyCache, exec.acquisition).flatMap { (c, acq) =>
-          expandSequence(select)(c, exec.science).map { (_, sci) =>
+      ): F[Either[K, ProtoExecution[S, D]]] =
+        expandSequence(toKey, select)(emptyCache, exec.acquisition).flatMap { (c, acq) =>
+          expandSequence(toKey, select)(c, exec.science).map { (_, sci) =>
             ProtoExecution(exec.static, acq, sci)
           }
         }.value
 
       override def expandGmosNorth(
         exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
-      ): F[Either[GmosNorth, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]] =
-        expand(service.selectGmosNorth, exec)
+      ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]] =
+        expand(GmosNorthSearchKey.fromDynamicConfig, service.selectGmosNorth, exec)
 
       private def mapAccumulateM[G[_]: Monad, A, B, S](
         as: List[A],
@@ -89,45 +92,54 @@ object SmartGcalExpander {
         }
 
 
-      private def expandSequence[D](
-        select:   (D, SmartGcalType) => F[List[(D, Gcal)]]
+      private def expandSequence[K, D](
+        toKey:    D => K,
+        select:   (K, SmartGcalType) => F[List[(D => D, Gcal)]]
       )(
-        cache:    Cache[D],
+        cache:    Cache[K, D],
         sequence: ProtoSequence[D]
-      ): EitherT[F, D, (Cache[D], ProtoSequence[D])] =
-        mapAccumulateNelM(sequence.atoms, cache)(expandAtom(select)).map { _.map(ProtoSequence(_)) }
+      ): EitherT[F, K, (Cache[K, D], ProtoSequence[D])] =
+        mapAccumulateNelM(sequence.atoms, cache)(expandAtom(toKey, select)).map { _.map(ProtoSequence(_)) }
 
-      private def expandAtom[D](
-        select: (D, SmartGcalType) => F[List[(D, Gcal)]]
+      private def expandAtom[K, D](
+        toKey:  D => K,
+        select: (K, SmartGcalType) => F[List[(D => D, Gcal)]]
       )(
-        cache:  Cache[D],
+        cache:  Cache[K, D],
         atom:   ProtoAtom[D]
-      ): EitherT[F, D, (Cache[D], ProtoAtom[D])] =
-        mapAccumulateNelM(atom.steps, cache)(expandStep(select)).map { _.map(nel => ProtoAtom(nel.reduce)) }
+      ): EitherT[F, K, (Cache[K, D], ProtoAtom[D])] =
+        mapAccumulateNelM(atom.steps, cache)(expandStep(toKey, select)).map { _.map(nel => ProtoAtom(nel.reduce)) }
 
-      private def expandStep[D](
-        select: (D, SmartGcalType) => F[List[(D, Gcal)]]
+      private def expandStep[K, D](
+        toKey:  D => K,
+        select: (K, SmartGcalType) => F[List[(D => D, Gcal)]]
       )(
-        cache:  Cache[D],
+        cache:  Cache[K, D],
         step:   ProtoStep[D]
-      ): EitherT[F, D, (Cache[D], NonEmptyList[ProtoStep[D]])] =
+      ): EitherT[F, K, (Cache[K, D], NonEmptyList[ProtoStep[D]])] =
         step match {
           case ProtoStep(d, StepConfig.SmartGcal(sgt)) =>
-            cache.get((d, sgt)).fold(
+            val key = toKey(d)
+
+            def toStep(tup: (D => D, Gcal)): ProtoStep[D] = {
+              val (update, gcal) = tup
+              ProtoStep(update(d), gcal)
+            }
+
+            cache.get((key, sgt)).fold(
               EitherT(
-                select(d, sgt).map {
-                  case Nil    =>
-                    d.asLeft  // sorry, no mapping for d
+                select(key, sgt).map {
+                  case Nil    => key.asLeft  // sorry, no mapping for d
                   case h :: t => (
-                    cache.updated((d, sgt), NonEmptyList(h, t)),
-                    NonEmptyList(ProtoStep(h._1, h._2), t.map(ProtoStep.apply))
+                    cache.updated((key, sgt), NonEmptyList(h, t)),
+                    NonEmptyList(toStep(h), t.map(toStep))
                   ).asRight
                 }
               )
-            ) { nel => EitherT.rightT[F, D]((cache, nel.map(ProtoStep.apply))) }
+            ) { nel => EitherT.rightT[F, K]((cache, nel.map(toStep))) }
 
           case ps@ProtoStep(_, _) =>
-            EitherT.rightT[F, D](cache, NonEmptyList.one(ps))
+            EitherT.rightT[F, K](cache, NonEmptyList.one(ps))
         }
 
     }

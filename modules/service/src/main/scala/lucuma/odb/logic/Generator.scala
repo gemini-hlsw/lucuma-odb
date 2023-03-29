@@ -96,10 +96,10 @@ object Generator {
     }
 
     case class MissingSmartGcalDef(
-      dynamicConfig: DynamicConfig
+      key: String
     ) extends Error {
       def format: String =
-        s"Could not generate a sequence, missing Smart GCAL mapping: $dynamicConfig"
+        s"Could not generate a sequence, missing Smart GCAL mapping: $key"
     }
 
     case class Success(
@@ -168,7 +168,7 @@ object Generator {
             for {
               tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
               (rs, p0) = tup
-              p1 <- EitherT(exp.expandGmosNorth(p0)).leftMap { d => MissingSmartGcalDef(d): Error }
+              p1 <- EitherT(exp.expandGmosNorth(p0)).leftMap { k => MissingSmartGcalDef(k.format): Error }
             } yield
               Success(
                 oid,
