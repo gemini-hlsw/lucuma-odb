@@ -236,15 +236,23 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    Main
-      .databasePoolResource[IO](databaseConfig)
-      .flatten
-      .use(initDb)
-      .unsafeRunSync()
+    dbInitialization.foreach { init =>
+      Main
+        .databasePoolResource[IO](databaseConfig)
+        .flatten
+        .use(init)
+        .unsafeRunSync()
+    }
   }
 
-  def initDb(s: Session[IO]): IO[Unit] =
-    IO.unit
+  /**
+   * Perform any database initialization required by the test suite.
+   *
+   * @return database initialization function wrapped in an Option; None if
+   *         there is no required initialization
+   */
+  def dbInitialization: Option[Session[IO] => IO[Unit]] =
+    None
 
   def expect(
     user:      User,

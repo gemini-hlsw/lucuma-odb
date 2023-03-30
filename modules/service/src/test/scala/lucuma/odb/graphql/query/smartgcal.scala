@@ -54,7 +54,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "SmartGcal Testing")
 
-  override def initDb(s: Session[IO]): IO[Unit] = {
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val srv = SmartGcalService.fromSession(s)
 
     val tableRow: TableRow =
