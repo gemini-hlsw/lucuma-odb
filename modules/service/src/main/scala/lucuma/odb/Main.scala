@@ -12,6 +12,8 @@ import com.comcast.ip4s.Port
 import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
+import io.laserdisc.pure.s3.tagless.Interpreter
+import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.AttachmentRoutes
@@ -36,6 +38,11 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command => _, _}
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3AsyncClient
+import software.amazon.awssdk.services.s3.S3Configuration
 
 import scala.concurrent.duration._
 
@@ -110,11 +117,36 @@ object Main extends IOApp {
       }
     }
 
+  /** A resource that encapsulates an s3 client */
+  def s3ClientOpsResource[F[_]: Async](awsConfig: Config.Aws): Resource[F, S3AsyncClientOp[F]] = {
+    val credentials = AwsBasicCredentials.create(awsConfig.accessKey.value, awsConfig.secretKey.value)
+
+    Interpreter[F].S3AsyncClientOpResource(
+      S3AsyncClient
+            .builder()
+            .credentialsProvider(StaticCredentialsProvider.create(credentials))
+            .serviceConfiguration(
+              S3Configuration
+                .builder()
+                .pathStyleAccessEnabled(true)
+                .build()
+            )
+            .region(Region.US_EAST_1)
+    )
+  }
+
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-    routesResource(config.database, config.aws, config.itcClient, config.commitHash, config.ssoClient, config.domain)
+    routesResource(
+      config.database,
+      config.aws,
+      config.itcClient,
+      config.commitHash,
+      config.ssoClient,
+      config.domain,
+      s3ClientOpsResource(config.aws))
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
@@ -124,6 +156,7 @@ object Main extends IOApp {
     commitHash:        CommitHash,
     ssoClientResource: Resource[F, SsoClient[F, User]],
     domain:            String,
+    s3OpsResource:     Resource[F, S3AsyncClientOp[F]]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool             <- databasePoolResource[F](databaseConfig)
@@ -132,9 +165,10 @@ object Main extends IOApp {
       userSvc          <- pool.map(UserService.fromSession(_))
       middleware       <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
       graphQLRoutes    <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
-      attachmentSvc    <- pool.flatMap(ses => AttachmentService.fromConfigAndSession(awsConfig, ses))
-      attachmentRoutes =  AttachmentRoutes.apply[F](attachmentSvc, ssoClient, awsConfig.fileUploadMaxMb)
+      s3ClientOps      <- s3OpsResource
+      attachmentSvc    <- pool.map(ses => AttachmentService.fromS3AndSession(awsConfig, s3ClientOps, ses))
     } yield { wsb =>
+      val attachmentRoutes =  AttachmentRoutes.apply[F](attachmentSvc, ssoClient, awsConfig.fileUploadMaxMb)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes)
     }
 
