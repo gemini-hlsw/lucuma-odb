@@ -24,6 +24,7 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.literal.*
+import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
@@ -37,6 +38,7 @@ import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
@@ -63,6 +65,21 @@ import scala.concurrent.duration.*
  * among all tests.
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
+
+  // The beforeAll and afterAll are necessary for tests that need S3 (from OdbSuiteWithS3).
+  // For some reason, overriding beforeAll and afterAll in OdbSuiteWithS3 didn't work.
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    startS3
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    stopS3
+  }
+
+  protected def startS3: Unit = ()
+  protected def stopS3: Unit = ()
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
@@ -129,14 +146,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       database = container.databaseName,
     )
 
-  private def awsConfig: Config.Aws = 
+  // overriden in OdbSuiteWithS3 for tests that need it.
+  protected def awsConfig: Config.Aws = 
     Config.Aws(
-      accessKey       = NonEmptyString.unsafeFrom("accessKey"),
-      secretKey       = NonEmptyString.unsafeFrom("secretKey"),
-      basePath        = NonEmptyString.unsafeFrom("basePath"),
-      bucketName      = fs2.aws.s3.models.Models.BucketName(NonEmptyString.unsafeFrom("bucketName")),
+      accessKey       = "accessKey".refined,
+      secretKey       = "secretkey".refined,
+      basePath        = "basePath".refined,
+      bucketName      = fs2.aws.s3.models.Models.BucketName("bucketName".refined),
       fileUploadMaxMb = 5
     )
+
+  // overriden in OdbSuiteWithS3 for tests that need it.
+  protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
+    Main.s3ClientOpsResource(awsConfig)
 
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Main.routesResource(
@@ -145,7 +167,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
-      "unused"
+      "unused",
+      s3ClientOpsResource
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -159,7 +182,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map <- Resource.eval(OdbMapping(db, mon, usr, top, itc, CommitHash.Zero))
     } yield map
 
-  private def server: Resource[IO, Server] =
+  protected def server: Resource[IO, Server] =
     // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
     httpApp.flatMap { app =>
       BlazeServerBuilder[IO]
