@@ -62,6 +62,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
+      LeafMapping[Tag](AttachmentTypeType),
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
