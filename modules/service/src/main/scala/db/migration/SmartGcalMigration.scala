@@ -4,27 +4,29 @@
 package db.migration
 
 import cats.data.NonEmptyList
-import cats.data.OptionT
 import cats.effect.IO
-import cats.effect.Resource
 import cats.effect.unsafe.implicits.global
-import cats.syntax.applicative.*
-import cats.syntax.traverse.*
-import fs2.Pipe
-import lucuma.odb.smartgcal.FileReader
 import org.flywaydb.core.api.MigrationVersion
-import org.flywaydb.core.api.migration.Context
-import org.flywaydb.core.api.migration.JavaMigration
-import org.postgresql.core.BaseConnection
-import skunk.Codec
 
 import java.io.InputStream
-import java.time.Duration
-import java.time.Instant
 import scala.math.BigInt
 
-abstract class SmartGcalMigration[A](instrumentName: String) extends IOMigration {
+/**
+ * Performs a smart gcal migration which consists of reading the named
+ * `definitionFiles`, parsing them and updating the corresponding tables.
+ * Most of this work is delegated to a `SmartGcalLoader` which could be used
+ * in other contexts.
+ *
+ * @param instrumentName identifies the migration in `getDescription`
+  */
+abstract class SmartGcalMigration(instrumentName: String) extends IOMigration {
 
+  /**
+   * Returns `null` as required by the Flyway API for repeatable migrations.
+   * Repeatable migrations are always executed after versioned migrations but
+   * in any order thereafter. They are skipped if the checksum (see
+   * `getChecksum`) has not been updated since the last time it was executed.
+   */
   override val getVersion: MigrationVersion =
     null // required by the API for repeatable migrations
 
@@ -49,11 +51,10 @@ abstract class SmartGcalMigration[A](instrumentName: String) extends IOMigration
     BigInt(bytes).intValue
   }
 
+  /**
+   * List of the definition files that describe the SmartGcal definitions for
+   * this instrument.
+   */
   def definitionFiles: NonEmptyList[(String, IO[InputStream])]
-
-  def loader: SmartGcalLoader[A]
-
-  def ioMigrate(ctx: Context, bc:  BaseConnection): IO[Unit] =
-    loader.load(bc, definitionFiles)
 
 }

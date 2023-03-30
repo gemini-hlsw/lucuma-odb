@@ -28,12 +28,15 @@ import scala.collection.mutable.ListBuffer
 
 trait SmartGcalExpander[F[_]] {
 
-  def expand[K, S, D](
-    toKey:  D => K,
-    select: (K, SmartGcalType) => F[List[(D => D, Gcal)]],
-    exec:   ProtoExecution[S, D]
-  ): F[Either[K, ProtoExecution[S, D]]]
-
+  /**
+   * Expands any SmartGcal steps found in the execution into their matching
+   * Gcal steps by matching on the dynamic instrument config in the step where
+   * they occur.
+   *
+   * @return a Left `GmosNorthSearchKey` if no smart gcal configuration can be
+   *         found for a particular step, a Right `ProtoExecution` if successful
+   *         with all SmartGcal steps replaced by one or more Gcal steps
+   */
   def expandGmosNorth(
     exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
   ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]]
@@ -53,7 +56,12 @@ object SmartGcalExpander {
       def emptyCache[K, D]: Cache[K, D] =
         Map.empty
 
-      override def expand[K, S, D](
+      override def expandGmosNorth(
+        exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
+      ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]] =
+        expand(GmosNorthSearchKey.fromDynamicConfig, service.selectGmosNorth, exec)
+
+      def expand[K, S, D](
         toKey:  D => K,
         select: (K, SmartGcalType) => F[List[(D => D, Gcal)]],
         exec:   ProtoExecution[S, D]
@@ -63,11 +71,6 @@ object SmartGcalExpander {
             ProtoExecution(exec.static, acq, sci)
           }
         }.value
-
-      override def expandGmosNorth(
-        exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
-      ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]] =
-        expand(GmosNorthSearchKey.fromDynamicConfig, service.selectGmosNorth, exec)
 
       private def mapAccumulateM[G[_]: Monad, A, B, S](
         as: List[A],
@@ -90,7 +93,6 @@ object SmartGcalExpander {
         f(s0, as.head).flatMap { (s1, b) =>
           mapAccumulateM(as.tail, s1)(f).map(_.map(NonEmptyList(b, _)))
         }
-
 
       private def expandSequence[K, D](
         toKey:    D => K,

@@ -65,7 +65,7 @@ CREATE TABLE t_gcal (
   PRIMARY KEY (c_instrument, c_gcal_id),
 
   -- Gcal Configuration Value
-  c_gcal_continuum   d_tag                          REFERENCES t_gcal_continuum(c_tag) ON DELETE CASCADE,
+  c_gcal_continuum   d_tag                 REFERENCES t_gcal_continuum(c_tag) ON DELETE CASCADE,
   c_gcal_ar_arc      boolean               NOT NULL DEFAULT FALSE,
   c_gcal_cuar_arc    boolean               NOT NULL DEFAULT FALSE,
   c_gcal_thar_arc    boolean               NOT NULL DEFAULT FALSE,

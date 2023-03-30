@@ -214,7 +214,7 @@ object OdbMapping {
             itc.use {
               _.lookup(pid, oid, useCache)
                .map {
-                 case Left(errors) => Result.failure(errors.map(_.format).intercalate(", "))
+                 case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
                  case Right(resultSet) => Result(resultSet.asJson)
                }
             }
