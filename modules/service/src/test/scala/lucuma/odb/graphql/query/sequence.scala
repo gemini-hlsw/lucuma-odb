@@ -52,7 +52,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "Sequence Testing")
 
-  override def initDb(s: Session[IO]): IO[Unit] = {
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val tableRow: TableRow =
       TableRow(
         PosLong.unsafeFrom(1),
