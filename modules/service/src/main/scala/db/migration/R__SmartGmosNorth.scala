@@ -5,9 +5,7 @@ package db.migration
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.effect.Resource
 import eu.timepit.refined.types.numeric.PosLong
-import fs2.Pipe
 import lucuma.core.enums.Instrument.GmosNorth
 import lucuma.odb.smartgcal.FileReader
 import lucuma.odb.smartgcal.data.GmosNorth.FileEntry
@@ -16,6 +14,8 @@ import lucuma.odb.smartgcal.data.GmosNorth.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import org.flywaydb.core.api.migration.Context
+import org.postgresql.core.BaseConnection
 import skunk.Encoder
 import skunk.codec.temporal.interval
 import skunk.implicits.*
@@ -26,13 +26,13 @@ import java.io.InputStream
  * Repeatable Smart GCal configuration loader for GMOS North.  Located,
  * instantiated and executed by flyway.
  */
-class R__SmartGmosNorth extends SmartGcalMigration[TableRow]("GMOS North") {
+class R__SmartGmosNorth extends SmartGcalMigration("GMOS North") {
 
-  val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
+  lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
     gcalFilesFromClasspath("GMOS-N_ARC", "GMOS-N_FLAT")
 
-  val loader: SmartGcalLoader[TableRow] =
-    R__SmartGmosNorth.Loader
+  override def ioMigrate(ctx: Context, bc:  BaseConnection): IO[Unit] =
+    R__SmartGmosNorth.Loader.load(bc, definitionFiles)
 
 }
 

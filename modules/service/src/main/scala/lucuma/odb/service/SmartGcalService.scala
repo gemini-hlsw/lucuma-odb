@@ -46,16 +46,16 @@ trait SmartGcalService[F[_]] {
    * @param sgt SmartGcal type of interest
    *
    * @return list of tuples, each corresponding to a calibration step; each
-   *         tuple contains an update to the dynamic config to apply and the
-   *         GCAL unit configuration to use
+   *         tuple contains an update to the dynamic config to apply (e.g., to
+   *         set its exposure time) and the GCAL unit configuration to use
    */
   def selectGmosNorth(
     gn:  GmosNorthSearchKey,
     sgt: SmartGcalType
   ): F[List[(GmosNorth => GmosNorth, Gcal)]]
 
-  // Insertion is done by a flyway migration and not via this method.  The
-  // insert here is for initializing a database for testing.
+  // N.B. Insertion is done by a flyway migration and not via this method.  The
+  // insert here is intended for initializing a database for testing.
   def insertGmosNorth(
     id:  Int,
     row: GmosNorthTableRow
