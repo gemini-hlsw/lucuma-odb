@@ -8,8 +8,6 @@ package mapping
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.FilterTypeTable
 
-import table.ObservationView
-
 trait FilterTypeMetaMapping[F[_]] extends FilterTypeTable[F] {
 
   lazy val FilterTypeMetaMapping =
