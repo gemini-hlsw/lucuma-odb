@@ -14,8 +14,8 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.odb.smartgcal.data.GmosNorth.FileEntry
-import lucuma.odb.smartgcal.data.GmosNorth.FileKey
+import lucuma.odb.smartgcal.data.Gmos.FileEntry
+import lucuma.odb.smartgcal.data.Gmos.FileKey
 
 import scala.collection.immutable.ListMap
 
@@ -92,7 +92,7 @@ trait GmosNorthParsers {
   val gain: Parser[NonEmptyList[GmosAmpGain]] =
     manyOfEnumerated[GmosAmpGain].withContext("GMOS amp gain")
 
-  val fileKey: Parser[FileKey] =
+  val fileKey: Parser[FileKey.North] =
     (
       (grating           <* columnSep) ~
       (filter            <* columnSep) ~
@@ -106,7 +106,7 @@ trait GmosNorthParsers {
       FileKey(grating, filter, fpu, xBin, yBin, range, order, gain)
     }
 
-  def fileEntry: Parser[FileEntry] =
+  def fileEntry: Parser[FileEntry.North] =
     ((fileKey <* file.keyValueSep) ~ file.legacyValue).map { case (k, v) =>
       FileEntry(k, v)
     }

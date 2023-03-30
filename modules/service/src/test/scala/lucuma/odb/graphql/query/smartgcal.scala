@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.State
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -34,9 +35,9 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.SmartGcalService
-import lucuma.odb.smartgcal.data.GmosNorth.GratingConfigKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableRow
+import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
+import lucuma.odb.smartgcal.data.Gmos.TableKey
+import lucuma.odb.smartgcal.data.Gmos.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import monocle.Lens
@@ -57,7 +58,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val srv = SmartGcalService.fromSession(s)
 
-    val tableRow: TableRow =
+    val tableRow: TableRow.North =
       TableRow(
         PosLong.unsafeFrom(1),
         TableKey(
@@ -104,13 +105,14 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                     Wavelength.unsafeFromIntPicometers(high)
                   )
 
-      val update = for {
-        _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
-        _ <- TableRow.grating         := disperser
-        _ <- TableRow.wavelengthRange := range
-        _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-        _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
-      } yield ()
+      val update: State[TableRow.North, Unit] =
+        for {
+          _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
+          _ <- TableRow.grating         := disperser
+          _ <- TableRow.wavelengthRange := range
+          _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
+          _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
+        } yield ()
 
       srv.insertGmosNorth(id, update.runS(tableRow).value)
     }

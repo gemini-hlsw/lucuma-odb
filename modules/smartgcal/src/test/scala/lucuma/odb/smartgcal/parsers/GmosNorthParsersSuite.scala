@@ -16,8 +16,8 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
-import lucuma.odb.smartgcal.data.GmosNorth.GratingConfigKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableKey
+import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
+import lucuma.odb.smartgcal.data.Gmos.TableKey
 
 final class GmosNorthParsersSuite extends munit.FunSuite {
 
@@ -43,7 +43,7 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
       for {
         f <- filters
         u <- fpus
-      } yield TableKey(
+      } yield TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](
         GratingConfigKey(
           GmosNorthGrating.R400_G5305,
           GmosGratingOrder.One,
@@ -79,7 +79,7 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
       for {
         f <- filters
         u <- fpus
-      } yield TableKey(
+      } yield TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](
         none,
         f,
         u,
