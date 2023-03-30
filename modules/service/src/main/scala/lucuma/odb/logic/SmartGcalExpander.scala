@@ -21,7 +21,7 @@ import lucuma.odb.sequence.data.ProtoExecution
 import lucuma.odb.sequence.data.ProtoSequence
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
-import lucuma.odb.smartgcal.data.GmosNorth.{ SearchKey => GmosNorthSearchKey }
+import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ North => GmosNorthSearchKey }
 
 import scala.collection.mutable.ListBuffer
 

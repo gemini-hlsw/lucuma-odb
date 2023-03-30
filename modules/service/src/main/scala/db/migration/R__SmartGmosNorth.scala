@@ -8,9 +8,9 @@ import cats.effect.IO
 import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.Instrument.GmosNorth
 import lucuma.odb.smartgcal.FileReader
-import lucuma.odb.smartgcal.data.GmosNorth.FileEntry
-import lucuma.odb.smartgcal.data.GmosNorth.TableKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableRow
+import lucuma.odb.smartgcal.data.Gmos.FileEntry
+import lucuma.odb.smartgcal.data.Gmos.TableKey
+import lucuma.odb.smartgcal.data.Gmos.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -48,7 +48,7 @@ object R__SmartGmosNorth {
   given Encoder[SmartGcalValue.Legacy] =
     SmartGcalTable.valueEncoder
 
-  given Encoder[TableKey] =
+  given Encoder[TableKey.North] =
     (
       gmos_north_grating.opt   ~
       gmos_north_filter.opt    ~
@@ -58,7 +58,7 @@ object R__SmartGmosNorth {
       wavelength_pm_range.opt  ~
       gmos_disperser_order.opt ~
       gmos_amp_gain
-    ).contramap[TableKey] { k =>
+    ).contramap[TableKey.North] { k =>
       k.grating         ~
       k.filter          ~
       k.fpu             ~
@@ -81,12 +81,12 @@ object R__SmartGmosNorth {
       Col.fkey("c_amp_gain", "t_gmos_amp_gain"),
     )
 
-  def encoder(using k: Encoder[TableKey], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow] =
+  def encoder(using k: Encoder[TableKey.North], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow.North] =
     (
       pos_long ~
       k        ~
       v
-    ).contramap[TableRow] { r =>
+    ).contramap[TableRow.North] { r =>
       r.line ~
       r.key  ~
       r.value
@@ -102,7 +102,7 @@ object R__SmartGmosNorth {
   object Loader extends SmartGcalLoader(
     tmp,
     inst,
-    pipe    = filename => FileReader.gmosNorth[IO](filename) andThen FileEntry.tableRows[IO],
+    pipe    = filename => FileReader.gmosNorth[IO](filename) andThen FileEntry.tableRowsNorth[IO],
     encoder = encoder
   )
 

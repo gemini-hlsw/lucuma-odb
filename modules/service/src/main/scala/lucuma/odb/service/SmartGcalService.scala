@@ -26,9 +26,9 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.GmosFpuMask
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
-import lucuma.odb.smartgcal.data.GmosNorth.{SearchKey => GmosNorthSearchKey}
-import lucuma.odb.smartgcal.data.GmosNorth.{TableKey  => GmosNorthTableKey}
-import lucuma.odb.smartgcal.data.GmosNorth.{TableRow  => GmosNorthTableRow}
+import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ North => GmosNorthSearchKey}
+import lucuma.odb.smartgcal.data.Gmos.TableKey.{ North  => GmosNorthTableKey}
+import lucuma.odb.smartgcal.data.Gmos.TableRow.{ North  => GmosNorthTableRow}
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*

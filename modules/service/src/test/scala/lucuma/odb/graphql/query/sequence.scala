@@ -34,9 +34,9 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.SmartGcalService
-import lucuma.odb.smartgcal.data.GmosNorth.GratingConfigKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableRow
+import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
+import lucuma.odb.smartgcal.data.Gmos.TableKey
+import lucuma.odb.smartgcal.data.Gmos.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
@@ -53,7 +53,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(user, "Sequence Testing")
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRow: TableRow =
+    val tableRow: TableRow.North =
       TableRow(
         PosLong.unsafeFrom(1),
         TableKey(
