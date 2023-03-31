@@ -46,4 +46,7 @@ object FileReader {
   def gmosNorth[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gmos.FileEntry.North)] =
     read(fileName, parsers.gmosNorth.fileEntry)
 
+  def gmosSouth[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gmos.FileEntry.South)] =
+    read(fileName, parsers.gmosSouth.fileEntry)
+
 }
