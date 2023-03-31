@@ -13,6 +13,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.StaticConfig
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -22,6 +23,7 @@ import lucuma.odb.sequence.data.ProtoSequence
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ North => GmosNorthSearchKey }
+import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ South => GmosSouthSearchKey }
 
 import scala.collection.mutable.ListBuffer
 
@@ -40,6 +42,19 @@ trait SmartGcalExpander[F[_]] {
   def expandGmosNorth(
     exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
   ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]]
+
+  /**
+   * Expands any SmartGcal steps found in the execution into their matching
+   * Gcal steps by matching on the dynamic instrument config in the step where
+   * they occur.
+   *
+   * @return a Left `GmosSouthSearchKey` if no smart gcal configuration can be
+   *         found for a particular step, a Right `ProtoExecution` if successful
+   *         with all SmartGcal steps replaced by one or more Gcal steps
+   */
+  def expandGmosSouth(
+    exec: ProtoExecution[StaticConfig.GmosSouth, GmosSouth]
+  ): F[Either[GmosSouthSearchKey, ProtoExecution[StaticConfig.GmosSouth, GmosSouth]]]
 
 }
 
@@ -60,6 +75,11 @@ object SmartGcalExpander {
         exec: ProtoExecution[StaticConfig.GmosNorth, GmosNorth]
       ): F[Either[GmosNorthSearchKey, ProtoExecution[StaticConfig.GmosNorth, GmosNorth]]] =
         expand(GmosNorthSearchKey.fromDynamicConfig, service.selectGmosNorth, exec)
+
+      override def expandGmosSouth(
+        exec: ProtoExecution[StaticConfig.GmosSouth, GmosSouth]
+      ): F[Either[GmosSouthSearchKey, ProtoExecution[StaticConfig.GmosSouth, GmosSouth]]] =
+        expand(GmosSouthSearchKey.fromDynamicConfig, service.selectGmosSouth, exec)
 
       def expand[K, S, D](
         toKey:  D => K,
