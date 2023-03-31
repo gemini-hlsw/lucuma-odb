@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.State
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -22,6 +23,9 @@ import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.SmartGcalType
@@ -34,9 +38,9 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.SmartGcalService
-import lucuma.odb.smartgcal.data.GmosNorth.GratingConfigKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableKey
-import lucuma.odb.smartgcal.data.GmosNorth.TableRow
+import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
+import lucuma.odb.smartgcal.data.Gmos.TableKey
+import lucuma.odb.smartgcal.data.Gmos.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import monocle.Lens
@@ -57,7 +61,23 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val srv = SmartGcalService.fromSession(s)
 
-    val tableRow: TableRow =
+    val smartGcalValue =
+      SmartGcalValue(
+        Gcal(
+          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+          GcalFilter.Gmos,
+          GcalDiffuser.Ir,
+          GcalShutter.Open
+        ),
+        GcalBaselineType.Night,
+        PosInt.unsafeFrom(1),
+        LegacyInstrumentConfig(
+          TimeSpan.unsafeFromMicroseconds(1_000_000L)
+        )
+      )
+
+
+    val tableRowN: TableRow.North =
       TableRow(
         PosLong.unsafeFrom(1),
         TableKey(
@@ -72,22 +92,28 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           GmosYBinning.Two,
           GmosAmpGain.Low
         ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
-        )
+        smartGcalValue
       )
 
-    def define(
+    val tableRowS: TableRow.South =
+      TableRow(
+        PosLong.unsafeFrom(1),
+        TableKey(
+          GratingConfigKey(
+            GmosSouthGrating.R600_G5324,
+            GmosGratingOrder.One,
+            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+          ).some,
+          GmosSouthFilter.RPrime.some,
+          GmosSouthFpu.LongSlit_0_50.some,
+          GmosXBinning.One,
+          GmosYBinning.Two,
+          GmosAmpGain.Low
+        ),
+        smartGcalValue
+      )
+
+    def defineN(
       id:         Int,
       stepOrder:  Int              = 1,
       disperser:  GmosNorthGrating = GmosNorthGrating.R831_G5302,
@@ -95,6 +121,31 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
       high:       Int              = Wavelength.Max.pm.value.value,
       expTimeSec: Int              = 1,
       count:      Int              = 1
+    ): IO[Unit] =
+      define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowN, srv.insertGmosNorth)
+
+    def defineS(
+      id:         Int,
+      stepOrder:  Int              = 1,
+      disperser:  GmosSouthGrating = GmosSouthGrating.R600_G5324,
+      low:        Int              = Wavelength.Min.pm.value.value,
+      high:       Int              = Wavelength.Max.pm.value.value,
+      expTimeSec: Int              = 1,
+      count:      Int              = 1
+    ): IO[Unit] =
+      define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowS, srv.insertGmosSouth)
+
+    def define[G, L, U](
+      id:         Int,
+      stepOrder:  Int,
+      disperser:  G,
+      low:        Int,
+      high:       Int,
+      expTimeSec: Int,
+      count:      Int
+    )(
+      tableRow:   TableRow[G, L, U],
+      insert:     (Int, TableRow[G, L, U]) => IO[Unit]
     ): IO[Unit] = {
 
       import lucuma.core.optics.syntax.all.*
@@ -104,35 +155,41 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                     Wavelength.unsafeFromIntPicometers(high)
                   )
 
-      val update = for {
-        _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
-        _ <- TableRow.grating         := disperser
-        _ <- TableRow.wavelengthRange := range
-        _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-        _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
-      } yield ()
+      val update: State[TableRow[G, L, U], Unit] =
+        for {
+          _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
+          _ <- TableRow.grating         := disperser
+          _ <- TableRow.wavelengthRange := range
+          _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
+          _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
+        } yield ()
 
-      srv.insertGmosNorth(id, update.runS(tableRow).value)
+      insert(id, update.runS(tableRow).value)
     }
+
 
     for {
       // simple lookup
-      _ <- define(1, high = 500_000, expTimeSec = 1)
-      _ <- define(2, low  = 500_000, high = 600_000, expTimeSec = 2)
-      _ <- define(3, low  = 600_000, expTimeSec = 3)
+      _ <- defineN(1, high = 500_000, expTimeSec = 1)
+      _ <- defineN(2, low  = 500_000, high = 600_000, expTimeSec = 2)
+      _ <- defineN(3, low  = 600_000, expTimeSec = 3)
+
+      _ <- defineS(1, high = 500_000, expTimeSec = 1)
+      _ <- defineS(2, low  = 500_000, high = 600_000, expTimeSec = 2)
+      _ <- defineS(3, low  = 600_000, expTimeSec = 3)
 
       // multi steps
-      _ <- define(4, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
-      _ <- define(5, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
+      _ <- defineN(4, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
+      _ <- defineN(5, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
 
       // step count
-      _ <- define(6, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
+      _ <- defineN(6, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
 
     } yield ()
 
   }
 
-  test("simple lookup") {
+  test("simple GN expansion") {
     val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
       for {
         p <- createProgram
@@ -347,6 +404,90 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       }
                     ]
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
+  test("simple GS expansion") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosSouthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    // Should pick definition 2, with the 2 second exposure time based on the
+    // wavelength range [500, 600), which matches the 500nm observing wavelength
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 executionConfig {
+                   ... on GmosSouthExecutionConfig {
+                     science {
+                       nextAtom {
+                         steps {
+                           instrumentConfig {
+                             exposure {
+                               seconds
+                             }
+                           }
+                           stepConfig {
+                             stepType
+                             ... on Gcal {
+                               filter
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "executionConfig": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": [
+                        {
+                          "instrumentConfig": {
+                            "exposure": {
+                              "seconds": 10.000000
+                            }
+                          },
+                          "stepConfig": {
+                            "stepType": "SCIENCE"
+                          }
+                        },
+                        {
+                          "instrumentConfig": {
+                            "exposure": {
+                              "seconds": 2.000000
+                            }
+                          },
+                          "stepConfig": {
+                            "stepType": "GCAL",
+                            "filter": "GMOS"
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               }

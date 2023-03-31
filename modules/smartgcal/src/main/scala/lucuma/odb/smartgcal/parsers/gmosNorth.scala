@@ -14,12 +14,12 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.odb.smartgcal.data.GmosNorth.FileEntry
-import lucuma.odb.smartgcal.data.GmosNorth.FileKey
+import lucuma.odb.smartgcal.data.Gmos.FileEntry
+import lucuma.odb.smartgcal.data.Gmos.FileKey
 
 import scala.collection.immutable.ListMap
 
-trait GmosNorthParsers {
+trait GmosNorthParsers extends GmosCommonParsers {
   import common.*
   import util.*
 
@@ -80,19 +80,7 @@ trait GmosNorthParsers {
   val grating: Parser[NonEmptyList[Option[GmosNorthGrating]]] =
     manyOfOptionEnumerated[GmosNorthGrating]("Mirror").withContext("GMOS North grating")
 
-  val xBinning: Parser[GmosXBinning] =
-    oneOf(GmosXBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
-
-  val yBinning: Parser[GmosYBinning] =
-    oneOf(GmosYBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
-
-  val order: Parser[NonEmptyList[GmosGratingOrder]] =
-    manyOf(GmosGratingOrder.all.fproductLeft(_.count.toString)*).withContext("GMOS grating order")
-
-  val gain: Parser[NonEmptyList[GmosAmpGain]] =
-    manyOfEnumerated[GmosAmpGain].withContext("GMOS amp gain")
-
-  val fileKey: Parser[FileKey] =
+  val fileKey: Parser[FileKey.North] =
     (
       (grating           <* columnSep) ~
       (filter            <* columnSep) ~
@@ -106,7 +94,7 @@ trait GmosNorthParsers {
       FileKey(grating, filter, fpu, xBin, yBin, range, order, gain)
     }
 
-  def fileEntry: Parser[FileEntry] =
+  def fileEntry: Parser[FileEntry.North] =
     ((fileKey <* file.keyValueSep) ~ file.legacyValue).map { case (k, v) =>
       FileEntry(k, v)
     }

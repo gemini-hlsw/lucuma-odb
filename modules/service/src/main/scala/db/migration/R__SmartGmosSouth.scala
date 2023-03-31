@@ -11,15 +11,15 @@ import org.postgresql.core.BaseConnection
 import java.io.InputStream
 
 /**
- * Repeatable Smart GCal configuration loader for GMOS North.  Located,
+ * Repeatable Smart GCal configuration loader for GMOS South.  Located,
  * instantiated and executed by flyway.
  */
-class R__SmartGmosNorth extends SmartGcalMigration("GMOS North") {
+class R__SmartGmosSouth extends SmartGcalMigration("GMOS South") {
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
-    gcalFilesFromClasspath("GMOS-N_ARC", "GMOS-N_FLAT")
+    gcalFilesFromClasspath("GMOS-S_ARC", "GMOS-S_FLAT")
 
   override def ioMigrate(ctx: Context, bc:  BaseConnection): IO[Unit] =
-    SmartGmosLoader.North.load(bc, definitionFiles)
+    SmartGmosLoader.South.load(bc, definitionFiles)
 
 }

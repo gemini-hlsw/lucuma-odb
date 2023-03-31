@@ -168,7 +168,7 @@ object Generator {
             for {
               tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
               (rs, p0) = tup
-              p1 <- EitherT(exp.expandGmosNorth(p0)).leftMap { k => MissingSmartGcalDef(k.format): Error }
+              p1 <- EitherT(exp.expandGmosNorth(p0)).leftMap { k => MissingSmartGcalDef(k.format) }
             } yield
               Success(
                 oid,
@@ -184,24 +184,25 @@ object Generator {
               )
 
           case GeneratorParams.GmosSouthLongSlit(itcInput, config) =>
-            EitherT(
-              gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosSouth, useCache).value.map(
-                _.map { case (rs, proto) =>
-                  Success(
-                    oid,
-                    rs,
-                    futureExecutionConfig(
-                      namespace,
-                      proto,
-                      FutureExecutionConfig.GmosSouth.apply,
-                      ExecutionSequence.GmosSouth.apply,
-                      Atom.GmosSouth.apply,
-                      Step.GmosSouth.apply
-                    )
-                  )
-                }
+            for {
+              tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosSouth, useCache)
+              (rs, p0) = tup
+              p1  <- EitherT(exp.expandGmosSouth(p0)).leftMap { k => MissingSmartGcalDef(k.format) }
+            } yield
+              Success(
+                oid,
+                rs,
+                futureExecutionConfig(
+                  namespace,
+                  p1,
+                  FutureExecutionConfig.GmosSouth.apply,
+                  ExecutionSequence.GmosSouth.apply,
+                  Atom.GmosSouth.apply,
+                  Step.GmosSouth.apply
+                )
               )
-            )
+
+
         }
       }
 
