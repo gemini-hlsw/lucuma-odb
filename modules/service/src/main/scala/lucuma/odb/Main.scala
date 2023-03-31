@@ -144,37 +144,109 @@ object Main extends IOApp {
         .migrate()
     }
 
+  def resetDatabase[F[_]: Async : Console](config: Config.Database): F[Unit] = {
+
+    import skunk.*
+    import skunk.implicits.*
+    import natchez.Trace.Implicits.noop
+
+    val session: Resource[F, Session[F]] =
+      Session.single[F](
+        host     = config.host,
+        port     = config.port,
+        user     = config.user,
+        database = "postgres",
+        password = config.password.some
+      )
+
+    val drop   = sql"""DROP DATABASE "#${config.database}""""(Void)
+    val create = sql"""CREATE DATABASE "#${config.database}""""(Void)
+
+    session.use { s =>
+      for {
+        _ <- s.prepare(drop.fragment.command).flatMap(_.execute(drop.argument)).void
+        _ <- s.prepare(create.fragment.command).flatMap(_.execute(create.argument)).void
+      } yield()
+    }
+
+  }
+
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
+
+  object Arg {
+    opaque type ResetDatabase = Boolean
+
+    object ResetDatabase {
+
+      def apply(args: List[String]): ResetDatabase =
+        args.contains("-reset")
+
+      extension (rd: ResetDatabase) {
+        def toBoolean: Boolean =
+          rd
+
+        def isRequested: Boolean =
+          toBoolean
+      }
+    }
+
+
+    opaque type SkipMigration = Boolean
+
+    object SkipMigration {
+
+      def apply(args: List[String]): SkipMigration =
+        args.contains("-skip-migration")
+
+      extension (sm: SkipMigration) {
+        def toBoolean: Boolean =
+          sm
+
+        def isRequested: Boolean =
+          toBoolean
+      }
+    }
+
+  }
 
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Console](skipMigration: Boolean): Resource[F, ExitCode] =
+  def server[F[_]: Async: Logger: Console](
+    reset:         Arg.ResetDatabase,
+    skipMigration: Arg.SkipMigration
+  ): Resource[F, ExitCode] =
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
       _  <- Resource.eval(banner[F](c))
-      _  <- Applicative[Resource[F, *]].unlessA(skipMigration)(Resource.eval(migrateDatabase[F](c.database)))
+      _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
+      _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
       ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Logger: Console](skipMigration: Boolean): F[ExitCode] =
-    server(skipMigration).use(_ => Concurrent[F].never[ExitCode])
+  def runF[F[_]: Async: Logger: Console](
+    reset:         Arg.ResetDatabase,
+    skipMigration: Arg.SkipMigration
+  ): F[ExitCode] =
+    server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
 
   /** Our actual entry point. */
   def run(args: List[String]): IO[ExitCode] = {
     implicit val log: SelfAwareStructuredLogger[IO] =
       Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
 
-    val skipMigration = args.contains("-skip-migration")
+    val reset         = Arg.ResetDatabase(args)
+    val skipMigration = Arg.SkipMigration(args)
 
     for {
-      _ <- IO.whenA(skipMigration)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-      e <- runF[IO](skipMigration)
+      _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
+      _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
+      e <- runF[IO](reset, skipMigration)
     } yield e
   }
 

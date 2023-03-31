@@ -113,7 +113,6 @@ lazy val service = project
       "org.typelevel"  %% "paiges-core"                     % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
-    reStart / envVars += "PORT" -> "8082",
-//    reStartArgs       += "-skip-migration"
+    reStart / envVars += "PORT" -> "8082"
   )
 
