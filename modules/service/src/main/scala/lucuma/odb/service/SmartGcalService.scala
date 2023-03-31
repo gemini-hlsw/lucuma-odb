@@ -157,8 +157,8 @@ object SmartGcalService {
           ).void
 
         for {
-          _ <- insertInstRow
           _ <- insertGcalRow
+          _ <- insertInstRow
         } yield ()
 
       override def insertGmosSouth(
@@ -190,8 +190,8 @@ object SmartGcalService {
           ).void
 
         for {
-          _ <- insertInstRow
           _ <- insertGcalRow
+          _ <- insertInstRow
         } yield ()
     }
 
