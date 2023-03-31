@@ -2678,6 +2678,21 @@ type AsterismGroupSelectResult {
   hasMore: Boolean!
 }
 
+# AttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`
+scalar AttachmentId
+
+# Program Attachment
+type Attachment {
+  id:             AttachmentId!
+  attachmentType: AttachmentType!
+  fileName:       NonEmptyString!
+  description:    NonEmptyString
+  checked:        Boolean!
+  fileSize:       Long!
+  updatedAt:      Timestamp!
+  program:        Program!
+}
+
 # Metadata for `enum AttachmentType`
 type AttachmentTypeMeta {
   tag:        AttachmentType!
@@ -4499,6 +4514,9 @@ type Program {
     # Limits the result to at most this number of matches (but never more than 1000).
     LIMIT: NonNegInt
   ): ObservationSelectResult!
+
+  # Attachments assocated with the program
+  attachments: [Attachment!]!
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!

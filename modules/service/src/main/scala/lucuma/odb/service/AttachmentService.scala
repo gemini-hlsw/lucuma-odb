@@ -185,7 +185,7 @@ object AttachmentService {
     ): F[NonEmptyString] =
       Trace[F].span("getAttachmentFileNameFromDB") {
         val af   = Statements.getAttachmentFileName(user, programId, attachmentId)
-        val stmt = af.fragment.query(varchar)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -193,14 +193,7 @@ object AttachmentService {
             pg.option(af.argument)
               .flatMap {
                 case None    => Async[F].raiseError(AttachmentException.FileNotFound)
-                case Some(s) =>
-                  // should be non empty because of a database check
-                  NonEmptyString
-                    .from(s)
-                    .toOption
-                    .fold(
-                      Async[F].raiseError(AttachmentException.InvalidName("File name is missing"))
-                    )(Async[F].pure)
+                case Some(s) => Async[F].pure(s)
               }
           )
       }
@@ -212,7 +205,7 @@ object AttachmentService {
     ): F[NonEmptyString] =
       Trace[F].span("deleteAttachmentFromDB") {
         val af   = Statements.deleteAttachment(user, programId, attachmentId)
-        val stmt = af.fragment.query(varchar)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -220,14 +213,7 @@ object AttachmentService {
             pg.option(af.argument)
               .flatMap {
                 case None    => Async[F].raiseError(AttachmentException.FileNotFound)
-                case Some(s) =>
-                  // should be non empty because of a database check
-                  NonEmptyString
-                    .from(s)
-                    .toOption
-                    .fold(
-                      Async[F].raiseError(AttachmentException.InvalidName("File name is missing"))
-                    )(Async[F].pure)
+                case Some(s) => Async[F].pure(s)
               }
           )
       }

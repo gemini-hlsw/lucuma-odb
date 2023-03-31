@@ -21,7 +21,7 @@ create table t_attachment (
   c_program_id        d_program_id      not null    references t_program(c_program_id),
   c_attachment_id     d_attachment_id   primary key default 'a-' || to_hex(nextval('s_attachment_id')),
   c_attachment_type   d_tag             not null    references t_attachment_type(c_tag),
-  c_file_name         varchar           not null    check(length(c_file_name) > 0),
+  c_file_name         text              not null    check(length(c_file_name) > 0),
   c_description       text              check (c_description is null or length(c_description) > 0),
   c_checked           boolean           not null    default false,
   c_file_size         bigint            not null,

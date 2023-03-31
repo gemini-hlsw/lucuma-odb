@@ -110,6 +110,7 @@ object OdbMapping {
           with AngleMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
+          with AttachmentMapping[F]
           with AttachmentTypeMetaMapping[F]
           with CatalogInfoMapping[F]
           with CloneObservationResultMapping[F]
@@ -278,6 +279,7 @@ object OdbMapping {
               AngleMapping,
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
+              AttachmentMapping,
               AttachmentTypeMetaMapping,
               CatalogInfoMapping,
               CloneObservationResultMapping,
