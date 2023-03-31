@@ -16,8 +16,8 @@
 # quick update to R400 IFU-R to support queue,,,,,,,,,,,,,,,,,,
 # update for S18B-Q-208  using R831 1.0arcsec 2x2 (GG 20190416),,,,,,,,,,,,,,,,,,
 # update for  R400 0.25arcsec 2x2 (GG 20190628),,,,,,,,,,,,,,,,,,
-"# update for  R831 IFU-2+z+CaT 8sec->5sec, and  2sec -> 1sec for R400, 785 2"" slit 1x2 (GG 20210720)",,,,,,,,,,,,,,,,,,
-"# update for  R150  720nm  1"" slit 4x2 (GG 20220126) ND = ND4.0",,,,,,,,,,,,,,,,,,
+# update for  R831 IFU-2+z+CaT 8sec->5sec, and  2sec -> 1sec for R400, 785 2"" slit 1x2 (GG 20210720)",,,,,,,,,,,,,,,,,,
+# update for  R150  720nm  1"" slit 4x2 (GG 20220126) ND = ND4.0",,,,,,,,,,,,,,,,,,
 # this is a copy of GMOS-N flat version 240, starting point for Hamamatsu CCDs,,,,,,,,,,,,,,,,,
 # Site dependent instrument specifications removed.,,,,,,,,,,,,,,,,,,
 #,,,,,,,,,,,,,,,,,,
@@ -294,7 +294,7 @@ $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,2,1,850 - 1200,1,Low,,,,1,ND2.0,Visible,Qua
 $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,1,2,400 - 450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,10,1,Night
 $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,1,2,450 - 625,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,5,1,Night
 $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,1,2,625 - 850,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
-$R400.*,$.*one|.*G.*,$.* 0.75 arcsec,1,2*,850 - 1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,9,1,Night
+$R400.*,$.*one|.*G.*,$.* 0.75 arcsec,1,2,850 - 1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,9,1,Night
 $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,2,2,400 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
 $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,1,4,400 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
 $R400.*,$.*one|.*G.*,$.* 0.75 arcsec,4,1,400 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
