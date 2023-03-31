@@ -6,14 +6,14 @@ package db.migration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import eu.timepit.refined.types.numeric.PosLong
-import lucuma.core.enums.Instrument.GmosNorth
-import lucuma.core.enums.Instrument.GmosSouth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.Instrument.GmosNorth
+import lucuma.core.enums.Instrument.GmosSouth
 import lucuma.odb.smartgcal.FileReader
 import lucuma.odb.smartgcal.data.Gmos.FileEntry
 import lucuma.odb.smartgcal.data.Gmos.TableKey
