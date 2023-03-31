@@ -39,9 +39,9 @@ import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
+import lucuma.core.model.Attachment
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -62,6 +62,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
+      LeafMapping[Attachment.Id](AttachmentIdType),
       LeafMapping[Tag](AttachmentTypeType),
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CatalogName](CatalogNameType),

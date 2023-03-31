@@ -84,6 +84,9 @@ trait Codecs {
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
+  val attachment_id: Codec[Attachment.Id] =
+    gid[Attachment.Id]
+
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
@@ -251,9 +254,6 @@ trait Codecs {
       pm => Wavelength.intPicometers.getOption(pm).toRight(s"Invalid wavelength, must be positive pm: $pm"))(
       Wavelength.intPicometers.reverseGet
     )
-
-  val attachment_id: Codec[Attachment.Id] =
-    gid[Attachment.Id]
 
   // Not so atomic ...
 

@@ -19,6 +19,8 @@ trait BaseMapping[F[_]]
   lazy val AsterismGroupType                   = schema.ref("AsterismGroup")
   lazy val AsterismGroupSelectResultType       = schema.ref("AsterismGroupSelectResult")
   lazy val AngleType                           = schema.ref("Angle")
+  lazy val AttachmentIdType                    = schema.ref("AttachmentId")
+  lazy val AttachmentType                      = schema.ref("Attachment")
   lazy val AttachmentTypeMetaType              = schema.ref("AttachmentTypeMeta")
   lazy val AttachmentTypeType                  = schema.ref("AttachmentType")
   lazy val BigDecimalType                      = schema.ref("BigDecimal")
