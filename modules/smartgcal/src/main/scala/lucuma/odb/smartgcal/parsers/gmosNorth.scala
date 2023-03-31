@@ -19,7 +19,7 @@ import lucuma.odb.smartgcal.data.Gmos.FileKey
 
 import scala.collection.immutable.ListMap
 
-trait GmosNorthParsers {
+trait GmosNorthParsers extends GmosCommonParsers {
   import common.*
   import util.*
 
@@ -79,18 +79,6 @@ trait GmosNorthParsers {
 
   val grating: Parser[NonEmptyList[Option[GmosNorthGrating]]] =
     manyOfOptionEnumerated[GmosNorthGrating]("Mirror").withContext("GMOS North grating")
-
-  val xBinning: Parser[GmosXBinning] =
-    oneOf(GmosXBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
-
-  val yBinning: Parser[GmosYBinning] =
-    oneOf(GmosYBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
-
-  val order: Parser[NonEmptyList[GmosGratingOrder]] =
-    manyOf(GmosGratingOrder.all.fproductLeft(_.count.toString)*).withContext("GMOS grating order")
-
-  val gain: Parser[NonEmptyList[GmosAmpGain]] =
-    manyOfEnumerated[GmosAmpGain].withContext("GMOS amp gain")
 
   val fileKey: Parser[FileKey.North] =
     (
