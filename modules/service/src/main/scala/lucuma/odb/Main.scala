@@ -159,13 +159,13 @@ object Main extends IOApp {
         password = config.password.some
       )
 
-    val drop   = sql"""DROP DATABASE "#${config.database}""""(Void)
-    val create = sql"""CREATE DATABASE "#${config.database}""""(Void)
+    val drop   = sql"""DROP DATABASE "#${config.database}"""".command
+    val create = sql"""CREATE DATABASE "#${config.database}"""".command
 
     session.use { s =>
       for {
-        _ <- s.prepare(drop.fragment.command).flatMap(_.execute(drop.argument)).void
-        _ <- s.prepare(create.fragment.command).flatMap(_.execute(create.argument)).void
+        _ <- s.execute(drop).void
+        _ <- s.execute(create).void
       } yield()
     }
 
