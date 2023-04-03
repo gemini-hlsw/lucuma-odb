@@ -36,6 +36,27 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
+  def createGmosSouthLongSlitObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tids: Target.Id*
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids.toList,
+      """
+        gmosSouthLongSlit: {
+          grating: R600_G5324,
+          filter: R_PRIME,
+          fpu: LONG_SLIT_0_50,
+          centralWavelength: {
+            nanometers: 500
+          }
+        }
+      """
+    )
+
   def createObservationWithModeAs(
     user: User,
     pid:  Program.Id,

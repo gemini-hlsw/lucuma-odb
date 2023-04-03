@@ -1,3 +1,4 @@
+val catsParseVersion           = "0.3.9"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.5"
 val cirisVersion               = "3.1.0"
@@ -5,6 +6,7 @@ val clueVersion                = "0.25.1"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.16.1"
+val fs2Version                 = "3.6.1"
 val grackleVersion             = "0.10.3"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.18"
@@ -61,9 +63,25 @@ lazy val sequence = project
     )
   )
 
+lazy val smartgcal = project
+  .in(file("modules/smartgcal"))
+  .settings(
+    name := "lucuma-odb-smartgcal",
+    libraryDependencies ++= Seq(
+      "org.typelevel"  %% "cats-parse"                      % catsParseVersion,
+      "co.fs2"         %% "fs2-core"                        % fs2Version,
+      "co.fs2"         %% "fs2-io"                          % fs2Version,
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+      "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
+      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
+    )
+  )
+
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(sequence % "compile->test")
+  .dependsOn(sequence % "compile->test", smartgcal % "compile->test")
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
@@ -95,7 +113,6 @@ lazy val service = project
       "org.typelevel"  %% "paiges-core"                     % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
-    reStart / envVars += "PORT" -> "8082",
-    reStartArgs       += "-skip-migration"
+    reStart / envVars += "PORT" -> "8082"
   )
 
