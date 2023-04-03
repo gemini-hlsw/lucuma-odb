@@ -24,6 +24,7 @@ import lucuma.itc.client.ItcResult
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecution
+import lucuma.odb.sequence.data.ProtoSequence
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
@@ -70,8 +71,8 @@ sealed abstract class Generator[S, D, G, F, U](
       .when(itc.exposures.value > 0)(
         ProtoExecution(
           static,
-          NonEmptyList.one(ProtoAtom.of(acq.ccd2, acq.p10, acq.slit)),
-          NonEmptyList.of(
+          ProtoSequence.one(ProtoAtom.of(acq.ccd2, acq.p10, acq.slit)),
+          ProtoSequence.of(
             ProtoAtom(sci.head.steps),
             sci.tail.take(itc.exposures.value - 1).toList.map(a => ProtoAtom(a.steps))*
           )
