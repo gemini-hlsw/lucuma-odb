@@ -9,6 +9,7 @@ import cats.Applicative
 import cats.ApplicativeError
 import cats.Monoid
 import cats.data.EitherNel
+import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.ValidatedNel
 import cats.effect.std.Supervisor
@@ -46,8 +47,8 @@ import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
 import lucuma.odb.json.all.query.given
-import lucuma.odb.sequence.Generator
-import lucuma.odb.sequence.Itc
+import lucuma.odb.logic.Generator
+import lucuma.odb.logic.Itc
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
@@ -56,6 +57,7 @@ import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
@@ -196,39 +198,12 @@ object OdbMapping {
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
 
-          override val generatorParamsService: Resource[F, GeneratorParamsService[F]] =
+          val itc: Resource[F, Itc[F]] =
             pool.map { s =>
               val oms = ObservingModeServices.fromSession(s)
-              GeneratorParamsService.fromSession(s, user, oms)
+              val gps = GeneratorParamsService.fromSession(s, user, oms)
+              Itc.fromClientAndServices(itcClient, gps)
             }
-
-          private def withGeneratorParams(
-            pid: Program.Id,
-            oid: Observation.Id
-          )(
-            f:   GeneratorParams => F[Result[Json]]
-          ): F[Result[Json]] = {
-            def formatMissing(missing: NonEmptyList[GeneratorParamsService.MissingData]): String = {
-              val params = missing.map { m =>
-                s"${m.targetId.fold(""){tid => s"(target $tid) "}}${m.paramName}"
-              }.intercalate(", ")
-              s"ITC cannot be queried until the following parameters are defined: $params"
-            }
-
-            generatorParamsService.use(
-              _.select(pid, oid)
-               .flatMap {
-                 case None                => Result(Json.Null).pure[F]
-                 case Some(Left(missing)) => Result.failure(formatMissing(missing)).pure[F]
-                 case Some(Right(params)) => f(params)
-               }
-            )
-          }
-
-          private def formatItcErrors(
-            errors: NonEmptyList[Itc.Error]
-          ): String =
-            errors.map { e => s"(Target ${e.targetId}) ${e.message}" }.intercalate(", ")
 
           override def itcQuery(
             path:     Path,
@@ -236,11 +211,20 @@ object OdbMapping {
             oid:      Observation.Id,
             useCache: Boolean
           ): F[Result[Json]] =
-            withGeneratorParams(pid, oid) { params =>
-              Itc.fromClient(itcClient).lookup(params, useCache).map {
-                case Left(errors)     => Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
-                case Right(resultSet) => Result(resultSet.asJson)
-              }
+            itc.use {
+              _.lookup(pid, oid, useCache)
+               .map {
+                 case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
+                 case Right(resultSet) => Result(resultSet.asJson)
+               }
+            }
+
+          val generator: Resource[F, Generator[F]] =
+            pool.map { s =>
+              val oms = ObservingModeServices.fromSession(s)
+              val gps = GeneratorParamsService.fromSession(s, user, oms)
+              val sgc = SmartGcalService.fromSession(s)
+              Generator.fromClientAndServices(commitHash, itcClient, gps, sgc)
             }
 
           override def sequence(
@@ -249,24 +233,25 @@ object OdbMapping {
             oid:      Observation.Id,
             useCache: Boolean
           ): F[Result[Json]] =
-            withGeneratorParams(pid, oid) { params =>
-              import Generator.Result.*
-              Generator.fromClient(commitHash, itcClient).generate(oid, params, useCache).map {
-                case ItcServiceError(errors) =>
-                  Result.failure(s"ITC service errors: ${formatItcErrors(errors)}")
+            generator.use {
+              _.generate(pid, oid, useCache)
+               .map {
+                 case Generator.Result.ObservationNotFound(_, _) =>
+                   Result(Json.Null)
 
-                case InvalidData(msg)        =>
-                  Result.failure(s"The sequence could not be generated: $msg")
+                 case e: Generator.Error                         =>
+                   Result.failure(e.format)
 
-                case Success(_, itc, exec)   =>
-                  Result(Json.obj(
-                    "programId"       -> pid.asJson,
-                    "observationId"   -> oid.asJson,
-                    "itcResult"       -> itc.asJson,
-                    "executionConfig" -> exec.asJson
-                  ))
-              }
+                 case Generator.Result.Success(_, itc, exec)     =>
+                   Result(Json.obj(
+                     "programId"       -> pid.asJson,
+                     "observationId"   -> oid.asJson,
+                     "itcResult"       -> itc.asJson,
+                     "executionConfig" -> exec.asJson
+                   ))
+               }
             }
+
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =

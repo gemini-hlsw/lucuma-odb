@@ -56,6 +56,7 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import skunk.Session
 
 import java.time.Duration
 import scala.concurrent.duration.*
@@ -78,7 +79,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val it = Iterator.from(1)
 
   /** Generate a new id, impurely. */
-  def nextId = it.next().toLong
+  def nextId: Long = it.next().toLong
 
   val jlogger: slf4j.Logger =
     slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
@@ -231,6 +232,27 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val All: List[ClientOption] = List(Http, Ws)
   }
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    dbInitialization.foreach { init =>
+      Main
+        .databasePoolResource[IO](databaseConfig)
+        .flatten
+        .use(init)
+        .unsafeRunSync()
+    }
+  }
+
+  /**
+   * Perform any database initialization required by the test suite.
+   *
+   * @return database initialization function wrapped in an Option; None if
+   *         there is no required initialization
+   */
+  def dbInitialization: Option[Session[IO] => IO[Unit]] =
+    None
 
   def expect(
     user:      User,

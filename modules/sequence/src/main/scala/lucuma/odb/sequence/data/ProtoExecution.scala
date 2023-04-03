@@ -9,8 +9,8 @@ import monocle.Lens
 
 final case class ProtoExecution[S, D](
   static:      S,
-  acquisition: NonEmptyList[ProtoAtom[D]],
-  science:     NonEmptyList[ProtoAtom[D]]
+  acquisition: ProtoSequence[D],
+  science:     ProtoSequence[D]
 )
 
 object ProtoExecution {
@@ -18,10 +18,10 @@ object ProtoExecution {
   def static[S, D]: Lens[ProtoExecution[S, D], S] =
     Focus[ProtoExecution[S, D]](_.static)
 
-  def acquisition[S, D]: Lens[ProtoExecution[S, D], NonEmptyList[ProtoAtom[D]]] =
+  def acquisition[S, D]: Lens[ProtoExecution[S, D], ProtoSequence[D]] =
     Focus[ProtoExecution[S, D]](_.acquisition)
 
-  def science[S, D]: Lens[ProtoExecution[S, D], NonEmptyList[ProtoAtom[D]]] =
+  def science[S, D]: Lens[ProtoExecution[S, D], ProtoSequence[D]] =
     Focus[ProtoExecution[S, D]](_.science)
 
 }
