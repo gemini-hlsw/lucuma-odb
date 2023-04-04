@@ -9,6 +9,7 @@ import cats.effect._
 import cats.effect.std.Console
 import cats.implicits._
 import com.comcast.ip4s.Port
+import com.monovore.decline._
 import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
@@ -213,13 +214,13 @@ object Main extends IOApp {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
-  object Arg {
+  object Args {
     opaque type ResetDatabase = Boolean
 
     object ResetDatabase {
 
-      def apply(args: List[String]): ResetDatabase =
-        args.contains("-reset")
+      val opt: Opts[ResetDatabase] =
+        Opts.flag("reset", help = "Drop and recreate the database before starting.").orFalse
 
       extension (rd: ResetDatabase) {
         def toBoolean: Boolean =
@@ -235,8 +236,8 @@ object Main extends IOApp {
 
     object SkipMigration {
 
-      def apply(args: List[String]): SkipMigration =
-        args.contains("-skip-migration")
+      val opt: Opts[SkipMigration] =
+        Opts.flag("skip-migration", help = "Skip database migration on startup.").orFalse
 
       extension (sm: SkipMigration) {
         def toBoolean: Boolean =
@@ -247,6 +248,21 @@ object Main extends IOApp {
       }
     }
 
+    /** Prints a help message and produces a corresponding ExitCode. */
+    def printHelp(h: Help): IO[ExitCode] = {
+      val code = if (h.errors.isEmpty) ExitCode.Success else ExitCode.Error
+      IO.println(h.toString).as(code)
+    }
+
+    def parse(args: List[String]): Either[Help, (ResetDatabase, SkipMigration)] =
+      // Decline really seems to want you to have a `Command` but I have no
+      // natural values for the "name" or "header". I just want to parse the args
+      // but the parser is private.
+      Command("", "")((ResetDatabase.opt, SkipMigration.opt).tupled).parse(args)
+
+    def exec(args: List[String])(f: (ResetDatabase, SkipMigration) => IO[ExitCode]): IO[ExitCode] =
+      parse(args).fold(printHelp, f.tupled)
+
   }
 
   /**
@@ -254,8 +270,8 @@ object Main extends IOApp {
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
   def server[F[_]: Async: Logger: Console](
-    reset:         Arg.ResetDatabase,
-    skipMigration: Arg.SkipMigration
+    reset:         Args.ResetDatabase,
+    skipMigration: Args.SkipMigration
   ): Resource[F, ExitCode] =
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
@@ -269,24 +285,25 @@ object Main extends IOApp {
 
   /** Our logical entry point. */
   def runF[F[_]: Async: Logger: Console](
-    reset:         Arg.ResetDatabase,
-    skipMigration: Arg.SkipMigration
+    reset:         Args.ResetDatabase,
+    skipMigration: Args.SkipMigration
   ): F[ExitCode] =
     server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
+
 
   /** Our actual entry point. */
   def run(args: List[String]): IO[ExitCode] = {
     implicit val log: SelfAwareStructuredLogger[IO] =
       Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
 
-    val reset         = Arg.ResetDatabase(args)
-    val skipMigration = Arg.SkipMigration(args)
+    Args.exec(args) { (reset, skipMigration) =>
+      for {
+        _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
+        _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
+        e <- runF[IO](reset, skipMigration)
+      } yield e
+    }
 
-    for {
-      _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
-      _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-      e <- runF[IO](reset, skipMigration)
-    } yield e
   }
 
 }
