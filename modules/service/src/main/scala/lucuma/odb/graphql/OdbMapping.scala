@@ -38,6 +38,7 @@ import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
+import lucuma.odb.graphql.enums.AttachmentTypeEnumType
 import lucuma.odb.graphql.enums.FilterTypeEnumType
 import lucuma.odb.graphql.enums.PartnerEnumType
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
@@ -111,6 +112,8 @@ object OdbMapping {
           with AngleMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
+          with AttachmentMapping[F]
+          with AttachmentTypeMetaMapping[F]
           with CatalogInfoMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
@@ -261,6 +264,8 @@ object OdbMapping {
               AngleMapping,
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
+              AttachmentMapping,
+              AttachmentTypeMetaMapping,
               CatalogInfoMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
@@ -356,7 +361,7 @@ object OdbMapping {
     }
 
   def enumSchema[F[_]: Applicative](s: Session[F]): F[Schema] =
-    List(FilterTypeEnumType.fetch(s), PartnerEnumType.fetch(s)).sequence.map { tpes =>
+    List(FilterTypeEnumType.fetch(s), PartnerEnumType.fetch(s), AttachmentTypeEnumType.fetch(s)).sequence.map { tpes =>
       new Schema {
         def pos: SourcePos = SourcePos.instance
         def types: List[NamedType] = tpes

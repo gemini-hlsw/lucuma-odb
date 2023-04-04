@@ -7,7 +7,13 @@ import cats.Show
 import cats.effect._
 import cats.syntax.all._
 import ciris._
+import ciris.refined._
 import com.comcast.ip4s.Port
+import eu.timepit.refined.cats._
+import eu.timepit.refined.types.string.NonEmptyString
+import fs2.aws.s3.models.Models.BucketName
+import fs2.aws.s3.models.Models.FileKey
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.sequence.util.CommitHash
@@ -33,6 +39,7 @@ case class Config(
   serviceJwt: String,           // Only service users can exchange API keys, so we need a service user JWT.
   honeycomb:  Config.Honeycomb, // Honeycomb config
   database:   Config.Database,  // Database config
+  aws:        Config.Aws,       // AWS config
   domain:     String,           // Domain, for CORS headers
   commitHash: CommitHash        // From Heroku Dyno Metadata
 ) {
@@ -76,7 +83,7 @@ object Config {
 
   object Sso {
 
-    val fromCiris: ConfigValue[Effect, Sso] = (
+    lazy val fromCiris: ConfigValue[Effect, Sso] = (
       envOrProp("ODB_SSO_ROOT").as[Uri],
       envOrProp("ODB_SSO_PUBLIC_KEY").as[PublicKey]
     ).parMapN(Sso.apply)
@@ -90,7 +97,7 @@ object Config {
 
   object Honeycomb {
 
-    val fromCiris: ConfigValue[Effect, Honeycomb] = (
+    lazy val fromCiris: ConfigValue[Effect, Honeycomb] = (
       envOrProp("ODB_HONEYCOMB_WRITE_KEY"),
       envOrProp("ODB_HONEYCOMB_DATASET")
     ).parMapN(Honeycomb.apply)
@@ -141,6 +148,49 @@ object Config {
 
   }
 
+  case class Aws(
+    accessKey:       NonEmptyString,
+    secretKey:       NonEmptyString,
+    basePath:        NonEmptyString,
+    bucketName:      BucketName,
+    fileUploadMaxMb: Int 
+  ) {
+    def fileKey(programId: Program.Id, fileName: NonEmptyString): FileKey = 
+      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/$fileName"))
+  }
+
+  object Aws {
+    private implicit val showPath: Show[Uri.Path] = Show.fromToString
+
+    private implicit val uriPath: ConfigDecoder[Uri, Uri.Path] = 
+      ConfigDecoder[Uri].mapOption("Path")(_.path.some)
+      
+    // The basePath must be nonEmpty
+    private implicit val pathNES: ConfigDecoder[Uri.Path, NonEmptyString] =
+      ConfigDecoder[Uri.Path].mapOption("NonEmptyPath"){ p =>
+        val str = p.segments.map(_.encoded).mkString("/")
+        NonEmptyString.from(str).toOption
+      }
+
+    private implicit val bucketName: ConfigDecoder[Uri, BucketName] = 
+      ConfigDecoder[Uri].mapOption("BucketName"){ uri => 
+        uri.host.flatMap{ h => 
+          h.value.split("\\.").headOption
+         }.flatMap { b =>
+          NonEmptyString.from(b).toOption
+          .map(BucketName.apply) 
+        } 
+      }
+
+    lazy val fromCiris: ConfigValue[Effect, Aws] = (
+      envOrProp("CLOUDCUBE_ACCESS_KEY_ID").as[NonEmptyString],
+      envOrProp("CLOUDCUBE_SECRET_ACCESS_KEY").as[NonEmptyString].redacted,
+      envOrProp("CLOUDCUBE_URL").as[Uri].as[Uri.Path].as[NonEmptyString],
+      envOrProp("CLOUDCUBE_URL").as[Uri].as[BucketName],
+      envOrProp("FILE_UPLOAD_MAX_MB").as[Int]
+    ).parMapN(Aws.apply)
+  }
+
   private implicit val publicKey: ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key") { s =>
       GpgPublicKeyReader.publicKey(s).toOption
@@ -160,13 +210,14 @@ object Config {
   private def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name) or prop(name)
 
-  val fromCiris: ConfigValue[Effect, Config] = (
+  lazy val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     envOrProp("ODB_ITC_ROOT").as[Uri],
     Sso.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
     Honeycomb.fromCiris,
     Database.fromCiris,
+    Aws.fromCiris,
     envOrProp("ODB_DOMAIN"),
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
   ).parMapN(Config.apply)

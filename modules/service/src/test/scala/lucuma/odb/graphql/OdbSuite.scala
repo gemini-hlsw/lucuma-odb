@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql
 
-import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
@@ -20,10 +19,12 @@ import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.literal.*
+import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
@@ -37,7 +38,7 @@ import lucuma.odb.Config
 import lucuma.odb.Main
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.sso.client.SsoClient
+import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
@@ -53,7 +54,6 @@ import org.slf4j
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.utility.DockerImageName
-import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
@@ -65,7 +65,7 @@ import scala.concurrent.duration.*
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
@@ -100,13 +100,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test")
 
-  def validUsers: List[User]
-
-  val Bearer: AuthScheme = CIString("Bearer")
-
-  def authorization(jwt: String): Authorization =
-    Authorization(Credentials.Token(Bearer, jwt))
-
   val FakeItcVersions: ItcVersions =
     ItcVersions("foo", "bar".some)
 
@@ -130,17 +123,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  private def ssoClient: SsoClient[IO, User] =
-    new SsoClient.AbstractSsoClient[IO, User] {
-      def find(req: Request[IO]): IO[Option[User]] = OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
-      def get(authorization: Authorization): IO[Option[User]] =
-        authorization match {
-          case Authorization(Credentials.Token(Bearer, s)) =>
-            Gid[User.Id].fromString.getOption(s).flatMap(id => validUsers.find(_.id === id)).pure[IO]
-          case _ => none.pure[IO]
-        }
-    }
-
   private def databaseConfig: Config.Database =
     Config.Database(
       host     = container.containerIpAddress,
@@ -150,13 +132,29 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       database = container.databaseName,
     )
 
+  // overriden in OdbSuiteWithS3 for tests that need it.
+  protected def awsConfig: Config.Aws = 
+    Config.Aws(
+      accessKey       = "accessKey".refined,
+      secretKey       = "secretkey".refined,
+      basePath        = "basePath".refined,
+      bucketName      = fs2.aws.s3.models.Models.BucketName("bucketName".refined),
+      fileUploadMaxMb = 5
+    )
+
+  // overriden in OdbSuiteWithS3 for tests that need it.
+  protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
+    Main.s3ClientOpsResource(awsConfig)
+
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Main.routesResource(
       databaseConfig,
+      awsConfig,
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
-      "unused"
+      "unused",
+      s3ClientOpsResource
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -170,7 +168,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map <- Resource.eval(OdbMapping(db, mon, usr, top, itc, CommitHash.Zero))
     } yield map
 
-  private def server: Resource[IO, Server] =
+  protected def server: Resource[IO, Server] =
     // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
     httpApp.flatMap { app =>
       BlazeServerBuilder[IO]
@@ -243,6 +241,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .use(init)
         .unsafeRunSync()
     }
+
+    startS3
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    stopS3
   }
 
   /**
@@ -253,6 +258,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
    */
   def dbInitialization: Option[Session[IO] => IO[Unit]] =
     None
+
+  // Override in tests that need S3.
+  // For some reason, overriding beforeAll and afterAll in OdbSuiteWithS3 didn't work.
+  protected def startS3: Unit = ()
+  protected def stopS3: Unit = ()
 
   def expect(
     user:      User,

@@ -31,6 +31,7 @@ trait ProgramMapping[F[_]]
      with ProgramUserTable[F]
      with ProposalTable[F]
      with ObservationView[F]
+     with AttachmentTable[F]
      with Predicates[F]
      with ResultMapping[F] {
 
@@ -49,6 +50,7 @@ trait ProgramMapping[F[_]]
         SqlObject("plannedTime"),
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
+        SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId))
       ),
     )
 
