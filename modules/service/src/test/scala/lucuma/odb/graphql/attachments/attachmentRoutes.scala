@@ -16,7 +16,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentService
 import lucuma.odb.service.AttachmentService.AttachmentException
 import lucuma.refined.*
-import monocle.function.At
 import munit.CatsEffectSuite
 import natchez.Trace.Implicits.noop
 import org.http4s.*
@@ -27,9 +26,8 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
   val forbiddenUser    = TestUsers.guest(2)
   val fileNotFoundUser = TestUsers.Standard.pi(3, 30)
   val invalidFileUser  = TestUsers.Standard.pi(4, 30)
-  val invalidTypeUser  = TestUsers.Standard.pi(5, 30)
 
-  val validUsers = List(pi, forbiddenUser, fileNotFoundUser, invalidFileUser, invalidTypeUser)
+  val validUsers = List(pi, forbiddenUser, fileNotFoundUser, invalidFileUser)
 
   private def responseStream(s: String): Stream[IO, Byte] =
     Stream[IO, String](s).through(text.utf8.encode)
@@ -38,15 +36,13 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
   private val attachmentId    = Attachment.Id(5.refined)
   private val notFound        = "Not found".some
   private val invalidFileName = "File name must be right"
-  private val invalidType     = "Type not valid"
 
   // This isn't really what the errors depend on, but we're not testing the service.
   // Only the result matters.
   private def getError(user: User): Option[AttachmentException] =
     if (user === forbiddenUser) AttachmentException.Forbidden.some
     else if (user === fileNotFoundUser) AttachmentException.FileNotFound.some
-    else if (user === invalidFileUser) AttachmentException.InvalidName(invalidFileName).some
-    else if (user === invalidTypeUser) AttachmentException.InvalidType(invalidType).some
+    else if (user === invalidFileUser) AttachmentException.InvalidRequest(invalidFileName).some
     else none
 
   private val service: AttachmentService[IO] = new AttachmentService[IO] {
@@ -215,20 +211,12 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
     routes.run(request).assertResponse(Status.NotFound, none)
   }
 
-  test("GET returns BadRequest with message if service returns InvalidName") {
+  test("GET returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.GET,
                               uri = uri"attachment/p-1/a-1",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
-  }
-
-  test("GET returns BadRequest with message if service returns InvalidType") {
-    val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/p-1/a-1",
-                              headers = headers(invalidTypeUser)
-    )
-    routes.run(request).assertResponse(Status.BadRequest, invalidType.some)
   }
 
   test("POST returns Forbidden if service returns Forbidden") {
@@ -247,20 +235,12 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
     routes.run(request).assertResponse(Status.NotFound, none)
   }
 
-  test("POST returns BadRequest with message if service returns InvalidName") {
+  test("POST returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.POST,
                               uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
-  }
-
-  test("POST returns BadRequest with message if service returns InvalidType") {
-    val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
-                              headers = headers(invalidTypeUser)
-    )
-    routes.run(request).assertResponse(Status.BadRequest, invalidType.some)
   }
 
   test("DELETE returns Forbidden if service returns Forbidden") {
@@ -279,20 +259,12 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
     routes.run(request).assertResponse(Status.NotFound, none)
   }
 
-  test("DELETE returns BadRequest with message if service returns InvalidName") {
+  test("DELETE returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.DELETE,
                               uri = uri"attachment/p-1/a-1",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
-  }
-
-  test("DELETE returns BadRequest with message if service returns InvalidType") {
-    val request = Request[IO](method = Method.DELETE,
-                              uri = uri"attachment/p-1/a-1",
-                              headers = headers(invalidTypeUser)
-    )
-    routes.run(request).assertResponse(Status.BadRequest, invalidType.some)
   }
 
 }

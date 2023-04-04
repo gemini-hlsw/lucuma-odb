@@ -62,8 +62,7 @@ object AttachmentService {
   // maybe we can improve on the AWS error handling...
   object AttachmentException {
     case object Forbidden                   extends AttachmentException
-    case class InvalidName(message: String) extends AttachmentException
-    case class InvalidType(message: String) extends AttachmentException
+    case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                extends AttachmentException
   }
 
@@ -77,10 +76,10 @@ object AttachmentService {
       val fileName     = NonEmptyString.from(path.fileName.toString).toOption
 
       fileName.fold(
-        InvalidName("File name is required").asLeft
+        InvalidRequest("File name is required").asLeft
       )(fn =>
         if (path.names.length > 1) {
-          InvalidName("File name cannot include a path").asLeft
+          InvalidRequest("File name cannot include a path").asLeft
         } else FileName(fn).asRight
       )
     }
@@ -159,7 +158,7 @@ object AttachmentService {
         }
         .flatMap(isValid =>
           if (isValid) Async[F].unit
-          else Async[F].raiseError(AttachmentException.InvalidType(s"Invalid attachment type"))
+          else Async[F].raiseError(AttachmentException.InvalidRequest("Invalid attachment type"))
         )
     }
 
@@ -272,8 +271,6 @@ object AttachmentService {
 
                   for {
                     size   <- uploadRemoteFile(fileKey, data)
-                    body   <- data.through(fs2.text.utf8.decode).compile.string
-                    _      <- Async[F].delay(println(s"Body: $body"))
                     result <- insertOrUpdateAttachmentInDB(user, programId, attachmentType, fn, description, size)
                   } yield result
               )

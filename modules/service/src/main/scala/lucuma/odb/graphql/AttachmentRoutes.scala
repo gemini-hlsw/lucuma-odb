@@ -43,8 +43,7 @@ object AttachmentRoutes {
       def toResponse: F[Response[F]] = exc match {
         case AttachmentException.Forbidden        => Forbidden()
         case AttachmentException.FileNotFound     => NotFound()
-        case AttachmentException.InvalidName(msg) => BadRequest(msg)
-        case AttachmentException.InvalidType(msg) => BadRequest(msg)
+        case AttachmentException.InvalidRequest(msg) => BadRequest(msg)
       }
 
     given QueryParamDecoder[Tag] = QueryParamDecoder[String].map(s => Tag(s.toLowerCase))
