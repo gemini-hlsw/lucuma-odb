@@ -492,8 +492,11 @@ enum GcalContinuum {
   # GcalContinuum IrGreyBodyHigh
   IR_GREY_BODY_HIGH
 
-  # GcalContinuum QuartzHalogen
-  QUARTZ_HALOGEN
+  # GcalContinuum QuartzHalogen 5W
+  QUARTZ_HALOGEN5
+
+  # GcalContinuum QuartzHalogen 100W
+  QUARTZ_HALOGEN100
 }
 
 # GCAL diffuser

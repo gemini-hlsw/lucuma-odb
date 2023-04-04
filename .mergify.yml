@@ -40,3 +40,11 @@ pull_request_rules:
       add:
       - service
       remove: []
+- name: Label smartgcal PRs
+  conditions:
+  - files~=^modules/smartgcal/
+  actions:
+    label:
+      add:
+      - smartgcal
+      remove: []

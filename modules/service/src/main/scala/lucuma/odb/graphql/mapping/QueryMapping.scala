@@ -32,6 +32,7 @@ import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.SmartGcalService
 
 import scala.reflect.ClassTag
 
@@ -43,8 +44,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with PartnerMetaMapping[F]
    with ProgramMapping[F]
    with ObservationMapping[F] =>
-
-  def generatorParamsService: Resource[F, GeneratorParamsService[F]]
 
   def itcQuery(
     path:     Path,
