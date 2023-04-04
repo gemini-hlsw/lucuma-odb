@@ -51,3 +51,17 @@ update its schema table.
 * `-skip-migration` - Skips the database migration.  This assumes that the 
 database has been initialized already.  Usually this won't be necessary since
 flyway already skips migrations that have previously run. 
+
+## S3/Cloudcube
+We are using the Cloudcube heroku addon for accessing S3. In Heroku, the addon sets 
+the environment variables for us. However, when running locally these are what needs
+to be set. If you want to actually upload/download attachments, you can get the 
+real values from the staging app in Heroku. Otherwise, you can use these as 
+dummy values
+
+- CLOUDCUBE_ACCESS_KEY_ID = <Any string>
+- CLOUDCUBE_SECRET_ACCESS_KEY = <Any string>
+- CLOUDCUBE_URL = https://cube.wherever.com/lucuma-staging
+
+There is also a required environment variable that sets the maximum file upload size
+- FILE_UPLOAD_MAX_MB = 20
