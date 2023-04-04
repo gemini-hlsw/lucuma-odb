@@ -18,9 +18,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.Config
 import lucuma.refined.*
-import org.http4s.*
-import org.http4s.client.Client
-import org.http4s.client.JavaNetClientBuilder
 import org.testcontainers.containers.localstack.LocalStackContainer.Service
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3AsyncClient
@@ -91,51 +88,4 @@ abstract class OdbSuiteWithS3 extends OdbSuite {
         .void
     )
 
-  val client: Client[IO] = JavaNetClientBuilder[IO].create
-
-  def uploadAttachment(
-    user:           User,
-    programId:      Program.Id,
-    fileName:       String,
-    attachmentType: String,
-    content:        String
-  ): IO[Attachment.Id] =
-    server.use { svr =>
-      val uri =
-        (svr.baseUri / "attachment" / programId.toString)
-          .withQueryParam("fileName", fileName)
-          .withQueryParam("attachmentType", attachmentType)
-
-      val request = Request[IO](
-        method = Method.POST,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      ).withEntity(content)
-
-      client.expect[String](request).map(s => Attachment.Id.parse(s).get)
-    }
-
-  def getAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): IO[String] =
-    server.use { svr =>
-      var uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
-      var request = Request[IO](
-        method = Method.GET,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
-
-      client.expect[String](request)
-    }
-
-  def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): IO[Unit] =
-    server.use { svr =>
-      var uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
-      var request = Request[IO](
-        method = Method.DELETE,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
-
-      client.expect[String](request).void
-    }
 }
