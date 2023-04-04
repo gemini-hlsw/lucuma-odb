@@ -6,6 +6,7 @@ val clueVersion                = "0.25.1"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.16.1"
+val fs2AwsVersion              = "6.0.0"
 val fs2Version                 = "3.6.1"
 val grackleVersion             = "0.10.3"
 val http4sBlazeVersion         = "0.23.14"
@@ -14,7 +15,7 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.6"
 val log4catsVersion            = "2.5.0"
-val lucumaCoreVersion          = "0.71.0"
+val lucumaCoreVersion          = "0.71.1"
 val lucumaGraphQLRoutesVersion = "0.5.11"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -86,31 +87,36 @@ lazy val service = project
   .settings(
     name := "lucuma-odb-service",
     libraryDependencies ++= Seq(
-      "ch.qos.logback" %  "logback-classic"                 % logbackVersion,
-      "com.monovore"   %% "decline-effect"                  % declineVersion,
-      "com.monovore"   %% "decline"                         % declineVersion,
-      "edu.gemini"     %% "gsp-graphql-skunk"               % grackleVersion,
-      "edu.gemini"     %% "lucuma-graphql-routes-grackle"   % lucumaGraphQLRoutesVersion,
-      "edu.gemini"     %% "lucuma-sso-backend-client"       % lucumaSsoVersion,
-      "is.cir"         %% "ciris"                           % cirisVersion,
-      "org.flywaydb"   %  "flyway-core"                     % flywayVersion,
-      "org.http4s"     %% "http4s-jdk-http-client"          % http4sJdkHttpClientVersion,
-      "org.http4s"     %% "http4s-blaze-server"             % http4sBlazeVersion,
-      "org.http4s"     %% "http4s-ember-client"             % http4sEmberVersion,
-      "org.postgresql" %  "postgresql"                      % postgresVersion,
-      "org.tpolecat"   %% "natchez-honeycomb"               % natchezVersion,
-      "org.tpolecat"   %% "natchez-http4s"                  % natchezHttp4sVersion,
-      "org.tpolecat"   %% "natchez-log"                     % natchezVersion,
-      "org.tpolecat"   %% "skunk-core"                      % skunkVersion,
-      "com.dimafeng"   %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,
-      "com.dimafeng"   %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
-      "edu.gemini"     %% "clue-http4s"                     % clueVersion                % Test,
-      "org.scalameta"  %% "munit"                           % munitVersion               % Test,
-      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
-      "org.typelevel"  %% "cats-time"                       % catsTimeVersion,
-      "org.typelevel"  %% "log4cats-slf4j"                  % log4catsVersion,
-      "org.typelevel"  %% "munit-cats-effect-3"             % munitCatsEffectVersion     % Test,
-      "org.typelevel"  %% "paiges-core"                     % paigesVersion,
+      "ch.qos.logback" %  "logback-classic"                    % logbackVersion,
+      "com.monovore"   %% "decline-effect"                     % declineVersion,
+      "com.monovore"   %% "decline"                            % declineVersion,
+      "io.laserdisc"   %% "fs2-aws-s3"                         % fs2AwsVersion,
+      "edu.gemini"     %% "gsp-graphql-skunk"                  % grackleVersion,
+      "edu.gemini"     %% "lucuma-graphql-routes-grackle"      % lucumaGraphQLRoutesVersion,
+      "edu.gemini"     %% "lucuma-sso-backend-client"          % lucumaSsoVersion,
+      "is.cir"         %% "ciris"                              % cirisVersion,
+      "is.cir"         %% "ciris-refined"                      % cirisVersion,
+      "org.flywaydb"   %  "flyway-core"                        % flywayVersion,
+      "org.http4s"     %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion,
+      "org.http4s"     %% "http4s-blaze-server"                % http4sBlazeVersion,
+      "org.http4s"     %% "http4s-ember-client"                % http4sEmberVersion,
+      "org.postgresql" %  "postgresql"                         % postgresVersion,
+      "org.tpolecat"   %% "natchez-honeycomb"                  % natchezVersion,
+      "org.tpolecat"   %% "natchez-http4s"                     % natchezHttp4sVersion,
+      "org.tpolecat"   %% "natchez-log"                        % natchezVersion,
+      "org.tpolecat"   %% "skunk-core"                         % skunkVersion,
+      "com.dimafeng"   %% "testcontainers-scala-munit"         % testcontainersScalaVersion % Test,
+      "com.dimafeng"   %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
+      "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
+      // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.436"                 % Test,
+      "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
+      "org.scalameta"  %% "munit"                              % munitVersion               % Test,
+      "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
+      "org.typelevel"  %% "cats-time"                          % catsTimeVersion,
+      "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
+      "org.typelevel"  %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
+      "org.typelevel"  %% "paiges-core"                        % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
     ),
     reStart / envVars += "PORT" -> "8082"

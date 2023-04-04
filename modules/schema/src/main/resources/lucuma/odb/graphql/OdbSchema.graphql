@@ -2681,6 +2681,28 @@ type AsterismGroupSelectResult {
   hasMore: Boolean!
 }
 
+# AttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`
+scalar AttachmentId
+
+# Program Attachment
+type Attachment {
+  id:             AttachmentId!
+  attachmentType: AttachmentType!
+  fileName:       NonEmptyString!
+  description:    NonEmptyString
+  checked:        Boolean!
+  fileSize:       Long!
+  updatedAt:      Timestamp!
+  program:        Program!
+}
+
+# Metadata for `enum AttachmentType`
+type AttachmentTypeMeta {
+  tag:        AttachmentType!
+  shortName:  String!
+  longName:	  String!
+}
+
 # Brightness bands
 enum Band {
   # Band SloanU
@@ -4496,6 +4518,9 @@ type Program {
     LIMIT: NonNegInt
   ): ObservationSelectResult!
 
+  # Attachments assocated with the program
+  attachments: [Attachment!]!
+
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
 }
@@ -4628,6 +4653,9 @@ type Query {
     # Set to true to include deleted values
     includeDeleted: Boolean! = false
   ): AsterismGroupSelectResult!
+
+  # Metadata for `enum AttachmentType`
+  attachmentTypeMeta: [AttachmentTypeMeta!]!
 
   # Observations grouped by commonly held constraints
   constraintSetGroup(

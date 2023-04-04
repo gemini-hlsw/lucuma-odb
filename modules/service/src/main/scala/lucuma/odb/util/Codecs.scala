@@ -141,6 +141,9 @@ trait Codecs {
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
+  val attachment_id: Codec[Attachment.Id] =
+    gid[Attachment.Id]
+
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
