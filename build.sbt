@@ -26,7 +26,7 @@ val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
 val lucumaSsoVersion           = "0.5.4"
 val lucumaItcVersion           = "0.7.3"
-val testcontainersScalaVersion = "0.40.12"
+val testcontainersScalaVersion = "0.40.14"
 val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
