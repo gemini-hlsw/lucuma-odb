@@ -40,8 +40,14 @@ You can now run the app, and you can do `docker-compose stop`.  If you do
 
 ### Using reStart
 
-Alternatively, you can set up the database with `docker-compose up` and then run
-the app from within SBT with `service/reStart` (stopping with `service/reStop`).
-The build defines an argument which is passed to the application when run this
-way, asking it to skip the migration.  This will fail of course if starting
-with an empty database.
+Alternatively, you can run the app from within SBT with `service/reStart`
+(stopping with `service/reStop`).  By default, this command will fail after
+running `docker-compose` `down` and then `up` as described above.  You can
+supply optional arguments to simplify development though:
+
+* `-reset` - Drops then creates the database for you. Do this after cycling
+`docker-compose` `down`, `up` to give flyway a chance to run the migration and
+update its schema table. 
+* `-skip-migration` - Skips the database migration.  This assumes that the 
+database has been initialized already.  Usually this won't be necessary since
+flyway already skips migrations that have previously run. 

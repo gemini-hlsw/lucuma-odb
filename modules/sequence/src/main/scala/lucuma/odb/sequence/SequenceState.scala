@@ -9,10 +9,11 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.SmartGcalType.Flat
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.StepConfig.SmartGcal
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
@@ -63,17 +64,6 @@ trait SequenceState[D] {
    * Generates a GCAL flat based on the current instrument configuration.
    */
   def flatStep: State[D, ProtoStep[D]] =
-    step { d =>
-      ProtoStep(
-        d,
-        // TODO: SmartGcal.  This is a placeholder
-        Gcal(
-          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-          GcalFilter.Nd10,
-          GcalDiffuser.Ir,
-          GcalShutter.Open
-        )
-      )
-    }
+    step(ProtoStep(_, SmartGcal(Flat)))
 
 }

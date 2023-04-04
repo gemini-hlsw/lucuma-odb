@@ -56,6 +56,7 @@ import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.utility.DockerImageName
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import skunk.Session
 
 import java.time.Duration
 import scala.concurrent.duration.*
@@ -65,21 +66,6 @@ import scala.concurrent.duration.*
  * among all tests.
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
-
-  // The beforeAll and afterAll are necessary for tests that need S3 (from OdbSuiteWithS3).
-  // For some reason, overriding beforeAll and afterAll in OdbSuiteWithS3 didn't work.
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    startS3
-  }
-
-  override def afterAll(): Unit = {
-    super.afterAll()
-    stopS3
-  }
-
-  protected def startS3: Unit = ()
-  protected def stopS3: Unit = ()
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
@@ -93,7 +79,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val it = Iterator.from(1)
 
   /** Generate a new id, impurely. */
-  def nextId = it.next().toLong
+  def nextId: Long = it.next().toLong
 
   val jlogger: slf4j.Logger =
     slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
@@ -244,6 +230,39 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val All: List[ClientOption] = List(Http, Ws)
   }
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    dbInitialization.foreach { init =>
+      Main
+        .databasePoolResource[IO](databaseConfig)
+        .flatten
+        .use(init)
+        .unsafeRunSync()
+    }
+
+    startS3
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    stopS3
+  }
+
+  /**
+   * Perform any database initialization required by the test suite.
+   *
+   * @return database initialization function wrapped in an Option; None if
+   *         there is no required initialization
+   */
+  def dbInitialization: Option[Session[IO] => IO[Unit]] =
+    None
+
+  // Override in tests that need S3.
+  // For some reason, overriding beforeAll and afterAll in OdbSuiteWithS3 didn't work.
+  protected def startS3: Unit = ()
+  protected def stopS3: Unit = ()
 
   def expect(
     user:      User,
