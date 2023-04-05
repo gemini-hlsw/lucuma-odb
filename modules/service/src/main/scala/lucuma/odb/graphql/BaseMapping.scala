@@ -116,6 +116,7 @@ trait BaseMapping[F[_]]
   lazy val ScienceRequirementsType             = schema.ref("ScienceRequirements")
   lazy val SetAllocationResultType             = schema.ref("SetAllocationResult")
   lazy val SiderealType                        = schema.ref("Sidereal")
+  lazy val SignalToNoiseType                   = schema.ref("SignalToNoise")
   lazy val SkyBackgroundType                   = schema.ref("SkyBackground")
   lazy val SpectroscopyCapabilitiesType        = schema.ref("SpectroscopyCapabilities")
   lazy val SpectroscopyScienceRequirementsType = schema.ref("SpectroscopyScienceRequirements")

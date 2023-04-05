@@ -37,6 +37,7 @@ import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.SignalToNoise
 import lucuma.odb.json.angle.decoder.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.data.GeneratorParams
@@ -167,7 +168,7 @@ object GeneratorParamsService {
             tid ->
             SpectroscopyModeInput(
               wavelength,
-              s2n,
+              s2n.toPosBigDecimal,
               params.signalToNoiseAt,
               sp,
               b,
@@ -186,7 +187,7 @@ object GeneratorParamsService {
   final case class Params(
     observationId:   Observation.Id,
     constraints:     ConstraintSet,
-    signalToNoise:   Option[PosBigDecimal],
+    signalToNoise:   Option[SignalToNoise],
     signalToNoiseAt: Option[Wavelength],
     observingMode:   Option[ObservingModeType],
     targetId:        Option[Target.Id],
