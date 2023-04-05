@@ -802,7 +802,7 @@ class updateObservations extends OdbSuite
                     "nanometers": 400.000
                   },
                   "resolution": 10,
-                  "signalToNoise": 75.00,
+                  "signalToNoise": 75.000,
                   "signalToNoiseAt": {
                     "nanometers": 410.000
                   },

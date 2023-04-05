@@ -12,16 +12,18 @@ import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.SignalToNoise
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosBigDecimalBinding
 import lucuma.odb.graphql.binding.PosIntBinding
+import lucuma.odb.graphql.binding.SignalToNoiseBinding
 import lucuma.odb.graphql.binding.enumeratedBinding
 
 final case class SpectroscopyScienceRequirementsInput(
   wavelength:         Nullable[Wavelength],
   resolution:         Nullable[PosInt],
-  signalToNoise:      Nullable[PosBigDecimal],
+  signalToNoise:      Nullable[SignalToNoise],
   signalToNoiseAt:    Nullable[Wavelength],
   wavelengthCoverage: Nullable[Wavelength],
   focalPlane:         Nullable[FocalPlane],
@@ -54,7 +56,7 @@ object SpectroscopyScienceRequirementsInput {
       case List(
         WavelengthInput.Binding.Nullable("wavelength", rWavelength),
         PosIntBinding.Nullable("resolution", rResolution),
-        PosBigDecimalBinding.Nullable("signalToNoise", rSignalToNoise),
+        SignalToNoiseBinding.Nullable("signalToNoise", rSignalToNoise),
         WavelengthInput.Binding.Nullable("signalToNoiseAt", rSignalToNoiseAt),
         WavelengthInput.Binding.Nullable("wavelengthCoverage", rWavelengthCoverage),
         FocalPlaneBinding.Nullable("focalPlane", rFocalPlane),

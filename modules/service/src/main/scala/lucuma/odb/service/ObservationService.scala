@@ -56,6 +56,7 @@ import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.SignalToNoise
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
@@ -107,7 +108,7 @@ object ObservationService {
 
   final case class ItcParams(
     constraints:     ConstraintSet,
-    signalToNoise:   PosBigDecimal,
+    signalToNoise:   SignalToNoise,
     signalToNoiseAt: Option[Wavelength],
     observingMode:   ObservingModeType
   )
@@ -453,7 +454,7 @@ object ObservationService {
       ScienceMode                      ~
       Option[Wavelength]               ~
       Option[PosInt]                   ~
-      Option[PosBigDecimal]            ~
+      Option[SignalToNoise]            ~
       Option[Wavelength]               ~
       Option[Wavelength]               ~
       Option[FocalPlane]               ~

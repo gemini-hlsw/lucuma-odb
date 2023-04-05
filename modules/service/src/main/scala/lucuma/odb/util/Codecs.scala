@@ -54,6 +54,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.SignalToNoise
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
@@ -297,8 +298,10 @@ trait Codecs {
   val spectroscopy_capabilities: Codec[SpectroscopyCapabilities] =
     enumerated[SpectroscopyCapabilities](Type.varchar)
 
-  val signal_to_noise: Codec[PosBigDecimal] =
-    numeric(5, 2).eimap(PosBigDecimal.from)(_.value)
+   val signal_to_noise: Codec[SignalToNoise] =
+     numeric(10,3).eimap(
+      bd => SignalToNoise.fromBigDecimalExact(bd).toRight(s"Invalid signal-to-noise value: $bd")
+     )(_.toBigDecimal)
 
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)
