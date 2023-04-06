@@ -1,6 +1,6 @@
 
--- Increase the width of the signal-to-noise column to fit an integer milli-sn
--- value.
+-- Increase the width of the signal-to-noise column to fit a numeric(10,3) value.
+-- Requires dropping and then recreating views based on the observation table.
 
 do $$
   declare v_observation_def text;
