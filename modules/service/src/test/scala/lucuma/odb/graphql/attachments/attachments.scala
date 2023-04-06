@@ -28,7 +28,8 @@ class attachments extends OdbSuiteWithS3 {
     fileName:       String,
     attachmentType: String,
     description:    Option[String],
-    content:        String
+    content:        String,
+    checked:        Boolean = false
   ) {
     // The above values are allowed to be empty so that we can test the error conditions. However,
     // we can only check s3 if we have a file name.
@@ -40,7 +41,7 @@ class attachments extends OdbSuiteWithS3 {
   def assertAttachmentsOdb(
     user:        User,
     programId:   Program.Id,
-    attachments: (ObsAttachment.Id, TestAttachment)*
+    expectedTas: (ObsAttachment.Id, TestAttachment)*
   ): IO[Unit] =
     expect(
       user = user,
@@ -60,19 +61,58 @@ class attachments extends OdbSuiteWithS3 {
         """,
       expected = Right(
         Json.obj(
-          "program" -> Json.obj(
-            "attachments" -> Json.fromValues(
-              attachments.map((tid, ta) =>
-                Json.obj(
-                  "id"             -> tid.asJson,
-                  "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
-                  "fileName"       -> ta.fileName.asJson,
-                  "description"    -> ta.description.asJson,
-                  "checked"        -> false.asJson,
-                  "fileSize"       -> ta.content.length.asJson
-                )
-              )
-            )
+          "program" -> expected(expectedTas: _*)
+        )
+      )
+    )
+
+  def updateAttachmentsOdb(
+    user:        User,
+    programId:   Program.Id,
+    WHERE:       String,
+    SET:         String,
+    expectedTas: (Attachment.Id, TestAttachment)*
+  ): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateAttachments(
+            input: {
+              programId: "$programId"
+              WHERE: """ + WHERE + """
+              SET: """ + SET + """
+            }
+          ) {
+            attachments {
+              id
+              attachmentType
+              fileName
+              description
+              checked
+              fileSize
+            }
+          }
+        }
+      """,
+      expected = Right(
+        Json.obj(
+          "updateAttachments" -> expected(expectedTas: _*)
+        )
+      )
+    )
+
+  def expected(attachments: (Attachment.Id, TestAttachment)*): Json =
+    Json.obj(
+      "attachments" -> Json.fromValues(
+        attachments.map((tid, ta) =>
+          Json.obj(
+            "id"             -> tid.asJson,
+            "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
+            "fileName"       -> ta.fileName.asJson,
+            "description"    -> ta.description.asJson,
+            "checked"        -> ta.checked.asJson,
+            "fileSize"       -> ta.content.length.asJson
           )
         )
       )
@@ -168,6 +208,7 @@ class attachments extends OdbSuiteWithS3 {
   val file2            = TestAttachment("file2", "mos_mask", "Masked".some, "Zorro")
   val fileWithPath     = TestAttachment("this/file.txt", "pre_imaging", none, "Doesn't matter")
   val missingFileName  = TestAttachment("", "finder", none, "Doesn't matter")
+  val file3            = TestAttachment("different", "proposal", "Unmatching file name".some, "Something different")
 
   test("successful upload, download and delete") {
     for {
@@ -320,6 +361,85 @@ class attachments extends OdbSuiteWithS3 {
       _      <- deleteAttachment(service, pid, aid).expectOk
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsOdb(service, pid)
+    } yield ()
+  }
+
+  test("update single attachment metadata: description") {
+    for {
+      pid    <- createProgramAs(pi)
+      aid    <- uploadAttachment(service, pid, file1A).toAttachmentId
+      newDesc = "New description"
+      newTa   = file1A.copy(description = newDesc.some)
+      _      <- updateAttachmentsOdb(pi,
+                                     pid,
+                                     WHERE = s"""{ id: { EQ: "$aid"}}""",
+                                     SET = s"""{ description: "$newDesc" }""",
+                                     (aid, newTa)
+                )
+    } yield ()
+  }
+
+  test("update single attachment metadata: unset description") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid  <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      newTa = file1A.copy(description = none)
+      _    <- updateAttachmentsOdb(pi,
+                                   pid,
+                                   WHERE = s"""{ id: { EQ: "$aid"}}""",
+                                   SET = """{ description: null }""",
+                                   (aid, newTa)
+              )
+    } yield ()
+  }
+
+  test("update single attachment metadata: checked") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid  <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      newTa = file1A.copy(checked = true)
+      _    <- updateAttachmentsOdb(pi,
+                                   pid,
+                                   WHERE = s"""{ id: { EQ: "$aid"}}""",
+                                   SET = """{ checked: true }""",
+                                   (aid, newTa)
+              )
+    } yield ()
+  }
+
+  test("bulk update attachments metadata: by name") {
+    for {
+      pid    <- createProgramAs(pi)
+      aid1   <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      aid2   <- uploadAttachment(pi, pid, file2).toAttachmentId
+      aid3   <- uploadAttachment(pi, pid, file3).toAttachmentId
+      newDesc = "updated"
+      newTa1  = file1A.copy(description = newDesc.some, checked = true)
+      newTa2  = file2.copy(description = newDesc.some, checked = true)
+      _      <- updateAttachmentsOdb(pi,
+                                     pid,
+                                     WHERE = s"""{ fileName: { LIKE: "file%"}}""",
+                                     SET = s"""{ checked: true, description: "$newDesc" }""",
+                                     (aid1, newTa1),
+                                     (aid2, newTa2)
+                )
+    } yield ()
+  }
+  test("bulk update attachments metadata: by ids") {
+    for {
+      pid   <- createProgramAs(pi)
+      aid1  <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      aid2  <- uploadAttachment(pi, pid, file2).toAttachmentId
+      aid3  <- uploadAttachment(pi, pid, file3).toAttachmentId
+      newTa1 = file1A.copy(description = none, checked = true)
+      newTa3 = file3.copy(description = none, checked = true)
+      _     <- updateAttachmentsOdb(pi,
+                                    pid,
+                                    WHERE = s"""{ id: { IN: ["$aid1", "$aid3"]}}""",
+                                    SET = """{ checked: true, description: null }""",
+                                    (aid1, newTa1),
+                                    (aid3, newTa3)
+               )
     } yield ()
   }
 
