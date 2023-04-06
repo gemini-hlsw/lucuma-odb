@@ -13,8 +13,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.Config
 import lucuma.odb.data.Tag
-import lucuma.odb.service.AttachmentService
-import lucuma.odb.service.AttachmentService.AttachmentException
+import lucuma.odb.service.AttachmentFileService
+import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
@@ -32,9 +32,9 @@ object AttachmentRoutes {
   }
 
   def apply[F[_]: Async: Trace](
-    attachmentService: AttachmentService[F],
-    ssoClient:         SsoClient[F, User],
-    maxUploadMb:       Int
+    attachmentFileService: AttachmentFileService[F],
+    ssoClient:             SsoClient[F, User],
+    maxUploadMb:           Int
   ): HttpRoutes[F] = {
     val dsl = Http4sDsl[F]
     import dsl._
@@ -57,7 +57,7 @@ object AttachmentRoutes {
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / pathBase / ProgramId(programId) / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
-          attachmentService.getAttachment(user, programId, attachmentId).flatMap {
+          attachmentFileService.getAttachment(user, programId, attachmentId).flatMap {
             case Left(exc)     => exc.toResponse
             case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
           }
@@ -67,7 +67,7 @@ object AttachmentRoutes {
           :? FileNameMatcher(fileName) +& TagMatcher(typeTag) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-          attachmentService
+          attachmentFileService
             .uploadAttachment(user, programId, typeTag, fileName, description, req.body)
             .flatMap(id => Ok(id.toString))
             .recoverWith {
@@ -79,7 +79,7 @@ object AttachmentRoutes {
 
       case req @ DELETE -> Root / pathBase / ProgramId(programId) / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
-          attachmentService
+          attachmentFileService
             .deleteAttachment(user, programId, attachmentId)
             .flatMap(_ => Ok())
             .recoverWith { case e: AttachmentException => e.toResponse }

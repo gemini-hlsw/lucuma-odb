@@ -15,6 +15,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
    */
   object Predicates {
     val asterismGroup          = AsterismGroupPredicates(Path.from(AsterismGroupType))
+    val attachment             = AttachmentPredicates(Path.from(AttachmentType))
     val cloneObservationResult = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult      = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
     val constraintSetGroup     = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))

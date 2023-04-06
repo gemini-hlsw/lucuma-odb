@@ -33,8 +33,8 @@ import skunk.syntax.all._
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 
-trait AttachmentService[F[_]] {
-  import AttachmentService.AttachmentException
+trait AttachmentFileService[F[_]] {
+  import AttachmentFileService.AttachmentException
 
   /** Retrieves the given file from S3 as a stream. */
   def getAttachment(
@@ -57,7 +57,7 @@ trait AttachmentService[F[_]] {
   def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[Unit]
 }
 
-object AttachmentService {
+object AttachmentFileService {
   sealed trait AttachmentException extends Exception
   // maybe we can improve on the AWS error handling...
   object AttachmentException {
@@ -93,7 +93,7 @@ object AttachmentService {
     awsConfig: Config.Aws,
     s3Ops:     S3AsyncClientOp[F],
     session:   Session[F]
-  ): AttachmentService[F] = {
+  ): AttachmentFileService[F] = {
     // We can switch back to unsafeFrom when a new version of refined is out that fixes
     // https://github.com/fthomas/refined/issues/1161 or a version of fs2-aws > 6.0.0
     // is availabile with my PR that changes PartSizeMB to "GreaterEqual[5]"
@@ -217,7 +217,7 @@ object AttachmentService {
           )
       }
 
-    new AttachmentService[F] {
+    new AttachmentFileService[F] {
 
       def getAttachment(
         user:         User,

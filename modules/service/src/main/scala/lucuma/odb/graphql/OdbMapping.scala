@@ -52,6 +52,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
+import lucuma.odb.service.AttachmentMetadataService
 import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
@@ -165,6 +166,7 @@ object OdbMapping {
           with TargetSelectResultMapping[F]
           with TimeSpanMapping[F]
           with UpdateAsterismsResultMapping[F]
+          with UpdateAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UpdateTargetsResultMapping[F]
@@ -185,6 +187,9 @@ object OdbMapping {
 
           override val asterismService: Resource[F, AsterismService[F]] =
             pool.map(AsterismService.fromSessionAndUser(_, user))
+
+          override val attachmentMetadataService: Resource[F, AttachmentMetadataService[F]] =
+            pool.map(AttachmentMetadataService.fromSessionAndUser(_, user))
 
           override val observationService: Resource[F, ObservationService[F]] =
             pool.map { s =>
@@ -316,6 +321,7 @@ object OdbMapping {
               TargetSelectResultMapping,
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
+              UpdateAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
               UpdateTargetsResultMapping,

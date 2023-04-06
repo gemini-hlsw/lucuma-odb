@@ -22,7 +22,7 @@ import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.AttachmentService
+import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
@@ -240,17 +240,17 @@ object FMain extends MainParams {
     s3OpsResource:     Resource[F, S3AsyncClientOp[F]]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
-      pool             <- databasePoolResource[F](databaseConfig)
-      itcClient        <- itcClientResource
-      ssoClient        <- ssoClientResource
-      userSvc          <- pool.map(UserService.fromSession(_))
-      middleware       <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
-      enums            <- Resource.eval(pool.use(Enums.load))
-      graphQLRoutes    <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
-      s3ClientOps      <- s3OpsResource
-      attachmentSvc    <- pool.map(ses => AttachmentService.fromS3AndSession(awsConfig, s3ClientOps, ses))
+      pool              <- databasePoolResource[F](databaseConfig)
+      itcClient         <- itcClientResource
+      ssoClient         <- ssoClientResource
+      userSvc           <- pool.map(UserService.fromSession(_))
+      middleware        <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
+      enums             <- Resource.eval(pool.use(Enums.load))
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
+      s3ClientOps       <- s3OpsResource
+      attachmentFileSvc <- pool.map(ses => AttachmentFileService.fromS3AndSession(awsConfig, s3ClientOps, ses))
     } yield { wsb =>
-      val attachmentRoutes =  AttachmentRoutes.apply[F](attachmentSvc, ssoClient, awsConfig.fileUploadMaxMb)
+      val attachmentRoutes =  AttachmentRoutes.apply[F](attachmentFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes)
     }
 
