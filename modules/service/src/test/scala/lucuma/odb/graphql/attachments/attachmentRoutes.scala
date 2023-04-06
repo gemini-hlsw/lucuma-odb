@@ -13,8 +13,8 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
-import lucuma.odb.service.AttachmentService
-import lucuma.odb.service.AttachmentService.AttachmentException
+import lucuma.odb.service.AttachmentFileService
+import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.refined.*
 import munit.CatsEffectSuite
 import natchez.Trace.Implicits.noop
@@ -45,7 +45,7 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
     else if (user === invalidFileUser) AttachmentException.InvalidRequest(invalidFileName).some
     else none
 
-  private val service: AttachmentService[IO] = new AttachmentService[IO] {
+  private val service: AttachmentFileService[IO] = new AttachmentFileService[IO] {
     def getAttachment(
       user:         User,
       programId:    Program.Id,
