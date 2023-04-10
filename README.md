@@ -45,10 +45,10 @@ Alternatively, you can run the app from within SBT with `service/reStart`
 running `docker-compose` `down` and then `up` as described above.  You can
 supply optional arguments to simplify development though:
 
-* `-reset` - Drops then creates the database for you. Do this after cycling
+* `--reset` - Drops then creates the database for you. Do this after cycling
 `docker-compose` `down`, `up` to give flyway a chance to run the migration and
 update its schema table. 
-* `-skip-migration` - Skips the database migration.  This assumes that the 
+* `--skip-migration` - Skips the database migration.  This assumes that the 
 database has been initialized already.  Usually this won't be necessary since
 flyway already skips migrations that have previously run. 
 
