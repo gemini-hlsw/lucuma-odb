@@ -463,6 +463,272 @@ class updateTargets extends OdbSuite {
     }
   }
 
+  test("update source profile (point/bandNormalized/brightnesses)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        brightnesses: [
+                          {
+                             band: R
+                             value: 15.0
+                             units: VEGA_MAGNITUDE
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    point {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "point" : {
+                          "bandNormalized" : {
+                            "sed" : {
+                              "stellarLibrary" : "B5_III"
+                            },
+                            "brightnesses" : [
+                              {
+                                "band" : "R",
+                                 "value" : "15.0",
+                                 "units" : "VEGA_MAGNITUDE"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("update source profile (uniform/bandNormalized/brightnesses)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          uniform: {
+            bandNormalized: {
+              sed: {
+                stellarLibrary: B5_III
+              }
+              brightnesses: []
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    uniform: {
+                      bandNormalized: {
+                        brightnesses: [
+                          {
+                             band: R
+                             value: 15.0
+                             units: VEGA_MAG_PER_ARCSEC_SQUARED
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    uniform {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "uniform" : {
+                          "bandNormalized" : {
+                            "sed" : {
+                              "stellarLibrary" : "B5_III"
+                            },
+                            "brightnesses" : [
+                              {
+                                "band" : "R",
+                                 "value" : "15.0",
+                                 "units" : "VEGA_MAG_PER_ARCSEC_SQUARED"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("update source profile (gaussian/bandNormalized/brightnesses)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          gaussian: {
+            spectralDefinition: {
+              bandNormalized: {
+                sed: {
+                  stellarLibrary: B5_III
+                }
+                brightnesses: []
+              }
+            }
+            fwhm: {
+              microarcseconds: 42
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    gaussian: {
+                      spectralDefinition: {
+                        bandNormalized: {
+                          brightnesses: [
+                            {
+                              band: R
+                              value: 15.0
+                              units: VEGA_MAGNITUDE
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      bandNormalized {
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                      fwhm {
+                        microarcseconds
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : {
+                          "bandNormalized" : {
+                            "brightnesses" : [
+                              {
+                                "band" : "R",
+                                 "value" : "15.0",
+                                 "units" : "VEGA_MAGNITUDE"
+                              }
+                            ]
+                          },
+                          "fwhm" : {
+                            "microarcseconds" : 42
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
   test("update source profile (point -> gaussian, incomplete)") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1").flatMap { tid =>
