@@ -40,7 +40,7 @@ You can now run the app, and you can do `docker-compose stop`.  If you do
 
 ### Using reStart
 
-Alternatively, you can run the app from within SBT with `service/reStart serve`
+Alternatively, you can run the app from within SBT with `service/reStart`
 (stopping with `service/reStop`).  By default, this command will fail after
 running `docker-compose` `down` and then `up` as described above.  You can
 supply optional arguments to simplify development though:
