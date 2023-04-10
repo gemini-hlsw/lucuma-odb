@@ -26,6 +26,7 @@ import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessUnits.Surface
 import lucuma.core.math.RadialVelocity
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Observation
@@ -37,7 +38,6 @@ import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.SignalToNoise
 import lucuma.odb.json.angle.decoder.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.data.GeneratorParams
