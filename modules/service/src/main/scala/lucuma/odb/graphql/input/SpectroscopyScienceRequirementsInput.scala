@@ -10,9 +10,9 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.SignalToNoise
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosBigDecimalBinding

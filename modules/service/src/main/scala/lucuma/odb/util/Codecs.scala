@@ -40,6 +40,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
@@ -54,7 +55,6 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.SignalToNoise
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
@@ -300,7 +300,7 @@ trait Codecs {
 
    val signal_to_noise: Codec[SignalToNoise] =
      numeric(10,3).eimap(
-      bd => SignalToNoise.fromBigDecimalExact(bd).toRight(s"Invalid signal-to-noise value: $bd")
+      bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
      )(_.toBigDecimal)
 
   val tag: Codec[Tag] =

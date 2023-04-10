@@ -39,6 +39,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
@@ -56,7 +57,6 @@ import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.SignalToNoise
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput

@@ -39,6 +39,7 @@ import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
@@ -50,7 +51,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.SignalToNoise
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
