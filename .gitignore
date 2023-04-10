@@ -58,3 +58,5 @@ schemaspy/out
 
 # vim
 *.swp
+
+setup_api.bash
