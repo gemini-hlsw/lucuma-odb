@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
+import cats.data.Ior
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Query.Binding
@@ -74,5 +75,13 @@ trait Matcher[A] { outer =>
   /** If this matcher fails, try `other`. */
   def orElse[B](other: Matcher[B]): Matcher[Either[A, B]] = v =>
     outer.validate(v).map(_.asLeft) orElse other.validate(v).map(_.asRight)
+
+  /** Match this or `other`, or both. */
+  def or[B](other: Matcher[B]): Matcher[Ior[A, B]] = v =>
+    (outer.validate(v), other.validate(v)) match
+      case (Left(s1), Left(s2)) => Left(s"$s1, $s2") // :-\
+      case (Right(a), Left(_))  => Right(Ior.Left(a))
+      case (Left(_), Right(b))  => Right(Ior.Right(b))
+      case (Right(a), Right(b)) => Right(Ior.Both(a, b))
 
 }
