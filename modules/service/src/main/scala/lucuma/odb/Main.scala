@@ -256,6 +256,7 @@ object FMain extends MainParams {
     Sync[F].delay {
       Flyway
         .configure()
+        .loggers("slf4j")
         .dataSource(config.jdbcUrl, config.user, config.password)
         .baselineOnMigrate(true)
         .load()
