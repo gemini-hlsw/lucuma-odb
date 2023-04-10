@@ -9,6 +9,8 @@ import cats.effect._
 import cats.effect.std.Console
 import cats.implicits._
 import com.comcast.ip4s.Port
+import com.monovore.decline._
+import com.monovore.decline.effect.CommandIOApp
 import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
@@ -46,13 +48,97 @@ import software.amazon.awssdk.services.s3.S3Configuration
 
 import scala.concurrent.duration._
 
-object Main extends IOApp {
+object MainArgs {
+  opaque type ResetDatabase = Boolean
+
+  object ResetDatabase {
+
+    val opt: Opts[ResetDatabase] =
+      Opts.flag("reset", help = "Drop and recreate the database before starting.").orFalse
+
+    extension (rd: ResetDatabase) {
+      def toBoolean: Boolean =
+        rd
+
+      def isRequested: Boolean =
+        toBoolean
+    }
+  }
+
+
+  opaque type SkipMigration = Boolean
+
+  object SkipMigration {
+
+    val opt: Opts[SkipMigration] =
+      Opts.flag("skip-migration", help = "Skip database migration on startup.").orFalse
+
+    extension (sm: SkipMigration) {
+      def toBoolean: Boolean =
+        sm
+
+      def isRequested: Boolean =
+        toBoolean
+    }
+  }
+}
+
+sealed trait MainParams {
+  val ServiceName: String =
+    "lucuma-odb"
+
+  val Header: String =
+    s"""|██╗     ██╗   ██╗ ██████╗██╗   ██╗███╗   ███╗ █████╗      ██████╗ ██████╗ ██████╗
+        |██║     ██║   ██║██╔════╝██║   ██║████╗ ████║██╔══██╗    ██╔═══██╗██╔══██╗██╔══██╗
+        |██║     ██║   ██║██║     ██║   ██║██╔████╔██║███████║    ██║   ██║██║  ██║██████╔╝
+        |██║     ██║   ██║██║     ██║   ██║██║╚██╔╝██║██╔══██║    ██║   ██║██║  ██║██╔══██╗
+        |███████╗╚██████╔╝╚██████╗╚██████╔╝██║ ╚═╝ ██║██║  ██║    ╚██████╔╝██████╔╝██████╔╝
+        |╚══════╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝     ╚═════╝ ╚═════╝ ╚═════╝
+        |
+        |This is the Lucuma observing database.
+        |""".stripMargin
+}
+
+object MainParams extends MainParams
+
+
+object Main extends CommandIOApp(
+  name   = MainParams.ServiceName,
+  header = MainParams.Header
+) {
+
+  import MainArgs.*
+
+  override def main: Opts[IO[ExitCode]] =
+    command
+
+  lazy val serve: Command[IO[ExitCode]] =
+    Command(
+      name    = "serve",
+      header  = "Run the ODB service.",
+    )((ResetDatabase.opt, SkipMigration.opt).tupled.map { case (reset, skipMigration) =>
+      implicit val log: SelfAwareStructuredLogger[IO] =
+        Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
+
+      for {
+        _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
+        _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
+        e <- FMain.runF[IO](reset, skipMigration)
+      } yield e
+    })
+
+  lazy val command: Opts[IO[ExitCode]] =
+    Opts.subcommands(
+      serve
+    )
+}
+
+object FMain extends MainParams {
+
+  import MainArgs.*
 
   // TODO: put this in the config
   val MaxConnections = 10
-
-  // The name we're know by in the tracing back end.
-  val ServiceName = "lucuma-odb"
 
   // Time GraphQL service instances are cached
   val GraphQLServiceTTL = 30.minutes
@@ -61,14 +147,7 @@ object Main extends IOApp {
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
     val banner =
         s"""|
-            |██╗     ██╗   ██╗ ██████╗██╗   ██╗███╗   ███╗ █████╗      ██████╗ ██████╗ ██████╗
-            |██║     ██║   ██║██╔════╝██║   ██║████╗ ████║██╔══██╗    ██╔═══██╗██╔══██╗██╔══██╗
-            |██║     ██║   ██║██║     ██║   ██║██╔████╔██║███████║    ██║   ██║██║  ██║██████╔╝
-            |██║     ██║   ██║██║     ██║   ██║██║╚██╔╝██║██╔══██║    ██║   ██║██║  ██║██╔══██╗
-            |███████╗╚██████╔╝╚██████╗╚██████╔╝██║ ╚═╝ ██║██║  ██║    ╚██████╔╝██████╔╝██████╔╝
-            |╚══════╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝     ╚═════╝ ╚═════╝ ╚═════╝
-            |
-            |This is the Lucuma observing database.
+            |$Header
             |
             |CommitHash.: ${config.commitHash.format}
             |CORS domain: ${config.domain}
@@ -213,49 +292,13 @@ object Main extends IOApp {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
-  object Arg {
-    opaque type ResetDatabase = Boolean
-
-    object ResetDatabase {
-
-      def apply(args: List[String]): ResetDatabase =
-        args.contains("-reset")
-
-      extension (rd: ResetDatabase) {
-        def toBoolean: Boolean =
-          rd
-
-        def isRequested: Boolean =
-          toBoolean
-      }
-    }
-
-
-    opaque type SkipMigration = Boolean
-
-    object SkipMigration {
-
-      def apply(args: List[String]): SkipMigration =
-        args.contains("-skip-migration")
-
-      extension (sm: SkipMigration) {
-        def toBoolean: Boolean =
-          sm
-
-        def isRequested: Boolean =
-          toBoolean
-      }
-    }
-
-  }
-
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
   def server[F[_]: Async: Logger: Console](
-    reset:         Arg.ResetDatabase,
-    skipMigration: Arg.SkipMigration
+    reset:         ResetDatabase,
+    skipMigration: SkipMigration
   ): Resource[F, ExitCode] =
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
@@ -269,25 +312,10 @@ object Main extends IOApp {
 
   /** Our logical entry point. */
   def runF[F[_]: Async: Logger: Console](
-    reset:         Arg.ResetDatabase,
-    skipMigration: Arg.SkipMigration
+    reset:         ResetDatabase,
+    skipMigration: SkipMigration
   ): F[ExitCode] =
     server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
-
-  /** Our actual entry point. */
-  def run(args: List[String]): IO[ExitCode] = {
-    implicit val log: SelfAwareStructuredLogger[IO] =
-      Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
-
-    val reset         = Arg.ResetDatabase(args)
-    val skipMigration = Arg.SkipMigration(args)
-
-    for {
-      _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
-      _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-      e <- runF[IO](reset, skipMigration)
-    } yield e
-  }
 
 }
 

@@ -35,7 +35,7 @@ import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
-import lucuma.odb.Main
+import lucuma.odb.FMain
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.refined.*
@@ -144,10 +144,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   // overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
-    Main.s3ClientOpsResource(awsConfig)
+    FMain.s3ClientOpsResource[IO](awsConfig)
 
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
-    Main.routesResource(
+    FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
       itcClient.pure[Resource[IO, *]],
@@ -160,7 +160,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
   def mapping: Resource[IO, Mapping[IO]] =
     for {
-      db  <- Main.databasePoolResource[IO](databaseConfig)
+      db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
       usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
@@ -235,7 +235,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     super.beforeAll()
 
     dbInitialization.foreach { init =>
-      Main
+      FMain
         .databasePoolResource[IO](databaseConfig)
         .flatten
         .use(init)
