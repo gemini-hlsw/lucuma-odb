@@ -113,7 +113,7 @@ object Itc {
             "targetId"      -> s.targetId.asJson,
             "exposureTime"  -> s.value.exposureTime.asJson,
             "exposures"     -> s.value.exposures.value.asJson,
-            "signalToNoise" -> s.value.signalToNoise.value.asJson
+            "signalToNoise" -> s.value.signalToNoise.asJson
           )
         }
     }

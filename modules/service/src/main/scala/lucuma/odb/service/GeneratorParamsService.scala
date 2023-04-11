@@ -26,6 +26,7 @@ import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessUnits.Surface
 import lucuma.core.math.RadialVelocity
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Observation
@@ -186,7 +187,7 @@ object GeneratorParamsService {
   final case class Params(
     observationId:   Observation.Id,
     constraints:     ConstraintSet,
-    signalToNoise:   Option[PosBigDecimal],
+    signalToNoise:   Option[SignalToNoise],
     signalToNoiseAt: Option[Wavelength],
     observingMode:   Option[ObservingModeType],
     targetId:        Option[Target.Id],

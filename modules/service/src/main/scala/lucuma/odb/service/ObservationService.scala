@@ -39,6 +39,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
@@ -107,7 +108,7 @@ object ObservationService {
 
   final case class ItcParams(
     constraints:     ConstraintSet,
-    signalToNoise:   PosBigDecimal,
+    signalToNoise:   SignalToNoise,
     signalToNoiseAt: Option[Wavelength],
     observingMode:   ObservingModeType
   )
@@ -453,7 +454,7 @@ object ObservationService {
       ScienceMode                      ~
       Option[Wavelength]               ~
       Option[PosInt]                   ~
-      Option[PosBigDecimal]            ~
+      Option[SignalToNoise]            ~
       Option[Wavelength]               ~
       Option[Wavelength]               ~
       Option[FocalPlane]               ~

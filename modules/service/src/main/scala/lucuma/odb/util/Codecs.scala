@@ -40,6 +40,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
@@ -297,8 +298,10 @@ trait Codecs {
   val spectroscopy_capabilities: Codec[SpectroscopyCapabilities] =
     enumerated[SpectroscopyCapabilities](Type.varchar)
 
-  val signal_to_noise: Codec[PosBigDecimal] =
-    numeric(5, 2).eimap(PosBigDecimal.from)(_.value)
+   val signal_to_noise: Codec[SignalToNoise] =
+     numeric(10,3).eimap(
+      bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
+     )(_.toBigDecimal)
 
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)

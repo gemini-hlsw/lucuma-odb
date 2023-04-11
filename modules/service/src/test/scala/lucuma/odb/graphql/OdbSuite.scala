@@ -25,6 +25,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.literal.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
@@ -107,7 +108,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     ItcResult.Success(
       10.secTimeSpan,
       NonNegInt.unsafeFrom(6),
-      PosBigDecimal.unsafeFrom(50.0)
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   private def itcClient: ItcClient[IO] =
