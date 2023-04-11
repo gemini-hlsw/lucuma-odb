@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.syntax.traverse.*
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -76,7 +77,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                      "seconds": 10.000000
                    },
                    "exposures": ${FakeItcResult.exposures.value},
-                   "signalToNoise": ${FakeItcResult.signalToNoise.value}
+                   "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
                  },
                  "all": [
                    {

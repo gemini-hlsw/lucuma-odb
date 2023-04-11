@@ -168,7 +168,7 @@ object GeneratorParamsService {
             tid ->
             SpectroscopyModeInput(
               wavelength,
-              s2n.toPosBigDecimal,
+              s2n,
               params.signalToNoiseAt,
               sp,
               b,
