@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.syntax.applicative.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.*
+import lucuma.core.math.SignalToNoise
 import lucuma.core.util.TimeSpan
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcResult
@@ -33,7 +34,7 @@ object TestItcClient {
       ItcResult.Success(
         exposureTime,
         NonNegInt.unsafeFrom(exposures),
-        PosBigDecimal.unsafeFrom(signalToNoise)
+        SignalToNoise.unsafeFromBigDecimalExact(signalToNoise)
       )
     )
 

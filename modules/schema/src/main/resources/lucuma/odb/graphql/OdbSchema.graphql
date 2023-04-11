@@ -2133,7 +2133,7 @@ input SiderealInput {
 # Signal-to-noise mode parameters
 input SignalToNoiseModeInput {
   # s/n value
-  value: PosBigDecimal!
+  value: SignalToNoise!
 }
 
 # Create or edit a source profile.  Exactly one of "point", "uniform" or "gaussian" is required.
@@ -2164,7 +2164,7 @@ input SpectroscopyScienceRequirementsInput {
   resolution: PosInt
 
   # The signalToNoise field may be unset by assigning a null value, or ignored by skipping it altogether
-  signalToNoise: PosBigDecimal
+  signalToNoise: SignalToNoise
 
   # The signalToNoiseAt field may be unset by assigning a null value, or ignored by skipping it altogether
   signalToNoiseAt: WavelengthInput
@@ -4194,7 +4194,7 @@ type ItcResult {
   targetId:      TargetId!
   exposureTime:  TimeSpan!
   exposures:     NonNegInt!
-  signalToNoise: PosBigDecimal!
+  signalToNoise: SignalToNoise!
 }
 
 
@@ -5084,10 +5084,12 @@ type Sidereal {
   catalogInfo: CatalogInfo
 }
 
+scalar SignalToNoise
+
 # Signal to noise exposure time mode
 type SignalToNoiseMode {
   # Signal/Noise value
-  value: PosBigDecimal!
+  value: SignalToNoise!
 }
 
 # Sky background
@@ -5155,7 +5157,7 @@ type SpectroscopyScienceRequirements {
   resolution: PosInt
 
   # Requested signal to noise ratio
-  signalToNoise: PosBigDecimal
+  signalToNoise: SignalToNoise
 
   # Requested wavelength for the requested signal to noise
   signalToNoiseAt: Wavelength

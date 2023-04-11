@@ -39,6 +39,7 @@ import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
@@ -103,6 +104,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[ScienceMode](ScienceModeType),
+      LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
       LeafMapping[String](DmsStringType),
