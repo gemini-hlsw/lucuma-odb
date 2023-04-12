@@ -54,6 +54,9 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
+import lucuma.odb.data.Group
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.NonNegShort
 
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
@@ -86,6 +89,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosRoi](GmosRoiType),
       LeafMapping[GmosXBinning](GmosXBinningType),
       LeafMapping[GmosYBinning](GmosYBinningType),
+      LeafMapping[Group.Id](GroupIdType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
@@ -93,6 +97,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
       LeafMapping[NonNegLong](NonNegLongType),
+      LeafMapping[NonNegShort](NonNegShortType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),

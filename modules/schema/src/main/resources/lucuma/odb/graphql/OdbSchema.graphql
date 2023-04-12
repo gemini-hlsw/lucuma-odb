@@ -4052,6 +4052,43 @@ enum GmosYBinning {
   FOUR
 }
 
+"A group of observations and other groups."
+type Group {
+
+  id: GroupId!
+
+  "This group's program"
+  program: Program!
+
+  "The parent group. If null then this group is at the top level."
+  parentGroup: Group
+
+  "This group's index within the parent (or within the program if parent is null)."
+  parentIndex: NonNegShort!
+
+  "Optionally, a name"
+  name: String
+
+  "Optionally, a description."
+  description: String
+
+  "How many do we need to complete? If this is null then it means we have to complete them all"
+  minimumRequired: NonNegShort
+
+  "Do they need to be completed in order?"
+  ordered: Boolean!
+
+  "Is there a minimum required and/or maximum allowed timespan between observations?"
+  minimumInterval: TimeSpan
+  maximumInterval: TimeSpan
+
+  #"References to child elements"
+  #elements: [GroupElement!]!
+
+}
+
+scalar GroupId
+
 # HII Region spectrum
 enum HiiRegionSpectrum {
   # HiiRegionSpectrum OrionNebula
@@ -4252,6 +4289,9 @@ scalar NonEmptyString
 
 # A `BigDecimal` greater than or equal to 0
 scalar NonNegBigDecimal
+
+# A `Short` in the range from 0 to 32767
+scalar NonNegShort
 
 # An `Int` in the range from 0 to 2147483647
 scalar NonNegInt
@@ -4523,6 +4563,10 @@ type Program {
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
+
+  "All groups in the program."
+  allGroups: [Group!]!
+
 }
 
 # ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`

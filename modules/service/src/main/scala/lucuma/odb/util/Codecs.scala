@@ -51,6 +51,7 @@ import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -69,6 +70,7 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
+import eu.timepit.refined.types.numeric.NonNegShort
 
 
 // Codecs for some atomic types.
@@ -262,8 +264,14 @@ trait Codecs {
   val pos_long: Codec[PosLong] =
     int8.eimap(PosLong.from)(_.value)
 
+  val int2_nonneg: Codec[NonNegShort] =
+    int2.eimap(NonNegShort.from)(_.value)
+
   val program_id: Codec[Program.Id] =
     gid[Program.Id]
+
+  val group_id: Codec[Group.Id] =
+    gid[Group.Id]
 
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
