@@ -33,7 +33,8 @@ trait ProgramMapping[F[_]]
      with ObservationView[F]
      with AttachmentTable[F]
      with Predicates[F]
-     with ResultMapping[F] {
+     with ResultMapping[F]
+     with GroupView[F] {
 
   def user: User
 
@@ -50,7 +51,8 @@ trait ProgramMapping[F[_]]
         SqlObject("plannedTime"),
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
-        SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId))
+        SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),
+        SqlObject("allGroups", Join(ProgramTable.Id, GroupView.ProgramId)),
       ),
     )
 
