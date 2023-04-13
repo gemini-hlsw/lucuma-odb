@@ -11,6 +11,15 @@ import table.ObservationView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.ProgramTable
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.Select
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
+import edu.gemini.grackle.Query.OrderBy
+import edu.gemini.grackle.Query.OrderSelection
+import edu.gemini.grackle.Query.OrderSelections
+import eu.timepit.refined.types.numeric.NonNegShort
 
 trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] {
 
@@ -19,8 +28,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       tpe = GroupType,
       fieldMappings = List(
         SqlField("id", GroupView.Id, key = true),
-        SqlObject("parentGroup", Join(GroupView.ParentId, GroupView.Id)),
-        SqlField("parentIndex", GroupView.ParentIndex),
+        SqlField("parentId", GroupView.ParentId, hidden = true),
+        SqlField("parentIndex", GroupView.ParentIndex, hidden = true),
         SqlField("name", GroupView.Name),
         SqlField("description", GroupView.Description),
         SqlField("minimumRequired", GroupView.MinRequired),
@@ -29,6 +38,18 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
         SqlObject("maximumInterval"),
         SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       )
+    )
+
+  lazy val GroupElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
+    Map(
+      GroupType -> {
+        case Select("elements", Nil, child) =>
+          Result(
+            Select("elements", Nil,
+              OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "index"))), child)
+            )
+          )
+      }
     )
 
 }

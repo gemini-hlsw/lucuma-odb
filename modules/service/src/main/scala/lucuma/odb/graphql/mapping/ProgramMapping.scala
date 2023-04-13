@@ -24,6 +24,8 @@ import lucuma.odb.graphql.predicate.Predicates
 import binding._
 import input._
 import table._
+import eu.timepit.refined.types.numeric.NonNegShort
+import cats.kernel.Order
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
@@ -52,6 +54,7 @@ trait ProgramMapping[F[_]]
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
         SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),
+        SqlObject("groups", Join(ProgramTable.Id, GroupView.ProgramId)),
         SqlObject("allGroups", Join(ProgramTable.Id, GroupView.ProgramId)),
       ),
     )
@@ -79,6 +82,18 @@ trait ProgramMapping[F[_]]
               )
             }              
           }
+        case Select("groups", Nil, child) =>
+          Result(
+            Select("groups", Nil,
+              FilterOrderByOffsetLimit(
+                pred = Some(Predicates.group.parentId.isNull(true)),
+                oss = Some(List(OrderSelection[NonNegShort](GroupType / "parentIndex", true, true))),
+                offset = None,
+                limit = None,
+                child              
+              )
+            )
+          )
       }
     )
 
