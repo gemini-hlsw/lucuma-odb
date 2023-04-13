@@ -335,6 +335,7 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 ConstraintSetGroupElaborator,
+                GroupElaborator,
                 MutationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,

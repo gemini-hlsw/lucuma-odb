@@ -4057,12 +4057,6 @@ type Group {
 
   id: GroupId!
 
-  "The parent group. If null then this group is at the top level."
-  parentGroup: Group
-
-  "This group's index within the parent (or within the program if parent is null)."
-  parentIndex: NonNegShort!
-
   "Optionally, a name"
   name: String
 
@@ -4566,6 +4560,9 @@ type Program {
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
+
+  "Top-level groups in the program."
+  groups: [Group!]!
 
   "All groups in the program."
   allGroups: [Group!]!
