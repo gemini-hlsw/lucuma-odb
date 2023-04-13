@@ -129,6 +129,7 @@ object OdbMapping {
           with FilterTypeMetaMapping[F]
           with GmosLongSlitMapping[F]
           with GroupMapping[F]
+          with GroupElementMapping[F]
           with HourAngleRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
@@ -283,6 +284,7 @@ object OdbMapping {
               GmosNorthLongSlitMapping,
               GmosSouthLongSlitMapping,
               GroupMapping,
+              GroupElementMapping,
               HourAngleRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
