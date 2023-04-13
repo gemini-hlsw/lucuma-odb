@@ -9,9 +9,10 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 import lucuma.odb.graphql.table.GroupView
+import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.ProgramTable
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] {
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] {
 
   lazy val GroupMapping =
     ObjectMapping(
@@ -26,7 +27,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] {
         SqlField("ordered", GroupView.Ordered),
         SqlObject("minimumInterval"),
         SqlObject("maximumInterval"),
-        // SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
+        SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       )
     )
 
