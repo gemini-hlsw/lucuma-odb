@@ -22,6 +22,7 @@ create table t_group (
 
   -- optional properties
   c_name              text              null default null,
+  c_description       text              null default null,
   c_min_required      int2              null default null,
   c_ordered           bool              not null default false,
   c_min_interval      interval          null default null,

@@ -18,7 +18,6 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] {
       tpe = GroupType,
       fieldMappings = List(
         SqlField("id", GroupView.Id, key = true),
-        SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
         SqlObject("parentGroup", Join(GroupView.ParentId, GroupView.Id)),
         SqlField("parentIndex", GroupView.ParentIndex),
         SqlField("name", GroupView.Name),
