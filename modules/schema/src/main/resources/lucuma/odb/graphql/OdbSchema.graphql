@@ -4057,9 +4057,6 @@ type Group {
 
   id: GroupId!
 
-  "This group's program"
-  program: Program!
-
   "The parent group. If null then this group is at the top level."
   parentGroup: Group
 
