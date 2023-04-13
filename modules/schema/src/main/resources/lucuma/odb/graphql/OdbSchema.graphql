@@ -4080,11 +4080,17 @@ type Group {
   maximumInterval: TimeSpan
 
   #"References to child elements"
-  #elements: [GroupElement!]!
+  elements: [GroupElement!]!
 
 }
 
 scalar GroupId
+
+"Groups contain observations and other groups. Exactly one will be defined."
+type GroupElement {
+  group: Group
+  observation: Observation
+}
 
 # HII Region spectrum
 enum HiiRegionSpectrum {

@@ -292,3 +292,17 @@ create view v_group as
   case when c_min_interval is not null then c_group_id end as c_min_interval_id,
   case when c_max_interval is not null then c_group_id end as c_max_interval_id
   from t_group;
+
+create view v_group_element as
+  select 
+    c_program_id,
+    c_parent_id as c_group_id, 
+    c_parent_index as c_index, 
+    c_group_id as c_child_group_id,
+    null::d_observation_id as c_child_observation_id
+  from t_group
+  union
+  select c_program_id, c_group_id, c_group_index, null, c_observation_id 
+  from t_observation
+  where c_group_id is not null;
+
