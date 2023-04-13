@@ -13,8 +13,12 @@ import io.circe.Encoder
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
+import cats.kernel.Order
+import eu.timepit.refined.types.numeric.NonNegShort
 
 trait MappingExtras[F[_]] extends Mapping[F] {
+
+  given Order[NonNegShort] = Order.by(_.value) // y u not exist already
 
   given Eq[Path] with
     def eqv(a: Path, b: Path) =

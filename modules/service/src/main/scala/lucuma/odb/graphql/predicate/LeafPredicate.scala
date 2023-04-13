@@ -20,4 +20,7 @@ class LeafPredicates[A](path: Path) {
   def in(as: List[A])(using Eq[A]): Predicate =
     In(path, as)
 
+  def isNull(b: Boolean): Predicate =
+    IsNull(path, b)
+
 }
