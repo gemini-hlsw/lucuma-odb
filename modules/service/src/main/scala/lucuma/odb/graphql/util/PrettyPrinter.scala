@@ -62,7 +62,7 @@ object PrettyPrinter {
       case Filter(pred, child)             => obj("Filter", "pred" -> predicate(pred), "child" -> query(child))
       case Component(mapping, join, child) => obj("Component", "mapping" -> str("<mapping>"), "join" -> str("<function>") , "child" -> query(child))
       case Introspect(schema, child)       => obj("Introspect", "schema" -> str("<schema>"), "child" -> query(child))
-      case Defer(join, child, rootTpe)     => obj("Defer", "join" -> str("<function>"), "child" -> query(child), "rootTpe" -> str(rootTpe))
+      case Effect(handler, child)          => obj("Effect", "handler" -> str("<handler>"), "child" -> query(child))
       case Environment(e, child)           => obj("Environment", "env" -> env(e), "child" -> query(child))
       case Wrap(name, child)               => obj("Wrap", "name" -> quoted(name), "child" -> query(child))
       case Rename(name, child)             => obj("Rename", "name" -> quoted(name), "child" -> query(child))
