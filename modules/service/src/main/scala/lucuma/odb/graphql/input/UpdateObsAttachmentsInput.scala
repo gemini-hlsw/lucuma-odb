@@ -12,22 +12,22 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
 
-case class UpdateAttachmentsInput(
+case class UpdateObsAttachmentsInput(
   programId: Program.Id,
-  SET:       AttachmentPropertiesInput.Edit,
+  SET:       ObsAttachmentPropertiesInput.Edit,
   WHERE:     Option[Predicate],
   LIMIT:     Option[NonNegInt]
 )
 
-object UpdateAttachmentsInput {
+object UpdateObsAttachmentsInput {
 
-  def binding(path: Path): Matcher[UpdateAttachmentsInput] = {
-    val WhereAttachmentBinding = WhereAttachment.binding(path)
+  def binding(path: Path): Matcher[UpdateObsAttachmentsInput] = {
+    val WhereObsAttachmentBinding = WhereObsAttachment.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rPid),
-        AttachmentPropertiesInput.EditBinding("SET", rSET),
-        WhereAttachmentBinding.Option("WHERE", rWHERE),
+        ObsAttachmentPropertiesInput.EditBinding("SET", rSET),
+        WhereObsAttachmentBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       ) =>
         (rPid, rSET, rWHERE, rLIMIT).parMapN(apply)

@@ -15,11 +15,11 @@ trait Predicates[F[_]] extends BaseMapping[F] {
    */
   object Predicates {
     val asterismGroup          = AsterismGroupPredicates(Path.from(AsterismGroupType))
-    val attachment             = AttachmentPredicates(Path.from(AttachmentType))
     val cloneObservationResult = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult      = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
     val constraintSetGroup     = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
     val linkUserResult         = LinkUserResultPredicates(Path.from(LinkUserResultType))
+    val obsAttachment          = ObsAttachmentPredicates(Path.from(ObsAttachmentType))
     val observation            = ObservationPredicates(Path.from(ObservationType))
     val observationEdit        = ObservationEditPredicates(Path.from(ObservationEditType))
     val program                = ProgramPredicates(Path.from(ProgramType))

@@ -1727,10 +1727,10 @@ type Mutation {
     input: UpdateAsterismsInput!
  ): UpdateAsterismsResult!
 
-  updateAttachments(
-    # Parameters for updating existing attachments.
-    input: UpdateAttachmentsInput!
-  ): UpdateAttachmentsResult!
+  updateObsAttachments(
+    # Parameters for updating existing observation attachments.
+    input: UpdateObsAttachmentsInput!
+  ): UpdateObsAttachmentsResult!
 
   updateDatasets(
     # Parameters for editing existing datasets
@@ -2409,25 +2409,25 @@ type UpdateAsterismsResult {
   hasMore: Boolean!
 }
 
-# Attachment selection and update description.  Use `SET` to specify the changes, `WHERE` to select the attachments to update, and `LIMIT` to control the size of the return value.
-input UpdateAttachmentsInput {
-  # Program ID for the program whose attachments are to be edited.
+# Obs Attachment selection and update description.  Use `SET` to specify the changes, `WHERE` to select the obs attachments to update, and `LIMIT` to control the size of the return value.
+input UpdateObsAttachmentsInput {
+  # Program ID for the program whose obs attachments are to be edited.
   programId: ProgramId!
 
-  # Describes the attachment values to modify.
-  SET: AttachmentPropertiesInput!
+  # Describes the obs attachment values to modify.
+  SET: ObsAttachmentPropertiesInput!
 
-  # Filters the attachments to be updated according to those that match the given constraints.
-  WHERE: WhereAttachment
+  # Filters the obs attachments to be updated according to those that match the given constraints.
+  WHERE: WhereObsAttachment
 
-  # Caps the number of results returned to the given value (if additional attachments match the WHERE clause they will be updated but not returned).
+  # Caps the number of results returned to the given value (if additional obs attachments match the WHERE clause they will be updated but not returned).
   LIMIT: NonNegInt
 }
 
-# The result of updating the selected attachments, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional attachments were modified and not included here.
-type UpdateAttachmentsResult {
-  # The edited attachments, up to the specified LIMIT or the default maximum of 1000.
-  attachments: [Attachment!]!
+# The result of updating the selected obs attachments, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional obs attachments were modified and not included here.
+type UpdateObsAttachmentsResult {
+  # The edited obs attachments, up to the specified LIMIT or the default maximum of 1000.
+  obsAttachments: [ObsAttachment!]!
 
   # `true` when there were additional edits that were not returned.
   hasMore: Boolean!
@@ -2710,13 +2710,13 @@ type AsterismGroupSelectResult {
   hasMore: Boolean!
 }
 
-# AttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`
-scalar AttachmentId
+# ObsAttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`
+scalar ObsAttachmentId
 
-# Program Attachment
-type Attachment {
-  id:             AttachmentId!
-  attachmentType: AttachmentType!
+# Program Observation Attachment
+type ObsAttachment {
+  id:             ObsAttachmentId!
+  attachmentType: ObsAttachmentType!
   fileName:       NonEmptyString!
   description:    NonEmptyString
   checked:        Boolean!
@@ -2725,7 +2725,7 @@ type Attachment {
   program:        Program!
 }
 
-input AttachmentPropertiesInput {
+input ObsAttachmentPropertiesInput {
   # The description field may be unset by assigning a null value, or ignored by skipping it altogether
   description: NonEmptyString
 
@@ -2733,9 +2733,9 @@ input AttachmentPropertiesInput {
   checked: Boolean
 }
 
-# Metadata for `enum AttachmentType`
-type AttachmentTypeMeta {
-  tag:        AttachmentType!
+# Metadata for `enum ObsAttachmentType`
+type ObsAttachmentTypeMeta {
+  tag:        ObsAttachmentType!
   shortName:  String!
   longName:	  String!
 }
@@ -4555,8 +4555,8 @@ type Program {
     LIMIT: NonNegInt
   ): ObservationSelectResult!
 
-  # Attachments assocated with the program
-  attachments: [Attachment!]!
+  # ObsAttachments assocated with the program
+  obsAttachments: [ObsAttachment!]!
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
@@ -4691,8 +4691,8 @@ type Query {
     includeDeleted: Boolean! = false
   ): AsterismGroupSelectResult!
 
-  # Metadata for `enum AttachmentType`
-  attachmentTypeMeta: [AttachmentTypeMeta!]!
+  # Metadata for `enum ObsAttachmentType`
+  obsAttachmentTypeMeta: [ObsAttachmentTypeMeta!]!
 
   # Observations grouped by commonly held constraints
   constraintSetGroup(
@@ -5744,19 +5744,19 @@ type WavelengthDither {
   micrometers: BigDecimal!
 }
 
-# Attachment filter options. All specified items must match.
-input WhereAttachment {
+# ObsAttachment filter options. All specified items must match.
+input WhereObsAttachment {
   # A list of nested attachment filters that all must match in order for the AND group as a whole to match.
-  AND: [WhereAttachment!]
+  AND: [WhereObsAttachment!]
 
   # A list of nested attachment filters where any one match causes the entire OR group as a whole to match.
-  OR: [WhereAttachment!]
+  OR: [WhereObsAttachment!]
 
   # A nested attachment filter that must not match in order for the NOT itself to match.
-  NOT: WhereAttachment
+  NOT: WhereObsAttachment
 
   # Matches the attachment ID.
-  id: WhereOrderAttachmentId
+  id: WhereOrderObsAttachmentId
 
   # Matches the attachment file name.
   fileName: WhereOptionString
@@ -5766,30 +5766,30 @@ input WhereAttachment {
 # criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 # for an integer property will match when the value is 3 or more.
 #
-input WhereOrderAttachmentId {
+input WhereOrderObsAttachmentId {
   # Matches if the property is exactly the supplied value.
-  EQ: AttachmentId
+  EQ: ObsAttachmentId
 
   # Matches if the property is not the supplied value.
-  NEQ: AttachmentId
+  NEQ: ObsAttachmentId
 
   # Matches if the property value is any of the supplied options.
-  IN: [AttachmentId!]
+  IN: [ObsAttachmentId!]
 
   # Matches if the property value is none of the supplied values.
-  NIN: [AttachmentId!]
+  NIN: [ObsAttachmentId!]
 
   # Matches if the property is ordered after (>) the supplied value.
-  GT: AttachmentId
+  GT: ObsAttachmentId
 
   # Matches if the property is ordered before (<) the supplied value.
-  LT: AttachmentId
+  LT: ObsAttachmentId
 
   # Matches if the property is ordered after or equal (>=) the supplied value.
-  GTE: AttachmentId
+  GTE: ObsAttachmentId
 
   # Matches if the property is ordered before or equal (<=) the supplied value.
-  LTE: AttachmentId
+  LTE: ObsAttachmentId
 }
 
 # Dataset filter options.  All specified items must match.

@@ -4,20 +4,14 @@
 package lucuma.odb.service
 
 import cats.effect.Async
-import cats.effect.Ref
-import cats.effect.Resource
 import cats.syntax.all._
-import eu.timepit.refined._
-import eu.timepit.refined.boolean.Or
-import eu.timepit.refined.generic.Equal
-import eu.timepit.refined.numeric.Greater
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
-import fs2.aws.s3.S3
-import fs2.aws.s3.models.Models.FileKey
-import fs2.aws.s3.models.Models.PartSizeMB
 import fs2.io.file.Path
+<<<<<<< main:modules/service/src/main/scala/lucuma/odb/service/AttachmentFileService.scala
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+=======
+>>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/service/ObsAttachmentFileService.scala
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
@@ -30,18 +24,20 @@ import natchez.Trace
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 
-trait AttachmentFileService[F[_]] {
-  import AttachmentFileService.AttachmentException
+trait ObsAttachmentFileService[F[_]] {
+  import ObsAttachmentFileService.ObsAttachmentException
 
   /** Retrieves the given file from S3 as a stream. */
   def getAttachment(
     user:         User,
     programId:    Program.Id,
     attachmentId: ObsAttachment.Id
+<<<<<<< main:modules/service/src/main/scala/lucuma/odb/service/AttachmentFileService.scala
   ): F[Either[AttachmentException, Stream[F, Byte]]]
+=======
+  ): F[Either[ObsAttachmentException, Stream[F, Byte]]]
+>>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/service/ObsAttachmentFileService.scala
 
   /** Uploads the file to S3 and addes it to the database */
   def uploadAttachment(
@@ -57,20 +53,20 @@ trait AttachmentFileService[F[_]] {
   def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[Unit]
 }
 
-object AttachmentFileService {
-  sealed trait AttachmentException extends Exception
-  // maybe we can improve on the AWS error handling...
-  object AttachmentException {
-    case object Forbidden                   extends AttachmentException
-    case class InvalidRequest(message: String) extends AttachmentException
-    case object FileNotFound                extends AttachmentException
+object ObsAttachmentFileService {
+  sealed trait ObsAttachmentException extends Exception
+  
+  object ObsAttachmentException {
+    case object Forbidden                   extends ObsAttachmentException
+    case class InvalidRequest(message: String) extends ObsAttachmentException
+    case object FileNotFound                extends ObsAttachmentException
   }
 
-  import AttachmentException._
+  import ObsAttachmentException._
 
   private type FileName = FileName.Type
   private object FileName extends NewType[NonEmptyString] {
-    def fromString(name: String): Either[AttachmentException, FileName] = {
+    def fromString(name: String): Either[ObsAttachmentException, FileName] = {
       val path         = Path(name)
       val segmentCount = path.names.length
       val fileName     = NonEmptyString.from(path.fileName.toString).toOption
@@ -90,61 +86,21 @@ object AttachmentFileService {
   }
 
   def fromS3AndSession[F[_]: Async: Trace](
-    awsConfig: Config.Aws,
-    s3Ops:     S3AsyncClientOp[F],
+    s3FileSvc: S3FileService[F],
     session:   Session[F]
-  ): AttachmentFileService[F] = {
-    // We can switch back to unsafeFrom when a new version of refined is out that fixes
-    // https://github.com/fthomas/refined/issues/1161 or a version of fs2-aws > 6.0.0
-    // is availabile with my PR that changes PartSizeMB to "GreaterEqual[5]"
-    // val partSize = PartSizeMB.unsafeFrom(5)
-    val partSize = refineV[Greater[5] Or Equal[5]](5).toOption.get
-
-    val s3 = S3.create[F](s3Ops)
-
-    // We also use this to make sure the file exists and we have read permissions.
-    def getRemoteFileSize(fileKey: FileKey): F[Long] =
-      Trace[F].span("getRemoteFileSize") {
-        s3Ops
-          .headObject(
-            HeadObjectRequest
-              .builder()
-              .bucket(awsConfig.bucketName.value.value)
-              .key(fileKey.value.value)
-              .build
-          )
-          .onError { case e => Trace[F].attachError(e, ("error", true)) }
-          .map(_.contentLength())
-      }
-
-    def uploadRemoteFile(fileKey: FileKey, data: Stream[F, Byte]): F[Long] =
-      Trace[F].span("uploadRemoteFile") {
-        val f = for {
-          ref  <- Ref.of(0L)
-          pipe  = s3.uploadFileMultipart(awsConfig.bucketName, fileKey, partSize)
-          _    <- data.evalTapChunk(c => ref.update(_ + 1)).through(pipe).compile.drain
-          size <- ref.get
-        } yield size
-        f.onError { case e => Trace[F].attachError(e, ("error", true)) }
-      }
-
-    def deleteRemoteFile(programId: Program.Id, fileName: NonEmptyString): F[Unit] =
-      Trace[F].span("deleteRemoteFile") {
-        s3.delete(awsConfig.bucketName, awsConfig.fileKey(programId, fileName))
-          .onError { case e => Trace[F].attachError(e, ("error", true)) }
-      }
+  ): ObsAttachmentFileService[F] = {
 
     // TODO: eventually will probably want to check for write access for uploading/deleting files.
     def checkAccess[A](user: User, programId: Program.Id): F[Unit] = user match {
       // guest users not allowed to upload files - at least for now.
-      case GuestUser(_) => Async[F].raiseError(AttachmentException.Forbidden)
+      case GuestUser(_) => Async[F].raiseError(ObsAttachmentException.Forbidden)
       case _            =>
         ProgramService
           .fromSessionAndUser(session, user)
           .userHasAccess(programId)
           .flatMap(hasAccess =>
             if (hasAccess) Async[F].unit
-            else Async[F].raiseError(AttachmentException.Forbidden)
+            else Async[F].raiseError(ObsAttachmentException.Forbidden)
           )
     }
 
@@ -158,7 +114,7 @@ object AttachmentFileService {
         }
         .flatMap(isValid =>
           if (isValid) Async[F].unit
-          else Async[F].raiseError(AttachmentException.InvalidRequest("Invalid attachment type"))
+          else Async[F].raiseError(ObsAttachmentException.InvalidRequest("Invalid attachment type"))
         )
     }
 
@@ -173,7 +129,7 @@ object AttachmentFileService {
       Trace[F].span("insertOrUpdateAttachment") {
         val af   = 
           Statements.insertOrUpdateAttachment(user, programId, attachmentType, fileName.value, description, fileSize)
-        val stmt = af.fragment.query(attachment_id)
+        val stmt = af.fragment.query(obs_attachment_id)
         session.prepareR(stmt).use(pg => pg.unique(af.argument))
       }
 
@@ -191,7 +147,7 @@ object AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => Async[F].raiseError(AttachmentException.FileNotFound)
+                case None    => Async[F].raiseError(ObsAttachmentException.FileNotFound)
                 case Some(s) => Async[F].pure(s)
               }
           )
@@ -211,19 +167,23 @@ object AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => Async[F].raiseError(AttachmentException.FileNotFound)
+                case None    => Async[F].raiseError(ObsAttachmentException.FileNotFound)
                 case Some(s) => Async[F].pure(s)
               }
           )
       }
 
-    new AttachmentFileService[F] {
+    new ObsAttachmentFileService[F] {
 
       def getAttachment(
         user:         User,
         programId:    Program.Id,
         attachmentId: ObsAttachment.Id
+<<<<<<< main:modules/service/src/main/scala/lucuma/odb/service/AttachmentFileService.scala
       ): F[Either[AttachmentException, Stream[F, Byte]]] =
+=======
+      ): F[Either[ObsAttachmentException, Stream[F, Byte]]] =
+>>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/service/ObsAttachmentFileService.scala
         session.transaction
           .use(_ =>
             for {
@@ -232,17 +192,10 @@ object AttachmentFileService {
             } yield fileName
           )
           .flatMap { fn =>
-            val fileKey = awsConfig.fileKey(programId, fn)
-            val stream  = s3.readFileMultipart(awsConfig.bucketName, fileKey, partSize)
-
-            // Make sure the file exists and we can read it. Otherwise, the stream would have an error
-            // and HTTP4S would just terminate the response with no good response type.
-            getRemoteFileSize(fileKey)
-              .map(_ => stream.asRight)
+            s3FileSvc.verifyAndGet(programId, fn).map(_.asRight)
           }
           .recover {
-            case _: NoSuchKeyException  => AttachmentException.FileNotFound.asLeft
-            case e: AttachmentException => e.asLeft
+            case e: ObsAttachmentException => e.asLeft
           }
 
       def uploadAttachment(
@@ -267,10 +220,8 @@ object AttachmentFileService {
                 e => Async[F].raiseError(e),
                 fn =>
                   // TODO: Validate the file extension based on attachment type
-                  val fileKey = awsConfig.fileKey(programId, fn.value)
-
                   for {
-                    size   <- uploadRemoteFile(fileKey, data)
+                    size   <- s3FileSvc.upload(programId, fn.value, data)
                     result <- insertOrUpdateAttachmentInDB(user, programId, attachmentType, fn, description, size)
                   } yield result
               )
@@ -288,7 +239,11 @@ object AttachmentFileService {
               fileName <- deleteAttachmentFromDB(user, programId, attachmentId)
             } yield fileName
           )
-          .flatMap(fn => deleteRemoteFile(programId, fn))
+          .flatMap(fn =>
+            // We'll trap errors from the remote delete because, although not ideal, we don't 
+            // care so much if an orphan file is left on S3. The error will have been put in the trace.
+            s3FileSvc.delete(programId, fn).handleError{ case _ => () }
+          )
     }
   }
 
@@ -303,7 +258,7 @@ object AttachmentFileService {
       fileSize:       Long
     ): AppliedFragment =
       sql"""
-        INSERT INTO t_attachment (
+        INSERT INTO t_obs_attachment (
           c_program_id,
           c_attachment_type,
           c_file_name,
@@ -324,7 +279,7 @@ object AttachmentFileService {
           c_description     = EXCLUDED.c_description,
           c_checked         = false,
           c_file_size       = EXCLUDED.c_file_size
-        RETURNING c_attachment_id
+        RETURNING c_obs_attachment_id
       """
 
     def getAttachmentFileName(
@@ -334,8 +289,8 @@ object AttachmentFileService {
     ): AppliedFragment =
       sql"""
         SELECT c_file_name
-        FROM t_attachment
-        WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
+        FROM t_obs_attachment
+        WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId ~ attachmentId) |+|
         accessFrag(user, programId)
 
@@ -346,15 +301,15 @@ object AttachmentFileService {
       attachmentId: ObsAttachment.Id
     ): AppliedFragment =
       sql"""
-        DELETE FROM t_attachment
-        WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
+        DELETE FROM t_obs_attachment
+        WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId, attachmentId) |+|
         accessFrag(user, programId) |+|
         void"RETURNING c_file_name"
 
     def existsAttachmentType(attachmentType: Tag): AppliedFragment =
       sql"""
-        EXISTS (select c_tag from t_attachment_type where c_tag = $tag)
+        EXISTS (select c_tag from t_obs_attachment_type where c_tag = $tag)
       """.apply(attachmentType)
 
     private def accessFrag(user: User, programId: Program.Id): AppliedFragment =

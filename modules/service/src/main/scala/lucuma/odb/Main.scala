@@ -18,11 +18,12 @@ import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
-import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.graphql.ObsAttachmentRoutes
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.AttachmentFileService
+import lucuma.odb.service.ObsAttachmentFileService
+import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
@@ -248,10 +249,12 @@ object FMain extends MainParams {
       enums             <- Resource.eval(pool.use(Enums.load))
       graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
       s3ClientOps       <- s3OpsResource
-      attachmentFileSvc <- pool.map(ses => AttachmentFileService.fromS3AndSession(awsConfig, s3ClientOps, ses))
+      s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps)
+      obsAttachFileSvc  <- pool.map(ses => ObsAttachmentFileService.fromS3AndSession(s3FileService, ses))
     } yield { wsb =>
-      val attachmentRoutes =  AttachmentRoutes.apply[F](attachmentFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
-      middleware(graphQLRoutes(wsb) <+> attachmentRoutes)
+      val attachmentBaseRoute = "attachment"
+      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](obsAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb, attachmentBaseRoute)
+      middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */

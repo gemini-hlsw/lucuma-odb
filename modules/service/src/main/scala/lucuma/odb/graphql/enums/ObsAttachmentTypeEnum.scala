@@ -12,13 +12,13 @@ import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
 
-object AttachmentTypeEnumType {
+object ObsAttachmentTypeEnumType {
 
   def fetch[F[_]: Functor](s: Session[F]): F[EnumType] =
-    s.execute(sql"select c_tag, c_long_name from t_attachment_type order by c_tag".query(varchar ~ varchar)).map { elems =>
+    s.execute(sql"select c_tag, c_long_name from t_obs_attachment_type order by c_tag".query(varchar ~ varchar)).map { elems =>
       EnumType(
-        "AttachmentType",
-        Some("Enumerated type of attachments."),
+        "ObsAttachmentType",
+        Some("Enumerated type of observation attachments."),
         elems.map { case tag ~ desc => EnumValue(tag.toUpperCase(), Some(desc)) }
       )
     }

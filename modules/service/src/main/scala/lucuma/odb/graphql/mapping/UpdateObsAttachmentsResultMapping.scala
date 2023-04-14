@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.mapping
 
-trait UpdateAttachmentsResultMapping[F[_]] extends ResultMapping[F] {
+trait UpdateObsAttachmentsResultMapping[F[_]] extends ResultMapping[F] {
   
-  lazy val UpdateAttachmentsResultMapping: ObjectMapping = 
-    updateResultMapping(UpdateAttachmentsResultType, "attachments")
+  lazy val UpdateObsAttachmentsResultMapping: ObjectMapping = 
+    updateResultMapping(UpdateObsAttachmentsResultType, "obsAttachments")
 }

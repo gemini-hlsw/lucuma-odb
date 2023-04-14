@@ -8,11 +8,11 @@ import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model.Access._
-import lucuma.core.model.Attachment
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 
-class AttachmentPredicates(path: Path) {
-  lazy val id        = LeafPredicates[Attachment.Id](path / "id")
+class ObsAttachmentPredicates(path: Path) {
+  lazy val id        = LeafPredicates[ObsAttachment.Id](path / "id")
   lazy val program   = new ProgramPredicates(path / "program")
 }
