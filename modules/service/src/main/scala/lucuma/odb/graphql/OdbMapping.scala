@@ -38,9 +38,7 @@ import lucuma.itc.client.ItcResult
 import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
-import lucuma.odb.graphql.enums.AttachmentTypeEnumType
-import lucuma.odb.graphql.enums.FilterTypeEnumType
-import lucuma.odb.graphql.enums.PartnerEnumType
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
@@ -102,11 +100,13 @@ object OdbMapping {
     user0:      User,
     topics0:    Topics[F],
     itcClient:  ItcClient[F],
-    commitHash: CommitHash
-  ):  F[Mapping[F]] =
-    Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
-      database.use(enumSchema(_)).map { enums =>
-        new SkunkMapping[F](database, monitor) with BaseMapping[F]
+    commitHash: CommitHash,
+    enums:      Enums
+  ):  Mapping[F] =
+//    Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
+//      database.use(Enums.load(_)).map { enums =>
+        new SkunkMapping[F](database, monitor)
+          with BaseMapping[F]
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
@@ -176,7 +176,7 @@ object OdbMapping {
 
           // Our schema
           val schema: Schema =
-            unsafeLoadSchema("OdbSchema.graphql") |+| enums
+            unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
 
           // Our services and resources needed by various mappings.
           override val user: User         = user0
@@ -357,16 +357,7 @@ object OdbMapping {
           }
 
         }
-      }
-    }
-
-  def enumSchema[F[_]: Applicative](s: Session[F]): F[Schema] =
-    List(FilterTypeEnumType.fetch(s), PartnerEnumType.fetch(s), AttachmentTypeEnumType.fetch(s)).sequence.map { tpes =>
-      new Schema {
-        def pos: SourcePos = SourcePos.instance
-        def types: List[NamedType] = tpes
-        def directives: List[Directive] = Nil
-      }
-    }
+//      }
+//    }
 
 }
