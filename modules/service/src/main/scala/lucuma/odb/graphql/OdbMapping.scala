@@ -55,6 +55,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.GroupService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
@@ -66,6 +67,8 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
+import edu.gemini.grackle.Cursor.Context
+import lucuma.odb.graphql.mapping.CreateGroupResultMapping
 object OdbMapping {
 
   case class Topics[F[_]](
@@ -121,6 +124,7 @@ object OdbMapping {
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
+          with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -189,6 +193,9 @@ object OdbMapping {
 
           override val asterismService: Resource[F, AsterismService[F]] =
             pool.map(AsterismService.fromSessionAndUser(_, user))
+
+          override val groupService: Resource[F, GroupService[F]] =
+            pool.map(GroupService.fromSessionAndUser(_, user))
 
           override val observationService: Resource[F, ObservationService[F]] =
             pool.map { s =>
@@ -275,6 +282,7 @@ object OdbMapping {
               ConstraintSetGroupSelectResultMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
+              CreateGroupResultMapping,
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
@@ -346,9 +354,9 @@ object OdbMapping {
             )
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
-          override def defaultRootCursor(query: Query, tpe: Type, env: Env): F[Result[(Query, Cursor)]] =
+          override def defaultRootCursor(query: Query, tpe: Type, parentCursor: Option[Cursor]): F[Result[(Query, Cursor)]] =
             Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >> 
-            super.defaultRootCursor(query, tpe, env)
+            super.defaultRootCursor(query, tpe, parentCursor)
 
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {

@@ -52,13 +52,13 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
   // Convenience for constructing a Subscription stream and corresponding 1-arg elaborator.
   private trait SubscriptionField {
     def Elaborator: PartialFunction[Select, Result[Query]]
-    def FieldMapping: RootEffect
+    def FieldMapping: RootStream
   }
   private object SubscriptionField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => Stream[F, Result[Query]]) =
       new SubscriptionField {
         val FieldMapping =
-          RootEffect.computeQueryStream(fieldName) { (query, tpe, env) =>
+          RootStream.computeQuery(fieldName) { (query, tpe, env) =>
             query match
               case Environment(a, Select(b, c, q)) =>
                 Nested(env.getR[I]("input").flatTraverse(f(_, q)))

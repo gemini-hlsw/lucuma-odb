@@ -1630,6 +1630,12 @@ type Mutation {
     input: CloneTargetInput!
   ): CloneTargetResult!
 
+  "Creates a new observation according to provided parameters."
+  createGroup(
+    "Group description."
+    input: CreateGroupInput!
+  ): CreateGroupResult!
+
   # Creates a new observation according to provided parameters
   createObservation(
     # Observation description
@@ -4073,7 +4079,7 @@ type Group {
   minimumInterval: TimeSpan
   maximumInterval: TimeSpan
 
-  #"References to child elements"
+  "Contained elements"
   elements: [GroupElement!]!
 
 }
@@ -4085,6 +4091,46 @@ type GroupElement {
   group: Group
   observation: Observation
 }
+
+input GroupPropertiesInput {
+
+  "Group name (optional)."
+  name: NonEmptyString
+
+  "Group description (optional)."
+  description: NonEmptyString
+
+  "Minimum number of elements to be observed. If unspecified then all elements will be observed."
+  minimumRequired: NonNegShort
+
+  "If true, elements will be observed in order. Defaults to false if left unspecified."
+  ordered: Boolean
+
+  "If specified, elements will be separated by at least `minimumInterval`."
+  minimumInterval: TimeSpanInput
+
+  "If specified, elements will be separated by at most `maximumInterval`."
+  maximumInterval: TimeSpanInput
+
+  "Parent group (optional). If specified then parent index must also be specified."
+  parentGroup: GroupId
+
+  "Parent index. If unspecified then the element will appear first in the program or parent group (if specified). Cannot be set to null."
+  parentGroupIndex: NonNegShort
+
+}
+
+input CreateGroupInput {
+  programId: ProgramId!
+  SET: GroupPropertiesInput
+}
+
+"The result of creating a new group."
+type CreateGroupResult {
+  "The newly created group."
+  group: Group!
+}
+
 
 # HII Region spectrum
 enum HiiRegionSpectrum {
