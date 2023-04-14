@@ -34,6 +34,7 @@ trait BaseMapping[F[_]]
   lazy val ConstraintSetGroupType              = schema.ref("ConstraintSetGroup")
   lazy val ConstraintSetGroupSelectResultType  = schema.ref("ConstraintSetGroupSelectResult")
   lazy val CoordinatesType                     = schema.ref("Coordinates")
+  lazy val CreateGroupResultType               = schema.ref("CreateGroupResult")
   lazy val CreateObservationResultType         = schema.ref("CreateObservationResult")
   lazy val CreateProgramResultType             = schema.ref("CreateProgramResult")
   lazy val CreateTargetResultType              = schema.ref("CreateTargetResult")
