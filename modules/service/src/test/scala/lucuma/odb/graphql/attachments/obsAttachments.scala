@@ -22,7 +22,7 @@ import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.client.JavaNetClientBuilder
 
-class attachments extends OdbSuiteWithS3 {
+class obsAttachments extends OdbSuiteWithS3 {
 
   case class TestAttachment(
     fileName:       String,
@@ -35,7 +35,7 @@ class attachments extends OdbSuiteWithS3 {
     // we can only check s3 if we have a file name.
     // So, only call this for values with NonEmpty file names
     def fileKey(programId: Program.Id): FileKey =
-      awsConfig.fileKey(programId, NonEmptyString.unsafeFrom(fileName))
+      awsConfig.obsFileKey(programId, NonEmptyString.unsafeFrom(fileName))
   }
 
   def assertAttachmentsOdb(
@@ -48,7 +48,7 @@ class attachments extends OdbSuiteWithS3 {
       query = s"""
           query {
             program(programId: "$programId") {
-              attachments {
+              obsAttachments {
                 id
                 attachmentType
                 fileName
@@ -71,20 +71,20 @@ class attachments extends OdbSuiteWithS3 {
     programId:   Program.Id,
     WHERE:       String,
     SET:         String,
-    expectedTas: (Attachment.Id, TestAttachment)*
+    expectedTas: (ObsAttachment.Id, TestAttachment)*
   ): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
-          updateAttachments(
+          updateObsAttachments(
             input: {
               programId: "$programId"
               WHERE: """ + WHERE + """
               SET: """ + SET + """
             }
           ) {
-            attachments {
+            obsAttachments {
               id
               attachmentType
               fileName
@@ -97,14 +97,14 @@ class attachments extends OdbSuiteWithS3 {
       """,
       expected = Right(
         Json.obj(
-          "updateAttachments" -> expected(expectedTas: _*)
+          "updateObsAttachments" -> expected(expectedTas: _*)
         )
       )
     )
 
-  def expected(attachments: (Attachment.Id, TestAttachment)*): Json =
+  def expected(attachments: (ObsAttachment.Id, TestAttachment)*): Json =
     Json.obj(
-      "attachments" -> Json.fromValues(
+      "obsAttachments" -> Json.fromValues(
         attachments.map((tid, ta) =>
           Json.obj(
             "id"             -> tid.asJson,
@@ -127,7 +127,7 @@ class attachments extends OdbSuiteWithS3 {
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
       val uri =
-        (svr.baseUri / "attachment" / programId.toString)
+        (svr.baseUri / "attachment" / "obs" / programId.toString)
           .withQueryParam("fileName", ta.fileName)
           .withQueryParam("attachmentType", ta.attachmentType)
           .withOptionQueryParam("description", ta.description)
@@ -147,7 +147,7 @@ class attachments extends OdbSuiteWithS3 {
     attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+      var uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
       var request = Request[IO](
         method = Method.GET,
         uri = uri,
@@ -163,7 +163,7 @@ class attachments extends OdbSuiteWithS3 {
     attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+      var uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
       var request = Request[IO](
         method = Method.DELETE,
         uri = uri,
@@ -201,14 +201,14 @@ class attachments extends OdbSuiteWithS3 {
   val validUsers = List(pi, pi2, service)
 
   val file1A           = TestAttachment("file1", "finder", "A description".some, "Hopeful")
-  val file1B           = TestAttachment("file1", "proposal", None, "New contents")
+  val file1B           = TestAttachment("file1", "mos_mask", None, "New contents")
   val file1Empty       = TestAttachment("file1", "pre_imaging", "Thing".some, "")
   val file1MissingType = TestAttachment("file1", "", "Whatever".some, "It'll never make it")
   val file1InvalidType = TestAttachment("file1", "NotAType", none, "It'll never make it")
   val file2            = TestAttachment("file2", "mos_mask", "Masked".some, "Zorro")
   val fileWithPath     = TestAttachment("this/file.txt", "pre_imaging", none, "Doesn't matter")
   val missingFileName  = TestAttachment("", "finder", none, "Doesn't matter")
-  val file3            = TestAttachment("different", "proposal", "Unmatching file name".some, "Something different")
+  val file3            = TestAttachment("different", "mos_mask", "Unmatching file name".some, "Something different")
 
   test("successful upload, download and delete") {
     for {

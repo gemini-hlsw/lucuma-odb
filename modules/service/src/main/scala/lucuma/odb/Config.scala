@@ -155,8 +155,8 @@ object Config {
     bucketName:      BucketName,
     fileUploadMaxMb: Int 
   ) {
-    def fileKey(programId: Program.Id, fileName: NonEmptyString): FileKey = 
-      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/$fileName"))
+    def obsFileKey(programId: Program.Id, fileName: NonEmptyString): FileKey = 
+      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/obs/$fileName"))
   }
 
   object Aws {

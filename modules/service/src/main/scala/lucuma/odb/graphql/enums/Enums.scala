@@ -134,7 +134,7 @@ object Enums {
       un  <- List(
                // "Unreferenced" types -- those for which we do not need to refer
                // to individual instance in ODB code.
-               AttachmentTypeEnumType.fetch(s),
+               ObsAttachmentTypeEnumType.fetch(s),
                FilterTypeEnumType.fetch(s),
                PartnerEnumType.fetch(s),
              ).sequence

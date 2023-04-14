@@ -7,35 +7,35 @@ import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.all.*
 import edu.gemini.grackle.Result
-import lucuma.core.model.Attachment
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.AttachmentPropertiesInput
-import lucuma.odb.graphql.input.AttachmentPropertiesInput.Edit
+import lucuma.odb.graphql.input.ObsAttachmentPropertiesInput
+import lucuma.odb.graphql.input.ObsAttachmentPropertiesInput.Edit
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
-trait AttachmentMetadataService [F[_]] {
-  def updateAttachments(
-    SET: AttachmentPropertiesInput.Edit,
+trait ObsAttachmentMetadataService [F[_]] {
+  def updateObsAttachments(
+    SET: ObsAttachmentPropertiesInput.Edit,
     which: AppliedFragment
-  ): F[List[Attachment.Id]]
+  ): F[List[ObsAttachment.Id]]
 }
 
-object AttachmentMetadataService {
+object ObsAttachmentMetadataService {
 
   def fromSessionAndUser[F[_]: Sync: Trace](
     session: Session[F],
     user: User
-  ): AttachmentMetadataService[F] = 
-    new AttachmentMetadataService[F] {
+  ): ObsAttachmentMetadataService[F] = 
+    new ObsAttachmentMetadataService[F] {
 
-      def updateAttachments(SET: Edit, which: AppliedFragment): F[List[Attachment.Id]] = 
-        Statements.updateAttachments(SET, which).fold(Nil.pure[F]) { af =>
-          session.prepareR(af.fragment.query(attachment_id)).use { pq =>
+      def updateObsAttachments(SET: Edit, which: AppliedFragment): F[List[ObsAttachment.Id]] = 
+        Statements.updateObsAttachments(SET, which).fold(Nil.pure[F]) { af =>
+          session.prepareR(af.fragment.query(obs_attachment_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList
           }
         }
@@ -43,7 +43,7 @@ object AttachmentMetadataService {
 
   object Statements {
 
-    def updates(SET: AttachmentPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
+    def updates(SET: ObsAttachmentPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
       val upDescription = sql"c_description = ${text_nonempty.opt}"
       val upChecked = sql"c_checked = $bool"
       NonEmptyList.fromList(
@@ -58,12 +58,12 @@ object AttachmentMetadataService {
       )
     }
 
-    def updateAttachments(SET: AttachmentPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
+    def updateObsAttachments(SET: ObsAttachmentPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] =
       updates(SET).map { us =>
-        void"UPDATE t_attachment "                                           |+|
+        void"UPDATE t_obs_attachment "                                           |+|
         void"SET " |+| us.intercalate(void", ") |+| void" "                  |+|
-        void"WHERE t_attachment.c_attachment_id IN (" |+| which |+| void") " |+|
-        void"RETURNING t_attachment.c_attachment_id"
+        void"WHERE t_obs_attachment.c_obs_attachment_id IN (" |+| which |+| void") " |+|
+        void"RETURNING t_obs_attachment.c_obs_attachment_id"
       }
   }
 }
