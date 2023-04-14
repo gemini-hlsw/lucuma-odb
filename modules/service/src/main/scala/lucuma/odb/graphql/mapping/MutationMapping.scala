@@ -58,6 +58,8 @@ import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
+import lucuma.odb.service.GroupService
+import lucuma.odb.graphql.input.CreateGroupInput
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -65,6 +67,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     List(
       CloneObservation,
       CloneTarget,
+      CreateGroup,
       CreateObservation,
       CreateProgram,
       CreateTarget,
@@ -85,6 +88,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // Resources needed by mutations
   def allocationService: Resource[F, AllocationService[F]]
   def asterismService: Resource[F, AsterismService[F]]
+  def groupService: Resource[F, GroupService[F]]
   def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
   def targetService: Resource[F, TargetService[F]]
@@ -185,6 +189,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               case TrackingSwitchFailed(p)        => Result.failure(p)
 
         }  
+      }
+    }
+
+  private lazy val CreateGroup: MutationField =
+    MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
+      pool.use { s =>
+        groupService.use { svc =>
+          svc.createGroup(input).map { gid =>
+            Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
+          }
+        }
       }
     }
 
