@@ -228,8 +228,8 @@ object AsterismService {
     ): AppliedFragment =
        void"DELETE FROM ONLY t_asterism_target "        |+|
          void"WHERE " |+| programIdEqual(programId)     |+|
-         void"AND " |+| observationIdIn(observationIds) |+|
-         void"AND " |+| targetIdIn(targetIds)           |+|
+         void" AND " |+| observationIdIn(observationIds) |+|
+         void" AND " |+| targetIdIn(targetIds)           |+|
          andExistsUserAccess(user, programId)
 
     def deleteAllLinksAs(
@@ -239,7 +239,7 @@ object AsterismService {
     ): AppliedFragment =
       void"DELETE FROM ONLY t_asterism_target "         |+|
         void"WHERE " |+| programIdEqual(programId)      |+|
-        void"AND "  |+| observationIdIn(observationIds) |+|
+        void" AND "  |+| observationIdIn(observationIds) |+|
         andExistsUserAccess(user, programId)
 
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
