@@ -23,6 +23,14 @@ import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import skunk.Session
 
+/**
+ * Enums loaded from the database on startup.  These fall into two categories:
+ * "referenced" enums, those for which we need to reference individual values
+ * in code and "unreferenced" enums, those which are simply a listing of
+ * elements to add to the schema.
+ *
+ * @param enumMeta metadata for referenced enums
+ */
 final class Enums(
   enumMeta: Enums.Meta
 ) {
@@ -51,13 +59,7 @@ final class Enums(
   object PlannedTimeCategory {
 
     given Enumerated[PlannedTimeCategory] =
-      Enumerated.from(
-        ConfigChange,
-        Exposure,
-        Readout,
-        Setup,
-        Write
-      ).withTag(_.tag)
+      Enumerated.from(values.head, values.tail*).withTag(_.tag)
 
     def enumType: EnumType =
       Enumerated[PlannedTimeCategory]
@@ -98,33 +100,13 @@ final class Enums(
     case ScienceFold         extends TimeEstimate("science_fold")
 
     // Used to test that undefined values in the database produce immediate failure on startup.
-//     case FooBar              extends TimeEstimate("foo_bar")
+    // case FooBar              extends TimeEstimate("foo_bar")
   }
 
   object TimeEstimate {
 
     given Enumerated[TimeEstimate] =
-      Enumerated.from(
-        GcalDiffuser,
-        GcalFilter,
-        GcalShutter,
-        GmosNorthDisperser,
-        GmosNorthFilter,
-        GmosNorthFpu,
-        GmosNorthNod,
-        GmosNorthNodEOffset,
-        GmosNorthWrite,
-        GmosSouthDisperser,
-        GmosSouthFilter,
-        GmosSouthFpu,
-        GmosSouthNod,
-        GmosSouthNodEOffset,
-        GmosSouthWrite,
-        OffsetConstant,
-        OffsetDistance,
-        ScienceFold,
-//        FooBar
-      ).withTag(_.tag)
+      Enumerated.from(values.head, values.tail*).withTag(_.tag)
 
   }
 
@@ -150,6 +132,8 @@ object Enums {
       ptc <- PlannedTimeCategoryMeta.select(s)
       te  <- TimeEstimateMeta.select(s)
       un  <- List(
+              // "Unreferenced" types -- those for which we do not need to refer
+              // to individual instance in ODB code.
               AttachmentTypeEnumType.fetch(s),
               FilterTypeEnumType.fetch(s),
               PartnerEnumType.fetch(s),

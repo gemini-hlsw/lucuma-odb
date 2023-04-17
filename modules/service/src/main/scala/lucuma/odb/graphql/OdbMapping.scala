@@ -103,8 +103,6 @@ object OdbMapping {
     commitHash: CommitHash,
     enums:      Enums
   ):  Mapping[F] =
-//    Trace[F].span(s"Creating mapping for ${user0.displayName} (${user0.id}, ${user0.role})") {
-//      database.use(Enums.load(_)).map { enums =>
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
           with AirMassRangeMapping[F]
@@ -357,7 +355,5 @@ object OdbMapping {
           }
 
         }
-//      }
-//    }
 
 }
