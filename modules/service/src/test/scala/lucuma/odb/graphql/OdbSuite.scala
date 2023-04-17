@@ -38,6 +38,7 @@ import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.graphql.OdbMapping
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.refined.*
 import munit.CatsEffectSuite
@@ -147,7 +148,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
     FMain.s3ClientOpsResource[IO](awsConfig)
 
-  private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(enums: Enums): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -155,7 +156,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
       "unused",
-      s3ClientOpsResource
+      s3ClientOpsResource,
+      enums
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -166,18 +168,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
       itc  = itcClient
-      map <- Resource.eval(OdbMapping(db, mon, usr, top, itc, CommitHash.Zero))
+      enm <- db.evalMap(Enums.load)
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm)
     } yield map
 
   protected def server: Resource[IO, Server] =
-    // Resource.make(IO.println("  • Server starting..."))(_ => IO.println("  • Server stopped.")) *>
-    httpApp.flatMap { app =>
-      BlazeServerBuilder[IO]
-        .withHttpWebSocketApp(app)
-        .bindAny()
-        .resource
-        // .flatTap(_ => Resource.eval(IO.println("  • Server started.")))
-    }
+    for {
+      e <- FMain.singleSession[IO](databaseConfig).evalMap(Enums.load)
+      a <- httpApp(e)
+      s <- BlazeServerBuilder[IO]
+             .withHttpWebSocketApp(a)
+             .bindAny()
+             .resource
+    } yield s
 
   private def transactionalClient(user: User)(svr: Server): IO[TransactionalClient[IO, Nothing]] =
     for {
