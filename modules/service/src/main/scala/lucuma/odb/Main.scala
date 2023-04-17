@@ -300,6 +300,9 @@ object FMain extends MainParams {
     }
   }
 
+//  def loadEnums[F[_]: Async : Console](config: Config.Database): F[Enums] =
+//    singleSession(c.database).use(Enums.load)
+
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
@@ -317,6 +320,7 @@ object FMain extends MainParams {
       e  <- Resource.eval(singleSession(c.database).use(Enums.load))
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
+//      e  <- singleSession(c.database).evalMap(Enums.load)
       ep <- entryPointResource(c)
       ap <- ep.wsLiftR(routesResource(c, e)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
