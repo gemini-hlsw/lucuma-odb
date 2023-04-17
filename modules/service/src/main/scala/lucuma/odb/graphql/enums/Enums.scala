@@ -132,13 +132,12 @@ object Enums {
       ptc <- PlannedTimeCategoryMeta.select(s)
       te  <- TimeEstimateMeta.select(s)
       un  <- List(
-              // "Unreferenced" types -- those for which we do not need to refer
-              // to individual instance in ODB code.
-              AttachmentTypeEnumType.fetch(s),
-              FilterTypeEnumType.fetch(s),
-              PartnerEnumType.fetch(s),
-            ).sequence
-      enums = Enums(Meta(ptc, te, un))
-    } yield enums
+               // "Unreferenced" types -- those for which we do not need to refer
+               // to individual instance in ODB code.
+               AttachmentTypeEnumType.fetch(s),
+               FilterTypeEnumType.fetch(s),
+               PartnerEnumType.fetch(s),
+             ).sequence
+    } yield Enums(Meta(ptc, te, un))
 
 }
