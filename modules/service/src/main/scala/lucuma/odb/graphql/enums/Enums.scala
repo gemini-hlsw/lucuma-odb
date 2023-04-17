@@ -98,7 +98,7 @@ final class Enums(
     case ScienceFold         extends TimeEstimate("science_fold")
 
     // Used to test that undefined values in the database produce immediate failure on startup.
-    // case FooBar              extends TimeEstimate("foo_bar")
+//     case FooBar              extends TimeEstimate("foo_bar")
   }
 
   object TimeEstimate {
@@ -122,8 +122,8 @@ final class Enums(
         GmosSouthWrite,
         OffsetConstant,
         OffsetDistance,
-        ScienceFold
-        // FooBar
+        ScienceFold,
+//        FooBar
       ).withTag(_.tag)
 
   }
