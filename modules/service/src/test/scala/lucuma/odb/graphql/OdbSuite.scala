@@ -148,7 +148,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
     FMain.s3ClientOpsResource[IO](awsConfig)
 
-  private def httpApp(enums: Enums): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -157,7 +157,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       ssoClient.pure[Resource[IO, *]],
       "unused",
       s3ClientOpsResource,
-      enums
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -174,8 +173,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   protected def server: Resource[IO, Server] =
     for {
-      e <- FMain.singleSession[IO](databaseConfig).evalMap(Enums.load)
-      a <- httpApp(e)
+      a <- httpApp
       s <- BlazeServerBuilder[IO]
              .withHttpWebSocketApp(a)
              .bindAny()
