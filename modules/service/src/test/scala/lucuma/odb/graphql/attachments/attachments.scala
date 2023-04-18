@@ -14,7 +14,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
-import lucuma.core.model.Attachment
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.refined.*
@@ -40,7 +40,7 @@ class attachments extends OdbSuiteWithS3 {
   def assertAttachmentsOdb(
     user:        User,
     programId:   Program.Id,
-    attachments: (Attachment.Id, TestAttachment)*
+    attachments: (ObsAttachment.Id, TestAttachment)*
   ): IO[Unit] =
     expect(
       user = user,
@@ -104,7 +104,7 @@ class attachments extends OdbSuiteWithS3 {
   def getAttachment(
     user:         User,
     programId:    Program.Id,
-    attachmentId: Attachment.Id
+    attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
       var uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
@@ -120,7 +120,7 @@ class attachments extends OdbSuiteWithS3 {
   def deleteAttachment(
     user:         User,
     programId:    Program.Id,
-    attachmentId: Attachment.Id
+    attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
       var uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
@@ -146,11 +146,11 @@ class attachments extends OdbSuiteWithS3 {
 
     def expectOk: IO[Unit] = withExpectation(Status.Ok)
 
-    def toAttachmentId: IO[Attachment.Id] =
+    def toAttachmentId: IO[ObsAttachment.Id] =
       response.use { resp =>
         for {
           _   <- IO(resp.status).assertEquals(Status.Ok)
-          aid <- resp.getBody.map(s => Attachment.Id.parse(s).get)
+          aid <- resp.getBody.map(s => ObsAttachment.Id.parse(s).get)
         } yield aid
       }
 

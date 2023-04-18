@@ -9,7 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.text
-import lucuma.core.model.Attachment
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
@@ -33,7 +33,7 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
     Stream[IO, String](s).through(text.utf8.encode)
 
   private val fileContents    = "Phred"
-  private val attachmentId    = Attachment.Id(5.refined)
+  private val attachmentId    = ObsAttachment.Id(5.refined)
   private val notFound        = "Not found".some
   private val invalidFileName = "File name must be right"
 
@@ -49,7 +49,7 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
     def getAttachment(
       user:         User,
       programId:    Program.Id,
-      attachmentId: Attachment.Id
+      attachmentId: ObsAttachment.Id
     ): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
       val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
       IO(either)
@@ -62,10 +62,10 @@ class attachmentRoutes extends CatsEffectSuite with TestSsoClient {
       fileName:       String,
       description:    Option[NonEmptyString],
       data:           Stream[IO, Byte]
-    ): IO[Attachment.Id] =
+    ): IO[ObsAttachment.Id] =
       getError(user).fold(IO(attachmentId))(IO.raiseError)
 
-    def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): IO[Unit] =
+    def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
   }
 

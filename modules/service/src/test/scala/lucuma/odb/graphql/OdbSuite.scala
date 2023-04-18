@@ -6,13 +6,16 @@ package lucuma.odb.graphql
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
-import clue.websocket.WebSocketClient
+import clue.ErrorPolicy
+import clue.FetchClient
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
 import clue.ResponseException
-import clue.FetchClient
 import clue.http4s.Http4sHttpBackend
+import clue.http4s.Http4sHttpClient
 import clue.http4s.Http4sWebSocketBackend
+import clue.http4s.Http4sWebSocketClient
+import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import edu.gemini.grackle.Mapping
@@ -23,6 +26,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
+import io.circe.JsonObject
 import io.circe.literal.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.math.SignalToNoise
@@ -62,10 +66,6 @@ import skunk.Session
 
 import java.time.Duration
 import scala.concurrent.duration.*
-import clue.http4s.Http4sHttpClient
-import clue.http4s.Http4sWebSocketClient
-import clue.ErrorPolicy
-import io.circe.JsonObject
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
