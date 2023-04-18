@@ -59,7 +59,7 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
       IO(either)
     }
 
-    def uploadAttachment(
+    def insertAttachment(
       user:           User,
       programId:      Program.Id,
       attachmentType: Tag,
@@ -68,6 +68,16 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
       data:           Stream[IO, Byte]
     ): IO[ObsAttachment.Id] =
       getError(user).fold(IO(attachmentId))(IO.raiseError)
+
+    def updateAttachment(
+      user: User,
+      programId: Program.Id,
+      attachmentId: ObsAttachment.Id,
+      fileName: String,
+      description: Option[NonEmptyString],
+      data: Stream[cats.effect.IO, Byte]
+    ): IO[Unit] = 
+      getError(user).fold(IO.unit)(IO.raiseError)
 
     def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
@@ -102,6 +112,13 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
+  test("PUT requires authorization") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt"
+    )
+    routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
   test("DELETE requires authorization") {
     val request = Request[IO](method = Method.DELETE, uri = uri"attachment/obs/p-1/a-1")
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -118,6 +135,14 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
   test("POST requires valid user") {
     val request = Request[IO](method = Method.POST,
                               uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              headers = Headers(invalidAuthHeader)
+    )
+    routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
+  test("PUT requires valid user") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -143,6 +168,14 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.Ok, attachmentId.toString.some)
+  }
+
+  test("valid PUT returns Ok") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              headers = headers(pi)
+    )
+    routes.run(request).assertResponse(Status.Ok, none)
   }
 
   test("valid DELETE returns Ok") {
@@ -182,6 +215,30 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
   test("POST returns NotFound for missing attachmentType") {
     val request = Request[IO](method = Method.POST,
                               uri = uri"attachment/obs/a-1?fileName=/file.txt/",
+                              headers = headers(pi)
+    )
+    routes.run(request).assertResponse(Status.NotFound, notFound)
+  }
+
+  test("PUT returns NotFound for invalid program id") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/z-1/a-1?fileName=/file.txt",
+                              headers = headers(pi)
+    )
+    routes.run(request).assertResponse(Status.NotFound, notFound)
+  }
+
+  test("PUT returns NotFound for invalid attachment id") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/q-1?fileName=/file.txt",
+                              headers = headers(pi)
+    )
+    routes.run(request).assertResponse(Status.NotFound, notFound)
+  }
+
+  test("PUT returns NotFound for missing fileName") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -234,6 +291,30 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
   test("POST returns NotFound if service returns FileNotFound") {
     val request = Request[IO](method = Method.POST,
                               uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              headers = headers(fileNotFoundUser)
+    )
+    routes.run(request).assertResponse(Status.NotFound, none)
+  }
+
+  test("PUT returns BadRequest with message if service returns InvalidRequest") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              headers = headers(invalidFileUser)
+    )
+    routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
+  }
+
+  test("PUT returns Forbidden if service returns Forbidden") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              headers = headers(forbiddenUser)
+    )
+    routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
+  test("PUT returns NotFound if service returns FileNotFound") {
+    val request = Request[IO](method = Method.PUT,
+                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
                               headers = headers(fileNotFoundUser)
     )
     routes.run(request).assertResponse(Status.NotFound, none)
