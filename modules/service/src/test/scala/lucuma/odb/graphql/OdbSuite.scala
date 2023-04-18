@@ -130,7 +130,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  private def databaseConfig: Config.Database =
+  protected def databaseConfig: Config.Database =
     Config.Database(
       host     = container.containerIpAddress,
       port     = container.mappedPort(POSTGRESQL_PORT),

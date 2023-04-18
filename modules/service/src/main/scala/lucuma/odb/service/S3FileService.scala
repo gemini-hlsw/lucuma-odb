@@ -23,6 +23,8 @@ import natchez.Trace
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse
 
+import java.util.UUID
+
 /**
   * Service for dealing with the files in S3.
   * Because we are careful to only have file metadata in the database for 
@@ -32,10 +34,10 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse
   */
 trait S3FileService[F[_]] {
   /** Get the file as a stream */
-  def get(programId: Program.Id, fileName: NonEmptyString): Stream[F, Byte]
+  def get(programId: Program.Id, remoteId: UUID): Stream[F, Byte]
 
   /** Get metatada about the S3 file */
-  def getMetadata(programId: Program.Id, fileName: NonEmptyString): F[HeadObjectResponse]
+  def getMetadata(programId: Program.Id, remoteId: UUID): F[HeadObjectResponse]
 
   /**
     * A convenience method for verifying eistence of and access to the file.
@@ -43,16 +45,16 @@ trait S3FileService[F[_]] {
     * terminates without a response code. This allows the request to at least finish
     * with Internal Server Error most of the time.
     */
-  def verifyFileAcess(programId: Program.Id, fileName: NonEmptyString): F[Unit]
+  def verifyFileAcess(programId: Program.Id, remoteId: UUID): F[Unit]
 
   /** A meta-convenience method combining verify and get */
-  def verifyAndGet(programId: Program.Id, fileName: NonEmptyString): F[Stream[F, Byte]]
+  def verifyAndGet(programId: Program.Id, remoteId: UUID): F[Stream[F, Byte]]
 
   /** Uploads a stream to S3 */
-  def upload(programId: Program.Id, fileName: NonEmptyString, data: Stream[F, Byte]): F[Long]
+  def upload(programId: Program.Id, remoteId: UUID, data: Stream[F, Byte]): F[Long]
 
   /** Deletes a file from S3 */
-  def delete(programId: Program.Id, fileName: NonEmptyString): F[Unit]
+  def delete(programId: Program.Id, remoteId: UUID): F[Unit]
 }
 
 object S3FileService {
@@ -72,16 +74,16 @@ object S3FileService {
 
     new S3FileService[F] {
 
-      def get(programId: Program.Id, fileName: NonEmptyString): Stream[F, Byte] = {
-        val fileKey = awsConfig.obsFileKey(programId, fileName)
+      def get(programId: Program.Id, remoteId: UUID): Stream[F, Byte] = {
+        val fileKey = awsConfig.obsFileKey(programId, remoteId)
         s3.readFileMultipart(awsConfig.bucketName, fileKey, partSize)
       }
 
       def getMetadata(
         programId: Program.Id,
-        fileName:  NonEmptyString
+        remoteId:  UUID
       ): F[HeadObjectResponse] = {
-        val fileKey = awsConfig.obsFileKey(programId, fileName)
+        val fileKey = awsConfig.obsFileKey(programId, remoteId)
         Trace[F].span(s"get remote file metadata for file key: $fileKey") {
           s3Ops
             .headObject(
@@ -95,18 +97,18 @@ object S3FileService {
         }
       }
 
-      def verifyFileAcess(programId: Program.Id, fileName: NonEmptyString): F[Unit] =
-        getMetadata(programId, fileName).void
+      def verifyFileAcess(programId: Program.Id, remoteId: UUID): F[Unit] =
+        getMetadata(programId, remoteId).void
 
-      def verifyAndGet(programId: Program.Id, fileName: NonEmptyString): F[Stream[F, Byte]] = 
-        verifyFileAcess(programId, fileName).map(_ => get(programId, fileName))
+      def verifyAndGet(programId: Program.Id, remoteId: UUID): F[Stream[F, Byte]] = 
+        verifyFileAcess(programId, remoteId).map(_ => get(programId, remoteId))
 
       def upload(
         programId: Program.Id,
-        fileName:  NonEmptyString,
+        remoteId:  UUID,
         data:      Stream[F, Byte]
       ): F[Long] = {
-        val fileKey = awsConfig.obsFileKey(programId, fileName)
+        val fileKey = awsConfig.obsFileKey(programId, remoteId)
         Trace[F].span(s"uploading remote file with file key: $fileKey") {
           val f = for {
             ref  <- Ref.of(0L)
@@ -118,8 +120,8 @@ object S3FileService {
         }
       }
 
-      def delete(programId: Program.Id, fileName: NonEmptyString): F[Unit] = {
-        val fileKey = awsConfig.obsFileKey(programId, fileName)
+      def delete(programId: Program.Id, remoteId: UUID): F[Unit] = {
+        val fileKey = awsConfig.obsFileKey(programId, remoteId)
         Trace[F].span(s"deleting remote file with file key: $fileKey") {
           s3.delete(awsConfig.bucketName, fileKey)
             .onError { case e => Trace[F].attachError(e, ("error", true)) }

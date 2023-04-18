@@ -31,6 +31,7 @@ import org.typelevel.log4cats.Logger
 import java.net.URI
 import java.net.URISyntaxException
 import java.security.PublicKey
+import java.util.UUID
 
 case class Config(
   port:       Port,             // Our port, nothing fancy.
@@ -155,8 +156,8 @@ object Config {
     bucketName:      BucketName,
     fileUploadMaxMb: Int 
   ) {
-    def obsFileKey(programId: Program.Id, fileName: NonEmptyString): FileKey = 
-      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/obs/$fileName"))
+    def obsFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
+      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/obs/$remoteId"))
   }
 
   object Aws {
