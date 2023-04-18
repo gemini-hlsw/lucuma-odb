@@ -17,17 +17,17 @@ val logbackVersion             = "1.4.7"
 val log4catsVersion            = "2.6.0"
 val lucumaCoreVersion          = "0.75.2"
 val lucumaGraphQLRoutesVersion = "0.6.1"
+val lucumaItcVersion           = "0.12.0"
+val lucumaSsoVersion           = "0.5.9"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
+val paigesVersion              = "0.4.2"
 val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
-val lucumaSsoVersion           = "0.5.9"
-val lucumaItcVersion           = "0.12.0"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
-val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
 
@@ -45,7 +45,7 @@ lazy val schema = project
       "io.circe"       %% "circe-literal"                   % circeVersion,
       "io.circe"       %% "circe-refined"                   % circeVersion,
       "io.circe"       %% "circe-testing"                   % circeVersion               % Test,
-      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion force(),
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
@@ -72,7 +72,7 @@ lazy val smartgcal = project
       "org.typelevel"  %% "cats-parse"                      % catsParseVersion,
       "co.fs2"         %% "fs2-core"                        % fs2Version,
       "co.fs2"         %% "fs2-io"                          % fs2Version,
-      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion force(),
       "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
       "org.scalameta"  %% "munit"                           % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
