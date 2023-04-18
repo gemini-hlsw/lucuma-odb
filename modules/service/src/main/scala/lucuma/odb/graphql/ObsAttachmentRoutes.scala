@@ -73,8 +73,22 @@ object ObsAttachmentRoutes {
         ssoClient.require(req) { user =>
           val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
           attachmentFileService
-            .uploadAttachment(user, programId, typeTag, fileName, description, req.body)
+            .insertAttachment(user, programId, typeTag, fileName, description, req.body)
             .flatMap(id => Ok(id.toString))
+            .recoverWith {
+              case EntityLimiter.EntityTooLarge(_) =>
+                BadRequest(s"File too large. Limit of $maxUploadMb MB")
+              case e: ObsAttachmentException          => e.toResponse
+            }
+        }
+
+      case req @ PUT -> Root / baseRoute / obsBase / ProgramId(programId) / ObsAttachmentId(attachmentId)
+          :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
+        ssoClient.require(req) { user =>
+          val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
+          attachmentFileService
+            .updateAttachment(user, programId, attachmentId, fileName, description, req.body)
+            .flatMap(_ => Ok())
             .recoverWith {
               case EntityLimiter.EntityTooLarge(_) =>
                 BadRequest(s"File too large. Limit of $maxUploadMb MB")
