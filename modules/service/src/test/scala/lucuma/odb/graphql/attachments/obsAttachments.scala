@@ -17,28 +17,30 @@ import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.FMain
+import lucuma.odb.util.Codecs.obs_attachment_id
 import lucuma.refined.*
+import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.client.JavaNetClientBuilder
+import skunk.*
+import skunk.codec.all.*
+import skunk.syntax.all.*
+
+import java.util.UUID
 
 class obsAttachments extends OdbSuiteWithS3 {
-
+  
   case class TestAttachment(
     fileName:       String,
     attachmentType: String,
     description:    Option[String],
     content:        String,
     checked:        Boolean = false
-  ) {
-    // The above values are allowed to be empty so that we can test the error conditions. However,
-    // we can only check s3 if we have a file name.
-    // So, only call this for values with NonEmpty file names
-    def fileKey(programId: Program.Id): FileKey =
-      awsConfig.obsFileKey(programId, NonEmptyString.unsafeFrom(fileName))
-  }
+  ) 
 
-  def assertAttachmentsOdb(
+  def assertAttachmentsGql(
     user:        User,
     programId:   Program.Id,
     expectedTas: (ObsAttachment.Id, TestAttachment)*
@@ -66,7 +68,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       )
     )
 
-  def updateAttachmentsOdb(
+  def updateAttachmentsGql(
     user:        User,
     programId:   Program.Id,
     WHERE:       String,
@@ -172,6 +174,13 @@ class obsAttachments extends OdbSuiteWithS3 {
 
       client.run(request)
     }
+  
+  def getRemoteIdFromDb(aid: ObsAttachment.Id): IO[UUID] = {
+    val query = sql"select c_remote_id from t_obs_attachment where c_obs_attachment_id = $obs_attachment_id".query(uuid)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.unique(aid))
+    )
+  }
 
   extension (response: Response[IO])
     def getBody: IO[String] = response.body.through(utf8.decode).compile.string
@@ -213,14 +222,15 @@ class obsAttachments extends OdbSuiteWithS3 {
   test("successful upload, download and delete") {
     for {
       pid    <- createProgramAs(pi)
-      fileKey = file1A.fileKey(pid)
       aid    <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      rid    <- getRemoteIdFromDb(aid)
+      fileKey = awsConfig.obsFileKey(pid, rid)
       _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsOdb(pi, pid, (aid, file1A))
+      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
       _      <- getAttachment(pi, pid, aid).expectBody(file1A.content)
       _      <- deleteAttachment(pi, pid, aid).expectOk
       _      <- assertS3NotThere(fileKey)
-      _      <- assertAttachmentsOdb(pi, pid)
+      _      <- assertAttachmentsGql(pi, pid)
       _      <- getAttachment(pi, pid, aid).withExpectation(Status.NotFound)
     } yield ()
   }
@@ -228,13 +238,15 @@ class obsAttachments extends OdbSuiteWithS3 {
   test("successful upload, download and delete of multiple files") {
     for {
       pid  <- createProgramAs(pi)
-      fk1   = file1A.fileKey(pid)
-      fk2   = file2.fileKey(pid)
       aid1 <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      rid1 <- getRemoteIdFromDb(aid1)
+      fk1   = awsConfig.obsFileKey(pid, rid1)
       _    <- assertS3(fk1, file1A.content)
       aid2 <- uploadAttachment(pi, pid, file2).toAttachmentId
+      rid2 <- getRemoteIdFromDb(aid2)
+      fk2   = awsConfig.obsFileKey(pid, rid2)
       _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsOdb(pi, pid, (aid1, file1A), (aid2, file2))
+      _    <- assertAttachmentsGql(pi, pid, (aid1, file1A), (aid2, file2))
       _    <- getAttachment(pi, pid, aid1).expectBody(file1A.content)
       _    <- getAttachment(pi, pid, aid2).expectBody(file2.content)
       _    <- deleteAttachment(pi, pid, aid1).expectOk
@@ -242,34 +254,38 @@ class obsAttachments extends OdbSuiteWithS3 {
       _    <- getAttachment(pi, pid, aid2).expectBody(file2.content)
       _    <- assertS3NotThere(fk1)
       _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsOdb(pi, pid, (aid2, file2))
+      _    <- assertAttachmentsGql(pi, pid, (aid2, file2))
     } yield ()
   }
 
-  test("upload with same name overwrites previous upload") {
-    for {
-      pid    <- createProgramAs(pi)
-      fileKey = file1A.fileKey(pid)
-      aid    <- uploadAttachment(pi, pid, file1A).toAttachmentId
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsOdb(pi, pid, (aid, file1A))
-      _      <- uploadAttachment(pi, pid, file1B).toAttachmentId.assertEquals(aid)
-      _      <- assertS3(fileKey, file1B.content)
-      _      <- assertAttachmentsOdb(pi, pid, (aid, file1B))
-      _      <- getAttachment(pi, pid, aid).expectBody(file1B.content)
-    } yield ()
-  }
+  // No longer true. 
+  // TODO: Replace with a relevant test when "overwritting" a file requires an explicit PUT
+  // test("upload with same name overwrites previous upload") {
+  //   for {
+  //     pid    <- createProgramAs(pi)
+  //     aid    <- uploadAttachment(pi, pid, file1A).toAttachmentId
+  //     rid    <- getRemoteIdFromDb(aid)
+  //     fileKey = awsConfig.obsFileKey(pid, rid)
+  //     _      <- assertS3(fileKey, file1A.content)
+  //     _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
+  //     _      <- uploadAttachment(pi, pid, file1B).toAttachmentId.assertEquals(aid)
+  //     _      <- assertS3(fileKey, file1B.content)
+  //     _      <- assertAttachmentsGql(pi, pid, (aid, file1B))
+  //     _      <- getAttachment(pi, pid, aid).expectBody(file1B.content)
+  //   } yield ()
+  // }
 
   test("empty file upload fails, doesn't overwrite previous") {
     for {
       pid    <- createProgramAs(pi)
-      fileKey = file1A.fileKey(pid)
       aid    <- uploadAttachment(pi, pid, file1A).toAttachmentId
+      rid    <- getRemoteIdFromDb(aid)
+      fileKey = awsConfig.obsFileKey(pid, rid)
       _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsOdb(pi, pid, (aid, file1A))
+      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
       _      <- uploadAttachment(pi, pid, file1Empty).withExpectation(Status.InternalServerError)
       _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsOdb(pi, pid, (aid, file1A))
+      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
     } yield ()
   }
 
@@ -305,14 +321,10 @@ class obsAttachments extends OdbSuiteWithS3 {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      fk1   = file1A.fileKey(pid1)
-      fk2   = file1A.fileKey(pid2)
       _    <- uploadAttachment(pi, pid2, file1A).withExpectation(Status.Forbidden)
       _    <- uploadAttachment(pi2, pid1, file1A).withExpectation(Status.Forbidden)
-      _    <- assertS3NotThere(fk1)
-      _    <- assertS3NotThere(fk2)
-      _    <- assertAttachmentsOdb(pi, pid1)
-      _    <- assertAttachmentsOdb(pi2, pid2)
+      _    <- assertAttachmentsGql(pi, pid1)
+      _    <- assertAttachmentsGql(pi2, pid2)
     } yield ()
   }
 
@@ -320,14 +332,16 @@ class obsAttachments extends OdbSuiteWithS3 {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      fk1   = file1A.fileKey(pid1)
-      fk2   = file2.fileKey(pid2)
       aid1 <- uploadAttachment(pi, pid1, file1A).toAttachmentId
+      rid1 <- getRemoteIdFromDb(aid1)
+      fk1   = awsConfig.obsFileKey(pid1, rid1)
       _    <- assertS3(fk1, file1A.content)
-      _    <- assertAttachmentsOdb(pi, pid1, (aid1, file1A))
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, file1A))
       aid2 <- uploadAttachment(pi2, pid2, file2).toAttachmentId
+      rid2 <- getRemoteIdFromDb(aid2)
+      fk2   = awsConfig.obsFileKey(pid2, rid2)
       _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsOdb(pi2, pid2, (aid2, file2))
+      _    <- assertAttachmentsGql(pi2, pid2, (aid2, file2))
       _    <- getAttachment(pi, pid2, aid2).withExpectation(Status.Forbidden)
       _    <- getAttachment(pi2, pid1, aid1).withExpectation(Status.Forbidden)
     } yield ()
@@ -337,14 +351,16 @@ class obsAttachments extends OdbSuiteWithS3 {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      fk1   = file1A.fileKey(pid1)
-      fk2   = file2.fileKey(pid2)
       aid1 <- uploadAttachment(pi, pid1, file1A).toAttachmentId
+      rid1 <- getRemoteIdFromDb(aid1)
+      fk1   = awsConfig.obsFileKey(pid1, rid1)
       _    <- assertS3(fk1, file1A.content)
-      _    <- assertAttachmentsOdb(pi, pid1, (aid1, file1A))
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, file1A))
       aid2 <- uploadAttachment(pi2, pid2, file2).toAttachmentId
+      rid2 <- getRemoteIdFromDb(aid2)
+      fk2   = awsConfig.obsFileKey(pid2, rid2)
       _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsOdb(pi2, pid2, (aid2, file2))
+      _    <- assertAttachmentsGql(pi2, pid2, (aid2, file2))
       _    <- deleteAttachment(pi, pid2, aid2).withExpectation(Status.Forbidden)
       _    <- deleteAttachment(pi2, pid1, aid1).withExpectation(Status.Forbidden)
     } yield ()
@@ -353,14 +369,15 @@ class obsAttachments extends OdbSuiteWithS3 {
   test("service user can manage any program's attachments") {
     for {
       pid    <- createProgramAs(pi)
-      fileKey = file1A.fileKey(pid)
       aid    <- uploadAttachment(service, pid, file1A).toAttachmentId
+      rid    <- getRemoteIdFromDb(aid)
+      fileKey = awsConfig.obsFileKey(pid, rid)
       _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsOdb(service, pid, (aid, file1A))
+      _      <- assertAttachmentsGql(service, pid, (aid, file1A))
       _      <- getAttachment(service, pid, aid).expectBody(file1A.content)
       _      <- deleteAttachment(service, pid, aid).expectOk
       _      <- assertS3NotThere(fileKey)
-      _      <- assertAttachmentsOdb(service, pid)
+      _      <- assertAttachmentsGql(service, pid)
     } yield ()
   }
 
@@ -370,7 +387,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       aid    <- uploadAttachment(service, pid, file1A).toAttachmentId
       newDesc = "New description"
       newTa   = file1A.copy(description = newDesc.some)
-      _      <- updateAttachmentsOdb(pi,
+      _      <- updateAttachmentsGql(pi,
                                      pid,
                                      WHERE = s"""{ id: { EQ: "$aid"}}""",
                                      SET = s"""{ description: "$newDesc" }""",
@@ -384,7 +401,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       pid  <- createProgramAs(pi)
       aid  <- uploadAttachment(pi, pid, file1A).toAttachmentId
       newTa = file1A.copy(description = none)
-      _    <- updateAttachmentsOdb(pi,
+      _    <- updateAttachmentsGql(pi,
                                    pid,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
                                    SET = """{ description: null }""",
@@ -398,7 +415,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       pid  <- createProgramAs(pi)
       aid  <- uploadAttachment(pi, pid, file1A).toAttachmentId
       newTa = file1A.copy(checked = true)
-      _    <- updateAttachmentsOdb(pi,
+      _    <- updateAttachmentsGql(pi,
                                    pid,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
                                    SET = """{ checked: true }""",
@@ -416,7 +433,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       newDesc = "updated"
       newTa1  = file1A.copy(description = newDesc.some, checked = true)
       newTa2  = file2.copy(description = newDesc.some, checked = true)
-      _      <- updateAttachmentsOdb(pi,
+      _      <- updateAttachmentsGql(pi,
                                      pid,
                                      WHERE = s"""{ fileName: { LIKE: "file%"}}""",
                                      SET = s"""{ checked: true, description: "$newDesc" }""",
@@ -433,7 +450,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       aid3  <- uploadAttachment(pi, pid, file3).toAttachmentId
       newTa1 = file1A.copy(description = none, checked = true)
       newTa3 = file3.copy(description = none, checked = true)
-      _     <- updateAttachmentsOdb(pi,
+      _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ id: { IN: ["$aid1", "$aid3"]}}""",
                                     SET = """{ checked: true, description: null }""",

@@ -25,6 +25,8 @@ import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
 
+import java.util.UUID
+
 trait ObsAttachmentFileService[F[_]] {
   import ObsAttachmentFileService.ObsAttachmentException
 
@@ -124,23 +126,24 @@ object ObsAttachmentFileService {
       attachmentType: Tag,
       fileName:       FileName,
       description:    Option[NonEmptyString],
-      fileSize:       Long
+      fileSize:       Long, 
+      remoteId:       UUID
     ): F[ObsAttachment.Id] =
       Trace[F].span("insertOrUpdateAttachment") {
         val af   = 
-          Statements.insertOrUpdateAttachment(user, programId, attachmentType, fileName.value, description, fileSize)
+          Statements.insertOrUpdateAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remoteId)
         val stmt = af.fragment.query(obs_attachment_id)
         session.prepareR(stmt).use(pg => pg.unique(af.argument))
       }
 
-    def getAttachmentFileNameFromDB(
+    def getAttachmentRemoteIdFromDB(
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
-    ): F[NonEmptyString] =
-      Trace[F].span("getAttachmentFileNameFromDB") {
-        val af   = Statements.getAttachmentFileName(user, programId, attachmentId)
-        val stmt = af.fragment.query(text_nonempty)
+    ): F[UUID] =
+      Trace[F].span("getAttachmentRemoteIdFromDB") {
+        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentId)
+        val stmt = af.fragment.query(uuid)
 
         session
           .prepareR(stmt)
@@ -157,10 +160,10 @@ object ObsAttachmentFileService {
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
-    ): F[NonEmptyString] =
+    ): F[UUID] =
       Trace[F].span("deleteAttachmentFromDB") {
         val af   = Statements.deleteAttachment(user, programId, attachmentId)
-        val stmt = af.fragment.query(text_nonempty)
+        val stmt = af.fragment.query(uuid)
 
         session
           .prepareR(stmt)
@@ -188,11 +191,11 @@ object ObsAttachmentFileService {
           .use(_ =>
             for {
               _        <- checkAccess(user, programId)
-              fileName <- getAttachmentFileNameFromDB(user, programId, attachmentId)
-            } yield fileName
+              remoteId <- getAttachmentRemoteIdFromDB(user, programId, attachmentId)
+            } yield remoteId
           )
-          .flatMap { fn =>
-            s3FileSvc.verifyAndGet(programId, fn).map(_.asRight)
+          .flatMap { rid =>
+            s3FileSvc.verifyAndGet(programId, rid).map(_.asRight)
           }
           .recover {
             case e: ObsAttachmentException => e.asLeft
@@ -209,8 +212,8 @@ object ObsAttachmentFileService {
         session.transaction
           .use(_ =>
             for {
-              _ <- checkAccess(user, programId)
-              _ <- checkAttachmentType(attachmentType)
+              _    <- checkAccess(user, programId)
+              _    <- checkAttachmentType(attachmentType)
             } yield ()
           )
           .flatMap { _ =>
@@ -221,8 +224,9 @@ object ObsAttachmentFileService {
                 fn =>
                   // TODO: Validate the file extension based on attachment type
                   for {
-                    size   <- s3FileSvc.upload(programId, fn.value, data)
-                    result <- insertOrUpdateAttachmentInDB(user, programId, attachmentType, fn, description, size)
+                    rid    <- Async[F].delay(UUID.randomUUID())
+                    size   <- s3FileSvc.upload(programId, rid, data)
+                    result <- insertOrUpdateAttachmentInDB(user, programId, attachmentType, fn, description, size, rid)
                   } yield result
               )
           }
@@ -255,7 +259,8 @@ object ObsAttachmentFileService {
       attachmentType: Tag,
       fileName:       NonEmptyString,
       description:    Option[NonEmptyString],
-      fileSize:       Long
+      fileSize:       Long,
+      remoteId:       UUID
     ): AppliedFragment =
       sql"""
         INSERT INTO t_obs_attachment (
@@ -263,15 +268,17 @@ object ObsAttachmentFileService {
           c_attachment_type,
           c_file_name,
           c_description,
-          c_file_size
+          c_file_size,
+          c_remote_id
         ) 
         SELECT 
           $program_id,
           $tag,
           $text_nonempty,
           ${text_nonempty.opt},
-          $int8
-      """.apply(programId ~ attachmentType ~ fileName ~ description ~ fileSize) |+|
+          $int8,
+          $uuid
+      """.apply(programId ~ attachmentType ~ fileName ~ description ~ fileSize ~ remoteId) |+|
         ProgramService.Statements.whereUserAccess(user, programId) |+|
         void"""
         ON CONFLICT (c_program_id, c_file_name) DO UPDATE SET
@@ -282,13 +289,13 @@ object ObsAttachmentFileService {
         RETURNING c_obs_attachment_id
       """
 
-    def getAttachmentFileName(
+    def getAttachmentRemoteId(
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
     ): AppliedFragment =
       sql"""
-        SELECT c_file_name
+        SELECT c_remote_id
         FROM t_obs_attachment
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId ~ attachmentId) |+|
@@ -305,7 +312,7 @@ object ObsAttachmentFileService {
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId, attachmentId) |+|
         accessFrag(user, programId) |+|
-        void"RETURNING c_file_name"
+        void"RETURNING c_remote_id"
 
     def existsAttachmentType(attachmentType: Tag): AppliedFragment =
       sql"""
