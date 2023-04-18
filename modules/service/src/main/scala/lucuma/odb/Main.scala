@@ -217,8 +217,7 @@ object FMain extends MainParams {
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
-    config: Config,
-    enums:  Enums
+    config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
       config.database,
@@ -227,8 +226,7 @@ object FMain extends MainParams {
       config.commitHash,
       config.ssoClient,
       config.domain,
-      s3ClientOpsResource(config.aws),
-      enums
+      s3ClientOpsResource(config.aws)
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
@@ -239,8 +237,7 @@ object FMain extends MainParams {
     commitHash:        CommitHash,
     ssoClientResource: Resource[F, SsoClient[F, User]],
     domain:            String,
-    s3OpsResource:     Resource[F, S3AsyncClientOp[F]],
-    enums:             Enums
+    s3OpsResource:     Resource[F, S3AsyncClientOp[F]]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool             <- databasePoolResource[F](databaseConfig)
@@ -248,6 +245,7 @@ object FMain extends MainParams {
       ssoClient        <- ssoClientResource
       userSvc          <- pool.map(UserService.fromSession(_))
       middleware       <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
+      enums            <- Resource.eval(pool.use(Enums.load))
       graphQLRoutes    <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
       s3ClientOps      <- s3OpsResource
       attachmentSvc    <- pool.map(ses => AttachmentService.fromS3AndSession(awsConfig, s3ClientOps, ses))
@@ -315,11 +313,10 @@ object FMain extends MainParams {
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
       _  <- Resource.eval(banner[F](c))
-      e  <- Resource.eval(singleSession(c.database).use(Enums.load))
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
-      ap <- ep.wsLiftR(routesResource(c, e)).map(_.map(_.orNotFound))
+      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
