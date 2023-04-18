@@ -280,7 +280,8 @@ object FMain extends MainParams {
       port     = config.port,
       user     = config.user,
       database = database.getOrElse(config.database),
-      password = config.password.some
+      password = config.password.some,
+      ssl      = SSL.Trusted.withFallback(true)
     )
 }
 
