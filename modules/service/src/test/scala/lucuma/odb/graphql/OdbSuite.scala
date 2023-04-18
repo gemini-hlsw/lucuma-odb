@@ -6,13 +6,13 @@ package lucuma.odb.graphql
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
-import clue.ApolloWebSocketClient
+import clue.websocket.WebSocketClient
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
 import clue.ResponseException
-import clue.TransactionalClient
-import clue.http4s.Http4sBackend
-import clue.http4s.Http4sWSBackend
+import clue.FetchClient
+import clue.http4s.Http4sHttpBackend
+import clue.http4s.Http4sWebSocketBackend
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import edu.gemini.grackle.Mapping
@@ -62,18 +62,23 @@ import skunk.Session
 
 import java.time.Duration
 import scala.concurrent.duration.*
+import clue.http4s.Http4sHttpClient
+import clue.http4s.Http4sWebSocketClient
+import clue.ErrorPolicy
+import io.circe.JsonObject
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
+  private implicit val DefaultErrorPolicy: ErrorPolicy.RaiseAlways.type = ErrorPolicy.RaiseAlways
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
     fa.attempt.flatMap {
       case Left(e: ResponseException) =>
-        assertEquals(messages.toList, e.asGraphQLErrors.toList.flatten.map(_.message)).pure[IO]
+        assertEquals(messages.toList, e.errors.toList.map(_.message)).pure[IO]
       case Left(other) => IO.raiseError(other)
       case Right(a) => fail(s"Expected failure, got $a")
     }
@@ -180,30 +185,23 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
              .resource
     } yield s
 
-  private def transactionalClient(user: User)(svr: Server): IO[TransactionalClient[IO, Nothing]] =
+  private def transactionalClient(user: User)(svr: Server): IO[FetchClient[IO, Nothing]] =
     for {
-      xbe <- JdkHttpClient.simple[IO].map(Http4sBackend[IO](_))
+      xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
       uri  = svr.baseUri / "odb"
-      xc  <- TransactionalClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, Gid[User.Id].fromString.reverseGet(user.id)))))(Async[IO], xbe, Logger[IO])
+      xc  <- Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, Gid[User.Id].fromString.reverseGet(user.id)))))(Async[IO], xbe, Logger[IO])
     } yield xc
 
-  private def streamingClient(user: User)(svr: Server): Resource[IO, ApolloWebSocketClient[IO, Nothing]] =
+  private def streamingClient(user: User)(svr: Server): Resource[IO, WebSocketClient[IO, Nothing]] =
     for {
-      sbe <- Resource.eval(JdkWSClient.simple[IO].map(Http4sWSBackend[IO](_)))
+      sbe <- Resource.eval(JdkWSClient.simple[IO].map(Http4sWebSocketBackend[IO](_)))
       uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
-      sc  <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[IO], Logger[IO], sbe))
+      sc  <- Resource.eval(Http4sWebSocketClient.of[IO, Nothing](uri)(Async[IO], Logger[IO], sbe))
       ps   = Map("Authorization" -> Json.fromString(s"Bearer ${Gid[User.Id].fromString.reverseGet(user.id)}"))
       _   <- Resource.make(sc.connect() *> sc.initialize(ps))(_ => sc.terminate() *> sc.disconnect())
-    } yield sc.asInstanceOf[ApolloWebSocketClient[IO, Nothing]] // why does Nothing change to Any here?
+    } yield sc
 
-  case class Operation(
-    document: String
-  ) extends GraphQLOperation[Nothing] {
-    type Data       = Json
-    type Variables  = Json
-    val varEncoder: Encoder[Variables] = implicitly
-    val dataDecoder: Decoder[Data]     = implicitly
-  }
+  case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
 
   private lazy val serverFixture: Fixture[Server] =
     ResourceSuiteLocalFixture("server", server)
@@ -218,7 +216,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         case ClientOption.Ws   => "websocket"
       }
 
-    def connection(user: User): Server => Resource[IO, TransactionalClient[IO, Nothing]] =
+    def connection(user: User): Server => Resource[IO, FetchClient[IO, Nothing]] =
       this match {
         case ClientOption.Http => s => Resource.eval(transactionalClient(user)(s))
         case ClientOption.Ws   => streamingClient(user)
@@ -270,13 +268,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     user:      User,
     query:     String,
     expected:  Either[List[String], Json],
-    variables: Option[Json] = None,
+    variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Http,
   ): IO[Unit] = {
     val op = this.query(user, query, variables, client)
     expected.fold(errors => {
-      op.intercept[ResponseException]
-        .map { e => e.asGraphQLErrors.toList.flatten.map(_.message) }
+      op
+      .intercept[ResponseException]
+        .map { e => e.errors.toList.map(_.message) }
         .assertEquals(errors)
     }, success => {
       op.map(_.spaces2)
@@ -287,24 +286,24 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def query(
     user:      User,
     query:     String,
-    variables: Option[Json] = None,
+    variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Http,
   ): IO[Json] =
     Resource.eval(IO(serverFixture()))
       .flatMap(client.connection(user))
       .use { conn =>
         val req = conn.request(Operation(query))
-        val op  = variables.fold(req.apply)(req.apply)
+        val op  = variables.fold(req.apply)(req.withInput)
         op
       }
 
-  def subscription(user: User, query: String, mutations: Either[List[(String, Option[Json])], IO[Any]], variables: Option[Json] = None): IO[List[Json]] =
+  def subscription(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], variables: Option[JsonObject] = None): IO[List[Json]] =
     Supervisor[IO].use { sup =>
       Resource.eval(IO(serverFixture()))
         .flatMap(streamingClient(user))
         .use { conn =>
           val req = conn.subscribe(Operation(query))
-          variables.fold(req.apply)(req.apply).allocated.flatMap { case (sub, cleanup) =>
+          variables.fold(req.apply)(req.withInput).allocated.flatMap { case (sub, cleanup) =>
             for {
               _   <- log.info("*** ----- about to start stream fiber")
               fib <- sup.supervise(sub.compile.toList)
@@ -313,7 +312,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               _   <- log.info("*** ----- running mutations")
               _   <- mutations.fold(_.traverse_ { case (query, vars) =>
                 val req = conn.request(Operation(query))
-                vars.fold(req.apply)(req.apply)
+                vars.fold(req.apply)(req.withInput)
               }, identity)
               _   <- log.info("*** ----- pausing a bit")
               _   <- IO.sleep(1.second)
@@ -326,7 +325,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         }
     }
 
-  def subscriptionExpect(user: User, query: String, mutations: Either[List[(String, Option[Json])], IO[Any]], expected: List[Json], variables: Option[Json] = None) =
+  def subscriptionExpect(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expected: List[Json], variables: Option[JsonObject] = None) =
     subscription(user, query, mutations, variables).map { obt =>
       assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
     }
