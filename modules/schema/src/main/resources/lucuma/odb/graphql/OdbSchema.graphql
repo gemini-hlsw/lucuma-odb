@@ -4490,6 +4490,50 @@ enum ObsStatus {
   OBSERVED
 }
 
+scalar TimingWindowId
+
+enum TimingWindowInclusion {
+  # Inclusion Timing Window
+  INCLUDE
+
+  # Exclusion Timing Window
+  EXCLUDE
+}
+
+type TimingWindowRepeat {
+  period: TimeSpan!
+
+  #forever: Boolean!
+
+  times: Int
+}
+
+type TiminigWindowEndAt {
+  endAt: Timestamp!
+}
+
+type TiminigWindowEndAfter {
+  endAfter: TimeSpan!
+
+  repeat: TimingWindowRepeat
+}
+
+union TimingWindowEnd = TiminigWindowEndAt | TiminigWindowEndAfter
+
+type TimingWindow {
+  id: TimingWindowId!
+
+  observationId: ObservationId!
+
+  inclusion: TimingWindowInclusion!
+
+  start: Timestamp!
+
+  end: TimingWindowEnd
+
+  # derived fields? duration, openForever, repeatForever, etc ?
+}
+
 type Observation {
   # Observation ID
   id: ObservationId!
@@ -4526,6 +4570,9 @@ type Observation {
 
   # The constraint set for the observation
   constraintSet: ConstraintSet!
+
+  # Observation timing windows
+  timingWindows: [TimingWindow]
 
   # The top level science requirements
   scienceRequirements: ScienceRequirements!

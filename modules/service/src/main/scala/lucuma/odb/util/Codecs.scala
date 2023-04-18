@@ -326,6 +326,13 @@ trait Codecs {
       TimeSpan.FromDuration.reverseGet
     )
 
+  val timing_window_id: Codec[TimingWindow.Id] =
+    gid[TimingWindow.Id]
+
+  val timing_window_inclusion: Codec[TimingWindowInclusion] =
+    enumerated(Type("e_timing_window_inclusion"))
+
+
   val too_activation: Codec[ToOActivation] =
     enumerated(Type("e_too_activation"))
 
