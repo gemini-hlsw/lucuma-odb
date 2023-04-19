@@ -53,6 +53,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
@@ -110,8 +111,6 @@ object OdbMapping {
           with AngleMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
-          with AttachmentMapping[F]
-          with AttachmentTypeMetaMapping[F]
           with CatalogInfoMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
@@ -131,6 +130,8 @@ object OdbMapping {
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonsiderealMapping[F]
+          with ObsAttachmentMapping[F]
+          with ObsAttachmentTypeMetaMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservingModeMapping[F]
@@ -165,6 +166,7 @@ object OdbMapping {
           with TargetSelectResultMapping[F]
           with TimeSpanMapping[F]
           with UpdateAsterismsResultMapping[F]
+          with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UpdateTargetsResultMapping[F]
@@ -185,6 +187,9 @@ object OdbMapping {
 
           override val asterismService: Resource[F, AsterismService[F]] =
             pool.map(AsterismService.fromSessionAndUser(_, user))
+
+          override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
+            pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
 
           override val observationService: Resource[F, ObservationService[F]] =
             pool.map { s =>
@@ -263,7 +268,6 @@ object OdbMapping {
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
               AttachmentMapping,
-              AttachmentTypeMetaMapping,
               CatalogInfoMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
@@ -283,6 +287,7 @@ object OdbMapping {
               LinkUserResultMapping,
               MutationMapping,
               NonsiderealMapping,
+              ObsAttachmentTypeMetaMapping,
               ObservationEditMapping,
               ObservationMapping,
               ObservingModeMapping,
@@ -316,6 +321,7 @@ object OdbMapping {
               TargetSelectResultMapping,
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
+              UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
               UpdateTargetsResultMapping,

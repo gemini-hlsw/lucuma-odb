@@ -142,9 +142,6 @@ trait Codecs {
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
-  val attachment_id: Codec[ObsAttachment.Id] =
-    gid[ObsAttachment.Id]
-
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
@@ -224,6 +221,9 @@ trait Codecs {
 
   val obs_active_status: Codec[ObsActiveStatus] =
     enumerated(Type("e_obs_active_status"))
+
+  val obs_attachment_id: Codec[ObsAttachment.Id] =
+    gid[ObsAttachment.Id]
 
   val obs_status: Codec[ObsStatus] =
     enumerated(Type("e_obs_status"))
