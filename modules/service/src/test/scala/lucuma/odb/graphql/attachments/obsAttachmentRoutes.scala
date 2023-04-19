@@ -50,11 +50,7 @@ class obsAttachmentRoutes extends CatsEffectSuite with TestSsoClient {
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
-<<<<<<< main:modules/service/src/test/scala/lucuma/odb/graphql/attachments/attachmentRoutes.scala
-    ): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
-=======
     ): IO[Either[ObsAttachmentException, Stream[IO, Byte]]] = {
->>>>>>> Make current attachments specific to observations:modules/service/src/test/scala/lucuma/odb/graphql/attachments/obsAttachmentRoutes.scala
       val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
       IO(either)
     }

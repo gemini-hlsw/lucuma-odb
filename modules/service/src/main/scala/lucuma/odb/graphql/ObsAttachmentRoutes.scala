@@ -27,11 +27,7 @@ object ObsAttachmentRoutes {
     def unapply(str: String): Option[Program.Id] = Program.Id.parse(str)
   }
 
-<<<<<<< main:modules/service/src/main/scala/lucuma/odb/graphql/AttachmentRoutes.scala
-  object AttachmentId {
-=======
   object ObsAttachmentId {
->>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/graphql/ObsAttachmentRoutes.scala
     def unapply(str: String): Option[ObsAttachment.Id] = ObsAttachment.Id.parse(str)
   }
 
