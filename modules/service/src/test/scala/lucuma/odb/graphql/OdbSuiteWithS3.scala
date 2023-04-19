@@ -13,7 +13,7 @@ import fs2.aws.s3.models.Models.FileKey
 import fs2.text
 import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
-import lucuma.core.model.Attachment
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.Config

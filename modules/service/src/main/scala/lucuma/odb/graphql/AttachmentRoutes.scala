@@ -7,8 +7,8 @@ import cats.data.ValidatedNel
 import cats.effect._
 import cats.implicits._
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.model.Attachment
 import lucuma.core.model.GuestUser
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.Config
@@ -28,7 +28,7 @@ object AttachmentRoutes {
   }
 
   object AttachmentId {
-    def unapply(str: String): Option[Attachment.Id] = Attachment.Id.parse(str)
+    def unapply(str: String): Option[ObsAttachment.Id] = ObsAttachment.Id.parse(str)
   }
 
   def apply[F[_]: Async: Trace](

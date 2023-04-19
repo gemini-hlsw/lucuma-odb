@@ -20,6 +20,7 @@ import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.GraphQLRoutes
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentService
 import lucuma.odb.service.UserService
@@ -225,7 +226,8 @@ object FMain extends MainParams {
       config.commitHash,
       config.ssoClient,
       config.domain,
-      s3ClientOpsResource(config.aws))
+      s3ClientOpsResource(config.aws)
+    )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Logger: Network: Console](
@@ -243,7 +245,8 @@ object FMain extends MainParams {
       ssoClient        <- ssoClientResource
       userSvc          <- pool.map(UserService.fromSession(_))
       middleware       <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
-      graphQLRoutes    <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc)
+      enums            <- Resource.eval(pool.use(Enums.load))
+      graphQLRoutes    <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
       s3ClientOps      <- s3OpsResource
       attachmentSvc    <- pool.map(ses => AttachmentService.fromS3AndSession(awsConfig, s3ClientOps, ses))
     } yield { wsb =>
@@ -263,31 +266,37 @@ object FMain extends MainParams {
         .migrate()
     }
 
+  def singleSession[F[_]: Async: Console](
+    config:   Config.Database,
+    database: Option[String] = None
+  ): Resource[F, Session[F]] = {
+
+    import natchez.Trace.Implicits.noop
+
+    Session.single[F](
+      host     = config.host,
+      port     = config.port,
+      user     = config.user,
+      database = database.getOrElse(config.database),
+      password = config.password.some,
+      ssl      = SSL.Trusted.withFallback(true)
+    )
+}
+
   def resetDatabase[F[_]: Async : Console](config: Config.Database): F[Unit] = {
 
     import skunk.*
     import skunk.implicits.*
-    import natchez.Trace.Implicits.noop
-
-    val session: Resource[F, Session[F]] =
-      Session.single[F](
-        host     = config.host,
-        port     = config.port,
-        user     = config.user,
-        database = "postgres",
-        password = config.password.some
-      )
 
     val drop   = sql"""DROP DATABASE "#${config.database}"""".command
     val create = sql"""CREATE DATABASE "#${config.database}"""".command
 
-    session.use { s =>
+    singleSession(config, "postgres".some).use { s =>
       for {
         _ <- s.execute(drop).void
         _ <- s.execute(create).void
       } yield()
     }
-
   }
 
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
