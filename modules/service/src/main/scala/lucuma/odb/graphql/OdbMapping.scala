@@ -39,9 +39,6 @@ import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.Enums
-// import lucuma.odb.graphql.enums.FilterTypeEnumType
-// import lucuma.odb.graphql.enums.ObsAttachmentTypeEnumType
-// import lucuma.odb.graphql.enums.PartnerEnumType
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
