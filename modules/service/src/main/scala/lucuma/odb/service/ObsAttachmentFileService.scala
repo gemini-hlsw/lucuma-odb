@@ -8,10 +8,6 @@ import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.io.file.Path
-<<<<<<< main:modules/service/src/main/scala/lucuma/odb/service/AttachmentFileService.scala
-import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
-=======
->>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/service/ObsAttachmentFileService.scala
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
@@ -35,11 +31,7 @@ trait ObsAttachmentFileService[F[_]] {
     user:         User,
     programId:    Program.Id,
     attachmentId: ObsAttachment.Id
-<<<<<<< main:modules/service/src/main/scala/lucuma/odb/service/AttachmentFileService.scala
-  ): F[Either[AttachmentException, Stream[F, Byte]]]
-=======
   ): F[Either[ObsAttachmentException, Stream[F, Byte]]]
->>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/service/ObsAttachmentFileService.scala
 
   /** Uploads the file to S3 and addes it to the database */
   def insertAttachment(
@@ -237,11 +229,7 @@ object ObsAttachmentFileService {
         user:         User,
         programId:    Program.Id,
         attachmentId: ObsAttachment.Id
-<<<<<<< main:modules/service/src/main/scala/lucuma/odb/service/AttachmentFileService.scala
-      ): F[Either[AttachmentException, Stream[F, Byte]]] =
-=======
       ): F[Either[ObsAttachmentException, Stream[F, Byte]]] =
->>>>>>> Make current attachments specific to observations:modules/service/src/main/scala/lucuma/odb/service/ObsAttachmentFileService.scala
         session.transaction
           .use(_ =>
             for {
