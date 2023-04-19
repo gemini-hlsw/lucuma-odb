@@ -18,8 +18,8 @@ import fs2.aws.s3.models.Models.FileKey
 import fs2.aws.s3.models.Models.PartSizeMB
 import fs2.io.file.Path
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
-import lucuma.core.model.Attachment
 import lucuma.core.model.GuestUser
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.NewType
@@ -40,7 +40,7 @@ trait AttachmentService[F[_]] {
   def getAttachment(
     user:         User,
     programId:    Program.Id,
-    attachmentId: Attachment.Id
+    attachmentId: ObsAttachment.Id
   ): F[Either[AttachmentException, Stream[F, Byte]]]
 
   /** Uploads the file to S3 and addes it to the database */
@@ -51,10 +51,10 @@ trait AttachmentService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  ): F[Attachment.Id]
+  ): F[ObsAttachment.Id]
 
   /** Deletes the file from the database and then removes it from S3. */
-  def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id): F[Unit]
+  def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[Unit]
 }
 
 object AttachmentService {
@@ -169,7 +169,7 @@ object AttachmentService {
       fileName:       FileName,
       description:    Option[NonEmptyString],
       fileSize:       Long
-    ): F[Attachment.Id] =
+    ): F[ObsAttachment.Id] =
       Trace[F].span("insertOrUpdateAttachment") {
         val af   = 
           Statements.insertOrUpdateAttachment(user, programId, attachmentType, fileName.value, description, fileSize)
@@ -180,7 +180,7 @@ object AttachmentService {
     def getAttachmentFileNameFromDB(
       user:         User,
       programId:    Program.Id,
-      attachmentId: Attachment.Id
+      attachmentId: ObsAttachment.Id
     ): F[NonEmptyString] =
       Trace[F].span("getAttachmentFileNameFromDB") {
         val af   = Statements.getAttachmentFileName(user, programId, attachmentId)
@@ -200,7 +200,7 @@ object AttachmentService {
     def deleteAttachmentFromDB(
       user:         User,
       programId:    Program.Id,
-      attachmentId: Attachment.Id
+      attachmentId: ObsAttachment.Id
     ): F[NonEmptyString] =
       Trace[F].span("deleteAttachmentFromDB") {
         val af   = Statements.deleteAttachment(user, programId, attachmentId)
@@ -222,7 +222,7 @@ object AttachmentService {
       def getAttachment(
         user:         User,
         programId:    Program.Id,
-        attachmentId: Attachment.Id
+        attachmentId: ObsAttachment.Id
       ): F[Either[AttachmentException, Stream[F, Byte]]] =
         session.transaction
           .use(_ =>
@@ -252,7 +252,7 @@ object AttachmentService {
         fileName:       String,
         description:    Option[NonEmptyString],
         data:           Stream[F, Byte]
-      ): F[Attachment.Id] =
+      ): F[ObsAttachment.Id] =
         session.transaction
           .use(_ =>
             for {
@@ -279,7 +279,7 @@ object AttachmentService {
       def deleteAttachment(
         user:         User,
         programId:    Program.Id,
-        attachmentId: Attachment.Id
+        attachmentId: ObsAttachment.Id
       ): F[Unit] =
         session.transaction
           .use(_ =>
@@ -330,7 +330,7 @@ object AttachmentService {
     def getAttachmentFileName(
       user:         User,
       programId:    Program.Id,
-      attachmentId: Attachment.Id
+      attachmentId: ObsAttachment.Id
     ): AppliedFragment =
       sql"""
         SELECT c_file_name
@@ -343,7 +343,7 @@ object AttachmentService {
     def deleteAttachment(
       user:         User,
       programId:    Program.Id,
-      attachmentId: Attachment.Id
+      attachmentId: ObsAttachment.Id
     ): AppliedFragment =
       sql"""
         DELETE FROM t_attachment
