@@ -26,6 +26,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -40,6 +41,7 @@ import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
@@ -47,6 +49,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
+import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalService
@@ -71,6 +74,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       LinkUser,
       SetAllocation,
       UpdateAsterisms,
+      UpdateObsAttachments,
       UpdateObservations,
       UpdatePrograms,
       UpdateTargets,
@@ -85,6 +89,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // Resources needed by mutations
   def allocationService: Resource[F, AllocationService[F]]
   def asterismService: Resource[F, AsterismService[F]]
+  def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
   def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
   def targetService: Resource[F, TargetService[F]]
@@ -126,6 +131,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         child = q
       )
     }
+
+  def obsAttachmentResultSubquery(aids: List[ObsAttachment.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = Predicates.obsAttachment.id.in(aids),
+      order = OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"),
+      limit = limit,
+      collectionField = "obsAttachments",
+      child
+    )
 
   def observationResultSubquery(oids: List[Observation.Id], limit: Option[NonNegInt], child: Query) =
     mutationResultSubquery(
@@ -325,6 +339,26 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         }
       }
     }
+
+  private lazy val UpdateObsAttachments = 
+      MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
+        
+        val filterPredicate = and(List(
+          Predicates.obsAttachment.program.id.eql(input.programId),
+          Predicates.obsAttachment.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val idSelect: Result[AppliedFragment] = 
+          MappedQuery(
+            Filter(filterPredicate, Select("id", Nil, Empty)), 
+            Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
+          ).map(_.fragment)
+
+        idSelect.flatTraverse { which =>
+          obsAttachmentMetadataService.use(_.updateObsAttachments(input.SET, which)).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
+        }
+      }
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
