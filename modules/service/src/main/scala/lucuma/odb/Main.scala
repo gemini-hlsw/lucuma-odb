@@ -19,8 +19,8 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.GraphQLRoutes
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.ObsAttachmentRoutes
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObsAttachmentFileService
 import lucuma.odb.service.S3FileService
