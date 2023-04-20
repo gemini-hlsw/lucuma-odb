@@ -67,6 +67,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
+
 object OdbMapping {
 
   case class Topics[F[_]](
@@ -172,6 +173,11 @@ object OdbMapping {
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
           with TimeSpanMapping[F]
+          with TimingWindowEndAfterMapping[F]
+          with TimingWindowEndAtMapping[F]
+          with TimingWindowEndMapping[F]
+          with TimingWindowMapping[F]
+          with TimingWindowRepeatMapping[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateGroupsResultMapping[F]
           with UpdateObsAttachmentsResultMapping[F]

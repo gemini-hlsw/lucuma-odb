@@ -4572,7 +4572,7 @@ type Observation {
   constraintSet: ConstraintSet!
 
   # Observation timing windows
-  timingWindows: [TimingWindow]
+  timingWindows: [TimingWindow!]!
 
   # The top level science requirements
   scienceRequirements: ScienceRequirements!
