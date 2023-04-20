@@ -20,6 +20,6 @@ trait ObsAttachmentTable[F[_]] extends BaseMapping[F] {
     val Description    = col("c_description", text_nonempty.opt)
     val Checked        = col("c_checked", bool)
     val FileSize       = col("c_file_size", int8)
-    val UpdatedAt      = col("c_updated_at", data_timestamp)
+    val UpdatedAt      = col("c_updated_at", core_timestamp)
   }
 }
