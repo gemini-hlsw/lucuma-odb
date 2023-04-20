@@ -10,10 +10,12 @@ import edu.gemini.grackle.skunk.SkunkMapping
 
 import table.ObservationView
 import table.ProgramTable
+import lucuma.odb.graphql.table.TimingWindowTable
 
 trait ObservationMapping[F[_]]
   extends ObservationView[F]
-     with ProgramTable[F]  {
+     with ProgramTable[F]  
+     with TimingWindowTable[F] {
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
@@ -30,6 +32,7 @@ trait ObservationMapping[F[_]]
         SqlObject("posAngleConstraint"),
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
+        SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowTable.ObservationId)),
         SqlObject("scienceRequirements"),
         SqlObject("observingMode"),
         SqlObject("plannedTime"),
