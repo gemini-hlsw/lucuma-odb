@@ -49,6 +49,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -56,7 +57,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
-import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
 import skunk.*
 import skunk.codec.all.*
@@ -148,7 +148,7 @@ trait Codecs {
   val cloud_extinction: Codec[CloudExtinction] =
     enumerated[CloudExtinction](Type.varchar)
 
-  val data_timestamp: Codec[Timestamp] =
+  val core_timestamp: Codec[Timestamp] =
     timestamp.eimap(
       ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
       _.toLocalDateTime
