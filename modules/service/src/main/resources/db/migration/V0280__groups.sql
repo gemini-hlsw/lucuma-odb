@@ -36,11 +36,27 @@ create table t_group (
 -- Add a group columns to observations.
 alter table t_observation
   add column c_group_id d_group_id null,
-  add c_group_index int2 null,
-  add check ((c_group_index is null) = (c_group_id is null)), -- both defined or both null
+  add c_group_index int2 null, -- we'll make this non-null after updating existing observations
   add foreign key (c_program_id, c_group_id) references t_group (c_program_id, c_group_id);
 
--- Re-create this view (previously defined in V0130) to include the new columns.
+-- Number existing observations by obs id, starting at zero within each program
+with helper as (
+  select
+    c_program_id p_id,
+    c_observation_id o_id,
+    row_number() over (partition by c_program_id order by c_observation_id) idx
+  from t_observation
+  order by c_program_id
+)
+update t_observation
+set c_group_index = helper.idx
+from helper
+where c_program_id = helper.p_id and c_observation_id = helper.o_id;
+
+-- Now make observation index non-null
+alter table t_observation alter column c_group_index set not null;
+
+-- Re-create this view to include the new columns.
 drop view v_observation;
 create view v_observation as
   select *,
@@ -60,7 +76,6 @@ DECLARE
   g0 d_group_id;
   g1 d_group_id;
 BEGIN
-
   -- Compute the paths of all groups in the specified program and detect cycles, both via the 
   -- built-in CYCLE syntax. Select the endpoints of the first such cycle into g0 and g1.
   WITH RECURSIVE child AS (
@@ -76,12 +91,10 @@ BEGIN
   SELECT c_group_id, c_parent_id
   INTO g0, g1
   from child WHERE c_cyclic;
-
   -- If we found a cycle then raise an exception.
   IF FOUND THEN
     RAISE EXCEPTION 'Cycle detected in group structure between % and %.', g0, g1;
   END IF;
-
 END;
 $$ LANGUAGE plpgsql;
 
@@ -106,7 +119,6 @@ CREATE OR REPLACE PROCEDURE group_verify_indices(pid d_program_id) AS $$
 DECLARE
   g d_group_id;
 BEGIN
-
   WITH indices AS (
     SELECT c_parent_id AS c_group_id, c_parent_index as c_index
     FROM   t_group
@@ -124,7 +136,6 @@ BEGIN
   GROUP BY
     c_group_id
   HAVING starts_at_zero_and_is_consecutive(array_agg(c_index order by c_index)) = false;
-
   IF FOUND THEN
     IF g IS NULL THEN
       RAISE EXCEPTION 'Index discontinuity detected in the top-level group.';
@@ -132,10 +143,10 @@ BEGIN
       RAISE EXCEPTION 'Index discontinuity detected in group %.', g;
     END IF;
   END IF;
-
 END;
 $$ LANGUAGE plpgsql;
 
+-- Raise an error if the specified program contains cyclic groups or a group with non-consecutive indices.
 CREATE OR REPLACE PROCEDURE group_verify(pid d_program_id) AS $$
 BEGIN
   CALL group_verify_acyclic(pid);
@@ -143,13 +154,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Ok, create a trigger function to check group constraints.
+-- Create a trigger function to check group constraints for t_group
 CREATE OR REPLACE FUNCTION t_group_trigger()
 RETURNS TRIGGER AS $$
 BEGIN
   -- If it's an update ...
   IF (TG_OP = 'UPDATE') THEN 
-    IF (OLD.c_program_id <> NEW.c_program_id) THEN
+    IF (OLD.c_program_id is distinct from NEW.c_program_id) THEN
       -- should never happen, but check anyway
       CALL group_verify(OLD.c_program_id);
     END IF;
@@ -161,9 +172,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Call this trigger function on any modification that can affect the group structure.
+-- Call this trigger function on any group modification that can affect the structure.
 CREATE CONSTRAINT TRIGGER group_trigger_groups
 AFTER INSERT OR DELETE OR UPDATE OF c_program_id, c_parent_id, c_parent_index ON t_group
+DEFERRABLE
+FOR EACH ROW
+EXECUTE FUNCTION t_group_trigger();
+
+-- TODO: Call this trigger function on any obs modification that can affect the group structure.
+CREATE CONSTRAINT TRIGGER group_trigger_observations
+AFTER INSERT OR DELETE OR UPDATE OF c_program_id, c_grouo_id, c_group_index ON t_observation
 DEFERRABLE
 FOR EACH ROW
 EXECUTE FUNCTION t_group_trigger();
@@ -188,7 +206,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Shuffle things forward to close a hole at the specified group+index. Used for move and delete.
+-- Shuffle things back to close a hole at the specified group+index. Used for move and delete.
 -- Constraints must be deferred when calling.
 CREATE OR REPLACE PROCEDURE group_close_hole(gid d_group_id, i int2) AS $$
 BEGIN
@@ -268,7 +286,7 @@ BEGIN
 
     -- Move it out of the way
     UPDATE t_observation
-    SET    c_group_id = null, c_group_index = null
+    SET    c_group_id = null, c_group_index = -1
     WHERE  c_observation_id = oid;
 
     -- Close the hole where used to be
