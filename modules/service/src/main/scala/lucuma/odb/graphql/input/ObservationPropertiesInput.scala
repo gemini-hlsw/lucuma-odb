@@ -7,12 +7,15 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import edu.gemini.grackle.Result
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
@@ -40,7 +43,9 @@ object ObservationPropertiesInput {
     constraintSet:       Option[ConstraintSetInput],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Option[ObservingModeInput.Create],
-    existence:           Option[Existence]
+    existence:           Option[Existence],
+    group:               Option[Group.Id],
+    groupIndex:          Option[NonNegShort],
   ) extends AsterismInput
 
   object Create {
@@ -56,7 +61,9 @@ object ObservationPropertiesInput {
         constraintSet       = ConstraintSetInput.Default.some,
         scienceRequirements = None,
         observingMode       = None,
-        existence           = Existence.Present.some
+        existence           = Existence.Present.some,
+        group               = None,
+        groupIndex          = None,
       )
 
     val Binding: Matcher[Create] =
@@ -82,7 +89,9 @@ object ObservationPropertiesInput {
             rConstraintSet,
             rScienceRequirements,
             rObservingMode,
-            rExistence
+            rExistence,
+            Result(None),
+            Result(None),
           ).parMapN(Create.apply)
       }
 

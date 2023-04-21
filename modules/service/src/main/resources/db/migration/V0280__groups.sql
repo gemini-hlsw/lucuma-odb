@@ -181,27 +181,47 @@ EXECUTE FUNCTION t_group_trigger();
 
 -- TODO: Call this trigger function on any obs modification that can affect the group structure.
 CREATE CONSTRAINT TRIGGER group_trigger_observations
-AFTER INSERT OR DELETE OR UPDATE OF c_program_id, c_grouo_id, c_group_index ON t_observation
+AFTER INSERT OR DELETE OR UPDATE OF c_program_id, c_group_id, c_group_index ON t_observation
 DEFERRABLE
 FOR EACH ROW
 EXECUTE FUNCTION t_group_trigger();
 
--- Shuffle things forward to open a hole at the specified group+index. Used for insert and move.
+-- Open a hole in the given program or program+group, at index i or at the end if i is null.
+-- Returns i, which will be computed if null was passed.
 -- Constraints must be deferred when calling.
-CREATE OR REPLACE PROCEDURE group_open_hole(gid d_group_id, i int2) AS $$
+CREATE OR REPLACE FUNCTION group_open_hole(pid d_program_id, gid d_group_id, i int2) RETURNS int2 AS $$
+DECLARE
+  ret int2;
 BEGIN
 
-  -- Shuffle groups forward as needed, keeping in mind that gid may be null
-  UPDATE t_group
-  SET c_parent_index = c_parent_index + 1
-  WHERE c_parent_id IS NOT DISTINCT FROM gid 
-  AND c_parent_index >= i;
+  -- If we were given an index, assume it's valid and open a hole
+  IF i IS NOT NULL THEN
 
-  -- Shuffle observations forward as needed
-  UPDATE t_observation
-  SET c_group_index = c_group_index + 1
-  WHERE c_group_id = gid
-  AND c_group_index >= i;
+    -- Shuffle groups forward as needed, keeping in mind that gid may be null
+    UPDATE t_group
+    SET c_parent_index = c_parent_index + 1
+    WHERE c_parent_id IS NOT DISTINCT FROM gid 
+    AND c_parent_index >= i
+    AND c_program_id = pid;
+
+    -- Shuffle observations forward as needed
+    UPDATE t_observation
+    SET c_group_index = c_group_index + 1
+    WHERE c_group_id IS NOT DISTINCT FROM gid
+    AND c_group_index >= i
+    AND c_program_id = pid;
+
+    RETURN i;
+
+  END IF;  
+
+  -- Otherwise select the next open one. No shuffling needed.
+  SELECT coalesce(max(c_index) + 1, 0) INTO ret
+  FROM v_group_element
+  WHERE c_group_id IS NOT DISTINCT FROM gid
+  AND c_program_id = pid;
+
+  RETURN ret;
 
 END;
 $$ LANGUAGE plpgsql;
