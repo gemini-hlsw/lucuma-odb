@@ -6,11 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
-
-import table.ObservationView
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
+
+import table.ObservationView
 
 trait GroupElementMapping[F[_]] extends GroupElementView[F] with GroupView[F] with ObservationView[F] {
 

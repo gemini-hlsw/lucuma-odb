@@ -4,17 +4,17 @@
 package lucuma.odb.graphql.util
 
 import cats.Eq
+import cats.kernel.Order
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Type
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Encoder
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
-import cats.kernel.Order
-import eu.timepit.refined.types.numeric.NonNegShort
 
 trait MappingExtras[F[_]] extends Mapping[F] {
 

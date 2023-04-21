@@ -5,21 +5,21 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.skunk.SkunkMapping
-
-import table.ObservationView
-import lucuma.odb.graphql.table.GroupView
-import lucuma.odb.graphql.table.GroupElementView
-import lucuma.odb.graphql.table.ProgramTable
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.Select
-import edu.gemini.grackle.Result
 import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
 import edu.gemini.grackle.Query.OrderBy
 import edu.gemini.grackle.Query.OrderSelection
 import edu.gemini.grackle.Query.OrderSelections
+import edu.gemini.grackle.Query.Select
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.TypeRef
+import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.odb.graphql.table.GroupElementView
+import lucuma.odb.graphql.table.GroupView
+import lucuma.odb.graphql.table.ProgramTable
+
+import table.ObservationView
 
 trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] {
 

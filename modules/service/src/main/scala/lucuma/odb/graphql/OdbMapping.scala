@@ -16,6 +16,7 @@ import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
+import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
@@ -39,6 +40,7 @@ import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.graphql.mapping.CreateGroupResultMapping
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
@@ -65,8 +67,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
-import edu.gemini.grackle.Cursor.Context
-import lucuma.odb.graphql.mapping.CreateGroupResultMapping
 object OdbMapping {
 
   case class Topics[F[_]](

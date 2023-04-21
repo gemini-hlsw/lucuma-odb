@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
@@ -70,7 +71,6 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import eu.timepit.refined.types.numeric.NonNegShort
 
 
 // Codecs for some atomic types.
