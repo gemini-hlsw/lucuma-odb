@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.kernel.Order
 import cats.syntax.all._
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
@@ -15,6 +16,7 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -24,8 +26,6 @@ import lucuma.odb.graphql.predicate.Predicates
 import binding._
 import input._
 import table._
-import eu.timepit.refined.types.numeric.NonNegShort
-import cats.kernel.Order
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]

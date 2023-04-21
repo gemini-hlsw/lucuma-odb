@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import lucuma.odb.graphql.binding._
 import lucuma.core.model.Program
+import lucuma.odb.graphql.binding._
 
 case class CreateGroupInput(
   programId: Program.Id,

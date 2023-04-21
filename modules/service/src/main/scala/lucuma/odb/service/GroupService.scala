@@ -5,15 +5,15 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.User
+import lucuma.odb.data.Group
+import lucuma.odb.graphql.input.CreateGroupInput
+import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk._
-import skunk.implicits._
 import skunk.codec.all.*
-import lucuma.odb.graphql.input.CreateGroupInput
-import lucuma.odb.data.Group
-import eu.timepit.refined.types.numeric.NonNegShort
-import lucuma.odb.graphql.input.GroupPropertiesInput
+import skunk.implicits._
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput): F[Group.Id]

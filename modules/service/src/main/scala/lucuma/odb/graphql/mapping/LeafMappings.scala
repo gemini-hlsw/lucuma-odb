@@ -7,7 +7,9 @@ package mapping
 
 import edu.gemini.grackle.Mapping
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -48,15 +50,13 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
-import lucuma.odb.data.Group
-import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.numeric.NonNegShort
 
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
