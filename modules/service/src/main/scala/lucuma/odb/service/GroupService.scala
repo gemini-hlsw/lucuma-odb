@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Group
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -30,13 +31,13 @@ object GroupService {
         s.transaction.use { xa =>
           for {
             _ <- s.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
-            _ <- openHole(input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
+            _ <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
             g <- s.prepareR(Statements.InsertGroup).use(_.unique(input))
           } yield g
         }
 
-      def openHole(gid: Option[Group.Id], index: NonNegShort, xa: Transaction[F]): F[Unit] =
-        s.prepareR(Statements.OpenHole).use(_.execute(gid ~ index)).void
+      def openHole(pid: Program.Id, gid: Option[Group.Id], index: NonNegShort, xa: Transaction[F]): F[Unit] =
+        s.prepareR(Statements.OpenHole).use(_.unique(pid ~ gid ~ index.some)).void
 
     }
 
@@ -78,8 +79,8 @@ object GroupService {
           c.SET.maximumInterval
         }
 
-    val OpenHole: Command[(Option[Group.Id], NonNegShort)] =
-      sql"""call group_open_hole(${group_id.opt}, $int2_nonneg)""".command
+    val OpenHole: Query[Program.Id ~ Option[Group.Id] ~ Option[NonNegShort], NonNegShort] =
+      sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)
 
   }
 
