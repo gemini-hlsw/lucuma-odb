@@ -16,7 +16,9 @@ object WhereObsAttachment {
 
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderObsAttachmentId = WhereOrder.binding[ObsAttachment.Id](path / "id", ObsAttachmentIdBinding)
-    val WhereFileNameBinding   = WhereOptionString.binding(path / "fileName")
+    val WhereFileNameBinding   = WhereString.binding(path / "fileName")
+    val WhereDescriptionBinding   = WhereOptionString.binding(path / "description")
+    val WhereAttachmentTypeBinding = WhereUnorderedTag.binding(path / "attachmentType", TagBinding)
 
     lazy val WhereObsAttachmentBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -25,18 +27,25 @@ object WhereObsAttachment {
             WhereObsAttachmentBinding.List.Option("OR", rOR),
             WhereObsAttachmentBinding.Option("NOT", rNOT),
             WhereOrderObsAttachmentId.Option("id", rId),
-            WhereFileNameBinding.Option("fileName", rFileName)
+            WhereFileNameBinding.Option("fileName", rFileName),
+            WhereDescriptionBinding.Option("description", rDescription),
+            WhereAttachmentTypeBinding.Option("attachmentType", rAttachmentType),
+            BooleanBinding.Option("checked", rChecked)
           ) =>
-        (rAND, rOR, rNOT, rId, rFileName).parMapN { (AND, OR, NOT, id, name) =>
-          and(
-            List(
-              AND.map(and),
-              OR.map(or),
-              NOT.map(Not(_)),
-              id,
-              name
-            ).flatten
-          )
+        (rAND, rOR, rNOT, rId, rFileName, rDescription, rAttachmentType, rChecked).parMapN { 
+          (AND, OR, NOT, id, name, desc, atType, checked) =>
+            and(
+              List(
+                AND.map(and),
+                OR.map(or),
+                NOT.map(Not(_)),
+                id,
+                name,
+                desc,
+                atType,
+                checked.map(b => Eql(path / "checked", Const(b)))
+              ).flatten
+            )
         }
     }
   }
