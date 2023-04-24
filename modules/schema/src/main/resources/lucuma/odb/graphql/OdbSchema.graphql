@@ -1816,6 +1816,8 @@ input ObservationPropertiesInput {
   # The constraintSet defaults to standard values if not specified on creation, and may be edited but not deleted
   constraintSet: ConstraintSetInput
 
+  timingWindows: [TimingWindowInput!]
+
   # The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
   scienceRequirements: ScienceRequirementsInput
 
@@ -2352,6 +2354,28 @@ input TargetPropertiesInput {
   nonsidereal: NonsiderealInput
   sourceProfile: SourceProfileInput
   existence: Existence
+}
+
+input TimingWindowRepeatInput {
+  period: TimeSpanInput!
+  times: PosInt
+}
+
+input TimingWindowEndAfterInput {
+  duration: TimeSpanInput!
+  repeat: TimingWindowRepeatInput
+}
+
+input TimingWindowEndInput {
+  at: Timestamp
+  after: TimingWindowEndAfterInput
+}
+
+input TimingWindowInput {
+  #timingWindowId: TimingWindowId!
+  inclusion: TimingWindowInclusion!
+  start: Timestamp!
+  end: TimingWindowEndInput
 }
 
 # Selects the observations for undelete
@@ -4503,22 +4527,21 @@ enum TimingWindowInclusion {
 type TimingWindowRepeat {
   period: TimeSpan!
 
-  #forever: Boolean!
-
-  times: Int
+  times: PosInt
 }
 
-type TiminigWindowEndAt {
+type TimingWindowEndAt {
+  # UTC
   endAt: Timestamp!
 }
 
-type TiminigWindowEndAfter {
+type TimingWindowEndAfter {
   endAfter: TimeSpan!
 
   repeat: TimingWindowRepeat
 }
 
-union TimingWindowEnd = TiminigWindowEndAt | TiminigWindowEndAfter
+union TimingWindowEnd = TimingWindowEndAt | TimingWindowEndAfter
 
 type TimingWindow {
   id: TimingWindowId!
@@ -4527,6 +4550,7 @@ type TimingWindow {
 
   inclusion: TimingWindowInclusion!
 
+  # UTC
   start: Timestamp!
 
   end: TimingWindowEnd

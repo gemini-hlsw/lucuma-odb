@@ -14,8 +14,9 @@ trait TimingWindowRepeatMapping[F[_]] extends TimingWindowTable[F] {
       tpe = TimingWindowRepeatType,
       fieldMappings = 
         List(
-          SqlField("repeat_period", TimingWindowTable.RepeatPeriod),
-          SqlField("repeat_times", TimingWindowTable.RepeatTimes),
+          SqlField("id", TimingWindowTable.Id, key = true),
+          SqlObject("period"),
+          SqlField("times", TimingWindowTable.RepeatTimes),
         )
     )
   }

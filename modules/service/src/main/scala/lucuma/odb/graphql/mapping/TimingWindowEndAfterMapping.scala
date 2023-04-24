@@ -14,7 +14,8 @@ trait TimingWindowEndAfterMapping[F[_]] extends TimingWindowTable[F] {
       tpe = TimingWindowEndAfterType,
       fieldMappings = 
         List(
-          SqlField("end_after", TimingWindowTable.EndAfter),
+          SqlField("id", TimingWindowTable.Id, key = true),
+          SqlObject("endAfter"),
           SqlObject("repeat")
         )
     )

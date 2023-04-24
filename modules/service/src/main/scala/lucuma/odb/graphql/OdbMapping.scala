@@ -61,6 +61,7 @@ import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
+import lucuma.odb.service.TimingWindowService
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
@@ -212,7 +213,8 @@ object OdbMapping {
             pool.map { s =>
               val oms = ObservingModeServices.fromSession(s)
               val as  = AsterismService.fromSessionAndUser(s, user)
-              ObservationService.fromSessionAndUser(s, user, oms, as)
+              val tws = TimingWindowService.fromSession(s)
+              ObservationService.fromSessionAndUser(s, user, oms, as, tws)
             }
 
           override val programService: Resource[F, ProgramService[F]] =
@@ -344,6 +346,11 @@ object OdbMapping {
               TargetGroupSelectResultMapping,
               TargetMapping,
               TargetSelectResultMapping,
+              TimingWindowEndAfterMapping,
+              TimingWindowEndAtMapping,
+              TimingWindowEndMapping,
+              TimingWindowMapping,
+              TimingWindowRepeatMapping,
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
               UpdateGroupsResultMapping,

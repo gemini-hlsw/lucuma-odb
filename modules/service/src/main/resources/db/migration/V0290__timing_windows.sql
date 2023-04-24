@@ -6,11 +6,15 @@ create sequence s_timing_window_id START with 256; -- three hex digits
 --- EXISTENCE
 create type e_timing_window_inclusion as enum ('include', 'exclude');
 
+-- END AT/AFTER
+create type e_timing_window_end_type as enum ('at', 'after');
+
 create table t_timing_window (
   c_timing_window_id d_timing_window_id        primary key default 'w-' || to_hex(nextval('s_timing_window_id')),
   c_observation_id   d_observation_id          not null,
   c_inclusion        e_timing_window_inclusion not null,
   c_start            timestamp                 not null,
+  c_end_type         e_timing_window_end_type  generated always as (case when c_end_at is not null then 'at'::e_timing_window_end_type when c_end_after is not null then 'after'::e_timing_window_end_type end) stored,
   c_end_at           timestamp,  -- if both c_end_at and c_end_after are null, remain open forever
   c_end_after        interval,   --
   c_repeat_period    interval,   -- if null, don't repeat

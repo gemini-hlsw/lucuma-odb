@@ -48,6 +48,7 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
@@ -57,6 +58,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
+import lucuma.core.model.TimingWindowInclusion
 
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
@@ -118,6 +120,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
       LeafMapping[Timestamp](TimestampType),
+      LeafMapping[TimingWindow.Id](TimingWindowIdType),
+      LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[ToOActivation](ToOActivationType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),

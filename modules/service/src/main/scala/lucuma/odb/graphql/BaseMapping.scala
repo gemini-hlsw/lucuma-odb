@@ -144,6 +144,7 @@ trait BaseMapping[F[_]]
   lazy val TimingWindowEndAtType               = schema.ref("TimingWindowEndAt")
   lazy val TimingWindowEndType                 = schema.ref("TimingWindowEnd")
   lazy val TimingWindowIdType                  = schema.ref("TimingWindowId")
+  lazy val TimingWindowInclusionType           = schema.ref("TimingWindowInclusion")
   lazy val TimingWindowRepeatType              = schema.ref("TimingWindowRepeat")
   lazy val TimingWindowType                    = schema.ref("TimingWindow")
   lazy val ToOActivationType                   = schema.ref("ToOActivation")
