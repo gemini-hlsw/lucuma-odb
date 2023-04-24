@@ -12,6 +12,7 @@ import skunk.codec.all._
 trait GroupElementView[F[_]] extends BaseMapping[F] {
 
   object GroupElementView extends TableDef("v_group_element") {
+    val Id                 = col("c_group_element_id", text)
     val ProgramId          = col("c_program_id", program_id)
     val GroupId            = col("c_group_id", group_id)
     val Index              = col("c_index", int2_nonneg)

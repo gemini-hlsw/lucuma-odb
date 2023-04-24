@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import coulomb.rational.typeexpr.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -31,19 +32,19 @@ object GroupService {
         s.transaction.use { xa =>
           for {
             _ <- s.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
-            _ <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
-            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input))
+            i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
+            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input ~ i))
           } yield g
         }
 
-      def openHole(pid: Program.Id, gid: Option[Group.Id], index: NonNegShort, xa: Transaction[F]): F[Unit] =
-        s.prepareR(Statements.OpenHole).use(_.unique(pid ~ gid ~ index.some)).void
+      def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort], xa: Transaction[F]): F[NonNegShort] =
+        s.prepareR(Statements.OpenHole).use(_.unique(pid ~ gid ~ index))
 
     }
 
   object Statements {
 
-    val InsertGroup: Query[CreateGroupInput, Group.Id] =
+    val InsertGroup: Query[CreateGroupInput ~ NonNegShort, Group.Id] =
       sql"""
       insert into t_group (
         c_program_id,   
@@ -67,10 +68,10 @@ object GroupService {
         ${time_span.opt}
       ) returning c_group_id
       """.query(group_id)
-         .contramap[CreateGroupInput] { c =>
+         .contramap[CreateGroupInput ~ NonNegShort] { case c ~ index =>
           c.programId ~
           c.SET.parentGroupId ~
-          c.SET.parentGroupIndex ~
+          index ~
           c.SET.name ~
           c.SET.description ~
           c.SET.minimumRequired ~

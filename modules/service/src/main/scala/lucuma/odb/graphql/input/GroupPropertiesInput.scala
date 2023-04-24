@@ -25,11 +25,11 @@ object GroupPropertiesInput {
     minimumInterval: Option[TimeSpan],
     maximumInterval: Option[TimeSpan],
     parentGroupId: Option[Group.Id],
-    parentGroupIndex: NonNegShort,
+    parentGroupIndex: Option[NonNegShort],
   )
 
   val Empty: Create =
-    Create(None, None, None, false, None, None, None, NonNegShort.unsafeFrom(0))
+    Create(None, None, None, false, None, None, None, None)
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
@@ -56,7 +56,7 @@ object GroupPropertiesInput {
                   minimumInterval, 
                   maximumInterval, 
                   parentGroup, 
-                  parentGroupIndex.getOrElse(NonNegShort.unsafeFrom(0))
+                  parentGroupIndex,
                 ))
         }
     }

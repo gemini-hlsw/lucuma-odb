@@ -4088,6 +4088,8 @@ scalar GroupId
 
 "Groups contain observations and other groups. Exactly one will be defined."
 type GroupElement {
+  parentGroupId: GroupId
+  parentIndex: NonNegShort!
   group: Group
   observation: Observation
 }
@@ -4607,11 +4609,11 @@ type Program {
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
 
-  "Top-level groups in the program."
-  groups: [Group!]!
+  "Top-level group elements (observations and sub-groups) in the program."
+  groupElements: [GroupElement!]!
 
-  "All groups in the program."
-  allGroups: [Group!]!
+  "All group elements (observations and sub-groups) in the program."
+  allGroupElements: [GroupElement!]!
 
 }
 
