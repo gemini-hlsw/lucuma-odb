@@ -46,7 +46,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
         case Select("elements", Nil, child) =>
           Result(
             Select("elements", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "index"))), child)
+              OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))), child)
             )
           )
       }

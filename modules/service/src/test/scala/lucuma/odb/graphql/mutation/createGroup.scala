@@ -1,0 +1,135 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package mutation
+
+import cats.effect.IO
+import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.Json
+import io.circe.literal._
+import io.circe.syntax._
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Group
+import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.OdbSuite
+
+import java.time.Duration
+
+class createGroup extends OdbSuite {
+
+  val pi = TestUsers.Standard.pi(nextId, nextId)
+
+  lazy val validUsers = List(pi)
+
+  test("simple group creation") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createGroup(
+              input: {
+                programId: "$pid",
+                SET: {
+                  name: "My Group"
+                  description: "A description"
+                  minimumRequired: 4
+                  ordered: true
+                  minimumInterval: {
+                    hours: 3
+                  }
+                  maximumInterval: {
+                    hours: 36
+                  }
+                }
+              }
+            ) {
+              group {
+                name
+                description
+                minimumRequired
+                ordered
+                minimumInterval {
+                  hours
+                }
+                maximumInterval {
+                  hours
+                }
+                elements {
+                  parentGroupId
+                  parentIndex
+                  group { id }
+                  observation { id }
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(json"""
+          {
+            "createGroup" : {
+              "group" : {
+                "name" : "My Group",
+                "description" : "A description",
+                "minimumRequired" : 4,
+                "ordered" : true,
+                "minimumInterval" : {
+                  "hours" : 3.000000
+                },
+                "maximumInterval" : {
+                  "hours" : 36.000000
+                },
+                "elements" : [
+                ]
+              }
+            }
+          }
+        """)
+      )
+    }
+  }
+
+  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None): IO[Group.Id] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          createGroup(
+            input: {
+              programId: "$pid"
+            }
+          ) {
+            group {
+              id
+            }
+          }
+        }
+        """
+    ).map { json =>
+      json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
+    }
+  
+  test("create many groups and then select them (in order)") {
+    for {
+      pid  <- createProgramAs(pi)
+      g1   <- createGroupAs(pi, pid)
+      g2   <- createGroupAs(pi, pid)
+      g3   <- createGroupAs(pi, pid)
+      json <- query(pi, s"""query { program(programId: "$pid") { groupElements { group { id } } } }""")
+      ids   = json
+                .hcursor
+                .downFields("program", "groupElements")
+                .require[List[Json]]
+                .map(_.hcursor.downFields("group", "id").require[Group.Id])
+    } yield assertEquals(ids, List(g1, g2, g3))
+  }
+
+}

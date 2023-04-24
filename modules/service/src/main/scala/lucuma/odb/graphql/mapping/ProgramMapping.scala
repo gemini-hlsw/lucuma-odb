@@ -22,6 +22,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table.GroupElementView
 
 import binding._
 import input._
@@ -36,7 +37,7 @@ trait ProgramMapping[F[_]]
      with AttachmentTable[F]
      with Predicates[F]
      with ResultMapping[F]
-     with GroupView[F] {
+     with GroupElementView[F] {
 
   def user: User
 
@@ -54,8 +55,8 @@ trait ProgramMapping[F[_]]
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
         SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),
-        SqlObject("groups", Join(ProgramTable.Id, GroupView.ProgramId)),
-        SqlObject("allGroups", Join(ProgramTable.Id, GroupView.ProgramId)),
+        SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
+        SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       ),
     )
 
@@ -82,12 +83,12 @@ trait ProgramMapping[F[_]]
               )
             }              
           }
-        case Select("groups", Nil, child) =>
+        case Select("groupElements", Nil, child) =>
           Result(
-            Select("groups", Nil,
+            Select("groupElements", Nil,
               FilterOrderByOffsetLimit(
-                pred = Some(Predicates.group.parentId.isNull(true)),
-                oss = Some(List(OrderSelection[NonNegShort](GroupType / "parentIndex", true, true))),
+                pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
+                oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
                 offset = None,
                 limit = None,
                 child              
