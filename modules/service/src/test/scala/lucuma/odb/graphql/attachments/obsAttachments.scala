@@ -547,6 +547,7 @@ class obsAttachments extends OdbSuiteWithS3 {
                 )
     } yield ()
   }
+
   test("bulk update attachments metadata: by ids") {
     for {
       pid   <- createProgramAs(pi)
@@ -565,4 +566,90 @@ class obsAttachments extends OdbSuiteWithS3 {
     } yield ()
   }
 
+  test("update attachments metadata: by checked") {
+    for {
+      pid   <- createProgramAs(pi)
+      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
+      ta3c   = file3.copy(checked = true)
+      _     <- updateAttachmentsGql(pi,
+                                    pid,
+                                    WHERE = s"""{ id: { EQ: "$aid3"}}""",
+                                    SET = s"""{ checked: true }""",
+                                    (aid3, ta3c)
+               )
+      newTa3 = ta3c.copy(description = "Verified".some)
+      _     <- updateAttachmentsGql(pi,
+                                    pid,
+                                    WHERE = s"""{ checked: true }""",
+                                    SET = """{ description: "Verified" }""",
+                                    (aid3, newTa3)
+               )
+    } yield ()
+  }
+
+  test("update attachments metadata: by decription") {
+    for {
+      pid   <- createProgramAs(pi)
+      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
+      newTa2 = file2.copy(description = none)
+      newTa3 = file3.copy(description = none)
+      _     <- updateAttachmentsGql(pi,
+                                    pid,
+                                    WHERE = s"""{ description: { NLIKE: "%script%" }}""",
+                                    SET = """{ description: null }""",
+                                    (aid2, newTa2),
+                                    (aid3, newTa3)
+               )
+    } yield ()
+  }
+
+  test("update attachments metadata: by null decription") {
+    for {
+      pid   <- createProgramAs(pi)
+      aid1  <- insertAttachment(pi, pid, file1B).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
+      newTa1 = file1B.copy(description = "No longer null!".some)
+      _     <- updateAttachmentsGql(pi,
+                                    pid,
+                                    WHERE = s"""{ description: { IS_NULL: true }}""",
+                                    SET = """{ description: "No longer null!" }""",
+                                    (aid1, newTa1)
+               )
+    } yield ()
+  }
+
+  test("update attachments metadata: by attachment type") {
+    for {
+      pid   <- createProgramAs(pi)
+      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
+      newTa2 = file2.copy(description = "Found".some)
+      newTa3 = file3.copy(description = "Found".some)
+      _     <- updateAttachmentsGql(pi,
+                                    pid,
+                                    WHERE = s"""{ attachmentType: { EQ: MOS_MASK }}""",
+                                    SET = """{ description: "Found" }""",
+                                    (aid2, newTa2),
+                                    (aid3, newTa3)
+               )
+    } yield ()
+  }
+
+  test("update attachments metadata: no matches") {
+    for {
+      pid   <- createProgramAs(pi)
+      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
+      _     <- updateAttachmentsGql(pi,
+                                    pid,
+                                    WHERE = s"""{ id: { NEQ: "$aid1" }}""",
+                                    SET = """{ description: "Found" }"""
+               )
+    } yield ()
+  }
 }
