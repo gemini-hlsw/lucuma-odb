@@ -35,9 +35,8 @@ object WhereString {
             neq.map(a => NEql(path, Const(a))),
             in.map(as => In(path, as)),
             nin.map(as => Not(In(path, as.map(a => a)))),
-            // the casts below are safe; the type parameter is a phantom in this case
-            like.map(s => Like(path.asInstanceOf[Term[String]], s.value, !matchCase.getOrElse(true))),
-            nlike.map(s => Not(Like(path.asInstanceOf[Term[String]], s.value, !matchCase.getOrElse(true)))),
+            like.map(s => Like(path, s.value, !matchCase.getOrElse(true))),
+            nlike.map(s => Not(Like(path, s.value, !matchCase.getOrElse(true)))),
           ).flatten)
         }
     }
