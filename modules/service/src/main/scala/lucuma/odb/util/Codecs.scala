@@ -59,6 +59,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import skunk.*
 import skunk.codec.all.*
@@ -326,12 +327,14 @@ trait Codecs {
       TimeSpan.FromDuration.reverseGet
     )
 
+  val timing_window_end_type: Codec[TimingWindowEndTypeEnum] =
+    enumerated(Type("e_timing_window_end_type"))
+
   val timing_window_id: Codec[TimingWindow.Id] =
     gid[TimingWindow.Id]
 
   val timing_window_inclusion: Codec[TimingWindowInclusion] =
     enumerated(Type("e_timing_window_inclusion"))
-
 
   val too_activation: Codec[ToOActivation] =
     enumerated(Type("e_too_activation"))

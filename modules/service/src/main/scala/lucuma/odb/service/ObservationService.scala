@@ -161,7 +161,8 @@ object ObservationService {
     session: Session[F],
     user:    User,
     observingModeServices: ObservingModeServices[F],
-    asterismService: AsterismService[F]
+    asterismService: AsterismService[F],
+    timingWindowService: TimingWindowService[F]
   ): ObservationService[F] =
     new ObservationService[F] {
 
@@ -191,9 +192,17 @@ object ObservationService {
 
                   }
                 }
+                .flatMap{ rOid =>
+
+                  val rOptF = SET.timingWindows.traverse(timingWindowService.createFunction)
+                  (rOid, rOptF).parMapN { (oid, optF) =>
+                    optF.fold(oid.pure[F]) { f => f(List(oid), xa).as(oid) }
+                  }.sequence
+
+                }
             }
+          }
         }
-      }
 
       override def selectObservations(
         which: AppliedFragment

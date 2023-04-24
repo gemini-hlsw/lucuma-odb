@@ -14,7 +14,6 @@ trait TimingWindowMapping[F[_]] extends TimingWindowTable[F] {
       tpe = TimingWindowType,
       fieldMappings = List(
         SqlField("id", TimingWindowTable.Id, key = true),
-        SqlField("observation_id", TimingWindowTable.ObservationId, hidden = true),
         SqlField("inclusion", TimingWindowTable.Inclusion),
         SqlField("start", TimingWindowTable.Start),
         SqlObject("end")
