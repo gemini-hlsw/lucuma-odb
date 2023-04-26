@@ -3,7 +3,7 @@
 
 package lucuma.odb.logic
 
-import cats.Monad
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptySet
@@ -27,9 +27,9 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepTime
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcResult
-import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecution
@@ -109,7 +109,7 @@ object Generator {
     ) extends Result
   }
 
-  def fromClientAndServices[F[_]: Monad](
+  def fromClientAndServices[F[_]: MonadThrow](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
     paramsSrv:    GeneratorParamsService[F],
@@ -208,7 +208,7 @@ object Generator {
 
 
       def gmosLongSlit[S, D, G, L, U](
-        itcInput:  NonEmptyList[(Target.Id, SpectroscopyModeInput)],
+        itcInput:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
         config:    gmos.longslit.Config[G, L, U],
         generator: gmos.longslit.Generator[S, D, G, L, U],
         useCache:  Boolean
