@@ -27,6 +27,7 @@ import lucuma.odb.graphql.table.GroupElementView
 import binding._
 import input._
 import table._
+import lucuma.odb.data.Group
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
@@ -89,6 +90,21 @@ trait ProgramMapping[F[_]]
               FilterOrderByOffsetLimit(
                 pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
                 oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
+                offset = None,
+                limit = None,
+                child              
+              )
+            )
+          )
+        case Select("allGroupElements", Nil, child) =>
+          Result(
+            Select("allGroupElements", Nil,
+              FilterOrderByOffsetLimit(
+                pred = None,
+                oss = Some(List(
+                  OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true), 
+                  OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
+                )),
                 offset = None,
                 limit = None,
                 child              

@@ -19,6 +19,9 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import org.checkerframework.checker.units.qual.s
+import lucuma.odb.data.Group
+import io.circe.Json
+import eu.timepit.refined.types.numeric.NonNegShort
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -378,5 +381,42 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
     updateTargetExistencetAs(user, tid, Existence.Present)
+
+  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None): IO[Group.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createGroup(
+            input: {
+              programId: "$pid"
+              SET: {
+                parentGroup: ${parentGroupId.asJson.spaces2}
+                parentGroupIndex: ${parentIndex.map(_.value).asJson.spaces2}
+              }
+            }
+          ) {
+            group {
+              id
+            }
+          }
+        }
+        """
+    ).map { json =>
+      json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
+    }
+  
+  def childGroupsAs(user: User, pid: Program.Id, gid: Option[Group.Id] = None): IO[List[Group.Id]] =
+    query(user, s"""query { program(programId: "$pid") { allGroupElements { parentGroupId group { id } } } }""")
+      .map(_
+        .hcursor
+        .downFields("program", "allGroupElements")
+        .require[List[Json]]
+        .flatMap { json =>
+          val parentId = json.hcursor.downField("parentGroupId").require[Option[Group.Id]]
+          if (parentId === gid) then List(json.hcursor.downFields("group", "id").require[Group.Id])
+          else Nil
+        }
+      )
 
 }

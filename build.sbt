@@ -23,7 +23,7 @@ val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
 val postgresVersion            = "42.6.0"
-val skunkVersion               = "0.5.1"
+val skunkVersion               = "0.5.1-108-d43df5c-20230426T152454Z-SNAPSHOT"
 val lucumaSsoVersion           = "0.5.7"
 val lucumaItcVersion           = "0.9.0"
 val testcontainersScalaVersion = "0.40.14"
@@ -105,6 +105,7 @@ lazy val service = project
       "org.tpolecat"   %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"   %% "natchez-log"                        % natchezVersion,
       "org.tpolecat"   %% "skunk-core"                         % skunkVersion,
+      "org.tpolecat"   %% "skunk-circe"                        % skunkVersion,
       "com.dimafeng"   %% "testcontainers-scala-munit"         % testcontainersScalaVersion % Test,
       "com.dimafeng"   %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
