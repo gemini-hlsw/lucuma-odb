@@ -106,6 +106,29 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
+  def createObservationInGroupAs(user: User, pid: Program.Id, groupId: Option[Group.Id] = None, groupIndex: Option[NonNegShort] = None): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+            programId: ${pid.asJson},
+              SET: {
+                groupId: ${groupId.asJson}
+                groupIndex: ${groupIndex.map(_.value).asJson}
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+        """
+    ).map { json => 
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
   def createTargetAs(
     user: User,
     pid:  Program.Id,
@@ -405,16 +428,18 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { json =>
       json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
     }
-  
-  def childGroupsAs(user: User, pid: Program.Id, gid: Option[Group.Id] = None): IO[List[Group.Id]] =
-    query(user, s"""query { program(programId: "$pid") { allGroupElements { parentGroupId group { id } } } }""")
+        
+  def groupElementsAs(user: User, pid: Program.Id, gid: Option[Group.Id]): IO[List[Either[Group.Id, Observation.Id]]] =
+    query(user, s"""query { program(programId: "$pid") { allGroupElements { parentGroupId group { id } observation { id } } } }""")
       .map(_
         .hcursor
         .downFields("program", "allGroupElements")
         .require[List[Json]]
         .flatMap { json =>
           val parentId = json.hcursor.downField("parentGroupId").require[Option[Group.Id]]
-          if (parentId === gid) then List(json.hcursor.downFields("group", "id").require[Group.Id])
+          if (parentId === gid) then 
+            val id = json.hcursor.downFields("group", "id").as[Group.Id].toOption.toLeft(json.hcursor.downFields("observation", "id").require[Observation.Id])
+            List(id)
           else Nil
         }
       )

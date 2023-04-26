@@ -103,8 +103,8 @@ class createGroup extends OdbSuite {
       g1   <- createGroupAs(pi, pid)
       g2   <- createGroupAs(pi, pid)
       g3   <- createGroupAs(pi, pid)
-      ids  <- childGroupsAs(pi, pid)
-    } yield assertEquals(ids, List(g1, g2, g3))
+      ids  <- groupElementsAs(pi, pid, None)
+    } yield assertEquals(ids, List(Left(g1), Left(g2), Left(g3)))
   }
 
   test("[program] insert group at beginning") {
@@ -113,8 +113,8 @@ class createGroup extends OdbSuite {
       g1   <- createGroupAs(pi, pid)
       g2   <- createGroupAs(pi, pid)
       g3   <- createGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(0)))
-      ids  <- childGroupsAs(pi, pid)
-    } yield assertEquals(ids, List(g3, g1, g2))
+      ids  <- groupElementsAs(pi, pid, None)
+    } yield assertEquals(ids, List(Left(g3), Left(g1), Left(g2)))
   }
 
   test("[program] insert group in the middle") {
@@ -123,8 +123,8 @@ class createGroup extends OdbSuite {
       g1   <- createGroupAs(pi, pid)
       g2   <- createGroupAs(pi, pid)
       g3   <- createGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(1)))
-      ids  <- childGroupsAs(pi, pid)
-    } yield assertEquals(ids, List(g1, g3, g2))
+      ids  <- groupElementsAs(pi, pid, None)
+    } yield assertEquals(ids, List(Left(g1), Left(g3), Left(g2)))
   }
 
   test("[group] create many sub-groups and then select them (in order)") {
@@ -134,8 +134,8 @@ class createGroup extends OdbSuite {
       g1   <- createGroupAs(pi, pid, Some(gid))
       g2   <- createGroupAs(pi, pid, Some(gid))
       g3   <- createGroupAs(pi, pid, Some(gid))
-      ids  <- childGroupsAs(pi, pid, Some(gid))
-    } yield assertEquals(ids, List(g1, g2, g3))
+      ids  <- groupElementsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(Left(g1), Left(g2), Left(g3)))
   }
 
   test("[group] insert sub-group at beginning") {
@@ -145,8 +145,8 @@ class createGroup extends OdbSuite {
       g1   <- createGroupAs(pi, pid, Some(gid))
       g2   <- createGroupAs(pi, pid, Some(gid))
       g3   <- createGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(0)))
-      ids  <- childGroupsAs(pi, pid, Some(gid))
-    } yield assertEquals(ids, List(g3, g1, g2))
+      ids  <- groupElementsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(Left(g3), Left(g1), Left(g2)))
   }
 
   test("[group] insert sub-group in the middle") {
@@ -156,8 +156,8 @@ class createGroup extends OdbSuite {
       g1   <- createGroupAs(pi, pid, Some(gid))
       g2   <- createGroupAs(pi, pid, Some(gid))
       g3   <- createGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(1)))
-      ids  <- childGroupsAs(pi, pid, Some(gid))
-    } yield assertEquals(ids, List(g1, g3, g2))
+      ids  <- groupElementsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(Left(g1), Left(g3), Left(g2)))
   }
 
 }

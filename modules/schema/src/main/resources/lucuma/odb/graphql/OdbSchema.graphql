@@ -1809,6 +1809,13 @@ input ObservationPropertiesInput {
 
   # Whether the observation is considered deleted (defaults to PRESENT) but may be edited
   existence: Existence
+
+  # Enclosing group, if any.
+  groupId: GroupId
+
+  # Index in enclosing group or at the top level if ungrouped. If left unspecified on creation, observation will be added last in its enclosing group or at the top level. Cannot be set to null.
+  groupIndex: NonNegShort
+
 }
 
 type Offset {
