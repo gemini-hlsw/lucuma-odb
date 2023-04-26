@@ -39,8 +39,8 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.AsterismService
 

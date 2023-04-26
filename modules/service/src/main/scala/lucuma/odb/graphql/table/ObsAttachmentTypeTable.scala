@@ -9,9 +9,9 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.codec.all._
 
-trait AttachmentTypeTable[F[_]] extends BaseMapping[F] {
+trait ObsAttachmentTypeTable[F[_]] extends BaseMapping[F] {
 
-  object AttachmentTypeTable extends TableDef("t_attachment_type") {
+  object ObsAttachmentTypeTable extends TableDef("t_obs_attachment_type") {
     val Tag       = col("c_tag", tag)
     val ShortName = col("c_short_name", varchar)
     val LongName  = col("c_long_name", varchar)

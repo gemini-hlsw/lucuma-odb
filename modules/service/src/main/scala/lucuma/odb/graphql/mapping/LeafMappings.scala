@@ -46,13 +46,13 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
-import lucuma.odb.data.Timestamp
 import lucuma.odb.data.UserType
 
 
@@ -63,8 +63,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
-      LeafMapping[ObsAttachment.Id](AttachmentIdType),
-      LeafMapping[Tag](AttachmentTypeType),
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
@@ -94,6 +92,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
       LeafMapping[NonNegLong](NonNegLongType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
+      LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),
+      LeafMapping[Tag](ObsAttachmentTypeType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObsStatus](ObsStatusType),
