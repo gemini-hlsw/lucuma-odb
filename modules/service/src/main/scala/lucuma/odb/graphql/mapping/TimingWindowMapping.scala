@@ -5,17 +5,17 @@ package lucuma.odb.graphql
 
 package mapping
 
-import lucuma.odb.graphql.table.TimingWindowTable
+import lucuma.odb.graphql.table.TimingWindowView
 
-trait TimingWindowMapping[F[_]] extends TimingWindowTable[F] {
+trait TimingWindowMapping[F[_]] extends TimingWindowView[F] {
 
   lazy val TimingWindowMapping =
     ObjectMapping(
       tpe = TimingWindowType,
       fieldMappings = List(
-        SqlField("id", TimingWindowTable.Id, key = true),
-        SqlField("inclusion", TimingWindowTable.Inclusion),
-        SqlField("start", TimingWindowTable.Start),
+        SqlField("id", TimingWindowView.Id, key = true),
+        SqlField("inclusion", TimingWindowView.Inclusion),
+        SqlField("startUtc", TimingWindowView.Start),
         SqlObject("end")
       )
     )

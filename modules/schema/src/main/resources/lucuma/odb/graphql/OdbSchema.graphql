@@ -4531,12 +4531,11 @@ type TimingWindowRepeat {
 }
 
 type TimingWindowEndAt {
-  # UTC
-  endAt: Timestamp!
+  utc: Timestamp!
 }
 
 type TimingWindowEndAfter {
-  endAfter: TimeSpan!
+  duration: TimeSpan!
 
   repeat: TimingWindowRepeat
 }
@@ -4546,12 +4545,11 @@ union TimingWindowEnd = TimingWindowEndAt | TimingWindowEndAfter
 type TimingWindow {
   id: TimingWindowId!
 
-  observationId: ObservationId!
+  # observationId: ObservationId!
 
   inclusion: TimingWindowInclusion!
 
-  # UTC
-  start: Timestamp!
+  startUtc: Timestamp!
 
   end: TimingWindowEnd
 

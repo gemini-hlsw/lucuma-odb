@@ -10,9 +10,9 @@ import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
-import lucuma.odb.graphql.table.TimingWindowTable
+import lucuma.odb.graphql.table.TimingWindowView
 
-trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowTable[F] {
+trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
     SwitchMapping(
@@ -29,8 +29,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with
         AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
         GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
         GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
-        TimingWindowEndAfterType / "endAfter"         -> timeSpanMapping(TimingWindowTable.EndAfter)(TimingWindowTable.Id),
-        TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowTable.RepeatPeriod)(TimingWindowTable.Id)
+        TimingWindowEndAfterType / "duration"         -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
+        TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )
     )
 
