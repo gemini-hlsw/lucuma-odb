@@ -13,6 +13,7 @@ import skunk.Transaction
 import cats.effect.Sync
 import skunk.Session
 import cats.syntax.all.*
+import skunk.codec.numeric.*
 
 trait TimingWindowService[F[_]] {
   def createFunction(
@@ -34,14 +35,14 @@ object TimingWindowService:
         timingWindows: List[TimingWindowInput]
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         Result( (obsIds, xa) =>
-          exec(Statements.setObservationTimingWindows(obsIds.head, timingWindows))
+          exec(Statements.setObservationTimingWindows(obsIds, timingWindows))
         )
     }
 
 object Statements {
   // TODO Handle multiple ObsIds
   def setObservationTimingWindows(
-    observationId: Observation.Id,
+    observationIds: List[Observation.Id],
     timingWindows: List[TimingWindowInput]
   ): AppliedFragment =
     // DELETE FROM t_timing_window WHERE observation_id = $observation_id;
@@ -50,13 +51,33 @@ object Statements {
         c_observation_id,
         c_inclusion,
         c_start,
-        c_end_at
+        c_end_at,
+        c_end_after,
+        c_repeat_period,
+        c_repeat_times
       ) VALUES ${(
         observation_id          ~
         timing_window_inclusion ~
         core_timestamp          ~
-        core_timestamp.opt
-      ).values.list(timingWindows.length)}
+        core_timestamp.opt      ~
+        time_span.opt           ~
+        time_span.opt           ~
+        int4.opt
+      ).values.list(timingWindows.length).list(observationIds.length)}
     """//.apply(observationId ~ timingWindows.map(tw => observationId ~ tw.inclusion ~ tw.start))
-    .apply(timingWindows.map(tw => observationId ~ tw.inclusion ~ tw.start ~ tw.end.flatMap(_.endAt)))
+    .apply( 
+      observationIds.map( obsId =>
+        timingWindows.map( tw =>
+      // (observationIds, timingWindows).tupled.map( (obsId, tw) => 
+      obsId ~ 
+      tw.inclusion  ~ 
+      tw.start      ~ 
+      tw.end.flatMap(_.endAt) ~
+      tw.end.flatMap(_.endAfter.map(_.duration)) ~
+      tw.end.flatMap(_.endAfter.flatMap(_.repeat.map(_.period))) ~
+      tw.end.flatMap(_.endAfter.flatMap(_.repeat.flatMap(_.times.map(_.value))))
+    )
+      )
+
+    )
 }

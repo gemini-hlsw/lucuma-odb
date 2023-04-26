@@ -13,20 +13,20 @@ import Predicate._
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 
-import lucuma.odb.graphql.table.TimingWindowTable
+import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.NullableType
 
-trait TimingWindowEndMapping[F[_]] extends TimingWindowTable[F] {
+trait TimingWindowEndMapping[F[_]] extends TimingWindowView[F] {
 
   lazy val TimingWindowEndMapping: ObjectMapping =
     SqlUnionMapping(
       tpe = TimingWindowEndType,
       fieldMappings = 
         List(
-          SqlField("id", TimingWindowTable.Id, key = true),
-          SqlField("endType", TimingWindowTable.EndType, discriminator = true, hidden = true),
+          SqlField("id", TimingWindowView.End.SyntheticId, key = true),
+          SqlField("endType", TimingWindowView.End.Type, discriminator = true, hidden = true),
         ),
       discriminator = endDiscriminator
     )
@@ -34,14 +34,9 @@ trait TimingWindowEndMapping[F[_]] extends TimingWindowTable[F] {
 
   object endDiscriminator extends SqlDiscriminator {
     def discriminate(c: Cursor): Result[Type] = {
-      println(c.fieldAs[Option[TimingWindowEndTypeEnum]]("endType"))
-      for {
-        et <- c.fieldAs[Option[TimingWindowEndTypeEnum]]("endType")
-      } yield 
-        et match {
-        case Some(TimingWindowEndTypeEnum.At) => TimingWindowEndAtType
-        case Some(TimingWindowEndTypeEnum.After) => TimingWindowEndAfterType
-        case _ => NullableType(TimingWindowEndType)
+      c.fieldAs[TimingWindowEndTypeEnum]("endType").map {
+        case TimingWindowEndTypeEnum.At => TimingWindowEndAtType
+        case TimingWindowEndTypeEnum.After => TimingWindowEndAfterType
       }
     }
 

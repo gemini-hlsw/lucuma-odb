@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 trait TargetView[F[_]] extends BaseMapping[F] {
 
   object TargetView extends TableDef("v_target") {
-    val ProgramId      = col("c_program_id", program_id)
+    val ProgramId     = col("c_program_id", program_id)
     val TargetId      = col("c_target_id", target_id)
     val Name          = col("c_name", text_nonempty)
     val Existence     = col("c_existence", existence)
