@@ -60,3 +60,4 @@ schemaspy/out
 *.swp
 
 setup_api.bash
+.direnv/

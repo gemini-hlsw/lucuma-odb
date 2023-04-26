@@ -3,11 +3,12 @@
 
 package lucuma.odb.logic
 
-import cats.Monad
+import cats.MonadThrow
 import cats.Order
 import cats.data.EitherNel
 import cats.data.EitherT
 import cats.data.NonEmptyList
+import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -22,9 +23,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcResult
-import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService
@@ -39,7 +40,7 @@ sealed trait Itc[F[_]] {
   ): F[EitherNel[Itc.Error, Itc.ResultSet]]
 
   def spectroscopy(
-    targets:  NonEmptyList[(Target.Id, SpectroscopyModeInput)],
+    targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
     useCache: Boolean
   ): F[EitherNel[Itc.Error, Itc.ResultSet]]
 
@@ -91,8 +92,8 @@ object Itc {
 
     case class Success(
       targetId: Target.Id,
-      input:    SpectroscopyModeInput,
-      value:    ItcResult.Success
+      input:    SpectroscopyIntegrationTimeInput,
+      value:    IntegrationTime
     ) extends Result {
       def totalTime: Option[TimeSpan] = {
         val total = BigInt(value.exposureTime.toMicroseconds) * value.exposures.value
@@ -135,7 +136,7 @@ object Itc {
 
   }
 
-  def fromClientAndServices[F[_]: Monad](
+  def fromClientAndServices[F[_]: MonadThrow](
     client:    ItcClient[F],
     paramsSrv: GeneratorParamsService[F]
   ): Itc[F] =
@@ -183,17 +184,18 @@ object Itc {
 
 
       override def spectroscopy(
-        targets:  NonEmptyList[(Target.Id, SpectroscopyModeInput)],
+        targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
         useCache: Boolean
       ): F[EitherNel[Error, ResultSet]] =
         targets.traverse { case (tid, si) =>
           client.spectroscopy(si, useCache).map {
             case SpectroscopyResult(_, None)                                 =>
               NoResult(tid).leftNel
-            case SpectroscopyResult(_, Some(ItcResult.Error(msg)))           =>
-              ServiceError(tid, msg).leftNel
-            case SpectroscopyResult(_, Some(s @ ItcResult.Success(_, _, _))) =>
+            case SpectroscopyResult(_, Some(s @ IntegrationTime(_, _, _))) =>
               Success(tid, si, s).rightNel
+          }
+          .handleError { t =>
+            ServiceError(tid, t.getMessage).leftNel
           }
         }.map(_.sequence.map(nel => ResultSet(Zipper.fromNel(nel).focusMax)))
 

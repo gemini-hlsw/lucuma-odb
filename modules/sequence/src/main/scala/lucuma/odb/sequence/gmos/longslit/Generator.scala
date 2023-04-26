@@ -20,7 +20,7 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.DynamicConfig
 import lucuma.core.model.sequence.StaticConfig
 import lucuma.core.syntax.timespan.*
-import lucuma.itc.client.ItcResult
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecution
@@ -46,7 +46,7 @@ sealed abstract class Generator[S, D, G, F, U](
 ) {
 
   def generate(
-    itc:           ItcResult.Success,
+    itc:           IntegrationTime,
     sourceProfile: SourceProfile,
     imageQuality:  ImageQuality,
     config:        Config[G, F, U]

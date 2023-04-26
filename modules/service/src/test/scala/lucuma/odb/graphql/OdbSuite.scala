@@ -20,8 +20,8 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.skunk.SkunkMonitor
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
@@ -34,10 +34,10 @@ import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
+import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcResult
 import lucuma.itc.client.ItcVersions
-import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.FMain
@@ -110,17 +110,17 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcVersions: ItcVersions =
     ItcVersions("foo", "bar".some)
 
-  val FakeItcResult: ItcResult.Success =
-    ItcResult.Success(
+  val FakeItcResult: IntegrationTime =
+    IntegrationTime(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(6),
+      PosInt.unsafeFrom(6),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
-      override def spectroscopy(input: SpectroscopyModeInput, useCache: Boolean): IO[SpectroscopyResult] =
+      override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[SpectroscopyResult] =
         SpectroscopyResult(
           FakeItcVersions,
           FakeItcResult.some
@@ -140,7 +140,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     )
 
   // overriden in OdbSuiteWithS3 for tests that need it.
-  protected def awsConfig: Config.Aws = 
+  protected def awsConfig: Config.Aws =
     Config.Aws(
       accessKey       = "accessKey".refined,
       secretKey       = "secretkey".refined,
