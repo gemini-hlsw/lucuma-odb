@@ -15,7 +15,7 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.6"
 val log4catsVersion            = "2.5.0"
-val lucumaCoreVersion          = "0.74.0"
+val lucumaCoreVersion          = "0.75.0"
 val lucumaGraphQLRoutesVersion = "0.6.0"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -24,8 +24,8 @@ val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
 val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
-val lucumaSsoVersion           = "0.5.7"
-val lucumaItcVersion           = "0.9.0"
+val lucumaSsoVersion           = "0.5.9"
+val lucumaItcVersion           = "0.10.0"
 val testcontainersScalaVersion = "0.40.14"
 val paigesVersion              = "0.4.2"
 
@@ -59,6 +59,7 @@ lazy val sequence = project
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
+      "edu.gemini"     %% "lucuma-itc-core"                 % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test
     )
