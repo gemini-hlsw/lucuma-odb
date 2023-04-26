@@ -25,7 +25,7 @@ val natchezVersion             = "0.3.1"
 val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
 val lucumaSsoVersion           = "0.5.7"
-val lucumaItcVersion           = "0.10-2038c9e-20230425T210040Z-SNAPSHOT"
+val lucumaItcVersion           = "0.10.0"
 val testcontainersScalaVersion = "0.40.14"
 val paigesVersion              = "0.4.2"
 
