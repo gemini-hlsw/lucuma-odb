@@ -13,7 +13,7 @@ import cats.syntax.all.*
 case class TimingWindowInput(
   // id: TimingWindow.Id,
   inclusion: TimingWindowInclusion,
-  start: Timestamp,
+  startUtc: Timestamp,
   end: Option[TimingWindowEndInput]
 )
 
@@ -26,7 +26,7 @@ object TimingWindowInput:
       case List(
         // TimingWindowIdBinding("timingWindowId", rTimingWindowId),
         TimingWindowInclusionBinding("inclusion", rInclusion),
-        TimestampBinding("start", rStart),
+        TimestampBinding("startUtc", rStart),
         TimingWindowEndInput.Binding.Option("end", rEnd)
       // ) => (rTimingWindowId, rInclusion, rStart, rEnd).parMapN(TimingWindowInput(_, _, _, _))
       ) => (rInclusion, rStart, rEnd).parMapN(TimingWindowInput(_, _, _))

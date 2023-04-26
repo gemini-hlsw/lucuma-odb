@@ -9,15 +9,15 @@ import lucuma.odb.graphql.binding.*
 import cats.syntax.all.*
 
 case class TimingWindowEndInput(
-  endAt: Option[Timestamp],
-  endAfter: Option[TimingWindowEndAfterInput]
+  atUtc: Option[Timestamp],
+  after: Option[TimingWindowEndAfterInput]
 )
 
 object TimingWindowEndInput:
   val Binding: Matcher[TimingWindowEndInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        TimestampBinding.Option("at", rAt),
+        TimestampBinding.Option("atUtc", rAt),
         TimingWindowEndAfterInput.Binding.Option("after", rAfter)
       ) => (rAt, rAfter).parMapN(TimingWindowEndInput(_, _))
     }
