@@ -348,6 +348,4 @@ create view v_group_element as
     c_group_index, 
     null, 
     c_observation_id 
-  from t_observation
-  where c_group_id is not null;
-
+  from t_observation;

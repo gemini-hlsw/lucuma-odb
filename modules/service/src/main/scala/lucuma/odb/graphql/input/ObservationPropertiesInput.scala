@@ -78,7 +78,9 @@ object ObservationPropertiesInput {
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Create.Binding.Option("observingMode", rObservingMode),
-          ExistenceBinding.Option("existence", rExistence)
+          ExistenceBinding.Option("existence", rExistence),
+          GroupIdBinding.Option("groupId", rGroupId),
+          NonNegShortBinding.Option("groupIndex", rGroupIndex),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -90,8 +92,8 @@ object ObservationPropertiesInput {
             rScienceRequirements,
             rObservingMode,
             rExistence,
-            Result(None),
-            Result(None),
+            rGroupId,
+            rGroupIndex,
           ).parMapN(Create.apply)
       }
 

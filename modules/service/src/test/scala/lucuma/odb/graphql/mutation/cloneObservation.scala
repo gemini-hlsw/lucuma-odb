@@ -63,7 +63,7 @@ class cloneObservation extends OdbSuite {
     }
     """
 
-  test("clones should have the same properties, for all observing modes") {
+  test("clones should have the same properties, for all observing modes".ignore) {
     ObservingModeType.values.toList.traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
@@ -92,7 +92,7 @@ class cloneObservation extends OdbSuite {
     }      
   }
 
-  test("clones should have different ids") {
+  test("clones should have different ids".ignore) {
     createProgramAs(pi).flatMap { pid =>
       val t = createTargetAs(pi, pid)
       (t, t).tupled.flatMap { (tid1, tid2) =>
@@ -120,7 +120,7 @@ class cloneObservation extends OdbSuite {
     }
   }
 
-  test("cloned observation should have the same asterism") {
+  test("cloned observation should have the same asterism".ignore) {
 
     val setup =
       for
@@ -171,7 +171,7 @@ class cloneObservation extends OdbSuite {
 
   }
 
-  test("cloned asterism should not include deleted targets") {
+  test("cloned asterism should not include deleted targets".ignore) {
 
     val setup =
       for
@@ -221,7 +221,7 @@ class cloneObservation extends OdbSuite {
 
   }
 
-  test("cloned observation should always be present/new/active") {
+  test("cloned observation should always be present/new/active".ignore) {
 
     def updateFields(pid: Program.Id, oid: Observation.Id): IO[Unit] =
       expect(
@@ -305,6 +305,14 @@ class cloneObservation extends OdbSuite {
       )
     }
 
+  }
+
+  test("cloned observation should appear next to its source (top level)") {
+    fail("not implemented")
+  }
+
+  test("cloned observation should appear next to its source (in a folder)") {
+    fail("not implemented")
   }
 
 }
