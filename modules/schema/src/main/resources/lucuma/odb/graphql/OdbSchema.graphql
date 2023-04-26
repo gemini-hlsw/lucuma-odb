@@ -2367,14 +2367,14 @@ input TimingWindowEndAfterInput {
 }
 
 input TimingWindowEndInput {
-  at: Timestamp
+  atUtc: Timestamp
   after: TimingWindowEndAfterInput
 }
 
 input TimingWindowInput {
   #timingWindowId: TimingWindowId!
   inclusion: TimingWindowInclusion!
-  start: Timestamp!
+  startUtc: Timestamp!
   end: TimingWindowEndInput
 }
 
