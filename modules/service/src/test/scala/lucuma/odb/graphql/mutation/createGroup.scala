@@ -97,39 +97,67 @@ class createGroup extends OdbSuite {
     }
   }
 
-  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None): IO[Group.Id] =
-    query(
-      user = pi,
-      query = s"""
-        mutation {
-          createGroup(
-            input: {
-              programId: "$pid"
-            }
-          ) {
-            group {
-              id
-            }
-          }
-        }
-        """
-    ).map { json =>
-      json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
-    }
-  
-  test("create many groups and then select them (in order)") {
+  test("[program] create many groups and then select them (in order)") {
     for {
       pid  <- createProgramAs(pi)
       g1   <- createGroupAs(pi, pid)
       g2   <- createGroupAs(pi, pid)
       g3   <- createGroupAs(pi, pid)
-      json <- query(pi, s"""query { program(programId: "$pid") { groupElements { group { id } } } }""")
-      ids   = json
-                .hcursor
-                .downFields("program", "groupElements")
-                .require[List[Json]]
-                .map(_.hcursor.downFields("group", "id").require[Group.Id])
+      ids  <- childGroupsAs(pi, pid)
     } yield assertEquals(ids, List(g1, g2, g3))
+  }
+
+  test("[program] insert group at beginning") {
+    for {
+      pid  <- createProgramAs(pi)
+      g1   <- createGroupAs(pi, pid)
+      g2   <- createGroupAs(pi, pid)
+      g3   <- createGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(0)))
+      ids  <- childGroupsAs(pi, pid)
+    } yield assertEquals(ids, List(g3, g1, g2))
+  }
+
+  test("[program] insert group in the middle") {
+    for {
+      pid  <- createProgramAs(pi)
+      g1   <- createGroupAs(pi, pid)
+      g2   <- createGroupAs(pi, pid)
+      g3   <- createGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(1)))
+      ids  <- childGroupsAs(pi, pid)
+    } yield assertEquals(ids, List(g1, g3, g2))
+  }
+
+  test("[group] create many sub-groups and then select them (in order)") {
+    for {
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid)
+      g1   <- createGroupAs(pi, pid, Some(gid))
+      g2   <- createGroupAs(pi, pid, Some(gid))
+      g3   <- createGroupAs(pi, pid, Some(gid))
+      ids  <- childGroupsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(g1, g2, g3))
+  }
+
+  test("[group] insert sub-group at beginning") {
+    for {
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid)
+      g1   <- createGroupAs(pi, pid, Some(gid))
+      g2   <- createGroupAs(pi, pid, Some(gid))
+      g3   <- createGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(0)))
+      ids  <- childGroupsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(g3, g1, g2))
+  }
+
+  test("[group] insert sub-group in the middle") {
+    for {
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid)
+      g1   <- createGroupAs(pi, pid, Some(gid))
+      g2   <- createGroupAs(pi, pid, Some(gid))
+      g3   <- createGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(1)))
+      ids  <- childGroupsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(g1, g3, g2))
   }
 
 }
