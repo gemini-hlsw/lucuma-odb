@@ -109,7 +109,9 @@ object ObservationPropertiesInput {
     constraintSet:       Option[ConstraintSetInput],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Nullable[ObservingModeInput.Edit],
-    existence:           Option[Existence]
+    existence:           Option[Existence],
+    group:               Nullable[Group.Id],
+    groupIndex:          Nullable[NonNegShort],
   ) extends AsterismInput
 
   object Edit {
@@ -126,7 +128,9 @@ object ObservationPropertiesInput {
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
-          ExistenceBinding.Option("existence", rExistence)
+          ExistenceBinding.Option("existence", rExistence),
+          GroupIdBinding.Nullable("groupId", rGroupId),
+          NonNegShortBinding.Nullable("groupIndex", rGroupIndex),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -137,7 +141,9 @@ object ObservationPropertiesInput {
             rConstraintSet,
             rScienceRequirements,
             rObservingMode,
-            rExistence
+            rExistence,
+            rGroupId,
+            rGroupIndex,
           ).parMapN(apply)
       }
   }

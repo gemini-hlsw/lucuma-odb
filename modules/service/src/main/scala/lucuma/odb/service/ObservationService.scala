@@ -79,6 +79,7 @@ import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
+import lucuma.odb.util.Codecs.gid
 
 sealed trait ObservationService[F[_]] {
   import ObservationService._
@@ -270,6 +271,18 @@ object ObservationService {
 
         }.fold(rObservationIds.pure[F]) { _.map(_ *> rObservationIds) }
 
+      // Applying the same move to a list of observations will put them all together in the
+      // destination group (or at the top level) in no particular order.
+      def moveObservations(
+        groupId: Nullable[Group.Id],
+        groupIndex: Nullable[NonNegShort],
+        which: AppliedFragment
+      ): F[Unit] =
+        (groupId, groupIndex) match
+          case (Nullable.Absent, Nullable.Absent) => Sync[F].unit // do nothing if neither is specified
+          case (gid, index) =>
+            val af = Statements.moveObservations(gid.toOption, index.toOption, which)
+            session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
       override def updateObservations(
         SET:   ObservationPropertiesInput.Edit,
@@ -278,6 +291,8 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           session.transaction.use { xa =>
             for {
+              _ <- session.execute(sql"set constraints all deferred".command)
+              _ <- moveObservations(SET.group, SET.groupIndex, which)
               r <- Statements.updateObservations(SET, which).traverse { af =>
                      session.prepareR(af.fragment.query(observation_id)).use { pq =>
                        pq.stream(af.argument, chunkSize = 1024).compile.toList
@@ -822,7 +837,12 @@ object ObservationService {
         RETURNING c_observation_id
       """
 
+    def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
+      sql"""
+        SELECT group_move_observation(c_observation_id, ${group_id.opt}, ${int2_nonneg.opt})
+        FROM t_observation
+        WHERE c_observation_id IN (
+      """.apply(gid ~ index) |+| which |+| void")"
   }
-
 
 }
