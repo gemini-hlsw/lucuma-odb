@@ -15,6 +15,8 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
+import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.odb.data.Group
 
 class updateObservations extends OdbSuite                          
                             with UpdateConstraintSetOps {
@@ -889,7 +891,7 @@ class updateObservations extends OdbSuite
     at unsafeRunSync @ munit.CatsEffectFixturesPlatform$$anon$1.beforeAll(CatsEffectFixturesPlatform.scala:41)
     at *> @ skunk.net.SSLNegotiation$.negotiateSSL(SSLNegotiation.scala:49)
 
-  test("delete science requirements spectroscopy wavelength".ignore) {
+  test("delete science requirements spectroscopy wavelength") {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -1473,6 +1475,138 @@ class updateObservations extends OdbSuite
     """.asRight
 
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+  }
+
+  def moveObservationsAs(user: User, pid: Program.Id, oids: List[Observation.Id], gid: Option[Group.Id], index: Option[NonNegShort]): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            programId: ${pid.asJson}
+            SET: {
+              groupId: ${gid.asJson}
+              groupIndex: ${index.map(_.value).asJson}
+            },
+            WHERE: {
+              id: { IN: ${oids.asJson} }
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("grouping: move observations into a group (at end)") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, None, None)
+      o2  <- createObservationInGroupAs(pi, pid, None, None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), None)
+      es  <- groupElementsAs(pi, pid, Some(gid))
+    } yield {
+      assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
+      assertEquals(es.drop(1).toSet, Set(Right(o2), Right(o1)))
+    }  
+  }
+
+  test("grouping: move observations into a group (at beginning)") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, None, None)
+      o2  <- createObservationInGroupAs(pi, pid, None, None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(0)))
+      es  <- groupElementsAs(pi, pid, Some(gid))
+    } yield {
+      assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
+      assertEquals(es.dropRight(1).toSet, Set(Right(o2), Right(o1)))
+    }
+  }
+
+  test("grouping: move observations into a group (in the middle)") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, None, None)
+      o2  <- createObservationInGroupAs(pi, pid, None, None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      o4  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(1)))
+      es  <- groupElementsAs(pi, pid, Some(gid))
+    } yield {
+      assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3), Right(o4)))
+      assertEquals(es.drop(1).dropRight(1).toSet, Set(Right(o2), Right(o1)))
+    }
+  }
+
+  test("grouping: move observations out of a group (at end of program)") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, None, None)
+      o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, None)
+      es  <- groupElementsAs(pi, pid, None)
+    } yield {
+      assertEquals(es.take(2), List(Left(gid), Right(o1)))
+      assertEquals(es.drop(2).toSet, Set(Right(o2), Right(o3)))
+    }  
+  }
+
+  test("grouping: move observations out of a group (at beginning of program)") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, None, None)
+      o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, Some(NonNegShort.unsafeFrom(0)))
+      es  <- groupElementsAs(pi, pid, None)
+    } yield {
+      assertEquals(es.take(2).toSet, Set(Right(o2), Right(o3)))
+      assertEquals(es.drop(2), List(Left(gid), Right(o1)))
+    }  
+  }
+  
+  test("grouping: move observations out of a group (in the middle of program)") {
+    for {
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, None, None)
+      o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
+      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, Some(NonNegShort.unsafeFrom(1)))
+      es  <- groupElementsAs(pi, pid, None)
+    } yield {
+      assertEquals(es(0), Left(gid))
+      assertEquals(es.drop(1).take(2).toSet, Set(Right(o2), Right(o3)))
+      assertEquals(es(3), Right(o1))
+    }  
+  }
+
+  test("grouping: move observations between groups") {
+    for {
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, Some(g1), None)
+      o2  <- createObservationInGroupAs(pi, pid, Some(g1), None)
+      o3  <- createObservationInGroupAs(pi, pid, Some(g1), None)
+      _   <- moveObservationsAs(pi, pid, List(o2, o3), Some(g2), None)
+      e1  <- groupElementsAs(pi, pid, Some(g1))
+      e2  <- groupElementsAs(pi, pid, Some(g2))
+    } yield {
+      assertEquals(e1, List(Right(o1)))
+      assertEquals(e2.toSet, Set(Right(o2), Right(o3)))
+    }  
   }
 
 }

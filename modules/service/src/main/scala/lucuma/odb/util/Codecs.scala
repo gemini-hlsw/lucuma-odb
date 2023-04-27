@@ -417,6 +417,10 @@ trait Codecs {
         gcal.shutter
     }
 
+  val void: Codec[Unit] =
+    val rightUnit = Right(())
+    Codec.simple(_ => "", _ => rightUnit, Type.void)
+
 }
 
 object Codecs extends Codecs
