@@ -111,7 +111,7 @@ object ObservationPropertiesInput {
     observingMode:       Nullable[ObservingModeInput.Edit],
     existence:           Option[Existence],
     group:               Nullable[Group.Id],
-    groupIndex:          Nullable[NonNegShort],
+    groupIndex:          Option[NonNegShort],
   ) extends AsterismInput
 
   object Edit {
@@ -130,7 +130,7 @@ object ObservationPropertiesInput {
           ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence),
           GroupIdBinding.Nullable("groupId", rGroupId),
-          NonNegShortBinding.Nullable("groupIndex", rGroupIndex),
+          NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
         ) =>
           (rSubtitle,
             rObsStatus,

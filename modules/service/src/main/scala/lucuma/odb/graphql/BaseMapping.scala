@@ -139,6 +139,7 @@ trait BaseMapping[F[_]]
   lazy val TimeSpanType                        = schema.ref("TimeSpan")
   lazy val ToOActivationType                   = schema.ref("ToOActivation")
   lazy val UpdateAsterismsResultType           = schema.ref("UpdateAsterismsResult")
+  lazy val UpdateGroupsResultType              = schema.ref("UpdateGroupsResult")
   lazy val UpdateObservationsResultType        = schema.ref("UpdateObservationsResult")
   lazy val UpdateProgramsResultType            = schema.ref("UpdateProgramsResult")
   lazy val UpdateTargetsResultType             = schema.ref("UpdateTargetsResult")

@@ -275,13 +275,13 @@ object ObservationService {
       // destination group (or at the top level) in no particular order.
       def moveObservations(
         groupId: Nullable[Group.Id],
-        groupIndex: Nullable[NonNegShort],
+        groupIndex: Option[NonNegShort],
         which: AppliedFragment
       ): F[Unit] =
         (groupId, groupIndex) match
-          case (Nullable.Absent, Nullable.Absent) => Sync[F].unit // do nothing if neither is specified
+          case (Nullable.Absent, None) => Sync[F].unit // do nothing if neither is specified
           case (gid, index) =>
-            val af = Statements.moveObservations(gid.toOption, index.toOption, which)
+            val af = Statements.moveObservations(gid.toOption, index, which)
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
       override def updateObservations(

@@ -60,6 +60,8 @@ import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
+import lucuma.odb.graphql.input.UpdateGroupsInput
+import lucuma.odb.data.Group
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -74,6 +76,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       LinkUser,
       SetAllocation,
       UpdateAsterisms,
+      UpdateGroups,
       UpdateObservations,
       UpdatePrograms,
       UpdateTargets,
@@ -434,6 +437,39 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
           case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => problems.leftIor
           case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+        }
+      }
+
+    }
+
+  def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
+    mutationResultSubquery(
+      predicate = Predicates.group.id.in(pids),
+      order = OrderSelection[Group.Id](GroupType / "id"),
+      limit = limit,
+      collectionField = "groups",
+      child          
+    )
+
+  private lazy val UpdateGroups =
+    MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))) { (input, child) =>
+
+      // Our predicate for selecting groups to update
+      val filterPredicate = and(List(
+        // TODO: Predicates.group.program.isWritableBy(user),
+        input.WHERE.getOrElse(True)
+      ))
+
+      // An applied fragment that selects all group ids that satisfy `filterPredicate`
+      val idSelect: Result[AppliedFragment] =
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).map(_.fragment)
+
+      // Update the specified groups and then return a query for the affected groups (or an error)
+      idSelect.flatTraverse { which =>
+        import GroupService.UpdateGroupsResponse
+        groupService.use(_.updateGroups(input.SET, which)).map {
+          case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
+          case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
         }
       }
 
