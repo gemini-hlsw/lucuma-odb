@@ -3,28 +3,31 @@
 
 package lucuma.odb.service
 
+import cats.effect.Sync
+import cats.syntax.all.*
+import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.TimingWindowInput
-import edu.gemini.grackle.Result
-import skunk.AppliedFragment
-import skunk.syntax.all.*
 import lucuma.odb.util.Codecs.*
-import skunk.Transaction
-import cats.effect.Sync
+import skunk.AppliedFragment
 import skunk.Session
-import cats.syntax.all.*
+import skunk.Transaction
 import skunk.codec.numeric.*
+import skunk.syntax.all.*
 
 trait TimingWindowService[F[_]] {
   def createFunction(
     timingWindows: List[TimingWindowInput]
   ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
+
+  def cloneTimingWindows(
+    originalId: Observation.Id,
+    newId: Observation.Id,
+  ): F[Unit]
 }
 
 object TimingWindowService:
-  def fromSession[F[_]: Sync](
-    session: Session[F]
-  ): TimingWindowService[F] =
+  def fromSession[F[_]: Sync](session: Session[F]): TimingWindowService[F] =
     new TimingWindowService[F] {
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>
@@ -38,6 +41,12 @@ object TimingWindowService:
           exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
             exec(Statements.createObservationsTimingWindows(obsIds, timingWindows))
         )
+
+      def cloneTimingWindows(
+        originalId: Observation.Id,
+        newId: Observation.Id,
+      ): F[Unit] =
+        exec(Statements.clone(originalId, newId))
     }
 
 object Statements {
@@ -54,7 +63,7 @@ object Statements {
     timingWindows: List[TimingWindowInput]
   ): AppliedFragment =
     sql"""
-      INSERT INTO t_timing_window(
+      INSERT INTO t_timing_window (
         c_observation_id,
         c_inclusion,
         c_start,
@@ -85,4 +94,27 @@ object Statements {
         )
       )
     )
+
+  def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
+    sql"""
+      INSERT INTO t_timing_window (
+        c_observation_id,
+        c_inclusion,
+        c_start,
+        c_end_at,
+        c_end_after,
+        c_repeat_period,
+        c_repeat_times
+      )
+      SELECT 
+        $observation_id,
+        t_timing_window.c_inclusion,
+        t_timing_window.c_start,
+        t_timing_window.c_end_at,
+        t_timing_window.c_end_after,
+        t_timing_window.c_repeat_period,
+        t_timing_window.c_repeat_times
+      FROM t_timing_window
+      WHERE c_observation_id = $observation_id
+    """.apply(newOid ~ originalOid)
 }

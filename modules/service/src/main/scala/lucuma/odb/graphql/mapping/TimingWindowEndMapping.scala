@@ -6,17 +6,17 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.NullableType
+import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
-import edu.gemini.grackle.Predicate
-import Predicate._
+import edu.gemini.grackle.TypeRef
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
-
-import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.data.TimingWindowEndTypeEnum
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.NullableType
+import lucuma.odb.graphql.table.TimingWindowView
+
+import Predicate._
 
 trait TimingWindowEndMapping[F[_]] extends TimingWindowView[F] {
 

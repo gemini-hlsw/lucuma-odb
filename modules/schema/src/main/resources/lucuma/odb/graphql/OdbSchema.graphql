@@ -2372,7 +2372,6 @@ input TimingWindowEndInput {
 }
 
 input TimingWindowInput {
-  #timingWindowId: TimingWindowId!
   inclusion: TimingWindowInclusion!
   startUtc: Timestamp!
   end: TimingWindowEndInput
@@ -4514,8 +4513,6 @@ enum ObsStatus {
   OBSERVED
 }
 
-scalar TimingWindowId
-
 enum TimingWindowInclusion {
   # Inclusion Timing Window
   INCLUDE
@@ -4543,17 +4540,11 @@ type TimingWindowEndAfter {
 union TimingWindowEnd = TimingWindowEndAt | TimingWindowEndAfter
 
 type TimingWindow {
-  id: TimingWindowId!
-
-  # observationId: ObservationId!
-
   inclusion: TimingWindowInclusion!
 
   startUtc: Timestamp!
 
   end: TimingWindowEnd
-
-  # derived fields? duration, openForever, repeatForever, etc ?
 }
 
 type Observation {

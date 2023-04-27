@@ -38,6 +38,7 @@ import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
@@ -58,7 +59,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-import lucuma.core.model.TimingWindowInclusion
 
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
@@ -120,7 +120,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
       LeafMapping[Timestamp](TimestampType),
-      LeafMapping[TimingWindow.Id](TimingWindowIdType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[ToOActivation](ToOActivationType),
       LeafMapping[User.Id](UserIdType),

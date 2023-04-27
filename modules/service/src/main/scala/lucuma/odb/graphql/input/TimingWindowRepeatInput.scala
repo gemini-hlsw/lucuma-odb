@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.binding.*
-import cats.syntax.all.*
 
 case class TimingWindowRepeatInput(
   period: TimeSpan,
