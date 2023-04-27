@@ -2,6 +2,7 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
+
 package attachments
 
 import cats.effect.IO
@@ -14,78 +15,76 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentFileService.AttachmentException
-import lucuma.odb.service.ObsAttachmentFileService
-import lucuma.refined.*
+import lucuma.odb.service.ProposalAttachmentFileService
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
 
-class obsAttachmentRoutes extends AttachmentRoutesSuite {
-
-  private  val attachmentId    = ObsAttachment.Id(5.refined)
-  private val service: ObsAttachmentFileService[IO] = new ObsAttachmentFileService[IO] {
+class proposalAttachmentRoutes extends AttachmentRoutesSuite {
+  
+  private val service: ProposalAttachmentFileService[IO] = new ProposalAttachmentFileService[IO] {
     def getAttachment(
-      user:         User,
-      programId:    Program.Id,
-      attachmentId: ObsAttachment.Id
-    ): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
+      user: User,
+      programId: Program.Id,
+      attachmentType: Tag
+    ): IO[Either[AttachmentException, Stream[cats.effect.IO, Byte]]] = {
       val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
       IO(either)
     }
 
     def insertAttachment(
-      user:           User,
-      programId:      Program.Id,
-      attachmentType: Tag,
-      fileName:       String,
-      description:    Option[NonEmptyString],
-      data:           Stream[IO, Byte]
-    ): IO[ObsAttachment.Id] =
-      getError(user).fold(IO(attachmentId))(IO.raiseError)
-
-    def updateAttachment(
       user: User,
       programId: Program.Id,
-      attachmentId: ObsAttachment.Id,
+      attachmentType: Tag,
       fileName: String,
       description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
     ): IO[Unit] = 
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): IO[Unit] =
+    def updateAttachment(
+      user: User,
+      programId: Program.Id,
+      attachmentType: Tag,
+      fileName: String,
+      description: Option[NonEmptyString],
+      data: Stream[cats.effect.IO, Byte]
+    ): IO[Unit] =
+      getError(user).fold(IO.unit)(IO.raiseError)
+
+    def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): IO[Unit] = 
       getError(user).fold(IO.unit)(IO.raiseError)
   }
 
-  private val routes = ObsAttachmentRoutes(service, ssoClient, 1).orNotFound
+  private val routes = ProposalAttachmentRoutes(service, ssoClient, 1).orNotFound
 
   test("GET requires authorization") {
-    val request = Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-1")
+    val request = Request[IO](method = Method.GET, uri = uri"attachment/proposal/p-1/science")
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("POST requires authorization") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder"
+                              uri = uri"attachment/proposal/p-1/team?fileName=/file.txt"
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("PUT requires authorization") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt"
+                              uri = uri"attachment/proposal/p-1/team?fileName=/file.txt"
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("DELETE requires authorization") {
-    val request = Request[IO](method = Method.DELETE, uri = uri"attachment/obs/p-1/a-1")
+    val request = Request[IO](method = Method.DELETE, uri = uri"attachment/proposal/p-1/team")
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("GET requires valid user") {
     val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/science",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -93,7 +92,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST requires valid user") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment/proposal/p-1/team?fileName=/file.txt",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -101,7 +100,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT requires valid user") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/p-1/science?fileName=/file.txt",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -109,7 +108,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("DELETE requires valid user") {
     val request = Request[IO](method = Method.DELETE,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/science",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -117,21 +116,21 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("valid GET returns file contents") {
     val request =
-      Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-1", headers = headers(pi))
+      Request[IO](method = Method.GET, uri = uri"attachment/proposal/p-1/science", headers = headers(pi))
     routes.run(request).assertResponse(Status.Ok, fileContents.some)
   }
 
-  test("valid POST returns attachment") {
+  test("valid POST returns Ok") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment/proposal/p-1/science?fileName=/file.txt",
                               headers = headers(pi)
     )
-    routes.run(request).assertResponse(Status.Ok, attachmentId.toString.some)
+    routes.run(request).assertResponse(Status.Ok, none)
   }
 
   test("valid PUT returns Ok") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/p-1/science?fileName=/file.txt",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.Ok, none)
@@ -139,25 +138,25 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("valid DELETE returns Ok") {
     val request =
-      Request[IO](method = Method.DELETE, uri = uri"attachment/obs/p-1/a-1", headers = headers(pi))
+      Request[IO](method = Method.DELETE, uri = uri"attachment/proposal/p-1/science", headers = headers(pi))
     routes.run(request).assertResponse(Status.Ok, none)
   }
 
   test("GET returns NotFound for invalid program id") {
     val request =
-      Request[IO](method = Method.GET, uri = uri"attachment/obs/p1/a-1", headers = headers(pi))
+      Request[IO](method = Method.GET, uri = uri"attachment/proposal/p1/team", headers = headers(pi))
     routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
-  test("GET returns NotFound for invalid attachment id") {
+  test("GET returns NotFound for missing attachment type") {
     val request =
-      Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-x1", headers = headers(pi))
+      Request[IO](method = Method.GET, uri = uri"attachment/proposal/p-1", headers = headers(pi))
     routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("POST returns NotFound for invalid program id") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/a-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment/proposal/a-1/team?fileName=/file.txt",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -165,7 +164,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST returns NotFound for missing fileName") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?attachmentType=finder",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -173,7 +172,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST returns NotFound for missing attachmentType") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/",
+                              uri = uri"attachment/proposal/p-1?fileName=/file.txt/",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -181,15 +180,15 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT returns NotFound for invalid program id") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/z-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/z-1/science?fileName=/file.txt",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
-  test("PUT returns NotFound for invalid attachment id") {
+  test("PUT returns NotFound for missing attachment type") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/q-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/p-1?fileName=/file.txt",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -197,7 +196,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT returns NotFound for missing fileName") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/science",
                               headers = headers(pi)
     )
     routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -205,19 +204,19 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("DELETE returns NotFound for invalid program id") {
     val request =
-      Request[IO](method = Method.DELETE, uri = uri"attachment/obs/p/a-1", headers = headers(pi))
+      Request[IO](method = Method.DELETE, uri = uri"attachment/proposal/p/team", headers = headers(pi))
     routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
-  test("DELETE returns NotFound for invalid attachment id") {
+  test("DELETE returns NotFound for missing attachment type") {
     val request =
-      Request[IO](method = Method.DELETE, uri = uri"attachment/obs/p-1/a", headers = headers(pi))
+      Request[IO](method = Method.DELETE, uri = uri"attachment/proposal/p-1", headers = headers(pi))
     routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("GET returns Forbidden if service returns Forbidden") {
     val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(forbiddenUser)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -225,7 +224,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("GET returns NotFound if service returns FileNotFound") {
     val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(fileNotFoundUser)
     )
     routes.run(request).assertResponse(Status.NotFound, none)
@@ -233,7 +232,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("GET returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -241,7 +240,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST returns Forbidden if service returns Forbidden") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment/proposal/p-1/team?fileName=/file.txt",
                               headers = headers(forbiddenUser)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -249,15 +248,15 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST returns NotFound if service returns FileNotFound") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment/proposal/p-1/team?fileName=/file.txt",
                               headers = headers(fileNotFoundUser)
     )
     routes.run(request).assertResponse(Status.NotFound, none)
   }
 
-  test("POST returns BadRequest with message if service returns FileNotFound") {
+  test("POST returns BadRequest if service returns FileNotFound") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment/proposal/p-1/team?fileName=/file.txt",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -265,7 +264,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/p-1/science?fileName=/file.txt",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -273,7 +272,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT returns Forbidden if service returns Forbidden") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/p-1/science?fileName=/file.txt",
                               headers = headers(forbiddenUser)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -281,7 +280,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT returns NotFound if service returns FileNotFound") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/obs/p-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/proposal/p-1/science?fileName=/file.txt",
                               headers = headers(fileNotFoundUser)
     )
     routes.run(request).assertResponse(Status.NotFound, none)
@@ -289,7 +288,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("DELETE returns Forbidden if service returns Forbidden") {
     val request = Request[IO](method = Method.DELETE,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(forbiddenUser)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -297,7 +296,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("DELETE returns NotFound if service returns FileNotFound") {
     val request = Request[IO](method = Method.DELETE,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(fileNotFoundUser)
     )
     routes.run(request).assertResponse(Status.NotFound, none)
@@ -305,10 +304,9 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   test("DELETE returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.DELETE,
-                              uri = uri"attachment/obs/p-1/a-1",
+                              uri = uri"attachment/proposal/p-1/team",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
   }
-
 }

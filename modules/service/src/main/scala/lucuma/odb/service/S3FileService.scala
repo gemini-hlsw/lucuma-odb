@@ -34,10 +34,10 @@ import java.util.UUID
   */
 trait S3FileService[F[_]] {
   /** Get the file as a stream */
-  def get(programId: Program.Id, remoteId: UUID): Stream[F, Byte]
+  def get(fileKey: FileKey): Stream[F, Byte]
 
   /** Get metatada about the S3 file */
-  def getMetadata(programId: Program.Id, remoteId: UUID): F[HeadObjectResponse]
+  def getMetadata(fileKey: FileKey): F[HeadObjectResponse]
 
   /**
     * A convenience method for verifying eistence of and access to the file.
@@ -45,16 +45,20 @@ trait S3FileService[F[_]] {
     * terminates without a response code. This allows the request to at least finish
     * with Internal Server Error most of the time.
     */
-  def verifyFileAcess(programId: Program.Id, remoteId: UUID): F[Unit]
+  def verifyFileAcess(fileKey: FileKey): F[Unit]
 
   /** A meta-convenience method combining verify and get */
-  def verifyAndGet(programId: Program.Id, remoteId: UUID): F[Stream[F, Byte]]
+  def verifyAndGet(fileKey: FileKey): F[Stream[F, Byte]]
 
   /** Uploads a stream to S3 */
-  def upload(programId: Program.Id, remoteId: UUID, data: Stream[F, Byte]): F[Long]
+  def upload(fileKey: FileKey, data: Stream[F, Byte]): F[Long]
 
   /** Deletes a file from S3 */
-  def delete(programId: Program.Id, remoteId: UUID): F[Unit]
+  def delete(fileKey: FileKey): F[Unit]
+
+  def obsFileKey(programId: Program.Id, remoteId: UUID): FileKey
+
+  def proposalFileKey(programId: Program.Id, remoteId: UUID): FileKey
 }
 
 object S3FileService {
@@ -74,16 +78,10 @@ object S3FileService {
 
     new S3FileService[F] {
 
-      def get(programId: Program.Id, remoteId: UUID): Stream[F, Byte] = {
-        val fileKey = awsConfig.obsFileKey(programId, remoteId)
+      def get(fileKey: FileKey): Stream[F, Byte] = 
         s3.readFileMultipart(awsConfig.bucketName, fileKey, partSize)
-      }
 
-      def getMetadata(
-        programId: Program.Id,
-        remoteId:  UUID
-      ): F[HeadObjectResponse] = {
-        val fileKey = awsConfig.obsFileKey(programId, remoteId)
+      def getMetadata(fileKey: FileKey): F[HeadObjectResponse] = 
         Trace[F].span(s"get remote file metadata for file key: $fileKey") {
           s3Ops
             .headObject(
@@ -95,20 +93,14 @@ object S3FileService {
             )
             .onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
-      }
 
-      def verifyFileAcess(programId: Program.Id, remoteId: UUID): F[Unit] =
-        getMetadata(programId, remoteId).void
+      def verifyFileAcess(fileKey: FileKey): F[Unit] =
+        getMetadata(fileKey).void
 
-      def verifyAndGet(programId: Program.Id, remoteId: UUID): F[Stream[F, Byte]] = 
-        verifyFileAcess(programId, remoteId).map(_ => get(programId, remoteId))
+      def verifyAndGet(fileKey: FileKey): F[Stream[F, Byte]] = 
+        verifyFileAcess(fileKey).map(_ => get(fileKey))
 
-      def upload(
-        programId: Program.Id,
-        remoteId:  UUID,
-        data:      Stream[F, Byte]
-      ): F[Long] = {
-        val fileKey = awsConfig.obsFileKey(programId, remoteId)
+      def upload(fileKey: FileKey, data:      Stream[F, Byte]): F[Long] = 
         Trace[F].span(s"uploading remote file with file key: $fileKey") {
           val f = for {
             ref  <- Ref.of(0L)
@@ -118,15 +110,18 @@ object S3FileService {
           } yield size
           f.onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
-      }
-
-      def delete(programId: Program.Id, remoteId: UUID): F[Unit] = {
-        val fileKey = awsConfig.obsFileKey(programId, remoteId)
+      
+      def delete(fileKey: FileKey): F[Unit] = 
         Trace[F].span(s"deleting remote file with file key: $fileKey") {
           s3.delete(awsConfig.bucketName, fileKey)
             .onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
-      }
+
+      def obsFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
+        awsConfig.obsFileKey(programId, remoteId)
+
+      def proposalFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
+        awsConfig.proposalFileKey(programId, remoteId)
     }
   }
 }

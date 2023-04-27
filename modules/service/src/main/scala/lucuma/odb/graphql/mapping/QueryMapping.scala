@@ -43,6 +43,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with FilterTypeMetaMapping[F]
    with PartnerMetaMapping[F]
    with ProgramMapping[F]
+   with ProposalAttachmentTypeMetaMapping[F]
    with ObservationMapping[F] =>
 
   def itcQuery(
@@ -64,7 +65,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       tpe = QueryType,
       fieldMappings = List(
         SqlObject("asterismGroup"),
-        SqlObject("attachmentTypeMeta"),
         SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
         RootEffect.computeJson("itc") { (_, path, env) =>
@@ -81,6 +81,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("partnerMeta"),
         SqlObject("program"),
         SqlObject("programs"),
+        SqlObject("proposalAttachmentTypeMeta"),
         RootEffect.computeJson("sequence") { (_, path, env) =>
           val useCache = env.get[Boolean]("useCache").getOrElse(true)
           (env.getR[lucuma.core.model.Program.Id]("programId"),
@@ -98,15 +99,16 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
       AsterismGroup,
-      ObsAttachmentTypeMeta,
       ConstraintSetGroup,
       FilterTypeMeta,
       Itc,
+      ObsAttachmentTypeMeta,
       Observation,
       Observations,
       PartnerMeta,
       Program,
       Programs,
+      ProposalAttachmentTypeMeta,
       Sequence,
       Target,
       TargetGroup,
@@ -148,9 +150,15 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val ObsAttachmentTypeMeta: PartialFunction[Select, Result[Query]] =
-    case Select("attachmentTypeMeta", Nil, child) =>
-      Result(Select("attachmentTypeMeta", Nil,
+    case Select("obsAttachmentTypeMeta", Nil, child) =>
+      Result(Select("obsAttachmentTypeMeta", Nil,
         OrderBy(OrderSelections(List(OrderSelection[Tag](ObsAttachmentTypeMetaType / "tag"))), child)
+      ))
+
+  private lazy val ProposalAttachmentTypeMeta: PartialFunction[Select, Result[Query]] =
+    case Select("proposalAttachmentTypeMeta", Nil, child) =>
+      Result(Select("proposalAttachmentTypeMeta", Nil,
+        OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentTypeMetaType / "tag"))), child)
       ))
 
   private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = 

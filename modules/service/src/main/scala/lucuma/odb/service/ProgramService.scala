@@ -264,6 +264,14 @@ object ProgramService {
         void"WHERE " |+| af
       }
 
+    def andWhereUserAccess(
+      user:      User,
+      programId: Program.Id
+    ): AppliedFragment =
+      existsUserAccess(user, programId).fold(AppliedFragment.empty) { af =>
+        void"AND " |+| af
+      }
+
     /** Insert a program, making the passed user PI if it's a non-service user. */
     val InsertProgram: Query[Option[NonEmptyString] ~ User, Program.Id] =
       sql"""
