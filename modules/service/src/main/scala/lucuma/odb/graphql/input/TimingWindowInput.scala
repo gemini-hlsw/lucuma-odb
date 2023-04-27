@@ -4,14 +4,12 @@
 package lucuma.odb.graphql
 package input
 
-import lucuma.core.model.TimingWindow
-import lucuma.core.model.TimingWindowInclusion
+import cats.syntax.all.*
+import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
-import cats.syntax.all.*
 
 case class TimingWindowInput(
-  // id: TimingWindow.Id,
   inclusion: TimingWindowInclusion,
   startUtc: Timestamp,
   end: Option[TimingWindowEndInput]
@@ -24,10 +22,8 @@ object TimingWindowInput:
   val Binding: Matcher[TimingWindowInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        // TimingWindowIdBinding("timingWindowId", rTimingWindowId),
         TimingWindowInclusionBinding("inclusion", rInclusion),
         TimestampBinding("startUtc", rStart),
         TimingWindowEndInput.Binding.Option("end", rEnd)
-      // ) => (rTimingWindowId, rInclusion, rStart, rEnd).parMapN(TimingWindowInput(_, _, _, _))
       ) => (rInclusion, rStart, rEnd).parMapN(TimingWindowInput(_, _, _))
     }

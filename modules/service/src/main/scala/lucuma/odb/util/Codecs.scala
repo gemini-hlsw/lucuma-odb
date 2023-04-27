@@ -32,6 +32,7 @@ import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
@@ -329,9 +330,6 @@ trait Codecs {
 
   val timing_window_end_type: Codec[TimingWindowEndTypeEnum] =
     enumerated(Type("e_timing_window_end_type"))
-
-  val timing_window_id: Codec[TimingWindow.Id] =
-    gid[TimingWindow.Id]
 
   val timing_window_inclusion: Codec[TimingWindowInclusion] =
     enumerated(Type("e_timing_window_inclusion"))

@@ -72,6 +72,7 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
+import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.gid
 import lucuma.odb.util.Codecs.group_id
@@ -166,6 +167,16 @@ object ObservationService {
   ): ObservationService[F] =
     new ObservationService[F] {
 
+      private def setTimingWindows(
+        rObservationIds: Result[List[Observation.Id]],
+        timingWindows: Option[List[TimingWindowInput]],
+        xa: Transaction[F]
+      ): F[Result[Unit]] =
+        val rOptF = timingWindows.traverse(timingWindowService.createFunction)
+        (rObservationIds, rOptF).parMapN { (oids, optF) =>
+          optF.fold(().pure[F])( f => f(oids, xa) )
+        }.sequence
+
       override def createObservation(
         programId: Program.Id,
         SET:       ObservationPropertiesInput.Create
@@ -192,13 +203,8 @@ object ObservationService {
 
                   }
                 }
-                .flatMap{ rOid =>
-
-                  val rOptF = SET.timingWindows.traverse(timingWindowService.createFunction)
-                  (rOid, rOptF).parMapN { (oid, optF) =>
-                    optF.fold(oid.pure[F]) { f => f(List(oid), xa).as(oid) }
-                  }.sequence
-
+                .flatTap{ rOid =>
+                  setTimingWindows(rOid.map(List(_)), SET.timingWindows, xa)
                 }
             }
           }
@@ -308,7 +314,8 @@ object ObservationService {
                      }
                    }.flatMap { rObservationIds =>
                      updateObservingModes(SET.observingMode, rObservationIds, xa)
-
+                   }.flatTap { rObservationIds =>
+                    setTimingWindows(rObservationIds, SET.timingWindows, xa)
                    }.recoverWith {
                      case SqlState.CheckViolation(ex) =>
                        Result.failure(constraintViolationMessage(ex)).pure[F]
@@ -357,7 +364,8 @@ object ObservationService {
 
                   val cloneRelatedItems =
                     asterismService.cloneAsterism(input.observationId, oid2) >>
-                    observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2))
+                    observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2)) >>
+                    timingWindowService.cloneTimingWindows(input.observationId, oid2)
 
                   val doUpdate =
                     input.SET match

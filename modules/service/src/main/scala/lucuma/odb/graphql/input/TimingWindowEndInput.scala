@@ -4,10 +4,12 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.all.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
-import cats.syntax.all.*
 
+// TODO Validate somewhere that only one is present
+// TODO Also that atUtc happens after startUtc, and that repeat period is greater than duration
 case class TimingWindowEndInput(
   atUtc: Option[Timestamp],
   after: Option[TimingWindowEndAfterInput]

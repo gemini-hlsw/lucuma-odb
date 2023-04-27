@@ -1,19 +1,14 @@
---- TIMING WINDOW ID
-create domain d_timing_window_id as varchar; -- TODO format check
-comment on domain d_timing_window_id is 'GID for timing windows';
-create sequence s_timing_window_id START with 256; -- three hex digits
-
 --- EXISTENCE
-create type e_timing_window_inclusion as enum ('include', 'exclude');
+CREATE TYPE e_timing_window_inclusion AS ENUM ('include', 'exclude');
 
 -- END AT/AFTER
-create type e_timing_window_end_type as enum ('at', 'after');
+CREATE TYPE e_timing_window_end_type AS ENUM ('at', 'after');
 
-create table t_timing_window (
-  c_timing_window_id d_timing_window_id        primary key default 'w-' || to_hex(nextval('s_timing_window_id')),
-  c_observation_id   d_observation_id          not null,
-  c_inclusion        e_timing_window_inclusion not null,
-  c_start            timestamp                 not null,
+CREATE TABLE t_timing_window (
+  c_timing_window_id bigserial                 PRIMARY KEY,
+  c_observation_id   d_observation_id          NOT NULL,
+  c_inclusion        e_timing_window_inclusion NOT NULL,
+  c_start            timestamp                 NOT NULL,
   c_end_at           timestamp,  -- if both c_end_at and c_end_after are null, remain open forever
   c_end_after        interval,   --
   c_repeat_period    interval,   -- if null, don't repeat
@@ -22,14 +17,24 @@ create table t_timing_window (
   foreign key (c_observation_id) references t_observation(c_observation_id),
 
   -- if window ends, either timestamp or duration is defined but not both.
-  constraint end_timestamp_nand_interval
+  constraint end_at_nand_end_after
   check (num_nulls(c_end_at, c_end_after) >= 1),
 
-  -- repeat criterion may be defined only if duration is defined
+  -- repeat criterion is defined only if c_end_after is defined
+  constraint repeat_only_if_end_after
   check ( (c_end_after is not null) or (num_nulls(c_repeat_period, c_repeat_times) = 2) ),
 
   -- c_repeat_times is defined only if c_repeat_period is defined
-  check ( (c_repeat_period is not null) or (c_repeat_times is null) )
+  constraint repeat_times_only_if_repeat_period
+  check ( (c_repeat_period is not null) or (c_repeat_times is null) ),
+
+  -- c_end_at is greater than c_start
+  constraint c_end_at_greater_than_c_start
+  check ( c_end_at > c_start ),
+
+  -- c_repeat_period is greater than c_end_after
+  constraint repeat_period_greater_than_end_after
+  check ( c_repeat_period > c_end_after )
 );
 
 -- a view that has synthetic nullable ids for nullable embedded objects and end type discriminator (required by grackle)

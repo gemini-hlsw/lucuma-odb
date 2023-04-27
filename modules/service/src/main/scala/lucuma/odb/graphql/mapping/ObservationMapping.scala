@@ -7,10 +7,10 @@ package mapping
 
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.TimingWindowView
 
 import table.ObservationView
 import table.ProgramTable
-import lucuma.odb.graphql.table.TimingWindowView
 
 trait ObservationMapping[F[_]]
   extends ObservationView[F]
