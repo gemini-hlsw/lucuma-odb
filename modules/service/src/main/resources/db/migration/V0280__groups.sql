@@ -250,15 +250,16 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Move a group. Constraints must be deferred when calling.
-CREATE OR REPLACE PROCEDURE group_move_group(gid d_group_id, dest d_group_id, dest_index int2) AS $$
+CREATE OR REPLACE FUNCTION group_move_group(gid d_group_id, dest d_group_id, dest_index int2) RETURNS VOID AS $$
 DECLARE
+  pid d_program_id;
   src d_group_id;
   src_index int2;
 BEGIN
 
   -- Get the current location
-  SELECT c_parent_id, c_parent_index
-  INTO   src, src_index
+  SELECT c_program_id, c_parent_id, c_parent_index
+  INTO   pid, src, src_index
   FROM   t_group
   WHERE  c_group_id = gid;
 
@@ -267,18 +268,34 @@ BEGIN
     RAISE EXCEPTION 'Group % was not found.', gid;
   END IF;
   
-  -- Move it out of the way
-  UPDATE t_group
-  SET    c_parent_index = -1
-  WHERE  c_group_id = gid;
+  IF src IS NOT NULL THEN
 
-  -- Close the hole where used to be
-  CALL group_close_hole(src, src_index);
+    -- Move it out of the way
+    UPDATE t_group
+    SET    c_parent_id = null, c_parent_index = -1
+    WHERE  c_group_id = gid;
 
-  -- Open a hole where we're going.
-  CALL group_open_hole(dest, dest_index);
+    -- Close the hole where used to be
+    CALL group_close_hole(pid, src, src_index);
 
-  -- And put the group in it.
+  END IF;
+
+  IF dest_index IS NOT NULL THEN
+
+    -- Open a hole where we're going.
+    PERFORM group_open_hole(pid, dest, dest_index);
+
+  ELSE
+
+    -- No need to open a hole but we do need to compute a real dest_index 
+    SELECT coalesce(max(c_index) + 1, 0) INTO dest_index
+    FROM v_group_element
+    WHERE c_group_id IS NOT DISTINCT FROM dest
+    AND c_program_id = pid;
+
+  END IF;
+
+  -- Finally put the group where it goes.
   UPDATE t_group
   SET    c_parent_id = dest, c_parent_index = dest_index
   WHERE  c_group_id = gid;

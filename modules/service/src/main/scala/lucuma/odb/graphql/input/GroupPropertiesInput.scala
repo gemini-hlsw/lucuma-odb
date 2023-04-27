@@ -28,6 +28,17 @@ object GroupPropertiesInput {
     parentGroupIndex: Option[NonNegShort],
   )
 
+  case class Edit(
+    name: Nullable[NonEmptyString],
+    description: Nullable[NonEmptyString],
+    minimumRequired: Nullable[NonNegShort],
+    ordered: Option[Boolean],
+    minimumInterval: Nullable[TimeSpan],
+    maximumInterval: Nullable[TimeSpan],
+    parentGroupId: Nullable[Group.Id],
+    parentGroupIndex: Option[NonNegShort],
+  )
+
   val Empty: Create =
     Create(None, None, None, false, None, None, None, None)
 
@@ -53,6 +64,36 @@ object GroupPropertiesInput {
                   description, 
                   minimumRequired, 
                   ordered.getOrElse(false), 
+                  minimumInterval, 
+                  maximumInterval, 
+                  parentGroup, 
+                  parentGroupIndex,
+                ))
+        }
+    }
+
+  val EditBinding: Matcher[Edit] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        NonEmptyStringBinding.Nullable("name", rName),
+        NonEmptyStringBinding.Nullable("description", rDescription),
+        NonNegShortBinding.Nullable("minimumRequired", rMinimumRequired),
+        BooleanBinding.Option("ordered", rOrdered),
+        TimeSpanInput.Binding.Nullable("minimumInterval", rMinimumInterval),
+        TimeSpanInput.Binding.Nullable("maximumInterval", rMaximumInterval),
+        GroupIdBinding.Nullable("parentGroup", rParentGroup),
+        NonNegShortBinding.NonNullable("parentGroupIndex", rParentGroupIndex),
+      ) =>
+        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rParentGroup, rParentGroupIndex).parTupled.flatMap {
+          (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, parentGroup, parentGroupIndex) =>
+            (minimumInterval.toOption, maximumInterval.toOption) match // Scala can't typecheck it if we match Nullable.NonNull for some reason :-\
+              case (Some(min), Some(max)) if max <= min => Result.failure("Minimum interval must be less than maximum interval.")
+              case _ =>
+                Result(Edit(
+                  name, 
+                  description, 
+                  minimumRequired, 
+                  ordered,
                   minimumInterval, 
                   maximumInterval, 
                   parentGroup, 

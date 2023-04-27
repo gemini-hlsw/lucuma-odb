@@ -171,6 +171,7 @@ object OdbMapping {
           with TargetSelectResultMapping[F]
           with TimeSpanMapping[F]
           with UpdateAsterismsResultMapping[F]
+          with UpdateGroupsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UpdateTargetsResultMapping[F]
@@ -328,6 +329,7 @@ object OdbMapping {
               TargetSelectResultMapping,
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
+              UpdateGroupsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
               UpdateTargetsResultMapping,

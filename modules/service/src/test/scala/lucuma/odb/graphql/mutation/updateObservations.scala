@@ -1485,8 +1485,8 @@ class updateObservations extends OdbSuite
           updateObservations(input: {
             programId: ${pid.asJson}
             SET: {
-              groupId: ${gid.asJson}
-              groupIndex: ${index.map(_.value).asJson}
+              groupId: ${gid.asJson}              
+              ${index.map(_.value.asJson).foldMap(j => s"groupIndex: $j")}
             },
             WHERE: {
               id: { IN: ${oids.asJson} }
