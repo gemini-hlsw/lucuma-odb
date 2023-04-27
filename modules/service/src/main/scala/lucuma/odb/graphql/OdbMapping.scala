@@ -58,6 +58,7 @@ import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
 import natchez.Trace
@@ -154,6 +155,8 @@ object OdbMapping {
           with ProperMotionRAMapping[F]
           with ProposalMapping[F]
           with ProposalClassMapping[F]
+          with ProposalAttachmentMapping[F]
+          with ProposalAttachmentTypeMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RightAscensionMapping[F]
@@ -174,6 +177,7 @@ object OdbMapping {
           with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
+          with UpdateProposalAttachmentsResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
           with WavelengthMapping[F]
@@ -207,6 +211,9 @@ object OdbMapping {
 
           override val programService: Resource[F, ProgramService[F]] =
             pool.map(ProgramService.fromSessionAndUser(_, user))
+
+          override val proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]] =
+            pool.map(ProposalAttachmentMetadataService.fromSessionAndUser(_, user))
 
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
@@ -274,7 +281,6 @@ object OdbMapping {
               AngleMapping,
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
-              AttachmentMapping,
               CatalogInfoMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
@@ -297,6 +303,7 @@ object OdbMapping {
               LinkUserResultMapping,
               MutationMapping,
               NonsiderealMapping,
+              ObsAttachmentMapping,
               ObsAttachmentTypeMetaMapping,
               ObservationEditMapping,
               ObservationMapping,
@@ -314,6 +321,8 @@ object OdbMapping {
               ProperMotionDeclinationMapping,
               ProperMotionMapping,
               ProperMotionRAMapping,
+              ProposalAttachmentMapping,
+              ProposalAttachmentTypeMetaMapping,
               ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
@@ -335,6 +344,7 @@ object OdbMapping {
               UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
+              UpdateProposalAttachmentsResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
               WavelengthMapping
