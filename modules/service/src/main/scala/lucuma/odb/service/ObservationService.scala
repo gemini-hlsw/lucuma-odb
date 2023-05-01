@@ -73,13 +73,13 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Codecs.gid
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
-import lucuma.odb.util.Codecs.gid
 
 sealed trait ObservationService[F[_]] {
   import ObservationService._

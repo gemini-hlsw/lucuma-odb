@@ -6,6 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -13,10 +14,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.Group
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
-import eu.timepit.refined.types.numeric.NonNegShort
-import lucuma.odb.data.Group
 
 class updateObservations extends OdbSuite                          
                             with UpdateConstraintSetOps {

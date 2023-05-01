@@ -21,13 +21,13 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 
 import binding._
 import input._
 import table._
-import lucuma.odb.data.Group
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]

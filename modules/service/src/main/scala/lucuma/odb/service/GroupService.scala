@@ -3,22 +3,22 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Sync
 import cats.syntax.all._
 import coulomb.rational.typeexpr.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Group
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.codec.all.*
 import skunk.implicits._
-import lucuma.odb.data.Nullable
-import cats.data.NonEmptyList
-import cats.effect.kernel.Sync
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput): F[Group.Id]
