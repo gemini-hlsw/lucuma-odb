@@ -23,10 +23,10 @@ val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
 val postgresVersion            = "42.6.0"
-val skunkVersion               = "0.5.1" //-108-d43df5c-20230426T152454Z-SNAPSHOT"
+val skunkVersion               = "0.5.1"
 val lucumaSsoVersion           = "0.5.9"
 val lucumaItcVersion           = "0.11.0"
-val testcontainersScalaVersion = "0.40.15"
+val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
@@ -59,6 +59,7 @@ lazy val sequence = project
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
+      // "edu.gemini"     %% "lucuma-itc-core"                 % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test
     )

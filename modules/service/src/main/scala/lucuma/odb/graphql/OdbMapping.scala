@@ -35,8 +35,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcResult
-import lucuma.itc.client.SpectroscopyModeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.Enums
@@ -56,6 +54,7 @@ import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.GroupService
+import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
@@ -113,8 +112,6 @@ object OdbMapping {
           with AngleMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
-          with AttachmentMapping[F]
-          with AttachmentTypeMetaMapping[F]
           with CatalogInfoMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
@@ -137,6 +134,8 @@ object OdbMapping {
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonsiderealMapping[F]
+          with ObsAttachmentMapping[F]
+          with ObsAttachmentTypeMetaMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservingModeMapping[F]
@@ -172,6 +171,7 @@ object OdbMapping {
           with TimeSpanMapping[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateGroupsResultMapping[F]
+          with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UpdateTargetsResultMapping[F]
@@ -195,6 +195,8 @@ object OdbMapping {
 
           override val groupService: Resource[F, GroupService[F]] =
             pool.map(GroupService.fromSessionAndUser(_, user))
+          override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
+            pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
 
           override val observationService: Resource[F, ObservationService[F]] =
             pool.map { s =>
@@ -273,7 +275,6 @@ object OdbMapping {
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
               AttachmentMapping,
-              AttachmentTypeMetaMapping,
               CatalogInfoMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
@@ -296,6 +297,7 @@ object OdbMapping {
               LinkUserResultMapping,
               MutationMapping,
               NonsiderealMapping,
+              ObsAttachmentTypeMetaMapping,
               ObservationEditMapping,
               ObservationMapping,
               ObservingModeMapping,
@@ -330,6 +332,7 @@ object OdbMapping {
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
               UpdateGroupsResultMapping,
+              UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
               UpdateTargetsResultMapping,

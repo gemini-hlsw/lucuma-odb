@@ -14,10 +14,10 @@ import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Target
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.binding._
 
 object ObservationPropertiesInput {

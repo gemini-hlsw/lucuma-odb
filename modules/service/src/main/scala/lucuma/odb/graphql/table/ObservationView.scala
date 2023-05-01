@@ -20,7 +20,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
 //      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
       val Status: ColumnRef            = col("c_status",             obs_status)
       val ActiveStatus: ColumnRef      = col("c_active_status",      obs_active_status) 
-      val VisualizationTime: ColumnRef = col("c_visualization_time", data_timestamp.opt)
+      val VisualizationTime: ColumnRef = col("c_visualization_time", core_timestamp.opt)
       val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
 
       object PlannedTime {

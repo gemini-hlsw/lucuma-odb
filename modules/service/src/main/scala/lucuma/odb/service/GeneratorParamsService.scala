@@ -36,7 +36,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.InstrumentMode
-import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.angle.decoder.given
 import lucuma.odb.json.sourceprofile.given
@@ -136,7 +136,7 @@ object GeneratorParamsService {
         params:     Params,
         mode:       InstrumentMode,
         wavelength: Wavelength
-      ): ValidatedNel[MissingData, (Target.Id, SpectroscopyModeInput)] = {
+      ): ValidatedNel[MissingData, (Target.Id, SpectroscopyIntegrationTimeInput)] = {
 
         def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[Band] =
           bMap.minByOption { case (b, _) =>
@@ -166,7 +166,7 @@ object GeneratorParamsService {
            params.sourceProfile.toValidNel(MissingData(tid.some, "source profile"))
           ).mapN { case (b, rv, sp) =>
             tid ->
-            SpectroscopyModeInput(
+            SpectroscopyIntegrationTimeInput(
               wavelength,
               s2n,
               params.signalToNoiseAt,

@@ -22,6 +22,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val groupElement           = GroupElementPredicates(Path.from(GroupElementType))
     val createGroupResult      = CreateGroupResultPredicates(Path.from(CreateGroupResultType))
     val linkUserResult         = LinkUserResultPredicates(Path.from(LinkUserResultType))
+    val obsAttachment          = ObsAttachmentPredicates(Path.from(ObsAttachmentType))
     val observation            = ObservationPredicates(Path.from(ObservationType))
     val observationEdit        = ObservationEditPredicates(Path.from(ObservationEditType))
     val program                = ProgramPredicates(Path.from(ProgramType))
