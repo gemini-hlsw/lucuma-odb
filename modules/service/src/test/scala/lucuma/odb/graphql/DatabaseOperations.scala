@@ -5,6 +5,8 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -14,14 +16,12 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import org.checkerframework.checker.units.qual.s
-import lucuma.odb.data.Group
-import io.circe.Json
-import eu.timepit.refined.types.numeric.NonNegShort
 
 trait DatabaseOperations { this: OdbSuite =>
 

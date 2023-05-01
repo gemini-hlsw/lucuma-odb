@@ -31,6 +31,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.Group
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
@@ -42,6 +43,7 @@ import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
@@ -63,8 +65,6 @@ import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.input.UpdateGroupsInput
-import lucuma.odb.data.Group
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 

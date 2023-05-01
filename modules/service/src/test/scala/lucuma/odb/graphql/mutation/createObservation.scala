@@ -7,6 +7,7 @@ package mutation
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.ACursor
 import io.circe.Decoder
 import io.circe.Json
@@ -46,7 +47,6 @@ import lucuma.odb.service.AsterismService
 
 import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
-import eu.timepit.refined.types.numeric.NonNegShort
 
 class createObservation extends OdbSuite {
 

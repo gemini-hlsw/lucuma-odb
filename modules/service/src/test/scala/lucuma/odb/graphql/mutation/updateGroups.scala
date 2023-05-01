@@ -4,13 +4,13 @@
 package lucuma.odb.graphql
 package mutation
 
-import io.circe.syntax.*
-import io.circe.literal.*
-import lucuma.core.model.User
-import lucuma.odb.data.Group
-import eu.timepit.refined.types.numeric.NonNegShort
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.model.User
+import lucuma.odb.data.Group
 
 class updateGroups extends OdbSuite {
 
