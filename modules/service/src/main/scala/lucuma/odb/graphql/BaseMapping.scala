@@ -63,6 +63,7 @@ trait BaseMapping[F[_]]
   lazy val GmosYBinningType                    = schema.ref("GmosYBinning")
   lazy val GroupType                           = schema.ref("Group")
   lazy val GroupIdType                         = schema.ref("GroupId")
+  lazy val GroupEditType                       = schema.ref("GroupEdit")
   lazy val GroupElementType                    = schema.ref("GroupElement")
   lazy val HmsStringType                       = schema.ref("HmsString")
   lazy val HourAngleRangeType                  = schema.ref("HourAngleRange")
