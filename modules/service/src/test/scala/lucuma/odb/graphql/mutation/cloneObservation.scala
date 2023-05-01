@@ -63,7 +63,7 @@ class cloneObservation extends OdbSuite {
     }
     """
 
-  test("clones should have the same properties, for all observing modes".ignore) {
+  test("clones should have the same properties, for all observing modes") {
     ObservingModeType.values.toList.traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
@@ -92,7 +92,7 @@ class cloneObservation extends OdbSuite {
     }      
   }
 
-  test("clones should have different ids".ignore) {
+  test("clones should have different ids") {
     createProgramAs(pi).flatMap { pid =>
       val t = createTargetAs(pi, pid)
       (t, t).tupled.flatMap { (tid1, tid2) =>
@@ -120,7 +120,7 @@ class cloneObservation extends OdbSuite {
     }
   }
 
-  test("cloned observation should have the same asterism".ignore) {
+  test("cloned observation should have the same asterism") {
 
     val setup =
       for
@@ -171,7 +171,7 @@ class cloneObservation extends OdbSuite {
 
   }
 
-  test("cloned asterism should not include deleted targets".ignore) {
+  test("cloned asterism should not include deleted targets") {
 
     val setup =
       for
@@ -221,7 +221,7 @@ class cloneObservation extends OdbSuite {
 
   }
 
-  test("cloned observation should always be present/new/active".ignore) {
+  test("cloned observation should always be present/new/active") {
 
     def updateFields(pid: Program.Id, oid: Observation.Id): IO[Unit] =
       expect(
@@ -308,11 +308,22 @@ class cloneObservation extends OdbSuite {
   }
 
   test("cloned observation should appear next to its source (top level)") {
-    fail("not implemented")
+    for
+      pid  <- createProgramAs(pi)
+      oids <- createObservationAs(pi, pid).replicateA(3)
+      coid <- cloneObservationAs(pi, oids(1))
+      es   <- groupElementsAs(pi, pid, None)
+    yield assertEquals(es, List(oids(0), oids(1), coid, oids(2)).map(_.asRight))
   }
 
-  test("cloned observation should appear next to its source (in a folder)") {
-    fail("not implemented")
+  test("cloned observation should appear next to its source (in a group)") {
+    for
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid, None, None)
+      oids <- createObservationInGroupAs(pi, pid, Some(gid)).replicateA(3)
+      coid <- cloneObservationAs(pi, oids(1))
+      es   <- groupElementsAs(pi, pid, Some(gid))
+    yield assertEquals(es, List(oids(0), oids(1), coid, oids(2)).map(_.asRight))
   }
 
 }
