@@ -39,7 +39,7 @@ import scala.reflect.ClassTag
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]
    with TargetMapping[F]
-   with AttachmentTypeMetaMapping[F]
+   with ObsAttachmentTypeMetaMapping[F]
    with FilterTypeMetaMapping[F]
    with PartnerMetaMapping[F]
    with ProgramMapping[F]
@@ -75,6 +75,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
             itcQuery(path, p, o, useCache)
           }
         },
+        SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
         SqlObject("observations"),
         SqlObject("partnerMeta"),
@@ -97,7 +98,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   lazy val QueryElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     List(
       AsterismGroup,
-      AttachmentTypeMeta,
+      ObsAttachmentTypeMeta,
       ConstraintSetGroup,
       FilterTypeMeta,
       Itc,
@@ -146,10 +147,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
     }
 
-  private lazy val AttachmentTypeMeta: PartialFunction[Select, Result[Query]] =
+  private lazy val ObsAttachmentTypeMeta: PartialFunction[Select, Result[Query]] =
     case Select("attachmentTypeMeta", Nil, child) =>
       Result(Select("attachmentTypeMeta", Nil,
-        OrderBy(OrderSelections(List(OrderSelection[Tag](AttachmentTypeMetaType / "tag"))), child)
+        OrderBy(OrderSelections(List(OrderSelection[Tag](ObsAttachmentTypeMetaType / "tag"))), child)
       ))
 
   private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = 

@@ -5,5 +5,5 @@ package lucuma.odb.graphql.binding
 
 import lucuma.core.model.ObsAttachment
 
-val AttachmentIdBinding: Matcher[ObsAttachment.Id] =
-  gidBinding("attachment")
+val ObsAttachmentIdBinding: Matcher[ObsAttachment.Id] =
+  gidBinding("observation attachment")

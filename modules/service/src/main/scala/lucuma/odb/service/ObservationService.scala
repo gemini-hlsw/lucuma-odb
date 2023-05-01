@@ -52,6 +52,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
@@ -60,7 +61,6 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
-import lucuma.odb.data.Timestamp
 import lucuma.odb.graphql.input.AirMassRangeInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -545,7 +545,7 @@ object ObservationService {
           $existence,
           $obs_status,
           $obs_active_status,
-          ${data_timestamp.opt},
+          ${core_timestamp.opt},
           $pac_mode,
           $angle_µas,
           ${right_ascension.opt},
@@ -684,7 +684,7 @@ object ObservationService {
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
-      val upVisualizationTime = sql"c_visualization_time = ${data_timestamp.opt}"
+      val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
 
       val ups: List[AppliedFragment] =
         List(

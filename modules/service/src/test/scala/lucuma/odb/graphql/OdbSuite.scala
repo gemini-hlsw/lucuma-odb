@@ -20,8 +20,8 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.skunk.SkunkMonitor
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
@@ -34,10 +34,10 @@ import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
+import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcResult
 import lucuma.itc.client.ItcVersions
-import lucuma.itc.client.SpectroscopyModeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.FMain
@@ -77,8 +77,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
     fa.attempt.flatMap {
-      case Left(e: ResponseException) =>
-        assertEquals(messages.toList, e.errors.toList.map(_.message)).pure[IO]
+      case Left(ResponseException(errors, _)) =>
+        assertEquals(messages.toList, errors.toList.map(_.message)).pure[IO]
       case Left(other) => IO.raiseError(other)
       case Right(a) => fail(s"Expected failure, got $a")
     }
@@ -110,27 +110,30 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcVersions: ItcVersions =
     ItcVersions("foo", "bar".some)
 
-  val FakeItcResult: ItcResult.Success =
-    ItcResult.Success(
+  val FakeItcResult: IntegrationTime =
+    IntegrationTime(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(6),
+      PosInt.unsafeFrom(6),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
-      override def spectroscopy(input: SpectroscopyModeInput, useCache: Boolean): IO[SpectroscopyResult] =
+      override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[SpectroscopyResult] =
         SpectroscopyResult(
           FakeItcVersions,
           FakeItcResult.some
         ).pure[IO]
 
+      def optimizedSpectroscopyGraph(input: lucuma.itc.client.OptimizedSpectroscopyGraphInput, useCache: Boolean): IO[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
+        IO.raiseError(new java.lang.RuntimeException("optimizedSpectroscopyGraph: not implemeneed"))
+        
       override def versions: IO[ItcVersions] =
         FakeItcVersions.pure[IO]
     }
 
-  private def databaseConfig: Config.Database =
+  protected def databaseConfig: Config.Database =
     Config.Database(
       host     = container.containerIpAddress,
       port     = container.mappedPort(POSTGRESQL_PORT),
@@ -140,7 +143,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     )
 
   // overriden in OdbSuiteWithS3 for tests that need it.
-  protected def awsConfig: Config.Aws = 
+  protected def awsConfig: Config.Aws =
     Config.Aws(
       accessKey       = "accessKey".refined,
       secretKey       = "secretkey".refined,
@@ -274,7 +277,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     val op = this.query(user, query, variables, client)
     expected.fold(errors => {
       op
-      .intercept[ResponseException]
+      .intercept[ResponseException[Any]]
         .map { e => e.errors.toList.map(_.message) }
         .assertEquals(errors)
     }, success => {
