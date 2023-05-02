@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.kernel.Order
 import cats.syntax.all._
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
@@ -15,11 +16,14 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table.GroupElementView
 
 import binding._
 import input._
@@ -33,7 +37,8 @@ trait ProgramMapping[F[_]]
      with ObservationView[F]
      with ObsAttachmentTable[F]
      with Predicates[F]
-     with ResultMapping[F] {
+     with ResultMapping[F]
+     with GroupElementView[F] {
 
   def user: User
 
@@ -50,6 +55,9 @@ trait ProgramMapping[F[_]]
         SqlObject("plannedTime"),
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
+        SqlObject("attachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
+        SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
+        SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
         SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId))
       ),
     )
@@ -77,6 +85,33 @@ trait ProgramMapping[F[_]]
               )
             }              
           }
+        case Select("groupElements", Nil, child) =>
+          Result(
+            Select("groupElements", Nil,
+              FilterOrderByOffsetLimit(
+                pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
+                oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
+                offset = None,
+                limit = None,
+                child              
+              )
+            )
+          )
+        case Select("allGroupElements", Nil, child) =>
+          Result(
+            Select("allGroupElements", Nil,
+              FilterOrderByOffsetLimit(
+                pred = None,
+                oss = Some(List(
+                  OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true), 
+                  OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
+                )),
+                offset = None,
+                limit = None,
+                child              
+              )
+            )
+          )
       }
     )
 

@@ -1630,6 +1630,12 @@ type Mutation {
     input: CloneTargetInput!
   ): CloneTargetResult!
 
+  "Creates a new observation according to provided parameters."
+  createGroup(
+    "Group description."
+    input: CreateGroupInput!
+  ): CreateGroupResult!
+
   # Creates a new observation according to provided parameters
   createObservation(
     # Observation description
@@ -1737,6 +1743,11 @@ type Mutation {
     input: UpdateDatasetsInput!
   ): UpdateDatasetsResult!
 
+  updateGroups(
+    # Parameters for editing existing groups
+    input: UpdateGroupsInput!
+  ): UpdateGroupsResult!
+
   # Updates existing observations
   updateObservations(
     # Parameters for editing existing observations.
@@ -1808,6 +1819,13 @@ input ObservationPropertiesInput {
 
   # Whether the observation is considered deleted (defaults to PRESENT) but may be edited
   existence: Existence
+
+  # Enclosing group, if any.
+  groupId: GroupId
+
+  # Index in enclosing group or at the top level if ungrouped. If left unspecified on creation, observation will be added last in its enclosing group or at the top level. Cannot be set to null.
+  groupIndex: NonNegShort
+
 }
 
 type Offset {
@@ -2453,6 +2471,27 @@ type UpdateDatasetsResult {
   # `true` when there were additional edits that were not returned.
   hasMore: Boolean!
 }
+
+# Dataset selection and update description. Use `SET` to specify the changes, `WHERE` to select the groups to update, and `LIMIT` to control the size of the return value.
+input UpdateGroupsInput {
+  # Describes the dataset values to modify.
+  SET: GroupPropertiesInput!
+
+  # Filters the datasets to be updated according to those that match the given constraints.
+  WHERE: WhereGroup
+
+  # Caps the number of results returned to the given value (if additional datasets match the WHERE clause they will be updated but not returned).
+  LIMIT: NonNegInt
+}
+
+type UpdateGroupsResult {
+  # The edited groups, up to the specified LIMIT or the default maximum of 1000.
+  groups: [Group!]!
+
+  # `true` when there were additional edits that were not returned.
+  hasMore: Boolean!
+}
+
 
 # Observation selection and update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
 input UpdateObservationsInput {
@@ -4089,6 +4128,82 @@ enum GmosYBinning {
   FOUR
 }
 
+"A group of observations and other groups."
+type Group {
+
+  id: GroupId!
+
+  "Optionally, a name"
+  name: String
+
+  "Optionally, a description."
+  description: String
+
+  "How many do we need to complete? If this is null then it means we have to complete them all"
+  minimumRequired: NonNegShort
+
+  "Do they need to be completed in order?"
+  ordered: Boolean!
+
+  "Is there a minimum required and/or maximum allowed timespan between observations?"
+  minimumInterval: TimeSpan
+  maximumInterval: TimeSpan
+
+  "Contained elements"
+  elements: [GroupElement!]!
+
+}
+
+scalar GroupId
+
+"Groups contain observations and other groups. Exactly one will be defined."
+type GroupElement {
+  parentGroupId: GroupId
+  parentIndex: NonNegShort!
+  group: Group
+  observation: Observation
+}
+
+input GroupPropertiesInput {
+
+  "Group name (optional)."
+  name: NonEmptyString
+
+  "Group description (optional)."
+  description: NonEmptyString
+
+  "Minimum number of elements to be observed. If unspecified then all elements will be observed."
+  minimumRequired: NonNegShort
+
+  "If true, elements will be observed in order. Defaults to false if left unspecified."
+  ordered: Boolean
+
+  "If specified, elements will be separated by at least `minimumInterval`."
+  minimumInterval: TimeSpanInput
+
+  "If specified, elements will be separated by at most `maximumInterval`."
+  maximumInterval: TimeSpanInput
+
+  "Parent group (optional). If specified then parent index must also be specified."
+  parentGroup: GroupId
+
+  "Parent index. If unspecified then the element will appear first in the program or parent group (if specified). Cannot be set to null."
+  parentGroupIndex: NonNegShort
+
+}
+
+input CreateGroupInput {
+  programId: ProgramId!
+  SET: GroupPropertiesInput
+}
+
+"The result of creating a new group."
+type CreateGroupResult {
+  "The newly created group."
+  group: Group!
+}
+
+
 # HII Region spectrum
 enum HiiRegionSpectrum {
   # HiiRegionSpectrum OrionNebula
@@ -4289,6 +4404,9 @@ scalar NonEmptyString
 
 # A `BigDecimal` greater than or equal to 0
 scalar NonNegBigDecimal
+
+# A `Short` in the range from 0 to 32767
+scalar NonNegShort
 
 # An `Int` in the range from 0 to 2147483647
 scalar NonNegInt
@@ -4560,6 +4678,13 @@ type Program {
 
   # Program planned time calculation.
   plannedTime: PlannedTimeSummary!
+
+  "Top-level group elements (observations and sub-groups) in the program."
+  groupElements: [GroupElement!]!
+
+  "All group elements (observations and sub-groups) in the program."
+  allGroupElements: [GroupElement!]!
+
 }
 
 # ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
@@ -5997,6 +6122,54 @@ input WhereObservation {
   # Matches the observation active status.
   activeStatus: WhereOrderObsActiveStatus
 }
+
+
+input WhereGroup {
+
+  # A list of nested group filters that all must match in order for the AND group as a whole to match.
+  AND: [WhereGroup!]
+
+  # A list of nested group filters where any one match causes the entire OR group as a whole to match.
+  OR: [WhereGroup!]
+
+  # A nested group filter that must not match in order for the NOT itself to match.
+  NOT: WhereGroup
+
+  id: WhereOrderGroupId
+
+  name: WhereOptionString
+
+  description: WhereOptionString
+
+}
+
+input WhereOrderGroupId {
+  # Matches if the property is exactly the supplied value.
+  EQ: GroupId
+
+  # Matches if the property is not the supplied value.
+  NEQ: GroupId
+
+  # Matches if the property value is any of the supplied options.
+  IN: [GroupId!]
+
+  # Matches if the property value is none of the supplied values.
+  NIN: [GroupId!]
+
+  # Matches if the property is ordered after (>) the supplied value.
+  GT: GroupId
+
+  # Matches if the property is ordered before (<) the supplied value.
+  LT: GroupId
+
+  # Matches if the property is ordered after or equal (>=) the supplied value.
+  GTE: GroupId
+
+  # Matches if the property is ordered before or equal (<=) the supplied value.
+  LTE: GroupId
+}
+
+
 
 # Filters on equality (or not) of the property value and the supplied criteria.
 # All supplied criteria must match, but usually only one is selected.  E.g.

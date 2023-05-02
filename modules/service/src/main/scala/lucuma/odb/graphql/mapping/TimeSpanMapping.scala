@@ -6,11 +6,12 @@ package lucuma.odb.graphql.mapping
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
+import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
 
-trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] {
+trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
     SwitchMapping(
@@ -25,6 +26,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with
         IntensiveType / "totalTime"                   -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         LargeProgramType / "totalTime"                -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
+        GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
+        GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
       )
     )
 

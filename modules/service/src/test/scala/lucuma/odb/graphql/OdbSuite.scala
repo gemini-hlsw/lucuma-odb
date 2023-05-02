@@ -77,8 +77,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
     fa.attempt.flatMap {
-      case Left(e: ResponseException) =>
-        assertEquals(messages.toList, e.errors.toList.map(_.message)).pure[IO]
+      case Left(ResponseException(errors, _)) =>
+        assertEquals(messages.toList, errors.toList.map(_.message)).pure[IO]
       case Left(other) => IO.raiseError(other)
       case Right(a) => fail(s"Expected failure, got $a")
     }
@@ -126,6 +126,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           FakeItcResult.some
         ).pure[IO]
 
+      def optimizedSpectroscopyGraph(input: lucuma.itc.client.OptimizedSpectroscopyGraphInput, useCache: Boolean): IO[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
+        IO.raiseError(new java.lang.RuntimeException("optimizedSpectroscopyGraph: not implemeneed"))
+        
       override def versions: IO[ItcVersions] =
         FakeItcVersions.pure[IO]
     }
@@ -274,7 +277,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     val op = this.query(user, query, variables, client)
     expected.fold(errors => {
       op
-      .intercept[ResponseException]
+      .intercept[ResponseException[Any]]
         .map { e => e.errors.toList.map(_.message) }
         .assertEquals(errors)
     }, success => {

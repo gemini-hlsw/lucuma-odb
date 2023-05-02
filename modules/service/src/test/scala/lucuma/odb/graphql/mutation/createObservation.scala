@@ -7,6 +7,7 @@ package mutation
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.ACursor
 import io.circe.Decoder
 import io.circe.Json
@@ -1235,6 +1236,66 @@ class createObservation extends OdbSuite {
     }
   }
 
-  // TODO: more access control tests
+  test("[program] create many obs and then select them (in order)") {
+    for {
+      pid  <- createProgramAs(pi)
+      o1   <- createObservationInGroupAs(pi, pid)
+      o2   <- createObservationInGroupAs(pi, pid)
+      o3   <- createObservationInGroupAs(pi, pid)
+      ids  <- groupElementsAs(pi, pid, None)
+    } yield assertEquals(ids, List(Right(o1), Right(o2), Right(o3)))
+  }
 
+  test("[program] insert obs at beginning") {
+    for {
+      pid  <- createProgramAs(pi)
+      o1   <- createObservationInGroupAs(pi, pid)
+      o2   <- createObservationInGroupAs(pi, pid)
+      o3   <- createObservationInGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(0)))
+      ids  <- groupElementsAs(pi, pid, None)
+    } yield assertEquals(ids, List(Right(o3), Right(o1), Right(o2)))
+  }
+
+  test("[program] insert obs in the middle") {
+    for {
+      pid  <- createProgramAs(pi)
+      o1   <- createObservationInGroupAs(pi, pid)
+      o2   <- createObservationInGroupAs(pi, pid)
+      o3   <- createObservationInGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(1)))
+      ids  <- groupElementsAs(pi, pid, None)
+    } yield assertEquals(ids, List(Right(o1), Right(o3), Right(o2)))
+  }
+
+  test("[program] create many obs and then select them (in order)") {
+    for {
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid)
+      o1   <- createObservationInGroupAs(pi, pid, Some(gid))
+      o2   <- createObservationInGroupAs(pi, pid, Some(gid))
+      o3   <- createObservationInGroupAs(pi, pid, Some(gid))
+      ids  <- groupElementsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(Right(o1), Right(o2), Right(o3)))
+  }
+
+  test("[program] insert obs at beginning") {
+    for {
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid)
+      o1   <- createObservationInGroupAs(pi, pid, Some(gid))
+      o2   <- createObservationInGroupAs(pi, pid, Some(gid))
+      o3   <- createObservationInGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(0)))
+      ids  <- groupElementsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(Right(o3), Right(o1), Right(o2)))
+  }
+
+  test("[program] insert obs in the middle") {
+    for {
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid)
+      o1   <- createObservationInGroupAs(pi, pid, Some(gid))
+      o2   <- createObservationInGroupAs(pi, pid, Some(gid))
+      o3   <- createObservationInGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(1)))
+      ids  <- groupElementsAs(pi, pid, Some(gid))
+    } yield assertEquals(ids, List(Right(o1), Right(o3), Right(o2)))
+  }
 }
