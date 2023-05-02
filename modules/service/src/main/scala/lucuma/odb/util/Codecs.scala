@@ -90,6 +90,12 @@ trait Codecs {
     )
   }
 
+  final case class DomainCodec[A](domainName: String, codec: Codec[A]) extends Codec[A]:
+    export codec.* // delegate everything!
+
+  extension [A](c: Codec[A]) def withDomain(name: String): Codec[A] =
+    DomainCodec(name, c)
+
   val int4range: Codec[BoundedInterval[Int]] = {
     val intPair             = raw"([+-]?\d+),([+-]?\d+)"
     val OpenOpen: Regex     = raw"\($intPair\)".r

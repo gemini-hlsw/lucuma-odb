@@ -52,8 +52,8 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           val SyntheticId: ColumnRef   = col("c_hour_angle_id",  observation_id.embedded)
           object AirMassRange {
             val SyntheticId: ColumnRef = col("c_air_mass_id",  observation_id.embedded)
-            val AirMassMin: ColumnRef  = col("c_air_mass_min", air_mass_range_value.embedded)
-            val AirMassMax: ColumnRef  = col("c_air_mass_max", air_mass_range_value.embedded)
+            val AirMassMin: ColumnRef  = col("c_air_mass_min", air_mass_range_value.embedded.withDomain("d_air_mass"))
+            val AirMassMax: ColumnRef  = col("c_air_mass_max", air_mass_range_value.embedded.withDomain("d_air_mass"))
           }
           object HourAngleRange {
             val SyntheticId: ColumnRef  = col("c_hour_angle_id",  observation_id.embedded)
