@@ -7,39 +7,24 @@ package attachments
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
-import fs2.aws.s3.models.Models.FileKey
-import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.FMain
 import lucuma.odb.util.Codecs.obs_attachment_id
-import lucuma.refined.*
 import natchez.Trace.Implicits.noop
 import org.http4s.*
-import org.http4s.client.Client
-import org.http4s.client.JavaNetClientBuilder
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import java.util.UUID
 
-class obsAttachments extends OdbSuiteWithS3 {
+class obsAttachments extends AttachmentsSuite {
   
-  case class TestAttachment(
-    fileName:       String,
-    attachmentType: String,
-    description:    Option[String],
-    content:        String,
-    checked:        Boolean = false
-  ) 
-
   def assertAttachmentsGql(
     user:        User,
     programId:   Program.Id,
@@ -119,8 +104,6 @@ class obsAttachments extends OdbSuiteWithS3 {
         )
       )
     )
-
-  val client: Client[IO] = JavaNetClientBuilder[IO].create
 
   def insertAttachment(
     user:      User,
@@ -202,33 +185,6 @@ class obsAttachments extends OdbSuiteWithS3 {
       .use(_.prepareR(query).use(_.unique(aid))
     )
   }
-
-  extension (response: Response[IO])
-    def getBody: IO[String] = response.body.through(utf8.decode).compile.string
-
-  extension (response: Resource[IO, Response[IO]])
-    def withExpectation(expectedStatus: Status, expectedBody: String = ""): IO[Unit] =
-      response
-        .use(resp => resp.getBody.map(s => (resp.status, s)))
-        .assertEquals((expectedStatus, expectedBody))
-
-    def expectBody(body: String): IO[Unit] = withExpectation(Status.Ok, body)
-
-    def expectOk: IO[Unit] = withExpectation(Status.Ok)
-
-    def toAttachmentId: IO[ObsAttachment.Id] =
-      response.use { resp =>
-        for {
-          _   <- IO(resp.status).assertEquals(Status.Ok)
-          aid <- resp.getBody.map(s => ObsAttachment.Id.parse(s).get)
-        } yield aid
-      }
-
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 30)
-  val service = TestUsers.service(3)
-
-  val validUsers = List(pi, pi2, service)
 
   val file1A           = TestAttachment("file1", "finder", "A description".some, "Hopeful")
   val file1B           = TestAttachment("file1", "mos_mask", None, "New contents")
@@ -316,6 +272,14 @@ class obsAttachments extends OdbSuiteWithS3 {
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid, (aid, file1B.copy(attachmentType = file1A.attachmentType)))
       _      <- getAttachment(pi, pid, aid).expectBody(file1B.content)
+    } yield ()
+  }
+
+  test("update of non-existent attachment is NotFound") {
+    for {
+      pid <- createProgramAs(pi)
+      aid  = ObsAttachment.Id.fromLong(100L).get
+      _   <- updateAttachment(pi, pid, aid, file1A).withExpectation(Status.NotFound)
     } yield ()
   }
 
@@ -428,6 +392,17 @@ class obsAttachments extends OdbSuiteWithS3 {
     } yield ()
   }
 
+  test("pi can only see their own programs") {
+    for {
+      pid1 <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi2)
+      aid1 <- insertAttachment(pi, pid1, file1A).toAttachmentId
+      aid2 <- insertAttachment(pi2, pid2, file1B).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, file1A))
+      _    <- assertAttachmentsGql(pi2, pid2, (aid2, file1B))
+    } yield ()
+  }
+
   test("pi can only download from their own programs") {
     for {
       pid1 <- createProgramAs(pi)
@@ -477,6 +452,7 @@ class obsAttachments extends OdbSuiteWithS3 {
       _      <- getAttachment(service, pid, aid).expectBody(file1A.content)
       _      <- updateAttachment(service, pid, aid, file2).expectOk
       rid2   <- getRemoteIdFromDb(aid)
+      _       = assertNotEquals(rid, rid2)
       fk2     = awsConfig.obsFileKey(pid, rid2)
       _      <- assertS3(fk2, file2.content)
       _      <- assertS3NotThere(fileKey)

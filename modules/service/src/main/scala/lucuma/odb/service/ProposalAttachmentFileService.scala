@@ -7,7 +7,6 @@ import cats.effect.Async
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
-import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.Config
@@ -20,14 +19,14 @@ import skunk.syntax.all.*
 
 import java.util.UUID
 
-trait ObsAttachmentFileService[F[_]] {
+trait ProposalAttachmentFileService[F[_]] {
   import AttachmentFileService.AttachmentException
 
   /** Retrieves the given file from S3 as a stream. */
   def getAttachment(
     user:         User,
     programId:    Program.Id,
-    attachmentId: ObsAttachment.Id
+    attachmentType: Tag
   ): F[Either[AttachmentException, Stream[F, Byte]]]
 
   /** Uploads the file to S3 and addes it to the database */
@@ -38,32 +37,33 @@ trait ObsAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  ): F[ObsAttachment.Id]
+  ): F[Unit]
 
   def updateAttachment(
     user:           User,
     programId:      Program.Id,
-    attachmentId:   ObsAttachment.Id,
+    attachmentType: Tag,
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
   ): F[Unit]
 
   /** Deletes the file from the database and then removes it from S3. */
-  def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[Unit]
+  def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit]
 }
 
-object ObsAttachmentFileService extends AttachmentFileService {
+object ProposalAttachmentFileService extends AttachmentFileService {
   import AttachmentFileService.AttachmentException
   import AttachmentException.*
 
-  def fromS3AndSession[F[_]: Async: Trace](
+  import org.typelevel.log4cats.Logger
+  def fromS3AndSession[F[_]: Async: Trace: Logger](
     s3FileSvc: S3FileService[F],
     session:   Session[F]
-  ): ObsAttachmentFileService[F] = {
+  ): ProposalAttachmentFileService[F] = {
 
     def checkAttachmentType(attachmentType: Tag): F[Unit] = {
-      val af   = Statements.attachmentTypeExists(attachmentType)
+      val af   = Statements.existsAttachmentType(attachmentType)
       val stmt = sql"Select ${af.fragment}".query(bool)
       session
         .prepareR(stmt)
@@ -84,17 +84,23 @@ object ObsAttachmentFileService extends AttachmentFileService {
       description:    Option[NonEmptyString],
       fileSize:       Long, 
       remoteId:       UUID
-    ): F[ObsAttachment.Id] =
-      Trace[F].span("insertObsAttachment") {
+    ): F[Unit] =
+      Trace[F].span("insertProposalAttachment") {
         val af   = 
           Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remoteId)
-        val stmt = af.fragment.query(obs_attachment_id)
+        val stmt = af.fragment.command
         session.prepareR(stmt)
           .use(pg =>
-            pg.unique(af.argument)
+            pg.execute(af.argument)
+              .void
+              // TODO: Handle 2 constraint violations
               .recoverWith {
-                case SqlState.UniqueViolation(_) => 
-                  Async[F].raiseError(InvalidRequest("Duplicate file name"))
+                // This seems a bit brittle. But this can only happen if something changes between the 
+                // initial checks for duplication and this function is called after the upload.
+                case SqlState.UniqueViolation(e) => 
+                  if (e.constraintName.contains("t_proposal_attachment_pkey"))
+                    Async[F].raiseError(InvalidRequest("Duplicate attachment type"))
+                  else Async[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -102,21 +108,21 @@ object ObsAttachmentFileService extends AttachmentFileService {
     def updateAttachmentInDB(
       user:           User,
       programId:      Program.Id,
-      attachmentId:   ObsAttachment.Id,
+      attachmentType: Tag,
       fileName:       FileName,
       description:    Option[NonEmptyString],
       fileSize:       Long, 
       remoteId:       UUID
     ): F[Unit] =
-      Trace[F].span("updateObsAttachment") {
+      Trace[F].span("updateProposalAttachment") {
         val af   = 
-          Statements.updateAttachment(user, programId, attachmentId, fileName.value, description, fileSize, remoteId)
+          Statements.updateAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remoteId)
         val stmt = af.fragment.query(bool)
         session.prepareR(stmt)
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
-                if (b) Async[F].unit 
+                if (b) Async[F].unit
                 else Async[F].raiseError(FileNotFound)
               )
               .recoverWith {
@@ -127,12 +133,12 @@ object ObsAttachmentFileService extends AttachmentFileService {
       }
 
     def getAttachmentRemoteIdFromDB(
-      user:         User,
-      programId:    Program.Id,
-      attachmentId: ObsAttachment.Id
+      user:           User,
+      programId:      Program.Id,
+      attachmentType: Tag
     ): F[UUID] =
-      Trace[F].span("getObsAttachmentRemoteIdFromDB") {
-        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentId)
+      Trace[F].span("getProposalAttachmentRemoteIdFromDB") {
+        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentType)
         val stmt = af.fragment.query(uuid)
 
         session
@@ -147,27 +153,48 @@ object ObsAttachmentFileService extends AttachmentFileService {
       }
 
     def deleteAttachmentFromDB(
-      user:         User,
-      programId:    Program.Id,
-      attachmentId: ObsAttachment.Id
+      user:           User,
+      programId:      Program.Id,
+      attachmentType: Tag
     ): F[UUID] =
-      Trace[F].span("deleteObsAttachmentFromDB") {
-        val af   = Statements.deleteAttachment(user, programId, attachmentId)
+      Trace[F].span("deleteProposalAttachmentFromDB") {
+        val af   = Statements.deleteAttachment(user, programId, attachmentType)
         val stmt = af.fragment.query(uuid)
 
         session
           .prepareR(stmt)
           .use(pg =>
             pg.option(af.argument)
-              .flatMap {
+              .flatMap { 
                 case None    => Async[F].raiseError(FileNotFound)
                 case Some(s) => Async[F].pure(s)
-              }
+                }
           )
       }
 
-    def checkForDuplicateName(programId: Program.Id, fileName: FileName, oaid: Option[ObsAttachment.Id]): F[Unit] = {
-      val af   = Statements.checkForDuplicateName(programId, fileName.value, oaid)
+    def checkForDuplicateAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
+      getOptionalRemoteId(user, programId, attachmentType)
+        .flatMap { 
+          case Some(_) => Async[F].raiseError(InvalidRequest("Duplicate attachment type"))
+          case None    => Async[F].unit
+          }
+
+    def getOptionalRemoteId(
+      user:           User,
+      programId:      Program.Id,
+      attachmentType: Tag
+    ): F[Option[UUID]] =
+      Trace[F].span("getProposalAttachmentRemoteIdFromDB") {
+        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentType)
+        val stmt = af.fragment.query(uuid)
+
+        session
+          .prepareR(stmt)
+          .use(_.option(af.argument))
+      }
+
+    def checkForDuplicateName(programId: Program.Id, fileName: FileName, oType: Option[Tag]): F[Unit] = {
+      val af   = Statements.checkForDuplicateName(programId, fileName.value, oType)
       val stmt = af.fragment.query(bool)
 
       session
@@ -182,20 +209,20 @@ object ObsAttachmentFileService extends AttachmentFileService {
     }
 
     def key(programId: Program.Id, remoteId: UUID) =
-      s3FileSvc.obsFileKey(programId, remoteId)
+      s3FileSvc.proposalFileKey(programId, remoteId)
 
-    new ObsAttachmentFileService[F] {
-
+    new ProposalAttachmentFileService[F] {
       def getAttachment(
-        user:         User,
-        programId:    Program.Id,
-        attachmentId: ObsAttachment.Id
-      ): F[Either[AttachmentException, Stream[F, Byte]]] =
+        user: User,
+        programId: Program.Id,
+        attachmentType: Tag
+      ): F[Either[AttachmentException, Stream[F, Byte]]] = 
         session.transaction
           .use(_ =>
             for {
               _        <- checkAccess(session, user, programId)
-              remoteId <- getAttachmentRemoteIdFromDB(user, programId, attachmentId)
+              _        <- checkAttachmentType(attachmentType)
+              remoteId <- getAttachmentRemoteIdFromDB(user, programId, attachmentType)
             } yield remoteId
           )
           .flatMap { rid =>
@@ -206,13 +233,12 @@ object ObsAttachmentFileService extends AttachmentFileService {
           }
 
       def insertAttachment(
-        user:           User,
-        programId:      Program.Id,
+        user: User,
+        programId: Program.Id,
         attachmentType: Tag,
-        fileName:       String,
-        description:    Option[NonEmptyString],
-        data:           Stream[F, Byte]
-      ): F[ObsAttachment.Id] =
+        fileName: String,
+        description: Option[NonEmptyString],
+        data: Stream[F, Byte]): F[Unit] = 
         FileName
           .fromString(fileName)
           .fold(
@@ -223,6 +249,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
                   for {
                     _ <- checkAccess(session, user, programId)
                     _ <- checkAttachmentType(attachmentType)
+                    _ <- checkForDuplicateAttachment(user, programId, attachmentType)
                     _ <- checkForDuplicateName(programId, fn, none)
                   } yield ()
                 )
@@ -238,7 +265,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
       def updateAttachment(
         user: User,
         programId: Program.Id,
-        attachmentId: ObsAttachment.Id,
+        attachmentType: Tag,
         fileName: String,
         description: Option[NonEmptyString],
         data: Stream[F, Byte]
@@ -252,30 +279,28 @@ object ObsAttachmentFileService extends AttachmentFileService {
                 .use(_ =>
                   for {
                     _   <- checkAccess(session, user, programId)
-                    _   <- checkForDuplicateName(programId, fn, attachmentId.some)
-                    rid <- getAttachmentRemoteIdFromDB(user, programId, attachmentId)
+                    _   <- checkAttachmentType(attachmentType)
+                    _   <- checkForDuplicateName(programId, fn, attachmentType.some)
+                    rid <- getAttachmentRemoteIdFromDB(user, programId, attachmentType)
                   } yield rid
                 )
                 .flatMap(oldRid =>
                   for {
                     newRid <- Async[F].delay(UUID.randomUUID())
                     size   <- s3FileSvc.upload(key(programId, newRid), data)
-                    _      <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newRid)
+                    _      <- updateAttachmentInDB(user, programId, attachmentType, fn, description, size, newRid)
                     _      <- s3FileSvc.delete(key(programId, oldRid))
                   } yield ()
                 )
           )
-
-      def deleteAttachment(
-        user:         User,
-        programId:    Program.Id,
-        attachmentId: ObsAttachment.Id
-      ): F[Unit] =
+        
+      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
         session.transaction
           .use(_ =>
             for {
               _   <- checkAccess(session, user, programId)
-              rid <- deleteAttachmentFromDB(user, programId, attachmentId)
+              _   <- checkAttachmentType(attachmentType)
+              rid <- deleteAttachmentFromDB(user, programId, attachmentType)
             } yield rid
           )
           .flatMap(rid =>
@@ -298,7 +323,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
       remoteId:       UUID
     ): AppliedFragment =
       sql"""
-        INSERT INTO t_obs_attachment (
+        INSERT INTO t_proposal_attachment (
           c_program_id,
           c_attachment_type,
           c_file_name,
@@ -314,76 +339,73 @@ object ObsAttachmentFileService extends AttachmentFileService {
           $int8,
           $uuid
       """.apply(programId ~ attachmentType ~ fileName ~ description ~ fileSize ~ remoteId) |+|
-        ProgramService.Statements.whereUserAccess(user, programId) |+|
-        void"""
-          RETURNING c_obs_attachment_id
-        """
+        ProgramService.Statements.whereUserAccess(user, programId)
 
     def updateAttachment(
       user:           User,
       programId:      Program.Id,
-      attachmentId:   ObsAttachment.Id,
+      attachmentType: Tag,
       fileName:       NonEmptyString,
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remoteId:       UUID
     ): AppliedFragment =
       sql"""
-        UPDATE t_obs_attachment
+        UPDATE t_proposal_attachment
         SET c_file_name   = $text_nonempty,
             c_description = ${text_nonempty.opt},
             c_checked     = false,
             c_file_size   = $int8,
             c_remote_id   = $uuid
-        WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
-      """.apply(fileName ~ description ~ fileSize ~ remoteId ~ programId ~ attachmentId) |+|
+        WHERE c_program_id = $program_id AND c_attachment_type = $tag
+      """.apply(fileName ~ description ~ fileSize ~ remoteId ~ programId ~ attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
     def getAttachmentRemoteId(
-      user:         User,
-      programId:    Program.Id,
-      attachmentId: ObsAttachment.Id
+      user:           User,
+      programId:      Program.Id,
+      attachmentType: Tag
     ): AppliedFragment =
       sql"""
         SELECT c_remote_id
-        FROM t_obs_attachment
-        WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
-      """.apply(programId ~ attachmentId) |+|
+        FROM t_proposal_attachment
+        WHERE c_program_id = $program_id AND c_attachment_type = $tag
+      """.apply(programId ~ attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId)
-
-    def checkForDuplicateName(
-      programId:     Program.Id,
-      fileName:      NonEmptyString,
-      oAttachmentId: Option[ObsAttachment.Id]
-    ): AppliedFragment =
-      sql"""
-        SELECT true
-        FROM t_obs_attachment
-        WHERE c_program_id = $program_id AND c_file_name = $text_nonempty
-      """.apply(programId ~ fileName) |+|
-        oAttachmentId.foldMap(aid =>
-          sql"""
-            AND c_obs_attachment_id != $obs_attachment_id
-          """.apply(aid)
-        )
 
     // returns the UUID for the remote file id
     def deleteAttachment(
-      user:         User,
-      programId:    Program.Id,
-      attachmentId: ObsAttachment.Id
+      user:           User,
+      programId:      Program.Id,
+      attachmentType: Tag
     ): AppliedFragment =
       sql"""
-        DELETE FROM t_obs_attachment
-        WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
-      """.apply(programId, attachmentId) |+|
+        DELETE FROM t_proposal_attachment
+        WHERE c_program_id = $program_id AND c_attachment_type = $tag
+      """.apply(programId, attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING c_remote_id"
 
-    def attachmentTypeExists(attachmentType: Tag): AppliedFragment =
+    def checkForDuplicateName(
+      programId:  Program.Id,
+      fileName:   NonEmptyString,
+      oType:      Option[Tag]
+    ): AppliedFragment =
       sql"""
-        EXISTS (select c_tag from t_obs_attachment_type where c_tag = $tag)
+        SELECT true
+        FROM t_proposal_attachment
+        WHERE c_program_id = $program_id AND c_file_name = $text_nonempty
+      """.apply(programId ~ fileName) |+|
+        oType.foldMap(attachmentType =>
+          sql"""
+            AND c_attachment_type != $tag
+          """.apply(attachmentType)
+        )
+
+    def existsAttachmentType(attachmentType: Tag): AppliedFragment =
+      sql"""
+        EXISTS (select from t_proposal_attachment_type where c_tag = $tag)
       """.apply(attachmentType)
   }
 }

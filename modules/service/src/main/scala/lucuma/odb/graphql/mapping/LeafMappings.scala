@@ -108,6 +108,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosInt](PosIntType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
+      LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[SkyBackground](SkyBackgroundType),

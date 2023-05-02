@@ -135,6 +135,7 @@ object Enums {
                // "Unreferenced" types -- those for which we do not need to refer
                // to individual instance in ODB code.
                ObsAttachmentTypeEnumType.fetch(s),
+               ProposalAttachmentTypeEnumType.fetch(s),
                FilterTypeEnumType.fetch(s),
                PartnerEnumType.fetch(s),
              ).sequence

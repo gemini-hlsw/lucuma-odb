@@ -158,6 +158,9 @@ object Config {
   ) {
     def obsFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
       FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/obs/$remoteId"))
+
+    def proposalFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
+      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/proposal/$remoteId"))
   }
 
   object Aws {
