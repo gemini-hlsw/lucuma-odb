@@ -71,5 +71,6 @@ There is also a required environment variable that sets the maximum file upload 
 If you're adding migration scripts you should ensure that they will run correctly on a populated
 database. You can do this by bringing the database up via `docker-compose up` and then overwriting
 the database with data from the dev environment with `./populate-db-from-dev.sh`. You can then run
-the app and see verify that it comes up and looks ok.
+the app and see verify that it comes up and looks ok. Note that you will need Heroku and Postgres
+tools installed locally.
 
