@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.Group
+import lucuma.core.model.Group
 
 val GroupIdBinding: Matcher[Group.Id] =
   gidBinding("group")
