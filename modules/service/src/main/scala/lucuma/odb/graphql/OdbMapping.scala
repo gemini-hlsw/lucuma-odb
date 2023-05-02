@@ -16,6 +16,7 @@ import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
+import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
@@ -37,6 +38,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.graphql.mapping.CreateGroupResultMapping
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.ObservationTopic
@@ -51,6 +53,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.GroupService
 import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
@@ -116,6 +119,7 @@ object OdbMapping {
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
+          with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -123,6 +127,8 @@ object OdbMapping {
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosLongSlitMapping[F]
+          with GroupMapping[F]
+          with GroupElementMapping[F]
           with HourAngleRangeMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
@@ -164,6 +170,7 @@ object OdbMapping {
           with TargetSelectResultMapping[F]
           with TimeSpanMapping[F]
           with UpdateAsterismsResultMapping[F]
+          with UpdateGroupsResultMapping[F]
           with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
@@ -186,6 +193,8 @@ object OdbMapping {
           override val asterismService: Resource[F, AsterismService[F]] =
             pool.map(AsterismService.fromSessionAndUser(_, user))
 
+          override val groupService: Resource[F, GroupService[F]] =
+            pool.map(GroupService.fromSessionAndUser(_, user))
           override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
             pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
 
@@ -273,6 +282,7 @@ object OdbMapping {
               ConstraintSetGroupSelectResultMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
+              CreateGroupResultMapping,
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
@@ -281,6 +291,8 @@ object OdbMapping {
               FilterTypeMetaMapping,
               GmosNorthLongSlitMapping,
               GmosSouthLongSlitMapping,
+              GroupMapping,
+              GroupElementMapping,
               HourAngleRangeMapping,
               LinkUserResultMapping,
               MutationMapping,
@@ -319,6 +331,7 @@ object OdbMapping {
               TargetSelectResultMapping,
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
+              UpdateGroupsResultMapping,
               UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
@@ -333,6 +346,7 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 ConstraintSetGroupElaborator,
+                GroupElaborator,
                 MutationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,
@@ -343,9 +357,9 @@ object OdbMapping {
             )
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
-          override def defaultRootCursor(query: Query, tpe: Type, env: Env): F[Result[(Query, Cursor)]] =
-            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
-            super.defaultRootCursor(query, tpe, env)
+          override def defaultRootCursor(query: Query, tpe: Type, parentCursor: Option[Cursor]): F[Result[(Query, Cursor)]] =
+            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >> 
+            super.defaultRootCursor(query, tpe, parentCursor)
 
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {

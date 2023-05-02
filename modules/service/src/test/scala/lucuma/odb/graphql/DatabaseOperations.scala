@@ -5,6 +5,8 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -14,6 +16,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
@@ -91,6 +94,29 @@ trait DatabaseOperations { this: OdbSuite =>
                     observingMode: ${observingModeObject(m)}
                   """
                 }}
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+        """
+    ).map { json => 
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def createObservationInGroupAs(user: User, pid: Program.Id, groupId: Option[Group.Id] = None, groupIndex: Option[NonNegShort] = None): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+            programId: ${pid.asJson},
+              SET: {
+                groupId: ${groupId.asJson}
+                groupIndex: ${groupIndex.map(_.value).asJson}
               }
             }) {
               observation {
@@ -378,5 +404,44 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
     updateTargetExistencetAs(user, tid, Existence.Present)
+
+  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None): IO[Group.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createGroup(
+            input: {
+              programId: "$pid"
+              SET: {
+                parentGroup: ${parentGroupId.asJson.spaces2}
+                parentGroupIndex: ${parentIndex.map(_.value).asJson.spaces2}
+              }
+            }
+          ) {
+            group {
+              id
+            }
+          }
+        }
+        """
+    ).map { json =>
+      json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
+    }
+        
+  def groupElementsAs(user: User, pid: Program.Id, gid: Option[Group.Id]): IO[List[Either[Group.Id, Observation.Id]]] =
+    query(user, s"""query { program(programId: "$pid") { allGroupElements { parentGroupId group { id } observation { id } } } }""")
+      .map(_
+        .hcursor
+        .downFields("program", "allGroupElements")
+        .require[List[Json]]
+        .flatMap { json =>
+          val parentId = json.hcursor.downField("parentGroupId").require[Option[Group.Id]]
+          if (parentId === gid) then 
+            val id = json.hcursor.downFields("group", "id").as[Group.Id].toOption.toLeft(json.hcursor.downFields("observation", "id").require[Observation.Id])
+            List(id)
+          else Nil
+        }
+      )
 
 }

@@ -23,6 +23,7 @@ import edu.gemini.grackle.Problem
 import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -53,6 +54,7 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
@@ -71,6 +73,9 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Codecs.gid
+import lucuma.odb.util.Codecs.group_id
+import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
@@ -166,25 +171,29 @@ object ObservationService {
       ): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
           session.transaction.use { xa =>
-            Statements
-              .insertObservationAs(user, programId, SET)
-              .flatTraverse { af =>
-                session.prepareR(af.fragment.query(observation_id)).use { pq =>
-                  pq.option(af.argument).map {
-                    case Some(oid) => Result(oid)
-                    case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+
+            session.execute(sql"set constraints all deferred".command) >>
+            session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId ~ SET.group ~ SET.groupIndex)).flatMap { ix =>
+              Statements
+                .insertObservationAs(user, programId, SET, ix)
+                .flatTraverse { af =>
+                  session.prepareR(af.fragment.query(observation_id)).use { pq =>
+                    pq.option(af.argument).map {
+                      case Some(oid) => Result(oid)
+                      case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                    }
+                  }.flatMap { rOid =>
+
+                    val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
+                    (rOid, rOptF).parMapN { (oid, optF) =>
+                      optF.fold(oid.pure[F]) { f => f(List(oid), xa).as(oid) }
+                    }.sequence
+
                   }
-                }.flatMap { rOid =>
-
-                  val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
-                  (rOid, rOptF).parMapN { (oid, optF) =>
-                    optF.fold(oid.pure[F]) { f => f(List(oid), xa).as(oid) }
-                  }.sequence
-
                 }
-              }
-          }
+            }
         }
+      }
 
       override def selectObservations(
         which: AppliedFragment
@@ -262,6 +271,18 @@ object ObservationService {
 
         }.fold(rObservationIds.pure[F]) { _.map(_ *> rObservationIds) }
 
+      // Applying the same move to a list of observations will put them all together in the
+      // destination group (or at the top level) in no particular order.
+      def moveObservations(
+        groupId: Nullable[Group.Id],
+        groupIndex: Option[NonNegShort],
+        which: AppliedFragment
+      ): F[Unit] =
+        (groupId, groupIndex) match
+          case (Nullable.Absent, None) => Sync[F].unit // do nothing if neither is specified
+          case (gid, index) =>
+            val af = Statements.moveObservations(gid.toOption, index, which)
+            session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
       override def updateObservations(
         SET:   ObservationPropertiesInput.Edit,
@@ -270,6 +291,8 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           session.transaction.use { xa =>
             for {
+              _ <- session.execute(sql"set constraints all deferred".command)
+              _ <- moveObservations(SET.group, SET.groupIndex, which)
               r <- Statements.updateObservations(SET, which).traverse { af =>
                      session.prepareR(af.fragment.query(observation_id)).use { pq =>
                        pq.stream(af.argument, chunkSize = 1024).compile.toList
@@ -291,21 +314,31 @@ object ObservationService {
       ): F[Result[Observation.Id]] = 
         session.transaction.use { xa =>
 
-          // First we need the pid and observing mode.
-          val selPid = sql"select c_program_id, c_observing_mode_type from t_observation where c_observation_id = $observation_id"
-          session.prepareR(selPid.query(program_id ~ observing_mode_type.opt)).use(_.option(input.observationId)).flatMap {
+          // First we need the pid, observing mode, and grouping information
+          val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
+          session.prepareR(selPid.query(program_id ~ observing_mode_type.opt ~ group_id.opt ~ int2_nonneg)).use(_.option(input.observationId)).flatMap {
 
             case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
 
-            case Some(pid ~ observingMode) =>
+            case Some(pid ~ observingMode ~ gid ~ gix) =>
+
+              // Desired group index is gix + 1
+              val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
 
               // Ok the obs exists, so let's clone its main row in t_observation. If this returns
               // None then it means the user doesn't have permission to see the obs.
-              val cObsStmt = Statements.cloneObservation(pid, input.observationId, user)
-              val cObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
+              val cObsStmt = Statements.cloneObservation(pid, input.observationId, user, destGroupIndex)
+              val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
               
-              // Ok let's do the clone
-              cObs.flatMap {
+              // Action to open a hole in the destination program/group after the observation we're cloning
+              val openHole: F[NonNegShort] =
+                session.execute(sql"set constraints all deferred".command) >>
+                session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
+                  pq.unique(pid ~ gid ~ destGroupIndex.some)
+                }
+
+              // Ok let's do the clone.
+              (openHole >> cloneObs).flatMap {
 
                 case None => 
                   // User doesn't have permission to see the obs
@@ -350,7 +383,8 @@ object ObservationService {
     def insertObservationAs(
       user:      User,
       programId: Program.Id,
-      SET:       ObservationPropertiesInput.Create
+      SET:       ObservationPropertiesInput.Create,
+      groupIndex: NonNegShort,
     ): Result[AppliedFragment] =
       for {
         eb <- SET.targetEnvironment.flatMap(_.explicitBase.toOption).flatTraverse(_.create)
@@ -359,6 +393,8 @@ object ObservationService {
         insertObservationAs(
           user,
           programId,
+          SET.group,
+          groupIndex,
           SET.subtitle,
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.New),
@@ -375,6 +411,8 @@ object ObservationService {
     def insertObservationAs(
       user:                User,
       programId:           Program.Id,
+      groupId:             Option[Group.Id],
+      groupIndex:          NonNegShort,
       subtitle:            Option[NonEmptyString],
       existence:           Existence,
       status:              ObsStatus,
@@ -394,6 +432,8 @@ object ObservationService {
 
         InsertObservation.apply(
           programId    ~
+           groupId     ~
+           groupIndex  ~
            subtitle    ~
            existence   ~
            status      ~
@@ -434,6 +474,8 @@ object ObservationService {
 
     val InsertObservation: Fragment[
       Program.Id                       ~
+      Option[Group.Id]                 ~
+      NonNegShort                      ~
       Option[NonEmptyString]           ~
       Existence                        ~
       ObsStatus                        ~
@@ -465,6 +507,8 @@ object ObservationService {
       sql"""
         INSERT INTO t_observation (
           c_program_id,
+          c_group_id,
+          c_group_index,
           c_subtitle,
           c_existence,
           c_status,
@@ -495,6 +539,8 @@ object ObservationService {
         )
         SELECT
           $program_id,
+          ${group_id.opt},
+          $int2_nonneg,
           ${text_nonempty.opt},
           $existence,
           $obs_status,
@@ -710,10 +756,12 @@ object ObservationService {
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original
      * doesn't exist or isn't accessible.
      */
-    def cloneObservation(pid: Program.Id, oid: Observation.Id, user: User): AppliedFragment =
+    def cloneObservation(pid: Program.Id, oid: Observation.Id, user: User, gix: NonNegShort): AppliedFragment =
       sql"""
         INSERT INTO t_observation (
           c_program_id,
+          c_group_id,
+          c_group_index,
           c_title,
           c_subtitle,
           c_instrument,
@@ -748,6 +796,8 @@ object ObservationService {
         )
         SELECT 
           c_program_id,
+          c_group_id,
+          $int2_nonneg,
           c_title,
           c_subtitle,
           c_instrument,
@@ -781,13 +831,18 @@ object ObservationService {
           c_observing_mode_type
       FROM t_observation
       WHERE c_observation_id = $observation_id
-      """.apply(oid) |+|
+      """.apply(gix ~ oid) |+|
       ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_observation_id
       """
 
+    def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
+      sql"""
+        SELECT group_move_observation(c_observation_id, ${group_id.opt}, ${int2_nonneg.opt})
+        FROM t_observation
+        WHERE c_observation_id IN (
+      """.apply(gid ~ index) |+| which |+| void")"
   }
-
 
 }
