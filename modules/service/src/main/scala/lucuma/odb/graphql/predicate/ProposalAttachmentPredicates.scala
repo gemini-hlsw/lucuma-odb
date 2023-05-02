@@ -6,9 +6,9 @@ package lucuma.odb.graphql.predicate
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import lucuma.core.model.ObsAttachment
+import lucuma.odb.data.Tag
 
-class ObsAttachmentPredicates(path: Path) {
-  lazy val id        = LeafPredicates[ObsAttachment.Id](path / "id")
+class ProposalAttachmentPredicates(path: Path) {
   lazy val program   = new ProgramPredicates(path / "program")
+  lazy val attachmentType = new LeafPredicates[Tag](path / "attachmentType")
 }
