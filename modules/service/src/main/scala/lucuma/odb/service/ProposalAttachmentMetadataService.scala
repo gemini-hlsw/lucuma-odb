@@ -21,7 +21,6 @@ import skunk.implicits.*
 
 trait ProposalAttachmentMetadataService[F[_]] {
   def updateProposalAttachments(
-    programId: Program.Id,
     SET: ProposalAttachmentPropertiesInput.Edit,
     which: AppliedFragment
   ): F[List[Tag]]
@@ -35,11 +34,10 @@ object ProposalAttachmentMetadataService {
   ): ProposalAttachmentMetadataService[F] =
     new ProposalAttachmentMetadataService[F] {
       def updateProposalAttachments(
-          programId: Program.Id,
           SET: ProposalAttachmentPropertiesInput.Edit, 
           which: AppliedFragment
       ): F[List[Tag]] = 
-        Statements.updateProposalAttachments(programId, SET, which).fold(Nil.pure[F]) { af =>
+        Statements.updateProposalAttachments(SET, which).fold(Nil.pure[F]) { af =>
           session.prepareR(af.fragment.query(tag)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList
           }
@@ -65,16 +63,13 @@ object ProposalAttachmentMetadataService {
     }
 
     def updateProposalAttachments(
-      programId: Program.Id,
       SET: ProposalAttachmentPropertiesInput.Edit,
       which: AppliedFragment
     ): Option[AppliedFragment] = 
       updates(SET).map {us =>
         void"UPDATE t_proposal_attachment "  |+|
         void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-        sql"WHERE t_proposal_attachment.c_program_id = $program_id ".apply(programId) |+|
-        void"AND t_proposal_attachment.c_attachment_type IN (" |+| which |+| void") " |+|
-        // void"AND (t_proposal_attachment.c_attachment_type, t_proposal_attachment.c_program_id) IN (" |+| which |+| void") " |+|
+        void"WHERE (t_proposal_attachment.c_attachment_type, t_proposal_attachment.c_program_id) IN (" |+| which |+| void") " |+|
         void"RETURNING t_proposal_attachment.c_attachment_type"
       }
   }

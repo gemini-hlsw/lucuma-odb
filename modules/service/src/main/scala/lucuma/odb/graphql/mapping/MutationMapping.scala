@@ -473,7 +473,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         typeSelect.flatTraverse { which =>
           proposalAttachmentMetadataService
-            .use(_.updateProposalAttachments(input.programId, input.SET, which))
+            .use(_.updateProposalAttachments(input.SET, which))
             .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
         }
       }
