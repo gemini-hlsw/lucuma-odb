@@ -26,7 +26,7 @@ val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
 val lucumaSsoVersion           = "0.5.9"
 val lucumaItcVersion           = "0.11.0"
-val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
+val testcontainersScalaVersion = "0.40.15" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
