@@ -44,6 +44,9 @@ object TestItcClient {
       ): F[SpectroscopyResult] =
         SpectroscopyResult(Version, result.some).pure[F]
 
+      def optimizedSpectroscopyGraph(input: lucuma.itc.client.OptimizedSpectroscopyGraphInput, useCache: Boolean): F[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
+        ???
+
       def versions: F[ItcVersions] =
         Version.pure[F]
     }

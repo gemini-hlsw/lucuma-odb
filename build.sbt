@@ -2,21 +2,21 @@ val catsParseVersion           = "0.3.9"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.5"
 val cirisVersion               = "3.1.0"
-val clueVersion                = "0.30.0"
+val clueVersion                = "0.31.0"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
-val flywayVersion              = "9.16.3"
+val flywayVersion              = "9.17.0"
 val fs2AwsVersion              = "6.0.0"
 val fs2Version                 = "3.6.1"
-val grackleVersion             = "0.10.3"
+val grackleVersion             = "0.11.0"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.18"
 val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.4.6"
-val log4catsVersion            = "2.5.0"
+val logbackVersion             = "1.4.7"
+val log4catsVersion            = "2.6.0"
 val lucumaCoreVersion          = "0.75.0"
-val lucumaGraphQLRoutesVersion = "0.6.0"
+val lucumaGraphQLRoutesVersion = "0.6.1"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -25,8 +25,8 @@ val natchezVersion             = "0.3.1"
 val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
 val lucumaSsoVersion           = "0.5.9"
-val lucumaItcVersion           = "0.10.0"
-val testcontainersScalaVersion = "0.40.14"
+val lucumaItcVersion           = "0.11.0"
+val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
@@ -59,7 +59,6 @@ lazy val sequence = project
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
-      "edu.gemini"     %% "lucuma-itc-core"                 % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test
     )
@@ -106,6 +105,7 @@ lazy val service = project
       "org.tpolecat"   %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"   %% "natchez-log"                        % natchezVersion,
       "org.tpolecat"   %% "skunk-core"                         % skunkVersion,
+      "org.tpolecat"   %% "skunk-circe"                        % skunkVersion,
       "com.dimafeng"   %% "testcontainers-scala-munit"         % testcontainersScalaVersion % Test,
       "com.dimafeng"   %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,

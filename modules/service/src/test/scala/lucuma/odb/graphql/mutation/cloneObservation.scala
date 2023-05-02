@@ -307,4 +307,23 @@ class cloneObservation extends OdbSuite {
 
   }
 
+  test("cloned observation should appear next to its source (top level)") {
+    for
+      pid  <- createProgramAs(pi)
+      oids <- createObservationAs(pi, pid).replicateA(3)
+      coid <- cloneObservationAs(pi, oids(1))
+      es   <- groupElementsAs(pi, pid, None)
+    yield assertEquals(es, List(oids(0), oids(1), coid, oids(2)).map(_.asRight))
+  }
+
+  test("cloned observation should appear next to its source (in a group)") {
+    for
+      pid  <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid, None, None)
+      oids <- createObservationInGroupAs(pi, pid, Some(gid)).replicateA(3)
+      coid <- cloneObservationAs(pi, oids(1))
+      es   <- groupElementsAs(pi, pid, Some(gid))
+    yield assertEquals(es, List(oids(0), oids(1), coid, oids(2)).map(_.asRight))
+  }
+
 }

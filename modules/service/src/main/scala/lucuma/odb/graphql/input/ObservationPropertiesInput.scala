@@ -7,6 +7,8 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import edu.gemini.grackle.Result
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
@@ -14,6 +16,7 @@ import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 
@@ -40,7 +43,9 @@ object ObservationPropertiesInput {
     constraintSet:       Option[ConstraintSetInput],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Option[ObservingModeInput.Create],
-    existence:           Option[Existence]
+    existence:           Option[Existence],
+    group:               Option[Group.Id],
+    groupIndex:          Option[NonNegShort],
   ) extends AsterismInput
 
   object Create {
@@ -56,7 +61,9 @@ object ObservationPropertiesInput {
         constraintSet       = ConstraintSetInput.Default.some,
         scienceRequirements = None,
         observingMode       = None,
-        existence           = Existence.Present.some
+        existence           = Existence.Present.some,
+        group               = None,
+        groupIndex          = None,
       )
 
     val Binding: Matcher[Create] =
@@ -71,7 +78,9 @@ object ObservationPropertiesInput {
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Create.Binding.Option("observingMode", rObservingMode),
-          ExistenceBinding.Option("existence", rExistence)
+          ExistenceBinding.Option("existence", rExistence),
+          GroupIdBinding.Option("groupId", rGroupId),
+          NonNegShortBinding.Option("groupIndex", rGroupIndex),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -82,7 +91,9 @@ object ObservationPropertiesInput {
             rConstraintSet,
             rScienceRequirements,
             rObservingMode,
-            rExistence
+            rExistence,
+            rGroupId,
+            rGroupIndex,
           ).parMapN(Create.apply)
       }
 
@@ -98,7 +109,9 @@ object ObservationPropertiesInput {
     constraintSet:       Option[ConstraintSetInput],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Nullable[ObservingModeInput.Edit],
-    existence:           Option[Existence]
+    existence:           Option[Existence],
+    group:               Nullable[Group.Id],
+    groupIndex:          Option[NonNegShort],
   ) extends AsterismInput
 
   object Edit {
@@ -115,7 +128,9 @@ object ObservationPropertiesInput {
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
-          ExistenceBinding.Option("existence", rExistence)
+          ExistenceBinding.Option("existence", rExistence),
+          GroupIdBinding.Nullable("groupId", rGroupId),
+          NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -126,7 +141,9 @@ object ObservationPropertiesInput {
             rConstraintSet,
             rScienceRequirements,
             rObservingMode,
-            rExistence
+            rExistence,
+            rGroupId,
+            rGroupIndex,
           ).parMapN(apply)
       }
   }

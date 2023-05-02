@@ -31,9 +31,11 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.Group
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
@@ -41,6 +43,7 @@ import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
@@ -49,6 +52,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
+import lucuma.odb.service.GroupService
 import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
@@ -68,12 +72,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     List(
       CloneObservation,
       CloneTarget,
+      CreateGroup,
       CreateObservation,
       CreateProgram,
       CreateTarget,
       LinkUser,
       SetAllocation,
       UpdateAsterisms,
+      UpdateGroups,
       UpdateObsAttachments,
       UpdateObservations,
       UpdatePrograms,
@@ -89,6 +95,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // Resources needed by mutations
   def allocationService: Resource[F, AllocationService[F]]
   def asterismService: Resource[F, AsterismService[F]]
+  def groupService: Resource[F, GroupService[F]]
   def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
   def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
@@ -199,6 +206,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               case TrackingSwitchFailed(p)        => Result.failure(p)
 
         }  
+      }
+    }
+
+  private lazy val CreateGroup: MutationField =
+    MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
+      pool.use { s =>
+        groupService.use { svc =>
+          svc.createGroup(input).map { gid =>
+            Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
+          }
+        }
       }
     }
 
@@ -453,6 +471,39 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
           case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => problems.leftIor
           case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+        }
+      }
+
+    }
+
+  def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
+    mutationResultSubquery(
+      predicate = Predicates.group.id.in(pids),
+      order = OrderSelection[Group.Id](GroupType / "id"),
+      limit = limit,
+      collectionField = "groups",
+      child          
+    )
+
+  private lazy val UpdateGroups =
+    MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))) { (input, child) =>
+
+      // Our predicate for selecting groups to update
+      val filterPredicate = and(List(
+        // TODO: Predicates.group.program.isWritableBy(user),
+        input.WHERE.getOrElse(True)
+      ))
+
+      // An applied fragment that selects all group ids that satisfy `filterPredicate`
+      val idSelect: Result[AppliedFragment] =
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).map(_.fragment)
+
+      // Update the specified groups and then return a query for the affected groups (or an error)
+      idSelect.flatTraverse { which =>
+        import GroupService.UpdateGroupsResponse
+        groupService.use(_.updateGroups(input.SET, which)).map {
+          case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
+          case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
         }
       }
 

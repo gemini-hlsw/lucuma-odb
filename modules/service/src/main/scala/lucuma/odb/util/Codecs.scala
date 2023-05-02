@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
@@ -52,6 +53,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -262,8 +264,14 @@ trait Codecs {
   val pos_long: Codec[PosLong] =
     int8.eimap(PosLong.from)(_.value)
 
+  val int2_nonneg: Codec[NonNegShort] =
+    int2.eimap(NonNegShort.from)(_.value)
+
   val program_id: Codec[Program.Id] =
     gid[Program.Id]
+
+  val group_id: Codec[Group.Id] =
+    gid[Group.Id]
 
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
@@ -408,6 +416,10 @@ trait Codecs {
         gcal.diffuser         ~
         gcal.shutter
     }
+
+  val void: Codec[Unit] =
+    val rightUnit = Right(())
+    Codec.simple(_ => "", _ => rightUnit, Type.void)
 
 }
 

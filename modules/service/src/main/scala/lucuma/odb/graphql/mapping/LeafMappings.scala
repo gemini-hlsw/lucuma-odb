@@ -7,7 +7,9 @@ package mapping
 
 import edu.gemini.grackle.Mapping
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -49,6 +51,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -84,6 +87,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosRoi](GmosRoiType),
       LeafMapping[GmosXBinning](GmosXBinningType),
       LeafMapping[GmosYBinning](GmosYBinningType),
+      LeafMapping[Group.Id](GroupIdType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
@@ -91,6 +95,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
       LeafMapping[NonNegLong](NonNegLongType),
+      LeafMapping[NonNegShort](NonNegShortType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
       LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),
       LeafMapping[Tag](ObsAttachmentTypeType),
