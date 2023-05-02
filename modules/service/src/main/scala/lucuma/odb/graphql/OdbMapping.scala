@@ -62,6 +62,7 @@ import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TimingWindowService
+import lucuma.odb.util.Codecs.DomainCodec
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
@@ -394,6 +395,16 @@ object OdbMapping {
             } *>
             super.fetch(fragment, codecs)
           }
+
+          // HACK: If the codec is a DomainCodec then use the domain name when generating `null::<type>` in Grackle queries
+          override implicit def Fragments: SqlFragment[AppliedFragment] =
+            val delegate = super.Fragments
+            new SqlFragment[AppliedFragment]:
+              export delegate.{ sqlTypeName => _, * }
+              def sqlTypeName(codec: Codec): Option[String] =
+                codec._1 match
+                  case DomainCodec(name, _) => Some(name)
+                  case _ => delegate.sqlTypeName(codec)
 
         }
 
