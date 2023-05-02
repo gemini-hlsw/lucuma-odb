@@ -42,6 +42,7 @@ import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
+import lucuma.core.model.Group
 import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -51,7 +52,6 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
-import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole

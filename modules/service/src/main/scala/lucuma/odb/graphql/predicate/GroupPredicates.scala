@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import edu.gemini.grackle.Path
-import lucuma.odb.data.Group
+import lucuma.core.model.Group
 
 class GroupPredicates(path: Path) {
   lazy val id       = LeafPredicates[Group.Id](path / "id")
