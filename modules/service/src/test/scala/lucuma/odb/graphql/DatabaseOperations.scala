@@ -9,6 +9,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
@@ -16,7 +17,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
-import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType

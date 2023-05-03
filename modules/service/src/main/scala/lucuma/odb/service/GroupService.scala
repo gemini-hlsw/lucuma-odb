@@ -9,9 +9,9 @@ import cats.effect.kernel.Sync
 import cats.syntax.all._
 import coulomb.rational.typeexpr.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput

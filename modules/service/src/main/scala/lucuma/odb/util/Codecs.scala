@@ -45,6 +45,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
+import lucuma.core.model.Group
 import lucuma.core.model.*
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.Enumerated
@@ -53,7 +54,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
-import lucuma.odb.data.Group
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
