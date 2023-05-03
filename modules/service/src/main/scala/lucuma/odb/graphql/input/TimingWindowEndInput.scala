@@ -5,21 +5,34 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import edu.gemini.grackle.Result
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
 
-// TODO Validate somewhere that only one is present
-// TODO Also that atUtc happens after startUtc, and that repeat period is greater than duration
 case class TimingWindowEndInput(
   atUtc: Option[Timestamp],
-  after: Option[TimingWindowEndAfterInput]
+  after: Option[TimeSpan],
+  repeat: Option[TimingWindowRepeatInput]
 )
 
 object TimingWindowEndInput:
+  object messages:
+    val OnlyOneDefinition: String = "Only one of atUtc or after may be specified."
+    val RepeatOnlyWhenAfter: String = "repeat can only be specified when after is specified."
+    val RepeatPeriodGreaterThanAfter: String = "repeat.period must be greater than after."
+
   val Binding: Matcher[TimingWindowEndInput] =
     ObjectFieldsBinding.rmap {
       case List(
         TimestampBinding.Option("atUtc", rAt),
-        TimingWindowEndAfterInput.Binding.Option("after", rAfter)
-      ) => (rAt, rAfter).parMapN(TimingWindowEndInput(_, _))
+        TimeSpanInput.Binding.Option("after", rAfter),
+        TimingWindowRepeatInput.Binding.Option("repeat", rRepeat)
+      ) => (rAt, rAfter, rRepeat).parMapN(TimingWindowEndInput(_, _, _)).flatMap {
+        case TimingWindowEndInput(Some(_), Some(_), _) => Result.failure(messages.OnlyOneDefinition)
+        case TimingWindowEndInput(_, None, Some(_))    => Result.failure(messages.RepeatOnlyWhenAfter)
+        case TimingWindowEndInput(_, Some(duration), Some(TimingWindowRepeatInput(period, _)))
+          if period <= duration                        => Result.failure(messages.RepeatPeriodGreaterThanAfter)
+        case other                                     => Result(other)
+      }
     }
