@@ -29,7 +29,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with
         AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
         GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
         GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
-        TimingWindowEndAfterType / "duration"         -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
+        TimingWindowEndAfterType / "after"            -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
         TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )
     )

@@ -88,9 +88,9 @@ object Statements {
           tw.inclusion  ~ 
           tw.startUtc      ~ 
           tw.end.flatMap(_.atUtc) ~
-          tw.end.flatMap(_.after.map(_.duration)) ~
-          tw.end.flatMap(_.after.flatMap(_.repeat.map(_.period))) ~
-          tw.end.flatMap(_.after.flatMap(_.repeat.flatMap(_.times.map(_.value))))
+          tw.end.flatMap(_.after) ~
+          tw.end.flatMap(_.repeat.map(_.period)) ~
+          tw.end.flatMap(_.repeat.flatMap(_.times.map(_.value)))
         )
       )
     )

@@ -57,8 +57,8 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           }
           object HourAngleRange {
             val SyntheticId: ColumnRef  = col("c_hour_angle_id",  observation_id.embedded)
-            val HourAngleMin: ColumnRef = col("c_hour_angle_min", hour_angle_range_value.embedded)
-            val HourAngleMax: ColumnRef = col("c_hour_angle_max", hour_angle_range_value.embedded)
+            val HourAngleMin: ColumnRef = col("c_hour_angle_min", hour_angle_range_value.embedded.withDomain("d_hour_angle"))
+            val HourAngleMax: ColumnRef = col("c_hour_angle_max", hour_angle_range_value.embedded.withDomain("d_hour_angle"))
           }
         }
       }

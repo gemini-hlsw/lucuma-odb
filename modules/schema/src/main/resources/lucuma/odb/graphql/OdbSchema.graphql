@@ -2361,14 +2361,10 @@ input TimingWindowRepeatInput {
   times: PosInt
 }
 
-input TimingWindowEndAfterInput {
-  duration: TimeSpanInput!
-  repeat: TimingWindowRepeatInput
-}
-
 input TimingWindowEndInput {
   atUtc: Timestamp
-  after: TimingWindowEndAfterInput
+  after: TimeSpanInput
+  repeat: TimingWindowRepeatInput
 }
 
 input TimingWindowInput {
@@ -4528,11 +4524,11 @@ type TimingWindowRepeat {
 }
 
 type TimingWindowEndAt {
-  utc: Timestamp!
+  atUtc: Timestamp!
 }
 
 type TimingWindowEndAfter {
-  duration: TimeSpan!
+  after: TimeSpan!
 
   repeat: TimingWindowRepeat
 }
