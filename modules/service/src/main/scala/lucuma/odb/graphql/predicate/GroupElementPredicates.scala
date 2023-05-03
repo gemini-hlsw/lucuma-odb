@@ -5,7 +5,7 @@ package lucuma.odb.graphql.predicate
 
 import edu.gemini.grackle.Path
 import eu.timepit.refined.types.numeric.NonNegShort
-import lucuma.odb.data.Group
+import lucuma.core.model.Group
 
 class GroupElementPredicates(path: Path) {
   lazy val parentGroupId = LeafPredicates[Group.Id](path / "parentGroupId")

@@ -46,6 +46,7 @@ import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
+import lucuma.core.model.Group
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -54,7 +55,6 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
-import lucuma.odb.data.Group
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
