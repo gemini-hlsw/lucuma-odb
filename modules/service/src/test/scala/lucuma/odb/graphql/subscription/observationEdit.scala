@@ -7,6 +7,7 @@ package subscription
 import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
+import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -161,6 +162,25 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       )
     } yield ()
 
+  }
+
+  test("work even if no database fields are selected") {
+    import Group1.pi
+    subscriptionExpect(
+      user      = pi,
+      query     = s"""
+        subscription {
+          observationEdit {
+            editType
+          }
+        }
+      """,
+      mutations =
+        Right(
+          createProgram(pi, "foo").flatMap(createObservation(pi, "foo obs", _)).replicateA(2)
+        ),
+      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED"}}""")
+    )
   }
 
 }
