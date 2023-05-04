@@ -38,7 +38,6 @@ object TargetTopic {
   case class Element(
     targetId:  Target.Id,
     programId: Program.Id,
-    eventId:   Long,
     editType:  EditType,
     users:     List[User.Id]
   ) {
@@ -53,11 +52,11 @@ object TargetTopic {
   }
 
   /** Infinite stream of target id, program id, event id, and edit type. */
-  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Target.Id, Program.Id, Long, EditType)] =
+  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Target.Id, Program.Id, EditType)] =
     s.channel(id"ch_target_edit").listen(maxQueued).flatMap { n =>
       n.value.split(",") match {
-        case Array(_oid, _pid, _eid, _tg_op) =>
-          (Gid[Target.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption, EditType.fromTgOp(_tg_op)).tupled match {
+        case Array(_oid, _pid, _tg_op) =>
+          (Gid[Target.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), EditType.fromTgOp(_tg_op)).tupled match {
             case Some(tuple) => Stream(tuple)
             case None        => Stream.exec(Logger[F].warn(s"Invalid target and/or event: $n"))
           }
@@ -72,7 +71,7 @@ object TargetTopic {
     for {
       oid   <- updates(s, maxQueued)
       users <- Stream.eval(ProgramTopic.selectProgramUsers(s, oid._2))
-      elem   = Element(oid._1, oid._2, oid._3, oid._4, users)
+      elem   = Element(oid._1, oid._2, oid._3, users)
       _     <- Stream.eval(Logger[F].info(s"TargetChannel: $elem"))
     } yield elem
 

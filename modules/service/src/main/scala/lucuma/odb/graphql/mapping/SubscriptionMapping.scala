@@ -83,7 +83,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .filter(e => e.canRead(user) && input.flatMap(_.programId).forall(_ === e.programId))
         .map(e => Result(
           Environment(
-            Env("id" -> e.eventId, "editType" -> e.editType),
+            Env("editType" -> e.editType),
             Unique(Filter(Predicates.programEdit.value.id.eql(e.programId), child))
           )
         ))
@@ -102,7 +102,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .map { e =>
           Result(
             Environment(
-              Env("id" -> e.eventId, "editType" -> e.editType),
+              Env("editType" -> e.editType),
               Unique(Filter(Predicates.observationEdit.value.id.eql(e.observationId), child))
             )
           )
@@ -122,7 +122,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .map { e =>
           Result(
             Environment(
-              Env("id" -> e.eventId, "editType" -> e.editType),
+              Env("editType" -> e.editType),
               Unique(Filter(Predicates.targetEdit.value.id.eql(e.targetId), child))
             )
           )

@@ -17,7 +17,6 @@ trait ObservationEditMapping[F[_]] extends ObservationView[F] {
       tpe = ObservationEditType,
       fieldMappings = List(
         SqlField("synthetic-id", ObservationView.Id, key = true, hidden = true),
-        CursorField("id", _.envR[Long]("id"), List("synthetic-id")),
         CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
         SqlObject("value")
       )
