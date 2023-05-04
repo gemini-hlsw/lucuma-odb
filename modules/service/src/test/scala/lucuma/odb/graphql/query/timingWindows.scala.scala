@@ -10,11 +10,197 @@ import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import lucuma.odb.graphql.OdbSuite
+import lucuma.core.model.User
+import lucuma.core.model.Program
+import lucuma.core.model.Observation
 
 class timingWindows extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
+  def createObservation(user: User, pid: Program.Id, twisOpt: Option[String]): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+        """ + 
+        twisOpt.map(twis => 
+          s""",
+              SET: {
+                timingWindows: $twis
+              }
+          """
+        ).orEmpty +
+        """
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+        """
+    ).map { json => 
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def queryObservationTimingWindows(obsId: Observation.Id): String = 
+    s"""
+      query {
+        observation(observationId: "$obsId") {
+          timingWindows {
+            inclusion
+            startUtc
+            end {
+              ... on TimingWindowEndAt {
+                atUtc
+              }
+              ... on TimingWindowEndAfter {
+                after {
+                  hours
+                }         
+                repeat {
+                  period {
+                    hours
+                  }
+                  times
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("null timing windows should result in an empty set") {
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        createObservation(user, pid, none).flatMap{ obsId =>
+          expect(
+            user = user,
+            query = queryObservationTimingWindows(obsId), 
+            expected = Right(
+              json"""
+                {
+                  "observation" : {
+                    "timingWindows" : [
+                    ]
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
+
+  test("empty timing windows should work") {
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        createObservation(user, pid, "[]".some).flatMap{ obsId =>
+          expect(
+            user = user,
+            query = queryObservationTimingWindows(obsId), 
+            expected = Right(
+              json"""
+                {
+                  "observation" : {
+                    "timingWindows" : [
+                    ]
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
+
+  test("timing windows should preserve creation order") {
+    val timingWindows = """[
+      {
+        inclusion: INCLUDE,
+        startUtc: "2023-04-01 00:00:00"
+      },
+      {
+        inclusion: INCLUDE,
+        startUtc: "2023-05-01 00:00:00",
+        end: {
+          atUtc: "2023-05-02 00:00:00"
+        }
+      },
+      {
+        inclusion: EXCLUDE,
+        startUtc: "2023-04-15 00:00:00",
+        end: {
+          after: {
+            hours: 2
+          },
+          repeat: {
+            period: {
+              hours: 4
+            },
+            times: 50
+          }
+        }
+      }
+    ]"""
+
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        createObservation(user, pid, timingWindows.some).flatMap{ obsId =>
+          expect(
+            user = user,
+            query = queryObservationTimingWindows(obsId), 
+            expected = Right(
+              json"""
+                {
+                  "observation" : {
+                    "timingWindows" : [
+                      {
+                        "inclusion": "INCLUDE",
+                        "startUtc": "2023-04-01 00:00:00",
+                        "end": null
+                      },
+                      {
+                        "inclusion": "INCLUDE",
+                        "startUtc": "2023-05-01 00:00:00",
+                        "end": {
+                          "atUtc": "2023-05-02 00:00:00"
+                        }
+                      },
+                      {
+                        "inclusion": "EXCLUDE",
+                        "startUtc": "2023-04-15 00:00:00",
+                        "end": {
+                          "after": {
+                            "hours": 2.000000
+                          },
+                          "repeat": {
+                            "period": {
+                              "hours": 4.000000
+                            },
+                            "times": 50
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
+
+  // This test addresses the case where type information was lost in the joins,
+  // and is now solved via `.withDomain` in the skunk codec.
   test("we should be able to query constraints and timing windows") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
@@ -35,7 +221,7 @@ class timingWindows extends OdbSuite {
                     timingWindows {
                       end {
                         ... on TimingWindowEndAfter {
-                          duration {
+                          after {
                             milliseconds
                           }         
                         }

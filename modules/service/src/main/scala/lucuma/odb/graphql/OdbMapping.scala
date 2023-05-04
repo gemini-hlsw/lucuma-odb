@@ -368,6 +368,7 @@ object OdbMapping {
                 ConstraintSetGroupElaborator,
                 GroupElaborator,
                 MutationElaborator,
+                ObservationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
