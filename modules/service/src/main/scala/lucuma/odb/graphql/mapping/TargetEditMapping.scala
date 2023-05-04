@@ -17,7 +17,6 @@ trait TargetEditMapping[F[_]] extends TargetView[F] {
       tpe = TargetEditType,
       fieldMappings = List(
         SqlField("synthetic-id", TargetView.TargetId, key = true, hidden = true),
-        CursorField("id", _.envR[Long]("id"), List("synthetic-id")),
         CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
         SqlObject("value")
       )
