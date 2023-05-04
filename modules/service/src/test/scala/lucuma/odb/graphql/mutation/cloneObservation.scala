@@ -35,6 +35,7 @@ class cloneObservation extends OdbSuite {
         imageQuality
         skyBackground
       }
+      $TimingWindowsGraph
       scienceRequirements {
         mode
         spectroscopy {
@@ -64,6 +65,7 @@ class cloneObservation extends OdbSuite {
     """
 
   test("clones should have the same properties, for all observing modes") {
+    IO.println(ObservationGraph) >>
     ObservingModeType.values.toList.traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
