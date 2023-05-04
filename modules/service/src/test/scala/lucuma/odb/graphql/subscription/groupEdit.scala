@@ -8,10 +8,10 @@ import cats.effect.IO
 import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
-import io.circe.syntax.*
 import io.circe.literal.*
-import lucuma.core.model.Program
+import io.circe.syntax.*
 import lucuma.core.model.Group
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 

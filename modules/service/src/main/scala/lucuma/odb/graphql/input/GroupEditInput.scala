@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.apply.*
-import lucuma.core.model.Program
 import lucuma.core.model.Group
+import lucuma.core.model.Program
 import lucuma.odb.graphql.binding.*
 
 final case class GroupEditInput(
