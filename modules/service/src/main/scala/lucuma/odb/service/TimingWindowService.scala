@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.Sync
 import cats.syntax.all.*
+import cats.syntax.all.given
 import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.TimingWindowInput
@@ -39,7 +40,7 @@ object TimingWindowService:
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         Result( (obsIds, xa) =>
           exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
-            exec(Statements.createObservationsTimingWindows(obsIds, timingWindows))
+            Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(exec)
         )
 
       def cloneTimingWindows(
@@ -61,39 +62,43 @@ object Statements {
   def createObservationsTimingWindows(
     observationIds: List[Observation.Id],
     timingWindows: List[TimingWindowInput]
-  ): AppliedFragment =
-    sql"""
-      INSERT INTO t_timing_window (
-        c_observation_id,
-        c_inclusion,
-        c_start,
-        c_end_at,
-        c_end_after,
-        c_repeat_period,
-        c_repeat_times
-      ) VALUES ${(
-        observation_id          ~
-        timing_window_inclusion ~
-        core_timestamp          ~
-        core_timestamp.opt      ~
-        time_span.opt           ~
-        time_span.opt           ~
-        int4.opt
-      ).values.list(timingWindows.length).list(observationIds.length)}
-    """
-    .apply( 
-      observationIds.map( obsId =>
-        timingWindows.map( tw =>
-          obsId ~ 
-          tw.inclusion  ~ 
-          tw.startUtc      ~ 
-          tw.end.flatMap(_.atUtc) ~
-          tw.end.flatMap(_.after) ~
-          tw.end.flatMap(_.repeat.map(_.period)) ~
-          tw.end.flatMap(_.repeat.flatMap(_.times.map(_.value)))
-        )
-      )
-    )
+  ): Option[AppliedFragment] =
+    (observationIds, timingWindows) match
+      case (Nil, _) => none
+      case (_, Nil) => none
+      case _ =>
+        sql"""
+          INSERT INTO t_timing_window (
+            c_observation_id,
+            c_inclusion,
+            c_start,
+            c_end_at,
+            c_end_after,
+            c_repeat_period,
+            c_repeat_times
+          ) VALUES ${(
+            observation_id          ~
+            timing_window_inclusion ~
+            core_timestamp          ~
+            core_timestamp.opt      ~
+            time_span.opt           ~
+            time_span.opt           ~
+            int4.opt
+          ).values.list(timingWindows.length).list(observationIds.length)}
+        """
+        .apply( 
+          observationIds.map( obsId =>
+            timingWindows.map( tw =>
+              obsId ~ 
+              tw.inclusion  ~ 
+              tw.startUtc      ~ 
+              tw.end.flatMap(_.atUtc) ~
+              tw.end.flatMap(_.after) ~
+              tw.end.flatMap(_.repeat.map(_.period)) ~
+              tw.end.flatMap(_.repeat.flatMap(_.times.map(_.value)))
+            )
+          )
+        ).some
 
   def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
     sql"""
