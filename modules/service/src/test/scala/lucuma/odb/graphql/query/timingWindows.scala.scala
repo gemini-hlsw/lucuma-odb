@@ -46,41 +46,20 @@ class timingWindows extends OdbSuite {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  def queryObservationTimingWindows(obsId: Observation.Id): String = 
-    s"""
-      query {
-        observation(observationId: "$obsId") {
-          timingWindows {
-            inclusion
-            startUtc
-            end {
-              ... on TimingWindowEndAt {
-                atUtc
-              }
-              ... on TimingWindowEndAfter {
-                after {
-                  hours
-                }         
-                repeat {
-                  period {
-                    hours
-                  }
-                  times
-                }
-              }
-            }
-          }
-        }
-      }
-    """
-
   test("null timing windows should result in an empty set") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         createObservation(user, pid, none).flatMap{ obsId =>
           expect(
             user = user,
-            query = queryObservationTimingWindows(obsId), 
+            query = 
+              s"""
+                query {
+                  observation(observationId: "$obsId") {
+                    $TimingWindowsGraph
+                  }
+                }
+              """,
             expected = Right(
               json"""
                 {
@@ -103,7 +82,14 @@ class timingWindows extends OdbSuite {
         createObservation(user, pid, "[]".some).flatMap{ obsId =>
           expect(
             user = user,
-            query = queryObservationTimingWindows(obsId), 
+            query = 
+              s"""
+                query {
+                  observation(observationId: "$obsId") {
+                    $TimingWindowsGraph
+                  }
+                }
+              """, 
             expected = Right(
               json"""
                 {
@@ -120,79 +106,88 @@ class timingWindows extends OdbSuite {
     }
   }
 
-  test("timing windows should preserve creation order") {
-    val timingWindows = """[
-      {
-        inclusion: INCLUDE,
-        startUtc: "2023-04-01 00:00:00"
-      },
-      {
-        inclusion: INCLUDE,
-        startUtc: "2023-05-01 00:00:00",
-        end: {
-          atUtc: "2023-05-02 00:00:00"
-        }
-      },
-      {
-        inclusion: EXCLUDE,
-        startUtc: "2023-04-15 00:00:00",
-        end: {
-          after: {
-            hours: 2
-          },
-          repeat: {
-            period: {
-              hours: 4
+  val TimingWindowsInput = 
+   """[
+        {
+          inclusion: INCLUDE,
+          startUtc: "2023-04-01 00:00:00"
+        },
+        {
+          inclusion: INCLUDE,
+          startUtc: "2023-05-01 00:00:00",
+          end: {
+            atUtc: "2023-05-02 00:00:00"
+          }
+        },
+        {
+          inclusion: EXCLUDE,
+          startUtc: "2023-04-15 00:00:00",
+          end: {
+            after: {
+              hours: 2
             },
-            times: 50
+            repeat: {
+              period: {
+                hours: 4
+              },
+              times: 50
+            }
           }
         }
-      }
-    ]"""
+      ]"""
 
+  val TimingWindowsOutput = 
+    json"""
+      {
+        "observation" : {
+          "timingWindows" : [
+            {
+              "inclusion": "INCLUDE",
+              "startUtc": "2023-04-01 00:00:00",
+              "end": null
+            },
+            {
+              "inclusion": "INCLUDE",
+              "startUtc": "2023-05-01 00:00:00",
+              "end": {
+                "atUtc": "2023-05-02 00:00:00"
+              }
+            },
+            {
+              "inclusion": "EXCLUDE",
+              "startUtc": "2023-04-15 00:00:00",
+              "end": {
+                "after": {
+                  "hours": 2.000000
+                },
+                "repeat": {
+                  "period": {
+                    "hours": 4.000000
+                  },
+                  "times": 50
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+  test("timing windows output should match input, preserving creation order") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
-        createObservation(user, pid, timingWindows.some).flatMap{ obsId =>
+        createObservation(user, pid, TimingWindowsInput.some).flatMap{ obsId =>
           expect(
             user = user,
-            query = queryObservationTimingWindows(obsId), 
-            expected = Right(
-              json"""
-                {
-                  "observation" : {
-                    "timingWindows" : [
-                      {
-                        "inclusion": "INCLUDE",
-                        "startUtc": "2023-04-01 00:00:00",
-                        "end": null
-                      },
-                      {
-                        "inclusion": "INCLUDE",
-                        "startUtc": "2023-05-01 00:00:00",
-                        "end": {
-                          "atUtc": "2023-05-02 00:00:00"
-                        }
-                      },
-                      {
-                        "inclusion": "EXCLUDE",
-                        "startUtc": "2023-04-15 00:00:00",
-                        "end": {
-                          "after": {
-                            "hours": 2.000000
-                          },
-                          "repeat": {
-                            "period": {
-                              "hours": 4.000000
-                            },
-                            "times": 50
-                          }
-                        }
-                      }
-                    ]
+            query = 
+              s"""
+                query {
+                  observation(observationId: "$obsId") {
+                    $TimingWindowsGraph
                   }
                 }
-              """
-            )
+              """,
+            expected = Right(TimingWindowsOutput)
           )
         }
       }
