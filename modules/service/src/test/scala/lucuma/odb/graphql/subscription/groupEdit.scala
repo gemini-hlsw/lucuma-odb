@@ -11,7 +11,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import io.circe.literal.*
 import lucuma.core.model.Program
-import lucuma.odb.data.Group
+import lucuma.core.model.Group
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 
