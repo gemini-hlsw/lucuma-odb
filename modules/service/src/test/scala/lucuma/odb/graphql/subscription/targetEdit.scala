@@ -181,4 +181,23 @@ class targetEdit extends OdbSuite {
     }
   }
 
+  test("work even if no database fields are selected") {
+    subscriptionExpect(
+      user      = pi,
+      query     = s"""
+        subscription {
+          targetEdit {
+            editType
+          }
+        }
+      """,
+      mutations =
+        Right(
+          createProgramAs(pi).flatMap(createTarget(pi, _, "t")).replicateA(2)
+        ),
+      expected = List.fill(2)(json"""{"targetEdit":{"editType":"CREATED"}}""")
+    )
+  }
+
+
 }

@@ -225,4 +225,23 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     )
   }
 
+  test("work even if no database fields are selected") {
+    import Group1.pi
+    subscriptionExpect(
+      user      = pi,
+      query     = s"""
+        subscription {
+          programEdit {
+            editType
+          }
+        }
+      """,
+      mutations =
+        Right(
+          createProgramAs(pi).replicateA(2)
+        ),
+      expected = List.fill(2)(json"""{"programEdit":{"editType":"CREATED"}}""")
+    )
+  }
+
 }
