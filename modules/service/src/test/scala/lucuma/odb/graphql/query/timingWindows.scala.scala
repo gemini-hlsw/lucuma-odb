@@ -9,10 +9,10 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
-import lucuma.odb.graphql.OdbSuite
-import lucuma.core.model.User
-import lucuma.core.model.Program
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.graphql.OdbSuite
 
 class timingWindows extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
