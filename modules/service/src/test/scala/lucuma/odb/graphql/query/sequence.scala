@@ -112,14 +112,13 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                          posA { p { microarcseconds } }
                        }
                      }
+                     observeClass
                      acquisition {
+                       observeClass
                        nextAtom {
-                         time {
-                           total {
-                             microseconds
-                           }
-                         }
+                         observeClass
                          steps {
+                           observeClass
                            instrumentConfig {
                              exposure {
                                seconds
@@ -170,15 +169,14 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
                     "nodAndShuffle": null
                   },
+                  "observeClass": "SCIENCE",
                   "acquisition": {
+                    "observeClass": "ACQUISITION",
                     "nextAtom": {
-                      "time": {
-                        "total": {
-                          "microseconds": 0
-                        }
-                      },
+                      "observeClass": "ACQUISITION",
                       "steps": [
                         {
+                          "observeClass": "ACQUISITION",
                           "instrumentConfig": {
                             "exposure": {
                               "seconds": 10.000000
@@ -202,6 +200,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                           }
                         },
                         {
+                          "observeClass": "ACQUISITION",
                           "instrumentConfig": {
                             "exposure": {
                               "seconds": 20.000000
@@ -227,6 +226,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                           }
                         },
                         {
+                          "observeClass": "ACQUISITION",
                           "instrumentConfig": {
                             "exposure": {
                               "seconds": 40.000000
@@ -302,6 +302,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                    ... on GmosNorthExecutionConfig {
                      science {
                        nextAtom {
+                         description
                          steps {
                            stepConfig {
                              stepType
@@ -314,6 +315,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                          }
                        }
                        possibleFuture {
+                         description
                          steps {
                            stepConfig {
                              stepType
@@ -339,6 +341,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                 "executionConfig": {
                   "science": {
                     "nextAtom": {
+                      "description": "q -15.0″, λ 500.0 nm",
                       "steps": [
                         {
                           "stepConfig": {
@@ -359,6 +362,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     },
                     "possibleFuture": [
                       {
+                        "description": "q 15.0″, λ 505.0 nm",
                         "steps": [
                           {
                             "stepConfig": {
@@ -378,6 +382,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q 15.0″, λ 505.0 nm",
                         "steps": [
                           {
                             "stepConfig": {
@@ -397,6 +402,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q -15.0″, λ 500.0 nm",
                         "steps": [
                           {
                             "stepConfig": {
@@ -416,6 +422,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q -15.0″, λ 500.0 nm",
                         "steps": [
                           {
                             "stepConfig": {
@@ -435,6 +442,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q 15.0″, λ 505.0 nm",
                         "steps": [
                           {
                             "stepConfig": {
@@ -500,6 +508,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                    ... on GmosNorthExecutionConfig {
                      science {
                        nextAtom {
+                         description
                          steps {
                            instrumentConfig {
                              gratingConfig {
@@ -509,6 +518,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                          }
                        }
                        possibleFuture {
+                         description
                          steps {
                            instrumentConfig {
                              gratingConfig {
@@ -531,6 +541,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                 "executionConfig": {
                   "science": {
                     "nextAtom": {
+                      "description": "q 0.0″, λ 495.0 nm",
                       "steps": [
                         {
                           "instrumentConfig": {
@@ -554,6 +565,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     },
                     "possibleFuture": [
                       {
+                        "description": "q 15.0″, λ 500.0 nm",
                         "steps": [
                           {
                             "instrumentConfig": {
@@ -576,6 +588,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q 15.0″, λ 505.0 nm",
                         "steps": [
                           {
                             "instrumentConfig": {
@@ -598,6 +611,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q 0.0″, λ 495.0 nm",
                         "steps": [
                           {
                             "instrumentConfig": {
@@ -621,6 +635,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q 0.0″, λ 500.0 nm",
                         "steps": [
                           {
                             "instrumentConfig": {
@@ -643,6 +658,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         ]
                       },
                       {
+                        "description": "q 15.0″, λ 505.0 nm",
                         "steps": [
                           {
                             "instrumentConfig": {
@@ -781,6 +797,646 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
             {
               "sequence": {
                 "executionConfig": {
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
+
+  test("planned time: config and detector estimates") {
+
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             fragment plannedTimeFields on PlannedTime {
+               total {
+                 seconds
+               }
+               charges {
+                 chargeClass
+                 time {
+                   seconds
+                 }
+               }
+             }
+
+             fragment configChangeEstimateFields on ConfigChangeEstimate {
+               name
+               description
+               estimate {
+                 seconds
+               }
+             }
+
+             fragment allConfigChangeEstimatesFields on AllConfigChangeEstimates {
+               selected {
+                 ...configChangeEstimateFields
+               }
+               all {
+                 ...configChangeEstimateFields
+               }
+               estimate {
+                 seconds
+               }
+             }
+
+             fragment datasetEstimateFields on DatasetEstimate {
+               estimate {
+                 seconds
+               }
+               exposure {
+                 seconds
+               }
+               readout {
+                 seconds
+               }
+               write {
+                 seconds
+               }
+             }
+
+             fragment detectorEstimateFields on DetectorEstimate {
+               name
+               description
+               dataset {
+                 ...datasetEstimateFields
+               }
+               count
+               estimate {
+                 seconds
+               }
+             }
+
+             fragment allDetectorEstimatesFields on AllDetectorEstimates {
+               selected {
+                 ...detectorEstimateFields
+               }
+               all {
+                 ...detectorEstimateFields
+               }
+               estimate {
+                 seconds
+               }
+             }
+
+             fragment stepEstimateFields on StepEstimate {
+               configChange {
+                 ...allConfigChangeEstimatesFields
+               }
+               detector {
+                 ...allDetectorEstimatesFields
+               }
+               total {
+                 seconds
+               }
+             }
+
+             fragment gmosNorthAtomFields on GmosNorthAtom {
+               steps {
+                 instrumentConfig {
+                   readout {
+                     xBin
+                     yBin
+                     ampCount
+                     ampGain
+                     ampReadMode
+                   }
+                   roi
+                 }
+                 estimate {
+                   ...stepEstimateFields
+                 }
+               }
+             }
+
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     acquisition {
+                       nextAtom {
+                         ...gmosNorthAtomFields
+                       }
+                       possibleFuture {
+                         ...gmosNorthAtomFields
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "programId": $pid,
+                "executionConfig": {
+                  "acquisition": {
+                    "nextAtom": {
+                       "steps": [
+                        {
+                          "instrumentConfig" : {
+                            "readout" : {
+                              "xBin" : "TWO",
+                              "yBin" : "TWO",
+                              "ampCount" : "TWELVE",
+                              "ampGain" : "LOW",
+                              "ampReadMode" : "FAST"
+                            },
+                            "roi" : "CCD2"
+                          },
+                          "estimate": {
+                            "configChange": null,
+                            "detector": {
+                              "selected": {
+                                "name": "GMOS North",
+                                "description": "GMOS North Hamamatsu Detector Array",
+                                "dataset": {
+                                  "estimate": {
+                                    "seconds": 29.700000
+                                  },
+                                  "exposure": {
+                                    "seconds": 10.000000
+                                  },
+                                  "readout": {
+                                    "seconds": 9.700000
+                                  },
+                                  "write": {
+                                    "seconds": 10.000000
+                                  }
+                                },
+                                "count": 1,
+                                "estimate": {
+                                  "seconds": 29.700000
+                                }
+                              },
+                              "all": [
+                                {
+                                  "name": "GMOS North",
+                                  "description": "GMOS North Hamamatsu Detector Array",
+                                  "dataset": {
+                                    "estimate": {
+                                      "seconds": 29.700000
+                                    },
+                                    "exposure": {
+                                      "seconds": 10.000000
+                                    },
+                                    "readout": {
+                                      "seconds": 9.700000
+                                    },
+                                    "write": {
+                                      "seconds": 10.000000
+                                    }
+                                  },
+                                  "count": 1,
+                                  "estimate": {
+                                    "seconds": 29.700000
+                                  }
+                                }
+                              ],
+                              "estimate": {
+                                "seconds": 29.700000
+                              }
+                            },
+                            "total": {
+                              "seconds": 29.700000
+                            }
+                          }
+                        },
+                      {
+                        "instrumentConfig" : {
+                          "readout" : {
+                            "xBin" : "ONE",
+                            "yBin" : "ONE",
+                            "ampCount" : "TWELVE",
+                            "ampGain" : "LOW",
+                            "ampReadMode" : "FAST"
+                          },
+                          "roi" : "CENTRAL_STAMP"
+                        },
+                        "estimate" : {
+                          "configChange" : {
+                            "selected" : {
+                              "name" : "GMOS North FPU",
+                              "description" : "GMOS North FPU change cost",
+                              "estimate" : {
+                                "seconds" : 60.000000
+                              }
+                            },
+                            "all" : [
+                              {
+                                "name" : "GMOS North FPU",
+                                "description" : "GMOS North FPU change cost",
+                                "estimate" : {
+                                  "seconds" : 60.000000
+                                }
+                              },
+                              {
+                                "name" : "Offset",
+                                "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
+                                "estimate" : {
+                                  "seconds" : 7.062500
+                                }
+                              }
+                            ],
+                            "estimate" : {
+                              "seconds" : 60.000000
+                            }
+                          },
+                          "detector" : {
+                            "selected" : {
+                              "name" : "GMOS North",
+                              "description" : "GMOS North Hamamatsu Detector Array",
+                              "dataset" : {
+                                "estimate" : {
+                                  "seconds" : 34.200000
+                                },
+                                "exposure" : {
+                                  "seconds" : 20.000000
+                                },
+                                "readout" : {
+                                  "seconds" : 4.200000
+                                },
+                                "write" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "count" : 1,
+                              "estimate" : {
+                                "seconds" : 34.200000
+                              }
+                            },
+                            "all" : [
+                              {
+                                "name" : "GMOS North",
+                                "description" : "GMOS North Hamamatsu Detector Array",
+                                "dataset" : {
+                                  "estimate" : {
+                                    "seconds" : 34.200000
+                                  },
+                                  "exposure" : {
+                                    "seconds" : 20.000000
+                                  },
+                                  "readout" : {
+                                    "seconds" : 4.200000
+                                  },
+                                  "write" : {
+                                    "seconds" : 10.000000
+                                  }
+                                },
+                                "count" : 1,
+                                "estimate" : {
+                                  "seconds" : 34.200000
+                                }
+                              }
+                            ],
+                            "estimate" : {
+                              "seconds" : 34.200000
+                            }
+                          },
+                          "total" : {
+                            "seconds" : 94.200000
+                          }
+                        }
+                      },
+                      {
+                        "instrumentConfig" : {
+                          "readout" : {
+                            "xBin" : "ONE",
+                            "yBin" : "ONE",
+                            "ampCount" : "TWELVE",
+                            "ampGain" : "LOW",
+                            "ampReadMode" : "FAST"
+                          },
+                          "roi" : "CENTRAL_STAMP"
+                        },
+                        "estimate" : {
+                          "configChange" : {
+                            "selected" : {
+                              "name" : "Offset",
+                              "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
+                              "estimate" : {
+                                "seconds" : 7.062500
+                              }
+                            },
+                            "all" : [
+                              {
+                                "name" : "Offset",
+                                "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
+                                "estimate" : {
+                                  "seconds" : 7.062500
+                                }
+                              }
+                            ],
+                            "estimate" : {
+                              "seconds" : 7.062500
+                            }
+                          },
+                          "detector" : {
+                            "selected" : {
+                              "name" : "GMOS North",
+                              "description" : "GMOS North Hamamatsu Detector Array",
+                              "dataset" : {
+                                "estimate" : {
+                                  "seconds" : 54.200000
+                                },
+                                "exposure" : {
+                                  "seconds" : 40.000000
+                                },
+                                "readout" : {
+                                  "seconds" : 4.200000
+                                },
+                                "write" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "count" : 1,
+                              "estimate" : {
+                                "seconds" : 54.200000
+                              }
+                            },
+                            "all" : [
+                              {
+                                "name" : "GMOS North",
+                                "description" : "GMOS North Hamamatsu Detector Array",
+                                "dataset" : {
+                                  "estimate" : {
+                                    "seconds" : 54.200000
+                                  },
+                                  "exposure" : {
+                                    "seconds" : 40.000000
+                                  },
+                                  "readout" : {
+                                    "seconds" : 4.200000
+                                  },
+                                  "write" : {
+                                    "seconds" : 10.000000
+                                  }
+                                },
+                                "count" : 1,
+                                "estimate" : {
+                                  "seconds" : 54.200000
+                                }
+                              }
+                            ],
+                            "estimate" : {
+                              "seconds" : 54.200000
+                            }
+                          },
+                          "total" : {
+                            "seconds" : 61.262500
+                          }
+                        }
+                       }
+                      ]
+                    },
+                    "possibleFuture": []
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("planned time: observation level") {
+
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             fragment plannedTimeFields on PlannedTime {
+               total {
+                 seconds
+               }
+               charges {
+                 chargeClass
+                 time {
+                   seconds
+                 }
+               }
+             }
+
+             fragment stepEstimateFields on StepEstimate {
+               total {
+                 seconds
+               }
+             }
+
+             fragment gmosNorthAtomFields on GmosNorthAtom {
+               steps {
+                 estimate {
+                   ...stepEstimateFields
+                 }
+               }
+             }
+
+             query {
+               sequence(programId: "$pid", observationId: "$oid") {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     setup {
+                       full {
+                         seconds
+                       }
+                       reacquisition {
+                         seconds
+                       }
+                     }
+                     science {
+                       plannedTime {
+                         ...plannedTimeFields
+                       }
+                       nextAtom {
+                         ...gmosNorthAtomFields
+                       }
+                       possibleFuture {
+                         ...gmosNorthAtomFields
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "programId": $pid,
+                "executionConfig" : {
+                  "setup": {
+                    "full": {
+                      "seconds": 960.000000
+                    },
+                    "reacquisition": {
+                      "seconds": 300.000000
+                    }
+                  },
+                  "science" : {
+                    "plannedTime" : {
+                      "total" : {
+                        "seconds" : 769.200000
+                      },
+                      "charges" : [
+                        {
+                          "chargeClass" : "NON_CHARGED",
+                          "time" : {
+                            "seconds" : 0.000000
+                          }
+                        },
+                        {
+                          "chargeClass" : "PARTNER",
+                          "time" : {
+                            "seconds" : 357.600000
+                          }
+                        },
+                        {
+                          "chargeClass" : "PROGRAM",
+                          "time" : {
+                            "seconds" : 411.600000
+                          }
+                        }
+                      ]
+                    },
+                    "nextAtom" : {
+                      "steps" : [
+                        {
+                          "estimate" : {
+                            "total" : {
+                              "seconds" : 61.100000
+                            }
+                          }
+                        },
+                        {
+                          "estimate" : {
+                            "total" : {
+                              "seconds" : 67.100000
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "possibleFuture" : [
+                      {
+                        "steps" : [
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 52.100000
+                              }
+                            }
+                          },
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 76.100000
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps" : [
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 61.100000
+                              }
+                            }
+                          },
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 67.100000
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps" : [
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 52.100000
+                              }
+                            }
+                          },
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 76.100000
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps" : [
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 61.100000
+                              }
+                            }
+                          },
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 67.100000
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "steps" : [
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 52.100000
+                              }
+                            }
+                          },
+                          {
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 76.100000
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
                 }
               }
             }

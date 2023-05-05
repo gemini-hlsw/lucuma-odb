@@ -3,10 +3,12 @@
 
 package lucuma.odb.logic
 
+import cats.Functor
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptySet
+import cats.data.NonEmptyVector
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
@@ -20,20 +22,24 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.DynamicConfig
-import lucuma.core.model.sequence.ExecutionSequence
-import lucuma.core.model.sequence.FutureExecutionConfig
+import lucuma.core.model.sequence.ConfigChangeEstimate
+import lucuma.core.model.sequence.DetectorEstimate
+import lucuma.core.model.sequence.ExecutionConfig
+import lucuma.core.model.sequence.InstrumentExecutionConfig
+import lucuma.core.model.sequence.Sequence
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.StepTime
+import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoExecution
+import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoSequence
+import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
@@ -115,7 +121,7 @@ object Generator {
     case class Success(
       observationId: Observation.Id,
       itc:           Itc.ResultSet,
-      value:         FutureExecutionConfig
+      value:         InstrumentExecutionConfig
     ) extends Result
   }
 
@@ -123,7 +129,8 @@ object Generator {
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
     paramsSrv:    GeneratorParamsService[F],
-    smartGcalSrv: SmartGcalService[F]
+    smartGcalSrv: SmartGcalService[F],
+    calculator:   PlannedTimeCalculator.ForInstrumentMode
   ): Generator[F] =
     new Generator[F] {
 
@@ -131,16 +138,6 @@ object Generator {
 
       private val itc = Itc.fromClientAndServices(itcClient, paramsSrv)
       private val exp = SmartGcalExpander.fromService(smartGcalSrv)
-
-      // This is a placeholder.  I'm not sure we'll end up adding step time to
-      // the generated sequence.
-      private val StepTimeZero: StepTime = StepTime(
-        TimeSpan.Zero,
-        TimeSpan.Zero,
-        TimeSpan.Zero,
-        TimeSpan.Zero,
-        TimeSpan.Zero
-      )
 
       override def generate(
         programId:     Program.Id,
@@ -166,6 +163,8 @@ object Generator {
             }
         )
 
+      // Generate a sequence for the observation, which will depend on the
+      // observation's observing mode.
       private def generateSequence(
         oid:       Observation.Id,
         params:    GeneratorParams,
@@ -178,54 +177,30 @@ object Generator {
             for {
               tup <- gmosLongSlit(oid, itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
               (rs, p0) = tup
-              p1 <- EitherT(exp.expandGmosNorth(p0)).leftMap { k => MissingSmartGcalDef(k.format) }
-            } yield
-              Success(
-                oid,
-                rs,
-                futureExecutionConfig(
-                  namespace,
-                  p1,
-                  FutureExecutionConfig.GmosNorth.apply,
-                  ExecutionSequence.GmosNorth.apply,
-                  Atom.GmosNorth.apply,
-                  Step.GmosNorth.apply
-                )
-              )
+              p1 <- expandAndEstimate(p0, exp.gmosNorth, _.format, calculator.gmosNorth)
+            } yield Success(oid, rs, InstrumentExecutionConfig.GmosNorth(execConfig(namespace, p1, calculator.gmosNorth)))
 
           case GeneratorParams.GmosSouthLongSlit(itcInput, config) =>
             for {
               tup <- gmosLongSlit(oid, itcInput, config, gmos.longslit.Generator.GmosSouth, useCache)
               (rs, p0) = tup
-              p1  <- EitherT(exp.expandGmosSouth(p0)).leftMap { k => MissingSmartGcalDef(k.format) }
-            } yield
-              Success(
-                oid,
-                rs,
-                futureExecutionConfig(
-                  namespace,
-                  p1,
-                  FutureExecutionConfig.GmosSouth.apply,
-                  ExecutionSequence.GmosSouth.apply,
-                  Atom.GmosSouth.apply,
-                  Step.GmosSouth.apply
-                )
-              )
-
+              p1  <- expandAndEstimate(p0, exp.gmosSouth, _.format, calculator.gmosSouth)
+            } yield Success(oid, rs, InstrumentExecutionConfig.GmosSouth(execConfig(namespace, p1, calculator.gmosSouth)))
 
         }
       }
 
-
-      def gmosLongSlit[S, D, G, L, U](
+      // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
+      // or planned time calculation.
+      private def gmosLongSlit[S, D, G, L, U](
         oid:       Observation.Id,
         itcInput:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
         config:    gmos.longslit.Config[G, L, U],
         generator: gmos.longslit.Generator[S, D, G, L, U],
         useCache:  Boolean
-      ): EitherT[F, Error, (Itc.ResultSet, ProtoExecution[S, D])] = {
+      ): EitherT[F, Error, (Itc.ResultSet, ProtoExecutionConfig[S, ProtoStep[D]])] = {
 
-        def generate(s: Itc.Result.Success): Either[Error, ProtoExecution[S, D]] =
+        def generate(s: Itc.Result.Success): Either[Error, ProtoExecutionConfig[S, ProtoStep[D]]] =
           generator.generate(
             s.value,
             s.input.sourceProfile,
@@ -254,45 +229,55 @@ object Generator {
         )
       }
 
-      def futureExecutionConfig[X <: ExecutionSequence, A <: Atom, T <: Step, S, D](
-        namespace:  UUID,
-        proto:      ProtoExecution[S, D],
-        mkExec:     (S, X, X) => FutureExecutionConfig,
-        mkSequence: (A, List[A]) => X,
-        mkAtom:     (Atom.Id, List[T]) => A,
-        mkStep:     (Step.Id, D, StepConfig, StepTime, Breakpoint) => T
-      ): FutureExecutionConfig = {
+      // Performs smart-gcal expansion and planned time calculation.
+      private def expandAndEstimate[K, S, D](
+        proto:     ProtoExecutionConfig[S, ProtoStep[D]],
+        expander:  SmartGcalExpander[F, K, D],
+        keyFormat: K => String,
+        calc:      PlannedTimeCalculator[S, D]
+      ): EitherT[F, Error, ProtoExecutionConfig[S, ProtoStep[(D, StepEstimate)]]] =
+        EitherT(SmartGcalExpander.expandExecutionConfig(proto, expander))
+          .bimap(
+            k => MissingSmartGcalDef(keyFormat(k)),
+            _.mapSequences(calc.estimateSequence(proto.static, _))
+          )
 
-        def executionSequence(
-          sequence:     ProtoSequence[D],
+      // Converts to lucuma-core ExecutionConfig, adding atom and step ids.
+      private def execConfig[S, D](
+        namespace: UUID,
+        proto:     ProtoExecutionConfig[S, ProtoStep[(D, StepEstimate)]],
+        calc:      PlannedTimeCalculator[S, D]
+      ): ExecutionConfig[S, D] = {
+
+        def toSequence(
+          sequence:     ProtoSequence[ProtoStep[(D, StepEstimate)]],
           sequenceType: SequenceType
-        ): X = {
-          val NonEmptyList(h, t) =
+        ): Sequence[D] =
+          Sequence(
             sequence
               .atoms
               .zipWithIndex
               .map(_.map(SequenceIds.atomId(namespace, sequenceType, _)))
               .map { case (atom, atomId) =>
-                mkAtom(
-                  atomId,
-                  atom.steps.zipWithIndex.map { case (s, j) =>
-                    mkStep(
-                      SequenceIds.stepId(namespace, sequenceType, atomId, j),
-                      s.instrumentConfig,
-                      s.stepConfig,
-                      StepTimeZero,        // Placeholder
-                      Breakpoint.Disabled
-                    )
-                  }.toList
-                )
+                val steps = atom.steps.zipWithIndex.map { case (ProtoStep((d, e), sc, oc, bp), j) =>
+                  Step(
+                    SequenceIds.stepId(namespace, sequenceType, atomId, j),
+                    d,
+                    sc,
+                    e,
+                    oc,
+                    bp
+                  )
+                }
+                Atom(atomId, atom.description, steps)
               }
-          mkSequence(h, t)
-        }
+          )
 
-        mkExec(
+        ExecutionConfig(
           proto.static,
-          executionSequence(proto.acquisition, SequenceType.Acquisition),
-          executionSequence(proto.science,     SequenceType.Science)
+          toSequence(proto.acquisition, SequenceType.Acquisition).some,
+          toSequence(proto.science,     SequenceType.Science).some,
+          calc.estimateSetup
         )
       }
 

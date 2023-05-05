@@ -9,6 +9,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType.Flat
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -47,8 +48,8 @@ trait SequenceState[D] {
    * Produces a "science" step based upon the current instrument configuration
    * state and the given telescope configuration.
    */
-  def scienceStep(o: Offset): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, StepConfig.Science(o)))
+  def scienceStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, StepConfig.Science(o), c))
 
   /**
    * Produces a "science" step based upon the current instrument configuration
@@ -57,13 +58,13 @@ trait SequenceState[D] {
    * @param p offset in p
    * @param q offset in q
    */
-  def scienceStep(p: Angle, q: Angle): State[D, ProtoStep[D]] =
-    scienceStep(Offset(Offset.P(p), Offset.Q(q)))
+  def scienceStep(p: Angle, q: Angle, c: ObserveClass): State[D, ProtoStep[D]] =
+    scienceStep(Offset(Offset.P(p), Offset.Q(q)), c)
 
   /**
    * Generates a GCAL flat based on the current instrument configuration.
    */
-  def flatStep: State[D, ProtoStep[D]] =
-    step(ProtoStep(_, SmartGcal(Flat)))
+  def flatStep(c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, SmartGcal(Flat), c))
 
 }

@@ -25,12 +25,14 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.NonNegDuration
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.GmosFpuMask
+import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.syntax.nonnegduration.*
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
@@ -67,17 +69,17 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
         _  <- optics.xBin          := GmosXBinning.Two
         _  <- optics.yBin          := GmosYBinning.Two
         _  <- optics.roi           := GmosRoi.Ccd2
-        s0 <- scienceStep(0.arcsec, 0.arcsec)
+        s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
         _  <- optics.exposure      := 20.secondTimeSpan
         _  <- optics.fpu           := GmosFpuMask.Builtin(fpu).some
         _  <- optics.xBin          := GmosXBinning.One
         _  <- optics.yBin          := GmosYBinning.One
         _  <- optics.roi           := GmosRoi.CentralStamp
-        s1 <- scienceStep(10.arcsec, 0.arcsec)
+        s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
         _  <- optics.exposure      := (exposureTime * NonNegInt.unsafeFrom(4)).timeSpan
-        s2 <- scienceStep(0.arcsec, 0.arcsec)
+        s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
       } yield Acquisition.Steps(s0, s1, s2)
     }
