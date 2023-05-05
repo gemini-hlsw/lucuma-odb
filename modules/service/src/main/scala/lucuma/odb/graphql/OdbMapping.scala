@@ -49,6 +49,7 @@ import lucuma.odb.graphql.util._
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Itc
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
@@ -249,11 +250,14 @@ object OdbMapping {
             }
 
           val generator: Resource[F, Generator[F]] =
-            pool.map { s =>
+            for {
+              s <- pool
+              c <- Resource.eval(PlannedTimeCalculator.fromSession(s, enums))
+            } yield {
               val oms = ObservingModeServices.fromSession(s)
               val gps = GeneratorParamsService.fromSession(s, user, oms)
               val sgc = SmartGcalService.fromSession(s)
-              Generator.fromClientAndServices(commitHash, itcClient, gps, sgc)
+              Generator.fromClientAndServices(commitHash, itcClient, gps, sgc, c)
             }
 
           override def sequence(

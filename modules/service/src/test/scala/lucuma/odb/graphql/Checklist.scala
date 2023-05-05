@@ -40,6 +40,7 @@ class Checklist extends OdbSuite {
       "ItcSuccess",
       "LineFluxIntegrated",
       "LineFluxSurface",
+      "PlannedTime",
       "SourceProfile",
       "SpectralDefinitionIntegrated",
       "SpectralDefinitionSurface",

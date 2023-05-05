@@ -15,8 +15,9 @@ import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.arb.ArbSourceProfile
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
@@ -59,7 +60,7 @@ class ScienceSuite extends ScalaCheckSuite {
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
-        as.map(a => DynamicOptics.North.yBin.get(a.science.instrumentConfig)),
+        as.map(a => DynamicOptics.North.yBin.get(a.science.value)),
         LazyList.continually(ls.explicitYBin.getOrElse(ls.defaultYBin))
       )
     }
@@ -70,7 +71,7 @@ class ScienceSuite extends ScalaCheckSuite {
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
-        as.map(a => DynamicOptics.North.wavelength.getOption(a.science.instrumentConfig).get),
+        as.map(a => DynamicOptics.North.wavelength.getOption(a.science.value).get),
         (ls.wavelengthDithers match {
           case Nil => LazyList.continually(WavelengthDither.Zero)
           case ds  => LazyList.continually(ds.to(LazyList)).flatten

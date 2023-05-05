@@ -24,11 +24,11 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.ExecutionSequence
-import lucuma.core.model.sequence.GmosFpuMask
+import lucuma.core.model.sequence.Sequence
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ North => GmosNorthSearchKey}
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ South => GmosSouthSearchKey}

@@ -37,12 +37,12 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.DynamicConfig
-import lucuma.core.model.sequence.GmosCcdMode
-import lucuma.core.model.sequence.GmosFpuMask
-import lucuma.core.model.sequence.GmosGratingConfig
-import lucuma.core.model.sequence.GmosNodAndShuffle
-import lucuma.core.model.sequence.StaticConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.GmosNodAndShuffle
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.TimeSpan
 
 
@@ -51,6 +51,7 @@ trait GmosCodec {
   import offset.decoder.given
   import time.decoder.given
   import wavelength.decoder.given
+  import sequence.given
 
   given Decoder[GmosNodAndShuffle] =
     Decoder.instance { c =>

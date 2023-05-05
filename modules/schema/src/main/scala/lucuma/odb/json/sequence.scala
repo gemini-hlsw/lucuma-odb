@@ -3,229 +3,177 @@
 
 package lucuma.odb.json
 
+import cats.data.NonEmptyList
 import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
+import io.circe.JsonObject
+import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.ExecutionSequence
-import lucuma.core.model.sequence.FutureExecutionConfig
-import lucuma.core.model.sequence.StaticConfig
+import lucuma.core.model.sequence.ExecutionConfig
+import lucuma.core.model.sequence.InstrumentExecutionConfig
+import lucuma.core.model.sequence.PlannedTime
+import lucuma.core.model.sequence.Sequence
+import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.StepTime
+import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Uid
 
+// (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength])
+
 trait SequenceCodec {
 
-  import gmos.given
   import stepconfig.given
   import time.decoder.given
+  import zipper.given
+  import plannedtime.given
 
-  given Decoder[StepTime] =
-    Decoder.instance { c =>
-      for {
-        h <- c.downField("configChange").as[TimeSpan]
-        e <- c.downField("exposure").as[TimeSpan]
-        r <- c.downField("readout").as[TimeSpan]
-        w <- c.downField("write").as[TimeSpan]
-        t <- c.downField("total").as[TimeSpan]
-      } yield StepTime(h, e, r, w, t)
-    }
-
-  given (using Encoder[TimeSpan]): Encoder[StepTime] =
-    Encoder.instance { (a: StepTime) =>
-      Json.obj(
-        "configChange" -> a.configChange.asJson,
-        "exposure"     -> a.exposure.asJson,
-        "readout"      -> a.readout.asJson,
-        "write"        -> a.write.asJson,
-        "total"        -> a.total.asJson
-      )
-    }
-
-  given given_Decoder_Step_GmosNorth: Decoder[Step.GmosNorth] =
+  given [D: Decoder]: Decoder[Step[D]] =
     Decoder.instance { c =>
       for {
         i <- c.downField("id").as[Step.Id]
-        g <- c.downField("instrumentConfig").as[GmosNorth]
-        s <- c.downField("stepConfig").as[StepConfig]
-        t <- c.downField("time").as[StepTime]
+        d <- c.downField("instrumentConfig").as[D]
+        n <- c.downField("stepConfig").as[StepConfig]
+        e <- c.downField("estimate").as[StepEstimate]
+        o <- c.downField("observeClass").as[ObserveClass]
         b <- c.downField("breakpoint").as[Breakpoint]
-      } yield Step.GmosNorth(i, g, s, t, b)
+      } yield Step(i, d, n, e, o, b)
     }
 
-  given given_Encoder_Step_GmosNorth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Step.GmosNorth] =
-    Encoder.instance { (a: Step.GmosNorth) =>
+  given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Step[D]] =
+    Encoder.instance { (a: Step[D]) =>
       Json.obj(
         "id"               -> a.id.asJson,
         "instrumentConfig" -> a.instrumentConfig.asJson,
         "stepConfig"       -> a.stepConfig.asJson,
-        "time"             -> a.time.asJson,
+        "estimate"         -> a.estimate.asJson,
+        "observeClass"     -> a.observeClass.asJson,
         "breakpoint"       -> a.breakpoint.asJson
       )
     }
 
-  given given_Decoder_Step_GmosSouth: Decoder[Step.GmosSouth] =
-    Decoder.instance { c =>
-      for {
-        i <- c.downField("id").as[Step.Id]
-        g <- c.downField("instrumentConfig").as[GmosSouth]
-        s <- c.downField("stepConfig").as[StepConfig]
-        t <- c.downField("time").as[StepTime]
-        b <- c.downField("breakpoint").as[Breakpoint]
-      } yield Step.GmosSouth(i, g, s, t, b)
-    }
-
-  given given_Encoder_Step_GmosSouth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Step.GmosSouth] =
-    Encoder.instance { (a: Step.GmosSouth) =>
-      Json.obj(
-        "id"               -> a.id.asJson,
-        "instrumentConfig" -> a.instrumentConfig.asJson,
-        "stepConfig"       -> a.stepConfig.asJson,
-        "time"             -> a.time.asJson,
-        "breakpoint"       -> a.breakpoint.asJson
-      )
-    }
-
-  given given_Decoder_Atom_GmosNorth: Decoder[Atom.GmosNorth] =
+  given [D: Decoder]: Decoder[Atom[D]] =
     Decoder.instance { c =>
       for {
         i <- c.downField("id").as[Atom.Id]
-        s <- c.downField("steps").as[List[Step.GmosNorth]]
-      } yield Atom.GmosNorth(i, s)
+        d <- c.downField("description").as[Option[String]]
+        s <- c.downField("steps").as[List[Step[D]]]
+        n <- NonEmptyList.fromList(s).toRight(DecodingFailure("At least one step is required in the `steps` array of an atom", c.history))
+      } yield Atom(i, d, n)
     }
 
-  private val StepTimeZero: StepTime =
-    StepTime(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero)
-
-  given given_Encoder_Atom_GmosNorth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Atom.GmosNorth] =
-    Encoder.instance { (a: Atom.GmosNorth) =>
+  given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Atom[D]] =
+    Encoder.instance { (a: Atom[D]) =>
       Json.obj(
-        "id"    -> a.id.asJson,
-        "time"  -> StepTimeZero.asJson,
-        "steps" -> a.steps.asJson
+        "id"           -> a.id.asJson,
+        "description"  -> a.description.asJson,
+        "steps"        -> a.steps.toList.asJson,
+        "observeClass" -> a.observeClass.asJson
       )
     }
 
-  given given_Decoder_Atom_GmosSouth: Decoder[Atom.GmosSouth] =
+  given [D: Decoder]: Decoder[Sequence[D]] =
     Decoder.instance { c =>
       for {
-        i <- c.downField("id").as[Atom.Id]
-        s <- c.downField("steps").as[List[Step.GmosSouth]]
-      } yield Atom.GmosSouth(i, s)
+        n <- c.downField("nextAtom").as[Atom[D]]
+        f <- c.downField("possibleFuture").as[List[Atom[D]]]
+      } yield Sequence(NonEmptyList(n, f))
     }
 
-  given given_Encoder_Atom_GmosSouth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Atom.GmosSouth] =
-    Encoder.instance { (a: Atom.GmosSouth) =>
+  given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Sequence[D]] =
+    Encoder.instance { (a: Sequence[D]) =>
       Json.obj(
-        "id"    -> a.id.asJson,
-        "time"  -> StepTimeZero.asJson,
-        "steps" -> a.steps.asJson
+        "nextAtom"       -> a.atoms.head.asJson,
+        "possibleFuture" -> a.atoms.tail.asJson,
+        "observeClass"   -> a.observeClass.asJson,
+        "plannedTime"    -> a.plannedTime.asJson
       )
     }
 
-  given given_Decoder_ExecutionSequence_GmosNorth: Decoder[ExecutionSequence.GmosNorth] =
+  given [S: Decoder, D: Decoder]: Decoder[ExecutionConfig[S, D]] =
     Decoder.instance { c =>
       for {
-        n <- c.downField("nextAtom").as[Atom.GmosNorth]
-        f <- c.downField("possibleFuture").as[List[Atom.GmosNorth]]
-      } yield ExecutionSequence.GmosNorth(n, f)
+        t <- c.downField("static").as[S]
+        a <- c.downField("acquisition").as[Option[Sequence[D]]]
+        s <- c.downField("science").as[Option[Sequence[D]]]
+        u <- c.downField("setup").as[SetupTime]
+      } yield ExecutionConfig(t, a, s, u)
     }
 
-  given given_Encoder_ExecutionSequence_GmosNorth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ExecutionSequence.GmosNorth] =
-    Encoder.instance { (a: ExecutionSequence.GmosNorth) =>
+  given [S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionConfig[S, D]] =
+    Encoder.instance { (a: ExecutionConfig[S, D]) =>
       Json.obj(
-        "nextAtom"       -> a.nextAtom.asJson,
-        "possibleFuture" -> a.possibleFuture.asJson
+        "static"        -> a.static.asJson,
+        "acquisition"   -> a.acquisition.asJson,
+        "science"       -> a.science.asJson,
+        "setup"         -> a.setup.asJson,
+        "observeClass"  -> a.observeClass.asJson
       )
     }
 
-  given given_Decoder_ExecutionSequence_GmosSouth: Decoder[ExecutionSequence.GmosSouth] =
+  import lucuma.odb.json.gmos.given
+
+  private def rootDecoder[R, S: Decoder, D: Decoder](name: String)(instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
     Decoder.instance { c =>
       for {
-        n <- c.downField("nextAtom").as[Atom.GmosSouth]
-        f <- c.downField("possibleFuture").as[List[Atom.GmosSouth]]
-      } yield ExecutionSequence.GmosSouth(n, f)
+        _ <- c.downField(name).as[Boolean]
+        r <- c.as[ExecutionConfig[S, D]]
+      } yield instrumentExecutionConfig(r)
     }
 
-  given given_Encoder_ExecutionSequence_GmosSouth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ExecutionSequence.GmosSouth] =
-    Encoder.instance { (a: ExecutionSequence.GmosSouth) =>
-      Json.obj(
-        "nextAtom"       -> a.nextAtom.asJson,
-        "possibleFuture" -> a.possibleFuture.asJson
-      )
+  given Decoder[InstrumentExecutionConfig.GmosNorth] =
+    rootDecoder("gmosNorth")(InstrumentExecutionConfig.GmosNorth.apply)
+
+  given Decoder[InstrumentExecutionConfig.GmosSouth] =
+    rootDecoder("gmosSouth")(InstrumentExecutionConfig.GmosSouth.apply)
+
+  private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
+    name:       String,
+    instrument: Instrument
+  )(root: R => ExecutionConfig[S, D]): Encoder[R] =
+    Encoder.instance { (a: R) =>
+      root(a).asJson.mapObject { obj =>
+        ("instrument", instrument.asJson) +: (name, true.asJson) +: obj
+      }
     }
 
-  given given_Decoder_FutureExecutionConfig_GmosNorth: Decoder[FutureExecutionConfig.GmosNorth] =
-    Decoder.instance { c =>
-      for {
-        _ <- c.downField("gmosNorth").as[Boolean]
-        t <- c.downField("static").as[StaticConfig.GmosNorth]
-        a <- c.downField("acquisition").as[ExecutionSequence.GmosNorth]
-        s <- c.downField("science").as[ExecutionSequence.GmosNorth]
-      } yield FutureExecutionConfig.GmosNorth(t, a, s)
-    }
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =
+    rootEncoder("gmosNorth", Instrument.GmosNorth)(_.executionConfig)
 
-  given given_Encoder_FutureExecutionConfig_GmosNorth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[FutureExecutionConfig.GmosNorth] =
-    Encoder.instance { (a: FutureExecutionConfig.GmosNorth) =>
-      Json.obj(
-        "gmosNorth"   -> true.asJson,
-        "instrument"  -> (Instrument.GmosNorth: Instrument).asJson,
-        "static"      -> a.static.asJson,
-        "acquisition" -> a.acquisition.asJson,
-        "science"     -> a.science.asJson
-      )
-    }
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
+    rootEncoder("gmosSouth", Instrument.GmosSouth)(_.executionConfig)
 
-  given given_Decoder_FutureExecutionConfig_GmosSouth: Decoder[FutureExecutionConfig.GmosSouth] =
-    Decoder.instance { c =>
-      for {
-        _ <- c.downField("gmosSouth").as[Boolean]
-        t <- c.downField("static").as[StaticConfig.GmosSouth]
-        a <- c.downField("acquisition").as[ExecutionSequence.GmosSouth]
-        s <- c.downField("science").as[ExecutionSequence.GmosSouth]
-      } yield FutureExecutionConfig.GmosSouth(t, a, s)
-    }
-
-  given given_Encoder_FutureExecutionConfig_GmosSouth(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[FutureExecutionConfig.GmosSouth] =
-    Encoder.instance { (a: FutureExecutionConfig.GmosSouth) =>
-      Json.obj(
-        "gmosSouth"   -> true.asJson,
-        "instrument"  -> (Instrument.GmosSouth: Instrument).asJson,
-        "static"      -> a.static.asJson,
-        "acquisition" -> a.acquisition.asJson,
-        "science"     -> a.science.asJson
-      )
-    }
-
-  given given_Decoder_FutureExecutionConfig: Decoder[FutureExecutionConfig] =
+  given Decoder[InstrumentExecutionConfig] =
     Decoder.instance { c =>
       for {
         i <- c.downField("instrument").as[Instrument]
-        x <- i match {
-          case Instrument.GmosNorth => Decoder[FutureExecutionConfig.GmosNorth].apply(c)
-          case Instrument.GmosSouth => Decoder[FutureExecutionConfig.GmosSouth].apply(c)
-          case _                    => DecodingFailure(s"Instrument not yet supported: ${i.tag}", c.history).asLeft
+        r <- i match {
+          case Instrument.GmosNorth => c.as[InstrumentExecutionConfig.GmosNorth]
+          case Instrument.GmosSouth => c.as[InstrumentExecutionConfig.GmosSouth]
+          case _                    => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
         }
-      } yield x
+      } yield r
     }
 
-  given given_Encoder_FutureExecutionConfig(using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[FutureExecutionConfig] =
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig] =
     Encoder.instance {
-      case a: FutureExecutionConfig.GmosNorth =>
-        Encoder[FutureExecutionConfig.GmosNorth].apply(a)
-      case a: FutureExecutionConfig.GmosSouth =>
-        Encoder[FutureExecutionConfig.GmosSouth].apply(a)
+      case i@InstrumentExecutionConfig.GmosNorth(_) => i.asJson
+      case i@InstrumentExecutionConfig.GmosSouth(_) => i.asJson
     }
 
 }
