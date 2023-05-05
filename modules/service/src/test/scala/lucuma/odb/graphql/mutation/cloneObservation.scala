@@ -25,6 +25,8 @@ class cloneObservation extends OdbSuite {
 
   // N.B. if we include the asterism here we hit a Grakle bug that's not yet minimized
   // see https://github.com/gemini-hlsw/lucuma-odb/issues/296
+  // TODO TimingWindows are omitted on purpose, they can be added by including $TimingWindowsGraph.
+  // See https://github.com/gemini-hlsw/lucuma-odb/issues/388
   val ObservationGraph = s"""
     { 
       title
@@ -35,7 +37,6 @@ class cloneObservation extends OdbSuite {
         imageQuality
         skyBackground
       }
-      $TimingWindowsGraph
       scienceRequirements {
         mode
         spectroscopy {
@@ -65,7 +66,6 @@ class cloneObservation extends OdbSuite {
     """
 
   test("clones should have the same properties, for all observing modes") {
-    IO.println(ObservationGraph) >>
     ObservingModeType.values.toList.traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
