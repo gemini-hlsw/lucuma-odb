@@ -1,4 +1,4 @@
---- EXISTENCE
+--- INCLUSION
 CREATE TYPE e_timing_window_inclusion AS ENUM ('include', 'exclude');
 
 -- END AT/AFTER

@@ -4526,7 +4526,7 @@ enum ObsStatus {
   OBSERVED
 }
 
-# Timing window inclusion options
+# Timing window inclusion options. Exclusions always take precedence over inclusions.
 enum TimingWindowInclusion {
   # Inclusion Timing Window
   INCLUDE

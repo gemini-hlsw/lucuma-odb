@@ -315,7 +315,7 @@ object ObservationService {
                    }.flatMap { rObservationIds =>
                      updateObservingModes(SET.observingMode, rObservationIds, xa)
                    }.flatTap { rObservationIds =>
-                    setTimingWindows(rObservationIds, SET.timingWindows, xa)
+                    setTimingWindows(rObservationIds, SET.timingWindows.foldPresent(_.orEmpty), xa)
                    }.recoverWith {
                      case SqlState.CheckViolation(ex) =>
                        Result.failure(constraintViolationMessage(ex)).pure[F]
