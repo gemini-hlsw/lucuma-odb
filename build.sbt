@@ -17,17 +17,17 @@ val logbackVersion             = "1.4.7"
 val log4catsVersion            = "2.6.0"
 val lucumaCoreVersion          = "0.75.2"
 val lucumaGraphQLRoutesVersion = "0.6.1"
+val lucumaItcVersion           = "0.12.0"
+val lucumaSsoVersion           = "0.5.9"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
+val paigesVersion              = "0.4.2"
 val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.5.1"
-val lucumaSsoVersion           = "0.5.9"
-val lucumaItcVersion           = "0.12.0"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
-val paigesVersion              = "0.4.2"
 
 enablePlugins(NoPublishPlugin)
 

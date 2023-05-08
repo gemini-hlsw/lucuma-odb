@@ -32,6 +32,7 @@ import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
@@ -59,6 +60,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import skunk.*
 import skunk.codec.all.*
@@ -87,6 +89,12 @@ trait Codecs {
       Type.varchar
     )
   }
+
+  final case class DomainCodec[A](domainName: String, codec: Codec[A]) extends Codec[A]:
+    export codec.* // delegate everything!
+
+  extension [A](c: Codec[A]) def withDomain(name: String): Codec[A] =
+    DomainCodec(name, c)
 
   val int4range: Codec[BoundedInterval[Int]] = {
     val intPair             = raw"([+-]?\d+),([+-]?\d+)"
@@ -325,6 +333,12 @@ trait Codecs {
       µs => TimeSpan.FromDuration.getOption(µs).toRight(s"Invalid TimeSpan, must be non-negative µs <  9,223,372,036,854,775,807 µs: $µs"))(
       TimeSpan.FromDuration.reverseGet
     )
+
+  val timing_window_end_type: Codec[TimingWindowEndTypeEnum] =
+    enumerated(Type("e_timing_window_end_type"))
+
+  val timing_window_inclusion: Codec[TimingWindowInclusion] =
+    enumerated(Type("e_timing_window_inclusion"))
 
   val too_activation: Codec[ToOActivation] =
     enumerated(Type("e_too_activation"))
