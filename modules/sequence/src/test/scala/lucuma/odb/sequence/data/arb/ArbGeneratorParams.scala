@@ -11,7 +11,7 @@ import lucuma.core.util.arb.ArbGid
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.itc.client.arb.ArbInstrumentMode
-import lucuma.itc.client.arb.ArbSpectroscopyIntegrationTimeInput
+import lucuma.itc.client.arb.ArbIntegrationTimeInput
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import org.scalacheck.Arbitrary.arbitrary
@@ -29,8 +29,8 @@ trait ArbGeneratorParams {
     given Arbitrary[SpectroscopyIntegrationTimeInput] =
       Arbitrary {
         for {
-          im <- arbitrary[InstrumentMode.GmosNorth]
-          sm <- ArbSpectroscopyIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(im)
+          im <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
+          sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(im)
         } yield sm
       }
 
@@ -47,8 +47,8 @@ trait ArbGeneratorParams {
     given Arbitrary[SpectroscopyIntegrationTimeInput] =
       Arbitrary {
         for {
-          im <- arbitrary[InstrumentMode.GmosSouth]
-          sm <- ArbSpectroscopyIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(im)
+          im <- arbitrary[InstrumentMode.GmosSouthSpectroscopy]
+          sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(im)
         } yield sm
       }
 

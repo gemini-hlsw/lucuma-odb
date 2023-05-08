@@ -34,8 +34,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.CreateGroupResultMapping
@@ -368,7 +368,7 @@ object OdbMapping {
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
           override def defaultRootCursor(query: Query, tpe: Type, parentCursor: Option[Cursor]): F[Result[(Query, Cursor)]] =
-            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >> 
+            Logger[F].info("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
             super.defaultRootCursor(query, tpe, parentCursor)
 
           // Override `fetch` to log the SQL query. This is optional.

@@ -102,14 +102,14 @@ object GeneratorParamsService {
               val genParams = m.get(oid).toValidNel(MissingData.nameOnly("observing mode")).andThen {
                 case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _) =>
                   oParams.traverse { p =>
-                    spectroscopyParams(p, InstrumentMode.GmosNorth(g, f, GmosFpu.North.builtin(u)), λ)
+                    spectroscopyParams(p, InstrumentMode.GmosNorthSpectroscopy(g, f, GmosFpu.North.builtin(u)), λ)
                   }.map { itcParams =>
                     GeneratorParams.GmosNorthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gn)
                   }
 
                 case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _) =>
                   oParams.traverse { p =>
-                    spectroscopyParams(p, InstrumentMode.GmosSouth(g, f, GmosFpu.South.builtin(u)), λ)
+                    spectroscopyParams(p, InstrumentMode.GmosSouthSpectroscopy(g, f, GmosFpu.South.builtin(u)), λ)
                   }.map { itcParams =>
                     GeneratorParams.GmosSouthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gs)
                   }
