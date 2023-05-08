@@ -7,10 +7,12 @@ package query
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
+import io.circe.JsonObject
 import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbSuite
 
@@ -44,6 +46,38 @@ class timingWindows extends OdbSuite {
         """
     ).map { json => 
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def updateObservation(user: User,  pid: Program.Id, oid: Observation.Id, twisOpt: Option[String]): IO[Json] = 
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            updateObservations(input: {
+              programId: ${pid.asJson},
+              WHERE: {
+                id: {
+                  EQ: "$oid"
+                }
+              },
+              SET: {
+        """ + 
+        twisOpt.map(twis => 
+          s"timingWindows: $twis"
+        ).orEmpty +
+        s"""
+              }
+            }) {
+              observations {
+                $TimingWindowsGraph
+              }
+            }
+          }
+        """
+
+    ).map { json => 
+      json.hcursor.downFields("updateObservations").require[Json]
     }
 
   test("null timing windows should result in an empty set") {
@@ -189,6 +223,85 @@ class timingWindows extends OdbSuite {
               """,
             expected = Right(TimingWindowsOutput)
           )
+        }
+      }
+    }
+  }
+
+  val TimingWindowsInput2 = 
+   """[
+        {
+          inclusion: EXCLUDE,
+          startUtc: "2023-04-01 00:00:00",
+          end: {
+            after: {
+              hours: 48
+            }
+          }
+        },
+        {
+          inclusion: INCLUDE,
+          startUtc: "2023-04-04 00:00:00",
+          end: {
+            atUtc: "2023-04-08 00:00:00"
+          }
+        }
+      ]"""
+
+  val TimingWindowsOutput2 = 
+    json"""
+      {
+        "observations" : [
+          {
+            "timingWindows" : [
+              {
+                "inclusion": "EXCLUDE",
+                "startUtc": "2023-04-01 00:00:00",
+                "end": {
+                  "after": {
+                    "hours": 48.000000
+                  },
+                  "repeat": null
+                }
+              },
+              {
+                "inclusion": "INCLUDE",
+                "startUtc": "2023-04-04 00:00:00",
+                "end": {
+                  "atUtc": "2023-04-08 00:00:00"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    """
+
+  test("timing windows edit to new list") {
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        createObservation(user, pid, TimingWindowsInput.some).flatMap{ obsId =>
+          updateObservation(user, pid, obsId, TimingWindowsInput2.some).assertEquals(TimingWindowsOutput2)
+        }
+      }
+    }
+  }
+
+  test("timing windows edit to null") {
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        createObservation(user, pid, TimingWindowsInput.some).flatMap{ obsId =>
+          updateObservation(user, pid, obsId, "null".some).assertEquals(json"""{ "observations": [{ "timingWindows": [] }]}""")
+        }
+      }
+    }
+  }
+
+  test("timing windows edit omit value") {
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        createObservation(user, pid, TimingWindowsInput2.some).flatMap{ obsId =>
+          updateObservation(user, pid, obsId, none).assertEquals(TimingWindowsOutput2)
         }
       }
     }
