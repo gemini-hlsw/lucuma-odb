@@ -20,9 +20,11 @@ import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.ObsAttachmentRoutes
+import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObsAttachmentFileService
+import lucuma.odb.service.ProposalAttachmentFileService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
@@ -251,10 +253,11 @@ object FMain extends MainParams {
       s3ClientOps       <- s3OpsResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps)
       obsAttachFileSvc  <- pool.map(ses => ObsAttachmentFileService.fromS3AndSession(s3FileService, ses))
+      propAttachFileSvc <- pool.map(ses => ProposalAttachmentFileService.fromS3AndSession(s3FileService, ses))
     } yield { wsb =>
-      val attachmentBaseRoute = "attachment"
-      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](obsAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb, attachmentBaseRoute)
-      middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes)
+      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](obsAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
+      val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](propAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
+      middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */

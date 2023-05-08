@@ -24,9 +24,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
-import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService
 
@@ -73,13 +73,6 @@ object Itc {
         }.intercalate(", ")
         s"ITC cannot be queried until the following parameters are defined: $params"
       }
-    }
-
-    case class NoResult(
-      targetId: Target.Id
-    ) extends Error {
-      def format: String =
-        s"ITC returned no results for target '$targetId'."
     }
 
     case class ServiceError(
@@ -189,10 +182,8 @@ object Itc {
       ): F[EitherNel[Error, ResultSet]] =
         targets.traverse { case (tid, si) =>
           client.spectroscopy(si, useCache).map {
-            case SpectroscopyResult(_, None)                                 =>
-              NoResult(tid).leftNel
-            case SpectroscopyResult(_, Some(s @ IntegrationTime(_, _, _))) =>
-              Success(tid, si, s).rightNel
+            case IntegrationTimeResult(_, results) =>
+              Success(tid, si, results.head).rightNel
           }
           .handleError { t =>
             ServiceError(tid, t.getMessage).leftNel

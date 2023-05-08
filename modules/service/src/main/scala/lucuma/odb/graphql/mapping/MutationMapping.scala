@@ -26,12 +26,13 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.Group
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
@@ -47,6 +48,7 @@ import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
+import lucuma.odb.graphql.input.UpdateProposalAttachmentsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
@@ -56,6 +58,7 @@ import lucuma.odb.service.GroupService
 import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
+import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.ProposalService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
@@ -83,6 +86,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateObsAttachments,
       UpdateObservations,
       UpdatePrograms,
+      UpdateProposalAttachments,
       UpdateTargets,
     )
 
@@ -99,6 +103,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
   def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
+  def proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]]
   def targetService: Resource[F, TargetService[F]]
   def user: User
 
@@ -164,6 +169,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       limit = limit,
       collectionField = "programs",
       child          
+    )
+  
+  def proposalAttachmentResultSubquery(pid: Program.Id, aTypes: List[Tag], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate = And(Predicates.proposalAttachment.program.id.eql(pid), Predicates.proposalAttachment.attachmentType.in(aTypes)),
+      order = OrderSelection[Tag](ProposalAttachmentType / "attachmentType"),
+      limit = limit,
+      collectionField = "proposalAttachments",
+      child
     )
 
   // Field definitions
@@ -441,6 +455,28 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
 
     }
+
+  private lazy val UpdateProposalAttachments = 
+      MutationField("updateProposalAttachments", UpdateProposalAttachmentsInput.binding(Path.from(ProposalAttachmentType))) { (input, child) =>
+        
+        val filterPredicate = and(List(
+          Predicates.proposalAttachment.program.id.eql(input.programId),
+          Predicates.proposalAttachment.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val typeSelect: Result[AppliedFragment] = 
+          MappedQuery(
+            Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
+            Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
+          ).map(_.fragment)
+
+        typeSelect.flatTraverse { which =>
+          proposalAttachmentMetadataService
+            .use(_.updateProposalAttachments(input.SET, which))
+            .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
+        }
+      }
 
   def targetResultSubquery(pids: List[Target.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(

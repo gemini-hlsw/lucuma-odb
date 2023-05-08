@@ -5,16 +5,12 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ObsAttachmentTable
-import lucuma.odb.graphql.util.MappingExtras
-
 import table.ObsAttachmentTable
 import table.ProgramTable
 
 trait ObsAttachmentMapping[F[_]] extends ObsAttachmentTable[F] with ProgramTable[F] {
   
-  lazy val AttachmentMapping =
+  lazy val ObsAttachmentMapping =
     ObjectMapping(
       tpe = ObsAttachmentType,
       fieldMappings = List(

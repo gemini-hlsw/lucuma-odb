@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
@@ -35,10 +36,11 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
 import lucuma.itc.IntegrationTime
+import lucuma.itc.client.ImagingIntegrationTimeInput
+import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
-import lucuma.itc.client.SpectroscopyResult
 import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.graphql.OdbMapping
@@ -120,15 +122,21 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
-      override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[SpectroscopyResult] =
-        SpectroscopyResult(
+      override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
+        IntegrationTimeResult(
           FakeItcVersions,
-          FakeItcResult.some
+          NonEmptyList.one(FakeItcResult)
+        ).pure[IO]
+
+      override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
+        IntegrationTimeResult(
+          FakeItcVersions,
+          NonEmptyList.one(FakeItcResult)
         ).pure[IO]
 
       def optimizedSpectroscopyGraph(input: lucuma.itc.client.OptimizedSpectroscopyGraphInput, useCache: Boolean): IO[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
         IO.raiseError(new java.lang.RuntimeException("optimizedSpectroscopyGraph: not implemeneed"))
-        
+
       override def versions: IO[ItcVersions] =
         FakeItcVersions.pure[IO]
     }

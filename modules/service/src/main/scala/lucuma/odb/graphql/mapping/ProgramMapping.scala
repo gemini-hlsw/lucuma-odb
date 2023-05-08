@@ -17,11 +17,11 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
-import lucuma.odb.data.Group
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 
@@ -37,7 +37,8 @@ trait ProgramMapping[F[_]]
      with ObservationView[F]
      with ObsAttachmentTable[F]
      with Predicates[F]
-     with ResultMapping[F]
+     with ProposalAttachmentTable[F]
+     with ResultMapping[F] 
      with GroupElementView[F] {
 
   def user: User
@@ -55,10 +56,10 @@ trait ProgramMapping[F[_]]
         SqlObject("plannedTime"),
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
-        SqlObject("attachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
         SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
         SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
-        SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId))
+        SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
+        SqlObject("proposalAttachments", Join(ProgramTable.Id, ProposalAttachmentTable.ProgramId))
       ),
     )
 
