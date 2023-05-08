@@ -5,15 +5,22 @@ package lucuma.odb.graphql
 
 package mapping
 
+import edu.gemini.grackle.Predicate._
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query._
+import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.TimingWindowView
 
 import table.ObservationView
 import table.ProgramTable
 
+
 trait ObservationMapping[F[_]]
   extends ObservationView[F]
-     with ProgramTable[F]  {
+     with ProgramTable[F]  
+     with TimingWindowView[F] {
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
@@ -30,6 +37,7 @@ trait ObservationMapping[F[_]]
         SqlObject("posAngleConstraint"),
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
+        SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId)),
         SqlObject("scienceRequirements"),
         SqlObject("observingMode"),
         SqlObject("plannedTime"),
@@ -37,5 +45,24 @@ trait ObservationMapping[F[_]]
       )
     )
 
+  lazy val ObservationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
+    Map(
+      ObservationType -> {
+        case Select("timingWindows", Nil, child) =>
+          Result(
+            Select("timingWindows", Nil,
+              FilterOrderByOffsetLimit(
+                pred = None,
+                oss = Some(List(
+                  OrderSelection[Long](TimingWindowType / "id", true, true)
+                )),
+                offset = None,
+                limit = None,
+                child
+              )
+            )
+          )
+      }
+    )
 }
 

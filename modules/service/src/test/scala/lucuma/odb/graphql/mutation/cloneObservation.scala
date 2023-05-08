@@ -25,6 +25,8 @@ class cloneObservation extends OdbSuite {
 
   // N.B. if we include the asterism here we hit a Grakle bug that's not yet minimized
   // see https://github.com/gemini-hlsw/lucuma-odb/issues/296
+  // TODO TimingWindows are omitted on purpose, they can be added by including $TimingWindowsGraph.
+  // See https://github.com/gemini-hlsw/lucuma-odb/issues/388
   val ObservationGraph = s"""
     { 
       title
