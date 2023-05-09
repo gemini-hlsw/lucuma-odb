@@ -12,4 +12,3 @@ CREATE CONSTRAINT TRIGGER ch_group_edit_trigger
   DEFERRABLE
   FOR EACH ROW
   EXECUTE PROCEDURE ch_group_edit();
-
