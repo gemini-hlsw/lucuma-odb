@@ -2304,11 +2304,32 @@ type Subscription {
   targetEdit(
     input: TargetEditInput
   ): TargetEdit!
+
+  #
+  # Subscribes to an event that is generated whenever a group is
+  # created or updated.  If a group id is provided, the event is only
+  # generated for edits to that particular group.  If a program id is
+  # provided then the event must correspond to a group referenced by
+  # that program.
+  #
+  groupEdit(
+    input: GroupEditInput
+  ): GroupEdit!
+
 }
 
 input TargetEditInput {
     # Target ID
     targetId: TargetId
+
+    # Program ID
+    programId: ProgramId
+
+}
+
+input GroupEditInput {
+    # Group ID
+    groupId: GroupId
 
     # Program ID
     programId: ProgramId
@@ -2338,6 +2359,16 @@ type TargetEdit {
 
   # Edited object
   value: Target!
+  id: Long!
+}
+
+# Event sent when a group is created or updated
+type GroupEdit {
+  # Type of edit
+  editType: EditType! 
+
+  # Edited object
+  value: Group!
   id: Long!
 }
 
