@@ -41,6 +41,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.CreateGroupResultMapping
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
+import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
@@ -76,6 +77,7 @@ object OdbMapping {
     program:     Topic[F, ProgramTopic.Element],
     observation: Topic[F, ObservationTopic.Element],
     target:      Topic[F, TargetTopic.Element],
+    group:       Topic[F, GroupTopic.Element],
   )
 
   object Topics {
@@ -86,7 +88,8 @@ object OdbMapping {
         pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
         obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
         tar <- Resource.eval(TargetTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, tar)
+        grp <- Resource.eval(GroupTopic(ses, 1024, sup))
+      } yield Topics(pro, obs, tar, grp)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -132,6 +135,7 @@ object OdbMapping {
           with FilterTypeMetaMapping[F]
           with GmosLongSlitMapping[F]
           with GroupMapping[F]
+          with GroupEditMapping[F]
           with GroupElementMapping[F]
           with HourAngleRangeMapping[F]
           with LeafMappings[F]
@@ -303,6 +307,7 @@ object OdbMapping {
               GmosNorthLongSlitMapping,
               GmosSouthLongSlitMapping,
               GroupMapping,
+              GroupEditMapping,
               GroupElementMapping,
               HourAngleRangeMapping,
               LinkUserResultMapping,
