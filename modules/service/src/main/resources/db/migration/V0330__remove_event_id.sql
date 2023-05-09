@@ -27,3 +27,13 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION ch_group_edit()
+  RETURNS trigger AS $$
+DECLARE
+BEGIN
+  PERFORM pg_notify('ch_group_edit', NEW.c_group_id || ',' || NEW.c_program_id || ',' || TG_OP);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+

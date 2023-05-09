@@ -2361,7 +2361,6 @@ type GroupEdit {
 
   # Edited object
   value: Group!
-  id: Long!
 }
 
 # Target environment editing and creation parameters

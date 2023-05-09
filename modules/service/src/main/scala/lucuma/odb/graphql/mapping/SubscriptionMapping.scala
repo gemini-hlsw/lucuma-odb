@@ -142,7 +142,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .map { e =>
           Result(
             Environment(
-              Env("id" -> e.eventId, "editType" -> e.editType),
+              Env("editType" -> e.editType),
               Unique(Filter(Predicates.groupEdit.value.id.eql(e.groupId), child))
             )
           )
