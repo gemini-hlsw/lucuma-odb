@@ -201,4 +201,21 @@ class groupEdit extends OdbSuite {
     }
   }
 
+  test("work even if no database fields are selected") {
+     subscriptionExpect(
+       user      = pi,
+       query     = s"""
+         subscription {
+           groupEdit {
+             editType
+           }
+         }
+       """,
+       mutations =
+         Right(
+           createProgramAs(pi).flatMap(createGroupAs(pi, _)).replicateA(2)
+         ),
+       expected = List.fill(2)(json"""{"groupEdit":{"editType":"CREATED"}}""")
+     )
+   }
 }

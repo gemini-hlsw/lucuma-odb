@@ -17,7 +17,7 @@ trait GroupEditMapping[F[_]] extends GroupView[F] {
       tpe = GroupEditType,
       fieldMappings = List(
         SqlField("synthetic-id", GroupView.Id, key = true, hidden = true),
-        CursorField("editType", _.envR[EditType]("editType")),
+        CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
         SqlObject("value")
       )
     )
