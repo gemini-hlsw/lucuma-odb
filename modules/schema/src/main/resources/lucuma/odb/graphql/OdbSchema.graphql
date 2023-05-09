@@ -1816,6 +1816,9 @@ input ObservationPropertiesInput {
   # The constraintSet defaults to standard values if not specified on creation, and may be edited but not deleted
   constraintSet: ConstraintSetInput
 
+  # The timingWindows defaults to empty if not specified on creation, and may be edited by specifying a new whole array
+  timingWindows: [TimingWindowInput!]
+
   # The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
   scienceRequirements: ScienceRequirementsInput
 
@@ -2352,6 +2355,39 @@ input TargetPropertiesInput {
   nonsidereal: NonsiderealInput
   sourceProfile: SourceProfileInput
   existence: Existence
+}
+
+# Timing window repetition parameters.
+input TimingWindowRepeatInput {
+  # Repeat period, counting from the start of the window.
+  period: TimeSpanInput!
+
+  # Repetition times. If omitted, will repeat forever.
+  times: PosInt
+}
+
+# Timing window end parameters.
+input TimingWindowEndInput {
+  # Window end date and time, in UTC. If specified, after and repeat must be omitted.
+  atUtc: Timestamp
+
+  # Window end after a period of time. If specified, atUtc must be omitted.
+  after: TimeSpanInput
+
+  # Repetition parameters. Only allowed if after is specified. If ommitted, window will not repeat.
+  repeat: TimingWindowRepeatInput
+}
+
+# Timing window creation parameters.
+input TimingWindowInput {
+  # Whether this is an INCLUDE or EXCLUDE window.
+  inclusion: TimingWindowInclusion!
+
+  # Window start time, in UTC.
+  startUtc: Timestamp!
+
+  # Window end parameters. If omitted, the window will never end.
+  end: TimingWindowEndInput
 }
 
 # Selects the observations for undelete
@@ -4490,6 +4526,53 @@ enum ObsStatus {
   OBSERVED
 }
 
+# Timing window inclusion options. Exclusions always take precedence over inclusions.
+enum TimingWindowInclusion {
+  # Inclusion Timing Window
+  INCLUDE
+
+  # Exclusion Timing Window
+  EXCLUDE
+}
+
+# Timing window repetition
+type TimingWindowRepeat {
+  # Repeat period, counting from the start of the window.
+  period: TimeSpan!
+
+  # Repetition times. If absent, will repeat forever.
+  times: PosInt
+}
+
+# Timing window end at a specified date and time.
+type TimingWindowEndAt {
+  # Window end date and time, in UTC.
+  atUtc: Timestamp!
+}
+
+# Timing window end after a period of time.
+type TimingWindowEndAfter {
+  # Window duration.
+  after: TimeSpan!
+
+  # Window repetetion. If absent, will not repeat.
+  repeat: TimingWindowRepeat
+}
+
+# Timing window end.
+union TimingWindowEnd = TimingWindowEndAt | TimingWindowEndAfter
+
+type TimingWindow {
+  # Whether this is an INCLUDE or EXCLUDE window.
+  inclusion: TimingWindowInclusion!
+
+  # Window start time, in UTC.
+  startUtc: Timestamp!
+
+ # Window end. If absent, the window will never end.
+  end: TimingWindowEnd
+}
+
 type Observation {
   # Observation ID
   id: ObservationId!
@@ -4526,6 +4609,9 @@ type Observation {
 
   # The constraint set for the observation
   constraintSet: ConstraintSet!
+
+  # Observation timing windows
+  timingWindows: [TimingWindow!]!
 
   # The top level science requirements
   scienceRequirements: ScienceRequirements!
