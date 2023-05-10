@@ -36,6 +36,13 @@ ThisBuild / Test / parallelExecution := false
 ThisBuild / scalaVersion       := "3.2.2"
 ThisBuild / crossScalaVersions := Seq("3.2.2")
 
+ThisBuild / githubWorkflowBuild +=
+  WorkflowStep.Use(
+    UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
+    name = Some("Validate Migrations"),
+    params = Map("path" -> "modules/service/src/main/resources/db/migration/")
+  )
+
 lazy val schema = project
   .in(file("modules/schema"))
   .settings(
