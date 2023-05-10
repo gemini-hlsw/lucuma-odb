@@ -76,6 +76,11 @@ jobs:
         if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-latest'
         run: sbt '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
+      - name: Validate Migrations
+        uses: gemini-hlsw/migration-validator-action@main
+        with:
+          path: modules/service/src/main/resources/db/migration/
+
       - name: Aggregate coverage reports
         run: sbt '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
