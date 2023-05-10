@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 
+import edu.gemini.grackle.Result
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.GroupView
 
@@ -17,6 +18,7 @@ trait GroupEditMapping[F[_]] extends GroupView[F] {
       tpe = GroupEditType,
       fieldMappings = List(
         SqlField("synthetic-id", GroupView.Id, key = true, hidden = true),
+        CursorField("id", _ => Result(0L), List("synthetic-id")),
         CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
         SqlObject("value")
       )

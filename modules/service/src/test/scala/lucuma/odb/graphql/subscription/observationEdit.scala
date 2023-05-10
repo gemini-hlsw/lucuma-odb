@@ -172,6 +172,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         subscription {
           observationEdit {
             editType
+            id
           }
         }
       """,
@@ -179,7 +180,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap(createObservation(pi, "foo obs", _)).replicateA(2)
         ),
-      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED"}}""")
+      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED","id":0}}""")
     )
   }
 
