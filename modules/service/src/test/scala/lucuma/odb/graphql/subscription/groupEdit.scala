@@ -46,7 +46,7 @@ class groupEdit extends OdbSuite {
         """
     ).map { json =>
       json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
-    }
+    } >> pause
 
   def updateGroup(user: User, gid: Group.Id, name: String) =
     expect(
