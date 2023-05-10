@@ -188,6 +188,7 @@ class targetEdit extends OdbSuite {
         subscription {
           targetEdit {
             editType
+            id
           }
         }
       """,
@@ -195,7 +196,7 @@ class targetEdit extends OdbSuite {
         Right(
           createProgramAs(pi).flatMap(createTarget(pi, _, "t")).replicateA(2)
         ),
-      expected = List.fill(2)(json"""{"targetEdit":{"editType":"CREATED"}}""")
+      expected = List.fill(2)(json"""{"targetEdit":{"editType":"CREATED","id":0}}""")
     )
   }
 

@@ -1785,6 +1785,7 @@ type ObservationEdit { #implements Event {
 
   # Edited object
   value: Observation!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Observation properties
@@ -1909,6 +1910,7 @@ type ProgramEdit { #implements Event {
 
   # Edited object
   value: Program!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Program properties
@@ -2352,6 +2354,7 @@ type TargetEdit {
 
   # Edited object
   value: Target!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Event sent when a group is created or updated
@@ -2361,6 +2364,7 @@ type GroupEdit {
 
   # Edited object
   value: Group!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Target environment editing and creation parameters

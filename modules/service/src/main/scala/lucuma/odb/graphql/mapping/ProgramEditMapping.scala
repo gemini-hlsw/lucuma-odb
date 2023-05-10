@@ -20,6 +20,7 @@ trait ProgramEditMapping[F[_]] extends ProgramTable[F]  {
       tpe = ProgramEditType,
       fieldMappings = List(
         SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+        CursorField("id", _ => Result(0L), List("synthetic-id")),
         CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
         SqlObject("value")
       )

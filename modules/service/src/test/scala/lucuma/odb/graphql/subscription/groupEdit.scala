@@ -208,6 +208,7 @@ class groupEdit extends OdbSuite {
          subscription {
            groupEdit {
              editType
+             id
            }
          }
        """,
@@ -215,7 +216,7 @@ class groupEdit extends OdbSuite {
          Right(
            createProgramAs(pi).flatMap(createGroupAs(pi, _)).replicateA(2)
          ),
-       expected = List.fill(2)(json"""{"groupEdit":{"editType":"CREATED"}}""")
+       expected = List.fill(2)(json"""{"groupEdit":{"editType":"CREATED", "id":0}}""")
      )
    }
 }
