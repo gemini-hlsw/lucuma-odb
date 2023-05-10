@@ -46,7 +46,7 @@ class groupEdit extends OdbSuite {
         """
     ).map { json =>
       json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
-    }
+    } <* pause
 
   def updateGroup(user: User, gid: Group.Id, name: String) =
     expect(
@@ -201,4 +201,22 @@ class groupEdit extends OdbSuite {
     }
   }
 
+  test("work even if no database fields are selected") {
+     subscriptionExpect(
+       user      = pi,
+       query     = s"""
+         subscription {
+           groupEdit {
+             editType
+             id
+           }
+         }
+       """,
+       mutations =
+         Right(
+           createProgramAs(pi).flatMap(createGroupAs(pi, _)).replicateA(2)
+         ),
+       expected = List.fill(2)(json"""{"groupEdit":{"editType":"CREATED", "id":0}}""")
+     )
+   }
 }

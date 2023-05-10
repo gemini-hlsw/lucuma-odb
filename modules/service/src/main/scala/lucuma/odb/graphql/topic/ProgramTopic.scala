@@ -33,7 +33,6 @@ object ProgramTopic {
    */
   case class Element(
     programId: Program.Id,
-    eventId:   Long,
     editType:  EditType,
     users:     List[User.Id],
     // TODO: time allocation
@@ -47,11 +46,11 @@ object ProgramTopic {
   }
 
   /** Infinite stream of program id and event id. */
-  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Program.Id, Long, EditType)] =
+  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Program.Id, EditType)] =
     s.channel(id"ch_program_edit").listen(maxQueued).flatMap { n =>
       n.value.split(",") match {
-        case Array(_pid, _eid, _tg_op) =>
-          (Gid[Program.Id].fromString.getOption(_pid), _eid.toLongOption, EditType.fromTgOp(_tg_op)).tupled match {
+        case Array(_pid, _tg_op) =>
+          (Gid[Program.Id].fromString.getOption(_pid), EditType.fromTgOp(_tg_op)).tupled match {
             case Some(tuple) => Stream(tuple)
             case None        => Stream.exec(Logger[F].warn(s"Invalid program and/or event: $n"))
           }
@@ -93,7 +92,7 @@ object ProgramTopic {
     for {
       pid   <- updates(s, maxQueued)
       users <- Stream.eval(ProgramTopic.selectProgramUsers(s, pid._1))
-      elem   = Element(pid._1, pid._2, pid._3, users)
+      elem   = Element(pid._1, pid._2, users)
       _     <- Stream.eval(Logger[F].info(s"ProgramChannel: $elem"))
     } yield elem
 

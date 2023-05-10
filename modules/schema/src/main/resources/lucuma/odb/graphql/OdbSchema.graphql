@@ -376,11 +376,6 @@ input EmissionLinesSurfaceInput {
   fluxDensityContinuum: FluxDensityContinuumSurfaceInput
 }
 
-# Common fields shared by all events
-interface Event {
-  id: Long!
-}
-
 # Exchange observing at Keck/Subaru
 input ExchangeInput {
   # The minPercentTime field is required when creating a new instance of exchange, but optional when editing
@@ -1790,7 +1785,7 @@ type ObservationEdit { #implements Event {
 
   # Edited object
   value: Observation!
-  id: Long!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Observation properties
@@ -1915,7 +1910,7 @@ type ProgramEdit { #implements Event {
 
   # Edited object
   value: Program!
-  id: Long!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Program properties
@@ -2359,7 +2354,7 @@ type TargetEdit {
 
   # Edited object
   value: Target!
-  id: Long!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Event sent when a group is created or updated
@@ -2369,7 +2364,7 @@ type GroupEdit {
 
   # Edited object
   value: Group!
-  id: Long!
+  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
 # Target environment editing and creation parameters

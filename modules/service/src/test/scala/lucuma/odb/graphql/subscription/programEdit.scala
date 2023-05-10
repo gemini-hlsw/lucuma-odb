@@ -152,33 +152,6 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     )
   }
 
-  test("event ids should be distinct") {
-    import Group2._
-    subscription(
-      user = service,
-      query = // N.B. if we don't select something from the value we'll hit a problem
-        """
-          subscription {
-            programEdit {
-              id
-              value {
-                id
-              }
-            }
-          }
-        """,
-      mutations =
-        Right(
-          createProgram(guest, "foo") >>
-          createProgram(pi, "bar") >>
-          createProgram(service, "baz")
-        ),
-    ).map { js =>
-      val ids = js.map(_.hcursor.downFields("programEdit", "id").require[Long]).distinct
-      assertEquals(ids.length, 3, "Should get three distinct IDs.")
-    }
-  }
-
   test("edit event should show up") {
     import Group2._
     subscriptionExpect(
@@ -222,6 +195,26 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo2" } } }""",
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
         )
+    )
+  }
+
+  test("work even if no database fields are selected") {
+    import Group1.pi
+    subscriptionExpect(
+      user      = pi,
+      query     = s"""
+        subscription {
+          programEdit {
+            editType
+            id
+          }
+        }
+      """,
+      mutations =
+        Right(
+          createProgramAs(pi).replicateA(2)
+        ),
+      expected = List.fill(2)(json"""{"programEdit":{"editType":"CREATED","id":0}}""")
     )
   }
 
