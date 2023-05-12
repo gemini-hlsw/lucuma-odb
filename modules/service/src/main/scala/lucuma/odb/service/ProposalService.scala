@@ -178,7 +178,7 @@ object ProposalService {
       }
 
     /** Insert a proposal. */
-    val InsertProposal: Command[Program.Id ~ ProposalInput.Create] =
+    val InsertProposal: Command[(Program.Id, ProposalInput.Create)] =
       sql"""
         INSERT INTO t_proposal (
           c_program_id,
@@ -203,16 +203,17 @@ object ProposalService {
         )
       """.command
          .contramap {
-            case pid ~ ppi =>
-              pid ~
-              ppi.title.toOption ~
-              ppi.abstrakt.toOption ~
-              ppi.category.toOption ~
-              ppi.toOActivation ~
-              ppi.proposalClass.fold(_.tag, _.tag) ~
-              ppi.proposalClass.fold(_.minPercentTime, _.minPercentTime) ~
-              ppi.proposalClass.toOption.map(_.minPercentTotalTime) ~
+            case (pid, ppi) => (
+              pid,
+              ppi.title.toOption,
+              ppi.abstrakt.toOption,
+              ppi.category.toOption,
+              ppi.toOActivation,
+              ppi.proposalClass.fold(_.tag, _.tag),
+              ppi.proposalClass.fold(_.minPercentTime, _.minPercentTime),
+              ppi.proposalClass.toOption.map(_.minPercentTotalTime),
               ppi.proposalClass.toOption.map(_.totalTime)
+            )
          }
 
     /** Insert proposals into all programs lacking one, based on the t_program_update temporary table. */
@@ -244,24 +245,25 @@ object ProposalService {
         RETURNING c_program_id
       """.query(program_id)
          .contramap {
-            case ppi =>
-              ppi.title.toOption ~
-              ppi.abstrakt.toOption ~
-              ppi.category.toOption ~
-              ppi.toOActivation ~
-              ppi.proposalClass.map(_.fold(_.tag, _.tag)) ~
-              ppi.proposalClass.flatMap(_.fold(_.minPercentTime, _.minPercentTime)) ~
-              ppi.proposalClass.flatMap(_.toOption.flatMap(_.minPercentTotalTime)) ~
+            case ppi => (
+              ppi.title.toOption,
+              ppi.abstrakt.toOption,
+              ppi.category.toOption,
+              ppi.toOActivation,
+              ppi.proposalClass.map(_.fold(_.tag, _.tag)),
+              ppi.proposalClass.flatMap(_.fold(_.minPercentTime, _.minPercentTime)),
+              ppi.proposalClass.flatMap(_.toOption.flatMap(_.minPercentTotalTime)),
               ppi.proposalClass.flatMap(_.toOption.flatMap(_.totalTime))
+            )
          }
 
-    def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =
+    def insertPartnerSplits(splits: Map[Tag, IntPercent]): Command[(Program.Id, splits.type)] =
       sql"""
          INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
-         VALUES ${(program_id ~ tag ~ int_percent).values.list(splits.size)}
+         VALUES ${(program_id *: tag *: int_percent).values.list(splits.size)}
       """.command
          .contramap {
-          case pid ~ splits => splits.toList.map { case (t, p) => pid ~ t ~ p }
+          case (pid, splits) => splits.toList.map { case (t, p) => (pid, t, p) }
          }
 
     /** Query program_id ~ bool, where the boolean indicates the presence of a proposal. */

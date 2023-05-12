@@ -273,19 +273,19 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[Option[NonEmptyString] ~ User, Program.Id] =
+    val InsertProgram: Query[(Option[NonEmptyString], User), Program.Id] =
       sql"""
         INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
         VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
         RETURNING c_program_id
       """.query(program_id)
          .contramap {
-            case oNes ~ ServiceUser(_, _) => oNes ~ None
-            case oNes ~ nonServiceUser    => oNes ~ Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser))
+            case (oNes, ServiceUser(_, _)) => (oNes, None)
+            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser)))
          }
 
     /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[Program.Id ~ User.Id ~ ProgramUserRole ~ Option[ProgramUserSupportType] ~ Option[Tag]] =
+    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, Option[ProgramUserSupportType], Option[Tag])] =
       sql"""
          INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_support_type, c_support_partner)
          SELECT $program_id, $user_id, 'standard', $program_user_role, ${program_user_support_type.opt}, ${tag.opt}
@@ -302,7 +302,7 @@ object ProgramService {
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram ~ targetUser ~ ProgramUserRole.Coi ~ None ~ None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, None, None)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -324,7 +324,7 @@ object ProgramService {
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram ~ targetUser ~ ProgramUserRole.Observer ~ None ~ None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Observer, None, None)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -350,7 +350,7 @@ object ProgramService {
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram ~ targetUser ~ ProgramUserRole.Support ~ Some(ProgramUserSupportType.Staff) ~ None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff), None)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this
@@ -369,7 +369,7 @@ object ProgramService {
       partner: Tag, // partner
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram ~ targetUser ~ ProgramUserRole.Support ~ Some(ProgramUserSupportType.Partner) ~ Some(partner))
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partner))
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this

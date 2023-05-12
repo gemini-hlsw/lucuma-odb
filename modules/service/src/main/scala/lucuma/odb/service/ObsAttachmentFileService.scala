@@ -313,7 +313,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
           ${text_nonempty.opt},
           $int8,
           $uuid
-      """.apply(programId ~ attachmentType ~ fileName ~ description ~ fileSize ~ remoteId) |+|
+      """.apply(programId, attachmentType, fileName, description, fileSize, remoteId) |+|
         ProgramService.Statements.whereUserAccess(user, programId) |+|
         void"""
           RETURNING c_obs_attachment_id
@@ -336,7 +336,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
             c_file_size   = $int8,
             c_remote_id   = $uuid
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
-      """.apply(fileName ~ description ~ fileSize ~ remoteId ~ programId ~ attachmentId) |+|
+      """.apply(fileName, description, fileSize, remoteId, programId, attachmentId) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 

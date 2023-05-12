@@ -61,6 +61,7 @@ import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.AirMassRangeInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -185,7 +186,7 @@ object ObservationService {
           session.transaction.use { xa =>
 
             session.execute(sql"set constraints all deferred".command) >>
-            session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId ~ SET.group ~ SET.groupIndex)).flatMap { ix =>
+            session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
               Statements
                 .insertObservationAs(user, programId, SET, ix)
                 .flatTraverse { af =>
@@ -332,11 +333,11 @@ object ObservationService {
 
           // First we need the pid, observing mode, and grouping information
           val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
-          session.prepareR(selPid.query(program_id ~ observing_mode_type.opt ~ group_id.opt ~ int2_nonneg)).use(_.option(input.observationId)).flatMap {
+          session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.option(input.observationId)).flatMap {
 
             case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
 
-            case Some(pid ~ observingMode ~ gid ~ gix) =>
+            case Some((pid, observingMode, gid, gix)) =>
 
               // Desired group index is gix + 1
               val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
@@ -350,7 +351,7 @@ object ObservationService {
               val openHole: F[NonNegShort] =
                 session.execute(sql"set constraints all deferred".command) >>
                 session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
-                  pq.unique(pid ~ gid ~ destGroupIndex.some)
+                  pq.unique(pid, gid, destGroupIndex.some)
                 }
 
               // Ok let's do the clone.
@@ -380,7 +381,7 @@ object ObservationService {
                             }  
                           }
                           .flatTap { 
-                            r => xa.rollback.whenA(r.isLeft)
+                            r => xa.rollback.unlessA(r.hasValue)
                           }
 
                   cloneRelatedItems >> doUpdate
@@ -448,35 +449,35 @@ object ObservationService {
           scienceRequirements.flatMap(_.spectroscopy)
 
         InsertObservation.apply(
-          programId    ~
-           groupId     ~
-           groupIndex  ~
-           subtitle    ~
-           existence   ~
-           status      ~
-           activeState ~
-           visualizationTime             ~
-           posAngleConsMode              ~
-           posAngle                      ~
-           explicitBase.map(_.ra)        ~
-           explicitBase.map(_.dec)       ~
-           constraintSet.cloudExtinction ~
-           constraintSet.imageQuality    ~
-           constraintSet.skyBackground   ~
-           constraintSet.waterVapor      ~
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.value)) ~  // TODO: fix in core
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.value)) ~
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.value)                           ~
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)                           ~
-           scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ~
-           spectroscopy.flatMap(_.wavelength.toOption)                              ~
-           spectroscopy.flatMap(_.resolution.toOption)                              ~
-           spectroscopy.flatMap(_.signalToNoise.toOption)                           ~
-           spectroscopy.flatMap(_.signalToNoiseAt.toOption)                         ~
-           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ~
-           spectroscopy.flatMap(_.focalPlane.toOption)                              ~
-           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ~
-           spectroscopy.flatMap(_.capability.toOption)                              ~
+          programId    ,
+           groupId     ,
+           groupIndex  ,
+           subtitle    ,
+           existence   ,
+           status      ,
+           activeState ,
+           visualizationTime             ,
+           posAngleConsMode              ,
+           posAngle                      ,
+           explicitBase.map(_.ra)        ,
+           explicitBase.map(_.dec)       ,
+           constraintSet.cloudExtinction ,
+           constraintSet.imageQuality    ,
+           constraintSet.skyBackground   ,
+           constraintSet.waterVapor      ,
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.value)) ,  // TODO: fix in core
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.value)) ,
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.value)                           ,
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)                           ,
+           scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ,
+           spectroscopy.flatMap(_.wavelength.toOption)                              ,
+           spectroscopy.flatMap(_.resolution.toOption)                              ,
+           spectroscopy.flatMap(_.signalToNoise.toOption)                           ,
+           spectroscopy.flatMap(_.signalToNoiseAt.toOption)                         ,
+           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ,
+           spectroscopy.flatMap(_.focalPlane.toOption)                              ,
+           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ,
+           spectroscopy.flatMap(_.capability.toOption)                              ,
            modeType
         )
       }
@@ -489,38 +490,38 @@ object ObservationService {
 
     }
 
-    val InsertObservation: Fragment[
-      Program.Id                       ~
-      Option[Group.Id]                 ~
-      NonNegShort                      ~
-      Option[NonEmptyString]           ~
-      Existence                        ~
-      ObsStatus                        ~
-      ObsActiveStatus                  ~
-      Option[Timestamp]                ~
-      PosAngleConstraintMode           ~
-      Angle                            ~
-      Option[RightAscension]           ~
-      Option[Declination]              ~
-      CloudExtinction                  ~
-      ImageQuality                     ~
-      SkyBackground                    ~
-      WaterVapor                       ~
-      Option[PosBigDecimal]            ~
-      Option[PosBigDecimal]            ~
-      Option[BigDecimal]               ~
-      Option[BigDecimal]               ~
-      ScienceMode                      ~
-      Option[Wavelength]               ~
-      Option[PosInt]                   ~
-      Option[SignalToNoise]            ~
-      Option[Wavelength]               ~
-      Option[Wavelength]               ~
-      Option[FocalPlane]               ~
-      Option[Angle]                    ~
-      Option[SpectroscopyCapabilities] ~
+    val InsertObservation: Fragment[(
+      Program.Id                       ,
+      Option[Group.Id]                 ,
+      NonNegShort                      ,
+      Option[NonEmptyString]           ,
+      Existence                        ,
+      ObsStatus                        ,
+      ObsActiveStatus                  ,
+      Option[Timestamp]                ,
+      PosAngleConstraintMode           ,
+      Angle                            ,
+      Option[RightAscension]           ,
+      Option[Declination]              ,
+      CloudExtinction                  ,
+      ImageQuality                     ,
+      SkyBackground                    ,
+      WaterVapor                       ,
+      Option[PosBigDecimal]            ,
+      Option[PosBigDecimal]            ,
+      Option[BigDecimal]               ,
+      Option[BigDecimal]               ,
+      ScienceMode                      ,
+      Option[Wavelength]               ,
+      Option[PosInt]                   ,
+      Option[SignalToNoise]            ,
+      Option[Wavelength]               ,
+      Option[Wavelength]               ,
+      Option[FocalPlane]               ,
+      Option[Angle]                    ,
+      Option[SpectroscopyCapabilities] ,
       Option[ObservingModeType]
-    ] =
+    )] =
       sql"""
         INSERT INTO t_observation (
           c_program_id,
