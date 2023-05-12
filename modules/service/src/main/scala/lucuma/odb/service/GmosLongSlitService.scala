@@ -257,24 +257,24 @@ object GmosLongSlitService {
     ): AppliedFragment =
       selectGmosLongSlit("t_gmos_south_long_slit", observationIds)
 
-    val InsertGmosNorthLongSlit: Fragment[
-      Observation.Id          ~
-      GmosNorthGrating        ~
-      Option[GmosNorthFilter] ~
-      GmosNorthFpu            ~
-      Wavelength              ~
-      Option[GmosXBinning]    ~
-      Option[GmosYBinning]    ~
-      Option[GmosAmpReadMode] ~
-      Option[GmosAmpGain]     ~
-      Option[GmosRoi]         ~
-      Option[String]          ~
-      Option[String]          ~
-      GmosNorthGrating        ~
-      Option[GmosNorthFilter] ~
-      GmosNorthFpu            ~
+    val InsertGmosNorthLongSlit: Fragment[(
+      Observation.Id          ,
+      GmosNorthGrating        ,
+      Option[GmosNorthFilter] ,
+      GmosNorthFpu            ,
+      Wavelength              ,
+      Option[GmosXBinning]    ,
+      Option[GmosYBinning]    ,
+      Option[GmosAmpReadMode] ,
+      Option[GmosAmpGain]     ,
+      Option[GmosRoi]         ,
+      Option[String]          ,
+      Option[String]          ,
+      GmosNorthGrating        ,
+      Option[GmosNorthFilter] ,
+      GmosNorthFpu            ,
       Wavelength
-    ] =
+    )] =
       sql"""
         INSERT INTO t_gmos_north_long_slit (
           c_observation_id,
@@ -318,42 +318,42 @@ object GmosLongSlitService {
       input:         GmosLongSlitInput.Create.North
     ): AppliedFragment =
       InsertGmosNorthLongSlit.apply(
-        observationId                          ~
-          input.grating                        ~
-          input.filter                         ~
-          input.fpu                            ~
-          input.common.centralWavelength       ~
-          input.common.explicitXBin            ~
-          input.common.explicitYBin            ~
-          input.common.explicitAmpReadMode     ~
-          input.common.explicitAmpGain         ~
-          input.common.explicitRoi             ~
-          input.common.formattedλDithers       ~
-          input.common.formattedSpatialOffsets ~
-          input.grating                        ~
-          input.filter                         ~
-          input.fpu                            ~
+        observationId                          ,
+          input.grating                        ,
+          input.filter                         ,
+          input.fpu                            ,
+          input.common.centralWavelength       ,
+          input.common.explicitXBin            ,
+          input.common.explicitYBin            ,
+          input.common.explicitAmpReadMode     ,
+          input.common.explicitAmpGain         ,
+          input.common.explicitRoi             ,
+          input.common.formattedλDithers       ,
+          input.common.formattedSpatialOffsets ,
+          input.grating                        ,
+          input.filter                         ,
+          input.fpu                            ,
           input.common.centralWavelength
       )
 
-    val InsertGmosSouthLongSlit: Fragment[
-      Observation.Id          ~
-      GmosSouthGrating        ~
-      Option[GmosSouthFilter] ~
-      GmosSouthFpu            ~
-      Wavelength              ~
-      Option[GmosXBinning]    ~
-      Option[GmosYBinning]    ~
-      Option[GmosAmpReadMode] ~
-      Option[GmosAmpGain]     ~
-      Option[GmosRoi]         ~
-      Option[String]          ~
-      Option[String]          ~
-      GmosSouthGrating        ~
-      Option[GmosSouthFilter] ~
-      GmosSouthFpu            ~
+    val InsertGmosSouthLongSlit: Fragment[(
+      Observation.Id          ,
+      GmosSouthGrating        ,
+      Option[GmosSouthFilter] ,
+      GmosSouthFpu            ,
+      Wavelength              ,
+      Option[GmosXBinning]    ,
+      Option[GmosYBinning]    ,
+      Option[GmosAmpReadMode] ,
+      Option[GmosAmpGain]     ,
+      Option[GmosRoi]         ,
+      Option[String]          ,
+      Option[String]          ,
+      GmosSouthGrating        ,
+      Option[GmosSouthFilter] ,
+      GmosSouthFpu            ,
       Wavelength
-    ] =
+    )] =
       sql"""
         INSERT INTO t_gmos_south_long_slit (
           c_observation_id,
@@ -397,21 +397,21 @@ object GmosLongSlitService {
       input:         GmosLongSlitInput.Create.South
     ): AppliedFragment =
       InsertGmosSouthLongSlit.apply(
-        observationId                          ~
-          input.grating                        ~
-          input.filter                         ~
-          input.fpu                            ~
-          input.common.centralWavelength       ~
-          input.common.explicitXBin            ~
-          input.common.explicitYBin            ~
-          input.common.explicitAmpReadMode     ~
-          input.common.explicitAmpGain         ~
-          input.common.explicitRoi             ~
-          input.common.formattedλDithers       ~
-          input.common.formattedSpatialOffsets ~
-          input.grating                        ~
-          input.filter                         ~
-          input.fpu                            ~
+        observationId                          ,
+          input.grating                        ,
+          input.filter                         ,
+          input.fpu                            ,
+          input.common.centralWavelength       ,
+          input.common.explicitXBin            ,
+          input.common.explicitYBin            ,
+          input.common.explicitAmpReadMode     ,
+          input.common.explicitAmpGain         ,
+          input.common.explicitRoi             ,
+          input.common.formattedλDithers       ,
+          input.common.formattedSpatialOffsets ,
+          input.grating                        ,
+          input.filter                         ,
+          input.fpu                            ,
           input.common.centralWavelength
       )
 

@@ -68,6 +68,26 @@ import skunk.Session
 
 import java.time.Duration
 import scala.concurrent.duration.*
+import cats.effect.unsafe.IORuntime
+import cats.effect.unsafe.IORuntimeConfig
+import lucuma.odb.service.ProposalService
+import lucuma.odb.service.AttachmentFileService.AttachmentException
+import java.net.SocketException
+
+object OdbSuite:
+  def reportFailure: Throwable => Unit =
+    case e: IllegalArgumentException if e.getMessage == "statusCode" => () // swallow annoying error ... not sure where it comes from though ... :-\
+    case _: ProposalService.ProposalUpdateException => ()
+    case _: AttachmentException => ()
+    case e: SocketException if e.getMessage == "Connection reset" => ()
+    case e => print("OdbSuite.reportFailure: "); e.printStackTrace
+
+  // a runtime that is constructed the same as global, but lets us see unhandled errors (above)
+  val runtime: IORuntime =
+    val (compute, _) = IORuntime.createWorkStealingComputeThreadPool(reportFailure = reportFailure)
+    val (blocking, _) = IORuntime.createDefaultBlockingExecutionContext()
+    val (scheduler, _) = IORuntime.createDefaultScheduler()
+    IORuntime(compute, blocking, scheduler, () => (), IORuntimeConfig())
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
@@ -75,6 +95,8 @@ import scala.concurrent.duration.*
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
   private implicit val DefaultErrorPolicy: ErrorPolicy.RaiseAlways.type = ErrorPolicy.RaiseAlways
+
+  override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any]): IO[Unit] =
@@ -106,7 +128,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     }
   }
 
-  private implicit val log: Logger[IO] =
+   implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test")
 
   val FakeItcVersions: ItcVersions =

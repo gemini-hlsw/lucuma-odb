@@ -142,9 +142,13 @@ object TargetService {
 
               // If any source profile updates failed then roll back.
               r match {
-                case Ior.Left(ps)    => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Ior.Both(ps, _) => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Ior.Right(ids)  => UpdateTargetsResponse.Success(ids).pure[F]
+                case Result.Success(ids)      => UpdateTargetsResponse.Success(ids).pure[F]
+                case Result.Failure(ps)       => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                case Result.Warning(ps, ids)  => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
+                // case Ior.Left(ps)    => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                // case Ior.Both(ps, _) => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                // case Ior.Right(ids)  => UpdateTargetsResponse.Success(ids).pure[F]
               }
               
             }
@@ -236,18 +240,18 @@ object TargetService {
           ${text_nonempty.opt},
           $json
       """.apply(
-        pid ~
-        name ~
-        si.ra ~
-        si.dec ~
-        si.epoch ~
-        si.properMotion.map(_.ra.μasy.value) ~
-        si.properMotion.map(_.dec.μasy.value) ~
-        si.radialVelocity ~
-        si.parallax ~ // TODO
-        si.catalogInfo.flatMap(_.name) ~
-        si.catalogInfo.flatMap(_.id) ~
-        si.catalogInfo.flatMap(_.objectType) ~
+        pid,
+        name,
+        si.ra,
+        si.dec,
+        si.epoch,
+        si.properMotion.map(_.ra.μasy.value),
+        si.properMotion.map(_.dec.μasy.value),
+        si.radialVelocity,
+        si.parallax, // TODO
+        si.catalogInfo.flatMap(_.name),
+        si.catalogInfo.flatMap(_.id),
+        si.catalogInfo.flatMap(_.objectType),
         sourceProfile
       )
     }
@@ -277,11 +281,11 @@ object TargetService {
           ${text_nonempty},
           $json
       """.apply(
-        pid ~
-        name ~
-        NonEmptyString.from(ek.des).toOption.get ~ // we know this is never emptyek.des ~
-        ek.keyType ~
-        NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get ~ // we know this is never empty
+        pid,
+        name,
+        NonEmptyString.from(ek.des).toOption.get, // we know this is never emptyek.des ~
+        ek.keyType,
+        NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
         sourceProfile
       )
     }
@@ -451,7 +455,7 @@ object TargetService {
       SET    c_target_id = $target_id
       WHERE  c_target_id = $target_id
       AND    c_observation_id IN (${observation_id.list(which.length)})
-      """.apply(to ~ from ~ which.toList)
+      """.apply(to, from, which.toList)
   }
 
 }

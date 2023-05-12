@@ -181,7 +181,7 @@ object AsterismService {
         for {
           oid <- observationIds
           tid <- targetIds
-        } yield sql"($program_id, $observation_id, $target_id)"(programId ~ oid ~ tid)
+        } yield sql"($program_id, $observation_id, $target_id)"(programId, oid, tid)
 
       val values: AppliedFragment =
         links.intercalate(void", ")
