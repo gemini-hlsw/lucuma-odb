@@ -127,7 +127,7 @@ object Main extends CommandIOApp(
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
         _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-        e <- FMain.runF[IO](reset, skipMigration)
+        e <- FMain.runF(reset, skipMigration)
       } yield e
     })
 
@@ -272,7 +272,7 @@ object FMain extends MainParams {
         .migrate()
     }
 
-  def singleSession[F[_]: Async: Console](
+  def singleSession[F[_]: Temporal: Network: Console](
     config:   Config.Database,
     database: Option[String] = None
   ): Resource[F, Session[F]] = {
@@ -289,7 +289,7 @@ object FMain extends MainParams {
     )
 }
 
-  def resetDatabase[F[_]: Async : Console](config: Config.Database): F[Unit] = {
+  def resetDatabase[F[_]: Temporal: Network: Console](config: Config.Database): F[Unit] = {
 
     import skunk.*
     import skunk.implicits.*
@@ -312,26 +312,26 @@ object FMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Console](
+  def server(
     reset:         ResetDatabase,
     skipMigration: SkipMigration
-  ): Resource[F, ExitCode] =
+  )(using Logger[IO]): Resource[IO, ExitCode] =
     for {
-      c  <- Resource.eval(Config.fromCiris.load[F])
-      _  <- Resource.eval(banner[F](c))
-      _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
-      _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
-      ep <- entryPointResource(c)
+      c  <- Resource.eval(Config.fromCiris.load[IO])
+      _  <- Resource.eval(banner[IO](c))
+      _ <- resetDatabase[IO](c.database).whenA(reset.isRequested).toResource
+      _ <- migrateDatabase[IO](c.database).unlessA(skipMigration.isRequested).toResource
+      ep <- entryPointResource[IO](c)
       ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Logger: Console](
+  def runF(
     reset:         ResetDatabase,
     skipMigration: SkipMigration
-  ): F[ExitCode] =
-    server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
+  )(using Logger[IO]): IO[ExitCode] =
+    server(reset, skipMigration).use(_ => IO.never[ExitCode])
 
 }
 

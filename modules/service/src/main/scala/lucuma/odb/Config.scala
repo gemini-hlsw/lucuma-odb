@@ -13,6 +13,7 @@ import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
+import fs2.io.net.Network
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
@@ -52,17 +53,17 @@ case class Config(
 
   // People also send us their API keys. We need to be able to exchange them for [longer-lived] JWTs
   // via an API call to SSO, so we need an HTTP client for that.
-  def httpClientResource[F[_]: Async]: Resource[F, Client[F]] =
+  def httpClientResource[F[_]: Async: Network]: Resource[F, Client[F]] =
     EmberClientBuilder.default[F].build
 
   // ITC client resource
-  def itcClient[F[_]: Async: Logger]: Resource[F, ItcClient[F]] =
+  def itcClient[F[_]: Async: Network: Logger]: Resource[F, ItcClient[F]] =
     httpClientResource[F].evalMap { httpClient =>
       ItcClient.create(itcRoot, httpClient)
     }
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
-  def ssoClient[F[_]: Async: Trace]: Resource[F, SsoClient[F, User]] =
+  def ssoClient[F[_]: Async: Network: Trace]: Resource[F, SsoClient[F, User]] =
     httpClientResource[F].evalMap { httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,
