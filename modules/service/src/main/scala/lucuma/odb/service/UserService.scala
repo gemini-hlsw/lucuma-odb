@@ -69,7 +69,7 @@ object UserService {
         values ($user_id, 'service', $varchar)
         on conflict (c_user_id) do
         update set c_service_name = $varchar
-      """.command.contramap { su => su.id ~ su.name ~ su.name }
+      """.command.contramap { su => (su.id, su.name, su.name) }
 
     // Standard user ORCID profiles can change.
     val CanonicalizeStandardUser: Command[StandardUser] =
@@ -97,8 +97,8 @@ object UserService {
             c_orcid_email       = ${varchar.opt}
       """.command.contramap { su =>
         val p = su.profile
-        su.id ~ p.orcidId ~ p.givenName ~ p.creditName ~ p.familyName ~ p.primaryEmail ~
-                            p.givenName ~ p.creditName ~ p.familyName ~ p.primaryEmail
+        (su.id, p.orcidId, p.givenName, p.creditName, p.familyName, p.primaryEmail,
+                p.givenName, p.creditName, p.familyName, p.primaryEmail)
       }
 
   }

@@ -14,6 +14,7 @@ import edu.gemini.grackle.ScalarType
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.UnionType
 
+@munit.IgnoreSuite // comment this out if you want to run this. there's probably a better way to do this
 class Checklist extends OdbSuite {
   val validUsers = Nil
 

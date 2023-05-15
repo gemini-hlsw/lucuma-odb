@@ -181,7 +181,7 @@ object AsterismService {
         for {
           oid <- observationIds
           tid <- targetIds
-        } yield sql"($program_id, $observation_id, $target_id)"(programId ~ oid ~ tid)
+        } yield sql"($program_id, $observation_id, $target_id)"(programId, oid, tid)
 
       val values: AppliedFragment =
         links.intercalate(void", ")
@@ -257,7 +257,7 @@ object AsterismService {
         JOIN t_target ON t_target.c_target_id = t_asterism_target.c_target_id
         WHERE c_observation_id = $observation_id
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
-      """.apply(newOid ~ originalOid)
+      """.apply(newOid, originalOid)
     
   }
 

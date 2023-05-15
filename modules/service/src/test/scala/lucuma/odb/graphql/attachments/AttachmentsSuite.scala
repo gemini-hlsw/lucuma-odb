@@ -13,9 +13,15 @@ import lucuma.core.model.ObsAttachment
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.client.JavaNetClientBuilder
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 abstract class AttachmentsSuite extends OdbSuiteWithS3 {
   
+  // this logger is turned off to silence some errors (see logback.xml)
+  override implicit val log: Logger[IO] =
+    Slf4jLogger.getLoggerFromName("lucuma-odb-test-attachments")
+
   val client: Client[IO] = JavaNetClientBuilder[IO].create
 
   case class TestAttachment(

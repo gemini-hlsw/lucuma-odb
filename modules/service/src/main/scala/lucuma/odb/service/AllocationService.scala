@@ -42,7 +42,7 @@ object AllocationService {
         user.role.access match {
           case Staff | Admin | Service =>
             s.prepareR(Statements.SetAllocation.command).use { ps =>
-              ps.execute(input.programId ~ input.partner ~ input.duration).as(SetAllocationResponse.Success)
+              ps.execute(input.programId, input.partner, input.duration).as(SetAllocationResponse.Success)
             }
           case _ => Applicative[F].pure(SetAllocationResponse.NotAuthorized(user))
         }
@@ -51,13 +51,13 @@ object AllocationService {
 
   object Statements {
 
-    val SetAllocation: Fragment[Program.Id ~ Tag ~ TimeSpan] =
+    val SetAllocation: Fragment[(Program.Id, Tag, TimeSpan)] =
         sql"""
           INSERT INTO t_allocation (c_program_id, c_partner, c_duration)
           VALUES ($program_id, $tag, $time_span)
           ON CONFLICT (c_program_id, c_partner) DO UPDATE
           SET c_duration = $time_span
-        """.contramap { case p ~ t ~ d => p ~ t ~ d ~ d }
+        """.contramap { case (p, t, d) => (p, t, d, d) }
 
   }
 
