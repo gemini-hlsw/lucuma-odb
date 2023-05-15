@@ -27,12 +27,12 @@ object TimeEstimateMeta {
     import skunk.codec.text.varchar
 
     val decoder: Decoder[TimeEstimateMeta] =
-      (varchar        ~
-       varchar        ~
-       instrument.opt ~
-       varchar        ~
+      (varchar        *:
+       varchar        *:
+       instrument.opt *:
+       varchar        *:
        time_span
-      ).gmap[TimeEstimateMeta]
+      ).to[TimeEstimateMeta]
 
     val select: Query[Void, (String, TimeEstimateMeta)] =
       sql"""

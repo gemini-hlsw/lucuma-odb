@@ -66,7 +66,7 @@ object ProposalService {
       lazy val partnerSplitsService = PartnerSplitsService.fromSession(s)
 
       def insertProposal(SET: ProposalInput.Create, pid: Program.Id, xa: Transaction[F]): F[Unit] =
-        s.prepareR(Statements.InsertProposal).use(_.execute(pid ~ SET)) >>
+        s.prepareR(Statements.InsertProposal).use(_.execute(pid, SET)) >>
         partnerSplitsService.insertSplits(SET.partnerSplits, pid, xa)
 
       def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]] = {

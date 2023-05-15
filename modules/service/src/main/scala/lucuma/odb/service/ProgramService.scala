@@ -115,7 +115,7 @@ object ProgramService {
         Trace[F].span("insertProgram") {
           s.transaction.use { xa =>
             val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
-            s.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name ~ user)).flatTap { pid =>
+            s.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
               SETʹ.proposal.traverse { proposalInput =>
                 proposalService.insertProposal(proposalInput, pid, xa)
               }
@@ -225,7 +225,7 @@ object ProgramService {
     ): AppliedFragment =
       sql"""
         EXISTS (select c_program_id from t_program where c_program_id = $program_id and c_pi_user_id = $user_id)
-      """.apply(programId ~ userId)
+      """.apply(programId, userId)
 
     def existsUserAsCoi(
       programId: Program.Id,
@@ -233,7 +233,7 @@ object ProgramService {
     ): AppliedFragment =
       sql"""
         EXISTS (select c_role from t_program_user where  c_program_id = $program_id and c_user_id = $user_id and c_role = 'coi')
-      """.apply(programId ~ userId)
+      """.apply(programId, userId)
 
     def existsAllocationForPartner(
       programId: Program.Id,
@@ -241,7 +241,7 @@ object ProgramService {
     ): AppliedFragment =
       sql"""
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=$tag and c_duration > 'PT')
-        """.apply(programId ~ partner)
+        """.apply(programId, partner)
 
     def existsUserAccess(
       user:      User,
@@ -281,7 +281,7 @@ object ProgramService {
       """.query(program_id)
          .contramap {
             case (oNes, ServiceUser(_, _)) => (oNes, None)
-            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id ~ UserType.fromUser(nonServiceUser)))
+            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
          }
 
     /** Link a user to a program, without any access checking. */

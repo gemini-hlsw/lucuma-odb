@@ -41,7 +41,7 @@ object GroupService {
           for {
             _ <- s.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
             i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
-            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input ~ i))
+            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input, i))
           } yield g
         }
 
@@ -142,7 +142,7 @@ object GroupService {
         SELECT c_group_id, group_move_group(c_group_id, ${group_id.opt}, ${int2_nonneg.opt})
         FROM t_group
         WHERE c_group_id IN (
-      """.apply(gid ~ index) |+| which |+| void")"
+      """.apply(gid, index) |+| which |+| void")"
 
   }
 

@@ -41,24 +41,24 @@ object SmartGmosLoader {
 
   def keyEncoder[G, L, U](g: Encoder[G], l: Encoder[L], u: Encoder[U]) : Encoder[TableKey[G, L, U]] =
     (
-      g.opt                    ~
-      l.opt                    ~
-      u.opt                    ~
-      gmos_x_binning           ~
-      gmos_y_binning           ~
-      wavelength_pm_range.opt  ~
-      gmos_disperser_order.opt ~
+      g.opt                    *:
+      l.opt                    *:
+      u.opt                    *:
+      gmos_x_binning           *:
+      gmos_y_binning           *:
+      wavelength_pm_range.opt  *:
+      gmos_disperser_order.opt *:
       gmos_amp_gain
-    ).contramap[TableKey[G, L, U]] { k =>
-      k.grating         ~
-      k.filter          ~
-      k.fpu             ~
-      k.xBin            ~
-      k.yBin            ~
-      k.wavelengthRange ~
-      k.order           ~
+    ).contramap[TableKey[G, L, U]] { k => (
+      k.grating         ,
+      k.filter          ,
+      k.fpu             ,
+      k.xBin            ,
+      k.yBin            ,
+      k.wavelengthRange ,
+      k.order           ,
       k.gain
-    }
+    )}
 
   given Encoder[TableKey.North] =
     keyEncoder(gmos_north_grating, gmos_north_filter, gmos_north_fpu)
@@ -80,14 +80,14 @@ object SmartGmosLoader {
 
   def encoder[G, L, U](using k: Encoder[TableKey[G, L, U]], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow[G, L, U]] =
     (
-      pos_long ~
-      k        ~
+      pos_long *:
+      k        *:
       v
-    ).contramap[TableRow[G, L, U]] { r =>
-      r.line ~
-      r.key  ~
+    ).contramap[TableRow[G, L, U]] { r => (
+      r.line ,
+      r.key  ,
       r.value
-    }
+    )}
 
   val (tmpS, instS) = SmartGcalTable.forInstrument(
     GmosSouth,

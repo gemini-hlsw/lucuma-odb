@@ -349,7 +349,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         SELECT c_remote_id
         FROM t_obs_attachment
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
-      """.apply(programId ~ attachmentId) |+|
+      """.apply(programId, attachmentId) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId)
 
     def checkForDuplicateName(
@@ -361,7 +361,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         SELECT true
         FROM t_obs_attachment
         WHERE c_program_id = $program_id AND c_file_name = $text_nonempty
-      """.apply(programId ~ fileName) |+|
+      """.apply(programId, fileName) |+|
         oAttachmentId.foldMap(aid =>
           sql"""
             AND c_obs_attachment_id != $obs_attachment_id
