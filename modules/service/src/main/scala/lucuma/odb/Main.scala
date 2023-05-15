@@ -308,6 +308,9 @@ object FMain extends MainParams {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
+  // This derivation is required to avoid a deprecation warning in the call to wsLiftR below.
+  given [F[_]: Async, A]: Network[Kleisli[F, A, _]] = Network.forAsync
+
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
@@ -322,7 +325,7 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
-      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound)) // Network constraint isn't being derived for the complicated type inferred for routesResource :-\
+      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
