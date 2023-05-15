@@ -13,6 +13,7 @@ import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
+import fs2.io.net.Network
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
@@ -32,7 +33,6 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.security.PublicKey
 import java.util.UUID
-import fs2.io.net.Network
 
 case class Config(
   port:       Port,             // Our port, nothing fancy.

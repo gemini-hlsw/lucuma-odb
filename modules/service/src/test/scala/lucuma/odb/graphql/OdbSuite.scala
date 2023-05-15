@@ -6,6 +6,8 @@ package lucuma.odb.graphql
 import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.Supervisor
+import cats.effect.unsafe.IORuntime
+import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
 import clue.ErrorPolicy
 import clue.FetchClient
@@ -46,6 +48,8 @@ import lucuma.odb.FMain
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.AttachmentFileService.AttachmentException
+import lucuma.odb.service.ProposalService
 import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
@@ -66,13 +70,9 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
 
+import java.net.SocketException
 import java.time.Duration
 import scala.concurrent.duration.*
-import cats.effect.unsafe.IORuntime
-import cats.effect.unsafe.IORuntimeConfig
-import lucuma.odb.service.ProposalService
-import lucuma.odb.service.AttachmentFileService.AttachmentException
-import java.net.SocketException
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
