@@ -205,15 +205,15 @@ object GeneratorParamsService {
       }
 
     private val params: Decoder[Params] =
-      (observation_id          ~
-       constraint_set          ~
-       signal_to_noise.opt     ~
-       wavelength_pm.opt       ~
-       observing_mode_type.opt ~
-       target_id.opt           ~
-       radial_velocity.opt     ~
+      (observation_id          *:
+       constraint_set          *:
+       signal_to_noise.opt     *:
+       wavelength_pm.opt       *:
+       observing_mode_type.opt *:
+       target_id.opt           *:
+       radial_velocity.opt     *:
        source_profile.opt
-      ).gmap[Params]
+      ).to[Params]
 
     def selectParams(
       user:      User,

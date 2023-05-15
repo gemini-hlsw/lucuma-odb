@@ -118,18 +118,18 @@ object GmosLongSlitService {
         }
 
       val north: Decoder[GmosLongSlitInput.Create.North] =
-        (gmos_north_grating     ~
-         gmos_north_filter.opt  ~
-         gmos_north_fpu         ~
+        (gmos_north_grating     *:
+         gmos_north_filter.opt  *:
+         gmos_north_fpu         *:
          common
-        ).gmap[GmosLongSlitInput.Create.North]
+        ).to[GmosLongSlitInput.Create.North]
 
       val south: Decoder[GmosLongSlitInput.Create.South] =
-        (gmos_south_grating     ~
-         gmos_south_filter.opt  ~
-         gmos_south_fpu         ~
+        (gmos_south_grating     *:
+         gmos_south_filter.opt  *:
+         gmos_south_fpu         *:
          common
-        ).gmap[GmosLongSlitInput.Create.South]
+        ).to[GmosLongSlitInput.Create.South]
 
       private def select[A](
         which:   List[Observation.Id],
@@ -570,7 +570,7 @@ object GmosLongSlitService {
         c_initial_central_wavelength
       FROM #$table
       WHERE c_observation_id = $observation_id
-      """.apply(newId ~ originalId)
+      """.apply(newId, originalId)
 
     def cloneGmosNorthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       cloneGmosLongSlit("t_gmos_north_long_slit", originalId, newId)

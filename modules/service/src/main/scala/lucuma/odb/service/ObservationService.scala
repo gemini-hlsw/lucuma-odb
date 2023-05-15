@@ -849,7 +849,7 @@ object ObservationService {
           c_observing_mode_type
       FROM t_observation
       WHERE c_observation_id = $observation_id
-      """.apply(gix ~ oid) |+|
+      """.apply(gix, oid) |+|
       ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_observation_id
@@ -860,7 +860,7 @@ object ObservationService {
         SELECT group_move_observation(c_observation_id, ${group_id.opt}, ${int2_nonneg.opt})
         FROM t_observation
         WHERE c_observation_id IN (
-      """.apply(gid ~ index) |+| which |+| void")"
+      """.apply(gid, index) |+| which |+| void")"
   }
 
 }

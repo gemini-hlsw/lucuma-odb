@@ -272,7 +272,7 @@ object FMain extends MainParams {
         .migrate()
     }
 
-  def singleSession[F[_]: Async: Console](
+  def singleSession[F[_]: Async: Console: Network](
     config:   Config.Database,
     database: Option[String] = None
   ): Resource[F, Session[F]] = {
@@ -289,7 +289,7 @@ object FMain extends MainParams {
     )
 }
 
-  def resetDatabase[F[_]: Async : Console](config: Config.Database): F[Unit] = {
+  def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
 
     import skunk.*
     import skunk.implicits.*
@@ -312,7 +312,7 @@ object FMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Console](
+  def server[F[_]: Async: Logger: Console: Network](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
   ): Resource[F, ExitCode] =
@@ -322,12 +322,12 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
-      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
+      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound)) // Network constraint isn't being derived for the complicated type inferred for routesResource :-\
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Logger: Console](
+  def runF[F[_]: Async: Logger: Console: Network](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
   ): F[ExitCode] =

@@ -257,7 +257,7 @@ object AsterismService {
         JOIN t_target ON t_target.c_target_id = t_asterism_target.c_target_id
         WHERE c_observation_id = $observation_id
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
-      """.apply(newOid ~ originalOid)
+      """.apply(newOid, originalOid)
     
   }
 

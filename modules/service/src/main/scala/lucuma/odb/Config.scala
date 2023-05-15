@@ -32,6 +32,7 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.security.PublicKey
 import java.util.UUID
+import fs2.io.net.Network
 
 case class Config(
   port:       Port,             // Our port, nothing fancy.
@@ -52,17 +53,17 @@ case class Config(
 
   // People also send us their API keys. We need to be able to exchange them for [longer-lived] JWTs
   // via an API call to SSO, so we need an HTTP client for that.
-  def httpClientResource[F[_]: Async]: Resource[F, Client[F]] =
+  def httpClientResource[F[_]: Async: Network]: Resource[F, Client[F]] =
     EmberClientBuilder.default[F].build
 
   // ITC client resource
-  def itcClient[F[_]: Async: Logger]: Resource[F, ItcClient[F]] =
+  def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
     httpClientResource[F].evalMap { httpClient =>
       ItcClient.create(itcRoot, httpClient)
     }
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
-  def ssoClient[F[_]: Async: Trace]: Resource[F, SsoClient[F, User]] =
+  def ssoClient[F[_]: Async: Trace: Network]: Resource[F, SsoClient[F, User]] =
     httpClientResource[F].evalMap { httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,
