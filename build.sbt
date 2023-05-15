@@ -8,17 +8,17 @@ val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.17.0"
 val fs2AwsVersion              = "6.0.0"
 val fs2Version                 = "3.6.1"
-val grackleVersion             = "0.11.0"
+val grackleVersion             = "0.12.0"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.18"
 val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.7"
 val log4catsVersion            = "2.6.0"
-val lucumaCoreVersion          = "0.75.2"
-val lucumaGraphQLRoutesVersion = "0.6.1"
-val lucumaItcVersion           = "0.12.0"
-val lucumaSsoVersion           = "0.5.9"
+val lucumaCoreVersion          = "0.76.0"
+val lucumaGraphQLRoutesVersion = "0.6.2"
+val lucumaItcVersion           = "0.12.1"
+val lucumaSsoVersion           = "0.5.10"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -26,7 +26,7 @@ val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
 val paigesVersion              = "0.4.2"
 val postgresVersion            = "42.6.0"
-val skunkVersion               = "0.5.1"
+val skunkVersion               = "0.6.0-RC2"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
 enablePlugins(NoPublishPlugin)
@@ -35,6 +35,13 @@ ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
 ThisBuild / scalaVersion       := "3.2.2"
 ThisBuild / crossScalaVersions := Seq("3.2.2")
+
+ThisBuild / githubWorkflowBuild +=
+  WorkflowStep.Use(
+    UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
+    name = Some("Validate Migrations"),
+    params = Map("path" -> "modules/service/src/main/resources/db/migration/")
+  )
 
 lazy val schema = project
   .in(file("modules/schema"))

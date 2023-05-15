@@ -37,7 +37,7 @@ trait Matcher[A] { outer =>
   final def rmap[B](f: PartialFunction[A, Result[B]]): Matcher[B] = v =>
     outer.validate(v).flatMap { a =>
       f.lift(a) match {
-        case Some(r) => r.toEither.leftMap(_.head.message)
+        case Some(r) => r.toEither.leftMap(_.fold(_.getMessage, _.head.message))
         case None    => Left(s"rmap: unhandled case; no match for $v") // todo: this sucks
       }
     } // only preserves the first problem, rats

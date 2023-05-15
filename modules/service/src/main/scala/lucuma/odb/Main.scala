@@ -272,7 +272,7 @@ object FMain extends MainParams {
         .migrate()
     }
 
-  def singleSession[F[_]: Async: Console](
+  def singleSession[F[_]: Async: Console: Network](
     config:   Config.Database,
     database: Option[String] = None
   ): Resource[F, Session[F]] = {
@@ -289,7 +289,7 @@ object FMain extends MainParams {
     )
 }
 
-  def resetDatabase[F[_]: Async : Console](config: Config.Database): F[Unit] = {
+  def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
 
     import skunk.*
     import skunk.implicits.*
@@ -308,11 +308,14 @@ object FMain extends MainParams {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
+  // This derivation is required to avoid a deprecation warning in the call to wsLiftR below.
+  given [F[_]: Async, A]: Network[Kleisli[F, A, _]] = Network.forAsync
+
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Console](
+  def server[F[_]: Async: Logger: Console: Network](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
   ): Resource[F, ExitCode] =
@@ -327,7 +330,7 @@ object FMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Logger: Console](
+  def runF[F[_]: Async: Logger: Console: Network](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
   ): F[ExitCode] =

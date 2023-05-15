@@ -7,17 +7,17 @@ package mapping
 
 import edu.gemini.grackle.Result
 import lucuma.odb.data.EditType
-import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.GroupView
 
 
-trait ObservationEditMapping[F[_]] extends ObservationView[F] {
+trait GroupEditMapping[F[_]] extends GroupView[F] {
 
   // N.B. env is populated by the subscription elaborator
-  lazy val ObservationEditMapping: ObjectMapping =
+  lazy val GroupEditMapping: ObjectMapping =
     ObjectMapping(
-      tpe = ObservationEditType,
+      tpe = GroupEditType,
       fieldMappings = List(
-        SqlField("synthetic-id", ObservationView.Id, key = true, hidden = true),
+        SqlField("synthetic-id", GroupView.Id, key = true, hidden = true),
         CursorField("id", _ => Result(0L), List("synthetic-id")),
         CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
         SqlObject("value")

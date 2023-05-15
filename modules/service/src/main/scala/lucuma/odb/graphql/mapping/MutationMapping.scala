@@ -216,7 +216,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           case NoSuchTarget(targetId) => Result.failure(s"No such target: $targetId")
           case UpdateFailed(problem)  =>
             problem match
-              case SourceProfileUpdatesFailed(ps) => ps.leftIor
+              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps)
               case TrackingSwitchFailed(p)        => Result.failure(p)
 
         }  
@@ -259,7 +259,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             rUnit <- insertAsterism(oid)
             query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
             // Fail altogether if there was an issue, say, creating the asterism
-            _     <- query.left.traverse_(_ => xa.rollback)
+            _     <- xa.rollback.unlessA(query.hasValue)
           } yield query
         }
       }
@@ -331,7 +331,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MappedQuery(
       Filter(whereObservation, Select("id", Nil, Query.Empty)),
       Cursor.Context(QueryType, List("observations"), List("observations"), List(ObservationType))
-    ).map(_.fragment)
+    ).flatMap(_.fragment)
   }
 
   private lazy val UpdateAsterisms: MutationField =
@@ -366,7 +366,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             oids   = rTup.toList.flatMap(_._1)
             rUnit <- setAsterisms(oids)
             query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            _     <- query.left.traverse_(_ => xa.rollback)
+            _     <- xa.rollback.unlessA(query.hasValue)
           } yield query
         }
       }
@@ -385,7 +385,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           MappedQuery(
             Filter(filterPredicate, Select("id", Nil, Empty)), 
             Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
-          ).map(_.fragment)
+          ).flatMap(_.fragment)
 
         idSelect.flatTraverse { which =>
           obsAttachmentMetadataService.use(_.updateObsAttachments(input.SET, which)).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
@@ -424,7 +424,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             oids   = rTup.toList.flatMap(_._1)
             rUnit <- setAsterisms(oids)
             query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            _     <- query.left.traverse_(_ => xa.rollback)
+            _     <- xa.rollback.unlessA(query.hasValue)
           } yield query
         }
       }
@@ -442,7 +442,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
       // An applied fragment that selects all program ids that satisfy `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).map(_.fragment)
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
 
       // Update the specified programs and then return a query for the affected programs.
       idSelect.flatTraverse { which =>
@@ -469,7 +469,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           MappedQuery(
             Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
             Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
-          ).map(_.fragment)
+          ).flatMap(_.fragment)
 
         typeSelect.flatTraverse { which =>
           proposalAttachmentMetadataService
@@ -499,13 +499,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
       // An applied fragment that selects all target ids that satisfy `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).map(_.fragment)
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
 
       // Update the specified targets and then return a query for the affected targets (or an error)
       idSelect.flatTraverse { which =>
         targetService.use(_.updateTargets(input.SET, which)).map {
           case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
-          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => problems.leftIor
+          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems)
           case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
         }
       }
@@ -532,7 +532,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
       // An applied fragment that selects all group ids that satisfy `filterPredicate`
       val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).map(_.fragment)
+        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
 
       // Update the specified groups and then return a query for the affected groups (or an error)
       idSelect.flatTraverse { which =>
