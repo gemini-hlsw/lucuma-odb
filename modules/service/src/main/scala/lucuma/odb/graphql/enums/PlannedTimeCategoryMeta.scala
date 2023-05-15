@@ -19,7 +19,7 @@ object PlannedTimeCategoryMeta {
     import skunk.codec.text.varchar
 
     val decoder: Decoder[PlannedTimeCategoryMeta] =
-      (varchar ~ varchar).gmap[PlannedTimeCategoryMeta]
+      (varchar *: varchar).to[PlannedTimeCategoryMeta]
 
     val select: Query[Void, (String, PlannedTimeCategoryMeta)] =
       sql"""

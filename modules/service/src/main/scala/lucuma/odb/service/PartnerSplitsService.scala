@@ -46,7 +46,7 @@ object PartnerSplitsService {
     new PartnerSplitsService[F] {
 
       def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id, xa: Transaction[F]): F[Unit] =
-        s.prepareR(Statements.insertSplits(splits)).use(_.execute(pid ~ splits)).void
+        s.prepareR(Statements.insertSplits(splits)).use(_.execute(pid, splits)).void
 
       def updateSplits(splits: Map[Tag, IntPercent], xa: Transaction[F]): F[List[Program.Id]] = {
 
@@ -69,13 +69,13 @@ object PartnerSplitsService {
 
   private object Statements {
 
-    def insertSplits(splits: Map[Tag, IntPercent]): Command[Program.Id ~ splits.type] =
+    def insertSplits(splits: Map[Tag, IntPercent]): Command[(Program.Id, splits.type)] =
       sql"""
          INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
-         VALUES ${(program_id ~ tag ~ int_percent).values.list(splits.size)}
+         VALUES ${(program_id *: tag *: int_percent).values.list(splits.size)}
       """.command
          .contramap {
-          case pid ~ splits => splits.toList.map { case (t, p) => pid ~ t ~ p }
+          case (pid, splits) => splits.toList.map { case (t, p) => (pid, t, p) }
          }
 
     val DeleteSplits: Query[Void, Program.Id] =

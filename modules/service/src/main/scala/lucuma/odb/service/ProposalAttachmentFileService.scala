@@ -338,7 +338,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           ${text_nonempty.opt},
           $int8,
           $uuid
-      """.apply(programId ~ attachmentType ~ fileName ~ description ~ fileSize ~ remoteId) |+|
+      """.apply(programId, attachmentType, fileName, description, fileSize, remoteId) |+|
         ProgramService.Statements.whereUserAccess(user, programId)
 
     def updateAttachment(
@@ -358,7 +358,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
             c_file_size   = $int8,
             c_remote_id   = $uuid
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
-      """.apply(fileName ~ description ~ fileSize ~ remoteId ~ programId ~ attachmentType) |+|
+      """.apply(fileName, description, fileSize, remoteId, programId, attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
@@ -371,7 +371,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         SELECT c_remote_id
         FROM t_proposal_attachment
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
-      """.apply(programId ~ attachmentType) |+|
+      """.apply(programId, attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId)
 
     // returns the UUID for the remote file id
@@ -396,7 +396,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         SELECT true
         FROM t_proposal_attachment
         WHERE c_program_id = $program_id AND c_file_name = $text_nonempty
-      """.apply(programId ~ fileName) |+|
+      """.apply(programId, fileName) |+|
         oType.foldMap(attachmentType =>
           sql"""
             AND c_attachment_type != $tag

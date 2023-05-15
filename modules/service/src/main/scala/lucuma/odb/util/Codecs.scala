@@ -390,23 +390,23 @@ trait Codecs {
     }
 
   val constraint_set: Codec[ConstraintSet] =
-    (image_quality    ~
-     cloud_extinction ~
-     sky_background   ~
-     water_vapor      ~
+    (image_quality    *:
+     cloud_extinction *:
+     sky_background   *:
+     water_vapor      *:
      elevation_range
-    ).gimap[ConstraintSet]
+    ).to[ConstraintSet]
 
   val step_config_gcal: Codec[StepConfig.Gcal] =
-    (gcal_continuum.opt ~
-     bool               ~
-     bool               ~
-     bool               ~
-     bool               ~
-     gcal_filter        ~
-     gcal_diffuser      ~
+    (gcal_continuum.opt *:
+     bool               *:
+     bool               *:
+     bool               *:
+     bool               *:
+     gcal_filter        *:
+     gcal_diffuser      *:
      gcal_shutter
-    ).eimap { case (((((((c, ar), cuar), thar), xe), f), d), s) =>
+    ).eimap { case (c, ar, cuar, thar, xe, f, d, s) =>
 
       val arcs = List(
         GcalArc.ArArc   -> ar,
@@ -421,14 +421,16 @@ trait Codecs {
 
     } { (gcal: StepConfig.Gcal) =>
       val arcs = gcal.lamp.toArcsSortedSet
-      gcal.lamp.continuum     ~
-        arcs(GcalArc.ArArc)   ~
-        arcs(GcalArc.CuArArc) ~
-        arcs(GcalArc.ThArArc) ~
-        arcs(GcalArc.XeArc)   ~
-        gcal.filter           ~
-        gcal.diffuser         ~
+      (
+        gcal.lamp.continuum   ,
+        arcs(GcalArc.ArArc)   ,
+        arcs(GcalArc.CuArArc) ,
+        arcs(GcalArc.ThArArc) ,
+        arcs(GcalArc.XeArc)   ,
+        gcal.filter           ,
+        gcal.diffuser         ,
         gcal.shutter
+      )
     }
 
   val void: Codec[Unit] =
