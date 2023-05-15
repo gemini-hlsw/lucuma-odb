@@ -41,7 +41,7 @@ object GroupService {
           for {
             _ <- s.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
             i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
-            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input ~ i))
+            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input, i))
           } yield g
         }
 
@@ -57,7 +57,7 @@ object GroupService {
           case (Nullable.Absent, None) => Nil.pure[F] // do nothing if neither is specified
           case (gid, index) =>
             val af = Statements.moveGroups(gid.toOption, index, which)
-            s.prepareR(af.fragment.query(group_id ~ void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
+            s.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
       def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment): F[UpdateGroupsResponse] =
         s.transaction.use { xa =>
@@ -70,7 +70,7 @@ object GroupService {
         }
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort], xa: Transaction[F]): F[NonNegShort] =
-        s.prepareR(Statements.OpenHole).use(_.unique(pid ~ gid ~ index))
+        s.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 
     }
 
@@ -100,19 +100,19 @@ object GroupService {
         ${time_span.opt}
       ) returning c_group_id
       """.query(group_id)
-         .contramap[CreateGroupInput ~ NonNegShort] { case c ~ index =>
-          c.programId ~
-          c.SET.parentGroupId ~
-          index ~
-          c.SET.name ~
-          c.SET.description ~
-          c.SET.minimumRequired ~
-          c.SET.ordered ~
-          c.SET.minimumInterval ~
+         .contramap[CreateGroupInput ~ NonNegShort] { case (c, index) => (
+          c.programId,
+          c.SET.parentGroupId,
+          index,
+          c.SET.name,
+          c.SET.description,
+          c.SET.minimumRequired,
+          c.SET.ordered,
+          c.SET.minimumInterval,
           c.SET.maximumInterval
-        }
+        )}
 
-    val OpenHole: Query[Program.Id ~ Option[Group.Id] ~ Option[NonNegShort], NonNegShort] =
+    val OpenHole: Query[(Program.Id, Option[Group.Id], Option[NonNegShort]), NonNegShort] =
       sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)
 
     def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] = {
@@ -142,7 +142,7 @@ object GroupService {
         SELECT c_group_id, group_move_group(c_group_id, ${group_id.opt}, ${int2_nonneg.opt})
         FROM t_group
         WHERE c_group_id IN (
-      """.apply(gid ~ index) |+| which |+| void")"
+      """.apply(gid, index) |+| which |+| void")"
 
   }
 

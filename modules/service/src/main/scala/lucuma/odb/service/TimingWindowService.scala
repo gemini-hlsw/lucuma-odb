@@ -77,26 +77,26 @@ object Statements {
             c_repeat_period,
             c_repeat_times
           ) VALUES ${(
-            observation_id          ~
-            timing_window_inclusion ~
-            core_timestamp          ~
-            core_timestamp.opt      ~
-            time_span.opt           ~
-            time_span.opt           ~
+            observation_id          *:
+            timing_window_inclusion *:
+            core_timestamp          *:
+            core_timestamp.opt      *:
+            time_span.opt           *:
+            time_span.opt           *:
             int4.opt
           ).values.list(timingWindows.length).list(observationIds.length)}
         """
         .apply( 
           observationIds.map( obsId =>
-            timingWindows.map( tw =>
-              obsId ~ 
-              tw.inclusion  ~ 
-              tw.startUtc      ~ 
-              tw.end.flatMap(_.atUtc) ~
-              tw.end.flatMap(_.after) ~
-              tw.end.flatMap(_.repeat.map(_.period)) ~
+            timingWindows.map { tw => (
+              obsId , 
+              tw.inclusion  , 
+              tw.startUtc      , 
+              tw.end.flatMap(_.atUtc) ,
+              tw.end.flatMap(_.after) ,
+              tw.end.flatMap(_.repeat.map(_.period)) ,
               tw.end.flatMap(_.repeat.flatMap(_.times.map(_.value)))
-            )
+            )}
           )
         ).some
 
@@ -121,5 +121,5 @@ object Statements {
         t_timing_window.c_repeat_times
       FROM t_timing_window
       WHERE c_observation_id = $observation_id
-    """.apply(newOid ~ originalOid)
+    """.apply(newOid, originalOid)
 }

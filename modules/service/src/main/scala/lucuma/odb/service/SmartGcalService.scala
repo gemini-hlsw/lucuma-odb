@@ -136,24 +136,24 @@ object SmartGcalService {
         val insertInstRow =
           session.executeCommand(
             Statements.InsertGmosNorth(
-              Instrument.GmosNorth                         ~
-              id                                           ~
-              row.line                                     ~
-              row.key.gratingConfig.map(_.grating)         ~
-              row.key.filter                               ~
-              row.key.fpu                                  ~
-              row.key.xBin                                 ~
-              row.key.yBin                                 ~
-              row.key.gratingConfig.map(_.wavelengthRange) ~
-              row.key.gratingConfig.map(_.order)           ~
-              row.key.gain                                 ~
+              Instrument.GmosNorth                         ,
+              id                                           ,
+              row.line                                     ,
+              row.key.gratingConfig.map(_.grating)         ,
+              row.key.filter                               ,
+              row.key.fpu                                  ,
+              row.key.xBin                                 ,
+              row.key.yBin                                 ,
+              row.key.gratingConfig.map(_.wavelengthRange) ,
+              row.key.gratingConfig.map(_.order)           ,
+              row.key.gain                                 ,
               row.value.instrumentConfig.exposureTime
             )
           ).void
 
         val insertGcalRow  =
           session.executeCommand(
-            Statements.InsertGcal(Instrument.GmosNorth ~ id ~ row.value.gcalConfig ~ row.value.stepCount ~ row.value.baselineType)
+            Statements.InsertGcal(Instrument.GmosNorth, id, row.value.gcalConfig, row.value.stepCount, row.value.baselineType)
           ).void
 
         for {
@@ -169,24 +169,24 @@ object SmartGcalService {
         val insertInstRow =
           session.executeCommand(
             Statements.InsertGmosSouth(
-              Instrument.GmosSouth                         ~
-              id                                           ~
-              row.line                                     ~
-              row.key.gratingConfig.map(_.grating)         ~
-              row.key.filter                               ~
-              row.key.fpu                                  ~
-              row.key.xBin                                 ~
-              row.key.yBin                                 ~
-              row.key.gratingConfig.map(_.wavelengthRange) ~
-              row.key.gratingConfig.map(_.order)           ~
-              row.key.gain                                 ~
+              Instrument.GmosSouth                         ,
+              id                                           ,
+              row.line                                     ,
+              row.key.gratingConfig.map(_.grating)         ,
+              row.key.filter                               ,
+              row.key.fpu                                  ,
+              row.key.xBin                                 ,
+              row.key.yBin                                 ,
+              row.key.gratingConfig.map(_.wavelengthRange) ,
+              row.key.gratingConfig.map(_.order)           ,
+              row.key.gain                                 ,
               row.value.instrumentConfig.exposureTime
             )
           ).void
 
         val insertGcalRow  =
           session.executeCommand(
-            Statements.InsertGcal(Instrument.GmosSouth ~ id ~ row.value.gcalConfig ~ row.value.stepCount ~ row.value.baselineType)
+            Statements.InsertGcal(Instrument.GmosSouth, id, row.value.gcalConfig, row.value.stepCount, row.value.baselineType)
           ).void
 
         for {
@@ -266,13 +266,13 @@ object SmartGcalService {
       selectGmos("t_smart_gmos_south", where)
     }
 
-    val InsertGcal: Fragment[
-      Instrument ~
-        Int      ~
-        Gcal     ~
-        PosInt   ~
+    val InsertGcal: Fragment[(
+      Instrument ,
+        Int      ,
+        Gcal     ,
+        PosInt   ,
         GcalBaselineType
-    ] =
+    )] =
       sql"""
         INSERT INTO t_gcal (
           c_instrument,
@@ -295,20 +295,20 @@ object SmartGcalService {
           $gcal_baseline
       """
 
-    val InsertGmosNorth: Fragment[
-      Instrument                          ~
-      Int                                 ~
-      PosLong                             ~
-      Option[GmosNorthGrating]            ~
-      Option[GmosNorthFilter]             ~
-      Option[GmosNorthFpu]                ~
-      GmosXBinning                        ~
-      GmosYBinning                        ~
-      Option[BoundedInterval[Wavelength]] ~
-      Option[GmosGratingOrder]            ~
-      GmosAmpGain                         ~
+    val InsertGmosNorth: Fragment[(
+      Instrument                          ,
+      Int                                 ,
+      PosLong                             ,
+      Option[GmosNorthGrating]            ,
+      Option[GmosNorthFilter]             ,
+      Option[GmosNorthFpu]                ,
+      GmosXBinning                        ,
+      GmosYBinning                        ,
+      Option[BoundedInterval[Wavelength]] ,
+      Option[GmosGratingOrder]            ,
+      GmosAmpGain                         ,
       TimeSpan
-    ] =
+    )] =
       sql"""
         INSERT INTO t_smart_gmos_north (
           c_instrument,
@@ -338,20 +338,20 @@ object SmartGcalService {
           $time_span
       """
 
-    val InsertGmosSouth: Fragment[
-      Instrument                          ~
-      Int                                 ~
-      PosLong                             ~
-      Option[GmosSouthGrating]            ~
-      Option[GmosSouthFilter]             ~
-      Option[GmosSouthFpu]                ~
-      GmosXBinning                        ~
-      GmosYBinning                        ~
-      Option[BoundedInterval[Wavelength]] ~
-      Option[GmosGratingOrder]            ~
-      GmosAmpGain                         ~
+    val InsertGmosSouth: Fragment[(
+      Instrument                          ,
+      Int                                 ,
+      PosLong                             ,
+      Option[GmosSouthGrating]            ,
+      Option[GmosSouthFilter]             ,
+      Option[GmosSouthFpu]                ,
+      GmosXBinning                        ,
+      GmosYBinning                        ,
+      Option[BoundedInterval[Wavelength]] ,
+      Option[GmosGratingOrder]            ,
+      GmosAmpGain                         ,
       TimeSpan
-    ] =
+    )] =
       sql"""
         INSERT INTO t_smart_gmos_south (
           c_instrument,
