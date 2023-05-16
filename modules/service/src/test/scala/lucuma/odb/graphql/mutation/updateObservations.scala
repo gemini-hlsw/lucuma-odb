@@ -1609,6 +1609,16 @@ class updateObservations extends OdbSuite
     }  
   }
 
+  test("grouping: Hugo's example") {
+    for {
+      pid <- createProgramAs(pi)
+      o1  <- createObservationAs(pi, pid)
+      o2  <- createObservationAs(pi, pid)
+      g   <- createGroupAs(pi, pid)
+      _   <- moveObservationsAs(pi, pid, List(o1), Some(g), None)
+    } yield ()
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
