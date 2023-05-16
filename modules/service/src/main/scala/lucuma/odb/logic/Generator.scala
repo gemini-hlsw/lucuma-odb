@@ -55,6 +55,8 @@ sealed trait Generator[F[_]] {
 
 object Generator {
 
+  private val SequenceLengthLimit: Int = 1000
+
   sealed trait Result
   sealed trait Error extends Result {
     def format: String
@@ -86,6 +88,14 @@ object Generator {
     ) extends Error {
       def format: String =
         s"ITC service errors: ${errors.map(_.format).intercalate(", ")}"
+    }
+
+    case class SequenceTooLong(
+      observationId: Observation.Id,
+      length:        Int
+    ) extends Error {
+      def format: String =
+        s"Sequence length is temporarily limited to $SequenceLengthLimit steps, but observation '$observationId' would require $length."
     }
 
     case class InvalidData(
@@ -166,7 +176,7 @@ object Generator {
         params match {
           case GeneratorParams.GmosNorthLongSlit(itcInput, config) =>
             for {
-              tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
+              tup <- gmosLongSlit(oid, itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
               (rs, p0) = tup
               p1 <- EitherT(exp.expandGmosNorth(p0)).leftMap { k => MissingSmartGcalDef(k.format) }
             } yield
@@ -185,7 +195,7 @@ object Generator {
 
           case GeneratorParams.GmosSouthLongSlit(itcInput, config) =>
             for {
-              tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosSouth, useCache)
+              tup <- gmosLongSlit(oid, itcInput, config, gmos.longslit.Generator.GmosSouth, useCache)
               (rs, p0) = tup
               p1  <- EitherT(exp.expandGmosSouth(p0)).leftMap { k => MissingSmartGcalDef(k.format) }
             } yield
@@ -208,11 +218,23 @@ object Generator {
 
 
       def gmosLongSlit[S, D, G, L, U](
+        oid:       Observation.Id,
         itcInput:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
         config:    gmos.longslit.Config[G, L, U],
         generator: gmos.longslit.Generator[S, D, G, L, U],
         useCache:  Boolean
-      ): EitherT[F, Error, (Itc.ResultSet, ProtoExecution[S, D])] =
+      ): EitherT[F, Error, (Itc.ResultSet, ProtoExecution[S, D])] = {
+
+        def generate(s: Itc.Result.Success): Either[Error, ProtoExecution[S, D]] =
+          generator.generate(
+            s.value,
+            s.input.sourceProfile,
+            s.input.constraints.imageQuality,
+            config
+          ) match {
+            case Left(msg)    => InvalidData(msg).asLeft
+            case Right(proto) => proto.asRight
+          }
 
         EitherT(
           itc
@@ -222,17 +244,15 @@ object Generator {
                 ItcServiceError(errors).asLeft
               case Right(rs)    =>
                 val success = rs.value.focus
-                generator.generate(
-                  success.value,
-                  success.input.sourceProfile,
-                  success.input.constraints.imageQuality,
-                  config
-                ) match {
-                  case Left(msg)    => InvalidData(msg).asLeft
-                  case Right(proto) => (rs, proto).asRight
+                success.value.exposures.value match {
+                  case v if v > SequenceLengthLimit =>
+                    SequenceTooLong(oid, v).asLeft
+                  case _                            =>
+                    generate(success).tupleLeft(rs)
                 }
             }
         )
+      }
 
       def futureExecutionConfig[X <: ExecutionSequence, A <: Atom, T <: Step, S, D](
         namespace:  UUID,
