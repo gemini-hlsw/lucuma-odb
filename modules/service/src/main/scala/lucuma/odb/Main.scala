@@ -155,8 +155,9 @@ object FMain extends MainParams {
             |
             |CommitHash.: ${config.commitHash.format}
             |CORS domain: ${config.domain}
-            |ITC Root...: ${config.itcRoot}
-            |Port.......: ${config.port}
+            |ITC Root   : ${config.itcRoot}
+            |Port       : ${config.port}
+            |PID        : ${ProcessHandle.current.pid}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))

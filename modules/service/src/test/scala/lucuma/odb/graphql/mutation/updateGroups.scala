@@ -226,5 +226,14 @@ class updateGroups extends OdbSuite {
     }  
   }
 
+  test("Hugo's example, with groups") {
+    for {
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      g3  <- createGroupAs(pi, pid)
+      _   <- moveGroupsAs(pi, List(g1), Some(g3), None)
+    } yield ()
+  }
 
 }
