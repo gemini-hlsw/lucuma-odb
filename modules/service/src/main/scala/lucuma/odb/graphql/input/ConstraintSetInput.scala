@@ -41,12 +41,10 @@ final case class ConstraintSetInput(
 
 object ConstraintSetInput {
 
-  // TODO: figure out what the values should actually be and move to
-  // TODO: ConstraintSet companion in core?
   val NominalConstraints: ConstraintSet =
     ConstraintSet(
-      cloudExtinction = CloudExtinction.ThreePointZero,
-      imageQuality    = ImageQuality.TwoPointZero,
+      cloudExtinction = CloudExtinction.PointThree,
+      imageQuality    = ImageQuality.PointEight,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
       elevationRange  = ElevationRange.AirMass.Default
