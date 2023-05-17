@@ -473,7 +473,36 @@ class createObservation extends OdbSuite {
           .as[CloudExtinction]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, CloudExtinction.ThreePointZero)
+        assertIO(get, CloudExtinction.PointThree)
+      }
+    }
+  }
+
+    test("[general] created observation can default image quality") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                constraintSet {
+                  imageQuality
+                }
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("constraintSet")
+          .downField("imageQuality")
+          .as[ImageQuality]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, ImageQuality.PointEight)
       }
     }
   }
