@@ -14,7 +14,6 @@ case class TimeEstimateMeta(
   name:        String,
   description: String,
   instrument:  Option[Instrument],
-  category:    String,
   time:        TimeSpan
 )
 
@@ -30,7 +29,6 @@ object TimeEstimateMeta {
       (varchar        *:
        varchar        *:
        instrument.opt *:
-       varchar        *:
        time_span
       ).to[TimeEstimateMeta]
 
@@ -41,7 +39,6 @@ object TimeEstimateMeta {
           c_name,
           c_description,
           c_instrument,
-          c_category,
           c_time
         FROM
           t_time_estimate
@@ -52,4 +49,3 @@ object TimeEstimateMeta {
     s.execute(statements.select).map(_.toMap)
 
 }
-

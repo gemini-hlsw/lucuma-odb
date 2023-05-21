@@ -40,32 +40,7 @@ final class Enums(
   // to fail immediately if the associated meta data was not found.  For this
   // reason they must be explicitly "used" in the construction of `Enums`. Add
   // any new enums to the list below.
-  Enumerated[PlannedTimeCategory]
   Enumerated[TimeEstimate]
-
-  enum PlannedTimeCategory(val tag: String) {
-    private val meta = enumMeta.plannedTimeCategory.getOrElse(tag, sys.error(s"t_planned_time_category missing tag '$tag'"))
-
-    def name: String        = meta.name
-    def description: String = meta.description
-
-    case ConfigChange extends PlannedTimeCategory("config_change")
-    case Exposure     extends PlannedTimeCategory("exposure")
-    case Readout      extends PlannedTimeCategory("readout")
-    case Setup        extends PlannedTimeCategory("setup")
-    case Write        extends PlannedTimeCategory("write")
-  }
-
-  object PlannedTimeCategory {
-
-    given Enumerated[PlannedTimeCategory] =
-      Enumerated.from(values.head, values.tail*).withTag(_.tag)
-
-    def enumType: EnumType =
-      Enumerated[PlannedTimeCategory]
-        .toEnumType("PlannedTimeCategory", "Enumeration of planned time categories")(_.name)
-
-  }
 
   /**
    * Time estimates for config changes, etc.  Because this is internal to the
@@ -77,7 +52,6 @@ final class Enums(
     def name: String                   = meta.name
     def description: String            = meta.description
     def instrument: Option[Instrument] = meta.instrument
-    def category: PlannedTimeCategory  = Enumerated[PlannedTimeCategory].fromTag(meta.category).getOrElse(sys.error(s"t_time_estimate entry for '$tag' refers to missing planned time category '${meta.category}'"))
     def time: TimeSpan                 = meta.time
 
     case GcalDiffuser        extends TimeEstimate("gcal_diffuser")
@@ -113,7 +87,7 @@ final class Enums(
   val schema: Schema =
     new Schema {
       def pos:        SourcePos       = SourcePos.instance
-      def types:      List[NamedType] = PlannedTimeCategory.enumType :: enumMeta.unreferencedTypes
+      def types:      List[NamedType] = enumMeta.unreferencedTypes
       def directives: List[Directive] = Nil
     }
 
@@ -122,14 +96,12 @@ final class Enums(
 object Enums {
 
   case class Meta(
-    plannedTimeCategory: Map[String, PlannedTimeCategoryMeta],
     timeEstimate:        Map[String, TimeEstimateMeta],
     unreferencedTypes:   List[EnumType]
   )
 
   def load[F[_]: Monad: Logger](s: Session[F]): F[Enums] =
     for {
-      ptc <- PlannedTimeCategoryMeta.select(s)
       te  <- TimeEstimateMeta.select(s)
       un  <- List(
                // "Unreferenced" types -- those for which we do not need to refer
@@ -139,6 +111,6 @@ object Enums {
                FilterTypeEnumType.fetch(s),
                PartnerEnumType.fetch(s),
              ).sequence
-    } yield Enums(Meta(ptc, te, un))
+    } yield Enums(Meta(te, un))
 
 }
