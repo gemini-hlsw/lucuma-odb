@@ -95,6 +95,14 @@ object ObsAttachmentRoutes {
             .flatMap(_ => Ok())
             .recoverWith { case e: AttachmentException => e.toResponse }
         }
+      
+      case req @ GET -> Root / "attachment" / "obs" / "url" / ProgramId(programId) / ObsAttachmentId(attachmentId) =>
+        ssoClient.require(req) { user =>
+          attachmentFileService
+            .getPresignedUrl(user, programId, attachmentId)
+            .flatMap(Ok(_))
+            .recoverWith { case e: AttachmentException => e.toResponse }
+        }
     }
 
     EntityLimiter(routes, maxUploadMb * 1000 * 1000)

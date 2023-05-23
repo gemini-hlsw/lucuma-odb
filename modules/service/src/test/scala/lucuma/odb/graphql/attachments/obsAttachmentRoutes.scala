@@ -22,7 +22,8 @@ import org.http4s.implicits.*
 
 class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
-  private  val attachmentId    = ObsAttachment.Id(5.refined)
+  private val attachmentId    = ObsAttachment.Id(5.refined)
+
   private val service: ObsAttachmentFileService[IO] = new ObsAttachmentFileService[IO] {
     def getAttachment(
       user:         User,
@@ -55,12 +56,20 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
     def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
+
+    def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): IO[String] = 
+      getError(user).fold(IO(presignedUrl))(IO.raiseError)
   }
 
   private val routes = ObsAttachmentRoutes(service, ssoClient, 1).orNotFound
 
   test("GET requires authorization") {
     val request = Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-1")
+    routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
+  test("GETurl requires authorization") {
+    val request = Request[IO](method = Method.GET, uri = uri"attachment/obs/url/p-1/a-1")
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
@@ -86,6 +95,14 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
   test("GET requires valid user") {
     val request = Request[IO](method = Method.GET,
                               uri = uri"attachment/obs/p-1/a-1",
+                              headers = Headers(invalidAuthHeader)
+    )
+    routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
+  test("GETurl requires valid user") {
+    val request = Request[IO](method = Method.GET,
+                              uri = uri"attachment/obs/url/p-1/a-1",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -121,6 +138,12 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
     routes.run(request).assertResponse(Status.Ok, fileContents.some)
   }
 
+  test("valid GETurl returns url") {
+    val request =
+      Request[IO](method = Method.GET, uri = uri"attachment/obs/url/p-1/a-1", headers = headers(pi))
+    routes.run(request).assertResponse(Status.Ok, presignedUrl.some)
+  }
+
   test("valid POST returns attachment") {
     val request = Request[IO](method = Method.POST,
                               uri = uri"attachment/obs/p-1?fileName=/file.txt/&attachmentType=finder",
@@ -152,6 +175,18 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
   test("GET returns NotFound for invalid attachment id") {
     val request =
       Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-x1", headers = headers(pi))
+    routes.run(request).assertResponse(Status.NotFound, notFound)
+  }
+
+  test("GETurl returns NotFound for invalid program id") {
+    val request =
+      Request[IO](method = Method.GET, uri = uri"attachment/obs/url/p1/a-1", headers = headers(pi))
+    routes.run(request).assertResponse(Status.NotFound, notFound)
+  }
+
+  test("GETurl returns NotFound for invalid attachment id") {
+    val request =
+      Request[IO](method = Method.GET, uri = uri"attachment/obs/url/p-1/a-x1", headers = headers(pi))
     routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
@@ -234,6 +269,30 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
   test("GET returns BadRequest with message if service returns InvalidRequest") {
     val request = Request[IO](method = Method.GET,
                               uri = uri"attachment/obs/p-1/a-1",
+                              headers = headers(invalidFileUser)
+    )
+    routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
+  }
+
+  test("GETurl returns Forbidden if service returns Forbidden") {
+    val request = Request[IO](method = Method.GET,
+                              uri = uri"attachment/obs/url/p-1/a-1",
+                              headers = headers(forbiddenUser)
+    )
+    routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
+  test("GETurl returns NotFound if service returns FileNotFound") {
+    val request = Request[IO](method = Method.GET,
+                              uri = uri"attachment/obs/url/p-1/a-1",
+                              headers = headers(fileNotFoundUser)
+    )
+    routes.run(request).assertResponse(Status.NotFound, none)
+  }
+
+  test("GETurl returns BadRequest with message if service returns InvalidRequest") {
+    val request = Request[IO](method = Method.GET,
+                              uri = uri"attachment/obs/url/p-1/a-1",
                               headers = headers(invalidFileUser)
     )
     routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
