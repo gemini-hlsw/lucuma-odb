@@ -7,6 +7,8 @@ package longslit
 import cats.data.NonEmptyList
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosDouble
+import fs2.Pure
+import fs2.Stream
 import lucuma.core.enums.GmosNorthDetector.{Hamamatsu => HamamatsuNorth}
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -28,7 +30,6 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
-import lucuma.odb.sequence.data.ProtoSequence
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
@@ -37,7 +38,7 @@ import lucuma.odb.sequence.data.SciExposureTime
  * Generator for GMOS Long Slit.
  *
  * @tparam S static configuration type
- * @tparam D dynamic configurate type
+ * @tparam D dynamic configuration type
  * @tparam G grating enumeration
  * @tparam F filter enumeration
  * @tparam U FPU enumeration
@@ -54,7 +55,7 @@ sealed abstract class Generator[S, D, G, F, U](
     sourceProfile: SourceProfile,
     imageQuality:  ImageQuality,
     config:        Config[G, F, U]
-  ): Either[String, ProtoExecutionConfig[S, ProtoStep[D]]] = {
+  ): Either[String, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] = {
 
     val acq = acqSequence.compute(
       acqFilters,
@@ -75,11 +76,8 @@ sealed abstract class Generator[S, D, G, F, U](
       .when(itc.exposures.value > 0)(
         ProtoExecutionConfig(
           static,
-          ProtoSequence.one(ProtoAtom.of("Acquisition".some, acq.ccd2, acq.p10, acq.slit)),
-          ProtoSequence.of(
-            ProtoAtom(sci.head.description.some, sci.head.steps),
-            sci.tail.take(itc.exposures.value - 1).toList.map(a => ProtoAtom(a.description.some, a.steps))*
-          )
+          Stream(ProtoAtom.of("Acquisition - Initial".some, acq.ccd2, acq.p10, acq.slit)) ++ Stream(ProtoAtom.of("Acquisition - Slit".some, acq.slit)).repeat,
+          sci.map(a => ProtoAtom(a.description.some, a.steps))
         )
       ).toRight("ITC prescribes 0 exposures.")
 

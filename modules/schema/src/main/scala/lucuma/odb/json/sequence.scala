@@ -3,10 +3,12 @@
 
 package lucuma.odb.json
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
@@ -22,9 +24,10 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.ExecutionConfig
+import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.PlannedTime
-import lucuma.core.model.sequence.Sequence
+import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
@@ -34,10 +37,13 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Uid
 
+import scala.collection.immutable.SortedSet
+
 // (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength])
 
 trait SequenceCodec {
 
+  import offset.decoder.given
   import stepconfig.given
   import time.decoder.given
   import zipper.given
@@ -87,21 +93,43 @@ trait SequenceCodec {
       )
     }
 
-  given [D: Decoder]: Decoder[Sequence[D]] =
+  given Decoder[SequenceDigest] =
+    Decoder.instance { c =>
+      for {
+        o <- c.downField("observeClass").as[ObserveClass]
+        t <- c.downField("plannedTime").as[PlannedTime]
+        f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
+      } yield SequenceDigest(o, t, f)
+    }
+
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
+    Encoder.instance { (a: SequenceDigest) =>
+      Json.obj(
+        "observeClass" -> a.observeClass.asJson,
+        "plannedTime"  -> a.plannedTime.asJson,
+        "offsets"      -> a.offsets.toList.asJson
+      )
+    }
+
+  given [D: Decoder]: Decoder[ExecutionSequence[D]] =
     Decoder.instance { c =>
       for {
         n <- c.downField("nextAtom").as[Atom[D]]
         f <- c.downField("possibleFuture").as[List[Atom[D]]]
-      } yield Sequence(NonEmptyList(n, f))
+        m <- c.downField("hasMore").as[Boolean]
+        u <- c.downField("atomCount").as[PosInt]
+        d <- c.downField("digest").as[SequenceDigest]
+      } yield ExecutionSequence(n, f, m, u, d)
     }
 
-  given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Sequence[D]] =
-    Encoder.instance { (a: Sequence[D]) =>
+  given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionSequence[D]] =
+    Encoder.instance { (a: ExecutionSequence[D]) =>
       Json.obj(
-        "nextAtom"       -> a.atoms.head.asJson,
-        "possibleFuture" -> a.atoms.tail.asJson,
-        "observeClass"   -> a.observeClass.asJson,
-        "plannedTime"    -> a.plannedTime.asJson
+        "nextAtom"       -> a.nextAtom.asJson,
+        "possibleFuture" -> a.possibleFuture.asJson,
+        "hasMore"        -> a.hasMore.asJson,
+        "atomCount"      -> a.atomCount.asJson,
+        "digest"         -> a.digest.asJson
       )
     }
 
@@ -109,8 +137,8 @@ trait SequenceCodec {
     Decoder.instance { c =>
       for {
         t <- c.downField("static").as[S]
-        a <- c.downField("acquisition").as[Option[Sequence[D]]]
-        s <- c.downField("science").as[Option[Sequence[D]]]
+        a <- c.downField("acquisition").as[Option[ExecutionSequence[D]]]
+        s <- c.downField("science").as[Option[ExecutionSequence[D]]]
         u <- c.downField("setup").as[SetupTime]
       } yield ExecutionConfig(t, a, s, u)
     }
@@ -121,8 +149,7 @@ trait SequenceCodec {
         "static"        -> a.static.asJson,
         "acquisition"   -> a.acquisition.asJson,
         "science"       -> a.science.asJson,
-        "setup"         -> a.setup.asJson,
-        "observeClass"  -> a.observeClass.asJson
+        "setup"         -> a.setup.asJson
       )
     }
 

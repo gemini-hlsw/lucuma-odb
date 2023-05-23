@@ -841,38 +841,40 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   static: GmosNorthStatic!
 
   # GMOS North acquisition execution
-  acquisition: GmosNorthSequence
+  acquisition: GmosNorthExecutionSequence
 
   # GMOS North science execution
-  science: GmosNorthSequence
+  science: GmosNorthExecutionSequence
 
   #visits: [GmosNorthVisitRecord!]!
 
   # Instrument type
   instrument: Instrument!
 
-  # Observe class for the science sequence of this execution config.
-  observeClass: ObserveClass!
-
   # Setup time estimates
   setup: SetupTime!
 }
 
 # Next atom to execute and potential future atoms
-type GmosNorthSequence {
+type GmosNorthExecutionSequence implements ExecutionSequence {
   # Next atom to execute
   nextAtom: GmosNorthAtom!
 
-  # Remaining atoms to execute, if any
+  # (Prefix of the) remaining atoms to execute, if any.
   possibleFuture: [GmosNorthAtom!]!
 
-  # Observe class, derived from the combination of the observe class for all of
-  # the atoms.
-  observeClass: ObserveClass!
+  # Whether there are more anticipated atoms than those that appear in
+  # possibleFuture
+  hashMore: Boolean!
+  
+  # Total count of anticipated atoms, including nextAtom, possibleFuture and
+  # any remaining atoms not included in possibleFuture
+  atomCount: PosInt!
+  
+  # Sequence digest (including all anticipated future values regardless of
+  # whether they appear in possibleFuture)
+  digest: SequenceDigest!
 
-  # Planned time estimate for this sequence, the sum of all the atom's planned
-  # times.
-  plannedTime: PlannedTime!
 }
 
 # GMOS North FPU option, either builtin or custom mask
@@ -1215,33 +1217,38 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   static: GmosSouthStatic!
 
   # GMOS South acquisition execution
-  acquisition: GmosSouthSequence
+  acquisition: GmosSouthExecutionSequence
 
   # GMOS South science execution
-  science: GmosSouthSequence
+  science: GmosSouthExecutionSequence
   #visits: [GmosSouthVisitRecord!]!
 
   # Instrument type
   instrument: Instrument!
-
-  # Observe class for the science sequence of this execution config.
-  observeClass: ObserveClass!
 
   # Setup time estimates
   setup: SetupTime!
 }
 
 # Next atom to execute and potential future atoms
-type GmosSouthSequence {
+type GmosSouthExecutionSequence implements ExecutionSequence {
   # Next atom to execute
   nextAtom: GmosSouthAtom!
 
   # Remaining atoms to execute, if any
   possibleFuture: [GmosSouthAtom!]!
 
-  # Observe class, derived from the combination of the observe class for all of
-  # the atoms.
-  observeClass: ObserveClass!
+  # Whether there are more anticipated atoms than those that appear in
+  # possibleFuture
+  hashMore: Boolean!
+  
+  # Total count of anticipated atoms, including nextAtom, possibleFuture and
+  # any remaining atoms not included in possibleFuture
+  atomCount: PosInt!
+  
+  # Sequence digest (including all anticipated future values regardless of
+  # whether they appear in possibleFuture)
+  digest: SequenceDigest!
 
 }
 
@@ -3476,9 +3483,6 @@ interface ExecutionConfig {
   # Instrument type
   instrument: Instrument!
 
-  # Observe class for the science sequence of this execution config.
-  observeClass: ObserveClass!
-
   # Setup time estimates
   setup: SetupTime!
 }
@@ -3518,6 +3522,17 @@ enum Existence {
   # Existence Deleted
   DELETED
 }
+
+# Execution sequence -- type specific implementations will include access to
+# atoms. 
+interface ExecutionSequence {
+
+  # Sequence digest (including all anticipated future values regardless of
+  # whether they appear in possibleFuture)
+  digest: SequenceDigest!
+
+}
+
 
 # Exposure time mode, either signal to noise or fixed
 type ExposureTimeMode {
@@ -5398,6 +5413,17 @@ enum SequenceCommand {
   STOP
 }
 
+type SequenceDigest {
+  # ObserveClass of the whole sequence
+  observeClass: ObserveClass!
+  
+  # PlannedTime for the whole sequence
+  plannedTime: PlannedTime!
+  
+  # Unique offsets that occur in the sequence
+  offsets: [Offset!]! 
+}
+
 # Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
 type SequenceEvent implements ExecutionEvent {
   # Identifies the observation to which the event refers
@@ -5436,6 +5462,7 @@ type SequenceGenerationResult {
   observationId:   ObservationId!
   itcResult:       ItcResultSet!
   executionConfig: ExecutionConfig!
+  scienceDigest:   SequenceDigest
 }
 
 # Type of sequence, acquisition or science

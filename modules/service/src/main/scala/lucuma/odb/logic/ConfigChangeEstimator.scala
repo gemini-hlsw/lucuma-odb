@@ -17,7 +17,12 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.data.ProtoStep
 
-
+/**
+ * Estimates the configuration change cost from the previous step to the
+ * `present` one.
+ *
+ * @tparam D instrument dynamic configuration type
+ */
 trait ConfigChangeEstimator[D] {
 
   def estimate(past: EstimatorState[D], present: ProtoStep[D]): List[ConfigChangeEstimate]
