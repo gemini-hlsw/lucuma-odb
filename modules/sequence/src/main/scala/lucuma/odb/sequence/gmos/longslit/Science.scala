@@ -12,6 +12,8 @@ import cats.syntax.option.*
 import coulomb.Quantity
 import eu.timepit.refined.auto.*
 import eu.timepit.refined.types.numeric.PosDouble
+import fs2.Pure
+import fs2.Stream
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -58,18 +60,18 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
     sourceProfile: SourceProfile,
     imageQuality:  ImageQuality,
     sampling:      PosDouble
-  ): LazyList[Science.Atom[D]] = {
+  ): Stream[Pure, Science.Atom[D]] = {
 
     val λ    = mode.centralWavelength
     val p0   = Offset.P.Zero
-    val Δλs  = LazyList.continually(mode.wavelengthDithers match {
-      case Nil => LazyList(WavelengthDither.Zero)
-      case ws  => ws.to(LazyList)
-    }).flatten
-    val qs   = LazyList.continually(mode.spatialOffsets match {
-      case Nil => LazyList(Offset.Q.Zero)
-      case os  => os.to(LazyList)
-    }).flatten
+    val Δλs  = mode.wavelengthDithers match {
+      case Nil => Stream(WavelengthDither.Zero).repeat
+      case ws  => Stream.emits(ws).repeat
+    }
+    val qs   = mode.spatialOffsets match {
+      case Nil => Stream(Offset.Q.Zero).repeat
+      case os  => Stream.emits(os).repeat
+    }
     val xBin = mode.xBin(sourceProfile, imageQuality, sampling)
 
     def nextAtom(index: Int, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
@@ -95,8 +97,9 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
         _ <- optics.roi         := mode.roi
       } yield ()).runS(initialConfig).value
 
-    LazyList.unfold((0, Δλs, qs, init)) { case (i, wds, sos, d) =>
-      val a = nextAtom(i, wds.head, sos.head, d)
+    Stream.unfold((0, Δλs, qs, init)) { case (i, wds, sos, d) =>
+      // TODO: head.toList.head ? there's got to be a better way
+      val a = nextAtom(i, wds.head.toList.head, sos.head.toList.head, d)
       Some((a, (i+1, wds.tail, sos.tail, a.science.value)))
     }
   }

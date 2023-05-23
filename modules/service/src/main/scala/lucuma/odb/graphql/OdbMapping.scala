@@ -275,12 +275,13 @@ object OdbMapping {
                  case e: Generator.Error                         =>
                    Result.failure(e.format)
 
-                 case Generator.Result.Success(_, itc, exec)     =>
+                 case Generator.Result.Success(_, itc, exec, d)  =>
                    Result(Json.obj(
                      "programId"       -> pid.asJson,
                      "observationId"   -> oid.asJson,
                      "itcResult"       -> itc.asJson,
-                     "executionConfig" -> exec.asJson
+                     "executionConfig" -> exec.asJson,
+                     "scienceDigest"   -> d.asJson
                    ))
                }
             }

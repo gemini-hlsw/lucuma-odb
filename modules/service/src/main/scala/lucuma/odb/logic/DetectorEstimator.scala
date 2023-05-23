@@ -17,6 +17,13 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.data.ProtoStep
 
+/**
+ * Estimates the detector exposure, readout, and write times for the current
+ * `step`.
+ *
+ * @tparam S instrument static configuration type
+ * @tparam D instrument dyanmic configuration type
+ */
 trait DetectorEstimator[S, D] {
 
   def estimate(static: S, step: ProtoStep[D]): List[DetectorEstimate]

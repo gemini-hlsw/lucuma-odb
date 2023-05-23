@@ -112,9 +112,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                          posA { p { microarcseconds } }
                        }
                      }
-                     observeClass
                      acquisition {
-                       observeClass
+                       digest {
+                         observeClass
+                       }
                        nextAtom {
                          observeClass
                          steps {
@@ -169,9 +170,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
                     "nodAndShuffle": null
                   },
-                  "observeClass": "SCIENCE",
                   "acquisition": {
-                    "observeClass": "ACQUISITION",
+                    "digest": {
+                      "observeClass": "ACQUISITION"
+                    },
                     "nextAtom": {
                       "observeClass": "ACQUISITION",
                       "steps": [
@@ -301,6 +303,11 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                  executionConfig {
                    ... on GmosNorthExecutionConfig {
                      science {
+                       digest {
+                         offsets {
+                           q { arcseconds }
+                         }
+                       }
                        nextAtom {
                          description
                          steps {
@@ -340,6 +347,20 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                 "programId": $pid,
                 "executionConfig": {
                   "science": {
+                    "digest": {
+                      "offsets": [
+                        {
+                          "q": {
+                            "arcseconds": -15.000000
+                          }
+                        },
+                        {
+                          "q": {
+                            "arcseconds": 15.000000
+                          }
+                        }
+                      ]
+                    },
                     "nextAtom": {
                       "description": "q -15.0″, λ 500.0 nm",
                       "steps": [
@@ -1271,8 +1292,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                        }
                      }
                      science {
-                       plannedTime {
-                         ...plannedTimeFields
+                       digest {
+                         plannedTime {
+                           ...plannedTimeFields
+                         }
                        }
                        nextAtom {
                          ...gmosNorthAtomFields
@@ -1301,30 +1324,32 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     }
                   },
                   "science" : {
-                    "plannedTime" : {
-                      "total" : {
-                        "seconds" : 769.200000
-                      },
-                      "charges" : [
-                        {
-                          "chargeClass" : "NON_CHARGED",
-                          "time" : {
-                            "seconds" : 0.000000
-                          }
+                    "digest": {
+                      "plannedTime" : {
+                        "total" : {
+                          "seconds" : 769.200000
                         },
-                        {
-                          "chargeClass" : "PARTNER",
-                          "time" : {
-                            "seconds" : 357.600000
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 357.600000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 411.600000
+                            }
                           }
-                        },
-                        {
-                          "chargeClass" : "PROGRAM",
-                          "time" : {
-                            "seconds" : 411.600000
-                          }
-                        }
-                      ]
+                        ]
+                      }
                     },
                     "nextAtom" : {
                       "steps" : [

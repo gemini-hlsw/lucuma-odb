@@ -9,39 +9,33 @@ import cats.Eval
 import cats.Traverse
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
+import cats.syntax.functor.*
 import cats.syntax.traverse.*
+import fs2.Pure
+import fs2.Stream
 
-case class ProtoExecutionConfig[S, D](
+case class ProtoExecutionConfig[F[_], S, A](
   static:      S,
-  acquisition: ProtoSequence[D],
-  science:     ProtoSequence[D]
+  acquisition: Stream[F, A],
+  science:     Stream[F, A]
 ) {
 
-  def mapSequences[E](f: ProtoSequence[D] => ProtoSequence[E]): ProtoExecutionConfig[S, E] =
-    ProtoExecutionConfig[S, E](static, f(acquisition), f(science))
+  def map[B](f: A => B): ProtoExecutionConfig[F, S, B] =
+    ProtoExecutionConfig[F, S, B](static, acquisition.map(f), science.map(f))
 
-}
+  def mapSequences[F2[x] >: F[x], B](
+    fa: Stream[F2, A] => Stream[F2, B],
+    fs: Stream[F2, A] => Stream[F2, B]
+  ): ProtoExecutionConfig[F2, S, B] =
+    ProtoExecutionConfig(
+      static,
+      fa(acquisition),
+      fs(science)
+    )
 
-object ProtoExecutionConfig {
+  def mapBothSequences[F2[x] >: F[x], B](
+    f: Stream[F2, A] => Stream[F2, B]
+  ): ProtoExecutionConfig[F2, S, B] =
+    mapSequences(f, f)
 
-  given [S, D](using Eq[S], Eq[D]): Eq[ProtoExecutionConfig[S, D]] =
-    Eq.by { x => (
-      x.static,
-      x.acquisition,
-      x.science
-    )}
-
-  given [X]: Traverse[ProtoExecutionConfig[X, *]] with {
-    override def traverse[G[_]: Applicative, A, B](fa: ProtoExecutionConfig[X, A])(f: A => G[B]): G[ProtoExecutionConfig[X, B]] =
-      (fa.acquisition.traverse(f), fa.science.traverse(f)).mapN((ab, sb) =>
-        ProtoExecutionConfig(fa.static, ab, sb)
-      )
-
-    override def foldLeft[A, B](fa: ProtoExecutionConfig[X, A], b: B)(f: (B, A) => B): B =
-      fa.science.foldLeft(fa.acquisition.foldLeft(b)(f))(f)
-
-    override def foldRight[A, B](fa: ProtoExecutionConfig[X, A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
-      fa.acquisition.foldRight(fa.science.foldRight(lb)(f))(f)
-
-  }
 }

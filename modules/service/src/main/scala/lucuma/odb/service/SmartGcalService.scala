@@ -24,7 +24,6 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.Sequence
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth

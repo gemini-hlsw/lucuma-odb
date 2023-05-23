@@ -7,6 +7,16 @@ import cats.syntax.option.*
 import lucuma.core.model.sequence.StepConfig
 import lucuma.odb.sequence.data.ProtoStep
 
+/**
+ * State kept while computing planned time.  Figuring out how long a step will
+ * take requires information about what has happened in previous steps.
+ *
+ * @param gcal    last GCAL configuration, if any
+ * @param science last science step configuration, if any
+ * @param step    last step in general, if any
+ *
+ * @tparam D instrument dynamic configuration type
+ */
 final case class EstimatorState[D](
   gcal:    Option[StepConfig.Gcal],
   science: Option[StepConfig.Science],
