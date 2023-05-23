@@ -50,6 +50,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalService
+import lucuma.odb.service.S3FileService
 import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
@@ -69,6 +70,7 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
+import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
 import java.time.Duration
@@ -182,9 +184,12 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       fileUploadMaxMb = 5
     )
 
-  // overriden in OdbSuiteWithS3 for tests that need it.
+  // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
-    FMain.s3ClientOpsResource[IO](awsConfig)
+    S3FileService.s3AsyncClientOpsResource[IO](awsConfig)
+
+  protected def s3PresignerResource: Resource[IO, S3Presigner] =
+    S3FileService.s3PresignerResource[IO](awsConfig)
 
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
@@ -195,6 +200,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       ssoClient.pure[Resource[IO, *]],
       "unused",
       s3ClientOpsResource,
+      s3PresignerResource
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
