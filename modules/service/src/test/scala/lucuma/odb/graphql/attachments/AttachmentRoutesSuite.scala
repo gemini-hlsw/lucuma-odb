@@ -30,6 +30,7 @@ abstract class AttachmentRoutesSuite extends CatsEffectSuite with TestSsoClient 
   protected  val fileContents    = "Phred"
   protected  val notFound        = "Not found".some
   protected  val invalidFileName = "File name must be right"
+  protected val presignedUrl     = "http://wherever.com"
 
   // This isn't really what the errors depend on, but we're not testing the service.
   // Only the result matters.
