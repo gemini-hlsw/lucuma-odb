@@ -18,10 +18,12 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Group
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 
@@ -111,6 +113,18 @@ trait ProgramMapping[F[_]]
                 limit = None,
                 child              
               )
+            )
+          )
+        case Select("obsAttachments", Nil, child) =>
+          Result(
+            Select("obsAttachments", Nil,
+              OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
+            )
+          )
+        case Select("proposalAttachments", Nil, child) =>
+          Result(
+            Select("proposalAttachments", Nil,
+              OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
             )
           )
       }

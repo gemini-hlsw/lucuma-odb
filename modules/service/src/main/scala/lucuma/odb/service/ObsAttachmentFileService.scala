@@ -51,6 +51,8 @@ trait ObsAttachmentFileService[F[_]] {
 
   /** Deletes the file from the database and then removes it from S3. */
   def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[Unit]
+  
+  def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[String]
 }
 
 object ObsAttachmentFileService extends AttachmentFileService {
@@ -83,11 +85,11 @@ object ObsAttachmentFileService extends AttachmentFileService {
       fileName:       FileName,
       description:    Option[NonEmptyString],
       fileSize:       Long, 
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): F[ObsAttachment.Id] =
       Trace[F].span("insertObsAttachment") {
         val af   = 
-          Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remoteId)
+          Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.query(obs_attachment_id)
         session.prepareR(stmt)
           .use(pg =>
@@ -106,11 +108,11 @@ object ObsAttachmentFileService extends AttachmentFileService {
       fileName:       FileName,
       description:    Option[NonEmptyString],
       fileSize:       Long, 
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("updateObsAttachment") {
         val af   = 
-          Statements.updateAttachment(user, programId, attachmentId, fileName.value, description, fileSize, remoteId)
+          Statements.updateAttachment(user, programId, attachmentId, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.query(bool)
         session.prepareR(stmt)
           .use(pg =>
@@ -126,14 +128,14 @@ object ObsAttachmentFileService extends AttachmentFileService {
            )
       }
 
-    def getAttachmentRemoteIdFromDB(
+    def getAttachmentRemotePathFromDB(
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
-    ): F[UUID] =
+    ): F[NonEmptyString] =
       Trace[F].span("getObsAttachmentRemoteIdFromDB") {
-        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentId)
-        val stmt = af.fragment.query(uuid)
+        val af   = Statements.getAttachmentRemotePath(user, programId, attachmentId)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -150,10 +152,10 @@ object ObsAttachmentFileService extends AttachmentFileService {
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
-    ): F[UUID] =
+    ): F[NonEmptyString] =
       Trace[F].span("deleteObsAttachmentFromDB") {
         val af   = Statements.deleteAttachment(user, programId, attachmentId)
-        val stmt = af.fragment.query(uuid)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -181,8 +183,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
         )
     }
 
-    def key(programId: Program.Id, remoteId: UUID) =
-      s3FileSvc.obsFileKey(programId, remoteId)
+    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString) =
+      s3FileSvc.filePath(programId, remoteId, fileName)
 
     new ObsAttachmentFileService[F] {
 
@@ -194,12 +196,12 @@ object ObsAttachmentFileService extends AttachmentFileService {
         session.transaction
           .use(_ =>
             for {
-              _        <- checkAccess(session, user, programId)
-              remoteId <- getAttachmentRemoteIdFromDB(user, programId, attachmentId)
-            } yield remoteId
+              _    <- checkAccess(session, user, programId)
+              path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
+            } yield path
           )
-          .flatMap { rid =>
-            s3FileSvc.verifyAndGet(key(programId, rid)).map(_.asRight)
+          .flatMap { rpath =>
+            s3FileSvc.verifyAndGet(rpath).map(_.asRight)
           }
           .recover {
             case e: AttachmentException => e.asLeft
@@ -228,9 +230,10 @@ object ObsAttachmentFileService extends AttachmentFileService {
                 )
                 .flatMap( _ =>
                   for {
-                    rid    <- Async[F].delay(UUID.randomUUID())
-                    size   <- s3FileSvc.upload(key(programId, rid), data)
-                    result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, rid)
+                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    path    = filePath(programId, uuid, fn.value)
+                    size   <- s3FileSvc.upload(path, data)
+                    result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
                   } yield result
                 )
           )
@@ -251,17 +254,18 @@ object ObsAttachmentFileService extends AttachmentFileService {
               session.transaction
                 .use(_ =>
                   for {
-                    _   <- checkAccess(session, user, programId)
-                    _   <- checkForDuplicateName(programId, fn, attachmentId.some)
-                    rid <- getAttachmentRemoteIdFromDB(user, programId, attachmentId)
-                  } yield rid
+                    _    <- checkAccess(session, user, programId)
+                    _    <- checkForDuplicateName(programId, fn, attachmentId.some)
+                    path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
+                  } yield path
                 )
-                .flatMap(oldRid =>
+                .flatMap(oldPath =>
                   for {
-                    newRid <- Async[F].delay(UUID.randomUUID())
-                    size   <- s3FileSvc.upload(key(programId, newRid), data)
-                    _      <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newRid)
-                    _      <- s3FileSvc.delete(key(programId, oldRid))
+                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    newPath = filePath(programId, uuid, fn.value)
+                    size   <- s3FileSvc.upload(newPath, data)
+                    _      <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newPath)
+                    _      <- s3FileSvc.delete(oldPath)
                   } yield ()
                 )
           )
@@ -274,15 +278,27 @@ object ObsAttachmentFileService extends AttachmentFileService {
         session.transaction
           .use(_ =>
             for {
-              _   <- checkAccess(session, user, programId)
-              rid <- deleteAttachmentFromDB(user, programId, attachmentId)
-            } yield rid
+              _    <- checkAccess(session, user, programId)
+              path <- deleteAttachmentFromDB(user, programId, attachmentId)
+            } yield path
           )
-          .flatMap(rid =>
+          .flatMap(remotePath =>
             // We'll trap errors from the remote delete because, although not ideal, we don't 
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
-            s3FileSvc.delete(key(programId, rid)).handleError{ case _ => () }
+            s3FileSvc.delete(remotePath).handleError{ case _ => () }
           )
+
+      def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[String] = 
+        session.transaction
+          .use(_ =>
+            for {
+              _    <- checkAccess(session, user, programId)
+              path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
+            } yield path
+          )
+          .flatMap { remotePath =>
+            s3FileSvc.presignedUrl(remotePath)
+          }
     }
   }
 
@@ -295,7 +311,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
       fileName:       NonEmptyString,
       description:    Option[NonEmptyString],
       fileSize:       Long,
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): AppliedFragment =
       sql"""
         INSERT INTO t_obs_attachment (
@@ -304,7 +320,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
           c_file_name,
           c_description,
           c_file_size,
-          c_remote_id
+          c_remote_path
         ) 
         SELECT 
           $program_id,
@@ -312,8 +328,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           $text_nonempty,
           ${text_nonempty.opt},
           $int8,
-          $uuid
-      """.apply(programId, attachmentType, fileName, description, fileSize, remoteId) |+|
+          $text_nonempty
+      """.apply(programId, attachmentType, fileName, description, fileSize, remotePath) |+|
         ProgramService.Statements.whereUserAccess(user, programId) |+|
         void"""
           RETURNING c_obs_attachment_id
@@ -326,7 +342,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
       fileName:       NonEmptyString,
       description:    Option[NonEmptyString],
       fileSize:       Long,
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): AppliedFragment =
       sql"""
         UPDATE t_obs_attachment
@@ -334,19 +350,19 @@ object ObsAttachmentFileService extends AttachmentFileService {
             c_description = ${text_nonempty.opt},
             c_checked     = false,
             c_file_size   = $int8,
-            c_remote_id   = $uuid
+            c_remote_path = $text_nonempty
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
-      """.apply(fileName, description, fileSize, remoteId, programId, attachmentId) |+|
+      """.apply(fileName, description, fileSize, remotePath, programId, attachmentId) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
-    def getAttachmentRemoteId(
+    def getAttachmentRemotePath(
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
     ): AppliedFragment =
       sql"""
-        SELECT c_remote_id
+        SELECT c_remote_path
         FROM t_obs_attachment
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId, attachmentId) |+|
@@ -379,7 +395,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId, attachmentId) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
-        void"RETURNING c_remote_id"
+        void"RETURNING c_remote_path"
 
     def attachmentTypeExists(attachmentType: Tag): AppliedFragment =
       sql"""

@@ -8,6 +8,7 @@ package attachments
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.text.utf8
 import lucuma.core.model.ObsAttachment
 import org.http4s.*
@@ -54,10 +55,29 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
           aid <- resp.getBody.map(s => ObsAttachment.Id.parse(s).get)
         } yield aid
       }
+    
+    def toNonEmptyString: IO[NonEmptyString] =
+      response.use { resp =>
+        for {
+          _   <- IO(resp.status).assertEquals(Status.Ok)
+          nes <- resp.getBody.map(s => NonEmptyString.unsafeFrom(s))
+        } yield nes
+      }
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 30)
   val service = TestUsers.service(3)
 
   val validUsers = List(pi, pi2, service)
+
+  def getViaPresignedUrl(url: NonEmptyString): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      var uri = Uri.unsafeFromString(url.value)
+      var request = Request[IO](
+        method = Method.GET,
+        uri = uri,
+      )
+
+      client.run(request)
+    }
 }

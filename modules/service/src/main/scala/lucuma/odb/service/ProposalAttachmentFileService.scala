@@ -50,6 +50,8 @@ trait ProposalAttachmentFileService[F[_]] {
 
   /** Deletes the file from the database and then removes it from S3. */
   def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit]
+  
+  def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag): F[String]
 }
 
 object ProposalAttachmentFileService extends AttachmentFileService {
@@ -83,11 +85,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       fileName:       FileName,
       description:    Option[NonEmptyString],
       fileSize:       Long, 
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("insertProposalAttachment") {
         val af   = 
-          Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remoteId)
+          Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.command
         session.prepareR(stmt)
           .use(pg =>
@@ -112,11 +114,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       fileName:       FileName,
       description:    Option[NonEmptyString],
       fileSize:       Long, 
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("updateProposalAttachment") {
         val af   = 
-          Statements.updateAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remoteId)
+          Statements.updateAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.query(bool)
         session.prepareR(stmt)
           .use(pg =>
@@ -132,14 +134,14 @@ object ProposalAttachmentFileService extends AttachmentFileService {
            )
       }
 
-    def getAttachmentRemoteIdFromDB(
+    def getAttachmentRemotePathFromDB(
       user:           User,
       programId:      Program.Id,
       attachmentType: Tag
-    ): F[UUID] =
+    ): F[NonEmptyString] =
       Trace[F].span("getProposalAttachmentRemoteIdFromDB") {
-        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentType)
-        val stmt = af.fragment.query(uuid)
+        val af   = Statements.getAttachmentRemotePath(user, programId, attachmentType)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -156,10 +158,10 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       user:           User,
       programId:      Program.Id,
       attachmentType: Tag
-    ): F[UUID] =
+    ): F[NonEmptyString] =
       Trace[F].span("deleteProposalAttachmentFromDB") {
         val af   = Statements.deleteAttachment(user, programId, attachmentType)
-        val stmt = af.fragment.query(uuid)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -173,20 +175,20 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       }
 
     def checkForDuplicateAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
-      getOptionalRemoteId(user, programId, attachmentType)
+      getOptionalRemotePath(user, programId, attachmentType)
         .flatMap { 
           case Some(_) => Async[F].raiseError(InvalidRequest("Duplicate attachment type"))
           case None    => Async[F].unit
           }
 
-    def getOptionalRemoteId(
+    def getOptionalRemotePath(
       user:           User,
       programId:      Program.Id,
       attachmentType: Tag
-    ): F[Option[UUID]] =
+    ): F[Option[NonEmptyString]] =
       Trace[F].span("getProposalAttachmentRemoteIdFromDB") {
-        val af   = Statements.getAttachmentRemoteId(user, programId, attachmentType)
-        val stmt = af.fragment.query(uuid)
+        val af   = Statements.getAttachmentRemotePath(user, programId, attachmentType)
+        val stmt = af.fragment.query(text_nonempty)
 
         session
           .prepareR(stmt)
@@ -208,8 +210,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         )
     }
 
-    def key(programId: Program.Id, remoteId: UUID) =
-      s3FileSvc.proposalFileKey(programId, remoteId)
+    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString) =
+      s3FileSvc.filePath(programId, remoteId, fileName)
 
     new ProposalAttachmentFileService[F] {
       def getAttachment(
@@ -220,13 +222,13 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         session.transaction
           .use(_ =>
             for {
-              _        <- checkAccess(session, user, programId)
-              _        <- checkAttachmentType(attachmentType)
-              remoteId <- getAttachmentRemoteIdFromDB(user, programId, attachmentType)
-            } yield remoteId
+              _    <- checkAccess(session, user, programId)
+              _    <- checkAttachmentType(attachmentType)
+              path <- getAttachmentRemotePathFromDB(user, programId, attachmentType)
+            } yield path
           )
-          .flatMap { rid =>
-            s3FileSvc.verifyAndGet(key(programId, rid)).map(_.asRight)
+          .flatMap { rpath =>
+            s3FileSvc.verifyAndGet(rpath).map(_.asRight)
           }
           .recover {
             case e: AttachmentException => e.asLeft
@@ -255,9 +257,10 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 )
                 .flatMap( _ =>
                   for {
-                    rid    <- Async[F].delay(UUID.randomUUID())
-                    size   <- s3FileSvc.upload(key(programId, rid), data)
-                    result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, rid)
+                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    path    = filePath(programId, uuid, fn.value)
+                    size   <- s3FileSvc.upload(path, data)
+                    result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
                   } yield result
                 )
           )
@@ -278,18 +281,19 @@ object ProposalAttachmentFileService extends AttachmentFileService {
               session.transaction
                 .use(_ =>
                   for {
-                    _   <- checkAccess(session, user, programId)
-                    _   <- checkAttachmentType(attachmentType)
-                    _   <- checkForDuplicateName(programId, fn, attachmentType.some)
-                    rid <- getAttachmentRemoteIdFromDB(user, programId, attachmentType)
-                  } yield rid
+                    _    <- checkAccess(session, user, programId)
+                    _    <- checkAttachmentType(attachmentType)
+                    _    <- checkForDuplicateName(programId, fn, attachmentType.some)
+                    path <- getAttachmentRemotePathFromDB(user, programId, attachmentType)
+                  } yield path
                 )
-                .flatMap(oldRid =>
+                .flatMap(oldPath =>
                   for {
-                    newRid <- Async[F].delay(UUID.randomUUID())
-                    size   <- s3FileSvc.upload(key(programId, newRid), data)
-                    _      <- updateAttachmentInDB(user, programId, attachmentType, fn, description, size, newRid)
-                    _      <- s3FileSvc.delete(key(programId, oldRid))
+                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    newPath = filePath(programId, uuid, fn.value)
+                    size   <- s3FileSvc.upload(newPath, data)
+                    _      <- updateAttachmentInDB(user, programId, attachmentType, fn, description, size, newPath)
+                    _      <- s3FileSvc.delete(oldPath)
                   } yield ()
                 )
           )
@@ -298,16 +302,30 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         session.transaction
           .use(_ =>
             for {
-              _   <- checkAccess(session, user, programId)
-              _   <- checkAttachmentType(attachmentType)
-              rid <- deleteAttachmentFromDB(user, programId, attachmentType)
-            } yield rid
+              _    <- checkAccess(session, user, programId)
+              _    <- checkAttachmentType(attachmentType)
+              path <- deleteAttachmentFromDB(user, programId, attachmentType)
+            } yield path
           )
-          .flatMap(rid =>
+          .flatMap(remotePath =>
             // We'll trap errors from the remote delete because, although not ideal, we don't 
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
-            s3FileSvc.delete(key(programId, rid)).handleError{ case _ => () }
+            s3FileSvc.delete(remotePath).handleError{ case _ => () }
           )
+
+      def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag): F[String] =
+        session.transaction
+          .use(_ =>
+            for {
+              _    <- checkAccess(session, user, programId)
+              _    <- checkAttachmentType(attachmentType)
+              path <- getAttachmentRemotePathFromDB(user, programId, attachmentType)
+            } yield path
+          )
+          .flatMap { remotePath =>
+            s3FileSvc.presignedUrl(remotePath)
+          }
+
     }
   }
 
@@ -320,7 +338,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       fileName:       NonEmptyString,
       description:    Option[NonEmptyString],
       fileSize:       Long,
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): AppliedFragment =
       sql"""
         INSERT INTO t_proposal_attachment (
@@ -329,7 +347,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           c_file_name,
           c_description,
           c_file_size,
-          c_remote_id
+          c_remote_path
         ) 
         SELECT 
           $program_id,
@@ -337,8 +355,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           $text_nonempty,
           ${text_nonempty.opt},
           $int8,
-          $uuid
-      """.apply(programId, attachmentType, fileName, description, fileSize, remoteId) |+|
+          $text_nonempty
+      """.apply(programId, attachmentType, fileName, description, fileSize, remotePath) |+|
         ProgramService.Statements.whereUserAccess(user, programId)
 
     def updateAttachment(
@@ -348,7 +366,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       fileName:       NonEmptyString,
       description:    Option[NonEmptyString],
       fileSize:       Long,
-      remoteId:       UUID
+      remotePath:     NonEmptyString
     ): AppliedFragment =
       sql"""
         UPDATE t_proposal_attachment
@@ -356,19 +374,19 @@ object ProposalAttachmentFileService extends AttachmentFileService {
             c_description = ${text_nonempty.opt},
             c_checked     = false,
             c_file_size   = $int8,
-            c_remote_id   = $uuid
+            c_remote_path = $text_nonempty
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
-      """.apply(fileName, description, fileSize, remoteId, programId, attachmentType) |+|
+      """.apply(fileName, description, fileSize, remotePath, programId, attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
-    def getAttachmentRemoteId(
+    def getAttachmentRemotePath(
       user:           User,
       programId:      Program.Id,
       attachmentType: Tag
     ): AppliedFragment =
       sql"""
-        SELECT c_remote_id
+        SELECT c_remote_path
         FROM t_proposal_attachment
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
       """.apply(programId, attachmentType) |+|
@@ -385,7 +403,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
       """.apply(programId, attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
-        void"RETURNING c_remote_id"
+        void"RETURNING c_remote_path"
 
     def checkForDuplicateName(
       programId:  Program.Id,

@@ -8,6 +8,7 @@ package attachments
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -91,7 +92,7 @@ class proposalAttachments extends AttachmentsSuite {
   def expected(attachments: TestAttachment*): Json =
     Json.obj(
       "proposalAttachments" -> Json.fromValues(
-        attachments.map(ta =>
+        attachments.sortBy(_.attachmentType).map(ta =>
           Json.obj(
             "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
             "fileName"       -> ta.fileName.asJson,
@@ -158,6 +159,22 @@ class proposalAttachments extends AttachmentsSuite {
 
       client.run(request)
     }
+  
+  def getPresignedUrl(
+    user:      User,
+    programId: Program.Id,
+    ta:        TestAttachment
+  ): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      var uri     = svr.baseUri / "attachment" / "proposal" / "url" / programId.toString / ta.attachmentType
+      var request = Request[IO](
+        method = Method.GET,
+        uri = uri,
+        headers = Headers(authHeader(user))
+      )
+
+      client.run(request)
+    }
 
   def deleteAttachment(
     user:      User,
@@ -175,12 +192,12 @@ class proposalAttachments extends AttachmentsSuite {
       client.run(request)
     }
 
-  def getRemoteIdFromDb(pid: Program.Id, ta: TestAttachment): IO[UUID] = {
+  def getRemotePathFromDb(pid: Program.Id, ta: TestAttachment): IO[NonEmptyString] = {
     val query = 
       sql"""
-        select c_remote_id from t_proposal_attachment 
+        select c_remote_path from t_proposal_attachment 
         where c_program_id = $program_id and c_attachment_type = $tag
-      """.query(uuid)
+      """.query(text_nonempty)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(pid, Tag(ta.attachmentType)))
     )
@@ -201,8 +218,8 @@ class proposalAttachments extends AttachmentsSuite {
     for {
       pid    <- createProgramAs(pi)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
       _      <- getAttachment(pi, pid, file1A).expectBody(file1A.content)
@@ -213,18 +230,31 @@ class proposalAttachments extends AttachmentsSuite {
     } yield ()
   }
 
+  test("can download via presigned url") {
+    for {
+      pid    <- createProgramAs(pi)
+      _      <- insertAttachment(pi, pid, file1A).expectOk
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
+      _      <- assertS3(fileKey, file1A.content)
+      _      <- assertAttachmentsGql(pi, pid, file1A)
+      url    <- getPresignedUrl(pi, pid, file1A).toNonEmptyString
+      _      <- getViaPresignedUrl(url).expectBody(file1A.content)
+    } yield ()
+  }
+
   test("successful insert, download and delete of multiple files") {
     for {
       pid  <- createProgramAs(pi)
       _    <- insertAttachment(pi, pid, file1A).expectOk
-      rid1 <- getRemoteIdFromDb(pid, file1A)
-      fk1   = awsConfig.proposalFileKey(pid, rid1)
+      pth1 <- getRemotePathFromDb(pid, file1A)
+      fk1   = awsConfig.fileKey(pth1)
       _    <- assertS3(fk1, file1A.content)
       _    <- insertAttachment(pi, pid, file2).expectOk
-      rid2 <- getRemoteIdFromDb(pid, file2)
-      fk2   = awsConfig.proposalFileKey(pid, rid2)
+      pth2 <- getRemotePathFromDb(pid, file2)
+      fk2   = awsConfig.fileKey(pth2)
       _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsGql(pi, pid, file2, file1A)
+      _    <- assertAttachmentsGql(pi, pid, file1A, file2)
       _    <- getAttachment(pi, pid, file1A).expectBody(file1A.content)
       _    <- getAttachment(pi, pid, file2).expectBody(file2.content)
       _    <- deleteAttachment(pi, pid, file1A).expectOk
@@ -241,15 +271,15 @@ class proposalAttachments extends AttachmentsSuite {
       pid    <- createProgramAs(pi)
       _       = assertEquals(file1A.attachmentType, file3.attachmentType)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
       _      <- getAttachment(pi, pid, file1A).expectBody(file1A.content)
       _      <- updateAttachment(pi, pid, file3).expectOk
-      rid2   <- getRemoteIdFromDb(pid, file1A) // use the original type
-      _       = assertNotEquals(rid, rid2)
-      fk2     = awsConfig.proposalFileKey(pid, rid2)
+      path2  <- getRemotePathFromDb(pid, file1A) // use the original type
+      _       = assertNotEquals(path, path2)
+      fk2     = awsConfig.fileKey(path2)
       _      <- assertS3(fk2, file3.content)
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid, file3)
@@ -262,15 +292,15 @@ class proposalAttachments extends AttachmentsSuite {
       pid    <- createProgramAs(pi)
       _       = assertEquals(file1A.attachmentType, file1B.attachmentType)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
       _      <- getAttachment(pi, pid, file1A).expectBody(file1A.content)
       _      <- updateAttachment(pi, pid, file1B).expectOk
-      rid2   <- getRemoteIdFromDb(pid, file1A)
-      _       = assertNotEquals(rid, rid2)
-      fk2     = awsConfig.proposalFileKey(pid, rid2)
+      path2  <- getRemotePathFromDb(pid, file1A)
+      _       = assertNotEquals(path, path2)
+      fk2     = awsConfig.fileKey(path2)
       _      <- assertS3(fk2, file1B.content)
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid, file1B)
@@ -289,8 +319,8 @@ class proposalAttachments extends AttachmentsSuite {
     for {
       pid    <- createProgramAs(pi)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
       _      <- insertAttachment(pi, pid, file3).withExpectation(Status.BadRequest, "Duplicate attachment type")
@@ -300,8 +330,8 @@ class proposalAttachments extends AttachmentsSuite {
     for {
       pid    <- createProgramAs(pi)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
       _      <- insertAttachment(pi, pid, file1C).withExpectation(Status.BadRequest, "Duplicate file name")
@@ -312,11 +342,11 @@ class proposalAttachments extends AttachmentsSuite {
     for {
       pid    <- createProgramAs(pi)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- insertAttachment(pi, pid, file2).expectOk
-      rid2   <- getRemoteIdFromDb(pid, file2)
-      fk2     = awsConfig.proposalFileKey(pid, rid2)
+      path2  <- getRemotePathFromDb(pid, file2)
+      fk2     = awsConfig.fileKey(path2)
       _      <- assertAttachmentsGql(pi, pid, file2, file1A)
       _      <- updateAttachment(pi, pid, file1C).withExpectation(Status.BadRequest, "Duplicate file name")
       _      <- assertAttachmentsGql(pi, pid, file2, file1A)
@@ -329,8 +359,8 @@ class proposalAttachments extends AttachmentsSuite {
       pid    <- createProgramAs(pi)
       _       = assertEquals(file1A.attachmentType, file1Empty.attachmentType)
       _      <- insertAttachment(pi, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
       _      <- updateAttachment(pi, pid, file1Empty).withExpectation(Status.InternalServerError)
@@ -413,13 +443,13 @@ class proposalAttachments extends AttachmentsSuite {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
       _    <- insertAttachment(pi, pid1, file1A).expectOk
-      rid1 <- getRemoteIdFromDb(pid1, file1A)
-      fk1   = awsConfig.proposalFileKey(pid1, rid1)
+      pth1 <- getRemotePathFromDb(pid1, file1A)
+      fk1   = awsConfig.fileKey(pth1)
       _    <- assertS3(fk1, file1A.content)
       _    <- assertAttachmentsGql(pi, pid1, file1A)
       _    <- insertAttachment(pi2, pid2, file2).expectOk
-      rid2 <- getRemoteIdFromDb(pid2, file2)
-      fk2   = awsConfig.proposalFileKey(pid2, rid2)
+      pth2 <- getRemotePathFromDb(pid2, file2)
+      fk2   = awsConfig.fileKey(pth2)
       _    <- assertS3(fk2, file2.content)
       _    <- assertAttachmentsGql(pi2, pid2, file2)
       _    <- getAttachment(pi, pid2, file2).withExpectation(Status.Forbidden)
@@ -432,13 +462,13 @@ class proposalAttachments extends AttachmentsSuite {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
       _    <- insertAttachment(pi, pid1, file1A).expectOk
-      rid1 <- getRemoteIdFromDb(pid1, file1A)
-      fk1   = awsConfig.proposalFileKey(pid1, rid1)
+      pth1 <- getRemotePathFromDb(pid1, file1A)
+      fk1   = awsConfig.fileKey(pth1)
       _    <- assertS3(fk1, file1A.content)
       _    <- assertAttachmentsGql(pi, pid1, file1A)
       _    <- insertAttachment(pi2, pid2, file2).expectOk
-      rid2 <- getRemoteIdFromDb(pid2, file2)
-      fk2   = awsConfig.proposalFileKey(pid2, rid2)
+      pth2 <- getRemotePathFromDb(pid2, file2)
+      fk2   = awsConfig.fileKey(pth2)
       _    <- assertS3(fk2, file2.content)
       _    <- assertAttachmentsGql(pi2, pid2, file2)
       _    <- deleteAttachment(pi, pid2, file2).withExpectation(Status.Forbidden)
@@ -451,15 +481,15 @@ class proposalAttachments extends AttachmentsSuite {
       pid    <- createProgramAs(pi)
       _       = assertEquals(file1A.attachmentType, file3.attachmentType)
       _      <- insertAttachment(service, pid, file1A).expectOk
-      rid    <- getRemoteIdFromDb(pid, file1A)
-      fileKey = awsConfig.proposalFileKey(pid, rid)
+      path   <- getRemotePathFromDb(pid, file1A)
+      fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(service, pid, file1A)
       _      <- getAttachment(service, pid, file1A).expectBody(file1A.content)
       _      <- updateAttachment(service, pid, file3).expectOk
-      rid2   <- getRemoteIdFromDb(pid, file3)
-      _       = assertNotEquals(rid, rid2)
-      fk2     = awsConfig.proposalFileKey(pid, rid2)
+      path2  <- getRemotePathFromDb(pid, file3)
+      _       = assertNotEquals(path, path2)
+      fk2     = awsConfig.fileKey(path2)
       _      <- assertS3(fk2, file3.content)
       _      <- assertS3NotThere(fileKey)
       _      <- deleteAttachment(service, pid, file3).expectOk

@@ -157,11 +157,14 @@ object Config {
     bucketName:      BucketName,
     fileUploadMaxMb: Int 
   ) {
-    def obsFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
-      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/obs/$remoteId"))
-
-    def proposalFileKey(programId: Program.Id, remoteId: UUID): FileKey = 
-      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$programId/proposal/$remoteId"))
+    // Within the ODB we work with the filepath, which is the S3 FileKey
+    // minus the basePath. The s3FileService adds the basePath using
+    // `fileKey` as needed.
+    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString): NonEmptyString = 
+      NonEmptyString.unsafeFrom(s"$programId/$remoteId/$fileName")
+    
+    def fileKey(path: NonEmptyString): FileKey =
+      FileKey(NonEmptyString.unsafeFrom(s"$basePath/$path"))
   }
 
   object Aws {

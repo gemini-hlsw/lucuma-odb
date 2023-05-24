@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.S3Configuration
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 abstract class OdbSuiteWithS3 extends OdbSuite {
 
@@ -65,6 +66,25 @@ abstract class OdbSuiteWithS3 extends OdbSuite {
         )
         .region(Region.of(s3Container.container.getRegion()))
     )
+  
+  override protected def s3PresignerResource: Resource[IO, S3Presigner] = {
+    val builder     =
+      S3Presigner
+        .builder()
+        .endpointOverride(s3Container.endpointOverride(Service.S3))
+        .credentialsProvider(
+          s3Container.staticCredentialsProvider
+        )
+        .serviceConfiguration(
+          S3Configuration
+            .builder()
+            .pathStyleAccessEnabled(true)
+            .build()
+        )
+        .region(Region.of(s3Container.container.getRegion()))
+
+    Resource.fromAutoCloseable(IO.delay(builder.build()))
+  }
 
   def assertS3(fileKey: FileKey, expected: String): IO[Unit] =
     s3ClientOpsResource.use(s3Ops =>

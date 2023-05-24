@@ -95,6 +95,14 @@ object ProposalAttachmentRoutes {
             .flatMap(_ => Ok())
             .recoverWith { case e: AttachmentException => e.toResponse }
         }
+      
+      case req @ GET -> Root / "attachment" / "proposal" / "url" / ProgramId(programId) / TagPath(attachmentType) =>
+        ssoClient.require(req) { user =>
+          attachmentFileService
+            .getPresignedUrl(user, programId, attachmentType)
+            .flatMap(Ok(_))
+            .recoverWith { case e: AttachmentException => e.toResponse }
+        }
     }
 
     EntityLimiter(routes, maxUploadMb * 1000 * 1000)
