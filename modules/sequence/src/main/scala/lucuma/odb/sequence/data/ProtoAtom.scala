@@ -11,24 +11,31 @@ import cats.data.NonEmptyList
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.string.NonEmptyString
 
 case class ProtoAtom[A](
-  description: Option[String],
+  description: Option[NonEmptyString],
   steps:       NonEmptyList[A]
 )
 
 
 object ProtoAtom {
 
-  def one[A](description: Option[String], step: A): ProtoAtom[A] =
+  def one[A](description: Option[NonEmptyString], step: A): ProtoAtom[A] =
     ProtoAtom(description, NonEmptyList.one(step))
 
-  def of[A](description: Option[String], head: A, tail: A*): ProtoAtom[A] =
+  def one[A](description: String, step: A): ProtoAtom[A] =
+    ProtoAtom(NonEmptyString.from(description).toOption, NonEmptyList.one(step))
+
+  def of[A](description: Option[NonEmptyString], head: A, tail: A*): ProtoAtom[A] =
     ProtoAtom(description, NonEmptyList.of(head, tail*))
+
+  def of[A](description: String, head: A, tail: A*): ProtoAtom[A] =
+    ProtoAtom(NonEmptyString.from(description).toOption, NonEmptyList.of(head, tail*))
 
   given [A](using Eq[A]): Eq[ProtoAtom[A]] =
     Eq.by { a => (
-      a.description,
+      a.description.map(_.value),
       a.steps
     )}
 

@@ -7,6 +7,7 @@ package longslit
 import cats.data.NonEmptyList
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosDouble
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GmosNorthDetector.{Hamamatsu => HamamatsuNorth}
@@ -76,7 +77,8 @@ sealed abstract class Generator[S, D, G, F, U](
       .when(itc.exposures.value > 0)(
         ProtoExecutionConfig(
           static,
-          Stream(ProtoAtom.of("Acquisition - Initial".some, acq.ccd2, acq.p10, acq.slit)) ++ Stream(ProtoAtom.of("Acquisition - Slit".some, acq.slit)).repeat,
+          Stream(ProtoAtom.of("Acquisition - Initial", acq.ccd2, acq.p10, acq.slit)) ++
+            Stream(ProtoAtom.of("Acquisition - Slit", acq.slit)).repeat,
           sci.map(a => ProtoAtom(a.description.some, a.steps))
         )
       ).toRight("ITC prescribes 0 exposures.")
