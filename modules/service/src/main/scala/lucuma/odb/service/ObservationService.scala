@@ -82,6 +82,7 @@ import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
+import Services.Syntax.*
 
 sealed trait ObservationService[F[_]] {
   import ObservationService._
@@ -89,24 +90,24 @@ sealed trait ObservationService[F[_]] {
   def createObservation(
     programId: Program.Id,
     SET:       ObservationPropertiesInput.Create
-  ): F[Result[Observation.Id]]
+  )(using Transaction[F]): F[Result[Observation.Id]]
 
   def selectObservations(
     which: AppliedFragment
-  ): F[List[Observation.Id]]
+  )(using Transaction[F]): F[List[Observation.Id]]
 
   def selectObservingModes(
     which: List[Observation.Id]
-  ): F[Map[Option[ObservingModeType], List[Observation.Id]]]
+  )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
     SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
-  ): F[Result[List[Observation.Id]]]
+  )(using Transaction[F]): F[Result[List[Observation.Id]]]
 
   def cloneObservation(
     input: CloneObservationInput
-  ): F[Result[Observation.Id]]
+  )(using Transaction[F]): F[Result[Observation.Id]]
 
 }
 
@@ -159,13 +160,7 @@ object ObservationService {
       .map(_.message)
       .getOrElse(GenericConstraintViolationMessage(ex.message))
 
-  def fromSessionAndUser[F[_]: Sync: Trace](
-    session: Session[F],
-    user:    User,
-    observingModeServices: ObservingModeServices[F],
-    asterismService: AsterismService[F],
-    timingWindowService: TimingWindowService[F]
-  ): ObservationService[F] =
+  def instantiate[F[_]: Sync: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
 
       private def setTimingWindows(
@@ -181,7 +176,7 @@ object ObservationService {
       override def createObservation(
         programId: Program.Id,
         SET:       ObservationPropertiesInput.Create
-      ): F[Result[Observation.Id]] =
+      )(using Transaction[F]): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
           session.transaction.use { xa =>
 
@@ -213,14 +208,14 @@ object ObservationService {
 
       override def selectObservations(
         which: AppliedFragment
-      ): F[List[Observation.Id]] =
+      )(using Transaction[F]): F[List[Observation.Id]] =
         session.prepareR(which.fragment.query(observation_id)).use { pq =>
           pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
       override def selectObservingModes(
         which: List[Observation.Id]
-      ): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
+      )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
         NonEmptyList
           .fromList(which)
           .fold(Applicative[F].pure(Map.empty)) { oids =>
@@ -246,7 +241,7 @@ object ObservationService {
         nEdit:           Nullable[ObservingModeInput.Edit],
         rObservationIds: Result[List[Observation.Id]],
         xa:              Transaction[F]
-      ): F[Result[List[Observation.Id]]] =
+      )(using Transaction[F]): F[Result[List[Observation.Id]]] =
 
         (rObservationIds.toOption, nEdit.toOptionOption).mapN { (oids, oEdit) =>
 
@@ -303,7 +298,7 @@ object ObservationService {
       override def updateObservations(
         SET:   ObservationPropertiesInput.Edit,
         which: AppliedFragment
-      ): F[Result[List[Observation.Id]]] =
+      )(using Transaction[F]): F[Result[List[Observation.Id]]] =
         Trace[F].span("updateObservation") {
           session.transaction.use { xa =>
             for {
@@ -328,7 +323,7 @@ object ObservationService {
 
       def cloneObservation(
         input: CloneObservationInput
-      ): F[Result[Observation.Id]] = 
+      )(using Transaction[F]): F[Result[Observation.Id]] = 
         session.transaction.use { xa =>
 
           // First we need the pid, observing mode, and grouping information

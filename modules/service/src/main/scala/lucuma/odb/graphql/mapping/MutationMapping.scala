@@ -60,12 +60,15 @@ import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.ProposalService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
+import skunk.Transaction
 
 import scala.reflect.ClassTag
 
@@ -96,12 +99,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     mutationFields.foldMap(mf => Map(MutationType -> mf.Elaborator))
 
-  // Resources needed by mutations
-  def allocationService: Resource[F, AllocationService[F]]
-  def asterismService: Resource[F, AsterismService[F]]
+  // A services resource and syntax to use it wrapped in a transaction. All mutations need have the
+  // for services.useTransactionally { ... }
+  def services: Resource[F, Services[F]]
+  extension [A](s: Resource[F, Services[F]]) def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A]): F[A] =
+    s.use(ss => ss.session.transaction.use(xa => fa(using xa, ss)))
+
   def groupService: Resource[F, GroupService[F]]
   def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
-  def observationService: Resource[F, ObservationService[F]]
   def programService: Resource[F, ProgramService[F]]
   def proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]]
   def targetService: Resource[F, TargetService[F]]
@@ -184,8 +189,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
-      observationService.use { svc =>
-        svc.cloneObservation(input).map { r =>
+      services.useTransactionally {
+        observationService.cloneObservation(input).map { r =>
           r.map { oid =>
             Filter(And(
               Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
@@ -236,32 +241,29 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
+      services.useTransactionally {
 
-      val createObservation: F[Result[(Observation.Id, Query)]] =
-        observationService.use { svc =>
-          svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
+        val createObservation: F[Result[(Observation.Id, Query)]] =
+          observationService.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
             _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
           )
-        }
 
-      def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
-        oid.flatTraverse { o =>
-          input.asterism.toOption.traverse { a =>
-            asterismService.use(_.insertAsterism(input.programId, NonEmptyList.one(o), a))
-          }
-        }.map(_.getOrElse(Result.unit))
+        def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
+          oid.flatTraverse { o =>
+            input.asterism.toOption.traverse { a =>
+              asterismService.insertAsterism(input.programId, NonEmptyList.one(o), a)
+            }
+          }.map(_.getOrElse(Result.unit))
 
-      pool.use { s =>
-        s.transaction.use { xa =>
-          for {
-            rTup  <- createObservation
-            oid    = rTup.toOption.map(_._1)
-            rUnit <- insertAsterism(oid)
-            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            // Fail altogether if there was an issue, say, creating the asterism
-            _     <- xa.rollback.unlessA(query.hasValue)
-          } yield query
-        }
+        for {
+          rTup  <- createObservation
+          oid    = rTup.toOption.map(_._1)
+          rUnit <- insertAsterism(oid)
+          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+          // Fail altogether if there was an issue, say, creating the asterism
+          _     <- transaction.rollback.unlessA(query.hasValue)
+        } yield query
+
       }
     }
 
@@ -302,15 +304,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
       import AllocationService.SetAllocationResponse._
-      allocationService.use(_.setAllocation(input)).map[Result[Query]] {
-        case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
-        case PartnerNotFound(_)  => ???
-        case ProgramNotFound(_)  => ???
-        case Success             =>
-          Result(Unique(Filter(And(
-            Predicates.setAllocationResult.programId.eql(input.programId),
-            Predicates.setAllocationResult.partner.eql(input.partner)
-          ), child)))
+      services.useTransactionally {
+        allocationService.setAllocation(input).map[Result[Query]] {
+          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case PartnerNotFound(_)  => ???
+          case ProgramNotFound(_)  => ???
+          case Success             =>
+            Result(Unique(Filter(And(
+              Predicates.setAllocationResult.programId.eql(input.programId),
+              Predicates.setAllocationResult.partner.eql(input.partner)
+            ), child)))
+        }
       }
     }
 
@@ -336,39 +340,36 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
+      services.useTransactionally {
 
-      val idSelect: Result[AppliedFragment] =
-        observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+        val idSelect: Result[AppliedFragment] =
+          observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
-      val selectObservations: F[Result[(List[Observation.Id], Query)]] =
-        idSelect.traverse { which =>
-          observationService.use { svc =>
-            svc.selectObservations(which)            
-          } 
-        } map { r => 
-          r.flatMap { oids => 
-            observationResultSubquery(oids, input.LIMIT, child)
-              .tupleLeft(oids)
+        val selectObservations: F[Result[(List[Observation.Id], Query)]] =
+          idSelect.traverse { which =>
+            observationService.selectObservations(which)            
+          } map { r => 
+            r.flatMap { oids => 
+              observationResultSubquery(oids, input.LIMIT, child)
+                .tupleLeft(oids)
+            }
           }
-        }
 
-      def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-        NonEmptyList.fromList(oids).traverse { os =>
-          val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
-          val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
-          asterismService.use(_.updateAsterism(input.programId, os, add, del))
-        }.map(_.getOrElse(Result.unit))
+        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+          NonEmptyList.fromList(oids).traverse { os =>
+            val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
+            val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
+            asterismService.updateAsterism(input.programId, os, add, del)
+          }.map(_.getOrElse(Result.unit))
 
-      pool.use { s =>
-        s.transaction.use { xa =>
-          for {
-            rTup  <- selectObservations
-            oids   = rTup.toList.flatMap(_._1)
-            rUnit <- setAsterisms(oids)
-            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            _     <- xa.rollback.unlessA(query.hasValue)
-          } yield query
-        }
+        for {
+          rTup  <- selectObservations
+          oids   = rTup.toList.flatMap(_._1)
+          rUnit <- setAsterisms(oids)
+          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+          _     <- transaction.rollback.unlessA(query.hasValue)
+        } yield query
+
       }
     }
 
@@ -394,14 +395,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
+      services.useTransactionally {
 
-      val idSelect: Result[AppliedFragment] =
-        observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+        val idSelect: Result[AppliedFragment] =
+          observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
-      val updateObservations: F[Result[(List[Observation.Id], Query)]] =
-        idSelect.flatTraverse { which =>
-          observationService.use { svc =>
-            svc
+        val updateObservations: F[Result[(List[Observation.Id], Query)]] =
+          idSelect.flatTraverse { which =>
+            observationService
               .updateObservations(input.SET, which)
               .map { r => 
                 r.flatMap { oids => 
@@ -410,23 +411,20 @@ trait MutationMapping[F[_]] extends Predicates[F] {
                 }
               }
           }
-        }
 
-      def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-        NonEmptyList.fromList(oids).traverse { os =>
-          asterismService.use(_.setAsterism(input.programId, os, input.asterism))
-        }.map(_.getOrElse(Result.unit))
+        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+          NonEmptyList.fromList(oids).traverse { os =>
+            asterismService.setAsterism(input.programId, os, input.asterism)
+          }.map(_.getOrElse(Result.unit))
 
-      pool.use { s =>
-        s.transaction.use { xa =>
-          for {
-            rTup  <- updateObservations
-            oids   = rTup.toList.flatMap(_._1)
-            rUnit <- setAsterisms(oids)
-            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            _     <- xa.rollback.unlessA(query.hasValue)
-          } yield query
-        }
+        for {
+          rTup  <- updateObservations
+          oids   = rTup.toList.flatMap(_._1)
+          rUnit <- setAsterisms(oids)
+          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+          _     <- transaction.rollback.unlessA(query.hasValue)
+        } yield query
+
       }
     }
 

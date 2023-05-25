@@ -70,6 +70,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
+import lucuma.odb.service.Services
 
 object OdbMapping {
 
@@ -199,24 +200,14 @@ object OdbMapping {
           override val user: User         = user0
           override val topics: Topics[F]  = topics0
 
-          override val allocationService: Resource[F, AllocationService[F]] =
-            pool.map(AllocationService.fromSessionAndUser(_, user))
-
-          override val asterismService: Resource[F, AsterismService[F]] =
-            pool.map(AsterismService.fromSessionAndUser(_, user))
+          override val services: Resource[F, Services[F]] =
+            pool.map(Services.forUser(user))
 
           override val groupService: Resource[F, GroupService[F]] =
             pool.map(GroupService.fromSessionAndUser(_, user))
+
           override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
             pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
-
-          override val observationService: Resource[F, ObservationService[F]] =
-            pool.map { s =>
-              val oms = ObservingModeServices.fromSession(s)
-              val as  = AsterismService.fromSessionAndUser(s, user)
-              val tws = TimingWindowService.fromSession(s)
-              ObservationService.fromSessionAndUser(s, user, oms, as, tws)
-            }
 
           override val programService: Resource[F, ProgramService[F]] =
             pool.map(ProgramService.fromSessionAndUser(_, user))
@@ -228,11 +219,12 @@ object OdbMapping {
             pool.map(TargetService.fromSession(_, user))
 
           val itc: Resource[F, Itc[F]] =
-            pool.map { s =>
-              val oms = ObservingModeServices.fromSession(s)
-              val gps = GeneratorParamsService.fromSession(s, user, oms)
-              Itc.fromClientAndServices(itcClient, gps)
-            }
+            ???
+            // pool.map { s =>
+            //   val oms = ObservingModeServices.fromSession(s)
+            //   val gps = GeneratorParamsService.fromSession(s, user, oms)
+            //   Itc.fromClientAndServices(itcClient, gps)
+            // }
 
           override def itcQuery(
             path:     Path,
@@ -249,12 +241,13 @@ object OdbMapping {
             }
 
           val generator: Resource[F, Generator[F]] =
-            pool.map { s =>
-              val oms = ObservingModeServices.fromSession(s)
-              val gps = GeneratorParamsService.fromSession(s, user, oms)
-              val sgc = SmartGcalService.fromSession(s)
-              Generator.fromClientAndServices(commitHash, itcClient, gps, sgc)
-            }
+            ???
+            // pool.map { s =>
+            //   val oms = ObservingModeServices.fromSession(s)
+            //   val gps = GeneratorParamsService.fromSession(s, user, oms)
+            //   val sgc = SmartGcalService.fromSession(s)
+            //   Generator.fromClientAndServices(commitHash, itcClient, gps, sgc)
+            // }
 
           override def sequence(
             path:     Path,
@@ -262,24 +255,25 @@ object OdbMapping {
             oid:      Observation.Id,
             useCache: Boolean
           ): F[Result[Json]] =
-            generator.use {
-              _.generate(pid, oid, useCache)
-               .map {
-                 case Generator.Result.ObservationNotFound(_, _) =>
-                   Result(Json.Null)
+            ???
+            // generator.use {
+            //   _.generate(pid, oid, useCache)
+            //    .map {
+            //      case Generator.Result.ObservationNotFound(_, _) =>
+            //        Result(Json.Null)
 
-                 case e: Generator.Error                         =>
-                   Result.failure(e.format)
+            //      case e: Generator.Error                         =>
+            //        Result.failure(e.format)
 
-                 case Generator.Result.Success(_, itc, exec)     =>
-                   Result(Json.obj(
-                     "programId"       -> pid.asJson,
-                     "observationId"   -> oid.asJson,
-                     "itcResult"       -> itc.asJson,
-                     "executionConfig" -> exec.asJson
-                   ))
-               }
-            }
+            //      case Generator.Result.Success(_, itc, exec)     =>
+            //        Result(Json.obj(
+            //          "programId"       -> pid.asJson,
+            //          "observationId"   -> oid.asJson,
+            //          "itcResult"       -> itc.asJson,
+            //          "executionConfig" -> exec.asJson
+            //        ))
+            //    }
+            // }
 
 
           // Our combined type mappings
