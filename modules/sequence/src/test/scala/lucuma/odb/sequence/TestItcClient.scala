@@ -60,7 +60,14 @@ object TestItcClient {
         IntegrationTimeResult(Version, NonEmptyList.one(result)).pure[F]
 
       def optimizedSpectroscopyGraph(input: OptimizedSpectroscopyGraphInput, useCache: Boolean): F[OptimizedSpectroscopyGraphResult] =
-        OptimizedSpectroscopyGraphResult(Version.server, Version.data.orEmpty, graphResult._1, graphResult._2).pure[F]
+        OptimizedSpectroscopyGraphResult(
+          Version.server,
+          Version.data.orEmpty,
+          graphResult._1,
+          graphResult._2,
+          SignalToNoise.Min,
+          None
+        ).pure[F]
 
       def versions: F[ItcVersions] =
         Version.pure[F]
