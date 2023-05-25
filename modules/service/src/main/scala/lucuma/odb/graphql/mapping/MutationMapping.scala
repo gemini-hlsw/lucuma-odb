@@ -103,7 +103,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // for services.useTransactionally { ... }
   def services: Resource[F, Services[F]]
 
-  def groupService: Resource[F, GroupService[F]]
   def targetService: Resource[F, TargetService[F]]
   def user: User
 
@@ -225,11 +224,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
-      pool.use { s =>
-        groupService.use { svc =>
-          svc.createGroup(input).map { gid =>
-            Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
-          }
+      services.useTransactionally {
+        groupService.createGroup(input).map { gid =>
+          Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
         }
       }
     }
@@ -524,26 +521,28 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateGroups =
     MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))) { (input, child) =>
+      services.useTransactionally {
 
-      // Our predicate for selecting groups to update
-      val filterPredicate = and(List(
-        // TODO: Predicates.group.program.isWritableBy(user),
-        input.WHERE.getOrElse(True)
-      ))
+        // Our predicate for selecting groups to update
+        val filterPredicate = and(List(
+          // TODO: Predicates.group.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
 
-      // An applied fragment that selects all group ids that satisfy `filterPredicate`
-      val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
+        // An applied fragment that selects all group ids that satisfy `filterPredicate`
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
 
-      // Update the specified groups and then return a query for the affected groups (or an error)
-      idSelect.flatTraverse { which =>
-        import GroupService.UpdateGroupsResponse
-        groupService.use(_.updateGroups(input.SET, which)).map {
-          case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
-          case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
+        // Update the specified groups and then return a query for the affected groups (or an error)
+        idSelect.flatTraverse { which =>
+          import GroupService.UpdateGroupsResponse
+          groupService.updateGroups(input.SET, which).map {
+            case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
+            case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
+          }
         }
-      }
 
+      }
     }
 
 }
