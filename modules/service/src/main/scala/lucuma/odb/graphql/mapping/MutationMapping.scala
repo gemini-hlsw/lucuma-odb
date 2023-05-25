@@ -99,8 +99,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     mutationFields.foldMap(mf => Map(MutationType -> mf.Elaborator))
 
-  // A services resource and syntax to use it wrapped in a transaction. All mutations need have the
-  // for services.useTransactionally { ... }
+  // Resources defined in the final cake.
   def services: Resource[F, Services[F]]
   def user: User
 

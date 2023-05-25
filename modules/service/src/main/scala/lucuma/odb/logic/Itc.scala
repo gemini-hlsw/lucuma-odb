@@ -29,7 +29,9 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService
-
+import java.security.Provider.Service
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 
 sealed trait Itc[F[_]] {
 
@@ -129,10 +131,7 @@ object Itc {
 
   }
 
-  def fromClientAndServices[F[_]: MonadThrow](
-    client:    ItcClient[F],
-    paramsSrv: GeneratorParamsService[F]
-  ): Itc[F] =
+  def instantiate[F[_]: MonadThrow](client: ItcClient[F])(using Services[F]): Itc[F] =
     new Itc[F] {
 
       import Result.*
@@ -153,7 +152,7 @@ object Itc {
         oid: Observation.Id
       ): EitherT[F, Error, GeneratorParams] =
         EitherT(
-          paramsSrv
+          generatorParamsService
             .select(pid, oid)
             .map {
               case None                => ObservationNotFound(pid, oid).asLeft

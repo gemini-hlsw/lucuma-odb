@@ -23,7 +23,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ProgramType
-import lucuma.core.model.User
+import lucuma.core.model
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
@@ -33,8 +33,15 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.SmartGcalService
-
+import lucuma.odb.json.all.query.given
+import lucuma.odb.sequence.util.CommitHash
 import scala.reflect.ClassTag
+import lucuma.odb.logic.Itc
+import lucuma.odb.logic.Generator
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
+import lucuma.itc.client.ItcClient
+import io.circe.syntax.*
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]
@@ -46,19 +53,48 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProposalAttachmentTypeMetaMapping[F]
    with ObservationMapping[F] =>
 
+  // Resources defined in the final cake.
+  def commitHash: CommitHash
+  def user: model.User
+  def itcClient: ItcClient[F]
+  def services: Resource[F, Services[F]]
+
   def itcQuery(
     path:     Path,
-    pid:      lucuma.core.model.Program.Id,
-    oid:      lucuma.core.model.Observation.Id,
+    pid:      model.Program.Id,
+    oid:      model.Observation.Id,
     useCache: Boolean
-  ): F[Result[Json]]
-
+  ): F[Result[Json]] =
+    services.useTransactionally { 
+      itc(itcClient)
+        .lookup(pid, oid, useCache)
+        .map {
+          case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
+          case Right(resultSet) => Result(resultSet.asJson)
+        }
+    }
+  
   def sequence(
     path:     Path,
-    pid:      lucuma.core.model.Program.Id,
-    oid:      lucuma.core.model.Observation.Id,
+    pid:      model.Program.Id,
+    oid:      model.Observation.Id,
     useCache: Boolean
-  ): F[Result[Json]]
+  ): F[Result[Json]] =
+    services.useTransactionally {
+      generator(commitHash, itcClient)
+        .generate(pid, oid, useCache)
+        .map {
+          case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
+          case e: Generator.Error                         => Result.failure(e.format)
+          case Generator.Result.Success(_, itc, exec)     =>
+            Result(Json.obj(
+              "programId"       -> pid.asJson,
+              "observationId"   -> oid.asJson,
+              "itcResult"       -> itc.asJson,
+              "executionConfig" -> exec.asJson
+            ))
+        }
+    }
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
@@ -114,8 +150,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       TargetGroup,
       Targets,
     ).foldMap(pf => Map(QueryType -> pf))
-
-  def user: User
 
   // Elaborators below
 

@@ -105,13 +105,13 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database:   Resource[F, Session[F]],
-    monitor:    SkunkMonitor[F],
-    user0:      User,
-    topics0:    Topics[F],
-    itcClient:  ItcClient[F],
-    commitHash: CommitHash,
-    enums:      Enums
+    database:    Resource[F, Session[F]],
+    monitor:     SkunkMonitor[F],
+    user0:       User,
+    topics0:     Topics[F],
+    itcClient0:  ItcClient[F],
+    commitHash0: CommitHash,
+    enums:       Enums
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
@@ -197,67 +197,11 @@ object OdbMapping {
             unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
 
           // Our services and resources needed by various mappings.
+          override val commitHash = commitHash0
+          override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
           override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
-
-          val itc: Resource[F, Itc[F]] =
-            ???
-            // pool.map { s =>
-            //   val oms = ObservingModeServices.fromSession(s)
-            //   val gps = GeneratorParamsService.fromSession(s, user, oms)
-            //   Itc.fromClientAndServices(itcClient, gps)
-            // }
-
-          override def itcQuery(
-            path:     Path,
-            pid:      Program.Id,
-            oid:      Observation.Id,
-            useCache: Boolean
-          ): F[Result[Json]] =
-            itc.use {
-              _.lookup(pid, oid, useCache)
-               .map {
-                 case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-                 case Right(resultSet) => Result(resultSet.asJson)
-               }
-            }
-
-          val generator: Resource[F, Generator[F]] =
-            ???
-            // pool.map { s =>
-            //   val oms = ObservingModeServices.fromSession(s)
-            //   val gps = GeneratorParamsService.fromSession(s, user, oms)
-            //   val sgc = SmartGcalService.fromSession(s)
-            //   Generator.fromClientAndServices(commitHash, itcClient, gps, sgc)
-            // }
-
-          override def sequence(
-            path:     Path,
-            pid:      Program.Id,
-            oid:      Observation.Id,
-            useCache: Boolean
-          ): F[Result[Json]] =
-            ???
-            // generator.use {
-            //   _.generate(pid, oid, useCache)
-            //    .map {
-            //      case Generator.Result.ObservationNotFound(_, _) =>
-            //        Result(Json.Null)
-
-            //      case e: Generator.Error                         =>
-            //        Result.failure(e.format)
-
-            //      case Generator.Result.Success(_, itc, exec)     =>
-            //        Result(Json.obj(
-            //          "programId"       -> pid.asJson,
-            //          "observationId"   -> oid.asJson,
-            //          "itcResult"       -> itc.asJson,
-            //          "executionConfig" -> exec.asJson
-            //        ))
-            //    }
-            // }
-
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
