@@ -102,8 +102,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // A services resource and syntax to use it wrapped in a transaction. All mutations need have the
   // for services.useTransactionally { ... }
   def services: Resource[F, Services[F]]
-
-  def targetService: Resource[F, TargetService[F]]
   def user: User
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
@@ -199,8 +197,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import CloneTargetResponse.*
     import UpdateTargetsResponse.{ SourceProfileUpdatesFailed, TrackingSwitchFailed }
     MutationField("cloneTarget", CloneTargetInput.Binding) { (input, child) =>
-      targetService.use { svc =>
-        svc.cloneTarget(input).map {          
+      services.useTransactionally {
+        targetService.cloneTarget(input).map {          
 
           // Typical case          
           case Success(oldTargetId, newTargetId) =>
@@ -270,9 +268,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
-      targetService.use { ts =>
+      services.useTransactionally {
         import TargetService.CreateTargetResponse._
-        ts.createTarget(input.programId, input.SET).map {
+        targetService.createTarget(input.programId, input.SET).map {
           case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
           case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
           case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
@@ -487,27 +485,29 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateTargets =
     MutationField("updateTargets", UpdateTargetsInput.binding(Path.from(TargetType))) { (input, child) =>
+      services.useTransactionally {
 
-      // Our predicate for selecting targets to update
-      val filterPredicate = and(List(
-        Predicates.target.program.isWritableBy(user),
-        Predicates.target.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-        input.WHERE.getOrElse(True)
-      ))
+        // Our predicate for selecting targets to update
+        val filterPredicate = and(List(
+          Predicates.target.program.isWritableBy(user),
+          Predicates.target.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+          input.WHERE.getOrElse(True)
+        ))
 
-      // An applied fragment that selects all target ids that satisfy `filterPredicate`
-      val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
+        // An applied fragment that selects all target ids that satisfy `filterPredicate`
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
 
-      // Update the specified targets and then return a query for the affected targets (or an error)
-      idSelect.flatTraverse { which =>
-        targetService.use(_.updateTargets(input.SET, which)).map {
-          case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
-          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems)
-          case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+        // Update the specified targets and then return a query for the affected targets (or an error)
+        idSelect.flatTraverse { which =>
+          targetService.updateTargets(input.SET, which).map {
+            case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
+            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems)
+            case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+          }
         }
-      }
 
+      }
     }
 
   def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =

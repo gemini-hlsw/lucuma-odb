@@ -201,9 +201,6 @@ object OdbMapping {
           override val topics: Topics[F] = topics0
           override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
 
-          override val targetService: Resource[F, TargetService[F]] =
-            pool.map(TargetService.fromSession(_, user))
-
           val itc: Resource[F, Itc[F]] =
             ???
             // pool.map { s =>
