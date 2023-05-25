@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -84,7 +84,7 @@ object AsterismService {
   ): String =
     s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
 
-  def instantiate[F[_]: Sync](using Services[F]): AsterismService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
 
