@@ -22,7 +22,7 @@ sealed trait ObservingModeServices[F[_]] {
 
   def selectSequenceConfig(
     which: List[(Observation.Id, ObservingModeType)]
-  )/*TODO:(using Transaction[F])*/: F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
+  )(using Transaction[F]): F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -55,12 +55,9 @@ object ObservingModeServices {
   def instantiate[F[_]: Concurrent](using Services[F]): ObservingModeServices[F] =
     new ObservingModeServices[F] {
 
-      lazy val gmosLongSlitService: GmosLongSlitService[F] =
-        GmosLongSlitService.fromSession(session)
-
       override def selectSequenceConfig(
         which: List[(Observation.Id, ObservingModeType)]
-      ): F[Map[Observation.Id, SequenceConfig]] = {
+      )(using Transaction[F]): F[Map[Observation.Id, SequenceConfig]] = {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {

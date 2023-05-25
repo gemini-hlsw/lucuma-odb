@@ -145,9 +145,6 @@ object TargetService {
                 case Result.Failure(ps)       => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
-                // case Ior.Left(ps)    => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                // case Ior.Both(ps, _) => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                // case Ior.Right(ids)  => UpdateTargetsResponse.Success(ids).pure[F]
               }
               
             }

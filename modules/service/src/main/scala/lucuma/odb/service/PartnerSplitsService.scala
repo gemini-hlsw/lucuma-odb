@@ -27,12 +27,13 @@ import natchez.Trace
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
+import Services.Syntax.*
 
 private[service] trait PartnerSplitsService[F[_]] {
 
-    def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id, xa: Transaction[F]): F[Unit]
+    def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
 
-    def updateSplits(splits: Map[Tag, IntPercent], xa: Transaction[F]): F[List[Program.Id]]
+    def updateSplits(splits: Map[Tag, IntPercent])(using Transaction[F]): F[List[Program.Id]]
 
 }
 
@@ -42,22 +43,22 @@ object PartnerSplitsService {
    * Construct a `PartnerSplitsService` using the specified `Session`. This service is intended for
   * indirect use by `ProgramService`, and we thus assume the presence of the `t_program_update` table.
    */
-  def fromSession[F[_]: Concurrent: Trace](s: Session[F]): PartnerSplitsService[F] =
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): PartnerSplitsService[F] =
     new PartnerSplitsService[F] {
 
-      def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id, xa: Transaction[F]): F[Unit] =
-        s.prepareR(Statements.insertSplits(splits)).use(_.execute(pid, splits)).void
+      def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
+        session.prepareR(Statements.insertSplits(splits)).use(_.execute(pid, splits)).void
 
-      def updateSplits(splits: Map[Tag, IntPercent], xa: Transaction[F]): F[List[Program.Id]] = {
+      def updateSplits(splits: Map[Tag, IntPercent])(using Transaction[F]): F[List[Program.Id]] = {
 
         // First delete all the splits for these programs.
         val a: F[List[Program.Id]] =
-          s.prepareR(Statements.DeleteSplits).use(_.stream(Void, 1024).compile.toList)
+          session.prepareR(Statements.DeleteSplits).use(_.stream(Void, 1024).compile.toList)
 
         // Then insert the new ones
         val b: F[List[Program.Id]] = {
           val af = Statements.insertManySplits(splits)
-          s.prepareR(af.fragment.query(program_id)).use(_.stream(af.argument, 1024).compile.toList)
+          session.prepareR(af.fragment.query(program_id)).use(_.stream(af.argument, 1024).compile.toList)
         }
 
         // And combine the returned id lists (they should be the same though)

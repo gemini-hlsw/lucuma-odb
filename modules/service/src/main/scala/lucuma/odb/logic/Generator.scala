@@ -43,6 +43,7 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import java.io.ObjectOutputStream
 import java.util.UUID
+import skunk.Transaction
 
 sealed trait Generator[F[_]] {
 
@@ -50,7 +51,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     useCache:      Boolean
-  ): F[Generator.Result]
+  )(using Transaction[F]): F[Generator.Result]
 
 }
 
@@ -144,7 +145,7 @@ object Generator {
         programId:     Program.Id,
         observationId: Observation.Id,
         useCache:      Boolean
-      ): F[Result] =
+      )(using Transaction[F]): F[Result] =
         (for {
           params <- selectParams(programId, observationId)
           res    <- generateSequence(observationId, params, useCache)
@@ -153,7 +154,7 @@ object Generator {
       private def selectParams(
         pid: Program.Id,
         oid: Observation.Id
-      ): EitherT[F, Error, GeneratorParams] =
+      )(using Transaction[F]): EitherT[F, Error, GeneratorParams] =
         EitherT(
           generatorParamsService
             .select(pid, oid)
