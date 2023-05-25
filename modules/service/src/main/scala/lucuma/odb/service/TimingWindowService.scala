@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import cats.syntax.all.given
 import edu.gemini.grackle.Result
@@ -29,7 +29,7 @@ trait TimingWindowService[F[_]] {
 }
 
 object TimingWindowService:
-  def instantiate[F[_]: Sync](using Services[F]): TimingWindowService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): TimingWindowService[F] =
     new TimingWindowService[F] {
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>

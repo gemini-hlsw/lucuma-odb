@@ -7,7 +7,7 @@ import cats.Applicative
 import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -160,7 +160,7 @@ object ObservationService {
       .map(_.message)
       .getOrElse(GenericConstraintViolationMessage(ex.message))
 
-  def instantiate[F[_]: Sync: Trace](using Services[F]): ObservationService[F] =
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
 
       private def setTimingWindows(
@@ -290,7 +290,7 @@ object ObservationService {
         which: AppliedFragment
       ): F[Unit] =
         (groupId, groupIndex) match
-          case (Nullable.Absent, None) => Sync[F].unit // do nothing if neither is specified
+          case (Nullable.Absent, None) => ().pure[F] // do nothing if neither is specified
           case (gid, index) =>
             val af = Statements.moveObservations(gid.toOption, index, which)
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
