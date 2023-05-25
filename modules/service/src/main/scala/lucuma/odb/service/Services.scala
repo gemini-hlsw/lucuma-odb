@@ -12,11 +12,15 @@ import natchez.Trace
 import cats.effect.Resource
 import cats.effect.MonadCancelThrow
 import lucuma.odb.logic.Itc
+import lucuma.itc.client.ItcClient
+import lucuma.odb.logic.Generator
+import lucuma.odb.sequence.util.CommitHash
 
 /** A collection of services, all bound to a single Session and User. */
 trait Services[F[_]]:
   def session: Session[F]
   def user: User
+  def transactionally[A](f: (Transaction[F]) ?=> F[A]): F[A]
   def allocationService: AllocationService[F]
   def asterismService: AsterismService[F]
   def generatorParamsService: GeneratorParamsService[F]
@@ -32,10 +36,12 @@ trait Services[F[_]]:
   def proposalAttachmentMetadataService: ProposalAttachmentMetadataService[F]
   def proposalService: ProposalService[F]
   // def s3FileService: S3FileService[F]
-  // def smartGcalService: SmartGcalService[F]
+  def smartGcalService: SmartGcalService[F]
   def targetService: TargetService[F]
   def timingWindowService: TimingWindowService[F]
   // def userService: UserService[F]
+  def itc(itcClient: ItcClient[F]): Itc[F]
+  def generator(commitHash: CommitHash, itcClient: ItcClient[F]): Generator[F]
 
 object Services:
   
@@ -44,6 +50,9 @@ object Services:
 
       val user = u
       val session = s
+
+      def transactionally[A](f: Transaction[F] ?=> F[A]): F[A] =
+        session.transaction.use(xa => f(using xa))
 
       private given Services[F] = this
 
@@ -62,10 +71,12 @@ object Services:
       lazy val proposalAttachmentMetadataService = ProposalAttachmentMetadataService.instantiate
       lazy val proposalService = ??? //ProposalService.instantiate
       // lazy val s3FileService = S3FileService.instantiate
-      // lazy val smartGcalService = SmartGcalService.instantiate
+      lazy val smartGcalService = SmartGcalService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       // lazy val userService = UserService.instantiate
+      def itc(itcClient: ItcClient[F]) = Itc.instantiate(itcClient)
+      def generator(commitHash: CommitHash, itcClient: ItcClient[F]) = Generator.instantiate(commitHash, itcClient)
 
   object Syntax:
     def transaction[F[_]](using Transaction[F]): Transaction[F] = summon
@@ -86,10 +97,12 @@ object Services:
     def proposalAttachmentMetadataService[F[_]](using Services[F]): ProposalAttachmentMetadataService[F] = summon[Services[F]].proposalAttachmentMetadataService
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
     // def s3FileService[F[_]](using Services[F]): S3FileService[F] = summon[Services[F]].s3FileService
-    // def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
+    def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     // def userService[F[_]](using Services[F]): UserService[F] = summon[Services[F]].userService
+    def itc[F[_]](client: ItcClient[F])(using Services[F]): Itc[F] = summon[Services[F]].itc(client)
+    def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F])(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]]) def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A]): F[A] =
       s.use(ss => ss.session.transaction.use(xa => fa(using xa, ss)))

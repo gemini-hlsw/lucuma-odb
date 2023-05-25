@@ -40,6 +40,8 @@ import lucuma.odb.smartgcal.data.Gmos.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
+import lucuma.odb.service.Services
+import natchez.Trace.Implicits.noop
 
 class sequence extends OdbSuite with ObservingModeSetupOperations {
 
@@ -82,8 +84,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           )
         )
       )
-
-    SmartGcalService.fromSession(s).insertGmosNorth(1, tableRow)
+    val services = Services.forUser(pi /* doesn't matter*/)(s)
+    services.transactionally {
+      services.smartGcalService.insertGmosNorth(1, tableRow)
+    }
   }
 
   test("simple generation") {

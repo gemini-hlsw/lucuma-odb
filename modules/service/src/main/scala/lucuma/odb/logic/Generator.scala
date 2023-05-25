@@ -39,7 +39,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.SmartGcalService
-
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import java.io.ObjectOutputStream
 import java.util.UUID
 
@@ -119,18 +120,15 @@ object Generator {
     ) extends Result
   }
 
-  def fromClientAndServices[F[_]: MonadThrow](
+  def instantiate[F[_]: MonadThrow](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    paramsSrv:    GeneratorParamsService[F],
-    smartGcalSrv: SmartGcalService[F]
-  ): Generator[F] =
+  )(using Services[F]): Generator[F] =
     new Generator[F] {
 
       import Result.*
 
-      private val itc = Itc.fromClientAndServices(itcClient, paramsSrv)
-      private val exp = SmartGcalExpander.fromService(smartGcalSrv)
+      private val exp = SmartGcalExpander.fromService(smartGcalService)
 
       // This is a placeholder.  I'm not sure we'll end up adding step time to
       // the generated sequence.
@@ -157,7 +155,7 @@ object Generator {
         oid: Observation.Id
       ): EitherT[F, Error, GeneratorParams] =
         EitherT(
-          paramsSrv
+          generatorParamsService
             .select(pid, oid)
             .map {
               case None                => ObservationNotFound(pid, oid).asLeft
@@ -237,7 +235,7 @@ object Generator {
           }
 
         EitherT(
-          itc
+          itc(itcClient)
             .spectroscopy(itcInput, useCache)
             .map {
               case Left(errors) =>
