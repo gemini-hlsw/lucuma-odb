@@ -8,8 +8,8 @@ import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.string.NonEmptyString
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
