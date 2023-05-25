@@ -15,6 +15,7 @@ import skunk.Session
 import skunk.Transaction
 import skunk.codec.numeric.*
 import skunk.syntax.all.*
+import Services.Syntax.*
 
 trait TimingWindowService[F[_]] {
   def createFunction(
@@ -24,11 +25,11 @@ trait TimingWindowService[F[_]] {
   def cloneTimingWindows(
     originalId: Observation.Id,
     newId: Observation.Id,
-  ): F[Unit]
+  )(using Transaction[F]): F[Unit]
 }
 
 object TimingWindowService:
-  def fromSession[F[_]: Sync](session: Session[F]): TimingWindowService[F] =
+  def instantiate[F[_]: Sync](using Services[F]): TimingWindowService[F] =
     new TimingWindowService[F] {
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>
@@ -46,7 +47,7 @@ object TimingWindowService:
       def cloneTimingWindows(
         originalId: Observation.Id,
         newId: Observation.Id,
-      ): F[Unit] =
+      )(using Transaction[F]): F[Unit] =
         exec(Statements.clone(originalId, newId))
     }
 

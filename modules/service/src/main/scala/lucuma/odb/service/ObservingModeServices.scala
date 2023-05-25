@@ -16,12 +16,13 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
 import skunk.Session
 import skunk.Transaction
+import Services.Syntax.*
 
 sealed trait ObservingModeServices[F[_]] {
 
   def selectSequenceConfig(
     which: List[(Observation.Id, ObservingModeType)]
-  ): F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
+  )/*TODO:(using Transaction[F])*/: F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -51,9 +52,7 @@ object ObservingModeServices {
     lucuma.odb.sequence.gmos.longslit.Config.GmosNorth |
     lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 
-  def fromSession[F[_]: Sync](
-    session: Session[F]
-  ): ObservingModeServices[F] =
+  def instantiate[F[_]: Sync](using Services[F]): ObservingModeServices[F] =
     new ObservingModeServices[F] {
 
       lazy val gmosLongSlitService: GmosLongSlitService[F] =
