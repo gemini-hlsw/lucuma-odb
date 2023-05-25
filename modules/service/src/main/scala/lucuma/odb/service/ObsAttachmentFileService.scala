@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Async
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
@@ -17,7 +17,8 @@ import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
-
+import Services.Syntax.*
+import cats.effect.std.UUIDGen
 import java.util.UUID
 
 trait ObsAttachmentFileService[F[_]] {
@@ -28,7 +29,7 @@ trait ObsAttachmentFileService[F[_]] {
     user:         User,
     programId:    Program.Id,
     attachmentId: ObsAttachment.Id
-  ): F[Either[AttachmentException, Stream[F, Byte]]]
+  )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
 
   /** Uploads the file to S3 and addes it to the database */
   def insertAttachment(
@@ -38,7 +39,7 @@ trait ObsAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  ): F[ObsAttachment.Id]
+  )(using Transaction[F]): F[ObsAttachment.Id]
 
   def updateAttachment(
     user:           User,
@@ -47,22 +48,21 @@ trait ObsAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  ): F[Unit]
+  )(using Transaction[F]): F[Unit]
 
   /** Deletes the file from the database and then removes it from S3. */
-  def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[Unit]
+  def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using Transaction[F]): F[Unit]
   
-  def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[String]
+  def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using Transaction[F]): F[String]
 }
 
 object ObsAttachmentFileService extends AttachmentFileService {
   import AttachmentFileService.AttachmentException
   import AttachmentException.*
 
-  def fromS3AndSession[F[_]: Async: Trace](
+  def instantiate[F[_]: Concurrent: Trace: UUIDGen](
     s3FileSvc: S3FileService[F],
-    session:   Session[F]
-  ): ObsAttachmentFileService[F] = {
+  )(using Services[F]): ObsAttachmentFileService[F] = {
 
     def checkAttachmentType(attachmentType: Tag): F[Unit] = {
       val af   = Statements.attachmentTypeExists(attachmentType)
@@ -73,8 +73,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           pg.unique(af.argument)
         }
         .flatMap(isValid =>
-          if (isValid) Async[F].unit
-          else Async[F].raiseError(InvalidRequest("Invalid attachment type"))
+          if (isValid) Concurrent[F].unit
+          else Concurrent[F].raiseError(InvalidRequest("Invalid attachment type"))
         )
     }
 
@@ -96,7 +96,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
             pg.unique(af.argument)
               .recoverWith {
                 case SqlState.UniqueViolation(_) => 
-                  Async[F].raiseError(InvalidRequest("Duplicate file name"))
+                  Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -118,12 +118,12 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
-                if (b) Async[F].unit 
-                else Async[F].raiseError(FileNotFound)
+                if (b) Concurrent[F].unit 
+                else Concurrent[F].raiseError(FileNotFound)
               )
               .recoverWith {
                 case SqlState.UniqueViolation(_) => 
-                  Async[F].raiseError(InvalidRequest("Duplicate file name"))
+                  Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -142,8 +142,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => Async[F].raiseError(FileNotFound)
-                case Some(s) => Async[F].pure(s)
+                case None    => Concurrent[F].raiseError(FileNotFound)
+                case Some(s) => Concurrent[F].pure(s)
               }
           )
       }
@@ -162,8 +162,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => Async[F].raiseError(FileNotFound)
-                case Some(s) => Async[F].pure(s)
+                case None    => Concurrent[F].raiseError(FileNotFound)
+                case Some(s) => Concurrent[F].pure(s)
               }
           )
       }
@@ -177,8 +177,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
         .use(pg =>
           pg.option(af.argument)
             .flatMap {
-              case None    => Async[F].unit
-              case Some(_) => Async[F].raiseError(InvalidRequest("Duplicate file name"))
+              case None    => Concurrent[F].unit
+              case Some(_) => Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
             }
         )
     }
@@ -192,7 +192,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         user:         User,
         programId:    Program.Id,
         attachmentId: ObsAttachment.Id
-      ): F[Either[AttachmentException, Stream[F, Byte]]] =
+      )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] =
         session.transaction
           .use(_ =>
             for {
@@ -214,11 +214,11 @@ object ObsAttachmentFileService extends AttachmentFileService {
         fileName:       String,
         description:    Option[NonEmptyString],
         data:           Stream[F, Byte]
-      ): F[ObsAttachment.Id] =
+      )(using Transaction[F]): F[ObsAttachment.Id] =
         FileName
           .fromString(fileName)
           .fold(
-            e  => Async[F].raiseError(e),
+            e  => Concurrent[F].raiseError(e),
             fn =>
               session.transaction
                 .use(_ =>
@@ -230,7 +230,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
                 )
                 .flatMap( _ =>
                   for {
-                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    uuid   <- UUIDGen[F].randomUUID
                     path    = filePath(programId, uuid, fn.value)
                     size   <- s3FileSvc.upload(path, data)
                     result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
@@ -245,11 +245,11 @@ object ObsAttachmentFileService extends AttachmentFileService {
         fileName: String,
         description: Option[NonEmptyString],
         data: Stream[F, Byte]
-      ): F[Unit] = 
+      )(using Transaction[F]): F[Unit] = 
         FileName
           .fromString(fileName)
           .fold(
-            e  => Async[F].raiseError(e),
+            e  => Concurrent[F].raiseError(e),
             fn =>
               session.transaction
                 .use(_ =>
@@ -261,7 +261,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
                 )
                 .flatMap(oldPath =>
                   for {
-                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    uuid   <- UUIDGen[F].randomUUID
                     newPath = filePath(programId, uuid, fn.value)
                     size   <- s3FileSvc.upload(newPath, data)
                     _      <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newPath)
@@ -274,7 +274,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         user:         User,
         programId:    Program.Id,
         attachmentId: ObsAttachment.Id
-      ): F[Unit] =
+      )(using Transaction[F]): F[Unit] =
         session.transaction
           .use(_ =>
             for {
@@ -288,7 +288,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
             s3FileSvc.delete(remotePath).handleError{ case _ => () }
           )
 
-      def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id): F[String] = 
+      def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using Transaction[F]): F[String] = 
         session.transaction
           .use(_ =>
             for {

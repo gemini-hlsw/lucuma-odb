@@ -197,20 +197,15 @@ object OdbMapping {
             unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
 
           // Our services and resources needed by various mappings.
-          override val user: User         = user0
-          override val topics: Topics[F]  = topics0
-
-          override val services: Resource[F, Services[F]] =
-            pool.map(Services.forUser(user))
+          override val user: User = user0
+          override val topics: Topics[F] = topics0
+          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
 
           override val groupService: Resource[F, GroupService[F]] =
             pool.map(GroupService.fromSessionAndUser(_, user))
 
           override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
             pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
-
-          override val programService: Resource[F, ProgramService[F]] =
-            pool.map(ProgramService.fromSessionAndUser(_, user))
 
           override val proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]] =
             pool.map(ProposalAttachmentMetadataService.fromSessionAndUser(_, user))

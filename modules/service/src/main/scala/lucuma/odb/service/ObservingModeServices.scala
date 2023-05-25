@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
@@ -52,7 +52,7 @@ object ObservingModeServices {
     lucuma.odb.sequence.gmos.longslit.Config.GmosNorth |
     lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 
-  def instantiate[F[_]: Sync](using Services[F]): ObservingModeServices[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): ObservingModeServices[F] =
     new ObservingModeServices[F] {
 
       lazy val gmosLongSlitService: GmosLongSlitService[F] =

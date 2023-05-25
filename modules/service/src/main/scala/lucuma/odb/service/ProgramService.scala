@@ -29,6 +29,7 @@ import natchez.Trace
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
+import Services.Syntax.*
 
 trait ProgramService[F[_]] {
 
@@ -36,19 +37,19 @@ trait ProgramService[F[_]] {
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id]
+  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id]
 
   /**
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
    * if the user was not authorized to perform the action.
    */
-  def linkUser(req: ProgramService.LinkUserRequest): F[ProgramService.LinkUserResponse]
+  def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[ProgramService.LinkUserResponse]
 
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
-  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]]
+  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[List[Program.Id]]
 
   /** Check to see if the user has access to the given program. */
-  def userHasAccess(programId: Program.Id): F[Boolean]
+  def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean]
 
 }
 
@@ -106,16 +107,14 @@ object ProgramService {
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
    */
-  def fromSessionAndUser[F[_]: Concurrent: Trace](s: Session[F], user: User): ProgramService[F] =
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramService[F] =
     new ProgramService[F] {
 
-      lazy val proposalService = ProposalService.fromSession(s)
-
-      def insertProgram(SET: Option[ProgramPropertiesInput.Create]): F[Program.Id] =
+      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          s.transaction.use { xa =>
+          session.transaction.use { xa =>
             val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
-            s.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
+            session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
               SETʹ.proposal.traverse { proposalInput =>
                 proposalService.insertProposal(proposalInput, pid, xa)
               }
@@ -123,7 +122,7 @@ object ProgramService {
           }
         }
 
-      def linkUser(req: ProgramService.LinkUserRequest): F[LinkUserResponse] = {
+      def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
             case LinkUserRequest.Coi(programId, userId) => Statements.linkCoi(programId, userId, user)
@@ -135,7 +134,7 @@ object ProgramService {
           case None     =>  Monad[F].pure(LinkUserResponse.NotAuthorized(user))
           case Some(af) =>
             val stmt = sql"${af.fragment} RETURNING c_program_id, c_user_id".query(program_id ~ user_id)
-            s.prepareR(stmt).use { pq =>
+            session.prepareR(stmt).use { pq =>
               pq.option(af.argument).map {
                 case Some(pid ~ uid) => LinkUserResponse.Success(pid, uid)
                 case None            => LinkUserResponse.NotAuthorized(user)
@@ -147,20 +146,20 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment): F[List[Program.Id]] =
-        s.transaction.use { xa =>
+      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[List[Program.Id]] =
+        session.transaction.use { xa =>
 
           // Create the temp table with the programs we're updating. We will join with this
           // several times later on in the transaction.
           val setup: F[Unit] = {
             val af = Statements.createProgramUpdateTempTable(where)
-            s.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+            session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
           }
 
           // Update programs
           val updatePrograms: F[List[Program.Id]] =
             Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
-              s.prepareR(af.fragment.query(program_id)).use { ps =>
+              session.prepareR(af.fragment.query(program_id)).use { ps =>
                 ps.stream(af.argument, 1024)
                   .compile
                   .toList
@@ -178,10 +177,10 @@ object ProgramService {
 
         }
 
-      def userHasAccess(programId: Program.Id): F[Boolean] =
+      def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean] =
         Statements.existsUserAccess(user, programId).fold(true.pure[F]) { af =>
           val stmt = sql"SELECT ${af.fragment}".query(bool)
-          s.prepareR(stmt).use { pg =>
+          session.prepareR(stmt).use { pg =>
             pg.unique(af.argument)
           }
         }

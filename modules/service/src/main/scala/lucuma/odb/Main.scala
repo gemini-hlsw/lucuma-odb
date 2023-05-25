@@ -233,11 +233,9 @@ object FMain extends MainParams {
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
-      obsAttachFileSvc  <- pool.map(ses => ObsAttachmentFileService.fromS3AndSession(s3FileService, ses))
-      propAttachFileSvc <- pool.map(ses => ProposalAttachmentFileService.fromS3AndSession(s3FileService, ses))
     } yield { wsb =>
-      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](obsAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
-      val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](propAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
+      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
+      val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
       middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes)
     }
 

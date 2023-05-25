@@ -19,6 +19,10 @@ import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import org.http4s.server.middleware.EntityLimiter
+import skunk.Session
+import lucuma.odb.service.S3FileService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 
 object ProposalAttachmentRoutes {
   object ProgramId {
@@ -31,7 +35,8 @@ object ProposalAttachmentRoutes {
   }
 
   def apply[F[_]: Async: Trace](
-    attachmentFileService: ProposalAttachmentFileService[F],
+    pool:                  Resource[F, Session[F]],
+    s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
     maxUploadMb:           Int
   ): HttpRoutes[F] = {
@@ -54,54 +59,64 @@ object ProposalAttachmentRoutes {
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType) =>
         ssoClient.require(req) { user =>
-          attachmentFileService.getAttachment(user, programId, attachmentType).flatMap {
-            case Left(exc)     => exc.toResponse
-            case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
+          pool.map(Services.forUser(user)).useTransactionally {
+            proposalAttachmentFileService(s3).getAttachment(user, programId, attachmentType).flatMap {
+              case Left(exc)     => exc.toResponse
+              case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
+            }
           }
         }
 
       case req @ POST -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
-          val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-          attachmentFileService
-            .insertAttachment(user, programId, attachmentType, fileName, description, req.body)
-            .flatMap(_ => Ok())
-            .recoverWith {
-              case EntityLimiter.EntityTooLarge(_) =>
-                BadRequest(s"File too large. Limit of $maxUploadMb MB")
-              case e: AttachmentException          => e.toResponse
+          pool.map(Services.forUser(user)).useTransactionally {
+            val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
+            proposalAttachmentFileService(s3)
+              .insertAttachment(user, programId, attachmentType, fileName, description, req.body)
+              .flatMap(_ => Ok())
+              .recoverWith {
+                case EntityLimiter.EntityTooLarge(_) =>
+                  BadRequest(s"File too large. Limit of $maxUploadMb MB")
+                case e: AttachmentException          => e.toResponse
+              }
             }
         }
 
       case req @ PUT -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
-          val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-          attachmentFileService
-            .updateAttachment(user, programId, attachmentType, fileName, description, req.body)
-            .flatMap(_ => Ok())
-            .recoverWith {
-              case EntityLimiter.EntityTooLarge(_) =>
-                BadRequest(s"File too large. Limit of $maxUploadMb MB")
-              case e: AttachmentException          => e.toResponse
-            }
+          pool.map(Services.forUser(user)).useTransactionally {
+            val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
+            proposalAttachmentFileService(s3)
+              .updateAttachment(user, programId, attachmentType, fileName, description, req.body)
+              .flatMap(_ => Ok())
+              .recoverWith {
+                case EntityLimiter.EntityTooLarge(_) =>
+                  BadRequest(s"File too large. Limit of $maxUploadMb MB")
+                case e: AttachmentException          => e.toResponse
+              }
+          }
         }
 
       case req @ DELETE -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType) =>
         ssoClient.require(req) { user =>
-          attachmentFileService
-            .deleteAttachment(user, programId, attachmentType)
-            .flatMap(_ => Ok())
-            .recoverWith { case e: AttachmentException => e.toResponse }
+          pool.map(Services.forUser(user)).useTransactionally {          
+            proposalAttachmentFileService(s3)
+              .deleteAttachment(user, programId, attachmentType)
+              .flatMap(_ => Ok())
+              .recoverWith { case e: AttachmentException => e.toResponse }
+          }
         }
-      
+
       case req @ GET -> Root / "attachment" / "proposal" / "url" / ProgramId(programId) / TagPath(attachmentType) =>
         ssoClient.require(req) { user =>
-          attachmentFileService
-            .getPresignedUrl(user, programId, attachmentType)
-            .flatMap(Ok(_))
-            .recoverWith { case e: AttachmentException => e.toResponse }
+          pool.map(Services.forUser(user)).useTransactionally {          
+            proposalAttachmentFileService(s3)
+              .getPresignedUrl(user, programId, attachmentType)
+              .flatMap(Ok(_))
+              .recoverWith { case e: AttachmentException => e.toResponse }
+          }
         }
     }
 
