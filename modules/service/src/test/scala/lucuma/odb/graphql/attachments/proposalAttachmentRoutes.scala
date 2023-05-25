@@ -19,6 +19,7 @@ import lucuma.odb.service.ProposalAttachmentFileService
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
+import skunk.Transaction
 
 class proposalAttachmentRoutes extends AttachmentRoutesSuite {
   
@@ -27,7 +28,7 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
       user: User,
       programId: Program.Id,
       attachmentType: Tag
-    ): IO[Either[AttachmentException, Stream[cats.effect.IO, Byte]]] = {
+    )(using Transaction[IO]): IO[Either[AttachmentException, Stream[cats.effect.IO, Byte]]] = {
       val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
       IO(either)
     }
@@ -39,7 +40,7 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
       fileName: String,
       description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
-    ): IO[Unit] = 
+    )(using Transaction[IO]): IO[Unit] = 
       getError(user).fold(IO.unit)(IO.raiseError)
 
     def updateAttachment(
@@ -49,17 +50,17 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
       fileName: String,
       description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
-    ): IO[Unit] =
+    )(using Transaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): IO[Unit] = 
+    def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[IO]): IO[Unit] = 
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag): IO[String] =
+    def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[IO]): IO[String] =
       getError(user).fold(IO(presignedUrl))(IO.raiseError)
   }
 
-  private val routes = ProposalAttachmentRoutes(service, ssoClient, 1).orNotFound
+  private val routes: HttpApp[IO] = ??? // ProposalAttachmentRoutes(service, ssoClient, 1).orNotFound
 
   test("GET requires authorization") {
     val request = Request[IO](method = Method.GET, uri = uri"attachment/proposal/p-1/science")

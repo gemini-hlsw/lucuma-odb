@@ -104,8 +104,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   def services: Resource[F, Services[F]]
 
   def groupService: Resource[F, GroupService[F]]
-  def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
-  def proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]]
   def targetService: Resource[F, TargetService[F]]
   def user: User
 
@@ -376,21 +374,22 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateObsAttachments = 
       MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
-        
-        val filterPredicate = and(List(
-          Predicates.obsAttachment.program.id.eql(input.programId),
-          Predicates.obsAttachment.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
+        services.useTransactionally {
+          val filterPredicate = and(List(
+            Predicates.obsAttachment.program.id.eql(input.programId),
+            Predicates.obsAttachment.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
 
-        val idSelect: Result[AppliedFragment] = 
-          MappedQuery(
-            Filter(filterPredicate, Select("id", Nil, Empty)), 
-            Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
-          ).flatMap(_.fragment)
+          val idSelect: Result[AppliedFragment] = 
+            MappedQuery(
+              Filter(filterPredicate, Select("id", Nil, Empty)), 
+              Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
+            ).flatMap(_.fragment)
 
-        idSelect.flatTraverse { which =>
-          obsAttachmentMetadataService.use(_.updateObsAttachments(input.SET, which)).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
+          idSelect.flatTraverse { which =>
+            obsAttachmentMetadataService.updateObsAttachments(input.SET, which).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
+          }
         }
       }
 
@@ -457,23 +456,26 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateProposalAttachments = 
       MutationField("updateProposalAttachments", UpdateProposalAttachmentsInput.binding(Path.from(ProposalAttachmentType))) { (input, child) =>
-        
-        val filterPredicate = and(List(
-          Predicates.proposalAttachment.program.id.eql(input.programId),
-          Predicates.proposalAttachment.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
+        services.useTransactionally {
 
-        val typeSelect: Result[AppliedFragment] = 
-          MappedQuery(
-            Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
-            Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
-          ).flatMap(_.fragment)
+          val filterPredicate = and(List(
+            Predicates.proposalAttachment.program.id.eql(input.programId),
+            Predicates.proposalAttachment.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
 
-        typeSelect.flatTraverse { which =>
-          proposalAttachmentMetadataService
-            .use(_.updateProposalAttachments(input.SET, which))
-            .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
+          val typeSelect: Result[AppliedFragment] = 
+            MappedQuery(
+              Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
+              Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
+            ).flatMap(_.fragment)
+
+          typeSelect.flatTraverse { which =>
+            proposalAttachmentMetadataService
+              .updateProposalAttachments(input.SET, which)
+              .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
+          }
+          
         }
       }
 

@@ -204,12 +204,6 @@ object OdbMapping {
           override val groupService: Resource[F, GroupService[F]] =
             pool.map(GroupService.fromSessionAndUser(_, user))
 
-          override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
-            pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
-
-          override val proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]] =
-            pool.map(ProposalAttachmentMetadataService.fromSessionAndUser(_, user))
-
           override val targetService: Resource[F, TargetService[F]] =
             pool.map(TargetService.fromSession(_, user))
 
