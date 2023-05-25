@@ -32,7 +32,7 @@ trait Services[F[_]]:
   def proposalService: ProposalService[F]
   // def s3FileService: S3FileService[F]
   // def smartGcalService: SmartGcalService[F]
-  // def targetService: TargetService[F]
+  def targetService: TargetService[F]
   def timingWindowService: TimingWindowService[F]
   // def userService: UserService[F]
 
@@ -62,7 +62,7 @@ object Services:
       lazy val proposalService = ??? //ProposalService.instantiate
       // lazy val s3FileService = S3FileService.instantiate
       // lazy val smartGcalService = SmartGcalService.instantiate
-      // lazy val targetService = ???
+      lazy val targetService = TargetService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       // lazy val userService = UserService.instantiate
 
@@ -86,7 +86,7 @@ object Services:
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
     // def s3FileService[F[_]](using Services[F]): S3FileService[F] = summon[Services[F]].s3FileService
     // def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
-    // def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
+    def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     // def userService[F[_]](using Services[F]): UserService[F] = summon[Services[F]].userService
 

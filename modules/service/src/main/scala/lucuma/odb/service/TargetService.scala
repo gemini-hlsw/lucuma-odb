@@ -53,12 +53,13 @@ import skunk.Void
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
+import Services.Syntax.* 
 
 trait TargetService[F[_]] {
   import TargetService.{ CloneTargetResponse, CreateTargetResponse, UpdateTargetsResponse }
-  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse]
-  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse]
-  def cloneTarget(input: CloneTargetInput): F[CloneTargetResponse]
+  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse]
+  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse]
+  def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse]
 }
 
 object TargetService {
@@ -84,36 +85,34 @@ object TargetService {
     case NoSuchTarget(targetId: Target.Id)
     case UpdateFailed(problem: UpdateTargetsError)
 
-  def fromSession[F[_]: Concurrent](s: Session[F], u: User): TargetService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
     new TargetService[F] {
 
-      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create): F[CreateTargetResponse] = {
+      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
         val insert: AppliedFragment =
           input.tracking match {
             case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
             case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
           }
-        val where = Statements.whereFragment(pid, u)
+        val where = Statements.whereFragment(pid, user)
         val appl  = insert |+| void" " |+| where
-        s.prepareR(appl.fragment.query(target_id)).use { ps =>
+        session.prepareR(appl.fragment.query(target_id)).use { ps =>
           ps.option(appl.argument).map {
             case Some(tid) => Success(tid)
-            case None      => NotAuthorized(u)
+            case None      => NotAuthorized(user)
           } // todo: catch key violation to indicate ProgramNotFound
         }
       }
 
-      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse] =
-        s.transaction.use { xa =>
-          updateTargetsʹ(xa, input, which)
-        }
+      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
+        updateTargetsʹ(input, which)
 
-      def updateTargetsʹ(xa: Transaction[F], input: TargetPropertiesInput.Edit, which: AppliedFragment): F[UpdateTargetsResponse] =
+      def updateTargetsʹ(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
 
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
           val update = Statements.updateTargets(input, which)
-          Stream.resource(s.prepareR(update.fragment.query(target_id))).flatMap { ps =>
+          Stream.resource(session.prepareR(update.fragment.query(target_id))).flatMap { ps =>
             ps.stream(update.argument, 1024)
           }          
         }
@@ -129,8 +128,8 @@ object TargetService {
             // Here we must (embarrassingly) update each source profile individually, but we can
             // save a little bit of overhaed by preparing the statements once and reusing them.
             Stream.resource((
-              s.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
-              s.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
+              session.prepareR(sql"select c_source_profile from t_target where c_target_id = $target_id".query(jsonb)),
+              session.prepareR(sql"update t_target set c_source_profile = $jsonb where c_target_id = $target_id".command)
             ).tupled).flatMap { (read, update) =>
               nonSourceProfileUpdates.evalMap { tid =>
                 read.unique(tid).map(_.hcursor.as[SourceProfile]).flatMap {
@@ -143,8 +142,8 @@ object TargetService {
               // If any source profile updates failed then roll back.
               r match {
                 case Result.Success(ids)      => UpdateTargetsResponse.Success(ids).pure[F]
-                case Result.Failure(ps)       => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
-                case Result.Warning(ps, ids)  => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                case Result.Failure(ps)       => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
+                case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
                 // case Ior.Left(ps)    => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 // case Ior.Both(ps, _) => xa.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
@@ -158,41 +157,38 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      def cloneTarget(input: CloneTargetInput): F[CloneTargetResponse] =
-        s.transaction.use { xa =>
-          import CloneTargetResponse.*
+      def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
+        import CloneTargetResponse.*
 
-          val pid: F[Option[Program.Id]] =
-            s.prepareR(sql"select c_program_id from t_target where c_target_id = $target_id".query(program_id)).use { ps =>
-              ps.option(input.targetId)
-            }
-            
-          def clone(pid: Program.Id): F[Option[Target.Id]] =
-            val stmt = Statements.cloneTarget(pid, input.targetId, u)
-            s.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
-
-          def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] = 
-            input.SET.traverse(updateTargetsʹ(xa, _, sql"SELECT $target_id".apply(tid)))
-          
-          def replaceIn(tid: Target.Id): F[Unit] =
-            input.REPLACE_IN.traverse_ { which =>
-              val stmt = Statements.replaceTargetIn(which, input.targetId, tid)
-              s.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))               
-            } 
-
-          pid.flatMap {
-            case None => NoSuchTarget(input.targetId).pure[F] // doesn't exist at all
-            case Some(pid) =>
-              clone(pid).flatMap {
-                case None => NoSuchTarget(input.targetId).pure[F] // not authorized
-                case Some(tid) =>
-                  update(tid).flatMap {              
-                    case Some(err: UpdateTargetsError) => xa.rollback.as(UpdateFailed(err))
-                    case _ => replaceIn(tid) as Success(input.targetId, tid)
-                  }
-              }
+        val pid: F[Option[Program.Id]] =
+          session.prepareR(sql"select c_program_id from t_target where c_target_id = $target_id".query(program_id)).use { ps =>
+            ps.option(input.targetId)
           }
+          
+        def clone(pid: Program.Id): F[Option[Target.Id]] =
+          val stmt = Statements.cloneTarget(pid, input.targetId, user)
+          session.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
 
+        def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] = 
+          input.SET.traverse(updateTargetsʹ(_, sql"SELECT $target_id".apply(tid)))
+        
+        def replaceIn(tid: Target.Id): F[Unit] =
+          input.REPLACE_IN.traverse_ { which =>
+            val stmt = Statements.replaceTargetIn(which, input.targetId, tid)
+            session.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))               
+          } 
+
+        pid.flatMap {
+          case None => NoSuchTarget(input.targetId).pure[F] // doesn't exist at all
+          case Some(pid) =>
+            clone(pid).flatMap {
+              case None => NoSuchTarget(input.targetId).pure[F] // not authorized
+              case Some(tid) =>
+                update(tid).flatMap {              
+                  case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
+                  case _ => replaceIn(tid) as Success(input.targetId, tid)
+                }
+            }
         }
 
     }
