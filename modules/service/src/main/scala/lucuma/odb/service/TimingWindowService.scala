@@ -39,7 +39,7 @@ object TimingWindowService:
       override def createFunction(
         timingWindows: List[TimingWindowInput]
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
-        Result( (obsIds, xa) =>
+        Result( (obsIds, _) =>
           exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
             Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(exec)
         )

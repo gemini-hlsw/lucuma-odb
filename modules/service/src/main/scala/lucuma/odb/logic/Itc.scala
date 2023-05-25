@@ -32,6 +32,7 @@ import lucuma.odb.service.GeneratorParamsService
 import java.security.Provider.Service
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import skunk.Transaction
 
 sealed trait Itc[F[_]] {
 
@@ -39,7 +40,7 @@ sealed trait Itc[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     useCache:      Boolean
-  ): F[EitherNel[Itc.Error, Itc.ResultSet]]
+  )(using Transaction[F]): F[EitherNel[Itc.Error, Itc.ResultSet]]
 
   def spectroscopy(
     targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
@@ -140,7 +141,7 @@ object Itc {
         programId:     Program.Id,
         observationId: Observation.Id,
         useCache:      Boolean
-      ): F[EitherNel[Error, ResultSet]] =
+      )(using Transaction[F]): F[EitherNel[Error, ResultSet]] =
         (for {
           params <- selectParams(programId, observationId).leftMap(NonEmptyList.one)
           result <- callItc(params, useCache)
@@ -150,7 +151,7 @@ object Itc {
       private def selectParams(
         pid: Program.Id,
         oid: Observation.Id
-      ): EitherT[F, Error, GeneratorParams] =
+      )(using Transaction[F]): EitherT[F, Error, GeneratorParams] =
         EitherT(
           generatorParamsService
             .select(pid, oid)

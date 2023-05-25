@@ -112,12 +112,10 @@ object ProgramService {
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          session.transaction.use { xa =>
-            val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
-            session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
-              SETʹ.proposal.traverse { proposalInput =>
-                proposalService.insertProposal(proposalInput, pid, xa)
-              }
+          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None, None))
+          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
+            SETʹ.proposal.traverse { proposalInput =>
+              proposalService.insertProposal(proposalInput, pid)
             }
           }
         }
@@ -146,36 +144,35 @@ object ProgramService {
         }
       }
 
-      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[List[Program.Id]] =
-        session.transaction.use { xa =>
+      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[List[Program.Id]] = {
 
-          // Create the temp table with the programs we're updating. We will join with this
-          // several times later on in the transaction.
-          val setup: F[Unit] = {
-            val af = Statements.createProgramUpdateTempTable(where)
-            session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+        // Create the temp table with the programs we're updating. We will join with this
+        // several times later on in the transaction.
+        val setup: F[Unit] = {
+          val af = Statements.createProgramUpdateTempTable(where)
+          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+        }
+
+        // Update programs
+        val updatePrograms: F[List[Program.Id]] =
+          Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
+            session.prepareR(af.fragment.query(program_id)).use { ps =>
+              ps.stream(af.argument, 1024)
+                .compile
+                .toList
+            }
           }
 
-          // Update programs
-          val updatePrograms: F[List[Program.Id]] =
-            Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
-              session.prepareR(af.fragment.query(program_id)).use { ps =>
-                ps.stream(af.argument, 1024)
-                  .compile
-                  .toList
-              }
-            }
+        // Update proposals. This can fail in a few ways.
+        val updateProposals: F[List[Program.Id]] =
+          SET.proposal.fold(Nil.pure[F]) {
+            proposalService.updateProposals(_)
+          }
 
-          // Update proposals. This can fail in a few ways.
-          val updateProposals: F[List[Program.Id]] =
-            SET.proposal.fold(Nil.pure[F]) {
-              proposalService.updateProposals(_, xa)
-            }
+        // Combie the results
+        (setup >> updatePrograms, updateProposals).mapN(_ |+| _)
 
-          // Combie the results
-          (setup >> updatePrograms, updateProposals).mapN(_ |+| _)
-
-        }
+      }
 
       def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean] =
         Statements.existsUserAccess(user, programId).fold(true.pure[F]) { af =>

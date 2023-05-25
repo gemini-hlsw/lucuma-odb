@@ -31,7 +31,7 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
-
+import Services.Syntax.*
 
 trait GmosLongSlitService[F[_]] {
 
@@ -95,9 +95,7 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
-  def fromSession[F[_]: Concurrent](
-    session: Session[F]
-  ): GmosLongSlitService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): GmosLongSlitService[F] =
 
     new GmosLongSlitService[F] {
 
