@@ -12,6 +12,7 @@ import cats.syntax.option.*
 import coulomb.Quantity
 import eu.timepit.refined.auto.*
 import eu.timepit.refined.types.numeric.PosDouble
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GmosGratingOrder
@@ -80,7 +81,7 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
         s <- scienceStep(Offset(p0, q), ObserveClass.Science)
         f <- flatStep(ObserveClass.PartnerCal)
         label = f"q ${Angle.signedDecimalArcseconds.get(q.toAngle)}%.1f″, λ ${Wavelength.decimalNanometers.reverseGet(w.getOrElse(λ))}%.1f nm"
-      } yield Science.Atom(label, index, s, f)).runA(d).value
+      } yield Science.Atom(NonEmptyString.unsafeFrom(label), index, s, f)).runA(d).value
 
     val init: D =
       (for {
@@ -112,7 +113,7 @@ object Science {
    * Science and associated matching flat.
    */
   final case class Atom[D](
-    description: String,
+    description: NonEmptyString,
     index:       Int,
     science:     ProtoStep[D],
     flat:        ProtoStep[D]

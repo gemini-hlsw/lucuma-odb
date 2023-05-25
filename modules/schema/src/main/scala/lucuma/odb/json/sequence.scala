@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.string.NonEmptyString
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -77,10 +78,10 @@ trait SequenceCodec {
     Decoder.instance { c =>
       for {
         i <- c.downField("id").as[Atom.Id]
-        d <- c.downField("description").as[Option[String]]
+        d <- c.downField("description").as[Option[NonEmptyString]]
         s <- c.downField("steps").as[List[Step[D]]]
         n <- NonEmptyList.fromList(s).toRight(DecodingFailure("At least one step is required in the `steps` array of an atom", c.history))
-      } yield Atom(i, d, n)
+      } yield Atom(i, d/*.flatMap(s => NonEmptyString.from(s).toOption)*/, n)
     }
 
   given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Atom[D]] =
