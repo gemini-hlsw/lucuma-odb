@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.data.NonEmptyList
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosAmpGain
@@ -95,7 +95,7 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
-  def fromSession[F[_]: Sync](
+  def fromSession[F[_]: Concurrent](
     session: Session[F]
   ): GmosLongSlitService[F] =
 

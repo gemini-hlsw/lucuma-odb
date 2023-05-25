@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Async
+import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
@@ -16,8 +16,9 @@ import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
-
+import Services.Syntax.*
 import java.util.UUID
+import cats.effect.std.UUIDGen
 
 trait ProposalAttachmentFileService[F[_]] {
   import AttachmentFileService.AttachmentException
@@ -27,7 +28,7 @@ trait ProposalAttachmentFileService[F[_]] {
     user:         User,
     programId:    Program.Id,
     attachmentType: Tag
-  ): F[Either[AttachmentException, Stream[F, Byte]]]
+  )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
 
   /** Uploads the file to S3 and addes it to the database */
   def insertAttachment(
@@ -37,7 +38,7 @@ trait ProposalAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  ): F[Unit]
+  )(using Transaction[F]): F[Unit]
 
   def updateAttachment(
     user:           User,
@@ -46,23 +47,22 @@ trait ProposalAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  ): F[Unit]
+  )(using Transaction[F]): F[Unit]
 
   /** Deletes the file from the database and then removes it from S3. */
-  def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit]
+  def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[Unit]
   
-  def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag): F[String]
+  def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[String]
 }
 
 object ProposalAttachmentFileService extends AttachmentFileService {
   import AttachmentFileService.AttachmentException
   import AttachmentException.*
-
   import org.typelevel.log4cats.Logger
-  def fromS3AndSession[F[_]: Async: Trace: Logger](
+
+  def instantiate[F[_]: Concurrent: Trace: UUIDGen](
     s3FileSvc: S3FileService[F],
-    session:   Session[F]
-  ): ProposalAttachmentFileService[F] = {
+  )(using Services[F]): ProposalAttachmentFileService[F] = {
 
     def checkAttachmentType(attachmentType: Tag): F[Unit] = {
       val af   = Statements.existsAttachmentType(attachmentType)
@@ -73,8 +73,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           pg.unique(af.argument)
         }
         .flatMap(isValid =>
-          if (isValid) Async[F].unit
-          else Async[F].raiseError(InvalidRequest("Invalid attachment type"))
+          if (isValid) Concurrent[F].unit
+          else Concurrent[F].raiseError(InvalidRequest("Invalid attachment type"))
         )
     }
 
@@ -101,8 +101,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 // initial checks for duplication and this function is called after the upload.
                 case SqlState.UniqueViolation(e) => 
                   if (e.constraintName.contains("t_proposal_attachment_pkey"))
-                    Async[F].raiseError(InvalidRequest("Duplicate attachment type"))
-                  else Async[F].raiseError(InvalidRequest("Duplicate file name"))
+                    Concurrent[F].raiseError(InvalidRequest("Duplicate attachment type"))
+                  else Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -124,12 +124,12 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
-                if (b) Async[F].unit
-                else Async[F].raiseError(FileNotFound)
+                if (b) Concurrent[F].unit
+                else Concurrent[F].raiseError(FileNotFound)
               )
               .recoverWith {
                 case SqlState.UniqueViolation(_) => 
-                  Async[F].raiseError(InvalidRequest("Duplicate file name"))
+                  Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -148,8 +148,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => Async[F].raiseError(FileNotFound)
-                case Some(s) => Async[F].pure(s)
+                case None    => Concurrent[F].raiseError(FileNotFound)
+                case Some(s) => Concurrent[F].pure(s)
               }
           )
       }
@@ -168,8 +168,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap { 
-                case None    => Async[F].raiseError(FileNotFound)
-                case Some(s) => Async[F].pure(s)
+                case None    => Concurrent[F].raiseError(FileNotFound)
+                case Some(s) => Concurrent[F].pure(s)
                 }
           )
       }
@@ -177,8 +177,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
     def checkForDuplicateAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
       getOptionalRemotePath(user, programId, attachmentType)
         .flatMap { 
-          case Some(_) => Async[F].raiseError(InvalidRequest("Duplicate attachment type"))
-          case None    => Async[F].unit
+          case Some(_) => Concurrent[F].raiseError(InvalidRequest("Duplicate attachment type"))
+          case None    => Concurrent[F].unit
           }
 
     def getOptionalRemotePath(
@@ -204,8 +204,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         .use(pg =>
           pg.option(af.argument)
             .flatMap {
-              case None    => Async[F].unit
-              case Some(_) => Async[F].raiseError(InvalidRequest("Duplicate file name"))
+              case None    => Concurrent[F].unit
+              case Some(_) => Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
             }
         )
     }
@@ -218,7 +218,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         user: User,
         programId: Program.Id,
         attachmentType: Tag
-      ): F[Either[AttachmentException, Stream[F, Byte]]] = 
+      )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] = 
         session.transaction
           .use(_ =>
             for {
@@ -240,11 +240,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         attachmentType: Tag,
         fileName: String,
         description: Option[NonEmptyString],
-        data: Stream[F, Byte]): F[Unit] = 
+        data: Stream[F, Byte])(using Transaction[F]): F[Unit] = 
         FileName
           .fromString(fileName)
           .fold(
-            e  => Async[F].raiseError(e),
+            e  => Concurrent[F].raiseError(e),
             fn =>
               session.transaction
                 .use(_ =>
@@ -257,7 +257,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 )
                 .flatMap( _ =>
                   for {
-                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    uuid   <- UUIDGen[F].randomUUID
                     path    = filePath(programId, uuid, fn.value)
                     size   <- s3FileSvc.upload(path, data)
                     result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
@@ -272,11 +272,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         fileName: String,
         description: Option[NonEmptyString],
         data: Stream[F, Byte]
-      ): F[Unit] = 
+      )(using Transaction[F]): F[Unit] = 
         FileName
           .fromString(fileName)
           .fold(
-            e  => Async[F].raiseError(e),
+            e  => Concurrent[F].raiseError(e),
             fn =>
               session.transaction
                 .use(_ =>
@@ -289,7 +289,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 )
                 .flatMap(oldPath =>
                   for {
-                    uuid   <- Async[F].delay(UUID.randomUUID())
+                    uuid   <- UUIDGen[F].randomUUID
                     newPath = filePath(programId, uuid, fn.value)
                     size   <- s3FileSvc.upload(newPath, data)
                     _      <- updateAttachmentInDB(user, programId, attachmentType, fn, description, size, newPath)
@@ -298,7 +298,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 )
           )
         
-      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
+      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[Unit] = 
         session.transaction
           .use(_ =>
             for {
@@ -313,7 +313,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
             s3FileSvc.delete(remotePath).handleError{ case _ => () }
           )
 
-      def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag): F[String] =
+      def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[String] =
         session.transaction
           .use(_ =>
             for {

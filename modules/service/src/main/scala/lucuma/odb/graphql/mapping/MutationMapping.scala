@@ -102,12 +102,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // A services resource and syntax to use it wrapped in a transaction. All mutations need have the
   // for services.useTransactionally { ... }
   def services: Resource[F, Services[F]]
-  extension [A](s: Resource[F, Services[F]]) def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A]): F[A] =
-    s.use(ss => ss.session.transaction.use(xa => fa(using xa, ss)))
 
   def groupService: Resource[F, GroupService[F]]
   def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
-  def programService: Resource[F, ProgramService[F]]
   def proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]]
   def targetService: Resource[F, TargetService[F]]
   def user: User
@@ -269,8 +266,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
-      programService.use(_.insertProgram(input.SET)).map { id =>
-        Result(Unique(Filter(Predicates.program.id.eql(id), child)))
+      services.useTransactionally {
+        programService.insertProgram(input.SET).map { id =>
+          Result(Unique(Filter(Predicates.program.id.eql(id), child)))
+        }
       }
     }
 
@@ -288,16 +287,18 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>
-      import lucuma.odb.service.ProgramService.LinkUserResponse._
-      programService.use(_.linkUser(input)).map[Result[Query]] {
-        case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
-        case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
-        case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
-        case Success(pid, uid)       =>
-          Result(Unique(Filter(And(
-            Predicates.linkUserResult.programId.eql(pid),
-            Predicates.linkUserResult.userId.eql(uid),
-          ), child)))
+      services.useTransactionally {
+        import lucuma.odb.service.ProgramService.LinkUserResponse._
+        programService.linkUser(input).map[Result[Query]] {
+          case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
+          case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
+          case Success(pid, uid)       =>
+            Result(Unique(Filter(And(
+              Predicates.linkUserResult.programId.eql(pid),
+              Predicates.linkUserResult.userId.eql(uid),
+            ), child)))
+        }
       }
     }
 
@@ -430,28 +431,28 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdatePrograms =
     MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
+      services.useTransactionally {
+        // Our predicate for selecting programs to update
+        val filterPredicate = and(List(
+          Predicates.program.isWritableBy(user),
+          Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+          input.WHERE.getOrElse(True)
+        ))
 
-      // Our predicate for selecting programs to update
-      val filterPredicate = and(List(
-        Predicates.program.isWritableBy(user),
-        Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-        input.WHERE.getOrElse(True)
-      ))
+        // An applied fragment that selects all program ids that satisfy `filterPredicate`
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
 
-      // An applied fragment that selects all program ids that satisfy `filterPredicate`
-      val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
-
-      // Update the specified programs and then return a query for the affected programs.
-      idSelect.flatTraverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).map(programResultSubquery(_, input.LIMIT, child)).recover {
-          case ProposalService.ProposalUpdateException.CreationFailed =>
-            Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
-          case ProposalService.ProposalUpdateException.InconsistentUpdate =>
-            Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+        // Update the specified programs and then return a query for the affected programs.
+        idSelect.flatTraverse { which =>
+          programService.updatePrograms(input.SET, which).map(programResultSubquery(_, input.LIMIT, child)).recover {
+            case ProposalService.ProposalUpdateException.CreationFailed =>
+              Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
+            case ProposalService.ProposalUpdateException.InconsistentUpdate =>
+              Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+          }
         }
       }
-
     }
 
   private lazy val UpdateProposalAttachments = 
