@@ -20,7 +20,7 @@ trait Services[F[_]]:
   def asterismService: AsterismService[F]
   // def generatorParamsService: GeneratorParamsService[F]
   // def gmosLongSlitService: GmosLongSlitService[F]
-  // def groupService: GroupService[F]
+  def groupService: GroupService[F]
   def obsAttachmentFileService(s3: S3FileService[F]): ObsAttachmentFileService[F]
   def obsAttachmentMetadataService: ObsAttachmentMetadataService[F]
   def observationService: ObservationService[F]
@@ -50,7 +50,7 @@ object Services:
       lazy val asterismService = AsterismService.instantiate
       // lazy val generatorParamsService = GeneratorParamsService.instantiate
       // lazy val gmosLongSlitService = GmosLongSlitService.instantiate
-      // lazy val groupService = GroupService.instantiate
+      lazy val groupService = GroupService.instantiate
       def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
       lazy val obsAttachmentMetadataService = ObsAttachmentMetadataService.instantiate
       lazy val observationService = ObservationService.instantiate
@@ -74,7 +74,7 @@ object Services:
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
     // def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     // def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
-    // def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
+    def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
     def obsAttachmentMetadataService[F[_]](using Services[F]): ObsAttachmentMetadataService[F] = summon[Services[F]].obsAttachmentMetadataService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
