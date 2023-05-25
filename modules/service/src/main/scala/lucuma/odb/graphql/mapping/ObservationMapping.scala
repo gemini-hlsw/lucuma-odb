@@ -5,13 +5,31 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.effect.Resource
+import cats.syntax.applicative.*
+import cats.syntax.eq.*
+import cats.syntax.foldable.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.*
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import edu.gemini.grackle.syntax.*
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.TimingWindowView
+import lucuma.odb.logic.Itc
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
@@ -25,6 +43,9 @@ trait ObservationMapping[F[_]]
      with TimingWindowView[F]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F] {
+
+  def itcClient: ItcClient[F]
+  def services: Resource[F, Services[F]]
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
@@ -49,7 +70,8 @@ trait ObservationMapping[F[_]]
         SqlObject("observingMode"),
         SqlField("instrument", ObservationView.Instrument),
         SqlObject("plannedTime"),
-        SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id))
+        SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
+        EffectField("itc", itcQueryHandler, List("id", "programId"))
       )
     )
 
@@ -70,6 +92,7 @@ trait ObservationMapping[F[_]]
               )
             )
           )
+
         case Select("obsAttachments", Nil, child) =>
           Result(
             Select("obsAttachments", Nil,
@@ -78,5 +101,50 @@ trait ObservationMapping[F[_]]
           )
       }
     )
+
+  def itcQueryHandler: EffectHandler[F] =
+    new EffectHandler[F] {
+      private def extractIds(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id)]] =
+        queries.traverse { case (_, cursor) =>
+          for {
+            p <- cursor.fieldAs[Program.Id]("programId")
+            o <- cursor.fieldAs[Observation.Id]("id")
+          } yield (p, o)
+        }
+
+      private def callItc(pid: Program.Id, oid: Observation.Id): F[Result[(Observation.Id, Itc.ResultSet)]] =
+        services.useTransactionally {
+          itc(itcClient)
+            .lookup(pid, oid, useCache = true)
+            .map {
+              case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
+              case Right(resultSet) => (oid, resultSet).success
+            }
+        }
+
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] = {
+        val children = queries.flatMap {
+          case (PossiblyRenamedSelect(Select(name, _, child), alias), parentCursor) =>
+            parentCursor.context.forField(name, alias).toList.map(ctx => (ctx, child, parentCursor))
+          case _ => Nil
+        }
+
+        val res = for {
+          ids <- ResultT(extractIds(queries).pure[F])
+          distinct = ids.distinct
+          itc <- distinct.traverse { case (pid, oid) => ResultT(callItc(pid, oid)) }
+        } yield
+
+          ids.flatMap { case (_, oid) => itc.find(_._1 === oid).map(_._2).toList }
+             .zip(children)
+             .map { case (itcResultSet, (ctx, child, parentCursor)) =>
+               val cursor: Cursor = CirceCursor(ctx, itcResultSet.asJson, Some(parentCursor), parentCursor.fullEnv)
+               (child, cursor)
+             }
+
+        res.value
+      }
+    }
+
 }
 
