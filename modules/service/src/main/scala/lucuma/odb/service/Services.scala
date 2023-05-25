@@ -11,6 +11,7 @@ import skunk.Transaction
 import natchez.Trace
 import cats.effect.Resource
 import cats.effect.MonadCancelThrow
+import lucuma.odb.logic.Itc
 
 /** A collection of services, all bound to a single Session and User. */
 trait Services[F[_]]:
@@ -18,7 +19,7 @@ trait Services[F[_]]:
   def user: User
   def allocationService: AllocationService[F]
   def asterismService: AsterismService[F]
-  // def generatorParamsService: GeneratorParamsService[F]
+  def generatorParamsService: GeneratorParamsService[F]
   // def gmosLongSlitService: GmosLongSlitService[F]
   def groupService: GroupService[F]
   def obsAttachmentFileService(s3: S3FileService[F]): ObsAttachmentFileService[F]
@@ -48,7 +49,7 @@ object Services:
 
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
-      // lazy val generatorParamsService = GeneratorParamsService.instantiate
+      lazy val generatorParamsService = GeneratorParamsService.instantiate
       // lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val groupService = GroupService.instantiate
       def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
@@ -72,7 +73,7 @@ object Services:
     def user[F[_]](using Services[F]): User = summon[Services[F]].user
     def allocationService[F[_]](using Services[F]): AllocationService[F] = summon[Services[F]].allocationService
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
-    // def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
+    def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     // def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
