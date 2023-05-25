@@ -4864,6 +4864,12 @@ type Observation {
 
   # Execution sequence and runtime artifacts
   execution: Execution!
+
+  """
+  The ITC result for this observation, assuming it has associated target(s)
+  and a selected observing mode.
+  """
+  itc: ItcResultSet
 }
 
 # ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`
@@ -5282,15 +5288,18 @@ type Query {
   # Metadata for `enum FilterType`
   filterTypeMeta: [FilterTypeMeta!]!
 
-  # ITC execution results
+  """
+  ITC execution results.  DEPRECATED (use the `observation` query and select the
+  `itc` field instead).
+  """
   itc(
     programId:     ProgramId!
 
     observationId: ObservationId!
 
-    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    "Whether to use cached results (true) or ignore the cache and make a remote ITC call (false)."
     useCache: Boolean! = true
-  ): ItcResultSet
+  ): ItcResultSet @deprecated(reason: "use observation(observationId: \"o-111\") { itc {...} } instead")
 
   # Returns the observation with the given id, if any.
   observation(
