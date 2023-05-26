@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
@@ -13,8 +14,8 @@ import lucuma.core.model.User
 import lucuma.core.util.NewType
 import natchez.Trace
 import skunk.*
+
 import Services.Syntax.*
-import cats.MonadThrow
 
 trait AttachmentFileService {
 

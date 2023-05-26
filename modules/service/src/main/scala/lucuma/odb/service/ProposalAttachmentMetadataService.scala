@@ -18,6 +18,7 @@ import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
+
 import Services.Syntax.*
 
 trait ProposalAttachmentMetadataService[F[_]] {

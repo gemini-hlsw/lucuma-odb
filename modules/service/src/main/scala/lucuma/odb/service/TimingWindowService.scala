@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import cats.syntax.all.given
 import edu.gemini.grackle.Result
@@ -15,6 +15,7 @@ import skunk.Session
 import skunk.Transaction
 import skunk.codec.numeric.*
 import skunk.syntax.all.*
+
 import Services.Syntax.*
 
 trait TimingWindowService[F[_]] {
@@ -29,7 +30,7 @@ trait TimingWindowService[F[_]] {
 }
 
 object TimingWindowService:
-  def instantiate[F[_]: Concurrent](using Services[F]): TimingWindowService[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): TimingWindowService[F] =
     new TimingWindowService[F] {
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>

@@ -22,8 +22,10 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.ProgramType
 import lucuma.core.model
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
@@ -31,17 +33,16 @@ import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.service.GeneratorParamsService
-import lucuma.odb.service.SmartGcalService
 import lucuma.odb.json.all.query.given
-import lucuma.odb.sequence.util.CommitHash
-import scala.reflect.ClassTag
-import lucuma.odb.logic.Itc
 import lucuma.odb.logic.Generator
+import lucuma.odb.logic.Itc
+import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.itc.client.ItcClient
-import io.circe.syntax.*
+import lucuma.odb.service.SmartGcalService
+
+import scala.reflect.ClassTag
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]

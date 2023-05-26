@@ -70,12 +70,12 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
+import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
 import java.time.Duration
 import scala.concurrent.duration.*
-import software.amazon.awssdk.services.s3.model.S3Exception
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =

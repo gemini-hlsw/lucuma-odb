@@ -31,6 +31,7 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
+
 import Services.Syntax.*
 
 trait GmosLongSlitService[F[_]] {

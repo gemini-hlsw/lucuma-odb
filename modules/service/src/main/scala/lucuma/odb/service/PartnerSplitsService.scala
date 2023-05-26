@@ -27,6 +27,7 @@ import natchez.Trace
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
+
 import Services.Syntax.*
 
 private[service] trait PartnerSplitsService[F[_]] {

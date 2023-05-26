@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
-import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -23,6 +23,7 @@ import lucuma.odb.util.Codecs.program_id
 import lucuma.odb.util.Codecs.target_id
 import skunk.*
 import skunk.implicits.*
+
 import Services.Syntax.*
 
 trait AsterismService[F[_]] {
@@ -84,7 +85,7 @@ object AsterismService {
   ): String =
     s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
 
-  def instantiate[F[_]: Concurrent](using Services[F]): AsterismService[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
 

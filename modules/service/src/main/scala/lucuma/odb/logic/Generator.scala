@@ -38,12 +38,13 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.GeneratorParamsService
-import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.SmartGcalService
+import skunk.Transaction
+
 import java.io.ObjectOutputStream
 import java.util.UUID
-import skunk.Transaction
 
 sealed trait Generator[F[_]] {
 

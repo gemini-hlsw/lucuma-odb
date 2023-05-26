@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
 import cats.effect.Concurrent
 import cats.syntax.all._
 import coulomb.rational.typeexpr.NonNegInt
@@ -19,6 +18,7 @@ import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.codec.all.*
 import skunk.implicits._
+
 import Services.Syntax.*
 
 trait GroupService[F[_]] {

@@ -13,6 +13,9 @@ import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalAttachmentFileService
+import lucuma.odb.service.S3FileService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
@@ -20,9 +23,6 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import org.http4s.server.middleware.EntityLimiter
 import skunk.Session
-import lucuma.odb.service.S3FileService
-import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 
 object ProposalAttachmentRoutes {
   object ProgramId {

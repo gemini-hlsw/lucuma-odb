@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
@@ -16,6 +16,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
 import skunk.Session
 import skunk.Transaction
+
 import Services.Syntax.*
 
 sealed trait ObservingModeServices[F[_]] {
@@ -52,7 +53,7 @@ object ObservingModeServices {
     lucuma.odb.sequence.gmos.longslit.Config.GmosNorth |
     lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 
-  def instantiate[F[_]: Concurrent](using Services[F]): ObservingModeServices[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): ObservingModeServices[F] =
     new ObservingModeServices[F] {
 
       override def selectSequenceConfig(

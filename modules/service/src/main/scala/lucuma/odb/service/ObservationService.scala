@@ -82,6 +82,7 @@ import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
+
 import Services.Syntax.*
 
 sealed trait ObservationService[F[_]] {

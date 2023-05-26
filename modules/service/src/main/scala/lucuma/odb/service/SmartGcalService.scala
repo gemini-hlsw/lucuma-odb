@@ -41,6 +41,7 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.numeric.int4
 import skunk.implicits.*
+
 import Services.Syntax.*
 
 trait SmartGcalService[F[_]] {

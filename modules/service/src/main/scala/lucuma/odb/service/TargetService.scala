@@ -53,6 +53,7 @@ import skunk.Void
 import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
+
 import Services.Syntax.* 
 
 trait TargetService[F[_]] {
