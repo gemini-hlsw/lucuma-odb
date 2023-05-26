@@ -47,6 +47,7 @@ import skunk.circe.codec.json.*
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
+
 import Services.Syntax.*
 
 trait GeneratorParamsService[F[_]] {

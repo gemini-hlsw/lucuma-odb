@@ -18,9 +18,10 @@ import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.implicits._
-import Services.Syntax.*
 
 import java.time.Duration
+
+import Services.Syntax.*
 
 trait AllocationService[F[_]] {
   def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[AllocationService.SetAllocationResponse]

@@ -60,6 +60,7 @@ import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalAttachmentMetadataService
+import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TimingWindowService
@@ -70,7 +71,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
-import lucuma.odb.service.Services
 
 object OdbMapping {
 

@@ -3,18 +3,18 @@
 
 package lucuma.odb.service
 
-import lucuma.core.model.User
-import skunk.Session
 import cats.effect.Concurrent
-import cats.effect.std.UUIDGen
-import skunk.Transaction
-import natchez.Trace
-import cats.effect.Resource
 import cats.effect.MonadCancelThrow
-import lucuma.odb.logic.Itc
+import cats.effect.Resource
+import cats.effect.std.UUIDGen
+import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
+import lucuma.odb.logic.Itc
 import lucuma.odb.sequence.util.CommitHash
+import natchez.Trace
+import skunk.Session
+import skunk.Transaction
 
 /** A collection of services, all bound to a single Session and User. */
 trait Services[F[_]]:

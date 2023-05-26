@@ -3,7 +3,8 @@
 
 package lucuma.odb.service
 
-import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
+import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
@@ -16,9 +17,10 @@ import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
-import Services.Syntax.*
+
 import java.util.UUID
-import cats.effect.std.UUIDGen
+
+import Services.Syntax.*
 
 trait ProposalAttachmentFileService[F[_]] {
   import AttachmentFileService.AttachmentException
@@ -60,7 +62,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
   import AttachmentException.*
   import org.typelevel.log4cats.Logger
 
-  def instantiate[F[_]: Concurrent: Trace: UUIDGen](
+  def instantiate[F[_]: MonadCancelThrow: Trace: UUIDGen](
     s3FileSvc: S3FileService[F],
   )(using Services[F]): ProposalAttachmentFileService[F] = {
 
@@ -73,8 +75,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           pg.unique(af.argument)
         }
         .flatMap(isValid =>
-          if (isValid) Concurrent[F].unit
-          else Concurrent[F].raiseError(InvalidRequest("Invalid attachment type"))
+          if (isValid) MonadCancelThrow[F].unit
+          else MonadCancelThrow[F].raiseError(InvalidRequest("Invalid attachment type"))
         )
     }
 
@@ -101,8 +103,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 // initial checks for duplication and this function is called after the upload.
                 case SqlState.UniqueViolation(e) => 
                   if (e.constraintName.contains("t_proposal_attachment_pkey"))
-                    Concurrent[F].raiseError(InvalidRequest("Duplicate attachment type"))
-                  else Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
+                    MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate attachment type"))
+                  else MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -124,12 +126,12 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
-                if (b) Concurrent[F].unit
-                else Concurrent[F].raiseError(FileNotFound)
+                if (b) MonadCancelThrow[F].unit
+                else MonadCancelThrow[F].raiseError(FileNotFound)
               )
               .recoverWith {
                 case SqlState.UniqueViolation(_) => 
-                  Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
+                  MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -148,8 +150,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => Concurrent[F].raiseError(FileNotFound)
-                case Some(s) => Concurrent[F].pure(s)
+                case None    => MonadCancelThrow[F].raiseError(FileNotFound)
+                case Some(s) => MonadCancelThrow[F].pure(s)
               }
           )
       }
@@ -168,8 +170,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap { 
-                case None    => Concurrent[F].raiseError(FileNotFound)
-                case Some(s) => Concurrent[F].pure(s)
+                case None    => MonadCancelThrow[F].raiseError(FileNotFound)
+                case Some(s) => MonadCancelThrow[F].pure(s)
                 }
           )
       }
@@ -177,8 +179,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
     def checkForDuplicateAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
       getOptionalRemotePath(user, programId, attachmentType)
         .flatMap { 
-          case Some(_) => Concurrent[F].raiseError(InvalidRequest("Duplicate attachment type"))
-          case None    => Concurrent[F].unit
+          case Some(_) => MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate attachment type"))
+          case None    => MonadCancelThrow[F].unit
           }
 
     def getOptionalRemotePath(
@@ -204,8 +206,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         .use(pg =>
           pg.option(af.argument)
             .flatMap {
-              case None    => Concurrent[F].unit
-              case Some(_) => Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
+              case None    => MonadCancelThrow[F].unit
+              case Some(_) => MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
             }
         )
     }
@@ -240,7 +242,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         FileName
           .fromString(fileName)
           .fold(
-            e  => Concurrent[F].raiseError(e),
+            e  => MonadCancelThrow[F].raiseError(e),
             fn =>
               for {
                 _      <- checkAccess(session, user, programId)
@@ -266,7 +268,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         FileName
           .fromString(fileName)
           .fold(
-            e  => Concurrent[F].raiseError(e),
+            e  => MonadCancelThrow[F].raiseError(e),
             fn =>
               for {
                 _       <- checkAccess(session, user, programId)

@@ -29,10 +29,11 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService
-import java.security.Provider.Service
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
+
+import java.security.Provider.Service
 
 sealed trait Itc[F[_]] {
 
