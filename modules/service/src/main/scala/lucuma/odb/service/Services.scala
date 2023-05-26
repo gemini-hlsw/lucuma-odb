@@ -15,65 +15,153 @@ import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import skunk.Session
 import skunk.Transaction
+import fs2.compat.NotGiven
 
-/** A collection of services, all bound to a single Session and User. */
+/** 
+ * A collection of services, all bound to a single `Session` and `User`, together with a canonical
+ * operation for interacting with the database in a transactional way.
+ */
 trait Services[F[_]]:
+
+  /** The underlying `Session`. */
   def session: Session[F]
+
+  /** The associated `User`. */
   def user: User
-  def transactionally[A](f: (Transaction[F]) ?=> F[A]): F[A]
+
+  /** 
+   * Define an interaction with the database that will execute a block `fa` within a transaction,
+   * with `user` (see above) set in a transaction-local variable `lucuma.user` in the database,
+   * available in PostgreSQL as `current_setting('lucuma.user', true)` 
+   * 
+   * Within the pased block `fa` the current `Transaction` is implicit, as well as this `Services`
+   * instance. The purpose is as follows:
+   *
+   *   - When `Services` is `given` and `Services.Syntax.*` is imported, all members here are 
+   *     available unprefixed; i.e., you can just say `groupService.doWhatever(...)` or `user`
+   *     or `session` and the reference will be taken from the implicit `Services` in scope.
+   *   - When `Transaction` is `given` and `Services.Syntax.*` is imported, the current transaction
+   *     is available as `transaction`. This is rarely necessary, but it allows service code to use 
+   *     savepoints and rollback to handle errors when necessary.
+   *   - Most service methods have a `using Transaction[F]` clause, to prevent them from being
+   *     called without an active transaction. This adds a bit of safety.
+   * 
+   * See also `Services.Syntax.useTransactionally`, which is more commonly used; it does the same
+   * thing but works on `Resource[F, Service[F]]`. In this form you never actually see the
+   * `Services` instance; it's always implicit.
+   */
+  def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
+    using NotGiven[Transaction[F]], NotGiven[Services[F]] // discourage nested calls
+  ): F[A]
+
+  /** The `AllocationService`. */
   def allocationService: AllocationService[F]
+  
+  /** The `AsterismService`. */
   def asterismService: AsterismService[F]
+  
+  /** The `GeneratorParamsService`. */
   def generatorParamsService: GeneratorParamsService[F]
+  
+  /** The `GmosLongSlitService`. */
   def gmosLongSlitService: GmosLongSlitService[F]
+  
+  /** The `GroupService`. */
   def groupService: GroupService[F]
+  
+  /** Construct an `ObsAttachmentFileService`, given an `S3FileService`.  */
   def obsAttachmentFileService(s3: S3FileService[F]): ObsAttachmentFileService[F]
+  
+  /** The `ObsAttachmentMetadataService`. */
   def obsAttachmentMetadataService: ObsAttachmentMetadataService[F]
+  
+  /** The `ObservationService`. */
   def observationService: ObservationService[F]
+  
+  /** The `ObservingModeServices`. */
   def observingModeServices: ObservingModeServices[F]
+  
+  /** The `PartnerSplitsService`. */
   def partnerSplitsService: PartnerSplitsService[F]
+  
+  /** The `ProgramService`. */
   def programService: ProgramService[F]
+  
+  /** Construct a `ProposalAttachmentFileService`, given an `S3FileService`. */
   def proposalAttachmentFileService(s3: S3FileService[F]): ProposalAttachmentFileService[F]
+  
+  /** The `ProposalAttachmentMetadataService`. */
   def proposalAttachmentMetadataService: ProposalAttachmentMetadataService[F]
+  
+  /** The `ProposalService`. */
   def proposalService: ProposalService[F]
+  
+  /** The `SmartGcalService`. */
   def smartGcalService: SmartGcalService[F]
+  
+  /** The `TargetService`. */
   def targetService: TargetService[F]
+  
+  /** The `TimingWindowService`. */
   def timingWindowService: TimingWindowService[F]
+
+  /** Construct an `Itc` service, given an `ItcClient`.*/
   def itc(itcClient: ItcClient[F]): Itc[F]
+
+  /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
   def generator(commitHash: CommitHash, itcClient: ItcClient[F]): Generator[F]
 
+
+
 object Services:
-  
+
+  /** 
+   * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
+   * lazily.
+   */  
   def forUser[F[_]: Concurrent: Trace: UUIDGen](u: User)(s: Session[F]): Services[F[_]] =
     new Services[F]:
-
       val user = u
       val session = s
 
-      def transactionally[A](f: Transaction[F] ?=> F[A]): F[A] =
-        session.transaction.use(xa => f(using xa))
+      given Services[F] = this // need is for `instantiate` calls below
 
-      private given Services[F] = this
+      def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
+        using NotGiven[Transaction[F]], NotGiven[Services[F]] // discourage nested calls
+      ): F[A] =
+        session.transaction.use(xa => fa(using xa)) // TODO: bind user to transaction variable
 
+      // Services as passed their "owning" `Services` (i.e., `this`) on instantiation, which is
+      // circular and requies everything to be done lazily, which luckily is what we want. No point
+      // instantiating anything we're not using.
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val groupService = GroupService.instantiate
-      def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
       lazy val obsAttachmentMetadataService = ObsAttachmentMetadataService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programService = ProgramService.instantiate
-      def proposalAttachmentFileService(s3: S3FileService[F]) = ProposalAttachmentFileService.instantiate(s3)
       lazy val proposalAttachmentMetadataService = ProposalAttachmentMetadataService.instantiate
       lazy val proposalService = ProposalService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
+
+      // A few services require additional arguments for instantiation that may not always be
+      // available, so we require them here instead of demanding them before constructing a
+      // `Services` instance.
+      def proposalAttachmentFileService(s3: S3FileService[F]) = ProposalAttachmentFileService.instantiate(s3)
+      def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
       def itc(itcClient: ItcClient[F]) = Itc.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F]) = Generator.instantiate(commitHash, itcClient)
 
+  /**
+   * This adds syntax to access the members of `Services` and the current `Transaction` when they
+   * are present implicitly.
+   */
   object Syntax:
     def transaction[F[_]](using Transaction[F]): Transaction[F] = summon
     def session[F[_]](using Services[F]): Session[F] = summon[Services[F]].session
@@ -98,5 +186,8 @@ object Services:
     def itc[F[_]](client: ItcClient[F])(using Services[F]): Itc[F] = summon[Services[F]].itc(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F])(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient)
 
-    extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]]) def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A]): F[A] =
-      s.use(ss => ss.session.transaction.use(xa => fa(using xa, ss)))
+    extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
+      def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A])(
+        using NotGiven[Transaction[F]], NotGiven[Services[F]] // discourage nested calls
+      ): F[A] =
+          s.use(_.transactionally(fa))
