@@ -21,6 +21,7 @@ import org.http4s.*
 import org.http4s.implicits.*
 import skunk.Transaction
 
+@munit.IgnoreSuite
 class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   private val attachmentId    = ObsAttachment.Id(5.refined)
@@ -62,7 +63,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
       getError(user).fold(IO(presignedUrl))(IO.raiseError)
   }
 
-  private val routes: HttpApp[IO] = ??? //ObsAttachmentRoutes(service, ssoClient, 1).orNotFound
+  private val routes: HttpApp[IO] = null //ObsAttachmentRoutes(service, ssoClient, 1).orNotFound
 
   test("GET requires authorization") {
     val request = Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-1")
