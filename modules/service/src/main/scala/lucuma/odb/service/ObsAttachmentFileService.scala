@@ -192,20 +192,16 @@ object ObsAttachmentFileService extends AttachmentFileService {
         user:         User,
         programId:    Program.Id,
         attachmentId: ObsAttachment.Id
-      )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] =
-        session.transaction
-          .use(_ =>
-            for {
-              _    <- checkAccess(session, user, programId)
-              path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
-            } yield path
-          )
-          .flatMap { rpath =>
-            s3FileSvc.verifyAndGet(rpath).map(_.asRight)
-          }
-          .recover {
-            case e: AttachmentException => e.asLeft
-          }
+      )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] = {
+        for {
+          _    <- checkAccess(session, user, programId)
+          path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
+          _    <- transaction.commit // don't hold the transaction open while talking to S3
+          res  <- s3FileSvc.verifyAndGet(path).map(_.asRight)
+        } yield res
+      } recover {
+        case e: AttachmentException => e.asLeft
+      }
 
       def insertAttachment(
         user:           User,
@@ -220,22 +216,16 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .fold(
             e  => Concurrent[F].raiseError(e),
             fn =>
-              session.transaction
-                .use(_ =>
-                  for {
-                    _ <- checkAccess(session, user, programId)
-                    _ <- checkAttachmentType(attachmentType)
-                    _ <- checkForDuplicateName(programId, fn, none)
-                  } yield ()
-                )
-                .flatMap( _ =>
-                  for {
-                    uuid   <- UUIDGen[F].randomUUID
-                    path    = filePath(programId, uuid, fn.value)
-                    size   <- s3FileSvc.upload(path, data)
-                    result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
-                  } yield result
-                )
+              for {
+                _      <- checkAccess(session, user, programId)
+                _      <- checkAttachmentType(attachmentType)
+                _      <- checkForDuplicateName(programId, fn, none)
+                _      <- transaction.commit // don't hold the transaction open while talking to S3
+                uuid   <- UUIDGen[F].randomUUID
+                path    = filePath(programId, uuid, fn.value)
+                size   <- s3FileSvc.upload(path, data)
+                result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
+              } yield result
           )
 
       def updateAttachment(
@@ -251,23 +241,17 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .fold(
             e  => Concurrent[F].raiseError(e),
             fn =>
-              session.transaction
-                .use(_ =>
-                  for {
-                    _    <- checkAccess(session, user, programId)
-                    _    <- checkForDuplicateName(programId, fn, attachmentId.some)
-                    path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
-                  } yield path
-                )
-                .flatMap(oldPath =>
-                  for {
-                    uuid   <- UUIDGen[F].randomUUID
-                    newPath = filePath(programId, uuid, fn.value)
-                    size   <- s3FileSvc.upload(newPath, data)
-                    _      <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newPath)
-                    _      <- s3FileSvc.delete(oldPath)
-                  } yield ()
-                )
+              for {
+                _       <- checkAccess(session, user, programId)
+                _       <- checkForDuplicateName(programId, fn, attachmentId.some)
+                oldPath <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
+                _       <- transaction.commit // don't hold the transaction open while talking to S3
+                uuid    <- UUIDGen[F].randomUUID
+                newPath  = filePath(programId, uuid, fn.value)
+                size    <- s3FileSvc.upload(newPath, data)
+                _       <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newPath)
+                _       <- s3FileSvc.delete(oldPath)
+              } yield ()
           )
 
       def deleteAttachment(
@@ -275,30 +259,24 @@ object ObsAttachmentFileService extends AttachmentFileService {
         programId:    Program.Id,
         attachmentId: ObsAttachment.Id
       )(using Transaction[F]): F[Unit] =
-        session.transaction
-          .use(_ =>
-            for {
-              _    <- checkAccess(session, user, programId)
-              path <- deleteAttachmentFromDB(user, programId, attachmentId)
-            } yield path
-          )
-          .flatMap(remotePath =>
+        for {
+          _    <- checkAccess(session, user, programId)
+          path <- deleteAttachmentFromDB(user, programId, attachmentId)
+          _    <- transaction.commit // don't hold the transaction open while talking to S3
+          res  <- 
             // We'll trap errors from the remote delete because, although not ideal, we don't 
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
-            s3FileSvc.delete(remotePath).handleError{ case _ => () }
-          )
+            s3FileSvc.delete(path).handleError{ case _ => () }
+        } yield res
 
       def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using Transaction[F]): F[String] = 
-        session.transaction
-          .use(_ =>
-            for {
-              _    <- checkAccess(session, user, programId)
-              path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
-            } yield path
-          )
-          .flatMap { remotePath =>
-            s3FileSvc.presignedUrl(remotePath)
-          }
+        for {
+          _    <- checkAccess(session, user, programId)
+          path <- getAttachmentRemotePathFromDB(user, programId, attachmentId)
+          _    <- transaction.commit // don't hold the transaction open while talking to S3
+          res  <- s3FileSvc.presignedUrl(path)
+        } yield res
+
     }
   }
 

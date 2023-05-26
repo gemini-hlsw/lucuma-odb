@@ -75,12 +75,14 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.net.SocketException
 import java.time.Duration
 import scala.concurrent.duration.*
+import software.amazon.awssdk.services.s3.model.S3Exception
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
     case e: IllegalArgumentException if e.getMessage == "statusCode" => () // swallow annoying error ... not sure where it comes from though ... :-\
     case _: ProposalService.ProposalUpdateException => ()
     case _: AttachmentException => ()
+    case _: S3Exception => ()
     case e: SocketException if e.getMessage == "Connection reset" => ()
     case e => print("OdbSuite.reportFailure: "); e.printStackTrace
 
