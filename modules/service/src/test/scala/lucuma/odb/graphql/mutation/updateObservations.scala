@@ -949,6 +949,7 @@ class updateObservations extends OdbSuite
 
     val query = """
       observations {
+        instrument
         observingMode {
           gmosNorthLongSlit {
             grating
@@ -968,6 +969,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "B1200_G5301",
@@ -1035,6 +1037,7 @@ class updateObservations extends OdbSuite
 
     val query = """
       observations {
+        instrument
         observingMode {
           gmosNorthLongSlit {
             grating
@@ -1049,6 +1052,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "B1200_G5301"
@@ -1074,6 +1078,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "R831_G5302"
@@ -1122,6 +1127,7 @@ class updateObservations extends OdbSuite
 
     val query = """
       observations {
+        instrument
         observingMode {
           gmosNorthLongSlit {
             grating
@@ -1152,6 +1158,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "B1200_G5301",
@@ -1219,6 +1226,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "R831_G5302",
@@ -1272,6 +1280,7 @@ class updateObservations extends OdbSuite
     val query0 =
       """
       observations {
+        instrument
         observingMode {
           gmosNorthLongSlit {
             grating
@@ -1286,6 +1295,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "gmosNorthLongSlit": {
                   "grating": "B1200_G5301"
@@ -1314,6 +1324,7 @@ class updateObservations extends OdbSuite
     val query1 =
       """
       observations {
+        instrument
         observingMode {
           gmosSouthLongSlit {
             grating
@@ -1328,6 +1339,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_SOUTH",
               "observingMode": {
                 "gmosSouthLongSlit": {
                   "grating": "R831_G5322"
@@ -1430,6 +1442,7 @@ class updateObservations extends OdbSuite
 
     val query = """
       observations {
+        instrument
         observingMode {
           mode
           gmosNorthLongSlit {
@@ -1445,6 +1458,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": "GMOS_NORTH",
               "observingMode": {
                 "mode": "GMOS_NORTH_LONG_SLIT",
                 "gmosNorthLongSlit": {
@@ -1467,6 +1481,7 @@ class updateObservations extends OdbSuite
         "updateObservations": {
           "observations": [
             {
+              "instrument": null,
               "observingMode": null
             }
           ]
