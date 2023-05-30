@@ -203,16 +203,21 @@ class proposalAttachments extends AttachmentsSuite {
     )
   }
 
-  val file1A           = TestAttachment("file1", "science", "A description".some, "Hopeful")
-  val file1B           = TestAttachment("file1", "science", none, "New contents")
-  val file1C           = TestAttachment("file1", "team", none, "Same name, different type")
-  val file1Empty       = TestAttachment("file1", "science", "Thing".some, "")
-  val file1InvalidType = TestAttachment("file1", "NotAType", none, "It'll never make it")
-  val file2            = TestAttachment("file2", "team", "Masked".some, "Zorro")
-  val fileWithPath     = TestAttachment("this/file.txt", "science", none, "Doesn't matter")
+  val file1A           = TestAttachment("file1.pdf", "science", "A description".some, "Hopeful")
+  val file1B           = TestAttachment("file1.pdf", "science", none, "New contents")
+  val file1C           = TestAttachment("file1.pdf", "team", none, "Same name, different type")
+  val file1Empty       = TestAttachment("file1.pdf", "science", "Thing".some, "")
+  val file1InvalidType = TestAttachment("file1.pdf", "NotAType", none, "It'll never make it")
+  val file2            = TestAttachment("file2.pdf", "team", "Masked".some, "Zorro")
+  val fileWithPath     = TestAttachment("this/file.pdf", "science", none, "Doesn't matter")
   val missingFileName  = TestAttachment("", "science", none, "Doesn't matter")
   // same attachment type as file1A, but different name, etc.
-  val file3            = TestAttachment("different", "science", "Unmatching file name".some, "Something different")
+  val file3            = TestAttachment("different.pdf", "science", "Unmatching file name".some, "Something different")
+  val missingExtension = TestAttachment("file1", "science", "Missing extension".some, "Doesn't matter")
+  val emptyExtension =   TestAttachment("file1.", "team", "Empty extension".some, "Doesn't matter")
+  val invalidExtension =   TestAttachment("file1.pif", "science", "Invalid extension".some, "Doesn't matter")
+
+  val invalidExtensionMsg = "Invalid file. Must be a PDF file."
 
   test("successful insert, download and delete") {
     for {
@@ -405,6 +410,54 @@ class proposalAttachments extends AttachmentsSuite {
       _    = assertEquals(file1A.attachmentType, fileWithPath.attachmentType)
       _   <- insertAttachment(pi, pid, file1A).expectOk
       _   <- updateAttachment(pi, pid, fileWithPath).withExpectation(Status.BadRequest, "File name cannot include a path")
+    } yield ()
+  }
+  
+  test("file name with missing extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, missingExtension).withExpectation(Status.BadRequest, invalidExtensionMsg)
+    } yield ()
+  }
+
+  test("file name with missing extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _    = assertEquals(file1A.attachmentType, fileWithPath.attachmentType)
+      _   <- insertAttachment(pi, pid, file1A).expectOk
+      _   <- updateAttachment(pi, pid, missingExtension).withExpectation(Status.BadRequest, invalidExtensionMsg)
+    } yield ()
+  }
+
+  test("file name with empty extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, emptyExtension).withExpectation(Status.BadRequest, invalidExtensionMsg)
+    } yield ()
+  }
+
+  test("file name with empty extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _    = assertEquals(file1A.attachmentType, fileWithPath.attachmentType)
+      _   <- insertAttachment(pi, pid, file1A).expectOk
+      _   <- updateAttachment(pi, pid, emptyExtension).withExpectation(Status.BadRequest, invalidExtensionMsg)
+    } yield ()
+  }
+
+  test("file name with invalid extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, invalidExtension).withExpectation(Status.BadRequest, invalidExtensionMsg)
+    } yield ()
+  }
+
+  test("file name with invalid extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _    = assertEquals(file1A.attachmentType, fileWithPath.attachmentType)
+      _   <- insertAttachment(pi, pid, file1A).expectOk
+      _   <- updateAttachment(pi, pid, invalidExtension).withExpectation(Status.BadRequest, invalidExtensionMsg)
     } yield ()
   }
 
