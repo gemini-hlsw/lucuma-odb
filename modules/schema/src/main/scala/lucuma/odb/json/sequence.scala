@@ -81,7 +81,7 @@ trait SequenceCodec {
         d <- c.downField("description").as[Option[NonEmptyString]]
         s <- c.downField("steps").as[List[Step[D]]]
         n <- NonEmptyList.fromList(s).toRight(DecodingFailure("At least one step is required in the `steps` array of an atom", c.history))
-      } yield Atom(i, d/*.flatMap(s => NonEmptyString.from(s).toOption)*/, n)
+      } yield Atom(i, d, n)
     }
 
   given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Atom[D]] =

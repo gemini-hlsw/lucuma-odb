@@ -83,7 +83,7 @@ object GmosReadoutTime {
    import lucuma.odb.util.Codecs.*
    import lucuma.odb.util.GmosCodecs.*
 
-    val select: Query[Void, Tag ~ GmosCcdMode ~ GmosRoi ~ TimeSpan] =
+    val select: Query[Void, (Tag, GmosCcdMode, GmosRoi, TimeSpan)] =
       sql"""
         SELECT
           c_detector,
@@ -96,7 +96,7 @@ object GmosReadoutTime {
           c_time
         FROM
           t_gmos_readout
-      """.query(tag ~ gmos_ccd_mode ~ gmos_roi ~ time_span)
+      """.query(tag *: gmos_ccd_mode *: gmos_roi *: time_span)
   }
 
   def load[F[_]](s: Session[F])(using MonadError[F, Throwable]): F[GmosReadoutTime] = {
@@ -154,7 +154,7 @@ object GmosReadoutTime {
       ).sequence.void
 
     s.execute(statements.select)
-     .flatMap(_.flatTraverse { case (((tag, ccd), roi), time) => keys(tag, ccd, roi, time) })
+     .flatMap(_.flatTraverse { case (tag, ccd, roi, time) => keys(tag, ccd, roi, time) })
      .map(readoutMap)
      .flatMap(m => validate(m).as(m))
 

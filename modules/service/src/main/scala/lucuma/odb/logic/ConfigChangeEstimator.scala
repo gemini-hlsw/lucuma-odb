@@ -34,16 +34,17 @@ object ConfigChangeEstimator {
   def using(e: Enums): Applied =
     new Applied(e)
 
-  extension (tc: Enums#TimeEstimate) {
-    def toConfigChange: ConfigChangeEstimate =
-      ConfigChangeEstimate(tc.name, tc.description, tc.time)
-  }
 
   class Applied private[ConfigChangeEstimator] (private val enums: Enums) {
 
+    extension (tc: enums.TimeEstimate) {
+      private def toConfigChange: ConfigChangeEstimate =
+        ConfigChangeEstimate(tc.name, tc.description, tc.time)
+    }
+
     private abstract class ForInstrument[D] extends ConfigChangeEstimator[D] {
 
-      def check[A: Eq](estimate: Enums#TimeEstimate, past: EstimatorState[D], present: ProtoStep[D])(f: D => A): Option[ConfigChangeEstimate] =
+      def check[A: Eq](estimate: enums.TimeEstimate, past: EstimatorState[D], present: ProtoStep[D])(f: D => A): Option[ConfigChangeEstimate] =
         Option.when(past.step.map(s => f(s.value)).exists(_ =!= f(present.value)))(
           estimate.toConfigChange
         )
