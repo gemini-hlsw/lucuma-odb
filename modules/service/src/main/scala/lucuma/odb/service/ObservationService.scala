@@ -311,7 +311,7 @@ object ObservationService {
                     case SqlState.CheckViolation(ex) =>
                       Result.failure(constraintViolationMessage(ex)).pure[F]
                   }
-            _ <- r.toOption.fold(transaction.rollback)(_ => transaction.commit)
+            _ <- transaction.rollback.unlessA(r.hasValue) // barf if something failed
           } yield r
         }
 

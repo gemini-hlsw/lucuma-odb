@@ -35,9 +35,34 @@ object ObsAttachmentRoutes {
     def unapply(str: String): Option[ObsAttachment.Id] = ObsAttachment.Id.parse(str)
   }
 
-  def apply[F[_]: Concurrent: Trace: UUIDGen](
+  // the normal constructor
+  def apply[F[_]: Async: Trace](
     pool:                  Resource[F, Session[F]],
     s3:                    S3FileService[F],
+    ssoClient:             SsoClient[F, User],
+    maxUploadMb:           Int,
+  ): HttpRoutes[F] = 
+    apply(
+      [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u)).map(_.obsAttachmentFileService(s3)).use(fa),
+      ssoClient,
+      maxUploadMb
+    )
+  
+  // used by tests
+  def apply[F[_]: Async: Trace](
+    service:     ObsAttachmentFileService[F],
+    ssoClient:   SsoClient[F, User],
+    maxUploadMb: Int,
+  ): HttpRoutes[F] = 
+    apply(
+      [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => fa(service),
+      ssoClient,
+      maxUploadMb
+    )
+
+
+  def apply[F[_]: Concurrent: Trace: UUIDGen](
+    service:               [A] => User => (ObsAttachmentFileService[F] => F[A]) => F[A],
     ssoClient:             SsoClient[F, User],
     maxUploadMb:           Int
   ): HttpRoutes[F] = {
@@ -60,8 +85,8 @@ object ObsAttachmentRoutes {
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / "attachment" / "obs" / ProgramId(programId) / ObsAttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
-          pool.map(Services.forUser(user)).useTransactionally {
-            obsAttachmentFileService(s3).getAttachment(user, programId, attachmentId).flatMap {
+          service(user) { s =>
+            s.getAttachment(user, programId, attachmentId).flatMap {
               case Left(exc)     => exc.toResponse
               case Right(stream) => Response(Status.Ok, body = stream).pure[F]
             }
@@ -71,9 +96,9 @@ object ObsAttachmentRoutes {
       case req @ POST -> Root / "attachment" / "obs" / ProgramId(programId)
           :? FileNameMatcher(fileName) +& TagMatcher(typeTag) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
-          pool.map(Services.forUser(user)).useTransactionally {
+          service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-            obsAttachmentFileService(s3)
+            s
               .insertAttachment(user, programId, typeTag, fileName, description, req.body)
               .flatMap(id => Ok(id.toString))
               .recoverWith {
@@ -87,9 +112,9 @@ object ObsAttachmentRoutes {
       case req @ PUT -> Root / "attachment" / "obs" / ProgramId(programId) / ObsAttachmentId(attachmentId)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
-          pool.map(Services.forUser(user)).useTransactionally {
+          service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-            obsAttachmentFileService(s3)
+            s
               .updateAttachment(user, programId, attachmentId, fileName, description, req.body)
               .flatMap(_ => Ok())
               .recoverWith {
@@ -102,8 +127,8 @@ object ObsAttachmentRoutes {
 
       case req @ DELETE -> Root / "attachment" / "obs" / ProgramId(programId) / ObsAttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
-          pool.map(Services.forUser(user)).useTransactionally {
-            obsAttachmentFileService(s3)
+          service(user) { s =>
+            s
               .deleteAttachment(user, programId, attachmentId)
               .flatMap(_ => Ok())
               .recoverWith { case e: AttachmentException => e.toResponse }
@@ -112,8 +137,8 @@ object ObsAttachmentRoutes {
       
       case req @ GET -> Root / "attachment" / "obs" / "url" / ProgramId(programId) / ObsAttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
-          pool.map(Services.forUser(user)).useTransactionally {
-            obsAttachmentFileService(s3)
+          service(user) { s =>
+            s
               .getPresignedUrl(user, programId, attachmentId)
               .flatMap(Ok(_))
               .recoverWith { case e: AttachmentException => e.toResponse }
