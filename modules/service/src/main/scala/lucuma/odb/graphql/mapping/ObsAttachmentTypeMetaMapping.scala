@@ -6,9 +6,10 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ObsAttachmentFileExtTable
 import lucuma.odb.graphql.table.ObsAttachmentTypeTable
 
-trait ObsAttachmentTypeMetaMapping[F[_]] extends ObsAttachmentTypeTable[F] {
+trait ObsAttachmentTypeMetaMapping[F[_]] extends ObsAttachmentTypeTable[F] with ObsAttachmentFileExtTable[F] {
 
   lazy val ObsAttachmentTypeMetaMapping =
     ObjectMapping(
@@ -16,7 +17,8 @@ trait ObsAttachmentTypeMetaMapping[F[_]] extends ObsAttachmentTypeTable[F] {
       fieldMappings = List(
         SqlField("tag", ObsAttachmentTypeTable.Tag, key = true),
         SqlField("shortName", ObsAttachmentTypeTable.ShortName),
-        SqlField("longName", ObsAttachmentTypeTable.LongName)
+        SqlField("longName", ObsAttachmentTypeTable.LongName),
+        SqlObject("fileExtensions", Join(ObsAttachmentTypeTable.Tag, ObsAttachmentFileExtTable.AttachmentType))
       )
     )
 }

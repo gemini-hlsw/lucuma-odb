@@ -4,8 +4,8 @@
 package lucuma.odb.service
 
 import cats.MonadThrow
-import cats.effect.Async
 import cats.syntax.all._
+import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.io.file.Path
 import lucuma.core.model.GuestUser
@@ -39,8 +39,26 @@ trait AttachmentFileService {
     }
 
     extension (fileName: FileName)
+      // does not contain the dot.
       def extName: Option[NonEmptyString] =
-        NonEmptyString.from(Path(fileName.value.value).extName).toOption
+        NonEmptyString.from(Path(fileName.value.value).extName.drop(1).toLowerCase).toOption
+  }
+
+  def checkExtension[F[_]: MonadThrow](
+    fileName: FileName,
+    allowedExtensions: List[NonEmptyString]
+  ): F[Unit] =  {
+    val isOK = fileName.extName.exists(allowedExtensions.contains)
+    if (isOK) MonadThrow[F].unit
+    else {
+      val msg = allowedExtensions match {
+        case head :: Nil => s"Must be a ${head.value.toUpperCase} file."
+        case _           =>
+          val valids = allowedExtensions.map(_.value.toUpperCase).sorted.mkString(", ")
+          s"Must be one of: $valids"
+      }
+      MonadThrow[F].raiseError(InvalidRequest(s"Invalid file. $msg"))
+    }
   }
 
   // TODO: eventually will probably want to check for write access for uploading/deleting files.

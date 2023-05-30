@@ -13,7 +13,9 @@ import lucuma.core.model.User
 import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
 import natchez.Trace
+import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -27,8 +29,8 @@ trait ProposalAttachmentFileService[F[_]] {
 
   /** Retrieves the given file from S3 as a stream. */
   def getAttachment(
-    user:         User,
-    programId:    Program.Id,
+    user:           User,
+    programId:      Program.Id,
     attachmentType: Tag
   )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
 
@@ -60,7 +62,8 @@ trait ProposalAttachmentFileService[F[_]] {
 object ProposalAttachmentFileService extends AttachmentFileService {
   import AttachmentFileService.AttachmentException
   import AttachmentException.*
-  import org.typelevel.log4cats.Logger
+
+  private val allowedExtensions: List[NonEmptyString] = List("pdf".refined)
 
   def instantiate[F[_]: MonadCancelThrow: Trace: UUIDGen](
     s3FileSvc: S3FileService[F],
@@ -86,14 +89,15 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       attachmentType: Tag,
       fileName:       FileName,
       description:    Option[NonEmptyString],
-      fileSize:       Long, 
+      fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("insertProposalAttachment") {
         val af   = 
           Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.command
-        session.prepareR(stmt)
+        session
+          .prepareR(stmt)
           .use(pg =>
             pg.execute(af.argument)
               .void
@@ -101,12 +105,12 @@ object ProposalAttachmentFileService extends AttachmentFileService {
               .recoverWith {
                 // This seems a bit brittle. But this can only happen if something changes between the 
                 // initial checks for duplication and this function is called after the upload.
-                case SqlState.UniqueViolation(e) => 
+                case SqlState.UniqueViolation(e) =>
                   if (e.constraintName.contains("t_proposal_attachment_pkey"))
                     MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate attachment type"))
                   else MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
               }
-           )
+          )
       }
 
     def updateAttachmentInDB(
@@ -115,14 +119,15 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       attachmentType: Tag,
       fileName:       FileName,
       description:    Option[NonEmptyString],
-      fileSize:       Long, 
+      fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("updateProposalAttachment") {
-        val af   = 
+        val af   =
           Statements.updateAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.query(bool)
-        session.prepareR(stmt)
+        session
+          .prepareR(stmt)
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
@@ -133,7 +138,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 case SqlState.UniqueViolation(_) => 
                   MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
               }
-           )
+          )
       }
 
     def getAttachmentRemotePathFromDB(
@@ -176,7 +181,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           )
       }
 
-    def checkForDuplicateAttachment(user: User, programId: Program.Id, attachmentType: Tag): F[Unit] = 
+    def checkForDuplicateAttachment(
+      user:           User,
+      programId:      Program.Id,
+      attachmentType: Tag
+    ): F[Unit] =
       getOptionalRemotePath(user, programId, attachmentType)
         .flatMap { 
           case Some(_) => MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate attachment type"))
@@ -197,7 +206,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .use(_.option(af.argument))
       }
 
-    def checkForDuplicateName(programId: Program.Id, fileName: FileName, oType: Option[Tag]): F[Unit] = {
+    def checkForDuplicateName(
+      programId: Program.Id,
+      fileName:  FileName,
+      oType:     Option[Tag]
+    ): F[Unit] = {
       val af   = Statements.checkForDuplicateName(programId, fileName.value, oType)
       val stmt = af.fragment.query(bool)
 
@@ -217,8 +230,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
 
     new ProposalAttachmentFileService[F] {
       def getAttachment(
-        user: User,
-        programId: Program.Id,
+        user:           User,
+        programId:      Program.Id,
         attachmentType: Tag
       )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] = {
           for {
@@ -234,8 +247,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       }
 
       def insertAttachment(
-        user: User,
-        programId: Program.Id,
+        user:           User,
+        programId:      Program.Id,
         attachmentType: Tag,
         fileName: String,
         description: Option[NonEmptyString],
@@ -249,19 +262,20 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 _      <- services.transactionally {
                   checkAccess(session, user, programId) >>
                   checkAttachmentType(attachmentType) >>
+                  checkExtension(fn, allowedExtensions) >>
                   checkForDuplicateAttachment(user, programId, attachmentType) >>
                   checkForDuplicateName(programId, fn, none)
                 }
                 uuid   <- UUIDGen[F].randomUUID
                 path    = filePath(programId, uuid, fn.value)
                 size   <- s3FileSvc.upload(path, data)
-                result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
-              } yield result
+                _      <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
+              } yield ()
           )
 
       def updateAttachment(
-        user: User,
-        programId: Program.Id,
+        user:           User,
+        programId:      Program.Id,
         attachmentType: Tag,
         fileName: String,
         description: Option[NonEmptyString],
@@ -276,6 +290,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 oldPath <- services.transactionally {                
                   checkAccess(session, user, programId) >>
                   checkAttachmentType(attachmentType) >>
+                  checkExtension(fn, allowedExtensions) >>
                   checkForDuplicateName(programId, fn, attachmentType.some) >>
                   getAttachmentRemotePathFromDB(user, programId, attachmentType)
                 }
@@ -294,11 +309,11 @@ object ProposalAttachmentFileService extends AttachmentFileService {
             checkAttachmentType(attachmentType) >>
             deleteAttachmentFromDB(user, programId, attachmentType)
           }
-          res  <-
+          _    <-
             // We'll trap errors from the remote delete because, although not ideal, we don't 
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
             s3FileSvc.delete(path).handleError{ case _ => () }
-        } yield res
+        } yield ()
 
       def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[String] =
         for {
@@ -390,9 +405,9 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         void"RETURNING c_remote_path"
 
     def checkForDuplicateName(
-      programId:  Program.Id,
-      fileName:   NonEmptyString,
-      oType:      Option[Tag]
+      programId: Program.Id,
+      fileName:  NonEmptyString,
+      oType:     Option[Tag]
     ): AppliedFragment =
       sql"""
         SELECT true
