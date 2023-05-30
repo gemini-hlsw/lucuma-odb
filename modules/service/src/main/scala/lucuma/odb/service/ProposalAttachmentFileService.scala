@@ -30,7 +30,7 @@ trait ProposalAttachmentFileService[F[_]] {
     user:         User,
     programId:    Program.Id,
     attachmentType: Tag
-  )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
+  )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
 
   /** Uploads the file to S3 and addes it to the database */
   def insertAttachment(
@@ -40,7 +40,7 @@ trait ProposalAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  )(using Transaction[F]): F[Unit]
+  )(using NoTransaction[F]): F[Unit]
 
   def updateAttachment(
     user:           User,
@@ -49,12 +49,12 @@ trait ProposalAttachmentFileService[F[_]] {
     fileName:       String,
     description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
-  )(using Transaction[F]): F[Unit]
+  )(using NoTransaction[F]): F[Unit]
 
   /** Deletes the file from the database and then removes it from S3. */
-  def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[Unit]
+  def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[Unit]
   
-  def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[String]
+  def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[String]
 }
 
 object ProposalAttachmentFileService extends AttachmentFileService {
@@ -220,12 +220,13 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         user: User,
         programId: Program.Id,
         attachmentType: Tag
-      )(using Transaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] = {
+      )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] = {
           for {
-            _    <- checkAccess(session, user, programId)
-            _    <- checkAttachmentType(attachmentType)
-            path <- getAttachmentRemotePathFromDB(user, programId, attachmentType)
-            _    <- transaction.commit // don't hold the transaction open while talking to S3
+            path <- services.transactionally {
+              checkAccess(session, user, programId) >>
+              checkAttachmentType(attachmentType) >>
+              getAttachmentRemotePathFromDB(user, programId, attachmentType)
+            }
             res <- s3FileSvc.verifyAndGet(path).map(_.asRight)
         } yield res
       } recover {
@@ -238,18 +239,19 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         attachmentType: Tag,
         fileName: String,
         description: Option[NonEmptyString],
-        data: Stream[F, Byte])(using Transaction[F]): F[Unit] = 
+        data: Stream[F, Byte])(using NoTransaction[F]): F[Unit] = 
         FileName
           .fromString(fileName)
           .fold(
             e  => MonadCancelThrow[F].raiseError(e),
             fn =>
               for {
-                _      <- checkAccess(session, user, programId)
-                _      <- checkAttachmentType(attachmentType)
-                _      <- checkForDuplicateAttachment(user, programId, attachmentType)
-                _      <- checkForDuplicateName(programId, fn, none)
-                _      <- transaction.commit // don't hold the transaction open while talking to S3
+                _      <- services.transactionally {
+                  checkAccess(session, user, programId) >>
+                  checkAttachmentType(attachmentType) >>
+                  checkForDuplicateAttachment(user, programId, attachmentType) >>
+                  checkForDuplicateName(programId, fn, none)
+                }
                 uuid   <- UUIDGen[F].randomUUID
                 path    = filePath(programId, uuid, fn.value)
                 size   <- s3FileSvc.upload(path, data)
@@ -264,18 +266,19 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         fileName: String,
         description: Option[NonEmptyString],
         data: Stream[F, Byte]
-      )(using Transaction[F]): F[Unit] = 
+      )(using NoTransaction[F]): F[Unit] = 
         FileName
           .fromString(fileName)
           .fold(
             e  => MonadCancelThrow[F].raiseError(e),
             fn =>
               for {
-                _       <- checkAccess(session, user, programId)
-                _       <- checkAttachmentType(attachmentType)
-                _       <- checkForDuplicateName(programId, fn, attachmentType.some)
-                oldPath <- getAttachmentRemotePathFromDB(user, programId, attachmentType)
-                _       <- transaction.commit // don't hold the transaction open while talking to S3
+                oldPath <- services.transactionally {                
+                  checkAccess(session, user, programId) >>
+                  checkAttachmentType(attachmentType) >>
+                  checkForDuplicateName(programId, fn, attachmentType.some) >>
+                  getAttachmentRemotePathFromDB(user, programId, attachmentType)
+                }
                 uuid    <- UUIDGen[F].randomUUID
                 newPath = filePath(programId, uuid, fn.value)
                 size    <- s3FileSvc.upload(newPath, data)
@@ -284,24 +287,26 @@ object ProposalAttachmentFileService extends AttachmentFileService {
               } yield ()
           )
         
-      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[Unit] = 
+      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[Unit] = 
         for {
-          _    <- checkAccess(session, user, programId)
-          _    <- checkAttachmentType(attachmentType)
-          path <- deleteAttachmentFromDB(user, programId, attachmentType)
-          _    <- transaction.commit // don't hold the transaction open while talking to S3
+          path <- services.transactionally {
+            checkAccess(session, user, programId) >>
+            checkAttachmentType(attachmentType) >>
+            deleteAttachmentFromDB(user, programId, attachmentType)
+          }
           res  <-
             // We'll trap errors from the remote delete because, although not ideal, we don't 
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
             s3FileSvc.delete(path).handleError{ case _ => () }
         } yield res
 
-      def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using Transaction[F]): F[String] =
+      def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[String] =
         for {
-          _    <- checkAccess(session, user, programId)
-          _    <- checkAttachmentType(attachmentType)
-          path <- getAttachmentRemotePathFromDB(user, programId, attachmentType)
-          _    <- transaction.commit // don't hold the transaction open while talking to S3
+          path <- services.transactionally {
+            checkAccess(session, user, programId) >>
+            checkAttachmentType(attachmentType) >>
+            getAttachmentRemotePathFromDB(user, programId, attachmentType)
+          }
           res <- s3FileSvc.presignedUrl(path)
         } yield res
 

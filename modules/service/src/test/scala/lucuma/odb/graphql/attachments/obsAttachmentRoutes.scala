@@ -14,6 +14,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentFileService.AttachmentException
+import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.ObsAttachmentFileService
 import lucuma.refined.*
 import natchez.Trace.Implicits.noop
@@ -21,7 +22,6 @@ import org.http4s.*
 import org.http4s.implicits.*
 import skunk.Transaction
 
-@munit.IgnoreSuite
 class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
   private val attachmentId    = ObsAttachment.Id(5.refined)
@@ -31,7 +31,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
       user:         User,
       programId:    Program.Id,
       attachmentId: ObsAttachment.Id
-    )(using Transaction[IO]): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
+    )(using NoTransaction[IO]): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
       val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
       IO(either)
     }
@@ -43,7 +43,7 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
       fileName:       String,
       description:    Option[NonEmptyString],
       data:           Stream[IO, Byte]
-    )(using Transaction[IO]): IO[ObsAttachment.Id] =
+    )(using NoTransaction[IO]): IO[ObsAttachment.Id] =
       getError(user).fold(IO(attachmentId))(IO.raiseError)
 
     def updateAttachment(
@@ -53,17 +53,17 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
       fileName: String,
       description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
-    )(using Transaction[IO]): IO[Unit] = 
+    )(using NoTransaction[IO]): IO[Unit] = 
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using Transaction[IO]): IO[Unit] =
+    def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using Transaction[IO]): IO[String] = 
+    def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[IO]): IO[String] = 
       getError(user).fold(IO(presignedUrl))(IO.raiseError)
   }
 
-  private val routes: HttpApp[IO] = null //ObsAttachmentRoutes(service, ssoClient, 1).orNotFound
+  private val routes: HttpApp[IO] = ObsAttachmentRoutes(service, ssoClient, 1).orNotFound
 
   test("GET requires authorization") {
     val request = Request[IO](method = Method.GET, uri = uri"attachment/obs/p-1/a-1")

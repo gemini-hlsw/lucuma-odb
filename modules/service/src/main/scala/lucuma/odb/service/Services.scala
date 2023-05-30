@@ -7,6 +7,7 @@ import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
+import fs2.compat.NotGiven
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
@@ -15,7 +16,9 @@ import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import skunk.Session
 import skunk.Transaction
-import fs2.compat.NotGiven
+
+/** Witnesses that there is no transaction in context. */
+type NoTransaction[F[_]] = NotGiven[Transaction[F]]
 
 /** 
  * A collection of services, all bound to a single `Session` and `User`, together with a canonical
@@ -50,9 +53,7 @@ trait Services[F[_]]:
    * thing but works on `Resource[F, Service[F]]`. In this form you never actually see the
    * `Services` instance; it's always implicit.
    */
-  def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
-    using NotGiven[Transaction[F]], NotGiven[Services[F]] // discourage nested calls
-  ): F[A]
+  def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(using NoTransaction[F]): F[A]
 
   /** The `AllocationService`. */
   def allocationService: AllocationService[F]
@@ -127,7 +128,7 @@ object Services:
       given Services[F] = this // need is for `instantiate` calls below
 
       def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
-        using NotGiven[Transaction[F]], NotGiven[Services[F]] // discourage nested calls
+        using NoTransaction[F]
       ): F[A] =
         session.transaction.use(xa => fa(using xa)) // TODO: bind user to transaction variable
 
@@ -158,11 +159,13 @@ object Services:
       def itc(itcClient: ItcClient[F]) = Itc.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F]) = Generator.instantiate(commitHash, itcClient)
 
+
   /**
    * This adds syntax to access the members of `Services` and the current `Transaction` when they
    * are present implicitly.
    */
   object Syntax:
+    def services[F[_]](using Services[F]): Services[F] = summon
     def transaction[F[_]](using Transaction[F]): Transaction[F] = summon
     def session[F[_]](using Services[F]): Session[F] = summon[Services[F]].session
     def user[F[_]](using Services[F]): User = summon[Services[F]].user
@@ -187,7 +190,13 @@ object Services:
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F])(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
+
       def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A])(
-        using NotGiven[Transaction[F]], NotGiven[Services[F]] // discourage nested calls
+        using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =
           s.use(_.transactionally(fa))
+      
+      def useNonTransactionally(fa: (NoTransaction[F], Services[F]) ?=> F[A])(
+        using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
+      ): F[A] =
+          s.use(s => fa(using summon, s))
