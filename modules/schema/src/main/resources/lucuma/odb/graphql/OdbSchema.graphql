@@ -4645,6 +4645,11 @@ type Observation {
   # The science configuration
   observingMode: ObservingMode
 
+  """
+  The instrument in use for this observation, if the observing mode is set.
+  """
+  instrument: Instrument
+
   # Manual instrument configuration
   manualConfig: ManualConfig
 
