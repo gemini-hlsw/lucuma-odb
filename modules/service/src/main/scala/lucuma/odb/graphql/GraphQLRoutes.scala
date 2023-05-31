@@ -15,6 +15,7 @@ import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
@@ -29,7 +30,6 @@ import skunk.Session
 import skunk.SqlState
 
 import scala.concurrent.duration._
-import lucuma.odb.logic.PlannedTimeCalculator
 
 object GraphQLRoutes {
 

@@ -47,6 +47,7 @@ import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalService
@@ -76,7 +77,6 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.net.SocketException
 import java.time.Duration
 import scala.concurrent.duration.*
-import lucuma.odb.logic.PlannedTimeCalculator
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
