@@ -43,6 +43,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.SmartGcalService
 
 import scala.reflect.ClassTag
+import lucuma.odb.logic.PlannedTimeCalculator
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]
@@ -59,6 +60,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   def user: model.User
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
+  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
 
   def itcQuery(
     path:     Path,
@@ -82,18 +84,19 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     useCache: Boolean
   ): F[Result[Json]] =
     services.useTransactionally {
-      generator(commitHash, itcClient)
+      generator(commitHash, itcClient, plannedTimeCalculator)
         .generate(pid, oid, useCache)
         .map {
           case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
           case e: Generator.Error                         => Result.failure(e.format)
-          case Generator.Result.Success(_, itc, exec)     =>
-            Result(Json.obj(
-              "programId"       -> pid.asJson,
-              "observationId"   -> oid.asJson,
-              "itcResult"       -> itc.asJson,
-              "executionConfig" -> exec.asJson
-            ))
+            case Generator.Result.Success(_, itc, exec, d)  =>
+              Result(Json.obj(
+                "programId"       -> pid.asJson,
+                "observationId"   -> oid.asJson,
+                "itcResult"       -> itc.asJson,
+                "executionConfig" -> exec.asJson,
+                "scienceDigest"   -> d.asJson
+              ))
         }
     }
 

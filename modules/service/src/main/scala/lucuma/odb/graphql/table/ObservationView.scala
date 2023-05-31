@@ -17,7 +17,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val Existence: ColumnRef         = col("c_existence",          existence)
       val Title: ColumnRef             = col("c_title",              text_nonempty)
       val Subtitle: ColumnRef          = col("c_subtitle",           text_nonempty.opt)
-//      val Instrument: m.ColumnRef   = col("c_instrument", tag.opt)
+      val Instrument: ColumnRef        = col("c_instrument",         instrument.opt)
       val Status: ColumnRef            = col("c_status",             obs_status)
       val ActiveStatus: ColumnRef      = col("c_active_status",      obs_active_status) 
       val VisualizationTime: ColumnRef = col("c_visualization_time", core_timestamp.opt)

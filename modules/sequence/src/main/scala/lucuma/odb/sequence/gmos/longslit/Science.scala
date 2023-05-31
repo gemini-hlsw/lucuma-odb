@@ -12,6 +12,9 @@ import cats.syntax.option.*
 import coulomb.Quantity
 import eu.timepit.refined.auto.*
 import eu.timepit.refined.types.numeric.PosDouble
+import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Pure
+import fs2.Stream
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -20,15 +23,18 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.ObserveClass
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.syntax.int.*
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.GmosFpuMask
+import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
 import lucuma.odb.sequence.SequenceState
@@ -55,26 +61,27 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
     sourceProfile: SourceProfile,
     imageQuality:  ImageQuality,
     sampling:      PosDouble
-  ): LazyList[Science.Atom[D]] = {
+  ): Stream[Pure, Science.Atom[D]] = {
 
     val λ    = mode.centralWavelength
     val p0   = Offset.P.Zero
-    val Δλs  = LazyList.continually(mode.wavelengthDithers match {
-      case Nil => LazyList(WavelengthDither.Zero)
-      case ws  => ws.to(LazyList)
-    }).flatten
-    val qs   = LazyList.continually(mode.spatialOffsets match {
-      case Nil => LazyList(Offset.Q.Zero)
-      case os  => os.to(LazyList)
-    }).flatten
+    val Δλs  = mode.wavelengthDithers match {
+      case Nil => Stream(WavelengthDither.Zero).repeat
+      case ws  => Stream.emits(ws).repeat
+    }
+    val qs   = mode.spatialOffsets match {
+      case Nil => Stream(Offset.Q.Zero).repeat
+      case os  => Stream.emits(os).repeat
+    }
     val xBin = mode.xBin(sourceProfile, imageQuality, sampling)
 
     def nextAtom(index: Int, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
       (for {
-        _ <- optics.wavelength := λ.offset(Δ).getOrElse(λ)
-        s <- scienceStep(Offset(p0, q))
-        f <- flatStep
-      } yield Science.Atom(index, s, f)).runA(d).value
+        w <- optics.wavelength := λ.offset(Δ).getOrElse(λ)
+        s <- scienceStep(Offset(p0, q), ObserveClass.Science)
+        f <- flatStep(ObserveClass.PartnerCal)
+        label = f"q ${Angle.signedDecimalArcseconds.get(q.toAngle)}%.1f″, λ ${Wavelength.decimalNanometers.reverseGet(w.getOrElse(λ))}%.1f nm"
+      } yield Science.Atom(NonEmptyString.unsafeFrom(label), index, s, f)).runA(d).value
 
     val init: D =
       (for {
@@ -91,9 +98,10 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
         _ <- optics.roi         := mode.roi
       } yield ()).runS(initialConfig).value
 
-    LazyList.unfold((0, Δλs, qs, init)) { case (i, wds, sos, d) =>
-      val a = nextAtom(i, wds.head, sos.head, d)
-      Some((a, (i+1, wds.tail, sos.tail, a.science.instrumentConfig)))
+    Stream.unfold((0, Δλs, qs, init)) { case (i, wds, sos, d) =>
+      // TODO: head.toList.head ? there's got to be a better way
+      val a = nextAtom(i, wds.head.toList.head, sos.head.toList.head, d)
+      Some((a, (i+1, wds.tail, sos.tail, a.science.value)))
     }
   }
 
@@ -105,9 +113,10 @@ object Science {
    * Science and associated matching flat.
    */
   final case class Atom[D](
-    index:   Int,
-    science: ProtoStep[D],
-    flat:    ProtoStep[D]
+    description: NonEmptyString,
+    index:       Int,
+    science:     ProtoStep[D],
+    flat:        ProtoStep[D]
   ) {
 
     def steps: NonEmptyList[ProtoStep[D]] =

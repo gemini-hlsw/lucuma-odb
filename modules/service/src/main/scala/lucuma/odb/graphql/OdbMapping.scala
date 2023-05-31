@@ -49,6 +49,7 @@ import lucuma.odb.graphql.util._
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Itc
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AllocationService
@@ -111,7 +112,8 @@ object OdbMapping {
     topics0:     Topics[F],
     itcClient0:  ItcClient[F],
     commitHash0: CommitHash,
-    enums:       Enums
+    enums:       Enums,
+    ptc:         PlannedTimeCalculator.ForInstrumentMode,
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
@@ -202,6 +204,7 @@ object OdbMapping {
           override val user: User = user0
           override val topics: Topics[F] = topics0
           override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
+          override val plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode = ptc
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =

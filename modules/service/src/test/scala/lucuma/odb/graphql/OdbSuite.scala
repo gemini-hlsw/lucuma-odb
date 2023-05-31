@@ -76,6 +76,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.net.SocketException
 import java.time.Duration
 import scala.concurrent.duration.*
+import lucuma.odb.logic.PlannedTimeCalculator
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
@@ -214,7 +215,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm)
+      ptc <- db.evalMap(PlannedTimeCalculator.fromSession(_, enm))
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc)
     } yield map
 
   protected def server: Resource[IO, Server] =
