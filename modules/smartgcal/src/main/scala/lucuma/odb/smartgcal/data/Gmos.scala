@@ -22,9 +22,9 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.DynamicConfig
-import lucuma.core.model.sequence.GmosFpuMask
-import lucuma.core.model.sequence.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan

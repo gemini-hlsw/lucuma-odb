@@ -6,6 +6,8 @@ package gmos
 package longslit
 
 import eu.timepit.refined.types.numeric.PosDouble
+import fs2.Pure
+import fs2.Stream
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -15,8 +17,9 @@ import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.arb.ArbSourceProfile
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
@@ -42,13 +45,12 @@ class ScienceSuite extends ScalaCheckSuite {
     ls: Config.GmosNorth,
     sp: SourceProfile,
     iq: ImageQuality
-  ): LazyList[Science.Atom[GmosNorth]] =
+  ): Stream[Pure, Science.Atom[GmosNorth]] =
     Science.GmosNorth.compute(ls, tenMin, sp, iq, PosDouble.unsafeFrom(2.0))
 
-
   def sequencesEqual[A](
-    obtained: LazyList[A],
-    expected: LazyList[A]
+    obtained: Stream[Pure, A],
+    expected: Stream[Pure, A]
   )(implicit loc: Location): Unit = {
     val sz = 20
     assertEquals(obtained.take(sz).toList, expected.take(sz).toList)
@@ -59,8 +61,8 @@ class ScienceSuite extends ScalaCheckSuite {
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
-        as.map(a => DynamicOptics.North.yBin.get(a.science.instrumentConfig)),
-        LazyList.continually(ls.explicitYBin.getOrElse(ls.defaultYBin))
+        as.map(a => DynamicOptics.North.yBin.get(a.science.value)),
+        Stream(ls.explicitYBin.getOrElse(ls.defaultYBin)).repeat
       )
     }
   }
@@ -70,10 +72,10 @@ class ScienceSuite extends ScalaCheckSuite {
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
-        as.map(a => DynamicOptics.North.wavelength.getOption(a.science.instrumentConfig).get),
+        as.map(a => DynamicOptics.North.wavelength.getOption(a.science.value).get),
         (ls.wavelengthDithers match {
-          case Nil => LazyList.continually(WavelengthDither.Zero)
-          case ds  => LazyList.continually(ds.to(LazyList)).flatten
+          case Nil => Stream(WavelengthDither.Zero).repeat
+          case ds  => Stream.emits(ds).repeat
         }).map { d => ls.centralWavelength.offset(d).getOrElse(ls.centralWavelength) }
       )
     }
@@ -92,10 +94,10 @@ class ScienceSuite extends ScalaCheckSuite {
       val as = northSequence(ls, sp, iq)
 
       sequencesEqual(
-        as.map(_.science).flatMap(s => offset.getOption(s).toList),
+        as.map(_.science).flatMap(s => Stream.fromOption(offset.getOption(s))),
         (ls.spatialOffsets match {
-          case Nil => LazyList.continually(Offset.Q.Zero)
-          case qs  => LazyList.continually(qs.to(LazyList)).flatten
+          case Nil => Stream(Offset.Q.Zero).repeat
+          case qs  => Stream.emits(qs).repeat
         }).map(_.toAngle)
       )
     }
