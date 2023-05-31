@@ -7,7 +7,6 @@ import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
-import fs2.compat.NotGiven
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
@@ -17,6 +16,8 @@ import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import skunk.Session
 import skunk.Transaction
+
+import scala.util.NotGiven
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
