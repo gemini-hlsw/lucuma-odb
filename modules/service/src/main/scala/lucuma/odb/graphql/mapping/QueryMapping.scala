@@ -22,8 +22,10 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.ProgramType
-import lucuma.core.model.User
+import lucuma.core.model
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
@@ -31,7 +33,14 @@ import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
+import lucuma.odb.json.all.query.given
+import lucuma.odb.logic.Generator
+import lucuma.odb.logic.Itc
+import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.SmartGcalService
 
 import scala.reflect.ClassTag
@@ -46,19 +55,50 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ProposalAttachmentTypeMetaMapping[F]
    with ObservationMapping[F] =>
 
+  // Resources defined in the final cake.
+  def commitHash: CommitHash
+  def user: model.User
+  def itcClient: ItcClient[F]
+  def services: Resource[F, Services[F]]
+  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
+
   def itcQuery(
     path:     Path,
-    pid:      lucuma.core.model.Program.Id,
-    oid:      lucuma.core.model.Observation.Id,
+    pid:      model.Program.Id,
+    oid:      model.Observation.Id,
     useCache: Boolean
-  ): F[Result[Json]]
-
+  ): F[Result[Json]] =
+    services.useTransactionally { 
+      itc(itcClient)
+        .lookup(pid, oid, useCache)
+        .map {
+          case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
+          case Right(resultSet) => Result(resultSet.asJson)
+        }
+    }
+  
   def sequence(
     path:     Path,
-    pid:      lucuma.core.model.Program.Id,
-    oid:      lucuma.core.model.Observation.Id,
+    pid:      model.Program.Id,
+    oid:      model.Observation.Id,
     useCache: Boolean
-  ): F[Result[Json]]
+  ): F[Result[Json]] =
+    services.useTransactionally {
+      generator(commitHash, itcClient, plannedTimeCalculator)
+        .generate(pid, oid, useCache)
+        .map {
+          case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
+          case e: Generator.Error                         => Result.failure(e.format)
+            case Generator.Result.Success(_, itc, exec, d)  =>
+              Result(Json.obj(
+                "programId"       -> pid.asJson,
+                "observationId"   -> oid.asJson,
+                "itcResult"       -> itc.asJson,
+                "executionConfig" -> exec.asJson,
+                "scienceDigest"   -> d.asJson
+              ))
+        }
+    }
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
@@ -114,8 +154,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       TargetGroup,
       Targets,
     ).foldMap(pf => Map(QueryType -> pf))
-
-  def user: User
 
   // Elaborators below
 

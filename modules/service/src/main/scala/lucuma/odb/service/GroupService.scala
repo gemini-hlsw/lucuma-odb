@@ -4,8 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
-import cats.effect.kernel.Sync
+import cats.effect.Concurrent
 import cats.syntax.all._
 import coulomb.rational.typeexpr.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -20,9 +19,11 @@ import skunk._
 import skunk.codec.all.*
 import skunk.implicits._
 
+import Services.Syntax.*
+
 trait GroupService[F[_]] {
-  def createGroup(input: CreateGroupInput): F[Group.Id]
-  def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment): F[GroupService.UpdateGroupsResponse]
+  def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Group.Id]
+  def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[GroupService.UpdateGroupsResponse]
 }
 
 object GroupService {
@@ -33,17 +34,15 @@ object GroupService {
 
   // TODO: check access control
 
-  def fromSessionAndUser[F[_]: Sync](s: Session[F], user: User): GroupService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
 
-      def createGroup(input: CreateGroupInput): F[Group.Id] =
-        s.transaction.use { xa =>
-          for {
-            _ <- s.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
-            i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex, xa)
-            g <- s.prepareR(Statements.InsertGroup).use(_.unique(input, i))
-          } yield g
-        }
+      def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Group.Id] =
+        for {
+          _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
+          i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex)
+          g <- session.prepareR(Statements.InsertGroup).use(_.unique(input, i))
+        } yield g
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of
@@ -57,20 +56,18 @@ object GroupService {
           case (Nullable.Absent, None) => Nil.pure[F] // do nothing if neither is specified
           case (gid, index) =>
             val af = Statements.moveGroups(gid.toOption, index, which)
-            s.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
+            session.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
-      def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment): F[UpdateGroupsResponse] =
-        s.transaction.use { xa =>
-          s.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
-          moveGroups(SET.parentGroupId, SET.parentGroupIndex, which).flatMap { ids =>
-            Statements.updateGroups(SET, which).traverse { af =>
-              s.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
-            } .map(moreIds => UpdateGroupsResponse.Success(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
-          }
+      def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateGroupsResponse] =
+        session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
+        moveGroups(SET.parentGroupId, SET.parentGroupIndex, which).flatMap { ids =>
+          Statements.updateGroups(SET, which).traverse { af =>
+            session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
+          } .map(moreIds => UpdateGroupsResponse.Success(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
         }
 
-      def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort], xa: Transaction[F]): F[NonNegShort] =
-        s.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
+      def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
+        session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 
     }
 

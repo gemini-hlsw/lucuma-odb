@@ -15,6 +15,7 @@ import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
@@ -47,7 +48,8 @@ object GraphQLRoutes {
     monitor:    SkunkMonitor[F],
     ttl:        FiniteDuration,
     userSvc:    UserService[F],
-    enums:      Enums
+    enums:      Enums,
+    ptc:        PlannedTimeCalculator.ForInstrumentMode,
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -87,7 +89,7 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(userSvc.canonicalizeUser(user).retryOnInvalidCursorName)
                       
                       _    <- OptionT.liftF(info(user, s"New service instance."))
-                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums)
+                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc)
                       svc   = new GrackleGraphQLService(map) {
                         override def query(request: ParsedGraphQLRequest): F[Either[Throwable, Json]] = 
                           super.query(request).retryOnInvalidCursorName.flatTap {

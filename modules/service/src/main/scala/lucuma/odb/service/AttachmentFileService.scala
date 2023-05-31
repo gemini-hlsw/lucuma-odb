@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
@@ -12,7 +13,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.NewType
 import natchez.Trace
-import skunk._
+import skunk.*
+
+import Services.Syntax.*
 
 trait AttachmentFileService {
 
@@ -41,21 +44,17 @@ trait AttachmentFileService {
   }
 
   // TODO: eventually will probably want to check for write access for uploading/deleting files.
-  def checkAccess[F[_]: Async: Trace](
+  def checkAccess[F[_]: MonadThrow](
     session: Session[F],
     user: User,
     programId: Program.Id
-  ): F[Unit] = user match {
+  )(using Services[F], Transaction[F]): F[Unit] = user match {
     // guest users not allowed to upload files - at least for now.
-    case GuestUser(_) => Async[F].raiseError(Forbidden)
+    case GuestUser(_) => MonadThrow[F].raiseError(Forbidden)
     case _            =>
-      ProgramService
-        .fromSessionAndUser(session, user)
+      programService
         .userHasAccess(programId)
-        .flatMap(hasAccess =>
-          if (hasAccess) Async[F].unit
-          else Async[F].raiseError(Forbidden)
-        )
+        .flatMap(MonadThrow[F].raiseError(Forbidden).unlessA)
   }
 }
 

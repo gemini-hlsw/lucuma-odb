@@ -29,7 +29,11 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
+import skunk.Transaction
 
+import java.security.Provider.Service
 
 sealed trait Itc[F[_]] {
 
@@ -37,7 +41,7 @@ sealed trait Itc[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     useCache:      Boolean
-  ): F[EitherNel[Itc.Error, Itc.ResultSet]]
+  )(using Transaction[F]): F[EitherNel[Itc.Error, Itc.ResultSet]]
 
   def spectroscopy(
     targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
@@ -129,10 +133,7 @@ object Itc {
 
   }
 
-  def fromClientAndServices[F[_]: MonadThrow](
-    client:    ItcClient[F],
-    paramsSrv: GeneratorParamsService[F]
-  ): Itc[F] =
+  def instantiate[F[_]: MonadThrow](client: ItcClient[F])(using Services[F]): Itc[F] =
     new Itc[F] {
 
       import Result.*
@@ -141,7 +142,7 @@ object Itc {
         programId:     Program.Id,
         observationId: Observation.Id,
         useCache:      Boolean
-      ): F[EitherNel[Error, ResultSet]] =
+      )(using Transaction[F]): F[EitherNel[Error, ResultSet]] =
         (for {
           params <- selectParams(programId, observationId).leftMap(NonEmptyList.one)
           result <- callItc(params, useCache)
@@ -151,9 +152,9 @@ object Itc {
       private def selectParams(
         pid: Program.Id,
         oid: Observation.Id
-      ): EitherT[F, Error, GeneratorParams] =
+      )(using Transaction[F]): EitherT[F, Error, GeneratorParams] =
         EitherT(
-          paramsSrv
+          generatorParamsService
             .select(pid, oid)
             .map {
               case None                => ObservationNotFound(pid, oid).asLeft

@@ -61,6 +61,7 @@ import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservingModeServices
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalAttachmentMetadataService
+import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TimingWindowService
@@ -105,13 +106,14 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database:   Resource[F, Session[F]],
-    monitor:    SkunkMonitor[F],
-    user0:      User,
-    topics0:    Topics[F],
-    itcClient:  ItcClient[F],
-    commitHash: CommitHash,
-    enums:      Enums
+    database:    Resource[F, Session[F]],
+    monitor:     SkunkMonitor[F],
+    user0:       User,
+    topics0:     Topics[F],
+    itcClient0:  ItcClient[F],
+    commitHash0: CommitHash,
+    enums:       Enums,
+    ptc:         PlannedTimeCalculator.ForInstrumentMode,
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
@@ -197,95 +199,12 @@ object OdbMapping {
             unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
 
           // Our services and resources needed by various mappings.
-          override val user: User         = user0
-          override val topics: Topics[F]  = topics0
-
-          override val allocationService: Resource[F, AllocationService[F]] =
-            pool.map(AllocationService.fromSessionAndUser(_, user))
-
-          override val asterismService: Resource[F, AsterismService[F]] =
-            pool.map(AsterismService.fromSessionAndUser(_, user))
-
-          override val groupService: Resource[F, GroupService[F]] =
-            pool.map(GroupService.fromSessionAndUser(_, user))
-          override val obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]] =
-            pool.map(ObsAttachmentMetadataService.fromSessionAndUser(_, user))
-
-          override val observationService: Resource[F, ObservationService[F]] =
-            pool.map { s =>
-              val oms = ObservingModeServices.fromSession(s)
-              val as  = AsterismService.fromSessionAndUser(s, user)
-              val tws = TimingWindowService.fromSession(s)
-              ObservationService.fromSessionAndUser(s, user, oms, as, tws)
-            }
-
-          override val programService: Resource[F, ProgramService[F]] =
-            pool.map(ProgramService.fromSessionAndUser(_, user))
-
-          override val proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]] =
-            pool.map(ProposalAttachmentMetadataService.fromSessionAndUser(_, user))
-
-          override val targetService: Resource[F, TargetService[F]] =
-            pool.map(TargetService.fromSession(_, user))
-
-          val itc: Resource[F, Itc[F]] =
-            pool.map { s =>
-              val oms = ObservingModeServices.fromSession(s)
-              val gps = GeneratorParamsService.fromSession(s, user, oms)
-              Itc.fromClientAndServices(itcClient, gps)
-            }
-
-          override def itcQuery(
-            path:     Path,
-            pid:      Program.Id,
-            oid:      Observation.Id,
-            useCache: Boolean
-          ): F[Result[Json]] =
-            itc.use {
-              _.lookup(pid, oid, useCache)
-               .map {
-                 case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-                 case Right(resultSet) => Result(resultSet.asJson)
-               }
-            }
-
-          val generator: Resource[F, Generator[F]] =
-            for {
-              s <- pool
-              c <- Resource.eval(PlannedTimeCalculator.fromSession(s, enums))
-            } yield {
-              val oms = ObservingModeServices.fromSession(s)
-              val gps = GeneratorParamsService.fromSession(s, user, oms)
-              val sgc = SmartGcalService.fromSession(s)
-              Generator.fromClientAndServices(commitHash, itcClient, gps, sgc, c)
-            }
-
-          override def sequence(
-            path:     Path,
-            pid:      Program.Id,
-            oid:      Observation.Id,
-            useCache: Boolean
-          ): F[Result[Json]] =
-            generator.use {
-              _.generate(pid, oid, useCache)
-               .map {
-                 case Generator.Result.ObservationNotFound(_, _) =>
-                   Result(Json.Null)
-
-                 case e: Generator.Error                         =>
-                   Result.failure(e.format)
-
-                 case Generator.Result.Success(_, itc, exec, d)  =>
-                   Result(Json.obj(
-                     "programId"       -> pid.asJson,
-                     "observationId"   -> oid.asJson,
-                     "itcResult"       -> itc.asJson,
-                     "executionConfig" -> exec.asJson,
-                     "scienceDigest"   -> d.asJson
-                   ))
-               }
-            }
-
+          override val commitHash = commitHash0
+          override val itcClient = itcClient0
+          override val user: User = user0
+          override val topics: Topics[F] = topics0
+          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
+          override val plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode = ptc
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =

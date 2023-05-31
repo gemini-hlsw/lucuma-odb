@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Sync
+import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import cats.syntax.all.given
 import edu.gemini.grackle.Result
@@ -16,6 +16,8 @@ import skunk.Transaction
 import skunk.codec.numeric.*
 import skunk.syntax.all.*
 
+import Services.Syntax.*
+
 trait TimingWindowService[F[_]] {
   def createFunction(
     timingWindows: List[TimingWindowInput]
@@ -24,11 +26,11 @@ trait TimingWindowService[F[_]] {
   def cloneTimingWindows(
     originalId: Observation.Id,
     newId: Observation.Id,
-  ): F[Unit]
+  )(using Transaction[F]): F[Unit]
 }
 
 object TimingWindowService:
-  def fromSession[F[_]: Sync](session: Session[F]): TimingWindowService[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): TimingWindowService[F] =
     new TimingWindowService[F] {
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>
@@ -38,7 +40,7 @@ object TimingWindowService:
       override def createFunction(
         timingWindows: List[TimingWindowInput]
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
-        Result( (obsIds, xa) =>
+        Result( (obsIds, _) =>
           exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
             Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(exec)
         )
@@ -46,7 +48,7 @@ object TimingWindowService:
       def cloneTimingWindows(
         originalId: Observation.Id,
         newId: Observation.Id,
-      ): F[Unit] =
+      )(using Transaction[F]): F[Unit] =
         exec(Statements.clone(originalId, newId))
     }
 

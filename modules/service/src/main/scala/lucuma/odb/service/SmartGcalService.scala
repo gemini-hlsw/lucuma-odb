@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -41,6 +41,7 @@ import skunk.*
 import skunk.codec.numeric.int4
 import skunk.implicits.*
 
+import Services.Syntax.*
 
 trait SmartGcalService[F[_]] {
 
@@ -91,10 +92,7 @@ trait SmartGcalService[F[_]] {
 
 object SmartGcalService {
 
-  def fromSession[F[_] : Sync](
-    session: Session[F]
-  ): SmartGcalService[F] =
-
+  def instantiate[F[_] : Concurrent](using Services[F]): SmartGcalService[F] =
     new SmartGcalService[F] {
 
       override def selectGmosNorth(

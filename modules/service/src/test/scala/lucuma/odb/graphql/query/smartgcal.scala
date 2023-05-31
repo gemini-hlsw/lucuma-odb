@@ -37,6 +37,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
+import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -45,6 +46,7 @@ import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import monocle.Lens
 import monocle.Optional
+import natchez.Trace.Implicits.noop
 import skunk.Session
 
 class smartgcal extends OdbSuite with ObservingModeSetupOperations {
@@ -59,134 +61,134 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(user, "SmartGcal Testing")
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val srv = SmartGcalService.fromSession(s)
+    val services = Services.forUser(pi /* doesn't matter*/)(s)
+    services.transactionally {
 
-    val smartGcalValue =
-      SmartGcalValue(
-        Gcal(
-          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-          GcalFilter.Gmos,
-          GcalDiffuser.Ir,
-          GcalShutter.Open
-        ),
-        GcalBaselineType.Night,
-        PosInt.unsafeFrom(1),
-        LegacyInstrumentConfig(
-          TimeSpan.unsafeFromMicroseconds(1_000_000L)
+      val smartGcalValue =
+        SmartGcalValue(
+          Gcal(
+            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+            GcalFilter.Gmos,
+            GcalDiffuser.Ir,
+            GcalShutter.Open
+          ),
+          GcalBaselineType.Night,
+          PosInt.unsafeFrom(1),
+          LegacyInstrumentConfig(
+            TimeSpan.unsafeFromMicroseconds(1_000_000L)
+          )
         )
-      )
 
 
-    val tableRowN: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_0_50.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
-        ),
-        smartGcalValue
-      )
+      val tableRowN: TableRow.North =
+        TableRow(
+          PosLong.unsafeFrom(1),
+          TableKey(
+            GratingConfigKey(
+              GmosNorthGrating.R831_G5302,
+              GmosGratingOrder.One,
+              BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+            ).some,
+            GmosNorthFilter.RPrime.some,
+            GmosNorthFpu.LongSlit_0_50.some,
+            GmosXBinning.One,
+            GmosYBinning.Two,
+            GmosAmpGain.Low
+          ),
+          smartGcalValue
+        )
 
-    val tableRowS: TableRow.South =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosSouthGrating.R600_G5324,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosSouthFilter.RPrime.some,
-          GmosSouthFpu.LongSlit_0_50.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
-        ),
-        smartGcalValue
-      )
+      val tableRowS: TableRow.South =
+        TableRow(
+          PosLong.unsafeFrom(1),
+          TableKey(
+            GratingConfigKey(
+              GmosSouthGrating.R600_G5324,
+              GmosGratingOrder.One,
+              BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+            ).some,
+            GmosSouthFilter.RPrime.some,
+            GmosSouthFpu.LongSlit_0_50.some,
+            GmosXBinning.One,
+            GmosYBinning.Two,
+            GmosAmpGain.Low
+          ),
+          smartGcalValue
+        )
 
-    def defineN(
-      id:         Int,
-      stepOrder:  Int              = 1,
-      disperser:  GmosNorthGrating = GmosNorthGrating.R831_G5302,
-      low:        Int              = Wavelength.Min.pm.value.value,
-      high:       Int              = Wavelength.Max.pm.value.value,
-      expTimeSec: Int              = 1,
-      count:      Int              = 1
-    ): IO[Unit] =
-      define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowN, srv.insertGmosNorth)
+      def defineN(
+        id:         Int,
+        stepOrder:  Int              = 1,
+        disperser:  GmosNorthGrating = GmosNorthGrating.R831_G5302,
+        low:        Int              = Wavelength.Min.pm.value.value,
+        high:       Int              = Wavelength.Max.pm.value.value,
+        expTimeSec: Int              = 1,
+        count:      Int              = 1
+      ): IO[Unit] =
+        define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowN, services.smartGcalService.insertGmosNorth)
 
-    def defineS(
-      id:         Int,
-      stepOrder:  Int              = 1,
-      disperser:  GmosSouthGrating = GmosSouthGrating.R600_G5324,
-      low:        Int              = Wavelength.Min.pm.value.value,
-      high:       Int              = Wavelength.Max.pm.value.value,
-      expTimeSec: Int              = 1,
-      count:      Int              = 1
-    ): IO[Unit] =
-      define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowS, srv.insertGmosSouth)
+      def defineS(
+        id:         Int,
+        stepOrder:  Int              = 1,
+        disperser:  GmosSouthGrating = GmosSouthGrating.R600_G5324,
+        low:        Int              = Wavelength.Min.pm.value.value,
+        high:       Int              = Wavelength.Max.pm.value.value,
+        expTimeSec: Int              = 1,
+        count:      Int              = 1
+      ): IO[Unit] =
+        define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowS, services.smartGcalService.insertGmosSouth)
 
-    def define[G, L, U](
-      id:         Int,
-      stepOrder:  Int,
-      disperser:  G,
-      low:        Int,
-      high:       Int,
-      expTimeSec: Int,
-      count:      Int
-    )(
-      tableRow:   TableRow[G, L, U],
-      insert:     (Int, TableRow[G, L, U]) => IO[Unit]
-    ): IO[Unit] = {
+      def define[G, L, U](
+        id:         Int,
+        stepOrder:  Int,
+        disperser:  G,
+        low:        Int,
+        high:       Int,
+        expTimeSec: Int,
+        count:      Int
+      )(
+        tableRow:   TableRow[G, L, U],
+        insert:     (Int, TableRow[G, L, U]) => IO[Unit]
+      ): IO[Unit] = {
 
-      import lucuma.core.optics.syntax.all.*
+        import lucuma.core.optics.syntax.all.*
 
-      val range = BoundedInterval.unsafeOpenUpper(
-                    Wavelength.unsafeFromIntPicometers(low),
-                    Wavelength.unsafeFromIntPicometers(high)
-                  )
+        val range = BoundedInterval.unsafeOpenUpper(
+                      Wavelength.unsafeFromIntPicometers(low),
+                      Wavelength.unsafeFromIntPicometers(high)
+                    )
 
-      val update: State[TableRow[G, L, U], Unit] =
-        for {
-          _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
-          _ <- TableRow.grating         := disperser
-          _ <- TableRow.wavelengthRange := range
-          _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-          _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
-        } yield ()
+        val update: State[TableRow[G, L, U], Unit] =
+          for {
+            _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
+            _ <- TableRow.grating         := disperser
+            _ <- TableRow.wavelengthRange := range
+            _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
+            _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
+          } yield ()
 
-      insert(id, update.runS(tableRow).value)
+        insert(id, update.runS(tableRow).value)
+      }
+
+      for {
+        // simple lookup
+        _ <- defineN(1, high = 500_000, expTimeSec = 1)
+        _ <- defineN(2, low  = 500_000, high = 600_000, expTimeSec = 2)
+        _ <- defineN(3, low  = 600_000, expTimeSec = 3)
+
+        _ <- defineS(1, high = 500_000, expTimeSec = 1)
+        _ <- defineS(2, low  = 500_000, high = 600_000, expTimeSec = 2)
+        _ <- defineS(3, low  = 600_000, expTimeSec = 3)
+
+        // multi steps
+        _ <- defineN(4, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
+        _ <- defineN(5, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
+
+        // step count
+        _ <- defineN(6, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
+
+      } yield ()
     }
-
-
-    for {
-      // simple lookup
-      _ <- defineN(1, high = 500_000, expTimeSec = 1)
-      _ <- defineN(2, low  = 500_000, high = 600_000, expTimeSec = 2)
-      _ <- defineN(3, low  = 600_000, expTimeSec = 3)
-
-      _ <- defineS(1, high = 500_000, expTimeSec = 1)
-      _ <- defineS(2, low  = 500_000, high = 600_000, expTimeSec = 2)
-      _ <- defineS(3, low  = 600_000, expTimeSec = 3)
-
-      // multi steps
-      _ <- defineN(4, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
-      _ <- defineN(5, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
-
-      // step count
-      _ <- defineN(6, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
-
-    } yield ()
-
   }
 
   test("simple GN expansion") {

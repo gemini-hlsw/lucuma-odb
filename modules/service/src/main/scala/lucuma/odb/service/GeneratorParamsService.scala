@@ -8,7 +8,7 @@ import cats.Functor
 import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.ValidatedNel
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.bifunctor.*
@@ -48,6 +48,7 @@ import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
 
+import Services.Syntax.*
 
 trait GeneratorParamsService[F[_]] {
 
@@ -56,13 +57,12 @@ trait GeneratorParamsService[F[_]] {
   def select(
     programId: Program.Id,
     which:     Observation.Id
-  )(using Functor[F]): F[Option[EitherNel[MissingData, GeneratorParams]]] =
-    selectAll(programId, List(which)).map(_.get(which))
+  )(using Transaction[F]): F[Option[EitherNel[MissingData, GeneratorParams]]]
 
   def selectAll(
     programId: Program.Id,
     which:     List[Observation.Id]
-  ): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]]
+  )(using Transaction[F]): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]]
 
 }
 
@@ -78,24 +78,25 @@ object GeneratorParamsService {
       MissingData(none, paramName)
   }
 
-  def fromSession[F[_]: Sync](
-    session:  Session[F],
-    user:     User,
-    mService: ObservingModeServices[F]
-  ): GeneratorParamsService[F] =
-
+  def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
 
       import lucuma.odb.sequence.gmos
 
+      override def select(
+        programId: Program.Id,
+        which:     Observation.Id
+      )(using Transaction[F]): F[Option[EitherNel[MissingData, GeneratorParams]]] =
+        selectAll(programId, List(which)).map(_.get(which))
+
       override def selectAll(
         programId: Program.Id,
         which:     List[Observation.Id]
-      ): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]] =
+      )(using Transaction[F]): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]] =
         for {
           ps <- selectParams(programId, which)     // F[List[Params]]
           oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
-          m  <- mService.selectSequenceConfig(oms) // F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
+          m  <- observingModeServices.selectSequenceConfig(oms) // F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
         } yield
           ps.groupBy(_.observationId)
             .map { case (oid, oParams) =>

@@ -7,7 +7,7 @@ import cats.Applicative
 import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.effect.Sync
+import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -84,30 +84,32 @@ import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
+import Services.Syntax.*
+
 sealed trait ObservationService[F[_]] {
   import ObservationService._
 
   def createObservation(
     programId: Program.Id,
     SET:       ObservationPropertiesInput.Create
-  ): F[Result[Observation.Id]]
+  )(using Transaction[F]): F[Result[Observation.Id]]
 
   def selectObservations(
     which: AppliedFragment
-  ): F[List[Observation.Id]]
+  )(using Transaction[F]): F[List[Observation.Id]]
 
   def selectObservingModes(
     which: List[Observation.Id]
-  ): F[Map[Option[ObservingModeType], List[Observation.Id]]]
+  )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
     SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
-  ): F[Result[List[Observation.Id]]]
+  )(using Transaction[F]): F[Result[List[Observation.Id]]]
 
   def cloneObservation(
     input: CloneObservationInput
-  ): F[Result[Observation.Id]]
+  )(using Transaction[F]): F[Result[Observation.Id]]
 
 }
 
@@ -160,68 +162,58 @@ object ObservationService {
       .map(_.message)
       .getOrElse(GenericConstraintViolationMessage(ex.message))
 
-  def fromSessionAndUser[F[_]: Sync: Trace](
-    session: Session[F],
-    user:    User,
-    observingModeServices: ObservingModeServices[F],
-    asterismService: AsterismService[F],
-    timingWindowService: TimingWindowService[F]
-  ): ObservationService[F] =
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
 
       private def setTimingWindows(
         rObservationIds: Result[List[Observation.Id]],
         timingWindows: Option[List[TimingWindowInput]],
-        xa: Transaction[F]
-      ): F[Result[Unit]] =
+      )(using Transaction[F]): F[Result[Unit]] =
         val rOptF = timingWindows.traverse(timingWindowService.createFunction)
         (rObservationIds, rOptF).parMapN { (oids, optF) =>
-          optF.fold(().pure[F])( f => f(oids, xa) )
+          optF.fold(().pure[F])( f => f(oids, transaction) )
         }.sequence
 
       override def createObservation(
         programId: Program.Id,
         SET:       ObservationPropertiesInput.Create
-      ): F[Result[Observation.Id]] =
+      )(using Transaction[F]): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
-          session.transaction.use { xa =>
-
-            session.execute(sql"set constraints all deferred".command) >>
-            session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
-              Statements
-                .insertObservationAs(user, programId, SET, ix)
-                .flatTraverse { af =>
-                  session.prepareR(af.fragment.query(observation_id)).use { pq =>
-                    pq.option(af.argument).map {
-                      case Some(oid) => Result(oid)
-                      case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
-                    }
-                  }.flatMap { rOid =>
-
-                    val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
-                    (rOid, rOptF).parMapN { (oid, optF) =>
-                      optF.fold(oid.pure[F]) { f => f(List(oid), xa).as(oid) }
-                    }.sequence
-
+          session.execute(sql"set constraints all deferred".command) >>
+          session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
+            Statements
+              .insertObservationAs(user, programId, SET, ix)
+              .flatTraverse { af =>
+                session.prepareR(af.fragment.query(observation_id)).use { pq =>
+                  pq.option(af.argument).map {
+                    case Some(oid) => Result(oid)
+                    case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
                   }
+                }.flatMap { rOid =>
+
+                  val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
+                  (rOid, rOptF).parMapN { (oid, optF) =>
+                    optF.fold(oid.pure[F]) { f => f(List(oid), transaction).as(oid) }
+                  }.sequence
+
                 }
-                .flatTap{ rOid =>
-                  setTimingWindows(rOid.map(List(_)), SET.timingWindows, xa)
-                }
-            }
+              }
+              .flatTap{ rOid =>
+                setTimingWindows(rOid.map(List(_)), SET.timingWindows)
+              }
           }
         }
 
       override def selectObservations(
         which: AppliedFragment
-      ): F[List[Observation.Id]] =
+      )(using Transaction[F]): F[List[Observation.Id]] =
         session.prepareR(which.fragment.query(observation_id)).use { pq =>
           pq.stream(which.argument, chunkSize = 1024).compile.toList
         }
 
       override def selectObservingModes(
         which: List[Observation.Id]
-      ): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
+      )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
         NonEmptyList
           .fromList(which)
           .fold(Applicative[F].pure(Map.empty)) { oids =>
@@ -246,8 +238,7 @@ object ObservationService {
       private def updateObservingModes(
         nEdit:           Nullable[ObservingModeInput.Edit],
         rObservationIds: Result[List[Observation.Id]],
-        xa:              Transaction[F]
-      ): F[Result[List[Observation.Id]]] =
+      )(using Transaction[F]): F[Result[List[Observation.Id]]] =
 
         (rObservationIds.toOption, nEdit.toOptionOption).mapN { (oids, oEdit) =>
 
@@ -258,24 +249,24 @@ object ObservationService {
               (existingMode, oEdit) match {
                 case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
                   // update existing
-                  observingModeServices.updateFunction(edit).traverse(f => f(matchingOids, xa))
+                  observingModeServices.updateFunction(edit).traverse(f => f(matchingOids, transaction))
 
                 case (Some(ex), Some(edit)) =>
                   for {
                     // delete existing
-                    _ <- observingModeServices.deleteFunction(ex)(matchingOids, xa)
+                    _ <- observingModeServices.deleteFunction(ex)(matchingOids, transaction)
 
                     // create new
-                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, xa))
+                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, transaction))
                   } yield r
 
                 case (None,    Some(edit)) =>
                   // create new
-                  observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, xa))
+                  observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, transaction))
 
                 case (Some(ex), None) =>
                   // delete existing
-                  observingModeServices.deleteFunction(ex)(matchingOids, xa).as(Result.unit)
+                  observingModeServices.deleteFunction(ex)(matchingOids, transaction).as(Result.unit)
 
                 case _  =>
                   // do nothing
@@ -296,7 +287,7 @@ object ObservationService {
         which: AppliedFragment
       ): F[Unit] =
         (groupId, groupIndex) match
-          case (Nullable.Absent, None) => Sync[F].unit // do nothing if neither is specified
+          case (Nullable.Absent, None) => ().pure[F] // do nothing if neither is specified
           case (gid, index) =>
             val af = Statements.moveObservations(gid.toOption, index, which)
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
@@ -304,93 +295,89 @@ object ObservationService {
       override def updateObservations(
         SET:   ObservationPropertiesInput.Edit,
         which: AppliedFragment
-      ): F[Result[List[Observation.Id]]] =
+      )(using Transaction[F]): F[Result[List[Observation.Id]]] =
         Trace[F].span("updateObservation") {
-          session.transaction.use { xa =>
-            for {
-              _ <- session.execute(sql"set constraints all deferred".command)
-              _ <- moveObservations(SET.group, SET.groupIndex, which)
-              r <- Statements.updateObservations(SET, which).traverse { af =>
-                     session.prepareR(af.fragment.query(observation_id)).use { pq =>
-                       pq.stream(af.argument, chunkSize = 1024).compile.toList
-                     }
-                   }.flatMap { rObservationIds =>
-                     updateObservingModes(SET.observingMode, rObservationIds, xa)
-                   }.flatTap { rObservationIds =>
-                    setTimingWindows(rObservationIds, SET.timingWindows.foldPresent(_.orEmpty), xa)
-                   }.recoverWith {
-                     case SqlState.CheckViolation(ex) =>
-                       Result.failure(constraintViolationMessage(ex)).pure[F]
-                   }
-              _ <- r.toOption.fold(xa.rollback)(_ => xa.commit)
-            } yield r
-          }
+          for {
+            _ <- session.execute(sql"set constraints all deferred".command)
+            _ <- moveObservations(SET.group, SET.groupIndex, which)
+            r <- Statements.updateObservations(SET, which).traverse { af =>
+                    session.prepareR(af.fragment.query(observation_id)).use { pq =>
+                      pq.stream(af.argument, chunkSize = 1024).compile.toList
+                    }
+                  }.flatMap { rObservationIds =>
+                    updateObservingModes(SET.observingMode, rObservationIds)
+                  }.flatTap { rObservationIds =>
+                  setTimingWindows(rObservationIds, SET.timingWindows.foldPresent(_.orEmpty))
+                  }.recoverWith {
+                    case SqlState.CheckViolation(ex) =>
+                      Result.failure(constraintViolationMessage(ex)).pure[F]
+                  }
+            _ <- transaction.rollback.unlessA(r.hasValue) // barf if something failed
+          } yield r
         }
 
       def cloneObservation(
         input: CloneObservationInput
-      ): F[Result[Observation.Id]] = 
-        session.transaction.use { xa =>
+      )(using Transaction[F]): F[Result[Observation.Id]] = {
 
-          // First we need the pid, observing mode, and grouping information
-          val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
-          session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.option(input.observationId)).flatMap {
+        // First we need the pid, observing mode, and grouping information
+        val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
+        session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.option(input.observationId)).flatMap {
 
-            case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
+          case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
 
-            case Some((pid, observingMode, gid, gix)) =>
+          case Some((pid, observingMode, gid, gix)) =>
 
-              // Desired group index is gix + 1
-              val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
+            // Desired group index is gix + 1
+            val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
 
-              // Ok the obs exists, so let's clone its main row in t_observation. If this returns
-              // None then it means the user doesn't have permission to see the obs.
-              val cObsStmt = Statements.cloneObservation(pid, input.observationId, user, destGroupIndex)
-              val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
-              
-              // Action to open a hole in the destination program/group after the observation we're cloning
-              val openHole: F[NonNegShort] =
-                session.execute(sql"set constraints all deferred".command) >>
-                session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
-                  pq.unique(pid, gid, destGroupIndex.some)
-                }
-
-              // Ok let's do the clone.
-              (openHole >> cloneObs).flatMap {
-
-                case None => 
-                  // User doesn't have permission to see the obs
-                  Result.failure(s"No such observation: ${input.observationId}").pure[F]
-
-                case Some(oid2) =>
-
-                  val cloneRelatedItems =
-                    asterismService.cloneAsterism(input.observationId, oid2) >>
-                    observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2)) >>
-                    timingWindowService.cloneTimingWindows(input.observationId, oid2)
-
-                  val doUpdate =
-                    input.SET match
-                      case None    => Result(oid2).pure[F] // nothing to do
-                      case Some(s) => 
-                        updateObservations(s, sql"select $observation_id".apply(oid2))
-                          .map { r =>
-                            // We probably don't need to check this return value, but I feel bad not doing it.
-                            r.flatMap {
-                              case List(`oid2`) => Result(oid2)
-                              case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
-                            }  
-                          }
-                          .flatTap { 
-                            r => xa.rollback.unlessA(r.hasValue)
-                          }
-
-                  cloneRelatedItems >> doUpdate
-
+            // Ok the obs exists, so let's clone its main row in t_observation. If this returns
+            // None then it means the user doesn't have permission to see the obs.
+            val cObsStmt = Statements.cloneObservation(pid, input.observationId, user, destGroupIndex)
+            val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
+            
+            // Action to open a hole in the destination program/group after the observation we're cloning
+            val openHole: F[NonNegShort] =
+              session.execute(sql"set constraints all deferred".command) >>
+              session.prepareR(sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)).use { pq =>
+                pq.unique(pid, gid, destGroupIndex.some)
               }
-          }
+
+            // Ok let's do the clone.
+            (openHole >> cloneObs).flatMap {
+
+              case None => 
+                // User doesn't have permission to see the obs
+                Result.failure(s"No such observation: ${input.observationId}").pure[F]
+
+              case Some(oid2) =>
+
+                val cloneRelatedItems =
+                  asterismService.cloneAsterism(input.observationId, oid2) >>
+                  observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2)) >>
+                  timingWindowService.cloneTimingWindows(input.observationId, oid2)
+
+                val doUpdate =
+                  input.SET match
+                    case None    => Result(oid2).pure[F] // nothing to do
+                    case Some(s) => 
+                      updateObservations(s, sql"select $observation_id".apply(oid2))
+                        .map { r =>
+                          // We probably don't need to check this return value, but I feel bad not doing it.
+                          r.flatMap {
+                            case List(`oid2`) => Result(oid2)
+                            case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
+                          }  
+                        }
+                        .flatTap { 
+                          r => transaction.rollback.unlessA(r.hasValue)
+                        }
+
+                cloneRelatedItems >> doUpdate
+
+            }
         }
-      end cloneObservation
+      }
 
     }
 

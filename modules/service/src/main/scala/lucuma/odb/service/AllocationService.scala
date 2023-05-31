@@ -21,8 +21,10 @@ import skunk.implicits._
 
 import java.time.Duration
 
+import Services.Syntax.*
+
 trait AllocationService[F[_]] {
-  def setAllocation(input: SetAllocationInput): F[AllocationService.SetAllocationResponse]
+  def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[AllocationService.SetAllocationResponse]
 }
 
 object AllocationService {
@@ -35,18 +37,16 @@ object AllocationService {
     case object Success                          extends SetAllocationResponse
   }
 
-  def fromSessionAndUser[F[_]: MonadCancelThrow](s: Session[F], user: User): AllocationService[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
-
-      def setAllocation(input: SetAllocationInput): F[SetAllocationResponse] =
+      def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[SetAllocationResponse] =
         user.role.access match {
           case Staff | Admin | Service =>
-            s.prepareR(Statements.SetAllocation.command).use { ps =>
+            session.prepareR(Statements.SetAllocation.command).use { ps =>
               ps.execute(input.programId, input.partner, input.duration).as(SetAllocationResponse.Success)
             }
           case _ => Applicative[F].pure(SetAllocationResponse.NotAuthorized(user))
         }
-
     }
 
   object Statements {
