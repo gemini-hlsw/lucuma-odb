@@ -64,9 +64,10 @@ lazy val schema = project
 lazy val sequence = project
   .in(file("modules/sequence"))
   .dependsOn(schema % "compile->test")
-  .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-sequence",
+    publish / skip := true,
+    publishTo := None,
     libraryDependencies ++= Seq(
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test
@@ -75,9 +76,10 @@ lazy val sequence = project
 
 lazy val smartgcal = project
   .in(file("modules/smartgcal"))
-  .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-smartgcal",
+    publish / skip := true,
+    publishTo := None,
     libraryDependencies ++= Seq(
       "org.typelevel"  %% "cats-parse"                      % catsParseVersion,
       "co.fs2"         %% "fs2-core"                        % fs2Version,
