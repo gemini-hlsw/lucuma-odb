@@ -36,6 +36,7 @@ import lucuma.odb.instances.given
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Itc
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.Services
@@ -43,7 +44,6 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.SmartGcalService
 
 import scala.reflect.ClassTag
-import lucuma.odb.logic.PlannedTimeCalculator
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]

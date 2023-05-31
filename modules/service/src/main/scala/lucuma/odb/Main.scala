@@ -21,6 +21,7 @@ import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.ObsAttachmentRoutes
 import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObsAttachmentFileService
 import lucuma.odb.service.ProposalAttachmentFileService
@@ -44,7 +45,7 @@ import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command => _, _}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
-import lucuma.odb.logic.PlannedTimeCalculator
+
 import scala.concurrent.duration._
 
 object MainArgs {
