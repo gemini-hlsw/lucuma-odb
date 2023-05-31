@@ -44,26 +44,28 @@ ThisBuild / githubWorkflowBuild +=
     params = Map("path" -> "modules/service/src/main/resources/db/migration/")
   )
 
-lazy val schema = project
-  .in(file("modules/schema"))
-  .settings(
-    name := "lucuma-odb-schema",
-    libraryDependencies ++= Seq(
-      "io.circe"       %% "circe-parser"                    % circeVersion,
-      "io.circe"       %% "circe-literal"                   % circeVersion,
-      "io.circe"       %% "circe-refined"                   % circeVersion,
-      "io.circe"       %% "circe-testing"                   % circeVersion               % Test,
-      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
-      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
-      "org.scalameta"  %% "munit"                           % munitVersion               % Test,
-      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
-      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
+lazy val schema = 
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("modules/schema"))
+    .settings(
+      name := "lucuma-odb-schema",
+      libraryDependencies ++= Seq(
+        "io.circe"       %% "circe-parser"                    % circeVersion,
+        "io.circe"       %% "circe-literal"                   % circeVersion,
+        "io.circe"       %% "circe-refined"                   % circeVersion,
+        "io.circe"       %% "circe-testing"                   % circeVersion               % Test,
+        "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+        "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+        "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+        "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
+        "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
+      )
     )
-  )
 
 lazy val sequence = project
   .in(file("modules/sequence"))
-  .dependsOn(schema % "compile->test")
+  .dependsOn(schema.jvm % "compile->test")
   .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-sequence",
