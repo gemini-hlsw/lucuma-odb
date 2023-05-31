@@ -30,6 +30,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -410,7 +411,8 @@ object ObservationService {
           eb,
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
-          SET.observingMode.flatMap(_.observingModeType)
+          SET.observingMode.flatMap(_.observingModeType),
+          SET.observingMode.flatMap(_.observingModeType).map(_.instrument)
         )
 
     def insertObservationAs(
@@ -428,7 +430,8 @@ object ObservationService {
       explicitBase:        Option[Coordinates],
       constraintSet:       ConstraintSet,
       scienceRequirements: Option[ScienceRequirementsInput],
-      modeType:            Option[ObservingModeType]
+      modeType:            Option[ObservingModeType],
+      instrument:          Option[Instrument]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -465,7 +468,8 @@ object ObservationService {
            spectroscopy.flatMap(_.focalPlane.toOption)                              ,
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ,
            spectroscopy.flatMap(_.capability.toOption)                              ,
-           modeType
+           modeType                                                                 ,
+           instrument
         )
       }
 
@@ -507,7 +511,8 @@ object ObservationService {
       Option[FocalPlane]               ,
       Option[Angle]                    ,
       Option[SpectroscopyCapabilities] ,
-      Option[ObservingModeType]
+      Option[ObservingModeType]        ,
+      Option[Instrument]
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -540,7 +545,8 @@ object ObservationService {
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
-          c_observing_mode_type
+          c_observing_mode_type,
+          c_instrument
         )
         SELECT
           $program_id,
@@ -572,7 +578,8 @@ object ObservationService {
           ${focal_plane.opt},
           ${angle_µas.opt},
           ${spectroscopy_capabilities.opt},
-          ${observing_mode_type.opt}
+          ${observing_mode_type.opt},
+          ${instrument.opt}
       """
 
     def selectObservingModes(
@@ -751,11 +758,12 @@ object ObservationService {
     def updateObservingModeType(
       newMode: Option[ObservingModeType],
       which:   List[Observation.Id]
-    ): AppliedFragment = {
+    ): AppliedFragment =
       void"UPDATE t_observation " |+|
-        void"SET " |+| sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void" " |+|
-        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
-    }
+         void"SET " |+|
+            sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
+            sql"c_instrument = ${instrument.opt}"(newMode.map(_.instrument)) |+| void" " |+|
+       void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 
     /** 
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original

@@ -16,6 +16,7 @@ import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import skunk.Session
 import skunk.Transaction
+import lucuma.odb.logic.PlannedTimeCalculator
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -110,7 +111,7 @@ trait Services[F[_]]:
   def itc(itcClient: ItcClient[F]): Itc[F]
 
   /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
-  def generator(commitHash: CommitHash, itcClient: ItcClient[F]): Generator[F]
+  def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): Generator[F]
 
 
 
@@ -157,7 +158,7 @@ object Services:
       def proposalAttachmentFileService(s3: S3FileService[F]) = ProposalAttachmentFileService.instantiate(s3)
       def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
       def itc(itcClient: ItcClient[F]) = Itc.instantiate(itcClient)
-      def generator(commitHash: CommitHash, itcClient: ItcClient[F]) = Generator.instantiate(commitHash, itcClient)
+      def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
 
 
   /**
@@ -187,7 +188,7 @@ object Services:
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def itc[F[_]](client: ItcClient[F])(using Services[F]): Itc[F] = summon[Services[F]].itc(client)
-    def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F])(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient)
+    def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 

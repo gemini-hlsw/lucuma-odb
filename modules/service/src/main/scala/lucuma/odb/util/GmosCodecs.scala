@@ -3,6 +3,7 @@
 
 package lucuma.odb.util
 
+import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosGratingOrder
@@ -15,6 +16,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.model.sequence.gmos.GmosCcdMode
 import skunk._
 import skunk.codec.all._
 import skunk.data.Type
@@ -23,11 +25,15 @@ trait GmosCodecs {
 
   import Codecs.enumerated
 
+  val gmos_amp_count: Codec[GmosAmpCount] =
+    enumerated(Type.varchar)
+
   val gmos_amp_gain: Codec[GmosAmpGain] =
     enumerated(Type.varchar)
 
   val gmos_amp_read_mode: Codec[GmosAmpReadMode] =
     enumerated(Type.varchar)
+
 
   val gmos_disperser_order: Codec[GmosGratingOrder] =
     enumerated(Type.varchar)
@@ -58,6 +64,16 @@ trait GmosCodecs {
 
   val gmos_y_binning: Codec[GmosYBinning] =
     enumerated(Type.varchar)
+
+  val gmos_ccd_mode: Decoder[GmosCcdMode] =
+    (
+      gmos_x_binning *:
+      gmos_y_binning *:
+      gmos_amp_count *:
+      gmos_amp_gain  *:
+      gmos_amp_read_mode
+    ).to[GmosCcdMode]
+
 
 }
 

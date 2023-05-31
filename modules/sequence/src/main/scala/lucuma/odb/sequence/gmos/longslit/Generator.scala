@@ -1,10 +1,15 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos.longslit
+package lucuma.odb.sequence.gmos
+package longslit
 
 import cats.data.NonEmptyList
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosDouble
+import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Pure
+import fs2.Stream
 import lucuma.core.enums.GmosNorthDetector.{Hamamatsu => HamamatsuNorth}
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -17,14 +22,15 @@ import lucuma.core.enums.GmosSouthStageMode.FollowXyz
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.MosPreImaging.IsNotMosPreImaging
 import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.DynamicConfig
-import lucuma.core.model.sequence.StaticConfig
+import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoExecution
-import lucuma.odb.sequence.data.ProtoSequence
+import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
@@ -33,7 +39,7 @@ import lucuma.odb.sequence.data.SciExposureTime
  * Generator for GMOS Long Slit.
  *
  * @tparam S static configuration type
- * @tparam D dynamic configurate type
+ * @tparam D dynamic configuration type
  * @tparam G grating enumeration
  * @tparam F filter enumeration
  * @tparam U FPU enumeration
@@ -50,7 +56,7 @@ sealed abstract class Generator[S, D, G, F, U](
     sourceProfile: SourceProfile,
     imageQuality:  ImageQuality,
     config:        Config[G, F, U]
-  ): Either[String, ProtoExecution[S, D]] = {
+  ): Either[String, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] = {
 
     val acq = acqSequence.compute(
       acqFilters,
@@ -69,13 +75,11 @@ sealed abstract class Generator[S, D, G, F, U](
 
     Option
       .when(itc.exposures.value > 0)(
-        ProtoExecution(
+        ProtoExecutionConfig(
           static,
-          ProtoSequence.one(ProtoAtom.of(acq.ccd2, acq.p10, acq.slit)),
-          ProtoSequence.of(
-            ProtoAtom(sci.head.steps),
-            sci.tail.take(itc.exposures.value - 1).toList.map(a => ProtoAtom(a.steps))*
-          )
+          Stream(ProtoAtom.of("Acquisition - Initial", acq.ccd2, acq.p10, acq.slit)) ++
+            Stream(ProtoAtom.of("Acquisition - Slit", acq.slit)).repeat,
+          sci.map(a => ProtoAtom(a.description.some, a.steps))
         )
       ).toRight("ITC prescribes 0 exposures.")
 

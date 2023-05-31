@@ -6,11 +6,11 @@ package lucuma.odb.sequence.gmos
 import cats.syntax.functor.*
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.GmosCcdMode
-import lucuma.core.model.sequence.GmosFpuMask
-import lucuma.core.model.sequence.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
 import monocle.Focus
 import monocle.Iso

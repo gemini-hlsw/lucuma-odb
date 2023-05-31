@@ -44,7 +44,7 @@ import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command => _, _}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
-
+import lucuma.odb.logic.PlannedTimeCalculator
 import scala.concurrent.duration._
 
 object MainArgs {
@@ -229,7 +229,8 @@ object FMain extends MainParams {
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
+      ptc               <- Resource.eval(pool.use(PlannedTimeCalculator.fromSession(_, enums)))
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)

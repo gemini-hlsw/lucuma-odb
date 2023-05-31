@@ -87,7 +87,8 @@ class observations extends OdbSuite {
     }
   }
 
-  test("simple observation selection, including planned time") {
+  // N.B. contains a planned time summary which needs to be reworked
+  test("simple observation selection") {
     createProgramAs(pi2).flatMap { pid =>
       createObservationAs(pi2, pid).flatMap { oid =>
         expect(

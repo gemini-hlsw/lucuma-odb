@@ -5,10 +5,10 @@ package lucuma.odb.json
 
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
-import lucuma.core.model.sequence.DynamicConfig
-import lucuma.core.model.sequence.StaticConfig
-import lucuma.core.model.sequence.arb.ArbDynamicConfig
-import lucuma.core.model.sequence.arb.ArbStaticConfig
+import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
+import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import munit.DisciplineSuite
 
 class GmosSuite extends DisciplineSuite with ArbitraryInstances {

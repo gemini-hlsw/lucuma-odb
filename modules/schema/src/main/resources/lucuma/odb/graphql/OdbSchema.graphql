@@ -67,8 +67,17 @@ input AngleInput {
 
 # Sequence atom
 interface Atom {
+
   # Atom id
   id: AtomId!
+
+  # Optional description of the atom.
+  description: String
+
+  # Observe class for this atom as a whole (combined observe class for each of
+  # its steps).
+  observeClass: ObserveClass!
+
 }
 
 # AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
@@ -738,14 +747,19 @@ input GmosNodAndShuffleInput {
 
 # GmosNorth atom, a collection of steps that should be executed in their entirety
 type GmosNorthAtom implements Atom {
+  # Atom id
+  id: AtomId!
+
+  # Optional description of the atom.
+  description: String
+
+  # Observe class for this atom as a whole (combined observe class for each of
+  # its steps).
+  observeClass: ObserveClass!
+
   # Individual steps that comprise the atom
   steps: [GmosNorthStep!]!
 
-  # Time estimate for this atom's execution, the sum of each step's time.
-  time: StepTime!
-
-  # Atom id
-  id: AtomId!
 }
 
 # GmosNorth bias step creation input
@@ -827,24 +841,40 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   static: GmosNorthStatic!
 
   # GMOS North acquisition execution
-  acquisition: GmosNorthExecutionSequence!
+  acquisition: GmosNorthExecutionSequence
 
   # GMOS North science execution
-  science: GmosNorthExecutionSequence!
+  science: GmosNorthExecutionSequence
 
   #visits: [GmosNorthVisitRecord!]!
 
   # Instrument type
   instrument: Instrument!
+
+  # Setup time estimates
+  setup: SetupTime!
 }
 
 # Next atom to execute and potential future atoms
-type GmosNorthExecutionSequence {
-  # Next atom to execute, if any
-  nextAtom: GmosNorthAtom
+type GmosNorthExecutionSequence implements ExecutionSequence {
+  # Next atom to execute
+  nextAtom: GmosNorthAtom!
 
-  # Remaining atoms to execute, if any
+  # (Prefix of the) remaining atoms to execute, if any.
   possibleFuture: [GmosNorthAtom!]!
+
+  # Whether there are more anticipated atoms than those that appear in
+  # possibleFuture
+  hashMore: Boolean!
+  
+  # Total count of anticipated atoms, including nextAtom, possibleFuture and
+  # any remaining atoms not included in possibleFuture
+  atomCount: PosInt!
+  
+  # Sequence digest (including all anticipated future values regardless of
+  # whether they appear in possibleFuture)
+  digest: SequenceDigest!
+
 }
 
 # GMOS North FPU option, either builtin or custom mask
@@ -935,24 +965,6 @@ input GmosNorthLongSlitInput {
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
 
-# GMOS North Manual Configuration
-type GmosNorthManualConfig implements ManualConfig {
-  # Static/unchanging configuration
-  static: GmosNorthStatic!
-
-  # Acquisition sequence.
-  acquisition: GmosNorthSequence!
-
-  # Science sequence.
-  science: GmosNorthSequence!
-
-  # Instrument type
-  instrument: Instrument!
-
-  # Planned time for this configuration
-  plannedTime: PlannedTime!
-}
-
 # GmosNorth science step creation input
 input GmosNorthScienceInput {
   # instrument configuration
@@ -960,15 +972,6 @@ input GmosNorthScienceInput {
 
   # offset position
   offset: OffsetInput!
-}
-
-# A series of GmosNorth atoms that comprise the sequence
-type GmosNorthSequence {
-  # Sequence atoms
-  atoms: [GmosNorthAtom!]!
-
-  # Time required for the full execution of this sequence
-  time: StepTime!
 }
 
 # GMOS North stage mode
@@ -1031,7 +1034,11 @@ type GmosNorthStep implements Step {
   stepConfig: StepConfig!
 
   # Time estimate for this step's execution
-  time: StepTime!
+  estimate: StepEstimate!
+
+  # Observe class for this step
+  observeClass: ObserveClass!
+
 }
 
 # GmosNorth step creation input.  Choose exactly one step type.
@@ -1117,14 +1124,18 @@ type GmosNorthVisitRecord {
 
 # GmosSouth atom, a collection of steps that should be executed in their entirety
 type GmosSouthAtom implements Atom {
-  # Individual steps that comprise the atom
-  steps: [GmosSouthStep!]!
-
-  # Time estimate for this atom's execution, the sum of each step's time.
-  time: StepTime!
-
   # Atom id
   id: AtomId!
+
+  # Optional description of the atom.
+  description: String
+
+  # Observe class for this atom as a whole (combined observe class for each of
+  # its steps).
+  observeClass: ObserveClass!
+
+  # Individual steps that comprise the atom
+  steps: [GmosSouthStep!]!
 }
 
 # GmosSouth bias step creation input
@@ -1206,23 +1217,39 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   static: GmosSouthStatic!
 
   # GMOS South acquisition execution
-  acquisition: GmosSouthExecutionSequence!
+  acquisition: GmosSouthExecutionSequence
 
   # GMOS South science execution
-  science: GmosSouthExecutionSequence!
+  science: GmosSouthExecutionSequence
   #visits: [GmosSouthVisitRecord!]!
 
   # Instrument type
   instrument: Instrument!
+
+  # Setup time estimates
+  setup: SetupTime!
 }
 
 # Next atom to execute and potential future atoms
-type GmosSouthExecutionSequence {
-  # Next atom to execute, if any
-  nextAtom: GmosSouthAtom
+type GmosSouthExecutionSequence implements ExecutionSequence {
+  # Next atom to execute
+  nextAtom: GmosSouthAtom!
 
   # Remaining atoms to execute, if any
   possibleFuture: [GmosSouthAtom!]!
+
+  # Whether there are more anticipated atoms than those that appear in
+  # possibleFuture
+  hashMore: Boolean!
+  
+  # Total count of anticipated atoms, including nextAtom, possibleFuture and
+  # any remaining atoms not included in possibleFuture
+  atomCount: PosInt!
+  
+  # Sequence digest (including all anticipated future values regardless of
+  # whether they appear in possibleFuture)
+  digest: SequenceDigest!
+
 }
 
 # GMOS South FPU option, either builtin or custom mask
@@ -1314,24 +1341,6 @@ input GmosSouthLongSlitInput {
 
 }
 
-# GMOS South Manual Configuration
-type GmosSouthManualConfig implements ManualConfig {
-  # Static/unchanging configuration
-  static: GmosSouthStatic!
-
-  # Acquisition sequence.
-  acquisition: GmosSouthSequence!
-
-  # Science sequence.
-  science: GmosSouthSequence!
-
-  # Instrument type
-  instrument: Instrument!
-
-  # Planned time for this configuration
-  plannedTime: PlannedTime!
-}
-
 # GmosSouth science step creation input
 input GmosSouthScienceInput {
   # instrument configuration
@@ -1339,15 +1348,6 @@ input GmosSouthScienceInput {
 
   # offset position
   offset: OffsetInput!
-}
-
-# A series of GmosSouth atoms that comprise the sequence
-type GmosSouthSequence {
-  # Sequence atoms
-  atoms: [GmosSouthAtom!]!
-
-  # Time required for the full execution of this sequence
-  time: StepTime!
 }
 
 # GMOS South stage mode
@@ -1410,7 +1410,11 @@ type GmosSouthStep implements Step {
   stepConfig: StepConfig!
 
   # Time estimate for this step's execution
-  time: StepTime!
+  estimate: StepEstimate!
+
+  # Observe class for this step
+  observeClass: ObserveClass!
+
 }
 
 # GmosSouth step creation input.  Choose exactly one step type.
@@ -2132,6 +2136,15 @@ type SetAllocationResult {
   allocation: Allocation!
 }
 
+type SetupTime {
+
+  # Full setup time estimate, including slew, configuration and target acquisition
+  full: TimeSpan!
+
+  # A reduced setup time contemplating reacquiring a previously acquired target
+  reacquisition: TimeSpan!
+}
+
 # Sidereal target edit parameters
 input SiderealInput {
   # The ra field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -2220,7 +2233,11 @@ interface Step {
   stepConfig: StepConfig!
 
   # Time estimate for this step's execution
-  time: StepTime!
+  estimate: StepEstimate!
+
+  # Observe class for this step
+  observeClass: ObserveClass!
+
 }
 
 # Step (bias, dark, gcal, science, etc.)
@@ -3044,6 +3061,20 @@ enum CatalogName {
   GAIA
 }
 
+# Who is charged for time, if anyone.
+enum ChargeClass {
+
+  # Time that is not charged.
+  NON_CHARGED
+
+  # Time charged to a partner country / entity.
+  PARTNER
+
+  # Time charged to the science program.
+  PROGRAM
+
+}
+
 # Classical observing at Gemini
 type Classical implements ProposalClass {
   # Minimum percent of requested observation time that is required
@@ -3451,6 +3482,9 @@ type Execution {
 interface ExecutionConfig {
   # Instrument type
   instrument: Instrument!
+
+  # Setup time estimates
+  setup: SetupTime!
 }
 
 # Execution event (sequence, step, or dataset events)
@@ -3488,6 +3522,17 @@ enum Existence {
   # Existence Deleted
   DELETED
 }
+
+# Execution sequence -- type specific implementations will include access to
+# atoms. 
+interface ExecutionSequence {
+
+  # Sequence digest (including all anticipated future values regardless of
+  # whether they appear in possibleFuture)
+  digest: SequenceDigest!
+
+}
+
 
 # Exposure time mode, either signal to noise or fixed
 type ExposureTimeMode {
@@ -4481,15 +4526,6 @@ enum LineFluxSurfaceUnits {
   ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
 }
 
-# Manual observing sequence and instrument configuration
-interface ManualConfig {
-  # Instrument type
-  instrument: Instrument!
-
-  # Planned time for this configuration
-  plannedTime: PlannedTime!
-}
-
 # A String value that cannot be empty
 scalar NonEmptyString
 
@@ -4625,7 +4661,7 @@ type Observation {
   posAngleConstraint: PosAngleConstraint!
 
   # Observation planned time calculation.
-  plannedTime: PlannedTimeSummary!
+  plannedTime: PlannedTimeSummary! @deprecated(reason: "the PlannedTimeSummary type will be replaced")
 
   # The program that contains this observation
   program: Program!
@@ -4645,8 +4681,13 @@ type Observation {
   # The science configuration
   observingMode: ObservingMode
 
+  """
+  The instrument in use for this observation, if the observing mode is set.
+  """
+  instrument: Instrument
+
   # Manual instrument configuration
-  manualConfig: ManualConfig
+  # manualConfig: ManualConfig
 
   # Execution sequence and runtime artifacts
   execution: Execution!
@@ -4662,6 +4703,30 @@ type ObservationSelectResult {
 
   # `true` when there were additional matches that were not returned.
   hasMore: Boolean!
+}
+
+# Each step in a sequence is tagged with an observe class which identifies its
+# purpose and who is ultimately charged for the time for that observe.
+enum ObserveClass {
+
+  # Science dataset, charged to the program.
+  SCIENCE
+
+  # Nighttime calibration, charged to the program.
+  PROGRAM_CAL
+
+  # Nighttime calibration, charged to the partner.
+  PARTNER_CAL
+
+  # Acquisition, charged to the program.
+  ACQUISITION
+
+  # Acquisition calibration, charged to the program.
+  ACQUISITION_CAL
+
+  # Daytime calibration, charged to the observatory.
+  DAY_CAL
+
 }
 
 type Parallax {
@@ -4707,36 +4772,37 @@ enum PlanetaryNebulaSpectrum {
   IC5117
 }
 
-# Time estimates for executing this configuration
+# A collection of PlannedTimeCharge
 type PlannedTime {
-  # Estimated setup time
-  setup: TimeSpan!
 
-  # Estimated acquisition time for each atom
-  acquisition: [StepTime!]!
+  # Individual time charges
+  charges: [PlannedTimeCharge!]!
 
-  # Total estimated acquisition time
-  acquisitionTotal: StepTime!
-
-  # Estimated science time for each atom
-  science: [StepTime!]!
-
-  # Total estimated science time
-  scienceTotal: StepTime!
-
-  # Total planned time across acquisition and science
+  # The total of all charges
   total: TimeSpan!
 }
 
+# A charge class and its corresponding time amount
+type PlannedTimeCharge {
+
+  # Charge class
+  chargeClass: ChargeClass!
+
+  # Charge amount
+  time: TimeSpan!
+
+}
+
+# Deprecated, to be replaced.
 type PlannedTimeSummary {
   # The portion of planned time that will be charged
-  pi: TimeSpan!
+  pi: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
 
   # The portion of planned time that will not be charged
-  uncharged: TimeSpan!
+  uncharged: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
 
   # The total estimated execution time
-  execution: TimeSpan!
+  execution: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
 }
 
 # Poor Weather
@@ -4821,7 +4887,7 @@ type Program {
   proposalAttachments: [ProposalAttachment!]!
 
   # Program planned time calculation.
-  plannedTime: PlannedTimeSummary!
+  plannedTime: PlannedTimeSummary! @deprecated(reason: "the PlannedTimeSummary type will be replaced")
 
   "Top-level group elements (observations and sub-groups) in the program."
   groupElements: [GroupElement!]!
@@ -5347,6 +5413,17 @@ enum SequenceCommand {
   STOP
 }
 
+type SequenceDigest {
+  # ObserveClass of the whole sequence
+  observeClass: ObserveClass!
+  
+  # PlannedTime for the whole sequence
+  plannedTime: PlannedTime!
+  
+  # Unique offsets that occur in the sequence
+  offsets: [Offset!]! 
+}
+
 # Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
 type SequenceEvent implements ExecutionEvent {
   # Identifies the observation to which the event refers
@@ -5385,6 +5462,7 @@ type SequenceGenerationResult {
   observationId:   ObservationId!
   itcResult:       ItcResultSet!
   executionConfig: ExecutionConfig!
+  scienceDigest:   SequenceDigest
 }
 
 # Type of sequence, acquisition or science
@@ -5726,23 +5804,123 @@ enum StepStage {
   START_STEP
 }
 
-# Time required for a step or steps, categorized according to use
-type StepTime {
-  # Time spent making configuration changes
-  configChange: TimeSpan!
+# An individual configuration change before a step is executed.  Multiple
+# items may change simultaneously (e.g., the science fold may move while the
+# Gcal filter is updated).  ConfigChangeEstimate identifies a single item that will
+# be updated.
+type ConfigChangeEstimate {
 
-  # Time spent collecting photons
+  # Name of the item that changed.
+  name: String!
+
+  # A possibly longer description of what was updated.
+  description: String!
+
+  # Estimated time required to effectuate the change.
+  estimate: TimeSpan!
+
+}
+
+# Time taken to update the configuration before a step is executed.
+type AllConfigChangeEstimates {
+
+  # The selected ConfigChangeEstimate is a maximum of all the config change
+  # estimates.  In other words, one that takes the longest.
+  selected: ConfigChangeEstimate!
+
+  # Index of the selected config change estimate amongst all the estimates in
+  # `all`.
+  index: NonNegInt!
+
+  # Complete collection of items that changed.  The selected estimate will be
+  # one of the longest (there may be multiple estimates tied for the longest).
+  all: [ConfigChangeEstimate!]!
+
+  # Time required for the collection of estimates in `all`.  This should
+  # be the max of the individual entries because the execution happens in
+  # parallel.
+  estimate: TimeSpan!
+
+}
+
+# Time estimate for taking an individual dataset.
+type DatasetEstimate {
+
+  # The exposure time itself
   exposure: TimeSpan!
 
-  # Time spent reading out the detector
+  # Time required to readout the detector
   readout: TimeSpan!
 
-  # Time spent writing the dataset file
+  # Time required to write the data to the storage system
   write: TimeSpan!
 
-  # Total time across all categories
-  total: TimeSpan!
+  # Total estimate for the dataset, summing exposure, readout and write
+  estimate: TimeSpan!
+
 }
+
+# Time estimate for a single detector.  Some instruments will employ multiple
+# detectors per step.
+type DetectorEstimate {
+
+  # Indicates which detector is estimated here
+  name: String!
+
+  # Detector description
+  description: String!
+
+  # Time estimate for a single dataset produced by this detector
+  dataset: DatasetEstimate!
+
+  # Count of datasets to be produced by the detector
+  count: NonNegInt!
+
+  # Total time estimate for the detector, which is the sum of the individual
+  # dataset estimate multiplied by the count.
+  estimate: TimeSpan!
+
+}
+
+# The collection of detector estimates involved in an individual step.
+type AllDetectorEstimates {
+
+  # The selected DetectorEstimate is a maximum of all the detector estimates.
+  # In other words, one that takes the longest.
+  selected: DetectorEstimate!
+
+  # Index of the selected detector estimate amongst all the estimates in
+  # `all`.
+  index: NonNegInt!
+
+  # Complete collection of detectors involved in a step.  The selected estimate
+  # will be one of the longest (there may be multiple estimates tied for the
+  # longest).
+  all: [DetectorEstimate!]!
+
+  # Time required for the collection of estimates in `all`.  This should
+  # be the max of the individual entries because the execution happens in
+  # parallel.
+  estimate: TimeSpan!
+
+}
+
+# Time estimate for an individual step, including configuration changes and
+# dataset production.
+type StepEstimate {
+
+  # Configuration changes required before the step is executed.  This will
+  # obviously depend not only on the step configuration but also the previous
+  # step configuration.
+  configChange: AllConfigChangeEstimates
+
+  # Time for producing the datasets for this step.
+  detector:     AllDetectorEstimates
+
+  # Total time estimate for the step.
+  total:        TimeSpan!
+}
+
 
 # System Verification
 type SystemVerification implements ProposalClass {

@@ -54,24 +54,28 @@ final class Enums(
     def instrument: Option[Instrument] = meta.instrument
     def time: TimeSpan                 = meta.time
 
-    case GcalDiffuser        extends TimeEstimate("gcal_diffuser")
-    case GcalFilter          extends TimeEstimate("gcal_filter")
-    case GcalShutter         extends TimeEstimate("gcal_shutter")
-    case GmosNorthDisperser  extends TimeEstimate("gmos_north_disperser")
-    case GmosNorthFilter     extends TimeEstimate("gmos_north_filter")
-    case GmosNorthFpu        extends TimeEstimate("gmos_north_fpu")
-    case GmosNorthNod        extends TimeEstimate("gmos_north_nod")
-    case GmosNorthNodEOffset extends TimeEstimate("gmos_north_nod_e_offset")
-    case GmosNorthWrite      extends TimeEstimate("gmos_north_write")
-    case GmosSouthDisperser  extends TimeEstimate("gmos_south_disperser")
-    case GmosSouthFilter     extends TimeEstimate("gmos_south_filter")
-    case GmosSouthFpu        extends TimeEstimate("gmos_south_fpu")
-    case GmosSouthNod        extends TimeEstimate("gmos_south_nod")
-    case GmosSouthNodEOffset extends TimeEstimate("gmos_south_nod_e_offset")
-    case GmosSouthWrite      extends TimeEstimate("gmos_south_write")
-    case OffsetConstant      extends TimeEstimate("offset_constant")
-    case OffsetDistance      extends TimeEstimate("offset_distance")
-    case ScienceFold         extends TimeEstimate("science_fold")
+    case GcalDiffuser           extends TimeEstimate("gcal_diffuser")
+    case GcalFilter             extends TimeEstimate("gcal_filter")
+    case GcalShutter            extends TimeEstimate("gcal_shutter")
+    case GmosNorthDisperser     extends TimeEstimate("gmos_north_disperser")
+    case GmosNorthFilter        extends TimeEstimate("gmos_north_filter")
+    case GmosNorthFpu           extends TimeEstimate("gmos_north_fpu")
+    case GmosNorthLongslitSetup extends TimeEstimate("gmos_north_longslit_setup")
+    case GmosNorthNod           extends TimeEstimate("gmos_north_nod")
+    case GmosNorthNodEOffset    extends TimeEstimate("gmos_north_nod_e_offset")
+    case GmosNorthReacquisition extends TimeEstimate("gmos_north_reacquisition")
+    case GmosNorthWrite         extends TimeEstimate("gmos_north_write")
+    case GmosSouthDisperser     extends TimeEstimate("gmos_south_disperser")
+    case GmosSouthFilter        extends TimeEstimate("gmos_south_filter")
+    case GmosSouthFpu           extends TimeEstimate("gmos_south_fpu")
+    case GmosSouthLongslitSetup extends TimeEstimate("gmos_south_longslit_setup")
+    case GmosSouthNod           extends TimeEstimate("gmos_south_nod")
+    case GmosSouthNodEOffset    extends TimeEstimate("gmos_south_nod_e_offset")
+    case GmosSouthReacquisition extends TimeEstimate("gmos_south_reacquisition")
+    case GmosSouthWrite         extends TimeEstimate("gmos_south_write")
+    case OffsetConstant         extends TimeEstimate("offset_constant")
+    case OffsetDistance         extends TimeEstimate("offset_distance")
+    case ScienceFold            extends TimeEstimate("science_fold")
 
     // Used to test that undefined values in the database produce immediate failure on startup.
     // case FooBar              extends TimeEstimate("foo_bar")
@@ -96,8 +100,8 @@ final class Enums(
 object Enums {
 
   case class Meta(
-    timeEstimate:        Map[String, TimeEstimateMeta],
-    unreferencedTypes:   List[EnumType]
+    timeEstimate:      Map[String, TimeEstimateMeta],
+    unreferencedTypes: List[EnumType]
   )
 
   def load[F[_]: Monad: Logger](s: Session[F]): F[Enums] =
