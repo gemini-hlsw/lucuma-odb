@@ -26,6 +26,7 @@ import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -53,6 +54,7 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -62,6 +64,7 @@ import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import monocle.Prism
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Arr
@@ -81,14 +84,18 @@ trait Codecs {
   def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
     `enum`(ev.tag, ev.fromTag, tpe)
 
-  def gid[A](implicit ev: Gid[A]): Codec[A] = {
-    val prism = ev.fromString
+  private def idCodecFromPrism[A](prism: Prism[String, A]): Codec[A] =
     Codec.simple(
       prism.reverseGet,
       s => prism.getOption(s).toRight(s"Invalid: $s"),
       Type.varchar
     )
-  }
+
+  def gid[A](implicit ev: Gid[A]): Codec[A] =
+    idCodecFromPrism(ev.fromString)
+
+  def uid[A](implicit ev: Uid[A]): Codec[A] =
+    idCodecFromPrism(ev.fromString)
 
   final case class DomainCodec[A](domainName: String, codec: Codec[A]) extends Codec[A]:
     export codec.* // delegate everything!
@@ -222,12 +229,17 @@ trait Codecs {
 
   val image_quality: Codec[ImageQuality] =
     enumerated[ImageQuality](Type.varchar)
-    
+
   val instrument: Codec[Instrument] =
-    enumerated[Instrument](Type.varchar)  
+    enumerated[Instrument](Type.varchar)
 
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
+
+  val mos_pre_imaging: Codec[MosPreImaging] =
+    bool.imap(
+      b => if (b) MosPreImaging.IsMosPreImaging else MosPreImaging.IsNotMosPreImaging
+    )(_.toBoolean)
 
   val obs_active_status: Codec[ObsActiveStatus] =
     enumerated(Type("e_obs_active_status"))
@@ -240,7 +252,7 @@ trait Codecs {
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
-  
+
   val observing_mode_type: Codec[ObservingModeType] =
     enumerated(Type("e_observing_mode_type"))
 
@@ -348,6 +360,9 @@ trait Codecs {
 
   val user_type: Codec[UserType] =
     enumerated(Type("e_user_type"))
+
+  val visit_id: Codec[Visit.Id] =
+    uid[Visit.Id]
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)

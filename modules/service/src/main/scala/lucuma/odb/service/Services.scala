@@ -68,6 +68,9 @@ trait Services[F[_]]:
   
   /** The `GmosLongSlitService`. */
   def gmosLongSlitService: GmosLongSlitService[F]
+
+  /** The `GmosSequenceService` */
+  def gmosSequenceService: GmosSequenceService[F]
   
   /** The `GroupService`. */
   def groupService: GroupService[F]
@@ -108,6 +111,9 @@ trait Services[F[_]]:
   /** The `TimingWindowService`. */
   def timingWindowService: TimingWindowService[F]
 
+  /** The `VisitService` */
+  def visitService: VisitService[F]
+
   /** Construct an `Itc` service, given an `ItcClient`.*/
   def itc(itcClient: ItcClient[F]): Itc[F]
 
@@ -135,12 +141,13 @@ object Services:
         session.transaction.use(xa => fa(using xa)) // TODO: bind user to transaction variable
 
       // Services as passed their "owning" `Services` (i.e., `this`) on instantiation, which is
-      // circular and requies everything to be done lazily, which luckily is what we want. No point
+      // circular and requires everything to be done lazily, which luckily is what we want. No point
       // instantiating anything we're not using.
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
+      lazy val gmosSequenceService = GmosSequenceService.instantiate
       lazy val groupService = GroupService.instantiate
       lazy val obsAttachmentMetadataService = ObsAttachmentMetadataService.instantiate
       lazy val observationService = ObservationService.instantiate
@@ -151,6 +158,7 @@ object Services:
       lazy val proposalService = ProposalService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val targetService = TargetService.instantiate
+      lazy val visitService = VisitService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be
@@ -175,6 +183,7 @@ object Services:
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
+    def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
     def obsAttachmentMetadataService[F[_]](using Services[F]): ObsAttachmentMetadataService[F] = summon[Services[F]].obsAttachmentMetadataService
@@ -188,6 +197,7 @@ object Services:
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
+    def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itc[F[_]](client: ItcClient[F])(using Services[F]): Itc[F] = summon[Services[F]].itc(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
 

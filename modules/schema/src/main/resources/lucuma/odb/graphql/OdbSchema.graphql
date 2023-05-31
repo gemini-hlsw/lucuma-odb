@@ -49,7 +49,9 @@ type Allocation {
   duration: TimeSpan!
 }
 
-# Create an angle from a signed value.  Choose exactly one of the available units.
+"""
+Create an angle from a signed value.  Choose exactly one of the available units.
+"""
 input AngleInput {
   microarcseconds: Long
   microseconds: BigDecimal
@@ -727,22 +729,35 @@ type GmosNodAndShuffle {
   shuffleCycles: Int!
 }
 
-# Creation input parameters for GMOS nod and shuffle
+"""
+Creation input parameters for GMOS nod and shuffle
+"""
 input GmosNodAndShuffleInput {
-  # Offset position A
+
+  """
+  Offset position A
+  """
   posA: OffsetInput!
 
-  # Offset position B
+  """
+  Offset position B
+  """
   posB: OffsetInput!
 
-  # Electronic offsetting
+  """
+  Electronic offsetting
+  """
   eOffset: GmosEOffsetting!
 
-  # Shuffle offset
-  shuffleOffset: Int!
+  """
+  Shuffle offset
+  """
+  shuffleOffset: PosInt!
 
-  # Suffle cycles
-  shuffleCycles: Int!
+  """
+  Shuffle cycles
+  """
+  shuffleCycles: PosInt!
 }
 
 # GmosNorth atom, a collection of steps that should be executed in their entirety
@@ -774,12 +789,12 @@ input GmosNorthDarkInput {
   config: GmosNorthDynamicInput!
 }
 
-# GmosNorth Detector type
+"""
+GmosNorth Detector type
+"""
 enum GmosNorthDetector {
-  # GmosNorthDetector E2V
   E2_V
 
-  # GmosNorthDetector HAMAMATSU
   HAMAMATSU
 }
 
@@ -846,7 +861,7 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   # GMOS North science execution
   science: GmosNorthExecutionSequence
 
-  #visits: [GmosNorthVisitRecord!]!
+  #visits: [GmosNorthVisit!]!
 
   # Instrument type
   instrument: Instrument!
@@ -866,11 +881,11 @@ type GmosNorthExecutionSequence implements ExecutionSequence {
   # Whether there are more anticipated atoms than those that appear in
   # possibleFuture
   hashMore: Boolean!
-  
+
   # Total count of anticipated atoms, including nextAtom, possibleFuture and
   # any remaining atoms not included in possibleFuture
   atomCount: PosInt!
-  
+
   # Sequence digest (including all anticipated future values regardless of
   # whether they appear in possibleFuture)
   digest: SequenceDigest!
@@ -1004,19 +1019,30 @@ type GmosNorthStatic {
   nodAndShuffle: GmosNodAndShuffle
 }
 
-# GMOS North static configuration input parameters
+"""
+GMOS North static configuration input parameters
+"""
 input GmosNorthStaticInput {
-  # GMOS North Detector option
-  detector: GmosNorthDetector! = HAMAMATSU
+  """
+  GMOS North Stage Mode
+  """
+  stageMode: GmosNorthStageMode = FOLLOW_XY
 
-  # Whether this is a MOS pre-imaging observation
-  mosPreImaging: MosPreImaging! = IS_NOT_MOS_PRE_IMAGING
+  """
+  GMOS North Detector option
+  """
+  detector: GmosNorthDetector = HAMAMATSU
 
-  # GMOS Nod And Shuffle configuration
+  """
+  Whether this is a MOS pre-imaging observation
+  """
+  mosPreImaging: MosPreImaging = IS_NOT_MOS_PRE_IMAGING
+
+  """
+  GMOS Nod And Shuffle configuration
+  """
   nodAndShuffle: GmosNodAndShuffleInput
 
-  # GMOS North Stage Mode
-  stageMode: GmosNorthStageMode! = FOLLOW_XY
 }
 
 # GmosNorth step with potential breakpoint
@@ -1096,7 +1122,7 @@ type GmosNorthStepRecord {
 }
 
 # A GmosNorth visit as recorded by Observe
-type GmosNorthVisitRecord {
+type GmosNorthVisit {
   # Visit id
   id: VisitId!
 
@@ -1113,7 +1139,7 @@ type GmosNorthVisitRecord {
   duration: TimeSpan!
 
   # GmosNorth static instrument configuration
-  staticConfig: GmosNorthStatic!
+  static: GmosNorthStatic!
 
   # GmosNorth recorded steps
   steps: [GmosNorthStepRecord!]!
@@ -1150,12 +1176,12 @@ input GmosSouthDarkInput {
   config: GmosSouthDynamicInput!
 }
 
-# GmosSouth Detector type
+"""
+GmosSouth Detector type
+"""
 enum GmosSouthDetector {
-  # GmosSouthDetector E2V
   E2_V
 
-  # GmosSouthDetector HAMAMATSU
   HAMAMATSU
 }
 
@@ -1221,7 +1247,7 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
 
   # GMOS South science execution
   science: GmosSouthExecutionSequence
-  #visits: [GmosSouthVisitRecord!]!
+  #visits: [GmosSouthVisit!]!
 
   # Instrument type
   instrument: Instrument!
@@ -1241,11 +1267,11 @@ type GmosSouthExecutionSequence implements ExecutionSequence {
   # Whether there are more anticipated atoms than those that appear in
   # possibleFuture
   hashMore: Boolean!
-  
+
   # Total count of anticipated atoms, including nextAtom, possibleFuture and
   # any remaining atoms not included in possibleFuture
   atomCount: PosInt!
-  
+
   # Sequence digest (including all anticipated future values regardless of
   # whether they appear in possibleFuture)
   digest: SequenceDigest!
@@ -1365,34 +1391,57 @@ enum GmosSouthStageMode {
   FOLLOW_Z
 }
 
-# Unchanging (over the course of the sequence) configuration values
+"""
+Unchanging (over the course of the sequence) configuration values
+"""
 type GmosSouthStatic {
-  # Stage mode
+
+  """
+  Stage mode
+  """
   stageMode: GmosSouthStageMode!
 
-  # Detector in use (always HAMAMATSU for recent and new observations)
+  """
+  Detector in use (always HAMAMATSU for recent and new observations)
+  """
   detector: GmosSouthDetector!
 
-  # Is MOS Pre-Imaging Observation
+  """
+  Is MOS Pre-Imaging Observation
+  """
   mosPreImaging: MosPreImaging!
 
-  # Nod-and-shuffle configuration
+  """
+  Nod-and-shuffle configuration
+  """
   nodAndShuffle: GmosNodAndShuffle
 }
 
-# GMOS South static configuration input parameters
+"""
+GMOS South static configuration input parameters
+"""
 input GmosSouthStaticInput {
-  # GMOS North Detector option
-  detector: GmosNorthDetector! = HAMAMATSU
 
-  # Whether this is a MOS pre-imaging observation
-  mosPreImaging: MosPreImaging! = IS_NOT_MOS_PRE_IMAGING
+  """
+  GMOS South Stage Mode
+  """
+  stageMode: GmosSouthStageMode = FOLLOW_XY
 
-  # GMOS Nod And Shuffle configuration
+  """
+  GMOS South Detector option
+  """
+  detector: GmosSouthDetector = HAMAMATSU
+
+  """
+  Whether this is a MOS pre-imaging observation
+  """
+  mosPreImaging: MosPreImaging = IS_NOT_MOS_PRE_IMAGING
+
+  """
+  GMOS Nod And Shuffle configuration
+  """
   nodAndShuffle: GmosNodAndShuffleInput
 
-  # GMOS North Stage Mode
-  stageMode: GmosSouthStageMode! = FOLLOW_XY
 }
 
 # GmosSouth step with potential breakpoint
@@ -1472,7 +1521,7 @@ type GmosSouthStepRecord {
 }
 
 # A GmosSouth visit as recorded by Observe
-type GmosSouthVisitRecord {
+type GmosSouthVisit {
   # Visit id
   id: VisitId!
 
@@ -1489,7 +1538,7 @@ type GmosSouthVisitRecord {
   duration: TimeSpan
 
   # GmosSouth static instrument configuration
-  staticConfig: GmosSouthStatic!
+  static: GmosSouthStatic!
 
   # GmosSouth recorded steps
   steps: [GmosSouthStepRecord!]!
@@ -1677,9 +1726,13 @@ type Mutation {
     input: RecordGmosNorthStepInput!
   ): RecordGmosNorthStepResult!
 
-  # Record a new visit
+  """
+  Record a new GMOS North visit
+  """
   recordGmosNorthVisit(
-    # VisitRecord creation parameters
+    """
+    Visit creation parameters
+    """
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
 
@@ -1689,9 +1742,13 @@ type Mutation {
     input: RecordGmosSouthStepInput!
   ): RecordGmosSouthStepResult!
 
-  # Record a new visit
+  """
+  Record a new GMOS South visit
+  """
   recordGmosSouthVisit(
-    # VisitRecord creation parameters
+    """
+    Visit creation parameters
+    """
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
 
@@ -1843,25 +1900,42 @@ type Offset {
   q: q!
 }
 
-# Offset component (p or q) input parameters. Choose one angle units definition.
+"""
+Offset component (p or q) input parameters. Choose one angle units definition.
+"""
 input OffsetComponentInput {
-  # Angle in µas
+
+  """
+  Angle in µas
+  """
   microarcseconds: Long
 
-  # Angle in mas
+  """
+  Angle in mas
+  """
   milliarcseconds: BigDecimal
 
-  # Angle in arcsec
+  """
+  Angle in arcsec
+  """
   arcseconds: BigDecimal
 }
 
-# Offset input.  Define offset in p and q.
+"""
+Offset input.  Define offset in p and q.
+"""
 input OffsetInput {
-  # Offset in p
+
+  """
+  Offset in p
+  """
   p: OffsetComponentInput!
 
-  # Offset in q
+  """
+  Offset in q
+  """
   q: OffsetComponentInput!
+
 }
 
 # Parallax, choose one of the available units
@@ -2042,7 +2116,9 @@ type RecordGmosNorthStepResult {
   stepRecord: GmosNorthStepRecord!
 }
 
-# Input parameters for creating a new GmosNorth VisitRecord
+"""
+Input parameters for creating a new GmosNorthVisit
+"""
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
   static: GmosNorthStaticInput!
@@ -2051,7 +2127,7 @@ input RecordGmosNorthVisitInput {
 # The result of recording a GmosNorth visit.
 type RecordGmosNorthVisitResult {
   # The newly added visit record itself.
-  visitRecord: GmosNorthVisitRecord!
+  visit: GmosNorthVisit!
 }
 
 # Input parameters for creating a new GmosSouth StepRecord
@@ -2067,7 +2143,9 @@ type RecordGmosSouthStepResult {
   stepRecord: GmosSouthStepRecord!
 }
 
-# Input parameters for creating a new GmosSouth VisitRecord
+"""
+Input parameters for creating a new GmosSouthVisit
+"""
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
   static: GmosSouthStaticInput!
@@ -2076,7 +2154,7 @@ input RecordGmosSouthVisitInput {
 # The result of recording a GmosSouth visit.
 type RecordGmosSouthVisitResult {
   # The newly added visit record itself.
-  visitRecord: GmosSouthVisitRecord!
+  visit: GmosSouthVisit!
 }
 
 # Right Ascension, choose one of the available units
@@ -2367,7 +2445,7 @@ input SystemVerificationInput {
 # Event sent when a new object is created or updated
 type TargetEdit {
   # Type of edit
-  editType: EditType! 
+  editType: EditType!
 
   # Edited object
   value: Target!
@@ -2377,7 +2455,7 @@ type TargetEdit {
 # Event sent when a group is created or updated
 type GroupEdit {
   # Type of edit
-  editType: EditType! 
+  editType: EditType!
 
   # Edited object
   value: Group!
@@ -3530,7 +3608,7 @@ enum Existence {
 }
 
 # Execution sequence -- type specific implementations will include access to
-# atoms. 
+# atoms.
 interface ExecutionSequence {
 
   # Sequence digest (including all anticipated future values regardless of
@@ -3929,7 +4007,7 @@ type GmosNorthLongSlit {
   # The FPU as it was initially selected.  See the `fpu` field for the FPU that
   # will be used in the observation.
   initialFpu: GmosNorthBuiltinFpu!
-  
+
   # The central wavelength as initially selected.  See the `centralWavelength`
   # field for the wavelength that will be used in the observation.
   initialCentralWavelength: Wavelength!
@@ -4240,7 +4318,7 @@ type GmosSouthLongSlit {
   # The FPU as it was initially selected.  See the `fpu` field for the FPU that
   # will be used in the observation.
   initialFpu: GmosSouthBuiltinFpu!
-  
+
   # The central wavelength as initially selected.  See the `centralWavelength`
   # field for the wavelength that will be used in the observation.
   initialCentralWavelength: Wavelength!
@@ -5422,12 +5500,12 @@ enum SequenceCommand {
 type SequenceDigest {
   # ObserveClass of the whole sequence
   observeClass: ObserveClass!
-  
+
   # PlannedTime for the whole sequence
   plannedTime: PlannedTime!
-  
+
   # Unique offsets that occur in the sequence
-  offsets: [Offset!]! 
+  offsets: [Offset!]!
 }
 
 # Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
@@ -6092,7 +6170,7 @@ type TargetGroup {
 
   # Link back to program, temporary, to avoid some mapping issues.
   # Please don't use this in API calls.
-  program: Program! @deprecated 
+  program: Program! @deprecated
 
 }
 
@@ -6211,7 +6289,7 @@ type Wavelength {
 
 # A WavelengthDither is expressed in the same units as Wavelength but
 # constrained to positive values.  It expresses an "offset" to a given
-# Wavelength. 
+# Wavelength.
 type WavelengthDither {
   # Wavelength dither in pm
   picometers: Int!
