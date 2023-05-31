@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.Sync
+import cats.effect.MonadCancelThrow
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
@@ -17,11 +17,13 @@ import lucuma.odb.graphql.input.ObservingModeInput
 import skunk.Session
 import skunk.Transaction
 
+import Services.Syntax.*
+
 sealed trait ObservingModeServices[F[_]] {
 
   def selectSequenceConfig(
     which: List[(Observation.Id, ObservingModeType)]
-  ): F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
+  )(using Transaction[F]): F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -51,17 +53,12 @@ object ObservingModeServices {
     lucuma.odb.sequence.gmos.longslit.Config.GmosNorth |
     lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 
-  def fromSession[F[_]: Sync](
-    session: Session[F]
-  ): ObservingModeServices[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): ObservingModeServices[F] =
     new ObservingModeServices[F] {
-
-      lazy val gmosLongSlitService: GmosLongSlitService[F] =
-        GmosLongSlitService.fromSession(session)
 
       override def selectSequenceConfig(
         which: List[(Observation.Id, ObservingModeType)]
-      ): F[Map[Observation.Id, SequenceConfig]] = {
+      )(using Transaction[F]): F[Map[Observation.Id, SequenceConfig]] = {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {

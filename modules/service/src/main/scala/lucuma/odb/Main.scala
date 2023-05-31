@@ -21,6 +21,7 @@ import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.ObsAttachmentRoutes
 import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObsAttachmentFileService
 import lucuma.odb.service.ProposalAttachmentFileService
@@ -229,15 +230,14 @@ object FMain extends MainParams {
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums)
+      ptc               <- Resource.eval(pool.use(PlannedTimeCalculator.fromSession(_, enums)))
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
-      obsAttachFileSvc  <- pool.map(ses => ObsAttachmentFileService.fromS3AndSession(s3FileService, ses))
-      propAttachFileSvc <- pool.map(ses => ProposalAttachmentFileService.fromS3AndSession(s3FileService, ses))
     } yield { wsb =>
-      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](obsAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
-      val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](propAttachFileSvc, ssoClient, awsConfig.fileUploadMaxMb)
+      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
+      val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
       middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes)
     }
 

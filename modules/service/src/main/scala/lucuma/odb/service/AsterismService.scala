@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
-import cats.effect.Sync
+import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -24,6 +24,8 @@ import lucuma.odb.util.Codecs.target_id
 import skunk.*
 import skunk.implicits.*
 
+import Services.Syntax.*
+
 trait AsterismService[F[_]] {
 
   /**
@@ -36,7 +38,7 @@ trait AsterismService[F[_]] {
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      NonEmptyList[Target.Id]
-  ): F[Result[Unit]]
+  )(using Transaction[F]): F[Result[Unit]]
 
   /**
    * Deletes the asterisms associated with the given observation ids.
@@ -44,7 +46,7 @@ trait AsterismService[F[_]] {
   def deleteAsterism(
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id]
-  ): F[Result[Unit]]
+  )(using Transaction[F]): F[Result[Unit]]
 
   /**
    * Replaces the existing asterisms associated with the given observation ids
@@ -55,7 +57,7 @@ trait AsterismService[F[_]] {
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      Nullable[NonEmptyList[Target.Id]]
-  ): F[Result[Unit]]
+  )(using Transaction[F]): F[Result[Unit]]
 
   /**
    * Updates the asterisms associated with each observation id, adding and
@@ -66,12 +68,12 @@ trait AsterismService[F[_]] {
     observationIds: NonEmptyList[Observation.Id],
     ADD:            Option[NonEmptyList[Target.Id]],
     DELETE:         Option[NonEmptyList[Target.Id]]
-  ): F[Result[Unit]]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def cloneAsterism(
     originalId: Observation.Id,
     newId: Observation.Id,
-  ): F[Unit]
+  )(using Transaction[F]): F[Unit]
 
 }
 
@@ -83,10 +85,7 @@ object AsterismService {
   ): String =
     s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
 
-  def fromSessionAndUser[F[_]: Sync](
-    session: Session[F],
-    user:    User
-  ): AsterismService[F] =
+  def instantiate[F[_]: MonadCancelThrow](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
 
@@ -94,7 +93,7 @@ object AsterismService {
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      NonEmptyList[Target.Id]
-      ): F[Result[Unit]] = {
+      )(using Transaction[F]): F[Result[Unit]] = {
         val af = Statements.insertLinksAs(user, programId, observationIds, targetIds)
         session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument)
@@ -109,7 +108,7 @@ object AsterismService {
       override def deleteAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id]
-      ): F[Result[Unit]] =
+      )(using Transaction[F]): F[Result[Unit]] =
         val af = Statements.deleteAllLinksAs(user, programId, observationIds)
         session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument).as(Result.unit)
@@ -119,7 +118,7 @@ object AsterismService {
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      Nullable[NonEmptyList[Target.Id]]
-      ): F[Result[Unit]] =
+      )(using Transaction[F]): F[Result[Unit]] =
         targetIds match {
           case Nullable.Null          =>
             deleteAsterism(programId, observationIds)
@@ -137,7 +136,7 @@ object AsterismService {
         observationIds: NonEmptyList[Observation.Id],
         ADD:            Option[NonEmptyList[Target.Id]],
         DELETE:         Option[NonEmptyList[Target.Id]]
-      ): F[Result[Unit]] =
+      )(using Transaction[F]): F[Result[Unit]] =
         ADD.fold(Result.unit.pure[F])(insertAsterism(programId, observationIds, _)) *>
           DELETE.fold(Result.unit.pure[F]) { tids =>
             val af = Statements.deleteLinksAs(user, programId, observationIds, tids)
@@ -149,7 +148,7 @@ object AsterismService {
       override def cloneAsterism(
         originalId: Observation.Id,
         newId: Observation.Id,
-      ): F[Unit] =
+      )(using Transaction[F]): F[Unit] =
         val clone = Statements.clone(originalId, newId)
         session.prepareR(clone.fragment.command).use { ps =>
           ps.execute(clone.argument).void

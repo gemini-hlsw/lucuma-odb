@@ -54,7 +54,10 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.SmartGcalService
+import skunk.Transaction
 
 import java.io.ObjectOutputStream
 import java.util.UUID
@@ -65,7 +68,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     useCache:      Boolean
-  ): F[Generator.Result]
+  )(using Transaction[F]): F[Generator.Result]
 
 }
 
@@ -130,25 +133,22 @@ object Generator {
     ) extends Result
   }
 
-  def fromClientAndServices[F[_]: Concurrent](
+  def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    paramsSrv:    GeneratorParamsService[F],
-    smartGcalSrv: SmartGcalService[F],
-    calculator:   PlannedTimeCalculator.ForInstrumentMode
-  ): Generator[F] =
+    calculator:   PlannedTimeCalculator.ForInstrumentMode,
+  )(using Services[F]): Generator[F] =
     new Generator[F] {
 
       import Result.*
 
-      private val itc = Itc.fromClientAndServices(itcClient, paramsSrv)
-      private val exp = SmartGcalExpander.fromService(smartGcalSrv)
+      private val exp = SmartGcalExpander.fromService(smartGcalService)
 
       override def generate(
         programId:     Program.Id,
         observationId: Observation.Id,
         useCache:      Boolean
-      ): F[Result] =
+      )(using Transaction[F]): F[Result] =
         (for {
           params <- selectParams(programId, observationId)
           res    <- generateSequence(observationId, params, useCache)
@@ -157,9 +157,9 @@ object Generator {
       private def selectParams(
         pid: Program.Id,
         oid: Observation.Id
-      ): EitherT[F, Error, GeneratorParams] =
+      )(using Transaction[F]): EitherT[F, Error, GeneratorParams] =
         EitherT(
-          paramsSrv
+          generatorParamsService
             .select(pid, oid)
             .map {
               case None                => ObservationNotFound(pid, oid).asLeft
@@ -217,7 +217,7 @@ object Generator {
           }
 
         EitherT(
-          itc
+          itc(itcClient)
             .spectroscopy(itcInput, useCache)
             .map {
               case Left(errors) => ItcServiceError(errors).asLeft

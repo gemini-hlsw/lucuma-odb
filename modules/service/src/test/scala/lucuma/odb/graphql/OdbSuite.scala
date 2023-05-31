@@ -47,6 +47,7 @@ import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalService
@@ -70,6 +71,7 @@ import org.testcontainers.utility.DockerImageName
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
+import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
@@ -81,6 +83,7 @@ object OdbSuite:
     case e: IllegalArgumentException if e.getMessage == "statusCode" => () // swallow annoying error ... not sure where it comes from though ... :-\
     case _: ProposalService.ProposalUpdateException => ()
     case _: AttachmentException => ()
+    case _: S3Exception => ()
     case e: SocketException if e.getMessage == "Connection reset" => ()
     case e => print("OdbSuite.reportFailure: "); e.printStackTrace
 
@@ -212,7 +215,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm)
+      ptc <- db.evalMap(PlannedTimeCalculator.fromSession(_, enm))
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc)
     } yield map
 
   protected def server: Resource[IO, Server] =

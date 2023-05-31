@@ -30,24 +30,24 @@ import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
 
+import Services.Syntax.*
+
 private[service] trait ProposalService[F[_]] {
 
   /**
-   * Insert the proposal associated with the specified program. This action only makes sense in the
-   * context of a larger transaction, which is why `xa` is required here.
+   * Insert the proposal associated with the specified program.
    */
-  def insertProposal(SET: ProposalInput.Create, pid: Program.Id, xa: Transaction[F]): F[Unit]
+  def insertProposal(SET: ProposalInput.Create, pid: Program.Id)(using Transaction[F]): F[Unit]
 
   /**
    * Update the proposals associated with the programs in temporary table `t_program_update`
    * (created by ProgramService#updatePrograms). If the update specifies enough information to
    * replace the proposal class then it will be replaced in its entirety (potentially
    * changing the proposal class). Otherwise the proposal class will be updated in-place, but only
-   * where the class matches what `SET` specifies. This action only makes sense in the context of
-   * a larger transaction, which is why `xa` is required here. This action also assumes the
+   * where the class matches what `SET` specifies. This action also assumes the
    * presence of the `t_program_update` table.
    */
-  def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]]
+  def updateProposals(SET: ProposalInput.Edit)(using Transaction[F]): F[List[Program.Id]]
 
 }
 
@@ -60,21 +60,19 @@ object ProposalService {
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
-  def fromSession[F[_]: Concurrent: Trace](s: Session[F]): ProposalService[F] =
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProposalService[F] =
     new ProposalService[F] {
 
-      lazy val partnerSplitsService = PartnerSplitsService.fromSession(s)
+      def insertProposal(SET: ProposalInput.Create, pid: Program.Id)(using Transaction[F]): F[Unit] =
+        session.prepareR(Statements.InsertProposal).use(_.execute(pid, SET)) >>
+        partnerSplitsService.insertSplits(SET.partnerSplits, pid)
 
-      def insertProposal(SET: ProposalInput.Create, pid: Program.Id, xa: Transaction[F]): F[Unit] =
-        s.prepareR(Statements.InsertProposal).use(_.execute(pid, SET)) >>
-        partnerSplitsService.insertSplits(SET.partnerSplits, pid, xa)
-
-      def updateProposals(SET: ProposalInput.Edit, xa: Transaction[F]): F[List[Program.Id]] = {
+      def updateProposals(SET: ProposalInput.Edit)(using Transaction[F]): F[List[Program.Id]] = {
 
         // Update existing proposals. This will fail if SET.asCreate.isEmpty and there is a class mismatch.
         val update: F[List[Program.Id]] =
           Statements.updateProposals(SET).fold(Nil.pure[F]) { af =>
-            s.prepareR(af.fragment.query(program_id)).use { ps =>
+            session.prepareR(af.fragment.query(program_id)).use { ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
@@ -86,7 +84,7 @@ object ProposalService {
 
         // Insert new proposals. This will fail if there's not enough information.
         val insert: F[List[Program.Id]] =
-          s.prepareR(Statements.InsertProposals).use { ps =>
+          session.prepareR(Statements.InsertProposals).use { ps =>
             ps.stream(SET, 1024)
               .compile
               .toList
@@ -98,7 +96,7 @@ object ProposalService {
         // Replace the splits
         def replaceSplits: F[List[Program.Id]] =
           SET.partnerSplits.fold(Nil.pure[F]) { ps =>
-            partnerSplitsService.updateSplits(ps, xa)
+            partnerSplitsService.updateSplits(ps)
           }
 
         // Done!

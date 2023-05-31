@@ -13,12 +13,16 @@ import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalAttachmentFileService
+import lucuma.odb.service.S3FileService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import org.http4s.server.middleware.EntityLimiter
+import skunk.Session
 
 object ProposalAttachmentRoutes {
   object ProgramId {
@@ -30,10 +34,35 @@ object ProposalAttachmentRoutes {
       NonEmptyString.from(str).toOption.map(s => Tag(s.value.toLowerCase))
   }
 
+  // the normal constructor
   def apply[F[_]: Async: Trace](
-    attachmentFileService: ProposalAttachmentFileService[F],
+    pool:                  Resource[F, Session[F]],
+    s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
-    maxUploadMb:           Int
+    maxUploadMb:           Int,
+  ): HttpRoutes[F] = 
+    apply(
+      [A] => (u: User) => (fa :ProposalAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u)).map(_.proposalAttachmentFileService(s3)).use(fa),
+      ssoClient,
+      maxUploadMb
+    )
+  
+  // used by tests
+  def apply[F[_]: Async: Trace](
+    service:     ProposalAttachmentFileService[F],
+    ssoClient:   SsoClient[F, User],
+    maxUploadMb: Int,
+  ): HttpRoutes[F] = 
+    apply(
+      [A] => (u: User) => (fa :ProposalAttachmentFileService[F] => F[A]) => fa(service),
+      ssoClient,
+      maxUploadMb
+    )
+
+  def apply[F[_]: Async: Trace](
+    service:      [A] => User => (ProposalAttachmentFileService[F] => F[A]) => F[A],
+    ssoClient:    SsoClient[F, User],
+    maxUploadMb:  Int
   ): HttpRoutes[F] = {
     val dsl = Http4sDsl[F]
     import dsl._
@@ -54,54 +83,64 @@ object ProposalAttachmentRoutes {
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType) =>
         ssoClient.require(req) { user =>
-          attachmentFileService.getAttachment(user, programId, attachmentType).flatMap {
-            case Left(exc)     => exc.toResponse
-            case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
+          service(user) { s =>
+            s.getAttachment(user, programId, attachmentType).flatMap {
+              case Left(exc)     => exc.toResponse
+              case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
+            }
           }
-        }
+        }        
 
       case req @ POST -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
-          val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-          attachmentFileService
-            .insertAttachment(user, programId, attachmentType, fileName, description, req.body)
-            .flatMap(_ => Ok())
-            .recoverWith {
-              case EntityLimiter.EntityTooLarge(_) =>
-                BadRequest(s"File too large. Limit of $maxUploadMb MB")
-              case e: AttachmentException          => e.toResponse
+          service(user) { s =>
+            val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
+            s
+              .insertAttachment(user, programId, attachmentType, fileName, description, req.body)
+              .flatMap(_ => Ok())
+              .recoverWith {
+                case EntityLimiter.EntityTooLarge(_) =>
+                  BadRequest(s"File too large. Limit of $maxUploadMb MB")
+                case e: AttachmentException          => e.toResponse
+              }
             }
         }
 
       case req @ PUT -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
-          val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
-          attachmentFileService
-            .updateAttachment(user, programId, attachmentType, fileName, description, req.body)
-            .flatMap(_ => Ok())
-            .recoverWith {
-              case EntityLimiter.EntityTooLarge(_) =>
-                BadRequest(s"File too large. Limit of $maxUploadMb MB")
-              case e: AttachmentException          => e.toResponse
-            }
+          service(user) { s =>
+            val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
+            s
+              .updateAttachment(user, programId, attachmentType, fileName, description, req.body)
+              .flatMap(_ => Ok())
+              .recoverWith {
+                case EntityLimiter.EntityTooLarge(_) =>
+                  BadRequest(s"File too large. Limit of $maxUploadMb MB")
+                case e: AttachmentException          => e.toResponse
+              }
+          }
         }
 
       case req @ DELETE -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType) =>
         ssoClient.require(req) { user =>
-          attachmentFileService
-            .deleteAttachment(user, programId, attachmentType)
-            .flatMap(_ => Ok())
-            .recoverWith { case e: AttachmentException => e.toResponse }
+          service(user) { s =>
+            s
+              .deleteAttachment(user, programId, attachmentType)
+              .flatMap(_ => Ok())
+              .recoverWith { case e: AttachmentException => e.toResponse }
+          }
         }
-      
+
       case req @ GET -> Root / "attachment" / "proposal" / "url" / ProgramId(programId) / TagPath(attachmentType) =>
         ssoClient.require(req) { user =>
-          attachmentFileService
-            .getPresignedUrl(user, programId, attachmentType)
-            .flatMap(Ok(_))
-            .recoverWith { case e: AttachmentException => e.toResponse }
+          service(user) { s =>
+            s
+              .getPresignedUrl(user, programId, attachmentType)
+              .flatMap(Ok(_))
+              .recoverWith { case e: AttachmentException => e.toResponse }
+          }
         }
     }
 

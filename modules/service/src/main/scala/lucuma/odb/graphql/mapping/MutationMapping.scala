@@ -60,12 +60,15 @@ import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.ProposalService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
+import skunk.Transaction
 
 import scala.reflect.ClassTag
 
@@ -96,15 +99,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
     mutationFields.foldMap(mf => Map(MutationType -> mf.Elaborator))
 
-  // Resources needed by mutations
-  def allocationService: Resource[F, AllocationService[F]]
-  def asterismService: Resource[F, AsterismService[F]]
-  def groupService: Resource[F, GroupService[F]]
-  def obsAttachmentMetadataService: Resource[F, ObsAttachmentMetadataService[F]]
-  def observationService: Resource[F, ObservationService[F]]
-  def programService: Resource[F, ProgramService[F]]
-  def proposalAttachmentMetadataService: Resource[F, ProposalAttachmentMetadataService[F]]
-  def targetService: Resource[F, TargetService[F]]
+  // Resources defined in the final cake.
+  def services: Resource[F, Services[F]]
   def user: User
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
@@ -184,8 +180,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
-      observationService.use { svc =>
-        svc.cloneObservation(input).map { r =>
+      services.useTransactionally {
+        observationService.cloneObservation(input).map { r =>
           r.map { oid =>
             Filter(And(
               Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
@@ -200,8 +196,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import CloneTargetResponse.*
     import UpdateTargetsResponse.{ SourceProfileUpdatesFailed, TrackingSwitchFailed }
     MutationField("cloneTarget", CloneTargetInput.Binding) { (input, child) =>
-      targetService.use { svc =>
-        svc.cloneTarget(input).map {          
+      services.useTransactionally {
+        targetService.cloneTarget(input).map {          
 
           // Typical case          
           case Success(oldTargetId, newTargetId) =>
@@ -225,58 +221,55 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
-      pool.use { s =>
-        groupService.use { svc =>
-          svc.createGroup(input).map { gid =>
-            Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
-          }
+      services.useTransactionally {
+        groupService.createGroup(input).map { gid =>
+          Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
         }
       }
     }
 
   private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
+      services.useTransactionally {
 
-      val createObservation: F[Result[(Observation.Id, Query)]] =
-        observationService.use { svc =>
-          svc.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
+        val createObservation: F[Result[(Observation.Id, Query)]] =
+          observationService.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
             _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
           )
-        }
 
-      def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
-        oid.flatTraverse { o =>
-          input.asterism.toOption.traverse { a =>
-            asterismService.use(_.insertAsterism(input.programId, NonEmptyList.one(o), a))
-          }
-        }.map(_.getOrElse(Result.unit))
+        def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
+          oid.flatTraverse { o =>
+            input.asterism.toOption.traverse { a =>
+              asterismService.insertAsterism(input.programId, NonEmptyList.one(o), a)
+            }
+          }.map(_.getOrElse(Result.unit))
 
-      pool.use { s =>
-        s.transaction.use { xa =>
-          for {
-            rTup  <- createObservation
-            oid    = rTup.toOption.map(_._1)
-            rUnit <- insertAsterism(oid)
-            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            // Fail altogether if there was an issue, say, creating the asterism
-            _     <- xa.rollback.unlessA(query.hasValue)
-          } yield query
-        }
+        for {
+          rTup  <- createObservation
+          oid    = rTup.toOption.map(_._1)
+          rUnit <- insertAsterism(oid)
+          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+          // Fail altogether if there was an issue, say, creating the asterism
+          _     <- transaction.rollback.unlessA(query.hasValue)
+        } yield query
+
       }
     }
 
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
-      programService.use(_.insertProgram(input.SET)).map { id =>
-        Result(Unique(Filter(Predicates.program.id.eql(id), child)))
+      services.useTransactionally {
+        programService.insertProgram(input.SET).map { id =>
+          Result(Unique(Filter(Predicates.program.id.eql(id), child)))
+        }
       }
     }
 
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
-      targetService.use { ts =>
+      services.useTransactionally {
         import TargetService.CreateTargetResponse._
-        ts.createTarget(input.programId, input.SET).map {
+        targetService.createTarget(input.programId, input.SET).map {
           case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
           case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
           case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
@@ -286,31 +279,35 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>
-      import lucuma.odb.service.ProgramService.LinkUserResponse._
-      programService.use(_.linkUser(input)).map[Result[Query]] {
-        case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
-        case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
-        case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
-        case Success(pid, uid)       =>
-          Result(Unique(Filter(And(
-            Predicates.linkUserResult.programId.eql(pid),
-            Predicates.linkUserResult.userId.eql(uid),
-          ), child)))
+      services.useTransactionally {
+        import lucuma.odb.service.ProgramService.LinkUserResponse._
+        programService.linkUser(input).map[Result[Query]] {
+          case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
+          case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
+          case Success(pid, uid)       =>
+            Result(Unique(Filter(And(
+              Predicates.linkUserResult.programId.eql(pid),
+              Predicates.linkUserResult.userId.eql(uid),
+            ), child)))
+        }
       }
     }
 
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
       import AllocationService.SetAllocationResponse._
-      allocationService.use(_.setAllocation(input)).map[Result[Query]] {
-        case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
-        case PartnerNotFound(_)  => ???
-        case ProgramNotFound(_)  => ???
-        case Success             =>
-          Result(Unique(Filter(And(
-            Predicates.setAllocationResult.programId.eql(input.programId),
-            Predicates.setAllocationResult.partner.eql(input.partner)
-          ), child)))
+      services.useTransactionally {
+        allocationService.setAllocation(input).map[Result[Query]] {
+          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
+          case PartnerNotFound(_)  => ???
+          case ProgramNotFound(_)  => ???
+          case Success             =>
+            Result(Unique(Filter(And(
+              Predicates.setAllocationResult.programId.eql(input.programId),
+              Predicates.setAllocationResult.partner.eql(input.partner)
+            ), child)))
+        }
       }
     }
 
@@ -336,72 +333,70 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
+      services.useTransactionally {
 
-      val idSelect: Result[AppliedFragment] =
-        observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+        val idSelect: Result[AppliedFragment] =
+          observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
-      val selectObservations: F[Result[(List[Observation.Id], Query)]] =
-        idSelect.traverse { which =>
-          observationService.use { svc =>
-            svc.selectObservations(which)            
-          } 
-        } map { r => 
-          r.flatMap { oids => 
-            observationResultSubquery(oids, input.LIMIT, child)
-              .tupleLeft(oids)
+        val selectObservations: F[Result[(List[Observation.Id], Query)]] =
+          idSelect.traverse { which =>
+            observationService.selectObservations(which)            
+          } map { r => 
+            r.flatMap { oids => 
+              observationResultSubquery(oids, input.LIMIT, child)
+                .tupleLeft(oids)
+            }
           }
-        }
 
-      def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-        NonEmptyList.fromList(oids).traverse { os =>
-          val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
-          val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
-          asterismService.use(_.updateAsterism(input.programId, os, add, del))
-        }.map(_.getOrElse(Result.unit))
+        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+          NonEmptyList.fromList(oids).traverse { os =>
+            val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
+            val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
+            asterismService.updateAsterism(input.programId, os, add, del)
+          }.map(_.getOrElse(Result.unit))
 
-      pool.use { s =>
-        s.transaction.use { xa =>
-          for {
-            rTup  <- selectObservations
-            oids   = rTup.toList.flatMap(_._1)
-            rUnit <- setAsterisms(oids)
-            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            _     <- xa.rollback.unlessA(query.hasValue)
-          } yield query
-        }
+        for {
+          rTup  <- selectObservations
+          oids   = rTup.toList.flatMap(_._1)
+          rUnit <- setAsterisms(oids)
+          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+          _     <- transaction.rollback.unlessA(query.hasValue)
+        } yield query
+
       }
     }
 
   private lazy val UpdateObsAttachments = 
       MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
-        
-        val filterPredicate = and(List(
-          Predicates.obsAttachment.program.id.eql(input.programId),
-          Predicates.obsAttachment.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
+        services.useTransactionally {
+          val filterPredicate = and(List(
+            Predicates.obsAttachment.program.id.eql(input.programId),
+            Predicates.obsAttachment.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
 
-        val idSelect: Result[AppliedFragment] = 
-          MappedQuery(
-            Filter(filterPredicate, Select("id", Nil, Empty)), 
-            Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
-          ).flatMap(_.fragment)
+          val idSelect: Result[AppliedFragment] = 
+            MappedQuery(
+              Filter(filterPredicate, Select("id", Nil, Empty)), 
+              Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
+            ).flatMap(_.fragment)
 
-        idSelect.flatTraverse { which =>
-          obsAttachmentMetadataService.use(_.updateObsAttachments(input.SET, which)).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
+          idSelect.flatTraverse { which =>
+            obsAttachmentMetadataService.updateObsAttachments(input.SET, which).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
+          }
         }
       }
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
+      services.useTransactionally {
 
-      val idSelect: Result[AppliedFragment] =
-        observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+        val idSelect: Result[AppliedFragment] =
+          observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
 
-      val updateObservations: F[Result[(List[Observation.Id], Query)]] =
-        idSelect.flatTraverse { which =>
-          observationService.use { svc =>
-            svc
+        val updateObservations: F[Result[(List[Observation.Id], Query)]] =
+          idSelect.flatTraverse { which =>
+            observationService
               .updateObservations(input.SET, which)
               .map { r => 
                 r.flatMap { oids => 
@@ -410,71 +405,71 @@ trait MutationMapping[F[_]] extends Predicates[F] {
                 }
               }
           }
-        }
 
-      def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-        NonEmptyList.fromList(oids).traverse { os =>
-          asterismService.use(_.setAsterism(input.programId, os, input.asterism))
-        }.map(_.getOrElse(Result.unit))
+        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
+          NonEmptyList.fromList(oids).traverse { os =>
+            asterismService.setAsterism(input.programId, os, input.asterism)
+          }.map(_.getOrElse(Result.unit))
 
-      pool.use { s =>
-        s.transaction.use { xa =>
-          for {
-            rTup  <- updateObservations
-            oids   = rTup.toList.flatMap(_._1)
-            rUnit <- setAsterisms(oids)
-            query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-            _     <- xa.rollback.unlessA(query.hasValue)
-          } yield query
-        }
+        for {
+          rTup  <- updateObservations
+          oids   = rTup.toList.flatMap(_._1)
+          rUnit <- setAsterisms(oids)
+          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+          _     <- transaction.rollback.unlessA(query.hasValue)
+        } yield query
+
       }
     }
 
   private lazy val UpdatePrograms =
     MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
+      services.useTransactionally {
+        // Our predicate for selecting programs to update
+        val filterPredicate = and(List(
+          Predicates.program.isWritableBy(user),
+          Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+          input.WHERE.getOrElse(True)
+        ))
 
-      // Our predicate for selecting programs to update
-      val filterPredicate = and(List(
-        Predicates.program.isWritableBy(user),
-        Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-        input.WHERE.getOrElse(True)
-      ))
+        // An applied fragment that selects all program ids that satisfy `filterPredicate`
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
 
-      // An applied fragment that selects all program ids that satisfy `filterPredicate`
-      val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
-
-      // Update the specified programs and then return a query for the affected programs.
-      idSelect.flatTraverse { which =>
-        programService.use(_.updatePrograms(input.SET, which)).map(programResultSubquery(_, input.LIMIT, child)).recover {
-          case ProposalService.ProposalUpdateException.CreationFailed =>
-            Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
-          case ProposalService.ProposalUpdateException.InconsistentUpdate =>
-            Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+        // Update the specified programs and then return a query for the affected programs.
+        idSelect.flatTraverse { which =>
+          programService.updatePrograms(input.SET, which).map(programResultSubquery(_, input.LIMIT, child)).recover {
+            case ProposalService.ProposalUpdateException.CreationFailed =>
+              Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
+            case ProposalService.ProposalUpdateException.InconsistentUpdate =>
+              Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+          }
         }
       }
-
     }
 
   private lazy val UpdateProposalAttachments = 
       MutationField("updateProposalAttachments", UpdateProposalAttachmentsInput.binding(Path.from(ProposalAttachmentType))) { (input, child) =>
-        
-        val filterPredicate = and(List(
-          Predicates.proposalAttachment.program.id.eql(input.programId),
-          Predicates.proposalAttachment.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
+        services.useTransactionally {
 
-        val typeSelect: Result[AppliedFragment] = 
-          MappedQuery(
-            Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
-            Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
-          ).flatMap(_.fragment)
+          val filterPredicate = and(List(
+            Predicates.proposalAttachment.program.id.eql(input.programId),
+            Predicates.proposalAttachment.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
 
-        typeSelect.flatTraverse { which =>
-          proposalAttachmentMetadataService
-            .use(_.updateProposalAttachments(input.SET, which))
-            .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
+          val typeSelect: Result[AppliedFragment] = 
+            MappedQuery(
+              Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
+              Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
+            ).flatMap(_.fragment)
+
+          typeSelect.flatTraverse { which =>
+            proposalAttachmentMetadataService
+              .updateProposalAttachments(input.SET, which)
+              .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
+          }
+          
         }
       }
 
@@ -489,27 +484,29 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateTargets =
     MutationField("updateTargets", UpdateTargetsInput.binding(Path.from(TargetType))) { (input, child) =>
+      services.useTransactionally {
 
-      // Our predicate for selecting targets to update
-      val filterPredicate = and(List(
-        Predicates.target.program.isWritableBy(user),
-        Predicates.target.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-        input.WHERE.getOrElse(True)
-      ))
+        // Our predicate for selecting targets to update
+        val filterPredicate = and(List(
+          Predicates.target.program.isWritableBy(user),
+          Predicates.target.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+          input.WHERE.getOrElse(True)
+        ))
 
-      // An applied fragment that selects all target ids that satisfy `filterPredicate`
-      val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
+        // An applied fragment that selects all target ids that satisfy `filterPredicate`
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
 
-      // Update the specified targets and then return a query for the affected targets (or an error)
-      idSelect.flatTraverse { which =>
-        targetService.use(_.updateTargets(input.SET, which)).map {
-          case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
-          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems)
-          case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+        // Update the specified targets and then return a query for the affected targets (or an error)
+        idSelect.flatTraverse { which =>
+          targetService.updateTargets(input.SET, which).map {
+            case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
+            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems)
+            case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+          }
         }
-      }
 
+      }
     }
 
   def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
@@ -523,26 +520,28 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateGroups =
     MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))) { (input, child) =>
+      services.useTransactionally {
 
-      // Our predicate for selecting groups to update
-      val filterPredicate = and(List(
-        // TODO: Predicates.group.program.isWritableBy(user),
-        input.WHERE.getOrElse(True)
-      ))
+        // Our predicate for selecting groups to update
+        val filterPredicate = and(List(
+          // TODO: Predicates.group.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
 
-      // An applied fragment that selects all group ids that satisfy `filterPredicate`
-      val idSelect: Result[AppliedFragment] =
-        MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
+        // An applied fragment that selects all group ids that satisfy `filterPredicate`
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
 
-      // Update the specified groups and then return a query for the affected groups (or an error)
-      idSelect.flatTraverse { which =>
-        import GroupService.UpdateGroupsResponse
-        groupService.use(_.updateGroups(input.SET, which)).map {
-          case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
-          case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
+        // Update the specified groups and then return a query for the affected groups (or an error)
+        idSelect.flatTraverse { which =>
+          import GroupService.UpdateGroupsResponse
+          groupService.updateGroups(input.SET, which).map {
+            case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
+            case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
+          }
         }
-      }
 
+      }
     }
 
 }
