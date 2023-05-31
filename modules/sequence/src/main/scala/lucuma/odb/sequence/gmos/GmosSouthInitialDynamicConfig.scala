@@ -11,8 +11,8 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.model.NonNegDuration
-import lucuma.core.model.sequence.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.GmosCcdMode
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.util.TimeSpan
 
 trait GmosSouthInitialDynamicConfig {

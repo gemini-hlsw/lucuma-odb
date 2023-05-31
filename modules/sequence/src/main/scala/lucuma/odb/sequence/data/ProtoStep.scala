@@ -3,24 +3,59 @@
 
 package lucuma.odb.sequence.data
 
+import cats.Applicative
+import cats.Eq
+import cats.Eval
+import cats.Traverse
+import cats.syntax.functor.*
+import lucuma.core.enums.Breakpoint
+import lucuma.core.enums.ObserveClass
 import lucuma.core.model.sequence.StepConfig
 import monocle.Focus
 import monocle.Lens
 
-/**
- * The complete instrument and step configuration, without a step id.
- */
-final case class ProtoStep[D](
-  instrumentConfig: D,
-  stepConfig:       StepConfig
+case class ProtoStep[A](
+  value:        A,
+  stepConfig:   StepConfig,
+  observeClass: ObserveClass,
+  breakpoint:   Breakpoint = Breakpoint.Disabled
 )
 
 object ProtoStep {
 
-  def instrumentConfig[D]: Lens[ProtoStep[D], D] =
-    Focus[ProtoStep[D]](_.instrumentConfig)
+  /** @group Optics */
+  def value[A]: Lens[ProtoStep[A], A] =
+    Focus[ProtoStep[A]](_.value)
 
-  def stepConfig[D]: Lens[ProtoStep[D], StepConfig] =
-    Focus[ProtoStep[D]](_.stepConfig)
+  /** @group Optics */
+  def stepConfig[A]: Lens[ProtoStep[A], StepConfig] =
+    Focus[ProtoStep[A]](_.stepConfig)
+
+  /** @group Optics */
+  def observeClass[A]: Lens[ProtoStep[A], ObserveClass] =
+    Focus[ProtoStep[A]](_.observeClass)
+
+  /** @group Optics */
+  def breakpoint[A]: Lens[ProtoStep[A], Breakpoint] =
+    Focus[ProtoStep[A]](_.breakpoint)
+
+  given [A](using Eq[A]): Eq[ProtoStep[A]] =
+    Eq.by { x => (
+      x.value,
+      x.stepConfig,
+      x.observeClass,
+      x.breakpoint
+    )}
+
+  given Traverse[ProtoStep] with {
+    override def traverse[G[_]: Applicative, A, B](fa: ProtoStep[A])(f: A => G[B]): G[ProtoStep[B]] =
+      f(fa.value).map(ProtoStep(_, fa.stepConfig, fa.observeClass, fa.breakpoint))
+
+    override def foldLeft[A, B](fa:  ProtoStep[A], b:  B)(f:  (B, A) => B): B =
+      f(b, fa.value)
+
+    override def foldRight[A, B](fa:  ProtoStep[A], lb:  Eval[B])(f:  (A, Eval[B]) => Eval[B]): Eval[B] =
+      f(fa.value, lb)
+  }
 
 }
