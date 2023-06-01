@@ -98,6 +98,7 @@ lazy val service = project
   .enablePlugins(NoPublishPlugin, JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
+    projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     libraryDependencies ++= Seq(
       "ch.qos.logback" %  "logback-classic"                    % logbackVersion,
       "com.monovore"   %% "decline-effect"                     % declineVersion,
