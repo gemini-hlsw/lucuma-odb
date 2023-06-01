@@ -145,6 +145,7 @@ object OdbMapping {
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonsiderealMapping[F]
+          with ObsAttachmentFileExtMapping[F]
           with ObsAttachmentMapping[F]
           with ObsAttachmentTypeMetaMapping[F]
           with ObservationEditMapping[F]
@@ -238,6 +239,7 @@ object OdbMapping {
               MutationMapping,
               NonsiderealMapping,
               ObsAttachmentMapping,
+              ObsAttachmentFileExtMapping,
               ObsAttachmentTypeMetaMapping,
               ObservationEditMapping,
               ObservationMapping,
