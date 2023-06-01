@@ -65,6 +65,7 @@ lazy val schema =
 
 lazy val sequence = project
   .in(file("modules/sequence"))
+  .disablePlugins(MimaPlugin, HeaderPlugin)
   .dependsOn(schema.jvm % "compile->test")
   .settings(
     name := "lucuma-odb-sequence",
@@ -76,6 +77,7 @@ lazy val sequence = project
 
 lazy val smartgcal = project
   .in(file("modules/smartgcal"))
+  .disablePlugins(MimaPlugin, HeaderPlugin)
   .settings(
     name := "lucuma-odb-smartgcal",
     libraryDependencies ++= Seq(
