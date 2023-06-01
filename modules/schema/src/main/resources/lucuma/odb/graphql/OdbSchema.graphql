@@ -2880,11 +2880,17 @@ input ObsAttachmentPropertiesInput {
   checked: Boolean
 }
 
+# Allowed file extension by obsAttachmentTypeMeta
+type ObsAttachmentFileExt {
+  fileExtension: NonEmptyString!
+}
+
 # Metadata for `enum ObsAttachmentType`
 type ObsAttachmentTypeMeta {
-  tag:        ObsAttachmentType!
-  shortName:  String!
-  longName:	  String!
+  tag:            ObsAttachmentType!
+  shortName:      String!
+  longName:       String!
+  fileExtensions: [ObsAttachmentFileExt!]!
 }
 
 # Brightness bands

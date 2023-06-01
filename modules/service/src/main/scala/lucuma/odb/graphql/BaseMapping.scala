@@ -82,6 +82,7 @@ trait BaseMapping[F[_]]
   lazy val NonNegShortType                     = schema.ref("NonNegShort")
   lazy val NonsiderealType                     = schema.ref("Nonsidereal")
   lazy val ObsActiveStatusType                 = schema.ref("ObsActiveStatus")
+  lazy val ObsAttachmentFileExtType            = schema.ref("ObsAttachmentFileExt")
   lazy val ObsAttachmentIdType                 = schema.ref("ObsAttachmentId")
   lazy val ObsAttachmentType                   = schema.ref("ObsAttachment")
   lazy val ObsAttachmentTypeMetaType           = schema.ref("ObsAttachmentTypeMeta")

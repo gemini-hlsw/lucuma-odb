@@ -204,25 +204,35 @@ class obsAttachments extends AttachmentsSuite {
     )
   }
 
-  val file1A           = TestAttachment("file1", "finder", "A description".some, "Hopeful")
-  val file1B           = TestAttachment("file1", "mos_mask", None, "New contents")
-  val file1Empty       = TestAttachment("file1", "pre_imaging", "Thing".some, "")
-  val file1MissingType = TestAttachment("file1", "", "Whatever".some, "It'll never make it")
-  val file1InvalidType = TestAttachment("file1", "NotAType", none, "It'll never make it")
-  val file2            = TestAttachment("file2", "mos_mask", "Masked".some, "Zorro")
-  val fileWithPath     = TestAttachment("this/file.txt", "pre_imaging", none, "Doesn't matter")
-  val missingFileName  = TestAttachment("", "finder", none, "Doesn't matter")
-  val file3            = TestAttachment("different", "mos_mask", "Unmatching file name".some, "Something different")
+  val mosMask1A         = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful")
+  val mosMask1B         = TestAttachment("file1.fits", "mos_mask", None, "New contents")
+  val mosMask2          = TestAttachment("file2.fits", "mos_mask", "Masked".some, "Zorro")
+  val finderPNG         = TestAttachment("different.png", "finder", "Unmatching file name".some, "Something different")
+  val finderJPG         = TestAttachment("finder.jpg", "finder", "jpg file".some, "A finder JPG file")
+  val preImaging        = TestAttachment("pi.fits", "pre_imaging", none, "A pre imaging file")
+  val emptyFile         = TestAttachment("file1.fits", "mos_mask", "Thing".some, "")
+  val missingType       = TestAttachment("file1.fits", "", "Whatever".some, "It'll never make it")
+  val invalidType       = TestAttachment("file1.fits", "NotAType", none, "It'll never make it")
+  val missingFileName   = TestAttachment("", "finder", none, "Doesn't matter")
+  val fileWithPath      = TestAttachment("this/file.jpg", "finder", none, "Doesn't matter")
+  val missingFinderExt  = TestAttachment("file", "finder", none, "Doesn't matter")
+  val emptyMosMaskExt   = TestAttachment("file.", "mos_mask", none, "Doesn't matter")
+  val invalidFinderExt  = TestAttachment("file.fits", "finder", none, "Doesn't matter")
+  val invalidMosMaskExt = TestAttachment("file.png", "mos_mask", none, "Doesn't matter")
+  val invalidPreImgExt  = TestAttachment("file.jpg", "pre_imaging", none, "Doesn't matter")
+
+  val invalidFitsMsg = "Invalid file. Must be a FITS file."
+  val invalidFinderMsg = "Invalid file. Must be one of: JPG, PNG"
 
   test("successful insert, download and delete") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(file1A.content)
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
       _      <- deleteAttachment(pi, pid, aid).expectOk
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid)
@@ -233,76 +243,85 @@ class obsAttachments extends AttachmentsSuite {
   test("can download via presigned url") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
       url    <- getPresignedUrl(pi, pid, aid).toNonEmptyString
-      _      <- getViaPresignedUrl(url).expectBody(file1A.content)
+      _      <- getViaPresignedUrl(url).expectBody(mosMask1A.content)
     } yield ()
   }
 
   test("successful insert, download and delete of multiple files") {
     for {
       pid  <- createProgramAs(pi)
-      aid1 <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid1 <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       pth1 <- getRemotePathFromDb(aid1)
       fk1   = awsConfig.fileKey(pth1)
-      _    <- assertS3(fk1, file1A.content)
-      aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
+      _    <- assertS3(fk1, mosMask1A.content)
+      aid2 <- insertAttachment(pi, pid, mosMask2).toAttachmentId
       pth2 <- getRemotePathFromDb(aid2)
       fk2   = awsConfig.fileKey(pth2)
-      _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsGql(pi, pid, (aid2, file2), (aid1, file1A))
-      _    <- getAttachment(pi, pid, aid1).expectBody(file1A.content)
-      _    <- getAttachment(pi, pid, aid2).expectBody(file2.content)
+      _    <- assertS3(fk2, mosMask2.content)
+      _    <- assertAttachmentsGql(pi, pid, (aid2, mosMask2), (aid1, mosMask1A))
+      _    <- getAttachment(pi, pid, aid1).expectBody(mosMask1A.content)
+      _    <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
       _    <- deleteAttachment(pi, pid, aid1).expectOk
       _    <- getAttachment(pi, pid, aid1).withExpectation(Status.NotFound)
-      _    <- getAttachment(pi, pid, aid2).expectBody(file2.content)
+      _    <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
       _    <- assertS3NotThere(fk1)
-      _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsGql(pi, pid, (aid2, file2))
+      _    <- assertS3(fk2, mosMask2.content)
+      _    <- assertAttachmentsGql(pi, pid, (aid2, mosMask2))
+    } yield ()
+  }
+
+  test("successful insert of other file types/extensions") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, finderJPG).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, preImaging).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, finderJPG), (aid2, preImaging))
     } yield ()
   }
 
   test("update with different name is successful") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(file1A.content)
-      _      <- updateAttachment(pi, pid, aid, file2).expectOk
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
+      _      <- updateAttachment(pi, pid, aid, mosMask2).expectOk
       path2  <- getRemotePathFromDb(aid)
       _       = assertNotEquals(path, path2)
       fk2     = awsConfig.fileKey(path2)
-      _      <- assertS3(fk2, file2.content)
+      _      <- assertS3(fk2, mosMask2.content)
       _      <- assertS3NotThere(fileKey)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file2.copy(attachmentType = file1A.attachmentType)))
-      _      <- getAttachment(pi, pid, aid).expectBody(file2.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask2.copy(attachmentType = mosMask1A.attachmentType)))
+      _      <- getAttachment(pi, pid, aid).expectBody(mosMask2.content)
     } yield ()
   }
 
   test("update with same name is successful") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(file1A.content)
-      _      <- updateAttachment(pi, pid, aid, file1B).expectOk
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
+      _      <- updateAttachment(pi, pid, aid, mosMask1B).expectOk
       path2  <- getRemotePathFromDb(aid)
       _       = assertNotEquals(path, path2)
       fk2     = awsConfig.fileKey(path2)
-      _      <- assertS3(fk2, file1B.content)
+      _      <- assertS3(fk2, mosMask1B.content)
       _      <- assertS3NotThere(fileKey)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1B.copy(attachmentType = file1A.attachmentType)))
-      _      <- getAttachment(pi, pid, aid).expectBody(file1B.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1B.copy(attachmentType = mosMask1A.attachmentType)))
+      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1B.content)
     } yield ()
   }
 
@@ -310,22 +329,22 @@ class obsAttachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid  = ObsAttachment.Id.fromLong(100L).get
-      _   <- updateAttachment(pi, pid, aid, file1A).withExpectation(Status.NotFound)
+      _   <- updateAttachment(pi, pid, aid, mosMask1A).withExpectation(Status.NotFound)
     } yield ()
   }
 
   test("insert with duplicate name is a BadRequest") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
-      _      <- insertAttachment(pi, pid, file1B).withExpectation(Status.BadRequest, "Duplicate file name")
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(file1A.content)
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+      _      <- insertAttachment(pi, pid, mosMask1B).withExpectation(Status.BadRequest, "Duplicate file name")
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
     } yield ()
   }
 
@@ -333,44 +352,44 @@ class obsAttachments extends AttachmentsSuite {
   test("update with duplicate name is a BadRequest") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      aid2   <- insertAttachment(pi, pid, file2).toAttachmentId
+      aid2   <- insertAttachment(pi, pid, mosMask2).toAttachmentId
       path2  <- getRemotePathFromDb(aid2)
       fk2     = awsConfig.fileKey(path2)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A), (aid2, file2))
-      _      <- updateAttachment(pi, pid, aid2, file1B).withExpectation(Status.BadRequest, "Duplicate file name")
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A), (aid2, file2))
-      _      <- getAttachment(pi, pid, aid2).expectBody(file2.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A), (aid2, mosMask2))
+      _      <- updateAttachment(pi, pid, aid2, mosMask1B).withExpectation(Status.BadRequest, "Duplicate file name")
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A), (aid2, mosMask2))
+      _      <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
     } yield ()
   }
 
   test("empty file update fails, doesn't overwrite previous") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
-      _      <- updateAttachment(pi, pid, aid, file1Empty).withExpectation(Status.InternalServerError)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(pi, pid, (aid, file1A))
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+      _      <- updateAttachment(pi, pid, aid, emptyFile).withExpectation(Status.InternalServerError)
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
     } yield ()
   }
 
   test("invalid attachment type insert is BadRequest") {
     for {
       pid <- createProgramAs(pi)
-      _   <- insertAttachment(pi, pid, file1InvalidType).withExpectation(Status.BadRequest, "Invalid attachment type")
+      _   <- insertAttachment(pi, pid, invalidType).withExpectation(Status.BadRequest, "Invalid attachment type")
     } yield ()
   }
 
   test("empty attachment type insert is BadRequest") {
     for {
       pid <- createProgramAs(pi)
-      _   <- insertAttachment(pi, pid, file1MissingType).withExpectation(Status.BadRequest, "Invalid attachment type")
+      _   <- insertAttachment(pi, pid, missingType).withExpectation(Status.BadRequest, "Invalid attachment type")
     } yield ()
   }
 
@@ -384,7 +403,7 @@ class obsAttachments extends AttachmentsSuite {
   test("update with empty file name is BadRequest") {
     for {
       pid <- createProgramAs(pi)
-      aid <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       _   <- updateAttachment(pi, pid, aid, missingFileName).withExpectation(Status.BadRequest, "File name is required")
     } yield ()
   }
@@ -399,8 +418,83 @@ class obsAttachments extends AttachmentsSuite {
   test("file name with path update fails") {
     for {
       pid <- createProgramAs(pi)
-      aid <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       _   <- updateAttachment(pi, pid, aid, fileWithPath).withExpectation(Status.BadRequest, "File name cannot include a path")
+    } yield ()
+  }
+
+  test("file name with missing extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
+    } yield ()
+  }
+
+  test("file name with missing extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, finderJPG).toAttachmentId
+      _   <- updateAttachment(pi, pid, aid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
+    } yield ()
+  }
+
+  test("file name with empty extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, emptyMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+    } yield ()
+  }
+
+  test("file name with empty extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      _   <- updateAttachment(pi, pid, aid, emptyMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+    } yield ()
+  }
+
+  test("finder file with invalid extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, invalidFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
+    } yield ()
+  }
+
+  test("finder file with invalid extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, finderJPG).toAttachmentId
+      _   <- updateAttachment(pi, pid, aid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
+    } yield ()
+  }
+
+  test("mos_mask file with invalid extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, invalidMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+    } yield ()
+  }
+
+  test("mos_mask file with invalid extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      _   <- updateAttachment(pi, pid, aid, invalidMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+    } yield ()
+  }
+
+  test("pre_imaging file with invalid extension insert fails") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, invalidPreImgExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+    } yield ()
+  }
+
+  test("pre_imaging file with invalid extension update fails") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, preImaging).toAttachmentId
+      _   <- updateAttachment(pi, pid, aid, invalidPreImgExt).withExpectation(Status.BadRequest, invalidFitsMsg)
     } yield ()
   }
 
@@ -408,8 +502,8 @@ class obsAttachments extends AttachmentsSuite {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      _    <- insertAttachment(pi, pid2, file1A).withExpectation(Status.Forbidden)
-      _    <- insertAttachment(pi2, pid1, file1A).withExpectation(Status.Forbidden)
+      _    <- insertAttachment(pi, pid2, mosMask1A).withExpectation(Status.Forbidden)
+      _    <- insertAttachment(pi2, pid1, mosMask1A).withExpectation(Status.Forbidden)
       _    <- assertAttachmentsGql(pi, pid1)
       _    <- assertAttachmentsGql(pi2, pid2)
     } yield ()
@@ -418,8 +512,8 @@ class obsAttachments extends AttachmentsSuite {
   test("pi can only update their own programs") {
     for {
       pid <- createProgramAs(pi)
-      aid <- insertAttachment(pi, pid, file1A).toAttachmentId
-      _   <- updateAttachment(pi2, pid, aid, file2).withExpectation(Status.Forbidden)
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      _   <- updateAttachment(pi2, pid, aid, mosMask2).withExpectation(Status.Forbidden)
     } yield ()
   }
 
@@ -427,10 +521,10 @@ class obsAttachments extends AttachmentsSuite {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      aid1 <- insertAttachment(pi, pid1, file1A).toAttachmentId
-      aid2 <- insertAttachment(pi2, pid2, file1B).toAttachmentId
-      _    <- assertAttachmentsGql(pi, pid1, (aid1, file1A))
-      _    <- assertAttachmentsGql(pi2, pid2, (aid2, file1B))
+      aid1 <- insertAttachment(pi, pid1, mosMask1A).toAttachmentId
+      aid2 <- insertAttachment(pi2, pid2, mosMask1B).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, mosMask1A))
+      _    <- assertAttachmentsGql(pi2, pid2, (aid2, mosMask1B))
     } yield ()
   }
 
@@ -438,16 +532,16 @@ class obsAttachments extends AttachmentsSuite {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      aid1 <- insertAttachment(pi, pid1, file1A).toAttachmentId
+      aid1 <- insertAttachment(pi, pid1, mosMask1A).toAttachmentId
       pth1 <- getRemotePathFromDb(aid1)
       fk1   = awsConfig.fileKey(pth1)
-      _    <- assertS3(fk1, file1A.content)
-      _    <- assertAttachmentsGql(pi, pid1, (aid1, file1A))
-      aid2 <- insertAttachment(pi2, pid2, file2).toAttachmentId
+      _    <- assertS3(fk1, mosMask1A.content)
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, mosMask1A))
+      aid2 <- insertAttachment(pi2, pid2, mosMask2).toAttachmentId
       pth2 <- getRemotePathFromDb(aid2)
       fk2   = awsConfig.fileKey(pth2)
-      _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsGql(pi2, pid2, (aid2, file2))
+      _    <- assertS3(fk2, mosMask2.content)
+      _    <- assertAttachmentsGql(pi2, pid2, (aid2, mosMask2))
       _    <- getAttachment(pi, pid2, aid2).withExpectation(Status.Forbidden)
       _    <- getAttachment(pi2, pid1, aid1).withExpectation(Status.Forbidden)
     } yield ()
@@ -457,16 +551,16 @@ class obsAttachments extends AttachmentsSuite {
     for {
       pid1 <- createProgramAs(pi)
       pid2 <- createProgramAs(pi2)
-      aid1 <- insertAttachment(pi, pid1, file1A).toAttachmentId
+      aid1 <- insertAttachment(pi, pid1, mosMask1A).toAttachmentId
       pth1 <- getRemotePathFromDb(aid1)
       fk1   = awsConfig.fileKey(pth1)
-      _    <- assertS3(fk1, file1A.content)
-      _    <- assertAttachmentsGql(pi, pid1, (aid1, file1A))
-      aid2 <- insertAttachment(pi2, pid2, file2).toAttachmentId
+      _    <- assertS3(fk1, mosMask1A.content)
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, mosMask1A))
+      aid2 <- insertAttachment(pi2, pid2, mosMask2).toAttachmentId
       pth2 <- getRemotePathFromDb(aid2)
       fk2   = awsConfig.fileKey(pth2)
-      _    <- assertS3(fk2, file2.content)
-      _    <- assertAttachmentsGql(pi2, pid2, (aid2, file2))
+      _    <- assertS3(fk2, mosMask2.content)
+      _    <- assertAttachmentsGql(pi2, pid2, (aid2, mosMask2))
       _    <- deleteAttachment(pi, pid2, aid2).withExpectation(Status.Forbidden)
       _    <- deleteAttachment(pi2, pid1, aid1).withExpectation(Status.Forbidden)
     } yield ()
@@ -475,17 +569,17 @@ class obsAttachments extends AttachmentsSuite {
   test("service user can manage any program's attachments") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(service, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(service, pid, mosMask1A).toAttachmentId
       path   <- getRemotePathFromDb(aid)
       fileKey = awsConfig.fileKey(path)
-      _      <- assertS3(fileKey, file1A.content)
-      _      <- assertAttachmentsGql(service, pid, (aid, file1A))
-      _      <- getAttachment(service, pid, aid).expectBody(file1A.content)
-      _      <- updateAttachment(service, pid, aid, file2).expectOk
+      _      <- assertS3(fileKey, mosMask1A.content)
+      _      <- assertAttachmentsGql(service, pid, (aid, mosMask1A))
+      _      <- getAttachment(service, pid, aid).expectBody(mosMask1A.content)
+      _      <- updateAttachment(service, pid, aid, mosMask2).expectOk
       path2  <- getRemotePathFromDb(aid)
       _       = assertNotEquals(path, path2)
       fk2     = awsConfig.fileKey(path2)
-      _      <- assertS3(fk2, file2.content)
+      _      <- assertS3(fk2, mosMask2.content)
       _      <- assertS3NotThere(fileKey)
       _      <- deleteAttachment(service, pid, aid).expectOk
       _      <- assertS3NotThere(fk2)
@@ -496,9 +590,9 @@ class obsAttachments extends AttachmentsSuite {
   test("update single attachment metadata: description") {
     for {
       pid    <- createProgramAs(pi)
-      aid    <- insertAttachment(service, pid, file1A).toAttachmentId
+      aid    <- insertAttachment(service, pid, mosMask1A).toAttachmentId
       newDesc = "New description"
-      newTa   = file1A.copy(description = newDesc.some)
+      newTa   = mosMask1A.copy(description = newDesc.some)
       _      <- updateAttachmentsGql(pi,
                                      pid,
                                      WHERE = s"""{ id: { EQ: "$aid"}}""",
@@ -511,8 +605,8 @@ class obsAttachments extends AttachmentsSuite {
   test("update single attachment metadata: unset description") {
     for {
       pid  <- createProgramAs(pi)
-      aid  <- insertAttachment(pi, pid, file1A).toAttachmentId
-      newTa = file1A.copy(description = none)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      newTa = mosMask1A.copy(description = none)
       _    <- updateAttachmentsGql(pi,
                                    pid,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
@@ -525,8 +619,8 @@ class obsAttachments extends AttachmentsSuite {
   test("update single attachment metadata: checked") {
     for {
       pid  <- createProgramAs(pi)
-      aid  <- insertAttachment(pi, pid, file1A).toAttachmentId
-      newTa = file1A.copy(checked = true)
+      aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      newTa = mosMask1A.copy(checked = true)
       _    <- updateAttachmentsGql(pi,
                                    pid,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
@@ -539,12 +633,12 @@ class obsAttachments extends AttachmentsSuite {
   test("bulk update attachments metadata: by name") {
     for {
       pid    <- createProgramAs(pi)
-      aid1   <- insertAttachment(pi, pid, file1A).toAttachmentId
-      aid2   <- insertAttachment(pi, pid, file2).toAttachmentId
-      aid3   <- insertAttachment(pi, pid, file3).toAttachmentId
+      aid1   <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2   <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      aid3   <- insertAttachment(pi, pid, finderPNG).toAttachmentId
       newDesc = "updated"
-      newTa1  = file1A.copy(description = newDesc.some, checked = true)
-      newTa2  = file2.copy(description = newDesc.some, checked = true)
+      newTa1  = mosMask1A.copy(description = newDesc.some, checked = true)
+      newTa2  = mosMask2.copy(description = newDesc.some, checked = true)
       _      <- updateAttachmentsGql(pi,
                                      pid,
                                      WHERE = s"""{ fileName: { LIKE: "file%"}}""",
@@ -558,11 +652,11 @@ class obsAttachments extends AttachmentsSuite {
   test("bulk update attachments metadata: by ids") {
     for {
       pid   <- createProgramAs(pi)
-      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
-      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
-      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
-      newTa1 = file1A.copy(description = none, checked = true)
-      newTa3 = file3.copy(description = none, checked = true)
+      aid1  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      newTa1 = mosMask1A.copy(description = none, checked = true)
+      newTa3 = finderPNG.copy(description = none, checked = true)
       _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ id: { IN: ["$aid1", "$aid3"]}}""",
@@ -576,10 +670,10 @@ class obsAttachments extends AttachmentsSuite {
   test("update attachments metadata: by checked") {
     for {
       pid   <- createProgramAs(pi)
-      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
-      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
-      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
-      ta3c   = file3.copy(checked = true)
+      aid1  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      ta3c   = finderPNG.copy(checked = true)
       _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ id: { EQ: "$aid3"}}""",
@@ -599,11 +693,11 @@ class obsAttachments extends AttachmentsSuite {
   test("update attachments metadata: by decription") {
     for {
       pid   <- createProgramAs(pi)
-      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
-      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
-      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
-      newTa2 = file2.copy(description = none)
-      newTa3 = file3.copy(description = none)
+      aid1  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      newTa2 = mosMask2.copy(description = none)
+      newTa3 = finderPNG.copy(description = none)
       _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ description: { NLIKE: "%script%" }}""",
@@ -617,10 +711,10 @@ class obsAttachments extends AttachmentsSuite {
   test("update attachments metadata: by null decription") {
     for {
       pid   <- createProgramAs(pi)
-      aid1  <- insertAttachment(pi, pid, file1B).toAttachmentId
-      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
-      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
-      newTa1 = file1B.copy(description = "No longer null!".some)
+      aid1  <- insertAttachment(pi, pid, mosMask1B).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      newTa1 = mosMask1B.copy(description = "No longer null!".some)
       _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ description: { IS_NULL: true }}""",
@@ -633,17 +727,17 @@ class obsAttachments extends AttachmentsSuite {
   test("update attachments metadata: by attachment type") {
     for {
       pid   <- createProgramAs(pi)
-      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
-      aid2  <- insertAttachment(pi, pid, file2).toAttachmentId
-      aid3  <- insertAttachment(pi, pid, file3).toAttachmentId
-      newTa2 = file2.copy(description = "Found".some)
-      newTa3 = file3.copy(description = "Found".some)
+      aid1  <- insertAttachment(pi, pid, mosMask1B).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      _     <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      newTa1 = mosMask1B.copy(description = "Found".some)
+      newTa2 = mosMask2.copy(description = "Found".some)
       _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ attachmentType: { EQ: MOS_MASK }}""",
                                     SET = """{ description: "Found" }""",
-                                    (aid2, newTa2),
-                                    (aid3, newTa3)
+                                    (aid1, newTa1),
+                                    (aid2, newTa2)
                )
     } yield ()
   }
@@ -651,7 +745,7 @@ class obsAttachments extends AttachmentsSuite {
   test("update attachments metadata: no matches") {
     for {
       pid   <- createProgramAs(pi)
-      aid1  <- insertAttachment(pi, pid, file1A).toAttachmentId
+      aid1  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       _     <- updateAttachmentsGql(pi,
                                     pid,
                                     WHERE = s"""{ id: { NEQ: "$aid1" }}""",

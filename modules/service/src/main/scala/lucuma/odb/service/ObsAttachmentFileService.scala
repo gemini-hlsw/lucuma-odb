@@ -3,7 +3,7 @@
 
 package lucuma.odb.service
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -62,7 +62,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
   import AttachmentFileService.AttachmentException
   import AttachmentException.*
 
-  def instantiate[F[_]: MonadCancelThrow: Trace: UUIDGen](
+  def instantiate[F[_]: Concurrent: Trace: UUIDGen](
     s3FileSvc: S3FileService[F],
   )(using Services[F]): ObsAttachmentFileService[F] = {
 
@@ -75,8 +75,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           pg.unique(af.argument)
         }
         .flatMap(isValid =>
-          if (isValid) MonadCancelThrow[F].unit
-          else MonadCancelThrow[F].raiseError(InvalidRequest("Invalid attachment type"))
+          if (isValid) Concurrent[F].unit
+          else Concurrent[F].raiseError(InvalidRequest("Invalid attachment type"))
         )
     }
 
@@ -98,7 +98,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
             pg.unique(af.argument)
               .recoverWith {
                 case SqlState.UniqueViolation(_) => 
-                  MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
+                  Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -120,12 +120,12 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
-                if (b) MonadCancelThrow[F].unit 
-                else MonadCancelThrow[F].raiseError(FileNotFound)
+                if (b) Concurrent[F].unit 
+                else Concurrent[F].raiseError(FileNotFound)
               )
               .recoverWith {
                 case SqlState.UniqueViolation(_) => 
-                  MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
+                  Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
       }
@@ -144,8 +144,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => MonadCancelThrow[F].raiseError(FileNotFound)
-                case Some(s) => MonadCancelThrow[F].pure(s)
+                case None    => Concurrent[F].raiseError(FileNotFound)
+                case Some(s) => Concurrent[F].pure(s)
               }
           )
       }
@@ -164,8 +164,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           .use(pg =>
             pg.option(af.argument)
               .flatMap {
-                case None    => MonadCancelThrow[F].raiseError(FileNotFound)
-                case Some(s) => MonadCancelThrow[F].pure(s)
+                case None    => Concurrent[F].raiseError(FileNotFound)
+                case Some(s) => Concurrent[F].pure(s)
               }
           )
       }
@@ -179,9 +179,34 @@ object ObsAttachmentFileService extends AttachmentFileService {
         .use(pg =>
           pg.option(af.argument)
             .flatMap {
-              case None    => MonadCancelThrow[F].unit
-              case Some(_) => MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
+              case None    => Concurrent[F].unit
+              case Some(_) => Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
             }
+        )
+    }
+
+    def validateFileExtensionByType(attachmentType: Tag, fileName: FileName): F[Unit] = {
+      val af = Statements.getFileExtensions(attachmentType)
+      val stmt = af.fragment.query(text_nonempty)
+
+      session
+        .prepareR(stmt)
+        .use(pq =>
+          pq.stream(af.argument, chunkSize = 1024).compile.toList
+        )
+        .flatMap(allowedExtensions => checkExtension(fileName, allowedExtensions))
+    }
+
+    def validateFileExtensionById(attachmentId: ObsAttachment.Id, fileName: FileName): F[Unit] = {
+      val af = Statements.getFileExtensionsById(attachmentId)
+      val stmt = af.fragment.query(text_nonempty)
+
+      session
+        .prepareR(stmt)
+        .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+        .flatMap(allowedExtensions =>
+          if (allowedExtensions.isEmpty) Concurrent[F].raiseError(FileNotFound)
+          else checkExtension(fileName, allowedExtensions)
         )
     }
 
@@ -217,12 +242,13 @@ object ObsAttachmentFileService extends AttachmentFileService {
         FileName
           .fromString(fileName)
           .fold(
-            e  => MonadCancelThrow[F].raiseError(e),
+            e  => Concurrent[F].raiseError(e),
             fn =>
               for {
                 _      <- services.transactionally {
                   checkAccess(session, user, programId) >>
                   checkAttachmentType(attachmentType) >>
+                  validateFileExtensionByType(attachmentType, fn) >>
                   checkForDuplicateName(programId, fn, none)
                 }
                 uuid   <- UUIDGen[F].randomUUID
@@ -243,11 +269,12 @@ object ObsAttachmentFileService extends AttachmentFileService {
         FileName
           .fromString(fileName)
           .fold(
-            e  => MonadCancelThrow[F].raiseError(e),
+            e  => Concurrent[F].raiseError(e),
             fn =>
               for {
                 oldPath <- services.transactionally {
                   checkAccess(session, user, programId) >>
+                  validateFileExtensionById(attachmentId, fn) >>
                   checkForDuplicateName(programId, fn, attachmentId.some) >>
                   getAttachmentRemotePathFromDB(user, programId, attachmentId)
                 }
@@ -386,5 +413,20 @@ object ObsAttachmentFileService extends AttachmentFileService {
       sql"""
         EXISTS (select c_tag from t_obs_attachment_type where c_tag = $tag)
       """.apply(attachmentType)
+
+    def getFileExtensions(attachmentType: Tag): AppliedFragment =
+      sql"""
+        SELECT c_file_extension
+        FROM t_obs_attachment_file_ext
+        WHERE c_attachment_type = $tag
+      """.apply(attachmentType)
+
+    def getFileExtensionsById(attachmentId: ObsAttachment.Id): AppliedFragment =
+      sql"""
+        SELECT e.c_file_extension
+        FROM t_obs_attachment_file_ext e
+        JOIN t_obs_attachment a ON e.c_attachment_type = a.c_attachment_type
+        WHERE a.c_obs_attachment_id = $obs_attachment_id
+      """.apply(attachmentId)
   }
 }
