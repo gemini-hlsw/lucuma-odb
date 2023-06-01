@@ -5,6 +5,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import lucuma.core.enums.GmosSouthDetector
+import lucuma.core.enums.GmosSouthStageMode
+import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
 
@@ -13,12 +16,20 @@ object GmosSouthStaticInput {
   val Binding: Matcher[GmosSouth] =
     ObjectFieldsBinding.rmap {
       case List(
-        GmosSouthStageModeBinding("stageMode", rStageMode),
-        GmosSouthDetectorBinding("detector", rDetector),
-        MosPreImagingBinding("mosPreImaging", rPreImaging),
+        GmosSouthStageModeBinding.Option("stageMode", rStageMode),
+        GmosSouthDetectorBinding.Option("detector", rDetector),
+        MosPreImagingBinding.Option("mosPreImaging", rPreImaging),
         GmosNodAndShuffleInput.Binding.Option("nodAndShuffle", rNodAndShuffle)
       ) =>
-        (rStageMode, rDetector, rPreImaging, rNodAndShuffle).parMapN(GmosSouth(_, _, _, _))
+        (rStageMode, rDetector, rPreImaging, rNodAndShuffle)
+          .parMapN { (stageMode, detector, preImage, ns) =>
+            GmosSouth(
+              stageMode.getOrElse(GmosSouthStageMode.FollowXyz),
+              detector.getOrElse(GmosSouthDetector.Hamamatsu),
+              preImage.getOrElse(MosPreImaging.IsNotMosPreImaging),
+              ns
+            )
+          }
     }
 
 }

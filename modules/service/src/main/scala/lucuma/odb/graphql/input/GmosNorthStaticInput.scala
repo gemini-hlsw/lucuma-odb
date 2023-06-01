@@ -5,6 +5,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import lucuma.core.enums.GmosNorthDetector
+import lucuma.core.enums.GmosNorthStageMode
+import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.odb.graphql.binding._
 
@@ -13,12 +16,20 @@ object GmosNorthStaticInput {
   val Binding: Matcher[GmosNorth] =
     ObjectFieldsBinding.rmap {
       case List(
-        GmosNorthStageModeBinding("stageMode", rStageMode), //.map(_.getOrElse(GmosNorthStageMode.FollowXy)),
-        GmosNorthDetectorBinding("detector", rDetector),
-        MosPreImagingBinding("mosPreImaging", rPreImaging),
+        GmosNorthStageModeBinding.Option("stageMode", rStageMode),
+        GmosNorthDetectorBinding.Option("detector", rDetector),
+        MosPreImagingBinding.Option("mosPreImaging", rPreImaging),
         GmosNodAndShuffleInput.Binding.Option("nodAndShuffle", rNodAndShuffle)
       ) =>
-        (rStageMode, rDetector, rPreImaging, rNodAndShuffle).parMapN(GmosNorth(_, _, _, _))
+        (rStageMode, rDetector, rPreImaging, rNodAndShuffle)
+          .parMapN { (stageMode, detector, preImage, ns) =>
+            GmosNorth(
+              stageMode.getOrElse(GmosNorthStageMode.FollowXy),
+              detector.getOrElse(GmosNorthDetector.Hamamatsu),
+              preImage.getOrElse(MosPreImaging.IsNotMosPreImaging),
+              ns
+            )
+          }
     }
 
 } 

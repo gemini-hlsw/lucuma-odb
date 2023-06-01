@@ -1024,19 +1024,19 @@ GMOS North static configuration input parameters
 """
 input GmosNorthStaticInput {
   """
-  GMOS North Stage Mode
+  GMOS North Stage Mode (default to FOLLOW_XY)
   """
-  stageMode: GmosNorthStageMode = FOLLOW_XY
+  stageMode: GmosNorthStageMode
 
   """
-  GMOS North Detector option
+  GMOS North Detector option (defaults to HAMAMATSU)
   """
-  detector: GmosNorthDetector = HAMAMATSU
+  detector: GmosNorthDetector
 
   """
-  Whether this is a MOS pre-imaging observation
+  Whether this is a MOS pre-imaging observation (defaults to IS_NOT_MOS_PRE_IMAGING)
   """
-  mosPreImaging: MosPreImaging = IS_NOT_MOS_PRE_IMAGING
+  mosPreImaging: MosPreImaging
 
   """
   GMOS Nod And Shuffle configuration
@@ -1423,19 +1423,19 @@ GMOS South static configuration input parameters
 input GmosSouthStaticInput {
 
   """
-  GMOS South Stage Mode
+  GMOS South Stage Mode (defaults to FOLLOW_XYZ)
   """
-  stageMode: GmosSouthStageMode = FOLLOW_XY
+  stageMode: GmosSouthStageMode
 
   """
-  GMOS South Detector option
+  GMOS South Detector option (defaults to HAMAMATSU)
   """
-  detector: GmosSouthDetector = HAMAMATSU
+  detector: GmosSouthDetector
 
   """
-  Whether this is a MOS pre-imaging observation
+  Whether this is a MOS pre-imaging observation (defaults to IS_NOT_MOS_PRE_IMAGING)
   """
-  mosPreImaging: MosPreImaging = IS_NOT_MOS_PRE_IMAGING
+  mosPreImaging: MosPreImaging
 
   """
   GMOS Nod And Shuffle configuration
