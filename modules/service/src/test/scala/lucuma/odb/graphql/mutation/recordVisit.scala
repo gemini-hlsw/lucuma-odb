@@ -45,14 +45,14 @@ class recordVisit extends OdbSuite {
           recordGmosNorthVisit(input: {
             observationId: "$oid",
             static: {
-              stageMode: FOLLOW_XY,
-              detector: HAMAMATSU,
-              mosPreImaging: IS_NOT_MOS_PRE_IMAGING
+              stageMode: NO_FOLLOW
             }
           }) {
             visit {
               static {
                 stageMode
+                detector
+                mosPreImaging
               }
             }
           }
@@ -63,7 +63,9 @@ class recordVisit extends OdbSuite {
         "recordGmosNorthVisit": {
           "visit": {
             "static": {
-              "stageMode": "FOLLOW_XY"
+              "stageMode": "NO_FOLLOW",
+              "detector": "HAMAMATSU",
+              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
             }
           }
         }
@@ -83,14 +85,14 @@ class recordVisit extends OdbSuite {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
             static: {
-              stageMode: FOLLOW_XY,
-              detector: HAMAMATSU,
-              mosPreImaging: IS_NOT_MOS_PRE_IMAGING
+              stageMode: FOLLOW_XY
             }
           }) {
             visit {
               static {
                 stageMode
+                detector
+                mosPreImaging
               }
             }
           }
@@ -101,7 +103,9 @@ class recordVisit extends OdbSuite {
         "recordGmosSouthVisit": {
           "visit": {
             "static": {
-              "stageMode": "FOLLOW_XY"
+              "stageMode": "FOLLOW_XY",
+              "detector": "HAMAMATSU",
+              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
             }
           }
         }

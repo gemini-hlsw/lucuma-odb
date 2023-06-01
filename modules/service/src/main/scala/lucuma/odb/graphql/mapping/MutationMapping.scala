@@ -321,15 +321,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val RecordGmosNorthVisit: MutationField =
     MutationField("recordGmosNorthVisit", RecordGmosNorthVisitInput.Binding) { (input, child) =>
       services.useTransactionally {
-        import VisitService.InsertVisitResponse.*
-        visitService.insertGmosNorth(input.observationId, input.static).map[Result[Query]] {
-          case NotAuthorized(user)                 =>
-            Result.failure(s"User ${user.id} is not authorized to perform this action")
-          case ObservationNotFound(id, instrument) =>
-            Result.failure(s"Observation $id not found or is not a ${instrument.longName} observation")
-          case Success(vid)                        =>
-            Result(Unique(Filter(Predicates.gmosNorthVisit.id.eql(vid), child)))
-        }
+        recordVisit(
+          visitService.insertGmosNorth(input.observationId, input.static),
+          Predicates.gmosNorthVisit.id,
+          child
+        )
       }
     }
 
