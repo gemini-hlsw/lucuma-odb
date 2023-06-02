@@ -412,7 +412,7 @@ object GmosLongSlitInput {
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.Binding.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
+        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
       ) => (
         rGrating,
         rFilter,
@@ -453,7 +453,7 @@ object GmosLongSlitInput {
           GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
           GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
           WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-          OffsetComponentInput.Binding.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
+          OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
         ) => (
           rGrating,
           rFilter,

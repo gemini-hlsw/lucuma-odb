@@ -32,6 +32,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.CloneObservationInput
@@ -42,6 +43,8 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.RecordGmosNorthVisitInput
+import lucuma.odb.graphql.input.RecordGmosSouthVisitInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
@@ -50,6 +53,7 @@ import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateProposalAttachmentsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
+import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
@@ -66,6 +70,7 @@ import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
+import lucuma.odb.service.VisitService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -83,6 +88,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProgram,
       CreateTarget,
       LinkUser,
+      RecordGmosNorthVisit,
+      RecordGmosSouthVisit,
       SetAllocation,
       UpdateAsterisms,
       UpdateGroups,
@@ -130,7 +137,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   def mutationResultSubquery[A: Order](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
     val limitʹ = limit.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-    ResultMapping.mutationResult(child, limitʹ, collectionField) { q =>           
+    ResultMapping.mutationResult(child, limitʹ, collectionField) { q =>
       FilterOrderByOffsetLimit(
         pred = Some(predicate),
         oss = Some(List(order)),
@@ -155,7 +162,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       order = OrderSelection[Observation.Id](ObservationType / "id"),
       limit = limit,
       collectionField = "observations",
-      child          
+      child
     )
 
   def programResultSubquery(pids: List[Program.Id], limit: Option[NonNegInt], child: Query) =
@@ -164,9 +171,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       order = OrderSelection[Program.Id](ProgramType / "id"),
       limit = limit,
       collectionField = "programs",
-      child          
+      child
     )
-  
+
   def proposalAttachmentResultSubquery(pid: Program.Id, aTypes: List[Tag], limit: Option[NonNegInt], child: Query) =
     mutationResultSubquery(
       predicate = And(Predicates.proposalAttachment.program.id.eql(pid), Predicates.proposalAttachment.attachmentType.in(aTypes)),
@@ -187,7 +194,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
               Predicates.cloneObservationResult.newObservation.id.eql(oid)
             ), child)
-          }  
+          }
         }
       }
     }
@@ -199,7 +206,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         targetService.cloneTarget(input).map {          
 
-          // Typical case          
+          // Typical case
           case Success(oldTargetId, newTargetId) =>
             Result(
               Filter(And(
@@ -207,7 +214,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
                 Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
               ), child)
             )
-          
+
           // Failure Cases
           case NoSuchTarget(targetId) => Result.failure(s"No such target: $targetId")
           case UpdateFailed(problem)  =>
@@ -215,7 +222,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               case SourceProfileUpdatesFailed(ps) => Result.Failure(ps)
               case TrackingSwitchFailed(p)        => Result.failure(p)
 
-        }  
+        }
       }
     }
 
@@ -294,6 +301,45 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private def recordVisit(
+    response:  F[VisitService.InsertVisitResponse],
+    predicate: LeafPredicates[Visit.Id],
+    child:     Query
+  ): F[Result[Query]] = {
+    import VisitService.InsertVisitResponse.*
+    response.map[Result[Query]] {
+      case NotAuthorized(user)                 =>
+        Result.failure(s"User ${user.id} is not authorized to perform this action")
+      case ObservationNotFound(id, instrument) =>
+        Result.failure(s"Observation $id not found or is not a ${instrument.longName} observation")
+      case Success(vid)                        =>
+        Result(Unique(Filter(predicate.eql(vid), child)))
+    }
+  }
+
+
+  private lazy val RecordGmosNorthVisit: MutationField =
+    MutationField("recordGmosNorthVisit", RecordGmosNorthVisitInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        recordVisit(
+          visitService.insertGmosNorth(input.observationId, input.static),
+          Predicates.gmosNorthVisit.id,
+          child
+        )
+      }
+    }
+
+  private lazy val RecordGmosSouthVisit: MutationField =
+    MutationField("recordGmosSouthVisit", RecordGmosSouthVisitInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        recordVisit(
+          visitService.insertGmosSouth(input.observationId, input.static),
+          Predicates.gmosSouthVisit.id,
+          child
+        )
+      }
+    }
+
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
       import AllocationService.SetAllocationResponse._
@@ -366,7 +412,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
-  private lazy val UpdateObsAttachments = 
+  private lazy val UpdateObsAttachments =
       MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
         services.useTransactionally {
           val filterPredicate = and(List(
@@ -398,8 +444,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           idSelect.flatTraverse { which =>
             observationService
               .updateObservations(input.SET, which)
-              .map { r => 
-                r.flatMap { oids => 
+              .map { r =>
+                r.flatMap { oids =>
                   observationResultSubquery(oids, input.LIMIT, child)
                     .tupleLeft(oids)
                 }
@@ -448,7 +494,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
-  private lazy val UpdateProposalAttachments = 
+  private lazy val UpdateProposalAttachments =
       MutationField("updateProposalAttachments", UpdateProposalAttachmentsInput.binding(Path.from(ProposalAttachmentType))) { (input, child) =>
         services.useTransactionally {
 
@@ -479,7 +525,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       order = OrderSelection[Target.Id](TargetType / "id"),
       limit = limit,
       collectionField = "targets",
-      child          
+      child
     )
 
   private lazy val UpdateTargets =
@@ -515,7 +561,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       order = OrderSelection[Group.Id](GroupType / "id"),
       limit = limit,
       collectionField = "groups",
-      child          
+      child
     )
 
   private lazy val UpdateGroups =
@@ -545,4 +591,3 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
 }
-

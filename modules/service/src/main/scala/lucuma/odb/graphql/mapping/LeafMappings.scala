@@ -22,17 +22,22 @@ import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosNorthStageMode
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosSouthStageMode
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
@@ -51,6 +56,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
@@ -81,11 +87,15 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosAmpGain](GmosAmpGainType),
       LeafMapping[GmosAmpReadMode](GmosAmpReadModeType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
+      LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),
       LeafMapping[GmosNorthGrating](GmosNorthGratingType),
+      LeafMapping[GmosNorthStageMode](GmosNorthStageModeType),
       LeafMapping[GmosSouthFpu](GmosSouthBuiltinFpuType),
+      LeafMapping[GmosSouthDetector](GmosSouthDetectorType),
       LeafMapping[GmosSouthFilter](GmosSouthFilterType),
       LeafMapping[GmosSouthGrating](GmosSouthGratingType),
+      LeafMapping[GmosSouthStageMode](GmosSouthStageModeType),
       LeafMapping[GmosRoi](GmosRoiType),
       LeafMapping[GmosXBinning](GmosXBinningType),
       LeafMapping[GmosYBinning](GmosYBinningType),
@@ -94,6 +104,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
+      LeafMapping[MosPreImaging](MosPreImagingType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
       LeafMapping[NonNegLong](NonNegLongType),
@@ -124,8 +135,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ToOActivation](ToOActivationType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
+      LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType)
     )
 
 }
-

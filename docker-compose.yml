@@ -1,7 +1,7 @@
 version: '3'
 services:
   db:
-    image: postgres:14
+    image: postgres:15
     command: -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key
     volumes:
       # this is necessary for CI but can cause confusion locally, sorry
