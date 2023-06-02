@@ -17,11 +17,11 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.monoid.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
-import eu.timepit.refined.refineV
 import eu.timepit.refined.numeric.Interval
+import eu.timepit.refined.refineV
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Pure
 import fs2.Stream
 import io.circe.Encoder
