@@ -271,6 +271,96 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
+  test("simple generation - limited future") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid", futureLimit: 1) {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     science {
+                       nextAtom {
+                         observeClass
+                       }
+                       possibleFuture {
+                         observeClass
+                       }
+                       hasMore
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected =
+          json"""
+            {
+              "sequence": {
+                "programId": $pid,
+                "executionConfig": {
+                  "science": {
+                    "nextAtom": {
+                      "observeClass": "SCIENCE"
+                    },
+                    "possibleFuture": [
+                      {
+                        "observeClass": "SCIENCE"
+                      }
+                    ],
+                    "hasMore": true
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+    }
+
+  }
+
+  test("simple generation - too many future atoms") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid", futureLimit: 101) {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     science {
+                       possibleFuture {
+                         observeClass
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = List("Argument 'futureLimit' is invalid: Future limit must range from 0 to 100, but was 101.").asLeft
+      )
+    }
+  }
 
   test("explicit offsets") {
 
