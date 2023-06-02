@@ -65,13 +65,16 @@ lazy val schema =
 
 lazy val sequence = project
   .in(file("modules/sequence"))
-  .dependsOn(schema.jvm % "compile->test")
+  .dependsOn(schema.jvm)
   .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
-      "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test
+      "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test,
+      "org.scalameta"  %% "munit"                           % munitVersion              % Test,
+      "org.scalameta"  %% "munit-scalacheck"                % munitVersion              % Test,
+      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion    % Test,
     )
   )
 
@@ -94,7 +97,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(sequence % "compile->test", smartgcal % "compile->test")
+  .dependsOn(sequence, smartgcal)
   .enablePlugins(NoPublishPlugin, JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
@@ -127,6 +130,7 @@ lazy val service = project
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
+      "edu.gemini"     %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
       "org.typelevel"  %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
