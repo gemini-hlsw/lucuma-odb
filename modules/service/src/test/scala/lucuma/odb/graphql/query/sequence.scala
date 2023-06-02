@@ -271,6 +271,62 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
+  test("simple generation - limited future") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+
+    setup.flatMap { case (pid, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               sequence(programId: "$pid", observationId: "$oid", futureLimit: 1) {
+                 programId
+                 executionConfig {
+                   ... on GmosNorthExecutionConfig {
+                     science {
+                       nextAtom {
+                         observeClass
+                       }
+                       possibleFuture {
+                         observeClass
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "sequence": {
+                "programId": $pid,
+                "executionConfig": {
+                  "science": {
+                    "nextAtom": {
+                      "observeClass": "SCIENCE"
+                    },
+                    "possibleFuture": [
+                      {
+                        "observeClass": "SCIENCE"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
 
   test("explicit offsets") {
 

@@ -18,6 +18,10 @@ import cats.syntax.functor.*
 import cats.syntax.monoid.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.api.RefinedTypeOps
+import eu.timepit.refined.refineV
+import eu.timepit.refined.numeric.Interval
 import fs2.Pure
 import fs2.Stream
 import io.circe.Encoder
@@ -62,22 +66,36 @@ import skunk.Transaction
 import java.io.ObjectOutputStream
 import java.util.UUID
 
+import Generator.FutureLimit
+
 sealed trait Generator[F[_]] {
 
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
-    useCache:      Boolean
+    useCache:      Boolean = true,
+    futureLimit:   FutureLimit = FutureLimit.Default
   )(using Transaction[F]): F[Generator.Result]
 
 }
 
 object Generator {
 
-  // Max atoms to appear in the possibleFuture + 1 for nextAtom
-  // Hardcode for now, parameter later ?
-  private val AtomLimit = 25
+  type FutureLimit = Int Refined Interval.Closed[0, 100]
 
+  object FutureLimit extends RefinedTypeOps[FutureLimit, Int] {
+    val Default: FutureLimit = unsafeFrom(25)
+    val Min: FutureLimit = unsafeFrom(0)
+    val Max: FutureLimit = unsafeFrom(100)
+
+    val Binding: lucuma.odb.graphql.binding.Matcher[FutureLimit] =
+      lucuma.odb.graphql.binding.IntBinding.emap { v =>
+        from(v).leftMap { _ =>
+          s"futureLimit must range from ${Min.value} to ${Max.value}, but was $v."
+        }
+      }
+  }
+  
   sealed trait Result
   sealed trait Error extends Result {
     def format: String
@@ -147,11 +165,12 @@ object Generator {
       override def generate(
         programId:     Program.Id,
         observationId: Observation.Id,
-        useCache:      Boolean
+        useCache:      Boolean,
+        futureLimit:   FutureLimit
       )(using Transaction[F]): F[Result] =
         (for {
           params <- selectParams(programId, observationId)
-          res    <- generateSequence(observationId, params, useCache)
+          res    <- generateSequence(observationId, params, useCache, futureLimit)
         } yield res).merge
 
       private def selectParams(
@@ -171,9 +190,10 @@ object Generator {
       // Generate a sequence for the observation, which will depend on the
       // observation's observing mode.
       private def generateSequence(
-        oid:       Observation.Id,
-        params:    GeneratorParams,
-        useCache:  Boolean
+        oid:         Observation.Id,
+        params:      GeneratorParams,
+        useCache:    Boolean,
+        futureLimit: FutureLimit
       ): EitherT[F, Error, Success] = {
         val namespace = SequenceIds.namespace(commitHash, oid, params)
 
@@ -183,7 +203,7 @@ object Generator {
               tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
               (itc, p0) = tup
               p1  <- expandAndEstimate(p0, exp.gmosNorth, calculator.gmosNorth)
-              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup))
+              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, futureLimit))
             } yield Success(oid, itc, InstrumentExecutionConfig.GmosNorth(res), res.science.map(_.digest))
 
           case GeneratorParams.GmosSouthLongSlit(itcInput, config) =>
@@ -191,7 +211,7 @@ object Generator {
               tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosSouth, useCache)
               (itc, p0) = tup
               p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
-              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup))
+              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, futureLimit))
             } yield Success(oid, itc, InstrumentExecutionConfig.GmosSouth(res), res.science.map(_.digest))
         }
       }
@@ -252,12 +272,15 @@ object Generator {
         digest:       SequenceDigest
       ) {
 
-        def addAtom(a: ProtoAtom[ProtoStep[(D, StepEstimate)]]): SequenceSummary[D] = {
+        def addAtom(
+          a: ProtoAtom[ProtoStep[(D, StepEstimate)]],
+          futureLimit: FutureLimit
+        ): SequenceSummary[D] = {
           val digestʹ    = a.steps.foldLeft(digest) { (d, s) =>
             val dʹ = d.add(s.observeClass).add(PlannedTime.fromStep(s.observeClass, s.value._2))
             offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
           }
-          val appendAtom = initialAtoms.lengthIs < AtomLimit
+          val appendAtom = initialAtoms.lengthIs < (futureLimit.value + 1 /* for nextAtom */)
           copy(
             initialAtoms = if (appendAtom) initialAtoms.appended(a) else initialAtoms,
             hasMore      = !appendAtom,
@@ -277,15 +300,17 @@ object Generator {
           )
 
         def summarize[D](
-          s: Stream[F, ProtoAtom[ProtoStep[(D, StepEstimate)]]]
+          s: Stream[F, ProtoAtom[ProtoStep[(D, StepEstimate)]]],
+          futureLimit: FutureLimit
         ): F[SequenceSummary[D]] =
-          s.fold(zero[D]) { (sum, a) => sum.addAtom(a) }.compile.onlyOrError
+          s.fold(zero[D]) { (sum, a) => sum.addAtom(a, futureLimit) }.compile.onlyOrError
       }
 
       private def toExecutionConfig[S, D](
-        namespace: UUID,
-        proto:     ProtoExecutionConfig[F, S, ProtoAtom[ProtoStep[(D, StepEstimate)]]],
-        setupTime: SetupTime
+        namespace:   UUID,
+        proto:       ProtoExecutionConfig[F, S, ProtoAtom[ProtoStep[(D, StepEstimate)]]],
+        setupTime:   SetupTime,
+        futureLimit: FutureLimit
       ): F[ExecutionConfig[S, D]] = {
 
         def toExecutionSequence(
@@ -306,8 +331,8 @@ object Generator {
         ).map(nel => ExecutionSequence(nel.head, nel.tail, sequence.hasMore, PosInt.unsafeFrom(sequence.atomCount), sequence.digest))
 
         for {
-          acq <- SequenceSummary.summarize(proto.acquisition)
-          sci <- SequenceSummary.summarize(proto.science)
+          acq <- SequenceSummary.summarize(proto.acquisition, futureLimit)
+          sci <- SequenceSummary.summarize(proto.science, futureLimit)
         } yield
           ExecutionConfig(
             proto.static,
