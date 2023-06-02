@@ -18,6 +18,8 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val cloneObservationResult = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult      = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
     val constraintSetGroup     = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
+    val gmosNorthVisit         = VisitPredicates(Path.from(GmosNorthVisitType))
+    val gmosSouthVisit         = VisitPredicates(Path.from(GmosSouthVisitType))
     val group                  = GroupPredicates(Path.from(GroupType))
     val groupEdit              = GroupEditPredicates(Path.from(GroupEditType))
     val groupElement           = GroupElementPredicates(Path.from(GroupElementType))

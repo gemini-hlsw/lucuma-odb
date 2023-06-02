@@ -65,6 +65,7 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TimingWindowService
+import lucuma.odb.service.VisitService
 import lucuma.odb.util.Codecs.DomainCodec
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
@@ -137,6 +138,10 @@ object OdbMapping {
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosLongSlitMapping[F]
+          with GmosNorthStaticMapping[F]
+          with GmosNorthVisitMapping[F]
+          with GmosSouthStaticMapping[F]
+          with GmosSouthVisitMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
           with GroupElementMapping[F]
@@ -170,6 +175,8 @@ object OdbMapping {
           with ProposalAttachmentTypeMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
+          with RecordGmosNorthVisitResultMapping[F]
+          with RecordGmosSouthVisitResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
@@ -230,7 +237,11 @@ object OdbMapping {
               ElevationRangeMapping,
               FilterTypeMetaMapping,
               GmosNorthLongSlitMapping,
+              GmosNorthStaticMapping,
+              GmosNorthVisitMapping,
               GmosSouthLongSlitMapping,
+              GmosSouthStaticMapping,
+              GmosSouthVisitMapping,
               GroupMapping,
               GroupEditMapping,
               GroupElementMapping,
@@ -262,6 +273,8 @@ object OdbMapping {
               ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
+              RecordGmosNorthVisitResultMapping,
+              RecordGmosSouthVisitResultMapping,
               RightAscensionMapping,
               ScienceRequirementsMapping,
               SpectroscopyScienceRequirementsMapping,
