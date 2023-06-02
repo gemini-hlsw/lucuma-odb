@@ -296,6 +296,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                        possibleFuture {
                          observeClass
                        }
+                       hasMore
                      }
                    }
                  }
@@ -316,7 +317,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                       {
                         "observeClass": "SCIENCE"
                       }
-                    ]
+                    ],
+                    "hasMore": true
                   }
                 }
               }

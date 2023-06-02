@@ -73,7 +73,7 @@ sealed trait Generator[F[_]] {
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
-    useCache:      Boolean = true,
+    useCache:      Boolean     = true,
     futureLimit:   FutureLimit = FutureLimit.Default
   )(using Transaction[F]): F[Generator.Result]
 
@@ -84,14 +84,14 @@ object Generator {
   type FutureLimit = Int Refined Interval.Closed[0, 100]
 
   object FutureLimit extends RefinedTypeOps[FutureLimit, Int] {
-    val Default: FutureLimit = unsafeFrom(25)
-    val Min: FutureLimit = unsafeFrom(0)
-    val Max: FutureLimit = unsafeFrom(100)
+    val Default: FutureLimit = unsafeFrom( 25)
+    val Min: FutureLimit     = unsafeFrom(  0)
+    val Max: FutureLimit     = unsafeFrom(100)
 
     val Binding: lucuma.odb.graphql.binding.Matcher[FutureLimit] =
       lucuma.odb.graphql.binding.IntBinding.emap { v =>
         from(v).leftMap { _ =>
-          s"futureLimit must range from ${Min.value} to ${Max.value}, but was $v."
+          s"Future limit must range from ${Min.value} to ${Max.value}, but was $v."
         }
       }
   }

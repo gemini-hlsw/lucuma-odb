@@ -870,24 +870,37 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   setup: SetupTime!
 }
 
-# Next atom to execute and potential future atoms
+"""
+Next atom to execute and potential future atoms.
+"""
 type GmosNorthExecutionSequence implements ExecutionSequence {
-  # Next atom to execute
+
+  """
+  Next atom to execute.
+  """
   nextAtom: GmosNorthAtom!
 
-  # (Prefix of the) remaining atoms to execute, if any.
+  """
+  (Prefix of the) remaining atoms to execute, if any.
+  """
   possibleFuture: [GmosNorthAtom!]!
 
-  # Whether there are more anticipated atoms than those that appear in
-  # possibleFuture
-  hashMore: Boolean!
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
 
-  # Total count of anticipated atoms, including nextAtom, possibleFuture and
-  # any remaining atoms not included in possibleFuture
+  """
+  Total count of anticipated atoms, including 'nextAtom', 'possibleFuture' and
+  any remaining atoms not included in 'possibleFuture'.
+  """
   atomCount: PosInt!
 
-  # Sequence digest (including all anticipated future values regardless of
-  # whether they appear in possibleFuture)
+  """
+  Sequence digest (including all anticipated future values regardless of
+  whether they appear in 'possibleFuture').
+  """
   digest: SequenceDigest!
 
 }
@@ -1256,24 +1269,37 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   setup: SetupTime!
 }
 
-# Next atom to execute and potential future atoms
+"""
+Next atom to execute and potential future atoms.
+"""
 type GmosSouthExecutionSequence implements ExecutionSequence {
-  # Next atom to execute
+
+  """
+  Next atom to execute.
+  """
   nextAtom: GmosSouthAtom!
 
-  # Remaining atoms to execute, if any
+  """
+  (Prefix of the) remaining atoms to execute, if any.
+  """
   possibleFuture: [GmosSouthAtom!]!
 
-  # Whether there are more anticipated atoms than those that appear in
-  # possibleFuture
-  hashMore: Boolean!
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
 
-  # Total count of anticipated atoms, including nextAtom, possibleFuture and
-  # any remaining atoms not included in possibleFuture
+  """
+  Total count of anticipated atoms, including 'nextAtom', 'possibleFuture' and
+  any remaining atoms not included in 'possibleFuture'.
+  """
   atomCount: PosInt!
 
-  # Sequence digest (including all anticipated future values regardless of
-  # whether they appear in possibleFuture)
+  """
+  Sequence digest (including all anticipated future values regardless of
+  whether they appear in 'possibleFuture').
+  """
   digest: SequenceDigest!
 
 }
@@ -5284,6 +5310,10 @@ type Query {
   #   includeDeleted: Boolean! = false
   # ): ScienceRequirementsGroupSelectResult!
 
+  """
+  Produces the execution configuration with its acquisition and science
+  sequences for this observation.
+  """
   sequence(
     programId:     ProgramId!
 
@@ -5295,10 +5325,11 @@ type Query {
     useCache: Boolean! = true
 
     """
-    The maximum size, i.e. number of atoms, of the possibleFuture in the sequence.
-    If projected future is longer, the value returned will be capped at this value.
-    Use 0 if only interested in the nextAtom.  The maximum is 100 and the default
-    is 25.
+    The maximum size (number of atoms) of the 'possibleFuture' in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the 'nextAtom'.  The maximum is 100.  Each
+    sequence has 'hasMore' and 'atomCount' fields that can be used to determine
+    whether and how many remaining atoms are yet to be executed.
     """
     futureLimit: PosInt! = 25
 
