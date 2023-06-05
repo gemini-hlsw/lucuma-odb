@@ -11,11 +11,12 @@ type AddDatasetEventResult {
   event: DatasetEvent!
 }
 
-# SequenceEvent creation parameters
+"""
+SequenceEvent creation parameters.
+"""
 input AddSequenceEventInput {
   visitId: VisitId!
-  location: SequenceEventLocationInput!
-  payload: SequenceEventPayloadInput!
+  command: SequenceCommand!
 }
 
 # The result of adding a sequence event.
@@ -2192,16 +2193,6 @@ input ScienceRequirementsInput {
 
   # The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   spectroscopy: SpectroscopyScienceRequirementsInput
-}
-
-# SequenceEvent location parameters
-input SequenceEventLocationInput {
-  observationId: ObservationId!
-}
-
-# SequenceEvent payload creation parameters
-input SequenceEventPayloadInput {
-  command: SequenceCommand!
 }
 
 input SetAllocationInput {
@@ -5476,24 +5467,39 @@ type ScienceRequirementsGroupSelectResult {
   hasMore: Boolean!
 }
 
-# Sequence-level command
+"""
+Sequence-level command
+"""
 enum SequenceCommand {
-  # SequenceCommand ABORT
+
+  """
+  SequenceCommand ABORT
+  """
   ABORT
 
-  # SequenceCommand CONTINUE
+  """
+  SequenceCommand CONTINUE
+  """
   CONTINUE
 
-  # SequenceCommand PAUSE
+  """
+  SequenceCommand PAUSE
+  """
   PAUSE
 
-  # SequenceCommand SLEW
+  """
+  SequenceCommand SLEW
+  """
   SLEW
 
-  # SequenceCommand START
+  """
+  SequenceCommand START
+  """
   START
 
-  # SequenceCommand STOP
+  """
+  SequenceCommand STOP
+  """
   STOP
 }
 
@@ -5510,17 +5516,17 @@ type SequenceDigest {
 
 # Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
 type SequenceEvent implements ExecutionEvent {
-  # Identifies the observation to which the event refers
-  location: SequenceEventLocation!
-
-  # Sequence event data
-  payload: SequenceEventPayload!
-
   # Event id
   id: ExecutionEventId!
 
+  # Observation containing the sequence
+  observationId: ObservationId!
+
   # Associated visit
   visitId: VisitId!
+
+  # Sequence event data
+  payload: SequenceEventPayload!
 
   # Observation whose execution produced this event
   observation: Observation!
@@ -5529,11 +5535,6 @@ type SequenceEvent implements ExecutionEvent {
   received: Timestamp!
 }
 
-# Sequence event location, i.e., to which observation the event refers.
-type SequenceEventLocation {
-  # Observation containing the sequence
-  observationId: ObservationId!
-}
 
 # Sequence event data
 type SequenceEventPayload {
