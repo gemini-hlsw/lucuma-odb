@@ -5488,11 +5488,6 @@ enum SequenceCommand {
   PAUSE
 
   """
-  SequenceCommand SLEW
-  """
-  SLEW
-
-  """
   SequenceCommand START
   """
   START
