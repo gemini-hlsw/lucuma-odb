@@ -29,6 +29,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
@@ -189,6 +190,9 @@ trait Codecs {
       Epoch.fromString.reverseGet
     )
 
+  val execution_event_id: Codec[ExecutionEvent.Id] =
+    uid[ExecutionEvent.Id]
+
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
 
@@ -310,6 +314,9 @@ trait Codecs {
       a => RightAscension.fromAngleExact.getOption(a).toRight(s"Invalid right ascension: $a"))(
       RightAscension.fromAngleExact.reverseGet
     )
+
+  val sequence_command: Codec[SequenceCommand] =
+    enumerated[SequenceCommand](Type.varchar)
 
   val science_mode: Codec[ScienceMode] =
     enumerated[ScienceMode](Type.varchar)
