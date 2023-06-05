@@ -5510,31 +5510,21 @@ type SequenceDigest {
 }
 
 # Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
-type SequenceEvent implements ExecutionEvent {
+type SequenceEvent { # implements ExecutionEvent {
   # Event id
   id: ExecutionEventId!
-
-  # Observation containing the sequence
-  observationId: ObservationId!
 
   # Associated visit
   visitId: VisitId!
 
   # Sequence event data
-  payload: SequenceEventPayload!
+  command: SequenceCommand!
 
   # Observation whose execution produced this event
   observation: Observation!
 
   # Time at which this event was received
   received: Timestamp!
-}
-
-
-# Sequence event data
-type SequenceEventPayload {
-  # Sequence command
-  command: SequenceCommand!
 }
 
 type SequenceGenerationResult {

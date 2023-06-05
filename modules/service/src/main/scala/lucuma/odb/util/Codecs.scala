@@ -316,7 +316,7 @@ trait Codecs {
     )
 
   val sequence_command: Codec[SequenceCommand] =
-    enumerated[SequenceCommand](Type.varchar)
+    enumerated[SequenceCommand](Type("e_sequence_command"))
 
   val science_mode: Codec[ScienceMode] =
     enumerated[ScienceMode](Type.varchar)

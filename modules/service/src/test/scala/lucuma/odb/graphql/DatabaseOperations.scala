@@ -9,12 +9,14 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Instrument
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -443,5 +445,49 @@ trait DatabaseOperations { this: OdbSuite =>
           else Nil
         }
       )
+
+  private def staticConfigObject(instrument: Instrument): String =
+    instrument match {
+      case Instrument.GmosNorth =>
+        """
+          {
+            stageMode: FOLLOW_XY
+          }
+        """
+
+      case Instrument.GmosSouth =>
+        """
+          {
+            stageMode: FOLLOW_XYZ
+          }
+        """
+
+      case _ => "{}"
+
+    }
+
+  def recordVisitAs(user: User, instrument: Instrument, oid: Observation.Id): IO[Visit.Id] = {
+    val name = s"record${instrument.tag}Visit"
+
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            $name(input: {
+              observationId: ${oid.asJson},
+              static: ${staticConfigObject(instrument)}
+            }) {
+              visit {
+                id
+              }
+            }
+          }
+        """
+    ).map { json =>
+      json.hcursor.downFields(name, "visit", "id").require[Visit.Id]
+    }
+}
+
 
 }

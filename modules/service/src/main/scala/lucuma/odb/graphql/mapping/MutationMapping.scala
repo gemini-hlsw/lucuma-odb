@@ -35,6 +35,7 @@ import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -58,6 +59,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
 import lucuma.odb.service.AsterismService
+import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
 import lucuma.odb.service.ObsAttachmentMetadataService
 import lucuma.odb.service.ObservationService
@@ -81,6 +83,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
+      AddSequenceEvent,
       CloneObservation,
       CloneTarget,
       CreateGroup,
@@ -301,6 +304,21 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private lazy val AddSequenceEvent: MutationField =
+    MutationField("addSequenceEvent", AddSequenceEventInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        import ExecutionEventService.InsertEventResponse.*
+        executionEventService.insertExecutionEvent(input.visitId, input.command).map[Result[Query]] {
+          case NotAuthorized(user) =>
+            Result.failure(s"User '${user.id}' is not authorized to perform this action")
+          case VisitNotFound(id)   =>
+            Result.failure(s"Visit id '$id' not found")
+          case Success(eid)        =>
+            Result(Unique(Filter(Predicates.sequenceEvent.id.eql(eid), child)))
+        }
+      }
+    }
+
   private def recordVisit(
     response:  F[VisitService.InsertVisitResponse],
     predicate: LeafPredicates[Visit.Id],
@@ -309,9 +327,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import VisitService.InsertVisitResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)                 =>
-        Result.failure(s"User ${user.id} is not authorized to perform this action")
+        Result.failure(s"User '${user.id}' is not authorized to perform this action")
       case ObservationNotFound(id, instrument) =>
-        Result.failure(s"Observation $id not found or is not a ${instrument.longName} observation")
+        Result.failure(s"Observation '$id' not found or is not a ${instrument.longName} observation")
       case Success(vid)                        =>
         Result(Unique(Filter(predicate.eql(vid), child)))
     }
