@@ -5,13 +5,7 @@
  package predicate
 
  import edu.gemini.grackle.Path
- import edu.gemini.grackle.Predicate
- import edu.gemini.grackle.Predicate._
- import edu.gemini.grackle.skunk.SkunkMapping
- import lucuma.core.model.Access._
- import lucuma.core.model.User
  import lucuma.core.model.Visit
- import lucuma.odb.data.Existence
 
  class VisitPredicates(path: Path) {
    lazy val id: LeafPredicates[Visit.Id] =

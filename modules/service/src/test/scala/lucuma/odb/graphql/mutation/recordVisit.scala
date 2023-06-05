@@ -29,11 +29,11 @@ class recordVisit extends OdbSuite {
     expected: Either[Observation.Id => String, Json]
   ): IO[Unit] =
 
-    for
+    for {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
       _   <- expect(user, query(oid), expected.leftMap(f => List(f(oid))))
-    yield ()
+    } yield ()
 
   test("recordGmosNorthVisit") {
 
@@ -57,7 +57,7 @@ class recordVisit extends OdbSuite {
             }
           }
         }
-      """.stripMargin,
+      """,
       json"""
       {
         "recordGmosNorthVisit": {
