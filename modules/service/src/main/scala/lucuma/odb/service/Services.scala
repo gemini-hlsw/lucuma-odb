@@ -78,6 +78,9 @@ trait Services[F[_]]:
   /** The `GroupService`. */
   def groupService: GroupService[F]
   
+  /** The `ObsAttachmentAssignmentService`. */
+  def obsAttachmentAssignmentService: ObsAttachmentAssignmentService[F]
+
   /** Construct an `ObsAttachmentFileService`, given an `S3FileService`.  */
   def obsAttachmentFileService(s3: S3FileService[F]): ObsAttachmentFileService[F]
   
@@ -153,6 +156,7 @@ object Services:
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
       lazy val groupService = GroupService.instantiate
+      lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val obsAttachmentMetadataService = ObsAttachmentMetadataService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
@@ -190,6 +194,7 @@ object Services:
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
+    def obsAttachmentAssignmentService[F[_]](using Services[F]):ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
     def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
     def obsAttachmentMetadataService[F[_]](using Services[F]): ObsAttachmentMetadataService[F] = summon[Services[F]].obsAttachmentMetadataService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService

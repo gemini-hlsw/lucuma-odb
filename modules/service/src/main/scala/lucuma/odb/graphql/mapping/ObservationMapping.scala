@@ -11,8 +11,11 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.core.model.ObsAttachment
 import lucuma.odb.graphql.table.TimingWindowView
 
+import table.ObsAttachmentAssignmentTable
+import table.ObsAttachmentTable
 import table.ObservationView
 import table.ProgramTable
 
@@ -20,7 +23,9 @@ import table.ProgramTable
 trait ObservationMapping[F[_]]
   extends ObservationView[F]
      with ProgramTable[F]  
-     with TimingWindowView[F] {
+     with TimingWindowView[F]
+     with ObsAttachmentTable[F]
+     with ObsAttachmentAssignmentTable[F] {
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
@@ -38,6 +43,9 @@ trait ObservationMapping[F[_]]
         SqlObject("targetEnvironment"),
         SqlObject("constraintSet"),
         SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId)),
+        SqlObject("obsAttachments",
+          Join(ObservationView.Id, ObsAttachmentAssignmentTable.ObservationId),
+          Join(ObsAttachmentAssignmentTable.ObsAttachmentId, ObsAttachmentTable.Id)),
         SqlObject("scienceRequirements"),
         SqlObject("observingMode"),
         SqlField("instrument", ObservationView.Instrument),
@@ -61,6 +69,12 @@ trait ObservationMapping[F[_]]
                 limit = None,
                 child
               )
+            )
+          )
+        case Select("obsAttachments", Nil, child) =>
+          Result(
+            Select("obsAttachments", Nil,
+              OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
             )
           )
       }

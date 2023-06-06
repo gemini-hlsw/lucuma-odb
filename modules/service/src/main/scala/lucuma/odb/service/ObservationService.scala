@@ -103,8 +103,9 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
-    SET:   ObservationPropertiesInput.Edit,
-    which: AppliedFragment
+    programId: Program.Id,
+    SET:       ObservationPropertiesInput.Edit,
+    which:     AppliedFragment
   )(using Transaction[F]): F[Result[List[Observation.Id]]]
 
   def cloneObservation(
@@ -197,9 +198,16 @@ object ObservationService {
                   }.sequence
 
                 }
-              }
-              .flatTap{ rOid =>
+              }.flatTap{ rOid =>
                 setTimingWindows(rOid.map(List(_)), SET.timingWindows)
+              }.flatMap { rOid =>
+                SET.obsAttachments.fold(rOid.pure[F]) { aids =>
+                  rOid.flatTraverse { oid =>
+                    obsAttachmentAssignmentService
+                      .insertAssignments(programId, List(oid), aids)
+                      .map(_.map(_ => oid))
+                  }
+                }
               }
           }
         }
@@ -293,8 +301,9 @@ object ObservationService {
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
       override def updateObservations(
-        SET:   ObservationPropertiesInput.Edit,
-        which: AppliedFragment
+        programId: Program.Id,
+        SET:       ObservationPropertiesInput.Edit,
+        which:     AppliedFragment
       )(using Transaction[F]): F[Result[List[Observation.Id]]] =
         Trace[F].span("updateObservation") {
           for {
@@ -307,7 +316,13 @@ object ObservationService {
                   }.flatMap { rObservationIds =>
                     updateObservingModes(SET.observingMode, rObservationIds)
                   }.flatTap { rObservationIds =>
-                  setTimingWindows(rObservationIds, SET.timingWindows.foldPresent(_.orEmpty))
+                    setTimingWindows(rObservationIds, SET.timingWindows.foldPresent(_.orEmpty))
+                  }.flatMap { rObservationIds =>
+                    rObservationIds.flatTraverse { oids =>
+                      obsAttachmentAssignmentService
+                        .setAssignments(programId, oids, SET.obsAttachments)
+                        .map(_.map(_ => oids))
+                    }
                   }.recoverWith {
                     case SqlState.CheckViolation(ex) =>
                       Result.failure(constraintViolationMessage(ex)).pure[F]
@@ -355,13 +370,14 @@ object ObservationService {
                 val cloneRelatedItems =
                   asterismService.cloneAsterism(input.observationId, oid2) >>
                   observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2)) >>
-                  timingWindowService.cloneTimingWindows(input.observationId, oid2)
+                  timingWindowService.cloneTimingWindows(input.observationId, oid2) >>
+                  obsAttachmentAssignmentService.cloneAssignments(input.observationId, oid2)
 
                 val doUpdate =
                   input.SET match
                     case None    => Result(oid2).pure[F] // nothing to do
                     case Some(s) => 
-                      updateObservations(s, sql"select $observation_id".apply(oid2))
+                      updateObservations(pid, s, sql"select $observation_id".apply(oid2))
                         .map { r =>
                           // We probably don't need to check this return value, but I feel bad not doing it.
                           r.flatMap {

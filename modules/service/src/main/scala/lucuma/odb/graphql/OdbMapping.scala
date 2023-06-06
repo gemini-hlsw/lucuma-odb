@@ -316,6 +316,7 @@ object OdbMapping {
                 ConstraintSetGroupElaborator,
                 GroupElaborator,
                 MutationElaborator,
+                ObsAttachmentElaborator,
                 ObservationElaborator,
                 ProgramElaborator,
                 SubscriptionElaborator,
