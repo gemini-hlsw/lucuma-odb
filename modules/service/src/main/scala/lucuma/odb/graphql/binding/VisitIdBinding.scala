@@ -6,4 +6,4 @@ package lucuma.odb.graphql.binding
 import lucuma.core.model.Visit
 
 val VisitIdBinding: Matcher[Visit.Id] =
-  uidBinding("visit")
+  gidBinding("visit")

@@ -89,7 +89,7 @@ class addSequenceEvent extends OdbSuite {
       s"""
         mutation {
           addSequenceEvent(input: {
-            visitId: "v-b00814f4-3106-4bd9-9a05-ecdef7ef5d49",
+            visitId: "v-42",
             command: START
           }) {
             event {
@@ -106,7 +106,7 @@ class addSequenceEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       staff,
       _ => query,
-      (_, _) => s"Visit id 'v-b00814f4-3106-4bd9-9a05-ecdef7ef5d49' not found".asLeft
+      (_, _) => s"Visit id 'v-42' not found".asLeft
     )
 
   }

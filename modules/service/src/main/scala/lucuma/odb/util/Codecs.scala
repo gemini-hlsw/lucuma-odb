@@ -29,8 +29,8 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
-import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
@@ -191,7 +191,7 @@ trait Codecs {
     )
 
   val execution_event_id: Codec[ExecutionEvent.Id] =
-    uid[ExecutionEvent.Id]
+    gid[ExecutionEvent.Id]
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
@@ -369,7 +369,7 @@ trait Codecs {
     enumerated(Type("e_user_type"))
 
   val visit_id: Codec[Visit.Id] =
-    uid[Visit.Id]
+    gid[Visit.Id]
 
   val water_vapor: Codec[WaterVapor] =
     enumerated[WaterVapor](Type.varchar)

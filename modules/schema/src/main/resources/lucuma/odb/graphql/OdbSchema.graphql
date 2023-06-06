@@ -83,7 +83,9 @@ interface Atom {
 
 }
 
-# AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
+AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
 scalar AtomId
 
 # Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
@@ -3577,7 +3579,9 @@ interface ExecutionEvent {
   received: Timestamp!
 }
 
-# ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`
+"""
+ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`
+"""
 scalar ExecutionEventId
 
 # The matching ExecutionEvent results, limited to a maximum of 1000 entries.
@@ -6241,7 +6245,9 @@ type User {
   orcidEmail:      String,
 }
 
-# VisitId id formatted as `v-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
+VisitId id formatted as `v-[1-9a-f][0-9a-f]*`
+"""
 scalar VisitId
 
 # Water vapor

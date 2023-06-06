@@ -8,7 +8,6 @@ package lucuma.odb.service
 
 import cats.data.EitherT
 import cats.effect.Concurrent
-import cats.effect.std.UUIDGen
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
@@ -27,8 +26,6 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
-
-import java.util.UUID
 
 import Services.Syntax.*
 
@@ -66,7 +63,7 @@ object VisitService {
 
   }
 
-  def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): VisitService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
     new VisitService[F] with ExecutionUserCheck {
 
       private def insert(
@@ -76,10 +73,10 @@ object VisitService {
       ): F[InsertVisitResponse] = {
         import InsertVisitResponse.*
 
-        def insertVisit(v: Visit.Id): F[Either[ObservationNotFound, Unit]] =
+        val insertVisit: F[Either[ObservationNotFound, Visit.Id]] =
           session
-            .execute(Statements.InsertVisit)(v, observationId, instrument)
-            .as(().asRight)
+            .unique(Statements.InsertVisit)(observationId, instrument)
+            .map(_.asRight)
             .recover {
               case SqlState.ForeignKeyViolation(_) =>
                 ObservationNotFound(observationId, instrument).asLeft
@@ -87,8 +84,7 @@ object VisitService {
 
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
-          v <- EitherT.right(UUIDGen[F].randomUUID).map(Visit.Id.fromUuid)
-          _ <- EitherT(insertVisit(v))
+          v <- EitherT(insertVisit)
           _ <- EitherT.right(insertStatic(v.some).void)
         } yield Success(v)).merge
       }
@@ -109,18 +105,18 @@ object VisitService {
 
   object Statements {
 
-    val InsertVisit: Command[(Visit.Id, Observation.Id, Instrument)] =
+    val InsertVisit: Query[(Observation.Id, Instrument), Visit.Id] =
       sql"""
         INSERT INTO t_visit (
-          c_visit_id,
           c_observation_id,
           c_instrument
         )
         SELECT
-          $visit_id,
           $observation_id,
           $instrument
-      """.command
+        RETURNING
+          c_visit_id
+      """.query(visit_id)
 
   }
 }
