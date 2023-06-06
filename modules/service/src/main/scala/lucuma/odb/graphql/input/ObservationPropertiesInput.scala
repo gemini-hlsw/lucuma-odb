@@ -14,6 +14,7 @@ import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Group
+import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
@@ -42,6 +43,7 @@ object ObservationPropertiesInput {
     targetEnvironment:   Option[TargetEnvironmentInput],
     constraintSet:       Option[ConstraintSetInput],
     timingWindows:       Option[List[TimingWindowInput]],
+    obsAttachments:      Option[List[ObsAttachment.Id]],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Option[ObservingModeInput.Create],
     existence:           Option[Existence],
@@ -61,6 +63,7 @@ object ObservationPropertiesInput {
         targetEnvironment   = None,
         constraintSet       = ConstraintSetInput.Default.some,
         timingWindows       = None,
+        obsAttachments      = None,
         scienceRequirements = None,
         observingMode       = None,
         existence           = Existence.Present.some,
@@ -79,6 +82,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Option("timingWindows", rTimingWindows),
+          ObsAttachmentIdBinding.List.Option("obsAttachments", rObsAttachments),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Create.Binding.Option("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence),
@@ -93,6 +97,7 @@ object ObservationPropertiesInput {
             rTargetEnvironment,
             rConstraintSet,
             rTimingWindows,
+            rObsAttachments,
             rScienceRequirements,
             rObservingMode,
             rExistence,
@@ -112,6 +117,7 @@ object ObservationPropertiesInput {
     targetEnvironment:   Option[TargetEnvironmentInput],
     constraintSet:       Option[ConstraintSetInput],
     timingWindows:       Nullable[List[TimingWindowInput]],
+    obsAttachments:      Nullable[List[ObsAttachment.Id]],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Nullable[ObservingModeInput.Edit],
     existence:           Option[Existence],
@@ -132,6 +138,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Nullable("timingWindows", rTimingWindows),
+          ObsAttachmentIdBinding.List.Nullable("obsAttachments", rObsAttachments),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence),
@@ -146,6 +153,7 @@ object ObservationPropertiesInput {
             rTargetEnvironment,
             rConstraintSet,
             rTimingWindows,
+            rObsAttachments,
             rScienceRequirements,
             rObservingMode,
             rExistence,
