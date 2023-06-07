@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.util.Gid
+import lucuma.core.enums.SequenceCommand
 
-def gidBinding[A: Gid](name: String): Matcher[A] =
-  StringBinding.emap { s =>
-    Gid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
-  }
+val SequenceCommandBinding: Matcher[SequenceCommand] =
+  enumeratedBinding
+
+

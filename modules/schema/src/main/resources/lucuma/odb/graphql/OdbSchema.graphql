@@ -11,11 +11,12 @@ type AddDatasetEventResult {
   event: DatasetEvent!
 }
 
-# SequenceEvent creation parameters
+"""
+SequenceEvent creation parameters.
+"""
 input AddSequenceEventInput {
   visitId: VisitId!
-  location: SequenceEventLocationInput!
-  payload: SequenceEventPayloadInput!
+  command: SequenceCommand!
 }
 
 # The result of adding a sequence event.
@@ -82,7 +83,9 @@ interface Atom {
 
 }
 
-# AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
+AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
 scalar AtomId
 
 # Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
@@ -2220,16 +2223,6 @@ input ScienceRequirementsInput {
   spectroscopy: SpectroscopyScienceRequirementsInput
 }
 
-# SequenceEvent location parameters
-input SequenceEventLocationInput {
-  observationId: ObservationId!
-}
-
-# SequenceEvent payload creation parameters
-input SequenceEventPayloadInput {
-  command: SequenceCommand!
-}
-
 input SetAllocationInput {
   programId: ProgramId!
   partner: Partner!
@@ -3612,7 +3605,9 @@ interface ExecutionEvent {
   received: Timestamp!
 }
 
-# ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`
+"""
+ExecutionEventId id formatted as `e-[1-9a-f][0-9a-f]*`
+"""
 scalar ExecutionEventId
 
 # The matching ExecutionEvent results, limited to a maximum of 1000 entries.
@@ -5518,24 +5513,34 @@ type ScienceRequirementsGroupSelectResult {
   hasMore: Boolean!
 }
 
-# Sequence-level command
+"""
+Sequence-level command
+"""
 enum SequenceCommand {
-  # SequenceCommand ABORT
+
+  """
+  SequenceCommand ABORT
+  """
   ABORT
 
-  # SequenceCommand CONTINUE
+  """
+  SequenceCommand CONTINUE
+  """
   CONTINUE
 
-  # SequenceCommand PAUSE
+  """
+  SequenceCommand PAUSE
+  """
   PAUSE
 
-  # SequenceCommand SLEW
-  SLEW
-
-  # SequenceCommand START
+  """
+  SequenceCommand START
+  """
   START
 
-  # SequenceCommand STOP
+  """
+  SequenceCommand STOP
+  """
   STOP
 }
 
@@ -5551,36 +5556,21 @@ type SequenceDigest {
 }
 
 # Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
-type SequenceEvent implements ExecutionEvent {
-  # Identifies the observation to which the event refers
-  location: SequenceEventLocation!
-
-  # Sequence event data
-  payload: SequenceEventPayload!
-
+type SequenceEvent { # implements ExecutionEvent {
   # Event id
   id: ExecutionEventId!
 
   # Associated visit
   visitId: VisitId!
 
+  # Sequence event data
+  command: SequenceCommand!
+
   # Observation whose execution produced this event
   observation: Observation!
 
   # Time at which this event was received
   received: Timestamp!
-}
-
-# Sequence event location, i.e., to which observation the event refers.
-type SequenceEventLocation {
-  # Observation containing the sequence
-  observationId: ObservationId!
-}
-
-# Sequence event data
-type SequenceEventPayload {
-  # Sequence command
-  command: SequenceCommand!
 }
 
 type SequenceGenerationResult {
@@ -6297,7 +6287,9 @@ type User {
   orcidEmail:      String,
 }
 
-# VisitId id formatted as `v-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"""
+VisitId id formatted as `v-[1-9a-f][0-9a-f]*`
+"""
 scalar VisitId
 
 # Water vapor
