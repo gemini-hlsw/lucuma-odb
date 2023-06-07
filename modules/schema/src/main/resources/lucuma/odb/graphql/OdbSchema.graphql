@@ -819,27 +819,43 @@ type GmosNorthDynamic {
   fpu: GmosNorthFpu
 }
 
-# GMOS North instrument configuration input
+"""
+GMOS North instrument configuration input
+"""
 input GmosNorthDynamicInput {
-  # Exposure time
+  """
+  Exposure time
+  """
   exposure: TimeSpanInput!
 
-  # GMOS CCD readout
+  """
+  GMOS CCD readout
+  """
   readout: GmosCcdModeInput!
 
-  # GMOS detector x offset
+  """
+  GMOS detector x offset
+  """
   dtax: GmosDtax!
 
-  # GMOS region of interest
+  """
+  GMOS region of interest
+  """
   roi: GmosRoi!
 
-  # GMOS North grating
+  """
+  GMOS North grating
+  """
   gratingConfig: GmosNorthGratingConfigInput
 
-  # GMOS North filter
+  """
+  GMOS North filter
+  """
   filter: GmosNorthFilter
 
-  # GMOS North FPU
+  """
+  GMOS North FPU
+  """
   fpu: GmosNorthFpuInput
 }
 
@@ -1180,27 +1196,43 @@ type GmosSouthDynamic {
   fpu: GmosSouthFpu
 }
 
-# GMOS South instrument configuration input
+"""
+GMOS South instrument configuration input
+"""
 input GmosSouthDynamicInput {
-  # Exposure time
+  """
+  Exposure time
+  """
   exposure: TimeSpanInput!
 
-  # GMOS CCD readout
+  """
+  GMOS CCD readout
+  """
   readout: GmosCcdModeInput!
 
-  # GMOS detector x offset
+  """
+  GMOS detector x offset
+  """
   dtax: GmosDtax!
 
-  # GMOS region of interest
+  """
+  GMOS region of interest
+  """
   roi: GmosRoi!
 
-  # GMOS South grating
+  """
+  GMOS South grating
+  """
   gratingConfig: GmosSouthGratingConfigInput
 
-  # GMOS South filter
+  """
+  GMOS South filter
+  """
   filter: GmosSouthFilter
 
-  # GMOS South FPU
+  """
+  GMOS South FPU
+  """
   fpu: GmosSouthFpuInput
 }
 
@@ -1671,9 +1703,13 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
-  # Record a new step
+  """
+  Record a new GMOS North step
+  """
   recordGmosNorthStep(
-    # GmosNorth step configuration parameters
+    """
+    GmosNorth step configuration parameters
+    """
     input: RecordGmosNorthStepInput!
   ): RecordGmosNorthStepResult!
 
@@ -1687,9 +1723,13 @@ type Mutation {
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
 
-  # Record a new step
+  """
+  Record a new GMOS South step
+  """
   recordGmosSouthStep(
-    # GmosSouth step configuration parameters
+    """
+    GmosSouth step configuration parameters
+    """
     input: RecordGmosSouthStepInput!
   ): RecordGmosSouthStepResult!
 
@@ -2267,19 +2307,29 @@ interface StepConfig {
   stepType: StepType!
 }
 
-# Step configuration.  Choose exactly one step type.
+"""
+Step configuration.  Choose exactly one step type.
+"""
 input StepConfigInput {
 
-  # Bias step creation option
+  """
+  Bias step creation option
+  """
   bias: Boolean
 
-  # Dark step creation option
+  """
+  Dark step creation option
+  """
   dark: Boolean
 
-  # GCAL step creation option
+  """
+  GCAL step creation option
+  """
   gcal: StepConfigGcalInput
 
-  # Science step creation option
+  """
+  Science step creation option
+  """
   science: StepConfigScienceInput
 
 }
@@ -2296,7 +2346,9 @@ input StepConfigGcalInput {
   shutter: GcalShutter!
 }
 
-# Science step creation input
+"""
+Science step creation input
+"""
 input StepConfigScienceInput {
   # offset position
   offset: OffsetInput!
