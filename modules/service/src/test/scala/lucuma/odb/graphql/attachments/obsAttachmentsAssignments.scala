@@ -199,6 +199,23 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       )
     )
 
+  def cloneObservationWithAttachments(user: User, oid: Observation.Id, aids: ObsAttachment.Id*): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          cloneObservation(input: {
+            observationId: "$oid"
+            SET: {
+              obsAttachments: ${aids.map(_.asJson).mkString("[", ", ","]")}
+            }
+          }) {
+            newObservation { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id])
+
   val file1 = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful")
   val file2 = TestAttachment("file2.jpg", "finder", "jpg file".some, "A finder JPG file")
 
@@ -337,6 +354,34 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       _    <- deleteObservation(pi, pid, oid1)
       _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List.empty), (aid2, file2, List(oid2)))
       // _    <- assertAttachmentsWithObs(pi, pid, true, (aid1, file1, List(oid1)), (aid2, file2, List(oid1)))
+    } yield ()
+  }
+
+  test("cloning an observation clones the assignments"){
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, file1).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
+      oid1 <- createObservation(pi, pid, (aid1, file1), (aid2, file2))
+      _    <- assertObservation(pi, pid, oid1, (aid1, file1), (aid2, file2))
+      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List(oid1)))
+      oid2 <- cloneObservationAs(pi, oid1)
+      _    <- assertObservation(pi, pid, oid2, (aid1, file1), (aid2, file2))
+      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1, oid2)), (aid2, file2, List(oid1, oid2)))
+    } yield ()
+  }
+
+  test("new attachments can be assigned when cloning an observation"){
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, file1).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
+      oid1 <- createObservation(pi, pid, (aid1, file1))
+      _    <- assertObservation(pi, pid, oid1, (aid1, file1))
+      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List.empty))
+      oid2 <- cloneObservationWithAttachments(pi, oid1, aid2)
+      _    <- assertObservation(pi, pid, oid2, (aid2, file2))
+      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List(oid2)))
     } yield ()
   }
 }
