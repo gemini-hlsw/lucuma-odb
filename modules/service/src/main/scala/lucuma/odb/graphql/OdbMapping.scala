@@ -118,6 +118,7 @@ object OdbMapping {
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
+          with AddSequenceEventResultMapping[F]
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
@@ -179,6 +180,7 @@ object OdbMapping {
           with RecordGmosSouthVisitResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
+          with SequenceEventMapping[F]
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
@@ -217,6 +219,7 @@ object OdbMapping {
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
             List(
+              AddSequenceEventResultMapping,
               AirMassRangeMapping,
               AllocationMapping,
               AngleMapping,
@@ -277,6 +280,7 @@ object OdbMapping {
               RecordGmosSouthVisitResultMapping,
               RightAscensionMapping,
               ScienceRequirementsMapping,
+              SequenceEventMapping,
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SiderealMapping,

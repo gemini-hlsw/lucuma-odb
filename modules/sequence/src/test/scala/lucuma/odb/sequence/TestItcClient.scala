@@ -19,6 +19,8 @@ import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.OptimizedChartResult
 import lucuma.itc.client.OptimizedSpectroscopyGraphInput
 import lucuma.itc.client.OptimizedSpectroscopyGraphResult
+import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphResult
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 
 object TestItcClient {
@@ -47,27 +49,29 @@ object TestItcClient {
   ): ItcClient[F] =
     new ItcClient[F] {
 
-      def spectroscopy(
+      override def spectroscopy(
         input:    SpectroscopyIntegrationTimeInput,
         useCache: Boolean
       ): F[IntegrationTimeResult] =
         IntegrationTimeResult(Version, NonEmptyList.one(result)).pure[F]
 
-      def imaging(
+      override def imaging(
         input:    ImagingIntegrationTimeInput,
         useCache: Boolean
       ): F[IntegrationTimeResult] =
         IntegrationTimeResult(Version, NonEmptyList.one(result)).pure[F]
 
-      def optimizedSpectroscopyGraph(input: OptimizedSpectroscopyGraphInput, useCache: Boolean): F[OptimizedSpectroscopyGraphResult] =
-        OptimizedSpectroscopyGraphResult(
-          Version.server,
-          Version.data.orEmpty,
-          graphResult._1,
-          graphResult._2,
-          SignalToNoise.Min,
-          None
-        ).pure[F]
+      override def optimizedSpectroscopyGraph(
+        input:    OptimizedSpectroscopyGraphInput,
+        useCache: Boolean = true
+      ): F[OptimizedSpectroscopyGraphResult] =
+        ???
+
+      override def spectroscopyIntegrationTimeAndGraph(
+        input:    SpectroscopyIntegrationTimeAndGraphInput,
+        useCache: Boolean = true
+      ): F[SpectroscopyIntegrationTimeAndGraphResult] =
+        ???
 
       def versions: F[ItcVersions] =
         Version.pure[F]

@@ -161,8 +161,17 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           NonEmptyList.one(FakeItcResult)
         ).pure[IO]
 
-      def optimizedSpectroscopyGraph(input: lucuma.itc.client.OptimizedSpectroscopyGraphInput, useCache: Boolean): IO[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
-        IO.raiseError(new java.lang.RuntimeException("optimizedSpectroscopyGraph: not implemeneed"))
+      def optimizedSpectroscopyGraph(
+        input: lucuma.itc.client.OptimizedSpectroscopyGraphInput,
+        useCache: Boolean
+      ): IO[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
+        IO.raiseError(new java.lang.RuntimeException("optimizedSpectroscopyGraph: not implemented"))
+
+      def spectroscopyIntegrationTimeAndGraph(
+        input:    lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphInput,
+        useCache: Boolean = true
+      ): IO[lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphResult] =
+        IO.raiseError(new java.lang.RuntimeException("spectroscopyIntegrationTimeAndGraph: not implemented"))
 
       override def versions: IO[ItcVersions] =
         FakeItcVersions.pure[IO]

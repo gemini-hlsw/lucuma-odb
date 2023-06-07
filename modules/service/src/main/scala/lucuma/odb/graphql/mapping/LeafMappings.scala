@@ -41,6 +41,7 @@ import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.TimingWindowInclusion
@@ -48,6 +49,7 @@ import lucuma.core.enums.ToOActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
@@ -80,6 +82,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
+      LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
@@ -123,6 +126,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ScienceMode](ScienceModeType),
+      LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),

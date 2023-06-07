@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.util.Gid
+import lucuma.core.util.Uid
 
-def gidBinding[A: Gid](name: String): Matcher[A] =
+def uidBinding[A: Uid](name: String): Matcher[A] =
   StringBinding.emap { s =>
-    Gid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
+    Uid[A].fromString.getOption(s).toRight(s"'$s' is not a valid $name id")
   }

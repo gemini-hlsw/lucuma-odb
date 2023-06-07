@@ -14,6 +14,7 @@ trait BaseMapping[F[_]]
      with MappingExtras[F] {
 
   // TODO: auto-generate this
+  lazy val AddSequenceEventResultType          = schema.ref("AddSequenceEventResult")
   lazy val AirMassRangeType                    = schema.ref("AirMassRange")
   lazy val AllocationType                      = schema.ref("Allocation")
   lazy val AsterismGroupType                   = schema.ref("AsterismGroup")
@@ -43,6 +44,7 @@ trait BaseMapping[F[_]]
   lazy val EphemerisKeyTypeType                = schema.ref("EphemerisKeyType")
   lazy val EpochStringType                     = schema.ref("EpochString")
   lazy val ExchangeType                        = schema.ref("Exchange")
+  lazy val ExecutionEventIdType                = schema.ref("ExecutionEventId")
   lazy val ExistenceType                       = schema.ref("Existence")
   lazy val FastTurnaroundType                  = schema.ref("FastTurnaround")
   lazy val FilterTypeMetaType                  = schema.ref("FilterTypeMeta")
@@ -136,6 +138,8 @@ trait BaseMapping[F[_]]
   lazy val RightAscensionType                  = schema.ref("RightAscension")
   lazy val ScienceModeType                     = schema.ref("ScienceMode")
   lazy val ScienceRequirementsType             = schema.ref("ScienceRequirements")
+  lazy val SequenceCommandType                 = schema.ref("SequenceCommand")
+  lazy val SequenceEventType                   = schema.ref("SequenceEvent")
   lazy val SetAllocationResultType             = schema.ref("SetAllocationResult")
   lazy val SiderealType                        = schema.ref("Sidereal")
   lazy val SignalToNoiseType                   = schema.ref("SignalToNoise")
