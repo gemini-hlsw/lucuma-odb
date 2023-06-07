@@ -44,7 +44,9 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.RecordGmosNorthStepInput
 import lucuma.odb.graphql.input.RecordGmosNorthVisitInput
+import lucuma.odb.graphql.input.RecordGmosSouthStepInput
 import lucuma.odb.graphql.input.RecordGmosSouthVisitInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
@@ -91,7 +93,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProgram,
       CreateTarget,
       LinkUser,
+      RecordGmosNorthStep,
       RecordGmosNorthVisit,
+      RecordGmosSouthStep,
       RecordGmosSouthVisit,
       SetAllocation,
       UpdateAsterisms,
@@ -317,6 +321,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Result(Unique(Filter(Predicates.sequenceEvent.id.eql(eid), child)))
         }
       }
+    }
+
+  private lazy val RecordGmosNorthStep: MutationField =
+    MutationField("recordGmosNorthStep", RecordGmosNorthStepInput.Binding) { (input, child) =>
+      Result.failure(s"Not implemented yet bub.").pure[F]
+    }
+
+  private lazy val RecordGmosSouthStep: MutationField =
+    MutationField("recordGmosSouthStep", RecordGmosSouthStepInput.Binding) { (input, child) =>
+      Result.failure(s"Not implemented yet bub.").pure[F]
     }
 
   private def recordVisit(
