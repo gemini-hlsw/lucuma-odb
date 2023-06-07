@@ -46,6 +46,7 @@ trait VisitService[F[_]] {
 object VisitService {
 
   sealed trait InsertVisitResponse extends Product with Serializable
+
   object InsertVisitResponse {
 
     case class NotAuthorized(
@@ -59,7 +60,7 @@ object VisitService {
 
     case class Success(
       vid: Visit.Id
-    )  extends InsertVisitResponse
+    ) extends InsertVisitResponse
 
   }
 
