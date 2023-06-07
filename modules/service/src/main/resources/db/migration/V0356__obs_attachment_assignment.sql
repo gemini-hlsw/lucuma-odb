@@ -12,7 +12,7 @@ create table t_obs_attachment_assignment (
   constraint t_obs_attachment_assignment_pkey primary key (c_program_Id, c_observation_id, c_obs_attachment_id)
 );
 
--- Notify of obs attachment changes in the observation subscription channel.
+-- Notify of obs attachment assignment changes in both the program and observation subscription channels.
 -- Since it is an observationEdit subscription, it is always an UPDATE to the observation.
 CREATE OR REPLACE FUNCTION ch_obs_attachment_assignment_edit()
   RETURNS trigger AS $$
@@ -20,6 +20,7 @@ DECLARE
   assignment record;
 BEGIN
   assignment := COALESCE(NEW, OLD);
+  PERFORM pg_notify('ch_program_edit', assignment.c_program_id || ',' || 'UPDATE');
   PERFORM pg_notify('ch_observation_edit', assignment.c_observation_id || ',' || assignment.c_program_id || ',' || 'UPDATE');
   RETURN assignment;
 END;
