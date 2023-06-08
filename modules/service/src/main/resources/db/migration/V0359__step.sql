@@ -23,6 +23,8 @@ CREATE TABLE t_step (
   c_instrument     d_tag            NOT NULL,
   FOREIGN KEY (c_observation_id, c_instrument) REFERENCES t_observation (c_observation_id, c_instrument),
 
+  UNIQUE (c_step_id, c_instrument),
+
   -- Link to the corresponding visit (if any)
   c_visit_id       d_visit_id       NULL REFERENCES t_visit (c_visit_id),
 
@@ -71,7 +73,7 @@ CREATE TABLE t_step_config_science (
 
 );
 
-CREATE TYPE e_smart_type AS ENUM (
+CREATE TYPE e_smart_gcal_type AS ENUM (
   'arc',
   'flat',
   'day_baseline',
@@ -79,12 +81,12 @@ CREATE TYPE e_smart_type AS ENUM (
 );
 
 CREATE TABLE t_step_config_smart_gcal (
-  c_step_id     d_step_id   PRIMARY KEY,
+  c_step_id     d_step_id             PRIMARY KEY,
 
-  c_step_type   e_step_type NOT NULL DEFAULT ('smart_gcal'),
+  c_step_type   e_step_type           NOT NULL DEFAULT ('smart_gcal'),
   CHECK (c_step_type = 'smart_gcal'),
 
   FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step (c_step_id, c_step_type),
 
-  c_smart_type e_smart_type NOT NULL
+  c_smart_gcal_type e_smart_gcal_type NOT NULL
 );
