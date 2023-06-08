@@ -10,7 +10,7 @@ CREATE TYPE e_step_type AS ENUM (
   'smart_gcal'
 );
 
-CREATE TYPE e_guiding_state AS ENUM (
+CREATE TYPE e_guide_state AS ENUM (
   'enabled',
   'disabled'
 );
@@ -34,16 +34,16 @@ CREATE TABLE t_step (
 );
 
 CREATE TABLE t_step_config_science (
-  c_step_id       d_step_id   PRIMARY KEY,
+  c_step_id     d_step_id     PRIMARY KEY,
 
-  c_step_type     e_step_type NOT NULL DEFAULT ('science'),
+  c_step_type   e_step_type   NOT NULL DEFAULT ('science'),
   CHECK (c_step_type = 'science'),
 
   FOREIGN KEY (c_step_id, c_step_type) REFERENCES t_step (c_step_id, c_step_type),
 
-  c_offset_p      d_angle_µas     NOT NULL DEFAULT (0),
-  c_offset_q      d_angle_µas     NOT NULL DEFAULT (0),
-  c_guiding_state e_guiding_state NOT NULL DEFAULT ('enabled')
+  c_offset_p    d_angle_µas   NOT NULL DEFAULT (0),
+  c_offset_q    d_angle_µas   NOT NULL DEFAULT (0),
+  c_guide_state e_guide_state NOT NULL DEFAULT ('enabled')
 
 );
 

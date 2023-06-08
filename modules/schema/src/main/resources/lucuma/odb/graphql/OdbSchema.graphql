@@ -1530,6 +1530,21 @@ type GmosSouthVisit {
   sequenceEvents: [SequenceEvent!]!
 }
 
+"""
+Whether guiding is enabled for a particular science step.
+"""
+enum GuideState {
+  """
+  Guiding enabled.
+  """
+  ENABLED
+
+  """
+  Guiding disabled.
+  """
+  DISABLED
+}
+
 # Hour angle range creation parameters
 input HourAngleRangeInput {
   minHours: BigDecimal
@@ -2167,6 +2182,11 @@ type Science implements StepConfig {
   # Offset
   offset: Offset!
 
+  """
+  Guide State (whether guiding is enabled for this step)
+  """
+  guiding: GuideState!
+
   # Step type
   stepType: StepType!
 }
@@ -2355,6 +2375,11 @@ Science step creation input
 input StepConfigScienceInput {
   # offset position
   offset: OffsetInput!
+
+  """
+  Whether guiding is enabled for this step (defaults to 'ENABLED').
+  """
+  guiding: GuideState
 }
 
 # StepEvent location parameters
