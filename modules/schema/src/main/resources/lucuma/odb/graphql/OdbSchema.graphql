@@ -485,14 +485,6 @@ enum GcalArc {
   XE_ARC
 }
 
-# GCAL configuration creation input
-input GcalConfigurationInput {
-  continuum: GcalContinuum
-  arcs: [GcalArc!]!
-  diffuser: GcalDiffuser!
-  shutter: GcalShutter!
-}
-
 # GCAL continuum
 enum GcalContinuum {
   # GcalContinuum IrGreyBodyLow
@@ -592,22 +584,36 @@ type GmosCcdMode {
   ampReadMode: GmosAmpReadMode!
 }
 
-# GMOS CCD readout input parameters
-input GmosCcdReadoutInput {
-  # X Binning
-  xBin: GmosXBinning! = ONE
+"""
+GMOS CCD readout input parameters
+"""
+input GmosCcdModeInput {
 
-  # Y Binning
-  yBin: GmosYBinning! = ONE
+  """
+  X Binning, defaults to 'ONE'.
+  """
+  xBin: GmosXBinning
 
-  # Amp Count
-  ampCount: GmosAmpCount! = TWELVE
+  """
+  Y Binning, defaults to 'ONE'.
+  """
+  yBin: GmosYBinning
 
-  # Amp Gain
-  ampGain: GmosAmpGain! = LOW
+  """
+  Amp Count, defaults to 'TWELVE'.
+  """
+  ampCount: GmosAmpCount
 
-  # Amp Read Mode
-  ampRead: GmosAmpReadMode! = SLOW
+  """
+  Amp Gain, defaults to 'LOW'
+  """
+  ampGain: GmosAmpGain
+
+  """
+  Amp Read Mode, defaults to 'SLOW'
+  """
+  ampRead: GmosAmpReadMode
+
 }
 
 # GMOS Custom Mask
@@ -780,18 +786,6 @@ type GmosNorthAtom implements Atom {
 
 }
 
-# GmosNorth bias step creation input
-input GmosNorthBiasInput {
-  # instrument configuration
-  config: GmosNorthDynamicInput!
-}
-
-# GmosNorth dark step creation input
-input GmosNorthDarkInput {
-  # instrument configuration
-  config: GmosNorthDynamicInput!
-}
-
 """
 GmosNorth Detector type
 """
@@ -825,27 +819,43 @@ type GmosNorthDynamic {
   fpu: GmosNorthFpu
 }
 
-# GMOS North instrument configuration input
+"""
+GMOS North instrument configuration input
+"""
 input GmosNorthDynamicInput {
-  # Exposure time
+  """
+  Exposure time
+  """
   exposure: TimeSpanInput!
 
-  # GMOS CCD readout
-  readout: GmosCcdReadoutInput!
+  """
+  GMOS CCD readout
+  """
+  readout: GmosCcdModeInput!
 
-  # GMOS detector x offset
+  """
+  GMOS detector x offset
+  """
   dtax: GmosDtax!
 
-  # GMOS region of interest
+  """
+  GMOS region of interest
+  """
   roi: GmosRoi!
 
-  # GMOS North grating
+  """
+  GMOS North grating
+  """
   gratingConfig: GmosNorthGratingConfigInput
 
-  # GMOS North filter
+  """
+  GMOS North filter
+  """
   filter: GmosNorthFilter
 
-  # GMOS North FPU
+  """
+  GMOS North FPU
+  """
   fpu: GmosNorthFpuInput
 }
 
@@ -917,22 +927,19 @@ type GmosNorthFpu {
   builtin: GmosNorthBuiltinFpu
 }
 
-# GMOS North FPU input parameters (choose custom or builtin).
+"""
+GMOS North FPU input parameters (choose custom or builtin).
+"""
 input GmosNorthFpuInput {
-  # Custom mask FPU option
+  """
+  Custom mask FPU option
+  """
   customMask: GmosCustomMaskInput
 
-  # Builtin FPU option
+  """
+  Builtin FPU option
+  """
   builtin: GmosNorthBuiltinFpu
-}
-
-# GmosNorth GCAL step creation input
-input GmosNorthGcalInput {
-  # instrument configuration
-  config: GmosNorthDynamicInput!
-
-  # GCAL configuration
-  gcalConfig: GcalConfigurationInput!
 }
 
 # GMOS North Grating Configuration
@@ -994,15 +1001,6 @@ input GmosNorthLongSlitInput {
 
   # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitSpatialOffsets: [OffsetComponentInput!]
-}
-
-# GmosNorth science step creation input
-input GmosNorthScienceInput {
-  # instrument configuration
-  config: GmosNorthDynamicInput!
-
-  # offset position
-  offset: OffsetInput!
 }
 
 # GMOS North stage mode
@@ -1081,21 +1079,6 @@ type GmosNorthStep implements Step {
   # Observe class for this step
   observeClass: ObserveClass!
 
-}
-
-# GmosNorth step creation input.  Choose exactly one step type.
-input GmosNorthStepInput {
-  # Bias step creation option
-  bias: GmosNorthBiasInput
-
-  # Dark step creation option
-  dark: GmosNorthDarkInput
-
-  # GCAL step creation option
-  gcal: GmosNorthGcalInput
-
-  # Science step creation option
-  science: GmosNorthScienceInput
 }
 
 # A GmosNorth step configuration as recorded by Observe
@@ -1180,18 +1163,6 @@ type GmosSouthAtom implements Atom {
   steps: [GmosSouthStep!]!
 }
 
-# GmosSouth bias step creation input
-input GmosSouthBiasInput {
-  # instrument configuration
-  config: GmosSouthDynamicInput!
-}
-
-# GmosSouth dark step creation input
-input GmosSouthDarkInput {
-  # instrument configuration
-  config: GmosSouthDynamicInput!
-}
-
 """
 GmosSouth Detector type
 """
@@ -1225,27 +1196,43 @@ type GmosSouthDynamic {
   fpu: GmosSouthFpu
 }
 
-# GMOS South instrument configuration input
+"""
+GMOS South instrument configuration input
+"""
 input GmosSouthDynamicInput {
-  # Exposure time
+  """
+  Exposure time
+  """
   exposure: TimeSpanInput!
 
-  # GMOS CCD readout
-  readout: GmosCcdReadoutInput!
+  """
+  GMOS CCD readout
+  """
+  readout: GmosCcdModeInput!
 
-  # GMOS detector x offset
+  """
+  GMOS detector x offset
+  """
   dtax: GmosDtax!
 
-  # GMOS region of interest
+  """
+  GMOS region of interest
+  """
   roi: GmosRoi!
 
-  # GMOS South grating
+  """
+  GMOS South grating
+  """
   gratingConfig: GmosSouthGratingConfigInput
 
-  # GMOS South filter
+  """
+  GMOS South filter
+  """
   filter: GmosSouthFilter
 
-  # GMOS South FPU
+  """
+  GMOS South FPU
+  """
   fpu: GmosSouthFpuInput
 }
 
@@ -1325,15 +1312,6 @@ input GmosSouthFpuInput {
   builtin: GmosSouthBuiltinFpu
 }
 
-# GmosSouth GCAL step creation input
-input GmosSouthGcalInput {
-  # instrument configuration
-  config: GmosSouthDynamicInput!
-
-  # GCAL configuration
-  gcalConfig: GcalConfigurationInput!
-}
-
 # GMOS South Grating Configuration
 type GmosSouthGratingConfig {
   # GMOS South Grating
@@ -1394,15 +1372,6 @@ input GmosSouthLongSlitInput {
   # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   explicitSpatialOffsets: [OffsetComponentInput!]
 
-}
-
-# GmosSouth science step creation input
-input GmosSouthScienceInput {
-  # instrument configuration
-  config: GmosSouthDynamicInput!
-
-  # offset position
-  offset: OffsetInput!
 }
 
 # GMOS South stage mode
@@ -1493,21 +1462,6 @@ type GmosSouthStep implements Step {
   # Observe class for this step
   observeClass: ObserveClass!
 
-}
-
-# GmosSouth step creation input.  Choose exactly one step type.
-input GmosSouthStepInput {
-  # Bias step creation option
-  bias: GmosSouthBiasInput
-
-  # Dark step creation option
-  dark: GmosSouthDarkInput
-
-  # GCAL step creation option
-  gcal: GmosSouthGcalInput
-
-  # Science step creation option
-  science: GmosSouthScienceInput
 }
 
 # A GmosSouth step configuration as recorded by Observe
@@ -1749,9 +1703,13 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
-  # Record a new step
+  """
+  Record a new GMOS North step
+  """
   recordGmosNorthStep(
-    # GmosNorth step configuration parameters
+    """
+    GmosNorth step configuration parameters
+    """
     input: RecordGmosNorthStepInput!
   ): RecordGmosNorthStepResult!
 
@@ -1765,9 +1723,13 @@ type Mutation {
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
 
-  # Record a new step
+  """
+  Record a new GMOS South step
+  """
   recordGmosSouthStep(
-    # GmosSouth step configuration parameters
+    """
+    GmosSouth step configuration parameters
+    """
     input: RecordGmosSouthStepInput!
   ): RecordGmosSouthStepResult!
 
@@ -2132,11 +2094,13 @@ input RadialVelocityInput {
   kilometersPerSecond: BigDecimal
 }
 
-# Input parameters for creating a new GmosNorth StepRecord
+"""
+Input parameters for creating a new GmosNorth StepRecord
+"""
 input RecordGmosNorthStepInput {
-  observationId: ObservationId!
   visitId: VisitId!
-  stepConfig: GmosNorthStepInput!
+  instrument: GmosNorthDynamicInput!
+  step: StepConfigInput!
 }
 
 # The result of recording a GmosNorth step.
@@ -2161,9 +2125,9 @@ type RecordGmosNorthVisitResult {
 
 # Input parameters for creating a new GmosSouth StepRecord
 input RecordGmosSouthStepInput {
-  observationId: ObservationId!
   visitId: VisitId!
-  stepConfig: GmosSouthStepInput!
+  instrument: GmosSouthDynamicInput!
+  step: GmosSouthStepInput!
 }
 
 # The result of recording a GmosSouth step.
@@ -2341,6 +2305,53 @@ interface Step {
 interface StepConfig {
   # Step type
   stepType: StepType!
+}
+
+"""
+Step configuration.  Choose exactly one step type.
+"""
+input StepConfigInput {
+
+  """
+  Bias step creation option
+  """
+  bias: Boolean
+
+  """
+  Dark step creation option
+  """
+  dark: Boolean
+
+  """
+  GCAL step creation option
+  """
+  gcal: StepConfigGcalInput
+
+  """
+  Science step creation option
+  """
+  science: StepConfigScienceInput
+
+}
+
+"""
+GCAL configuration creation input.  Specify either one or more arcs or else
+one continuum.
+"""
+input StepConfigGcalInput {
+  arcs: [GcalArc!]
+  continuum: GcalContinuum
+  diffuser: GcalDiffuser!
+  filter: GcalFilter!
+  shutter: GcalShutter!
+}
+
+"""
+Science step creation input
+"""
+input StepConfigScienceInput {
+  # offset position
+  offset: OffsetInput!
 }
 
 # StepEvent location parameters
