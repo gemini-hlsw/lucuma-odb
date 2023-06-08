@@ -14,33 +14,12 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.CatalogName
-import lucuma.core.enums.CloudExtinction
-import lucuma.core.enums.EphemerisKeyType
-import lucuma.core.enums.FocalPlane
-import lucuma.core.enums.GcalArc
-import lucuma.core.enums.GcalBaselineType
-import lucuma.core.enums.GcalContinuum
-import lucuma.core.enums.GcalDiffuser
-import lucuma.core.enums.GcalFilter
-import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.ImageQuality
-import lucuma.core.enums.Instrument
-import lucuma.core.enums.MosPreImaging
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
-import lucuma.core.enums.ScienceMode
-import lucuma.core.enums.SequenceCommand
-import lucuma.core.enums.Site
-import lucuma.core.enums.SkyBackground
-import lucuma.core.enums.SpectroscopyCapabilities
-import lucuma.core.enums.TimingWindowInclusion
-import lucuma.core.enums.ToOActivation
-import lucuma.core.enums.WaterVapor
+import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
+import lucuma.core.math.Offset
 import lucuma.core.math.Parallax
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
@@ -50,6 +29,7 @@ import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.Group
 import lucuma.core.model.*
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -217,6 +197,9 @@ trait Codecs {
   val gcal_shutter: Codec[GcalShutter] =
     enumerated[GcalShutter](Type.varchar)
 
+  val guide_state: Codec[GuideState] =
+    enumerated(Type("e_guide_state"))
+
   val hour_angle_range_value: Codec[BigDecimal] =
     numeric(3, 2)
 
@@ -330,13 +313,22 @@ trait Codecs {
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
 
+  val smart_gcal_type: Codec[SmartGcalType] =
+    enumerated(Type("e_smart_gcal_type"))
+
   val spectroscopy_capabilities: Codec[SpectroscopyCapabilities] =
     enumerated[SpectroscopyCapabilities](Type.varchar)
 
-   val signal_to_noise: Codec[SignalToNoise] =
-     numeric(10,3).eimap(
-      bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
-     )(_.toBigDecimal)
+  val signal_to_noise: Codec[SignalToNoise] =
+    numeric(10,3).eimap(
+     bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
+    )(_.toBigDecimal)
+
+  val step_id: Codec[Step.Id] =
+    uid[Step.Id]
+
+  val step_type: Codec[StepType] =
+    enumerated(Type("e_step_type"))
 
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)
@@ -404,13 +396,6 @@ trait Codecs {
 
   // Not so atomic ...
 
-  val elevation_range: Codec[ElevationRange] =
-    (air_mass_range.opt ~ hour_angle_range.opt).eimap { case (am, ha) =>
-      am.orElse(ha).toRight("Undefined elevation range")
-    } { e =>
-      (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
-    }
-
   val constraint_set: Codec[ConstraintSet] =
     (image_quality    *:
      cloud_extinction *:
@@ -418,6 +403,18 @@ trait Codecs {
      water_vapor      *:
      elevation_range
     ).to[ConstraintSet]
+
+  val elevation_range: Codec[ElevationRange] =
+    (air_mass_range.opt ~ hour_angle_range.opt).eimap { case (am, ha) =>
+      am.orElse(ha).toRight("Undefined elevation range")
+    } { e =>
+      (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
+    }
+
+  val offset: Codec[Offset] =
+    (angle_µas *: angle_µas).imap { (p, q) =>
+      Offset(Offset.P(p), Offset.Q(q))
+    }(o => (o.p.toAngle, o.q.toAngle))
 
   val step_config_gcal: Codec[StepConfig.Gcal] =
     (gcal_continuum.opt *:
@@ -454,6 +451,12 @@ trait Codecs {
         gcal.shutter
       )
     }
+
+  val step_config_science: Codec[StepConfig.Science] =
+    (offset *: guide_state).to[StepConfig.Science]
+
+  val step_config_smart_gcal: Codec[StepConfig.SmartGcal] =
+    smart_gcal_type.to[StepConfig.SmartGcal]
 
   val void: Codec[Unit] =
     val rightUnit = Right(())

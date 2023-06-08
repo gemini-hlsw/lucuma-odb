@@ -229,7 +229,7 @@ object SmartGcalService {
         sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_north_grating.opt}"(gn.grating.map(_.grating)),
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_north_filter.opt}"(gn.filter),
         sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_north_fpu.opt}"(gn.fpu),
-        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_disperser_order.opt}"(gn.grating.map(_.order)),
+        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_grating_order.opt}"(gn.grating.map(_.order)),
         sql"s.c_x_binning = ${gmos_x_binning}"(gn.xBin),
         sql"s.c_y_binning = ${gmos_y_binning}"(gn.yBin),
         sql"s.c_amp_gain  = ${gmos_amp_gain}"(gn.gain),
@@ -250,7 +250,7 @@ object SmartGcalService {
         sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_south_grating.opt}"(gs.grating.map(_.grating)),
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_south_filter.opt}"(gs.filter),
         sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_south_fpu.opt}"(gs.fpu),
-        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_disperser_order.opt}"(gs.grating.map(_.order)),
+        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_grating_order.opt}"(gs.grating.map(_.order)),
         sql"s.c_x_binning = ${gmos_x_binning}"(gs.xBin),
         sql"s.c_y_binning = ${gmos_y_binning}"(gs.yBin),
         sql"s.c_amp_gain  = ${gmos_amp_gain}"(gs.gain),
@@ -330,7 +330,7 @@ object SmartGcalService {
           $gmos_x_binning,
           $gmos_y_binning,
           ${wavelength_pm_range.opt},
-          ${gmos_disperser_order.opt},
+          ${gmos_grating_order.opt},
           $gmos_amp_gain,
           $time_span
       """
@@ -373,7 +373,7 @@ object SmartGcalService {
           $gmos_x_binning,
           $gmos_y_binning,
           ${wavelength_pm_range.opt},
-          ${gmos_disperser_order.opt},
+          ${gmos_grating_order.opt},
           $gmos_amp_gain,
           $time_span
       """

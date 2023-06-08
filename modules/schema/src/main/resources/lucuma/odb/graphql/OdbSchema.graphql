@@ -2187,8 +2187,34 @@ type Science implements StepConfig {
   """
   guiding: GuideState!
 
-  # Step type
+  """
+  Step type is always SCIENCE.
+  """
   stepType: StepType!
+}
+
+"""
+Which kind of smart gcal configuration is requested in a smart gcal step.
+"""
+enum SmartGcalType {
+  ARC
+  FLAT
+  DAY_BASELINE
+  NIGHT_BASELINE
+}
+
+"""
+SmartGcal step configuration.
+"""
+type SmartGcal implements StepConfig {
+
+  smartGcalType: SmartGcalType!
+
+  """
+  Step type is always SMART_GCAL.
+  """
+  stepType: StepType!
+
 }
 
 # Edit or create an observation's observing mode
