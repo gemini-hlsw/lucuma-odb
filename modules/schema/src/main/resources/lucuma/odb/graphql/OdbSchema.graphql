@@ -1866,6 +1866,9 @@ input ObservationPropertiesInput {
   # The timingWindows defaults to empty if not specified on creation, and may be edited by specifying a new whole array
   timingWindows: [TimingWindowInput!]
 
+  # The obsAttachments defaults to empty if not specified on creation, and may be edited by specifying a new whole array
+  obsAttachments: [ObsAttachmentId!]
+
   # The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
   scienceRequirements: ScienceRequirementsInput
 
@@ -4790,6 +4793,9 @@ type Observation {
 
   # Observation timing windows
   timingWindows: [TimingWindow!]!
+
+  # attachments
+  obsAttachments: [ObsAttachment!]!
 
   # The top level science requirements
   scienceRequirements: ScienceRequirements!
