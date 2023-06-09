@@ -16,16 +16,12 @@ import lucuma.core.model.Observation
 import lucuma.odb.graphql.predicate.Predicates
 
 import binding._
-import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
-import table.ObservationView
 import table.ProgramTable
 
 trait ObsAttachmentMapping[F[_]] 
   extends ObsAttachmentTable[F]
      with ProgramTable[F]
-     with ObsAttachmentAssignmentTable[F]
-     with ObservationView[F]
      with Predicates[F] {
   
   lazy val ObsAttachmentMapping =
