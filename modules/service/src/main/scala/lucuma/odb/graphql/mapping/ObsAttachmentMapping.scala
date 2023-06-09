@@ -41,33 +41,6 @@ trait ObsAttachmentMapping[F[_]]
         SqlField("fileSize", ObsAttachmentTable.FileSize),
         SqlField("updatedAt", ObsAttachmentTable.UpdatedAt),
         SqlObject("program", Join(ObsAttachmentTable.ProgramId, ProgramTable.Id)),
-        SqlObject("observations")
       )
-    )
-
-  lazy val ObsAttachmentElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] = 
-    Map(
-      ObsAttachmentType -> {
-        case Select("observations", List(
-          BooleanBinding("includeDeleted", rIncludeDeleted),
-          ObservationIdBinding.Option("OFFSET", rOFFSET),
-          NonNegIntBinding.Option("LIMIT", rLIMIT),
-        ), child) =>
-          (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
-            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
-            ResultMapping.selectResult("observations", child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  Predicates.observation.existence.includeDeleted(includeDeleted),
-                  OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
-                ))),
-                oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
-                offset = None,
-                limit = Some(limit + 1),
-                q
-              )
-            }
-          }
-      }
     )
 }

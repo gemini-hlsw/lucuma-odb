@@ -127,25 +127,6 @@ abstract class ObsAttachmentsSuite extends AttachmentsSuite {
       )
     )
 
-  def expectedAttachmentsWithObs(
-    attachments: List[(ObsAttachment.Id, TestAttachment, List[Observation.Id])]
-  ): Json =
-    Json.obj(
-      "obsAttachments" -> Json.fromValues(
-        attachments.sortBy(_._1).map((tid, ta, obsIds) =>
-          Json.obj(
-            "id"             -> tid.asJson,
-            "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
-            "fileName"       -> ta.fileName.asJson,
-            "description"    -> ta.description.asJson,
-            "checked"        -> ta.checked.asJson,
-            "fileSize"       -> ta.content.length.asJson,
-            "observations"   -> Json.obj("matches" -> Json.arr(obsIds.sorted.map(oid => Json.obj("id" -> oid.asJson)): _*))
-          )
-        )
-      )
-    )
-
   val ObsAttachmentsGraph: String =
     """obsAttachments {
        |  id
@@ -154,20 +135,5 @@ abstract class ObsAttachmentsSuite extends AttachmentsSuite {
        |  description
        |  checked
        |  fileSize
-       |}""".stripMargin
-
-  def ObsAttachmentsWithObsGraph(includeDeleted: Boolean): String =
-    s"""obsAttachments {
-       |  id
-       |  attachmentType
-       |  fileName
-       |  description
-       |  checked
-       |  fileSize
-       |  observations(includeDeleted: ${if (includeDeleted) "true" else "false"}) {
-       |    matches {
-       |      id
-       |    }
-       |  }
        |}""".stripMargin
 }

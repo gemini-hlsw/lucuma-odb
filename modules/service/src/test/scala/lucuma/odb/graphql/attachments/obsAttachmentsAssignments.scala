@@ -39,36 +39,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       case Skip(existing) => expectedAttachments(existing.toList)
       case Values(values) => expectedAttachments(values.toList)
 
-  def assertAttachmentsWithObs(
-    user:           User,
-    programId:      Program.Id,
-    expectedTas:    (ObsAttachment.Id, TestAttachment, List[Observation.Id])*
-  ): IO[Unit] =
-    assertAttachmentsWithObs(user, programId, false, expectedTas: _*)
-
-  def assertAttachmentsWithObs(
-    user:           User,
-    programId:      Program.Id,
-    includeDeleted: Boolean,
-    expectedTas:    (ObsAttachment.Id, TestAttachment, List[Observation.Id])*
-  ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-          query {
-            program(programId: "$programId") {
-              ${ObsAttachmentsWithObsGraph(includeDeleted)}
-            }
-          }
-        """,
-      expected = Right(
-        Json.obj(
-          "program" -> expectedAttachmentsWithObs(expectedTas.toList)
-        )
-      )
-    )
-
-
   def assertObservation(
     user:        User,
     pid:         Program.Id,
@@ -233,7 +203,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       oid <- createObservation(pi, pid, (aid, file1))
       _   <- assertObservation(pi, pid, oid, (aid, file1))
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List(oid)))
     } yield ()
   }
 
@@ -244,7 +213,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
       oid  <- createObservation(pi, pid, (aid1, file1), (aid2, file2))
       _    <- assertObservation(pi, pid, oid, (aid1, file1), (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid)), (aid2, file2, List(oid)))
     } yield ()
   }
 
@@ -257,7 +225,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid2 <- createObservation(pi, pid, (aid2, file2))
       _    <- assertObservation(pi, pid, oid1, (aid1, file1), (aid2, file2))
       _    <- assertObservation(pi, pid, oid2, (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List(oid1, oid2)))
     } yield ()
   }
 
@@ -275,7 +242,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid <- createObservationAs(pi, pid)
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       _   <- updateObservation(pi, pid, oid, updateFile1(aid))
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List(oid)))
     } yield ()
   }
 
@@ -285,9 +251,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       oid <- createObservation(pi, pid, (aid, file1))
       _   <- assertObservation(pi, pid, oid, (aid, file1))
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List(oid)))
       _   <- updateObservation(pi, pid, oid, UpdateInput.Null)
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List.empty))
     } yield ()
   }
 
@@ -297,9 +261,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       oid <- createObservation(pi, pid, (aid, file1))
       _   <- assertObservation(pi, pid, oid, (aid, file1))
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List(oid)))
       _   <- updateObservation(pi, pid, oid, updateEmpty)
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List.empty))
     } yield ()
   }
 
@@ -309,9 +271,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid <- createObservationAs(pi, pid)
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       _   <- updateObservation(pi, pid, oid, updateFile1(aid))
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List(oid)))
       _   <- updateObservation(pi, pid, oid, skipFile1(aid))
-      _   <- assertAttachmentsWithObs(pi, pid, (aid, file1, List(oid)))
     } yield ()
   }
 
@@ -321,9 +281,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid  <- createObservationAs(pi, pid)
       aid1 <- insertAttachment(pi, pid, file1).toAttachmentId
       aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List.empty), (aid2, file2, List.empty))
       _    <- updateObservation(pi, pid, oid, updateBothFiles(aid1, aid2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid)), (aid2, file2, List(oid)))
     } yield ()
   }
 
@@ -334,10 +292,8 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
       oid  <- createObservation(pi, pid, (aid1, file1), (aid2, file2))
       _    <- assertObservation(pi, pid, oid, (aid1, file1), (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid)), (aid2, file2, List(oid)))
       _    <- deleteAttachment(pi, pid, aid1).expectOk
       _    <- assertObservation(pi, pid, oid, (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid2, file2, List(oid)))
     } yield ()
   }
 
@@ -350,10 +306,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid2 <- createObservation(pi, pid, (aid2, file2))
       _    <- assertObservation(pi, pid, oid1, (aid1, file1), (aid2, file2))
       _    <- assertObservation(pi, pid, oid2, (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List(oid1, oid2)))
       _    <- deleteObservation(pi, pid, oid1)
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List.empty), (aid2, file2, List(oid2)))
-      // _    <- assertAttachmentsWithObs(pi, pid, true, (aid1, file1, List(oid1)), (aid2, file2, List(oid1)))
     } yield ()
   }
 
@@ -364,10 +317,8 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
       oid1 <- createObservation(pi, pid, (aid1, file1), (aid2, file2))
       _    <- assertObservation(pi, pid, oid1, (aid1, file1), (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List(oid1)))
       oid2 <- cloneObservationAs(pi, oid1)
       _    <- assertObservation(pi, pid, oid2, (aid1, file1), (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1, oid2)), (aid2, file2, List(oid1, oid2)))
     } yield ()
   }
 
@@ -378,10 +329,8 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
       oid1 <- createObservation(pi, pid, (aid1, file1))
       _    <- assertObservation(pi, pid, oid1, (aid1, file1))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List.empty))
       oid2 <- cloneObservationWithAttachments(pi, oid1, aid2)
       _    <- assertObservation(pi, pid, oid2, (aid2, file2))
-      _    <- assertAttachmentsWithObs(pi, pid, (aid1, file1, List(oid1)), (aid2, file2, List(oid2)))
     } yield ()
   }
 }

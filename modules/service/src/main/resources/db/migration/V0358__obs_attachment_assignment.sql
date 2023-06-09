@@ -20,7 +20,6 @@ DECLARE
   assignment record;
 BEGIN
   assignment := COALESCE(NEW, OLD);
-  PERFORM pg_notify('ch_program_edit', assignment.c_program_id || ',' || 'UPDATE');
   PERFORM pg_notify('ch_observation_edit', assignment.c_observation_id || ',' || assignment.c_program_id || ',' || 'UPDATE');
   RETURN assignment;
 END;

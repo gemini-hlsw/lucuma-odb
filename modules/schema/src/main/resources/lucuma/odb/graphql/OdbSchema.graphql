@@ -2981,18 +2981,6 @@ type ObsAttachment {
   fileSize:       Long!
   updatedAt:      Timestamp!
   program:        Program!
-  
-  # All observations to which the attachment is assigned.
-  observations(
-    # Set to true to include deleted values
-    includeDeleted: Boolean! = false
-
-    # Starts the result set at (or after if not existent) the given observation id.
-    OFFSET: ObservationId
-
-    # Limits the result to at most this number of matches (but never more than 1000).
-    LIMIT: NonNegInt
-  ): ObservationSelectResult!
 }
 
 input ObsAttachmentPropertiesInput {
