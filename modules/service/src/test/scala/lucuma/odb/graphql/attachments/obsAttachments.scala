@@ -4,9 +4,7 @@
 package lucuma.odb.graphql
 package attachments
 
-import cats.Order.given
 import cats.effect.IO
-import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
@@ -23,9 +21,7 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
-import java.util.UUID
-
-class obsAttachments extends AttachmentsSuite {
+class obsAttachments extends ObsAttachmentsSuite {
   
   def assertAttachmentsGql(
     user:        User,
@@ -37,20 +33,13 @@ class obsAttachments extends AttachmentsSuite {
       query = s"""
           query {
             program(programId: "$programId") {
-              obsAttachments {
-                id
-                attachmentType
-                fileName
-                description
-                checked
-                fileSize
-              }
+              $ObsAttachmentsGraph
             }
           }
         """,
       expected = Right(
         Json.obj(
-          "program" -> expected(expectedTas: _*)
+          "program" -> expectedAttachments(expectedTas.toList)
         )
       )
     )
@@ -70,133 +59,20 @@ class obsAttachments extends AttachmentsSuite {
             input: {
               programId: "$programId"
               WHERE: """ + WHERE + """
-              SET: """ + SET + """
+              SET: """ + SET + s"""
             }
           ) {
-            obsAttachments {
-              id
-              attachmentType
-              fileName
-              description
-              checked
-              fileSize
-            }
+            $ObsAttachmentsGraph
           }
         }
       """,
       expected = Right(
         Json.obj(
-          "updateObsAttachments" -> expected(expectedTas: _*)
+          "updateObsAttachments" -> expectedAttachments(expectedTas.toList)
         )
       )
     )
 
-  def expected(attachments: (ObsAttachment.Id, TestAttachment)*): Json =
-    Json.obj(
-      "obsAttachments" -> Json.fromValues(
-        attachments.sortBy(_._1).map((tid, ta) =>
-          Json.obj(
-            "id"             -> tid.asJson,
-            "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
-            "fileName"       -> ta.fileName.asJson,
-            "description"    -> ta.description.asJson,
-            "checked"        -> ta.checked.asJson,
-            "fileSize"       -> ta.content.length.asJson
-          )
-        )
-      )
-    )
-
-  def insertAttachment(
-    user:      User,
-    programId: Program.Id,
-    ta:        TestAttachment
-  ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri =
-        (svr.baseUri / "attachment" / "obs" / programId.toString)
-          .withQueryParam("fileName", ta.fileName)
-          .withQueryParam("attachmentType", ta.attachmentType)
-          .withOptionQueryParam("description", ta.description)
-
-      val request = Request[IO](
-        method = Method.POST,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      ).withEntity(ta.content)
-
-      client.run(request)
-    }
-  
-  def updateAttachment(
-    user:         User,
-    programId:    Program.Id,
-    attachmentId: ObsAttachment.Id,
-    ta:           TestAttachment
-  ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri =
-        (svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString)
-          .withQueryParam("fileName", ta.fileName)
-          .withOptionQueryParam("description", ta.description)
-
-      val request = Request[IO](
-        method = Method.PUT,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      ).withEntity(ta.content)
-
-      client.run(request)
-    }
-
-  def getAttachment(
-    user:         User,
-    programId:    Program.Id,
-    attachmentId: ObsAttachment.Id
-  ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
-      var request = Request[IO](
-        method = Method.GET,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
-
-      client.run(request)
-    }
-
-  def getPresignedUrl(
-    user:         User,
-    programId:    Program.Id,
-    attachmentId: ObsAttachment.Id
-  ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "obs" / "url" / programId.toString / attachmentId.toString
-      var request = Request[IO](
-        method = Method.GET,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
-
-      client.run(request)
-    }
-
-  def deleteAttachment(
-    user:         User,
-    programId:    Program.Id,
-    attachmentId: ObsAttachment.Id
-  ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
-      var request = Request[IO](
-        method = Method.DELETE,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
-
-      client.run(request)
-    }
-  
   def getRemotePathFromDb(aid: ObsAttachment.Id): IO[NonEmptyString] = {
     val query = sql"select c_remote_path from t_obs_attachment where c_obs_attachment_id = $obs_attachment_id".query(text_nonempty)
     FMain.databasePoolResource[IO](databaseConfig).flatten

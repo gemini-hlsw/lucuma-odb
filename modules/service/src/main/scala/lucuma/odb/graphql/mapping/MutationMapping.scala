@@ -461,9 +461,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         val updateObservations: F[Result[(List[Observation.Id], Query)]] =
           idSelect.flatTraverse { which =>
             observationService
-              .updateObservations(input.SET, which)
-              .map { r =>
-                r.flatMap { oids =>
+              .updateObservations(input.programId, input.SET, which)
+              .map { r => 
+                r.flatMap { oids => 
                   observationResultSubquery(oids, input.LIMIT, child)
                     .tupleLeft(oids)
                 }
