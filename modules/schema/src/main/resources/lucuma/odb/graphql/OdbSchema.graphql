@@ -2127,7 +2127,7 @@ type RecordGmosNorthVisitResult {
 input RecordGmosSouthStepInput {
   visitId: VisitId!
   instrument: GmosSouthDynamicInput!
-  step: GmosSouthStepInput!
+  step: StepConfigInput!
 }
 
 # The result of recording a GmosSouth step.
