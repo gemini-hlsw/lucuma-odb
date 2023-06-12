@@ -1,6 +1,5 @@
 -- Updates to GMOS North and South dynamic config
 
-
 -- Should ALTER TABLE but it is currently unused and it's easier to redefine.
 DROP TABLE t_gmos_north_dynamic;
 
