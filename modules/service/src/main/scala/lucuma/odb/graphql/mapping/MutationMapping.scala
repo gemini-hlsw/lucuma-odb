@@ -33,6 +33,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Step
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddSequenceEventInput
@@ -70,6 +71,7 @@ import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.ProposalService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.StepService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
@@ -323,14 +325,42 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private def recordStep(
+    response:  F[StepService.InsertStepResponse],
+    predicate: LeafPredicates[Step.Id],
+    child:     Query
+  ): F[Result[Query]] = {
+    import StepService.InsertStepResponse.*
+    response.map[Result[Query]] {
+      case NotAuthorized(user)                 =>
+        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+      case VisitNotFound(id, instrument)       =>
+        Result.failure(s"Visit '$id' not found or is not a ${instrument.longName} visit")
+      case Success(sid)                        =>
+        Result(Unique(Filter(predicate.eql(sid), child)))
+    }
+  }
+
   private lazy val RecordGmosNorthStep: MutationField =
     MutationField("recordGmosNorthStep", RecordGmosNorthStepInput.Binding) { (input, child) =>
-      Result.failure(s"Not implemented yet bub.").pure[F]
+      services.useTransactionally {
+        recordStep(
+          stepService.insertGmosNorth(input.visitId, input.instrument, input.step),
+          Predicates.gmosNorthStep.id,
+          child
+        )
+      }
     }
 
   private lazy val RecordGmosSouthStep: MutationField =
     MutationField("recordGmosSouthStep", RecordGmosSouthStepInput.Binding) { (input, child) =>
-      Result.failure(s"Not implemented yet bub.").pure[F]
+      services.useTransactionally {
+        recordStep(
+          stepService.insertGmosSouth(input.visitId, input.instrument, input.step),
+          Predicates.gmosSouthStep.id,
+          child
+        )
+      }
     }
 
   private def recordVisit(
