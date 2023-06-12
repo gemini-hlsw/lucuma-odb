@@ -15,6 +15,8 @@ CREATE TYPE e_guide_state AS ENUM (
   'disabled'
 );
 
+-- The t_step table will hold manual and executed steps.  Generated steps are
+-- not recorded until they are actually executed.
 CREATE TABLE t_step (
   c_step_id        d_step_id        PRIMARY KEY,
 
@@ -25,8 +27,12 @@ CREATE TABLE t_step (
 
   UNIQUE (c_step_id, c_instrument),
 
-  -- Link to the corresponding visit (if any)
+  -- Link to the corresponding visit (if any).  If none, this is a manual step.
+  -- All executed steps are tied to a particular visit.
   c_visit_id       d_visit_id       NULL REFERENCES t_visit (c_visit_id),
+
+  -- A step sequence number of some type will be added in a separate migration
+  -- for manual step entries.
 
   c_step_type      e_step_type      NOT NULL,
   UNIQUE (c_step_id, c_step_type),
@@ -35,9 +41,11 @@ CREATE TABLE t_step (
 
 );
 
+-- GCal step definition.
 CREATE TABLE t_step_config_gcal (
   c_step_id       d_step_id        PRIMARY KEY,
 
+  -- Tie to the t_step table, ensuring that it is in fact a gcal step.
   c_step_type     e_step_type      NOT NULL DEFAULT ('gcal'),
   CHECK (c_step_type = 'gcal'),
 
@@ -59,9 +67,11 @@ CREATE TABLE t_step_config_gcal (
 
 );
 
+-- Science step definition.
 CREATE TABLE t_step_config_science (
   c_step_id     d_step_id     PRIMARY KEY,
 
+  -- Tie to the t_step table, ensuring that it is in fact a science step.
   c_step_type   e_step_type   NOT NULL DEFAULT ('science'),
   CHECK (c_step_type = 'science'),
 
@@ -80,9 +90,11 @@ CREATE TYPE e_smart_gcal_type AS ENUM (
   'night_baseline'
 );
 
+-- Smart Gcal step definition.
 CREATE TABLE t_step_config_smart_gcal (
   c_step_id     d_step_id             PRIMARY KEY,
 
+  -- Tie to the t_step table, ensuring that it is in fact a smart gcal step.
   c_step_type   e_step_type           NOT NULL DEFAULT ('smart_gcal'),
   CHECK (c_step_type = 'smart_gcal'),
 
