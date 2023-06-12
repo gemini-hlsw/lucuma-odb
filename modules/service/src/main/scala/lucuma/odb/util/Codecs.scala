@@ -396,6 +396,13 @@ trait Codecs {
 
   // Not so atomic ...
 
+  val elevation_range: Codec[ElevationRange] =
+    (air_mass_range.opt ~ hour_angle_range.opt).eimap { case (am, ha) =>
+      am.orElse(ha).toRight("Undefined elevation range")
+    } { e =>
+      (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
+    }
+
   val constraint_set: Codec[ConstraintSet] =
     (image_quality    *:
      cloud_extinction *:
@@ -403,13 +410,6 @@ trait Codecs {
      water_vapor      *:
      elevation_range
     ).to[ConstraintSet]
-
-  val elevation_range: Codec[ElevationRange] =
-    (air_mass_range.opt ~ hour_angle_range.opt).eimap { case (am, ha) =>
-      am.orElse(ha).toRight("Undefined elevation range")
-    } { e =>
-      (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
-    }
 
   val offset: Codec[Offset] =
     (angle_µas *: angle_µas).imap { (p, q) =>

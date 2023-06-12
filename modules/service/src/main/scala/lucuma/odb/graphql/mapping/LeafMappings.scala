@@ -29,6 +29,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
@@ -107,6 +108,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[SmartGcalType](SmartGcalType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
+      LeafMapping[Step.Id](StepIdType),
       LeafMapping[StepType](StepType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),

@@ -2118,7 +2118,7 @@ Input parameters for creating a new GmosNorth StepRecord
 input RecordGmosNorthStepInput {
   visitId: VisitId!
   instrument: GmosNorthDynamicInput!
-  step: StepConfigInput!
+  stepConfig: StepConfigInput!
 }
 
 # The result of recording a GmosNorth step.
@@ -2145,7 +2145,7 @@ type RecordGmosNorthVisitResult {
 input RecordGmosSouthStepInput {
   visitId: VisitId!
   instrument: GmosSouthDynamicInput!
-  step: StepConfigInput!
+  stepConfig: StepConfigInput!
 }
 
 # The result of recording a GmosSouth step.

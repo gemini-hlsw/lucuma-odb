@@ -136,6 +136,7 @@ object StepService {
         INSERT INTO t_step (
           c_step_id,
           c_observation_id,
+          c_instrument,
           c_visit_id,
           c_step_type
         ) SELECT
