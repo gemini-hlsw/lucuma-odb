@@ -26,7 +26,7 @@ final case class EstimatorState[D](
   def next(step: ProtoStep[D]): EstimatorState[D] =
     step.stepConfig match {
       case g@StepConfig.Gcal(_, _, _, _) => EstimatorState(g.some, science, step.some)
-      case s@StepConfig.Science(_)       => EstimatorState(gcal, s.some, step.some)
+      case s@StepConfig.Science(_, _)    => EstimatorState(gcal, s.some, step.some)
       case _                             => copy(step = step.some)
     }
 

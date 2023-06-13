@@ -31,6 +31,10 @@ import Services.Syntax.*
 
 trait VisitService[F[_]] {
 
+  def select(
+    visitId: Visit.Id
+  ): F[Option[VisitService.VisitRecord]]
+
   def insertGmosNorth(
     observationId: Observation.Id,
     static:        GmosNorth
@@ -45,7 +49,15 @@ trait VisitService[F[_]] {
 
 object VisitService {
 
+  case class VisitRecord(
+    visitId:       Visit.Id,
+    observationId: Observation.Id,
+    instrument:    Instrument,
+    created:       Timestamp
+  )
+
   sealed trait InsertVisitResponse extends Product with Serializable
+
   object InsertVisitResponse {
 
     case class NotAuthorized(
@@ -59,12 +71,17 @@ object VisitService {
 
     case class Success(
       vid: Visit.Id
-    )  extends InsertVisitResponse
+    ) extends InsertVisitResponse
 
   }
 
   def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
     new VisitService[F] with ExecutionUserCheck {
+
+      override def select(
+        visitId: Visit.Id
+      ): F[Option[VisitService.VisitRecord]] =
+        session.option(Statements.SelectVisit)(visitId)
 
       private def insert(
         observationId: Observation.Id,
@@ -104,6 +121,20 @@ object VisitService {
     }
 
   object Statements {
+
+    private val visit_record: Codec[VisitRecord] =
+      (visit_id *: observation_id *: instrument *: core_timestamp).to[VisitRecord]
+
+    val SelectVisit: Query[Visit.Id, VisitRecord] =
+      sql"""
+        SELECT
+          c_visit_id,
+          c_observation_id,
+          c_instrument,
+          c_created
+        FROM t_visit
+        WHERE c_visit_id = $visit_id
+      """.query(visit_record)
 
     val InsertVisit: Query[(Observation.Id, Instrument), Visit.Id] =
       sql"""

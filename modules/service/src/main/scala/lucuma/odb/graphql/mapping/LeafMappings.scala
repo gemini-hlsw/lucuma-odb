@@ -16,37 +16,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
-import lucuma.core.enums.CatalogName
-import lucuma.core.enums.CloudExtinction
-import lucuma.core.enums.EphemerisKeyType
-import lucuma.core.enums.FocalPlane
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosNorthDetector
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosNorthStageMode
-import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosSouthDetector
-import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.GmosSouthFpu
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosSouthStageMode
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
-import lucuma.core.enums.Instrument
-import lucuma.core.enums.MosPreImaging
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
-import lucuma.core.enums.ScienceMode
-import lucuma.core.enums.SequenceCommand
-import lucuma.core.enums.SkyBackground
-import lucuma.core.enums.SpectroscopyCapabilities
-import lucuma.core.enums.TimingWindowInclusion
-import lucuma.core.enums.ToOActivation
-import lucuma.core.enums.WaterVapor
+import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.ExecutionEvent
@@ -59,6 +29,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
@@ -86,6 +57,11 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
+      LeafMapping[GcalArc](GcalArcType),
+      LeafMapping[GcalContinuum](GcalContinuumType),
+      LeafMapping[GcalDiffuser](GcalDiffuserType),
+      LeafMapping[GcalFilter](GcalFilterType),
+      LeafMapping[GcalShutter](GcalShutterType),
       LeafMapping[GmosNorthGrating](GmosNorthGratingType),
       LeafMapping[GmosAmpGain](GmosAmpGainType),
       LeafMapping[GmosAmpReadMode](GmosAmpReadModeType),
@@ -103,6 +79,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosXBinning](GmosXBinningType),
       LeafMapping[GmosYBinning](GmosYBinningType),
       LeafMapping[Group.Id](GroupIdType),
+      LeafMapping[GuideState](GuideStateType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
@@ -129,7 +106,10 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[SkyBackground](SkyBackgroundType),
+      LeafMapping[SmartGcalType](SmartGcalType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
+      LeafMapping[Step.Id](StepIdType),
+      LeafMapping[StepType](StepType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
