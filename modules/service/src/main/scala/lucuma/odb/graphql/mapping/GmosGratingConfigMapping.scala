@@ -1,0 +1,47 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package mapping
+
+import edu.gemini.grackle.TypeRef
+
+import table.GmosDynamicTables
+
+trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
+
+  private def gratingMapping[G, L, U](
+    typeRef: TypeRef,
+    table:   GmosDynamicTable[G, L, U]
+  ): ObjectMapping =
+    ObjectMapping(
+      tpe = typeRef,
+      fieldMappings = List(
+        SqlField("id",      table.Id, key = true, hidden = true),
+        SqlField("grating", table.Grating.Disperser),
+        SqlField("order",   table.Grating.Order),
+        SqlObject("wavelength")
+      )
+    )
+
+  // Defines a switch mapping from the step record root to prevent the mapping
+  // from being picked up in the context of a generated sequence.
+  private def gratingSwitchMapping[G, L, U](
+    stepRecordType:    TypeRef,
+    gratingConfigType: TypeRef,
+    table:             GmosDynamicTable[G, L, U]
+  ): TypeMapping =
+    SwitchMapping(
+      gratingConfigType,
+      List(
+        stepRecordType / "instrumentConfig" / "gratingConfig" -> gratingMapping(gratingConfigType, table)
+      )
+    )
+
+  lazy val GmosNorthGratingConfigMapping: TypeMapping =
+    gratingSwitchMapping(GmosNorthStepRecordType, GmosNorthGratingConfigType, GmosNorthDynamicTable)
+
+  lazy val GmosSouthGratingConfigMapping: TypeMapping =
+    gratingSwitchMapping(GmosSouthStepRecordType, GmosSouthGratingConfigType, GmosSouthDynamicTable)
+
+}

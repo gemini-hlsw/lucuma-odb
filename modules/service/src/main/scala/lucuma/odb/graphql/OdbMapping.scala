@@ -138,13 +138,15 @@ object OdbMapping {
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
+          with GmosDynamicMapping[F]
+          with GmosFpuMapping[F]
+          with GmosGratingConfigMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
-          with GmosNorthStepRecordMapping[F]
           with GmosNorthVisitMapping[F]
           with GmosSouthStaticMapping[F]
-          with GmosSouthStepRecordMapping[F]
           with GmosSouthVisitMapping[F]
+          with GmosStepRecordMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
           with GroupElementMapping[F]
@@ -178,10 +180,9 @@ object OdbMapping {
           with ProposalAttachmentTypeMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
-          with RecordGmosNorthStepResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
-          with RecordGmosSouthStepResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
+          with RecordGmosStepResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SequenceEventMapping[F]
@@ -243,10 +244,16 @@ object OdbMapping {
               DeclinationMapping,
               ElevationRangeMapping,
               FilterTypeMetaMapping,
+              GmosNorthDynamicMapping,
+              GmosNorthFpuMapping,
+              GmosNorthGratingConfigMapping,
               GmosNorthLongSlitMapping,
               GmosNorthStaticMapping,
               GmosNorthStepRecordMapping,
               GmosNorthVisitMapping,
+              GmosSouthDynamicMapping,
+              GmosSouthFpuMapping,
+              GmosSouthGratingConfigMapping,
               GmosSouthLongSlitMapping,
               GmosSouthStaticMapping,
               GmosSouthStepRecordMapping,
