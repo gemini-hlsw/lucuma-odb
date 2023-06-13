@@ -132,7 +132,16 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                                xBin
                                yBin
                              }
-                             roi,
+                             dtax
+                             roi
+                             gratingConfig {
+                               grating
+                               order
+                               wavelength {
+                                 nanometers
+                               }
+                             }
+                             filter
                              fpu {
                                builtin
                              }
@@ -191,7 +200,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               "xBin": "TWO",
                               "yBin": "TWO"
                             },
+                            "dtax": "ZERO",
                             "roi": "CCD2",
+                            "gratingConfig": null,
+                            "filter": "G_PRIME",
                             "fpu": null
                           },
                           "stepConfig": {
@@ -215,7 +227,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               "xBin": "ONE",
                               "yBin": "ONE"
                             },
+                            "dtax": "ZERO",
                             "roi": "CENTRAL_STAMP",
+                            "gratingConfig": null,
+                            "filter": "G_PRIME",
                             "fpu": {
                               "builtin": "LONG_SLIT_0_50"
                             }
@@ -241,7 +256,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               "xBin": "ONE",
                               "yBin": "ONE"
                             },
+                            "dtax": "ZERO",
                             "roi": "CENTRAL_STAMP",
+                            "gratingConfig": null,
+                            "filter": "G_PRIME",
                             "fpu": {
                               "builtin": "LONG_SLIT_0_50"
                             }
@@ -295,6 +313,17 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                        }
                        possibleFuture {
                          observeClass
+                         steps {
+                           instrumentConfig {
+                             gratingConfig {
+                               grating
+                               order
+                               wavelength {
+                                 nanometers
+                               }
+                             }
+                           }
+                         }
                        }
                        hasMore
                      }
@@ -315,7 +344,31 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     },
                     "possibleFuture": [
                       {
-                        "observeClass": "SCIENCE"
+                        "observeClass": "SCIENCE",
+                        "steps" : [
+                          {
+                            "instrumentConfig" : {
+                              "gratingConfig" : {
+                                "grating" : "R831_G5302",
+                                "order" : "ONE",
+                                "wavelength" : {
+                                  "nanometers" : 505.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig" : {
+                              "gratingConfig" : {
+                                "grating" : "R831_G5302",
+                                "order" : "ONE",
+                                "wavelength" : {
+                                  "nanometers" : 505.000
+                                }
+                              }
+                            }
+                          }
+                        ]
                       }
                     ],
                     "hasMore": true

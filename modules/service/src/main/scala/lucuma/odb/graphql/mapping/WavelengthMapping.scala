@@ -6,12 +6,14 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
+     with GmosDynamicTables[F]
      with ObservationView[F] {
 
   private def wavelengthMapping(
@@ -43,8 +45,10 @@ trait WavelengthMapping[F[_]]
     SwitchMapping(
       WavelengthType,
       List(
+        GmosNorthStepRecordType / "instrumentConfig" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosNorthDynamicTable.Id, GmosNorthDynamicTable.Grating.Wavelength),
         GmosNorthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength),
         GmosNorthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength),
+        GmosSouthStepRecordType / "instrumentConfig" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosSouthDynamicTable.Id, GmosSouthDynamicTable.Grating.Wavelength),
         GmosSouthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.CentralWavelength),
         GmosSouthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.InitialCentralWavelength),
         SpectroscopyScienceRequirementsType / "wavelength"         -> wavelengthMapping(Spectroscopy.Wavelength.SyntheticId, Spectroscopy.Wavelength.Value),

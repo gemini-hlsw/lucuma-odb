@@ -97,7 +97,7 @@ class recordVisit extends OdbSuite {
             }
           }
         }
-      """.stripMargin,
+      """,
       json"""
       {
         "recordGmosSouthVisit": {
@@ -137,7 +137,7 @@ class recordVisit extends OdbSuite {
             }
           }
         }
-      """.stripMargin,
+      """,
       ((oid: Observation.Id) => s"Observation '$oid' not found or is not a GMOS South observation").asLeft
     )
 
