@@ -66,6 +66,32 @@ class updatePrograms extends OdbSuite {
           }
           """
         )
+      ) >> chronProgramUpdates(pid).map(_.drop(1)).assertEquals(
+        List(
+          json"""
+          {
+            "c_user"              : ${pi.id},
+            "c_mod_name"          : true,
+            "c_new_name"          : "new name",
+            "c_operation"         : "UPDATE",
+            "c_mod_pts_pi"        : false,
+            "c_new_pts_pi"        : null,
+            "c_program_id"        : $pid,
+            "c_mod_existence"     : false,
+            "c_new_existence"     : null,
+            "c_mod_pi_user_id"    : false,
+            "c_mod_program_id"    : false,
+            "c_new_pi_user_id"    : null,
+            "c_new_program_id"    : null,
+            "c_mod_pi_user_type"  : false,
+            "c_new_pi_user_type"  : null,
+            "c_mod_pts_execution" : false,
+            "c_mod_pts_uncharged" : false,
+            "c_new_pts_execution" : null,
+            "c_new_pts_uncharged" : null
+          }
+          """
+        )
       )
     }
   }
@@ -107,6 +133,32 @@ class updatePrograms extends OdbSuite {
                 }
               ]
             }
+          }
+          """
+        )
+      ) >> chronProgramUpdates(pid).map(_.drop(1)).assertEquals(
+        List(
+          json"""
+          {
+            "c_user"              : ${pi.id},
+            "c_mod_name"          : false,
+            "c_new_name"          : null,
+            "c_operation"         : "UPDATE",
+            "c_mod_pts_pi"        : false,
+            "c_new_pts_pi"        : null,
+            "c_program_id"        : $pid,
+            "c_mod_existence"     : true,
+            "c_new_existence"     : "deleted",
+            "c_mod_pi_user_id"    : false,
+            "c_mod_program_id"    : false,
+            "c_new_pi_user_id"    : null,
+            "c_new_program_id"    : null,
+            "c_mod_pi_user_type"  : false,
+            "c_new_pi_user_type"  : null,
+            "c_mod_pts_execution" : false,
+            "c_mod_pts_uncharged" : false,
+            "c_new_pts_execution" : null,
+            "c_new_pts_uncharged" : null
           }
           """
         )

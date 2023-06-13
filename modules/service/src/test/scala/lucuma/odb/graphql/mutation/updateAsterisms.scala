@@ -35,6 +35,19 @@ class updateAsterisms extends OdbSuite {
         del  = Nil,
         exp  = List((oid, List(tid)))
       )
+      _   <- chronAsterismUpdates(pid).assertEquals(
+        List(
+          json"""
+          {
+            "c_user"           : ${pi.id},
+            "c_operation"      : "INSERT",
+            "c_target_id"      : $tid,
+            "c_program_id"     : $pid,
+            "c_observation_id" : $oid
+          }
+          """
+        )
+      )
     } yield ()
   }
 
@@ -60,6 +73,28 @@ class updateAsterisms extends OdbSuite {
         del  = Nil,
         exp  = List((oid, List(t0, t1)))
       )
+      _   <- chronAsterismUpdates(pid).assertEquals(
+        List(
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t0,
+            "c_program_id" : $pid,
+            "c_observation_id" : $oid
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t1,
+            "c_program_id" : $pid,
+            "c_observation_id" : $oid
+          }
+          """
+        )      
+      )
     } yield ()
   }
 
@@ -84,6 +119,37 @@ class updateAsterisms extends OdbSuite {
         add  = Nil,
         del  = List(t0),
         exp  = List((oid, List(t1)))
+      )
+      _   <- chronAsterismUpdates(pid).assertEquals(
+        List(
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t0,
+            "c_program_id" :$pid,
+            "c_observation_id" : $oid
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t1,
+            "c_program_id" :$pid,
+            "c_observation_id" : $oid
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "DELETE",
+            "c_target_id" : $t0,
+            "c_program_id" :$pid,
+            "c_observation_id" : $oid
+          }
+          """
+        )
       )
     } yield ()
   }
@@ -119,6 +185,64 @@ class updateAsterisms extends OdbSuite {
         add  = Nil,
         del  = List(t1),
         exp  = List((o0, List(t0)), (o1, List(t2)))
+      )
+      _   <- chronAsterismUpdates(pid).map(_.map(_.spaces2)).assertEquals(
+        List(
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t0,
+            "c_program_id" : $pid,
+            "c_observation_id" : $o0
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t1,
+            "c_program_id" : $pid,
+            "c_observation_id" : $o0
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t1,
+            "c_program_id" : $pid,
+            "c_observation_id" : $o1
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "INSERT",
+            "c_target_id" : $t2,
+            "c_program_id" : $pid,
+            "c_observation_id" : $o1
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "DELETE",
+            "c_target_id" : $t1,
+            "c_program_id" : $pid,
+            "c_observation_id" : $o0
+          }
+          """,
+          json"""
+          {
+            "c_user" : ${pi.id},
+            "c_operation" : "DELETE",
+            "c_target_id" : $t1,
+            "c_program_id" : $pid,
+            "c_observation_id" : $o1
+          }
+          """
+        ).map(_.spaces2)      
       )
     } yield ()
   }

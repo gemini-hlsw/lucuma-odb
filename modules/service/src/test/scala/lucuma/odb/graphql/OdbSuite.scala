@@ -98,7 +98,7 @@ object OdbSuite:
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient with ChronicleOperations {
   private implicit val DefaultErrorPolicy: ErrorPolicy.RaiseAlways.type = ErrorPolicy.RaiseAlways
 
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
@@ -237,6 +237,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
              .resource
     } yield s
 
+  protected def session: Resource[IO, Session[IO]] =
+    FMain.singleSession(databaseConfig)
+
   private def transactionalClient(user: User)(svr: Server): IO[FetchClient[IO, Nothing]] =
     for {
       xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
@@ -258,7 +261,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private lazy val serverFixture: Fixture[Server] =
     ResourceSuiteLocalFixture("server", server)
 
-  override def munitFixtures = List(serverFixture)
+  private lazy val sessionFixture: Fixture[Session[IO]] =
+    ResourceSuiteLocalFixture("session", session)
+
+  override def munitFixtures = List(serverFixture, sessionFixture)
 
   sealed trait ClientOption extends Product with Serializable {
 
@@ -381,5 +387,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     subscription(user, query, mutations, variables).map { obt =>
       assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
     }
+
+  def withSession[A](f: Session[IO] => IO[A]): IO[A] =
+    Resource.eval(IO(sessionFixture())).use(f)
 
 }
