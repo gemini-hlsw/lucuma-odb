@@ -17,6 +17,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -487,7 +488,40 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { json =>
       json.hcursor.downFields(name, "visit", "id").require[Visit.Id]
     }
-}
+  }
+
+  def recordStepAs(
+    user:       User,
+    vid:        Visit.Id,
+    instrument: Instrument,
+    instrumentInput: String,
+    stepConfigInput: String
+  ): IO[Step.Id] = {
+
+    val name = s"record${instrument.tag}Step"
+
+    val q = s"""
+      mutation {
+        $name(input: {
+          visitId: ${vid.asJson},
+          $instrumentInput,
+          $stepConfigInput
+        }) {
+          stepRecord {
+            id
+          }
+        }
+      }
+    """
+
+    query(
+      user  = user,
+      query = q,
+    ).map { json =>
+      json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
+    }
+
+  }
 
 
 }

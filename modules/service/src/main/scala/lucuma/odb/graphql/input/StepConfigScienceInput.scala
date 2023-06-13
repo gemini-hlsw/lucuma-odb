@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.parallel.*
+import lucuma.core.enums.GuideState.Enabled
 import lucuma.core.model.sequence.StepConfig.Science
 import lucuma.odb.graphql.binding.*
 
@@ -12,8 +14,11 @@ object StepConfigScienceInput {
   val Binding: Matcher[Science] =
     ObjectFieldsBinding.rmap {
       case List(
-        OffsetInput.Binding("offset", rOffset)
-      ) => rOffset.map(Science(_))
+        OffsetInput.Binding("offset", rOffset),
+        GuideStateBinding.Option("guiding", rGuiding)
+      ) => (rOffset, rGuiding).parMapN { (o, g) =>
+         Science(o, g.getOrElse(Enabled))
+      }
     }
 
 }

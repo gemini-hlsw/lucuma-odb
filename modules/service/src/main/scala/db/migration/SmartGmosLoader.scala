@@ -47,7 +47,7 @@ object SmartGmosLoader {
       gmos_x_binning           *:
       gmos_y_binning           *:
       wavelength_pm_range.opt  *:
-      gmos_disperser_order.opt *:
+      gmos_grating_order.opt   *:
       gmos_amp_gain
     ).contramap[TableKey[G, L, U]] { k => (
       k.grating         ,

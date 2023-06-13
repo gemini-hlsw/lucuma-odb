@@ -1530,6 +1530,21 @@ type GmosSouthVisit {
   sequenceEvents: [SequenceEvent!]!
 }
 
+"""
+Whether guiding is enabled for a particular science step.
+"""
+enum GuideState {
+  """
+  Guiding enabled.
+  """
+  ENABLED
+
+  """
+  Guiding disabled.
+  """
+  DISABLED
+}
+
 # Hour angle range creation parameters
 input HourAngleRangeInput {
   minHours: BigDecimal
@@ -2103,7 +2118,7 @@ Input parameters for creating a new GmosNorth StepRecord
 input RecordGmosNorthStepInput {
   visitId: VisitId!
   instrument: GmosNorthDynamicInput!
-  step: StepConfigInput!
+  stepConfig: StepConfigInput!
 }
 
 # The result of recording a GmosNorth step.
@@ -2130,7 +2145,7 @@ type RecordGmosNorthVisitResult {
 input RecordGmosSouthStepInput {
   visitId: VisitId!
   instrument: GmosSouthDynamicInput!
-  step: StepConfigInput!
+  stepConfig: StepConfigInput!
 }
 
 # The result of recording a GmosSouth step.
@@ -2167,8 +2182,39 @@ type Science implements StepConfig {
   # Offset
   offset: Offset!
 
-  # Step type
+  """
+  Guide State (whether guiding is enabled for this step)
+  """
+  guiding: GuideState!
+
+  """
+  Step type is always SCIENCE.
+  """
   stepType: StepType!
+}
+
+"""
+Which kind of smart gcal configuration is requested in a smart gcal step.
+"""
+enum SmartGcalType {
+  ARC
+  FLAT
+  DAY_BASELINE
+  NIGHT_BASELINE
+}
+
+"""
+SmartGcal step configuration.
+"""
+type SmartGcal implements StepConfig {
+
+  smartGcalType: SmartGcalType!
+
+  """
+  Step type is always SMART_GCAL.
+  """
+  stepType: StepType!
+
 }
 
 # Edit or create an observation's observing mode
@@ -2355,6 +2401,11 @@ Science step creation input
 input StepConfigScienceInput {
   # offset position
   offset: OffsetInput!
+
+  """
+  Whether guiding is enabled for this step (defaults to 'ENABLED').
+  """
+  guiding: GuideState
 }
 
 # StepEvent location parameters

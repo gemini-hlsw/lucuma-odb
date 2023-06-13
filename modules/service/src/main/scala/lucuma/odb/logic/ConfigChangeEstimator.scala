@@ -105,7 +105,7 @@ object ConfigChangeEstimator {
     private def offset[D](past: EstimatorState[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
       val prevOffset = past.science.fold(Offset.Zero)(_.offset)
       present.stepConfig match {
-        case StepConfig.Science(curOffset) =>
+        case StepConfig.Science(curOffset, _) =>
           Option.when(prevOffset =!= curOffset) {
             val const  = enums.TimeEstimate.OffsetConstant.time
             val perArc = enums.TimeEstimate.OffsetDistance.time

@@ -15,10 +15,10 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.7"
 val log4catsVersion            = "2.6.0"
-val lucumaCoreVersion          = "0.79.0"
+val lucumaCoreVersion          = "0.80.0"
 val lucumaGraphQLRoutesVersion = "0.6.4"
-val lucumaItcVersion           = "0.15.1"
-val lucumaSsoVersion           = "0.5.12"
+val lucumaItcVersion           = "0.15.2"
+val lucumaSsoVersion           = "0.5.13"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -29,7 +29,7 @@ val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.6.0-RC2"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
-ThisBuild / tlBaseVersion      := "0.2"
+ThisBuild / tlBaseVersion      := "0.3"
 ThisBuild / scalaVersion       := "3.2.2"
 ThisBuild / crossScalaVersions := Seq("3.2.2")
 

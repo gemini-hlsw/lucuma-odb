@@ -140,8 +140,10 @@ object OdbMapping {
           with FilterTypeMetaMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
+          with GmosNorthStepRecordMapping[F]
           with GmosNorthVisitMapping[F]
           with GmosSouthStaticMapping[F]
+          with GmosSouthStepRecordMapping[F]
           with GmosSouthVisitMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
@@ -176,7 +178,9 @@ object OdbMapping {
           with ProposalAttachmentTypeMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
+          with RecordGmosNorthStepResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
+          with RecordGmosSouthStepResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
@@ -241,9 +245,11 @@ object OdbMapping {
               FilterTypeMetaMapping,
               GmosNorthLongSlitMapping,
               GmosNorthStaticMapping,
+              GmosNorthStepRecordMapping,
               GmosNorthVisitMapping,
               GmosSouthLongSlitMapping,
               GmosSouthStaticMapping,
+              GmosSouthStepRecordMapping,
               GmosSouthVisitMapping,
               GroupMapping,
               GroupEditMapping,
@@ -276,7 +282,9 @@ object OdbMapping {
               ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
+              RecordGmosNorthStepResultMapping,
               RecordGmosNorthVisitResultMapping,
+              RecordGmosSouthStepResultMapping,
               RecordGmosSouthVisitResultMapping,
               RightAscensionMapping,
               ScienceRequirementsMapping,

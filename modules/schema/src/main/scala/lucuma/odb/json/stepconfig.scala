@@ -17,6 +17,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GuideState
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
@@ -64,15 +65,17 @@ trait StepConfigCodec {
 
   given Decoder[StepConfig.Science] =
     Decoder.instance { c =>
-      c.downField("offset").as[Offset].map { o =>
-        StepConfig.Science(o)
-      }
+      for {
+        o <- c.downField("offset").as[Offset]
+        g <- c.downField("guiding").as[GuideState]
+      } yield StepConfig.Science(o, g)
     }
 
   given (using Encoder[Offset]): Encoder[StepConfig.Science] =
     Encoder.instance { (a: StepConfig.Science) =>
       Json.obj(
-        "offset" -> a.offset.asJson
+        "offset"  -> a.offset.asJson,
+        "guiding" -> a.guiding.asJson
       )
     }
 
