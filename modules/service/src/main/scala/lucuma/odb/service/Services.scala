@@ -7,7 +7,9 @@ import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
+import cats.syntax.all.*
 import lucuma.core.model.User
+import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Itc
@@ -16,6 +18,8 @@ import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import skunk.Session
 import skunk.Transaction
+import skunk.codec.all.*
+import skunk.syntax.all.*
 
 import scala.util.NotGiven
 
@@ -147,7 +151,12 @@ object Services:
       def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
         using NoTransaction[F]
       ): F[A] =
-        session.transaction.use(xa => fa(using xa)) // TODO: bind user to transaction variable
+        session.transaction.use { xa =>
+          session.prepareR(sql"select set_config('lucuma.user', $text, true)".query(text)).use { ps =>
+            ps.unique(Gid[User.Id].fromString.reverseGet(u.id))
+          } >>
+          fa(using xa)
+        }
 
       // Services as passed their "owning" `Services` (i.e., `this`) on instantiation, which is
       // circular and requires everything to be done lazily, which luckily is what we want. No point
