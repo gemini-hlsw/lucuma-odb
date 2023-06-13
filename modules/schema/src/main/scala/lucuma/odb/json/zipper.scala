@@ -7,6 +7,7 @@ import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -23,17 +24,23 @@ trait ZipperCodec {
 
   given [A: Decoder : Eq]: Decoder[Zipper[A]] =
     Decoder.instance { c =>
-      for {
-        s  <- c.downField("selected").as[A]
-        i  <- c.downField("index").as[NonNegInt]
-        as <- c.downField("all").as[List[A]]
-        z  <- NonEmptyList
-                .fromList(as)
-                .map(Zipper.fromNel)
-                .flatMap(_.focusIndex(i.value))
-                .filter(_.focus === s)
-                .toRight(DecodingFailure("The `selected` item is not a member of the `all` list of items.", c.history))
-      } yield z
+      for
+        list   <- c.downField("all").as[List[A]]
+        idx    <- c.downField("index").as[Int] orElse 
+                    c.downField("selected").as[A].flatMap(a => 
+                      list
+                        .indexWhere(_ === a)
+                        .some
+                        .filter(_ >= 0)
+                        .toRight(DecodingFailure("The `selected` item is not a member of the `all` list of items.", c.history))
+                      )
+        zipper <- Zipper.fromList(list)
+                    .toRight(DecodingFailure("The `all` list of items must be non-empty.", c.history))
+                    .flatMap(
+                      _.focusIndex(idx)
+                        .toRight(DecodingFailure("The `index` value is out of bounds.", c.history))
+                    )
+      yield zipper
     }
 
   given [A: Encoder]: Encoder[Zipper[A]] =
