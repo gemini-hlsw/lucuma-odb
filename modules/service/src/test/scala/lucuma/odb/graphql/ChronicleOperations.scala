@@ -12,10 +12,6 @@ import skunk.syntax.all.*
 
 trait ChronicleOperations { this: OdbSuite =>
 
-  /** 
-   * Return all Chronicle updates for `pid`, order by chronicle ID. The timestamp and transaction
-   * id are removed to allow for easier asserting.
-   */
   def chronProgramUpdates(pid: Program.Id): IO[List[Json]] =
     withSession { s =>
       s.prepareR(
@@ -28,4 +24,16 @@ trait ChronicleOperations { this: OdbSuite =>
       ).use(_.stream(pid, 1024).compile.toList)
     }
 
+  def chronAsterismUpdates(pid: Program.Id): IO[List[Json]] =
+    withSession { s =>
+      s.prepareR(
+        sql"""
+          SELECT to_jsonb(row_to_json(t)) - ARRAY['c_timestamp', 'c_transaction_id', 'c_chron_id'] 
+          FROM t_chron_asterism_target_update t 
+          WHERE t.c_program_id = $program_id 
+          ORDER BY c_chron_id ASC
+        """.query(jsonb)
+      ).use(_.stream(pid, 1024).compile.toList)
+    }
 }
+
