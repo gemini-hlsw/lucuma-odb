@@ -6,29 +6,32 @@ package lucuma.odb.graphql.mapping
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
+import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.table.TimingWindowView
 
-trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] {
+trait TimeSpanMapping[F[_]] extends AllocationTable[F] with GmosDynamicTables[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
     SwitchMapping(
       TimeSpanType,
       List(
-        ProgramType / "plannedTime" / "pi"            -> timeSpanMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
-        ProgramType / "plannedTime" / "uncharged"     -> timeSpanMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
-        ProgramType / "plannedTime" / "execution"     -> timeSpanMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
+        AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
+        GmosNorthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
+        GmosSouthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
+        GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
+        GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
+        IntensiveType / "totalTime"                   -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        LargeProgramType / "totalTime"                -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         ObservationType / "plannedTime" / "pi"        -> timeSpanMapping(ObservationView.PlannedTime.Pi)(ObservationView.Id),
         ObservationType / "plannedTime" / "uncharged" -> timeSpanMapping(ObservationView.PlannedTime.Uncharged)(ObservationView.Id),
         ObservationType / "plannedTime" / "execution" -> timeSpanMapping(ObservationView.PlannedTime.Execution)(ObservationView.Id),
-        IntensiveType / "totalTime"                   -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        LargeProgramType / "totalTime"                -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
-        GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
-        GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
+        ProgramType / "plannedTime" / "pi"            -> timeSpanMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
+        ProgramType / "plannedTime" / "uncharged"     -> timeSpanMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
+        ProgramType / "plannedTime" / "execution"     -> timeSpanMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
         TimingWindowEndAfterType / "after"            -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
         TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )

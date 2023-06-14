@@ -19,7 +19,7 @@
        )
      )
 
-   // The GmosNorthStatic type appears in the middle of a computed JSON result.
+   // The GmosSouthStatic type appears in the middle of a computed JSON result.
    // In order to avoid finding this mapping in that case, we need to be
    // explicit about when to use this mapping.
    lazy val GmosSouthStaticMapping: TypeMapping =
