@@ -26,35 +26,9 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
       fieldMappings = List(
         SqlField("id",       table.Id, key = true),
         SqlObject("exposure"),
-
-        SqlField("xBin",        table.CcdMode.Xbin,        hidden = true),
-        SqlField("yBin",        table.CcdMode.Ybin,        hidden = true),
-        SqlField("ampCount",    table.CcdMode.AmpCount,    hidden = true),
-        SqlField("ampGain",     table.CcdMode.AmpGain,     hidden = true),
-        SqlField("ampReadMode", table.CcdMode.AmpReadMode, hidden = true),
-
-        CursorFieldJson(
-          "readout",
-          cursor =>
-            for {
-              x <- cursor.field("xBin",        None).flatMap(_.as[GmosXBinning])
-              y <- cursor.field("yBin",        None).flatMap(_.as[GmosYBinning])
-              c <- cursor.field("ampCount",    None).flatMap(_.as[GmosAmpCount])
-              g <- cursor.field("ampGain",     None).flatMap(_.as[GmosAmpGain])
-              r <- cursor.field("ampReadMode", None).flatMap(_.as[GmosAmpReadMode])
-            } yield Json.obj(
-              "xBin"        -> x.asJson,
-              "yBin"        -> y.asJson,
-              "ampCount"    -> c.asJson,
-              "ampGain"     -> g.asJson,
-              "ampReadMode" -> r.asJson
-            ),
-            List("xBin", "yBin", "ampCount", "ampGain", "ampReadMode")
-        ),
-
+        SqlObject("readout"),
         SqlField("dtax",     table.Dtax),
         SqlField("roi",      table.Roi),
-
         SqlObject("gratingConfig"),
         SqlField("filter",   table.Filter),
         SqlObject("fpu")
