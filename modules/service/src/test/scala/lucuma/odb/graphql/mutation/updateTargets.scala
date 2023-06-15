@@ -855,4 +855,80 @@ class updateTargets extends OdbSuite {
     }
   }
 
+  test("update source profile (point/bandNormalize -> point/emissionLines, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    point: {
+                      emissionLines: {
+                        lines: []
+                        fluxDensityContinuum: {
+                          value: 1
+                          units: W_PER_M_SQUARED_PER_UM
+                        }
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    point {
+                      emissionLines {
+                        lines  {
+                          wavelength {
+                            picometers
+                          }
+                        }
+                        fluxDensityContinuum {
+                          value
+                          units
+                          error
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "point" : {
+                          "lines" : [],
+                          "emissionLines" : {
+                            "fluxDensityContinuum" : {
+                              "value" : "1",
+                              "units" : "W_PER_M_SQUARED_PER_UM",
+                              "error" : null
+                            }
+                          }
+                        },
+                        "point" : null
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )          
+      }    
+    }
+  }
+
 }
