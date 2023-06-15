@@ -317,4 +317,204 @@ class recordStep extends OdbSuite {
       ((vid: Visit.Id) => s"Visit '$vid' not found or is not a GMOS South visit").asLeft
     )
   }
+
+  test("recordStep - no grating") {
+    val instrumentNoGrating: String =
+    """
+      instrument: {
+        exposure: {
+          seconds: 1200
+        },
+        readout: {
+          xBin: ONE,
+          yBin: ONE,
+          ampCount: TWELVE,
+          ampGain: LOW,
+          ampRead: SLOW
+        },
+        dtax: TWO,
+        roi: FULL_FRAME,
+        fpu: {
+          builtin: LONG_SLIT_0_50
+        }
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentNoGrating,
+            $stepConfigScience
+          }) {
+            stepRecord {
+              instrumentConfig {
+                exposure {
+                  seconds
+                }
+                gratingConfig {
+                  grating
+                  order
+                  wavelength {
+                    nanometers
+                  }
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "instrumentConfig": {
+                "exposure": {
+                  "seconds": 1200.000000
+                },
+                "gratingConfig": null
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - no fpu") {
+    val instrumentNoGrating: String =
+    """
+      instrument: {
+        exposure: {
+          seconds: 1200
+        },
+        readout: {
+          xBin: ONE,
+          yBin: ONE,
+          ampCount: TWELVE,
+          ampGain: LOW,
+          ampRead: SLOW
+        },
+        dtax: TWO,
+        roi: FULL_FRAME
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentNoGrating,
+            $stepConfigScience
+          }) {
+            stepRecord {
+              instrumentConfig {
+                exposure {
+                  seconds
+                }
+                fpu {
+                  builtin
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "instrumentConfig": {
+                "exposure": {
+                  "seconds": 1200.000000
+                },
+                "fpu": null
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - custom mask") {
+    val instrumentNoGrating: String =
+    """
+      instrument: {
+        exposure: {
+          seconds: 1200
+        },
+        readout: {
+          xBin: ONE,
+          yBin: ONE,
+          ampCount: TWELVE,
+          ampGain: LOW,
+          ampRead: SLOW
+        },
+        dtax: TWO,
+        roi: FULL_FRAME,
+        fpu: {
+          customMask: {
+            filename: "foo",
+            slitWidth: CUSTOM_WIDTH_0_75
+          }
+        }
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentNoGrating,
+            $stepConfigScience
+          }) {
+            stepRecord {
+              instrumentConfig {
+                exposure {
+                  seconds
+                }
+                fpu {
+                  customMask {
+                    filename
+                    slitWidth
+                  }
+                  builtin
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "instrumentConfig": {
+                "exposure": {
+                  "seconds": 1200.000000
+                },
+                "fpu": {
+                  "customMask": {
+                    "filename": "foo",
+                    "slitWidth": "CUSTOM_WIDTH_0_75"
+                  },
+                  "builtin": null
+                }
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
 }

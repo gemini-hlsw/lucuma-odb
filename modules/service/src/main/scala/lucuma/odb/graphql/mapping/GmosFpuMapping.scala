@@ -21,24 +21,8 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id",        table.Id, key = true, hidden = true),
-
-        SqlField("filename",  table.Fpu.CustomMaskFilename,  hidden = true),
-        SqlField("slitWidth", table.Fpu.CustomMaskSlitWidth, hidden = true),
-
-        CursorFieldJson(
-          "customMask",
-          cursor =>
-            for {
-              f <- cursor.field("filename",  None).flatMap(_.as[Option[String]])
-              w <- cursor.field("slitWidth", None).flatMap(_.as[Option[GmosCustomSlitWidth]])
-            } yield (f, w).mapN { (fʹ, wʹ) => Json.obj(
-              "filename"  -> fʹ.asJson,
-              "slitWidth" -> wʹ.asJson
-            )}.asJson,
-          List("filename", "slitWidth")
-        ),
-
+        SqlField("synthetic_id", table.Fpu.SyntheticId, key = true, hidden = true),
+        SqlObject("customMask"),
         SqlField("builtin", table.Fpu.Builtin)
       )
     )

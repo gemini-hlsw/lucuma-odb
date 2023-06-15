@@ -139,6 +139,7 @@ object OdbMapping {
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
+          with GmosCustomMaskMapping[F]
           with GmosDynamicMapping[F]
           with GmosFpuMapping[F]
           with GmosGratingConfigMapping[F]
@@ -246,6 +247,7 @@ object OdbMapping {
               ElevationRangeMapping,
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
+              GmosCustomMaskMapping,
               GmosNorthDynamicMapping,
               GmosNorthFpuMapping,
               GmosNorthGratingConfigMapping,
