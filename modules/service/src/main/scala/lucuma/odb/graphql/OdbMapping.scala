@@ -164,6 +164,7 @@ object OdbMapping {
           with ObservationMapping[F]
           with ObservingModeMapping[F]
           with ObservationSelectResultMapping[F]
+          with OffsetMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
@@ -191,6 +192,7 @@ object OdbMapping {
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
+          with StepConfigMapping[F]
           with SubscriptionMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
@@ -276,6 +278,9 @@ object OdbMapping {
               ObservationMapping,
               ObservingModeMapping,
               ObservationSelectResultMapping,
+              OffsetMapping,
+              OffsetPMapping,
+              OffsetQMapping,
               ParallaxMapping,
               PartnerMetaMapping,
               PartnerSplitMapping,
@@ -303,6 +308,12 @@ object OdbMapping {
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SiderealMapping,
+              StepConfigMapping,
+              StepConfigBiasMapping,
+              StepConfigDarkMapping,
+              StepConfigGcalMapping,
+              StepConfigScienceMapping,
+              StepConfigSmartGcalMapping,
               SubscriptionMapping,
               TargetEditMapping,
               TargetEnvironmentMapping,
