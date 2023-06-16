@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql
 
-import edu.gemini.grackle.Schema
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
 import lucuma.odb.graphql.util.SchemaSemigroup
@@ -117,6 +116,8 @@ trait BaseMapping[F[_]]
   lazy val NonNegLongType                      = schema.ref("NonNegLong")
   lazy val NonNegShortType                     = schema.ref("NonNegShort")
   lazy val NonsiderealType                     = schema.ref("Nonsidereal")
+  lazy val OffsetPType                         = schema.ref("OffsetP")
+  lazy val OffsetQType                         = schema.ref("OffsetQ")
   lazy val OffsetType                          = schema.ref("Offset")
   lazy val ObsActiveStatusType                 = schema.ref("ObsActiveStatus")
   lazy val ObsAttachmentFileExtType            = schema.ref("ObsAttachmentFileExt")
@@ -131,7 +132,6 @@ trait BaseMapping[F[_]]
   lazy val ObservingModeTypeType               = schema.ref("ObservingModeType")
   lazy val ObservationSelectResultType         = schema.ref("ObservationSelectResult")
   lazy val ObsStatusType                       = schema.ref("ObsStatus")
-  lazy val pType                               = schema.ref("p")
   lazy val ParallaxType                        = schema.ref("Parallax")
   lazy val PartnerMetaType                     = schema.ref("PartnerMeta")
   lazy val PartnerSplitType                    = schema.ref("PartnerSplit")
@@ -155,7 +155,6 @@ trait BaseMapping[F[_]]
   lazy val ProposalAttachmentTypeType          = schema.ref("ProposalAttachmentType")
   lazy val ProposalClassType                   = schema.ref("ProposalClass")
   lazy val ProposalType                        = schema.ref("Proposal")
-  lazy val qType                               = schema.ref("q")
   lazy val QueryType                           = schema.ref("Query")
   lazy val QueueType                           = schema.ref("Queue")
   lazy val RadialVelocityType                  = schema.ref("RadialVelocity")
