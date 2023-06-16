@@ -11,7 +11,7 @@ import table.GmosDynamicTables
 trait GmosCcdModeMapping[F[_]] extends GmosDynamicTables[F] {
 
   private def ccdModeMapping[G, L, U](
-    table:   GmosDynamicTable[G, L, U]
+    table: GmosDynamicTable[G, L, U]
   ): ObjectMapping =
     ObjectMapping(
       tpe = GmosCcdModeType,

@@ -59,6 +59,7 @@ trait BaseMapping[F[_]]
   lazy val GmosAmpGainType                     = schema.ref("GmosAmpGain")
   lazy val GmosAmpReadModeType                 = schema.ref("GmosAmpReadMode")
   lazy val GmosCcdModeType                     = schema.ref("GmosCcdMode")
+  lazy val GmosCustomMaskType                  = schema.ref("GmosCustomMask")
   lazy val GmosCustomSlitWidthType             = schema.ref("GmosCustomSlitWidth")
   lazy val GmosDtaxType                        = schema.ref("GmosDtax")
   lazy val GmosGratingOrderType                = schema.ref("GmosGratingOrder")

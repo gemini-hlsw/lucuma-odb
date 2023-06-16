@@ -34,31 +34,36 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
     // Grating (if any)
     object Grating {
-      val Disperser: ColumnRef  = col("c_grating_disperser",  grating.embedded)
-      val Order: ColumnRef      = col("c_grating_order",      gmos_grating_order.embedded)
-      val Wavelength: ColumnRef = col("c_grating_wavelength", wavelength_pm.embedded)
+      val SyntheticId: ColumnRef = col("c_grating_id",         step_id.embedded)
+      val Disperser: ColumnRef   = col("c_grating_disperser",  grating.embedded)
+      val Order: ColumnRef       = col("c_grating_order",      gmos_grating_order.embedded)
+      val Wavelength: ColumnRef  = col("c_grating_wavelength", wavelength_pm.embedded)
     }
 
     val Filter: ColumnRef       = col("c_filter",             filter.opt)
 
     // FPU (custom or builtin or none)
     object Fpu {
-      val CustomMaskFilename: ColumnRef  = col("c_fpu_custom_mask_filename",   varchar.opt)
-      val CustomMaskSlitWidth: ColumnRef = col("c_fpu_custom_mask_slit_width", gmos_custom_slit_width.opt)
-      val Builtin: ColumnRef             = col("c_fpu_builtin",                fpu.opt)
+      val SyntheticId: ColumnRef   = col("c_fpu_id",                     step_id.embedded)
+      object CustomMask {
+        val SyntheticId: ColumnRef = col("c_fpu_custom_mask_id",         step_id.embedded)
+        val Filename: ColumnRef    = col("c_fpu_custom_mask_filename",   varchar.embedded)
+        val SlitWidth: ColumnRef   = col("c_fpu_custom_mask_slit_width", gmos_custom_slit_width.embedded)
+      }
+      val Builtin: ColumnRef       = col("c_fpu_builtin",                fpu.opt)
     }
 
   }
 
   object GmosNorthDynamicTable extends GmosDynamicTable(
-    "t_gmos_north_dynamic",
+    "v_gmos_north_dynamic",
     gmos_north_grating,
     gmos_north_filter,
     gmos_north_fpu
   )
 
   object GmosSouthDynamicTable extends GmosDynamicTable(
-    "t_gmos_south_dynamic",
+    "v_gmos_south_dynamic",
     gmos_south_grating,
     gmos_south_filter,
     gmos_south_fpu
