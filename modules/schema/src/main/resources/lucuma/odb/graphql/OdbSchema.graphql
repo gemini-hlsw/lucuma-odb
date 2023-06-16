@@ -2381,6 +2381,11 @@ input StepConfigInput {
   """
   science: StepConfigScienceInput
 
+  """
+  Smart gcal creation option
+  """
+  smartGcal: StepConfigSmartGcalInput
+
 }
 
 """
@@ -2406,6 +2411,14 @@ input StepConfigScienceInput {
   Whether guiding is enabled for this step (defaults to 'ENABLED').
   """
   guiding: GuideState
+}
+
+"""
+SmartGcal step creation input
+"""
+input StepConfigSmartGcalInput {
+  # Smart Gcal type
+  smartGcalType: SmartGcalType!
 }
 
 # StepEvent location parameters
