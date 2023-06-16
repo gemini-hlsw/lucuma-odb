@@ -1,3 +1,5 @@
+-- A view that ties together all the step config tables, primarily to simplify
+-- mapping logic.
 CREATE VIEW v_step AS
 SELECT
   s.c_step_id,
