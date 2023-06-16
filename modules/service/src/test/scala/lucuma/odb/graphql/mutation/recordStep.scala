@@ -517,4 +517,239 @@ class recordStep extends OdbSuite {
       """.asRight
     )
   }
+
+  test("recordStep - stepConfig Bias") {
+    val stepConfigBias: String =
+    """
+      stepConfig: {
+        bias: true
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentGmosNorth,
+            $stepConfigBias
+          }) {
+            stepRecord {
+              stepConfig {
+                stepType
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "stepConfig": {
+                "stepType": "BIAS"
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - stepConfig Dark") {
+    val stepConfigDark: String =
+    """
+      stepConfig: {
+        dark: true
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentGmosNorth,
+            $stepConfigDark
+          }) {
+            stepRecord {
+              stepConfig {
+                stepType
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "stepConfig": {
+                "stepType": "DARK"
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - stepConfig Gcal") {
+    val stepConfigGcal: String =
+    """
+      stepConfig: {
+        gcal: {
+          arcs: [ AR_ARC, XE_ARC],
+          filter: GMOS,
+          diffuser: IR,
+          shutter: OPEN
+        }
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentGmosNorth,
+            $stepConfigGcal
+          }) {
+            stepRecord {
+              stepConfig {
+                stepType
+                ... on Gcal {
+                  arcs
+                  filter
+                  diffuser
+                  shutter
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "stepConfig": {
+                "stepType": "GCAL",
+                "arcs": [ "AR_ARC", "XE_ARC" ],
+                "filter": "GMOS",
+                "diffuser": "IR",
+                "shutter": "OPEN"
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - stepConfig Science") {
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentGmosNorth,
+            $stepConfigScience
+          }) {
+            stepRecord {
+              stepConfig {
+                stepType
+                ... on Science {
+                  offset {
+                    p {
+                      arcseconds
+                    }
+                    q {
+                      arcseconds
+                    }
+                  }
+                  guiding
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "stepConfig": {
+                "stepType": "SCIENCE",
+                "offset": {
+                  "p": {
+                    "arcseconds": 0
+                  },
+                  "q": {
+                    "arcseconds": 10
+                  }
+                },
+                "guiding":  "ENABLED"
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - stepConfig SmartGcal") {
+    val stepConfigSmartGcal: String =
+    """
+      stepConfig: {
+        smartGcal: {
+          smartGcalType: FLAT
+        }
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      vid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            visitId: ${vid.asJson},
+            $instrumentGmosNorth,
+            $stepConfigSmartGcal
+          }) {
+            stepRecord {
+              stepConfig {
+                stepType
+                ... on SmartGcal {
+                  smartGcalType
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "stepConfig": {
+                "stepType": "SMART_GCAL",
+                "smartGcalType": "FLAT"
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
 }
