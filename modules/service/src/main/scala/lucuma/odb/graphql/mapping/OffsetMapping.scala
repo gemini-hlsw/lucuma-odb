@@ -28,23 +28,25 @@ trait OffsetMapping[F[_]] extends StepTable[F] {
       )
     )
 
-  lazy val OffsetPMapping: TypeMapping =
+  private def offsetComponentSwitchMapping(
+    name:        String,
+    typeRef:     TypeRef,
+    idColumn:    ColumnRef,
+    valueColumn: ColumnRef
+  ): TypeMapping =
     SwitchMapping(
-      pType,
+      typeRef,
       List(
-        GmosNorthStepRecordType / "stepConfig" / "offset" / "p" -> offsetComponentMapping(pType, StepTable.Id, StepTable.Science.OffsetP),
-        GmosSouthStepRecordType / "stepConfig" / "offset" / "p" -> offsetComponentMapping(pType, StepTable.Id, StepTable.Science.OffsetP)
+        GmosNorthStepRecordType / "stepConfig" / "offset" / name -> offsetComponentMapping(typeRef, idColumn, valueColumn),
+        GmosSouthStepRecordType / "stepConfig" / "offset" / name -> offsetComponentMapping(typeRef, idColumn, valueColumn)
       )
     )
 
+  lazy val OffsetPMapping: TypeMapping =
+    offsetComponentSwitchMapping("p", pType, StepTable.Id, StepTable.Science.OffsetP)
+
   lazy val OffsetQMapping: TypeMapping =
-    SwitchMapping(
-      qType,
-      List(
-        GmosNorthStepRecordType / "stepConfig" / "offset" / "q" -> offsetComponentMapping(qType, StepTable.Id, StepTable.Science.OffsetQ),
-        GmosSouthStepRecordType / "stepConfig" / "offset" / "q" -> offsetComponentMapping(qType, StepTable.Id, StepTable.Science.OffsetQ)
-      )
-    )
+    offsetComponentSwitchMapping("q", qType, StepTable.Id, StepTable.Science.OffsetQ)
 
   private def offsetMapping(
     idColumn: ColumnRef
