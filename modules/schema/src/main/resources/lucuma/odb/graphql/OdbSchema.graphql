@@ -1903,10 +1903,10 @@ input ObservationPropertiesInput {
 
 type Offset {
   # Offset in p
-  p: p!
+  p: OffsetP!
 
   # Offset in q
-  q: q!
+  q: OffsetQ!
 }
 
 """
@@ -2086,10 +2086,10 @@ input ProposalInput {
   proposalClass: ProposalClassInput
 
   # The category field may be unset by assigning a null value, or ignored by skipping it altogether
-  category: tacCategory
+  category: TacCategory
 
   # The toOActivation field is required when creating a new instance of proposal, but optional when editing
-  toOActivation: toOActivation
+  toOActivation: ToOActivation
 
   # The abstract field may be unset by assigning a null value, or ignored by skipping it altogether
   abstract: NonEmptyString
@@ -2868,7 +2868,7 @@ input WavelengthDitherInput {
   micrometers: BigDecimal
 }
 
-type p {
+type OffsetP {
   # p offset in µas
   microarcseconds: Long!
 
@@ -2877,84 +2877,6 @@ type p {
 
   # p offset in arcsec
   arcseconds: BigDecimal!
-}
-
-# TAC category
-enum tacCategory {
-  # tacCategory SmallBodies
-  SMALL_BODIES
-
-  # tacCategory PlanetaryAtmospheres
-  PLANETARY_ATMOSPHERES
-
-  # tacCategory PlanetarySurfaces
-  PLANETARY_SURFACES
-
-  # tacCategory SolarSystemOther
-  SOLAR_SYSTEM_OTHER
-
-  # tacCategory ExoplanetRadialVelocities
-  EXOPLANET_RADIAL_VELOCITIES
-
-  # tacCategory ExoplanetAtmospheresActivity
-  EXOPLANET_ATMOSPHERES_ACTIVITY
-
-  # tacCategory ExoplanetTransits
-  EXOPLANET_TRANSITS
-
-  # tacCategory ExoplanetHostStar
-  EXOPLANET_HOST_STAR
-
-  # tacCategory ExoplanetOther
-  EXOPLANET_OTHER
-
-  # tacCategory StellarAstrophysics
-  STELLAR_ASTROPHYSICS
-
-  # tacCategory StellarPopulations
-  STELLAR_POPULATIONS
-
-  # tacCategory StarFormation
-  STAR_FORMATION
-
-  # tacCategory GaseousAstrophysics
-  GASEOUS_ASTROPHYSICS
-
-  # tacCategory StellarRemnants
-  STELLAR_REMNANTS
-
-  # tacCategory GalacticOther
-  GALACTIC_OTHER
-
-  # tacCategory Cosmology
-  COSMOLOGY
-
-  # tacCategory ClustersOfGalaxies
-  CLUSTERS_OF_GALAXIES
-
-  # tacCategory HighZUniverse
-  HIGH_Z_UNIVERSE
-
-  # tacCategory LowZUniverse
-  LOW_Z_UNIVERSE
-
-  # tacCategory ActiveGalaxies
-  ACTIVE_GALAXIES
-
-  # tacCategory ExtragalacticOther
-  EXTRAGALACTIC_OTHER
-}
-
-# Target of opportunity activation
-enum toOActivation {
-  # toOActivation None
-  NONE
-
-  # toOActivation Standard
-  STANDARD
-
-  # toOActivation Rapid
-  RAPID
 }
 
 type AirMassRange {
@@ -4086,14 +4008,14 @@ type GmosNorthLongSlit {
 
   # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   # or else taken from defaultSpatialOffsets
-  spatialOffsets: [q!]!
+  spatialOffsets: [OffsetQ!]!
 
   # Default spatial offsets.
-  defaultSpatialOffsets: [q!]!
+  defaultSpatialOffsets: [OffsetQ!]!
 
   # Optional explicitly specified spatial q offsets. If set it overrides the
   # the default.
-  explicitSpatialOffsets: [q!]
+  explicitSpatialOffsets: [OffsetQ!]
 
   # The grating as it was initially selected.  See the `grating` field for the
   # grating that will be used in the observation.
@@ -4397,14 +4319,14 @@ type GmosSouthLongSlit {
 
   # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   # or else taken from defaultSpatialOffsets
-  spatialOffsets: [q!]!
+  spatialOffsets: [OffsetQ!]!
 
   # Default spatial offsets.
-  defaultSpatialOffsets: [q!]!
+  defaultSpatialOffsets: [OffsetQ!]!
 
   # Optional explicitly specified spatial q offsets. If set it overrides the
   # the default.
-  explicitSpatialOffsets: [q!]
+  explicitSpatialOffsets: [OffsetQ!]
 
   # The grating as it was initially selected.  See the `grating` field for the
   # grating that will be used in the observation.
@@ -7364,7 +7286,7 @@ input WhereTarget {
   name: WhereString
 }
 
-type q {
+type OffsetQ {
   # q offset in µas
   microarcseconds: Long!
 
