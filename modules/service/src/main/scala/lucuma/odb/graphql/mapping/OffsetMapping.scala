@@ -43,10 +43,10 @@ trait OffsetMapping[F[_]] extends StepTable[F] {
     )
 
   lazy val OffsetPMapping: TypeMapping =
-    offsetComponentSwitchMapping("p", pType, StepTable.Id, StepTable.Science.OffsetP)
+    offsetComponentSwitchMapping("p", OffsetPType, StepTable.Id, StepTable.Science.OffsetP)
 
   lazy val OffsetQMapping: TypeMapping =
-    offsetComponentSwitchMapping("q", qType, StepTable.Id, StepTable.Science.OffsetQ)
+    offsetComponentSwitchMapping("q", OffsetQType, StepTable.Id, StepTable.Science.OffsetQ)
 
   private def offsetMapping(
     idColumn: ColumnRef
