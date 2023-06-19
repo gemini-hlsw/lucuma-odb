@@ -2,21 +2,21 @@ val catsParseVersion           = "0.3.9"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.5"
 val cirisVersion               = "3.1.0"
-val clueVersion                = "0.31.0"
+val clueVersion                = "0.31.1"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
-val flywayVersion              = "9.17.0"
+val flywayVersion              = "9.19.4"
 val fs2AwsVersion              = "6.0.0"
 val fs2Version                 = "3.6.1"
-val grackleVersion             = "0.12.0"
+val grackleVersion             = "0.13.0"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.18"
 val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.4.7"
+val logbackVersion             = "1.4.8"
 val log4catsVersion            = "2.6.0"
 val lucumaCoreVersion          = "0.80.0"
-val lucumaGraphQLRoutesVersion = "0.6.4"
+val lucumaGraphQLRoutesVersion = "0.6.5"
 val lucumaItcVersion           = "0.15.2"
 val lucumaSsoVersion           = "0.5.13"
 val munitVersion               = "0.7.29"
@@ -26,12 +26,12 @@ val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.1"
 val paigesVersion              = "0.4.2"
 val postgresVersion            = "42.6.0"
-val skunkVersion               = "0.6.0-RC2"
+val skunkVersion               = "0.6.0"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
 ThisBuild / tlBaseVersion      := "0.3"
-ThisBuild / scalaVersion       := "3.2.2"
-ThisBuild / crossScalaVersions := Seq("3.2.2")
+ThisBuild / scalaVersion       := "3.3.0"
+ThisBuild / crossScalaVersions := Seq("3.3.0")
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
@@ -127,7 +127,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-localstack-v2" % testcontainersScalaVersion % Test,
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.450"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.490"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
