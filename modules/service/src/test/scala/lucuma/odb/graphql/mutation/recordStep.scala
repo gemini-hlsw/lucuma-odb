@@ -56,79 +56,6 @@ class recordStep extends OdbSuite {
       _   <- expect(user, query(vid), expected.leftMap(f => List(f(vid))))
     } yield ()
 
-  val instrumentGmosNorth: String =
-    """
-      instrument: {
-        exposure: {
-          seconds: 1200
-        },
-        readout: {
-          xBin: ONE,
-          yBin: ONE,
-          ampCount: TWELVE,
-          ampGain: LOW,
-          ampRead: SLOW
-        },
-        dtax: TWO,
-        roi: FULL_FRAME,
-        gratingConfig: {
-          grating: B1200_G5301,
-          order: ONE,
-          wavelength: {
-            nanometers: 600
-          }
-        },
-        fpu: {
-          builtin: LONG_SLIT_0_50
-        }
-      }
-    """
-
-  val instrumentGmosSouth: String =
-    """
-      instrument: {
-        exposure: {
-          seconds: 1200
-        },
-        readout: {
-          xBin: ONE,
-          yBin: ONE,
-          ampCount: TWELVE,
-          ampGain: LOW,
-          ampRead: SLOW
-        },
-        dtax: TWO,
-        roi: FULL_FRAME,
-        gratingConfig: {
-          grating: B1200_G5321,
-          order: ONE,
-          wavelength: {
-            nanometers: 600
-          }
-        },
-        fpu: {
-          builtin: LONG_SLIT_0_50
-        }
-      }
-    """
-
-  val stepConfigScience: String =
-    """
-      stepConfig: {
-        science: {
-          offset: {
-             p: {
-               arcseconds: 0
-             },
-             q: {
-               arcseconds: 10
-             }
-          },
-          guiding: ENABLED
-        }
-      }
-    """
-
   test("recordStep - GmosNorth") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
@@ -137,7 +64,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosNorthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosNorth,
+            ${dynamicConfig(Instrument.GmosNorth)},
             $stepConfigScience
           }) {
             stepRecord {
@@ -219,7 +146,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosSouthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosSouth,
+            ${dynamicConfig(Instrument.GmosSouth)},
             $stepConfigScience
           }) {
             stepRecord {
@@ -301,7 +228,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosSouthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosSouth,
+            ${dynamicConfig(Instrument.GmosSouth)},
             $stepConfigScience
           }) {
             stepRecord {
@@ -533,7 +460,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosNorthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosNorth,
+            ${dynamicConfig(Instrument.GmosNorth)},
             $stepConfigBias
           }) {
             stepRecord {
@@ -573,7 +500,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosNorthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosNorth,
+            ${dynamicConfig(Instrument.GmosNorth)},
             $stepConfigDark
           }) {
             stepRecord {
@@ -618,7 +545,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosNorthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosNorth,
+            ${dynamicConfig(Instrument.GmosNorth)},
             $stepConfigGcal
           }) {
             stepRecord {
@@ -661,7 +588,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosNorthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosNorth,
+            ${dynamicConfig(Instrument.GmosNorth)},
             $stepConfigScience
           }) {
             stepRecord {
@@ -723,7 +650,7 @@ class recordStep extends OdbSuite {
         mutation {
           recordGmosNorthStep(input: {
             visitId: ${vid.asJson},
-            $instrumentGmosNorth,
+            ${dynamicConfig(Instrument.GmosNorth)},
             $stepConfigSmartGcal
           }) {
             stepRecord {

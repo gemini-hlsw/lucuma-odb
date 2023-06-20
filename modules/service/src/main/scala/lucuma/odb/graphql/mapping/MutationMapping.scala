@@ -37,6 +37,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddSequenceEventInput
+import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -88,6 +89,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val mutationFields: List[MutationField] =
     List(
       AddSequenceEvent,
+      AddStepEvent,
       CloneObservation,
       CloneTarget,
       CreateGroup,
@@ -314,13 +316,32 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("addSequenceEvent", AddSequenceEventInput.Binding) { (input, child) =>
       services.useTransactionally {
         import ExecutionEventService.InsertEventResponse.*
-        executionEventService.insertExecutionEvent(input.visitId, input.command).map[Result[Query]] {
+        executionEventService.insertSequenceEvent(input.visitId, input.command).map[Result[Query]] {
           case NotAuthorized(user) =>
             Result.failure(s"User '${user.id}' is not authorized to perform this action")
+          case StepNotFound(id)    =>
+            Result.internalError(s"StepNotFound($id) result not possible in addSequenceEvent")
           case VisitNotFound(id)   =>
             Result.failure(s"Visit id '$id' not found")
           case Success(eid)        =>
             Result(Unique(Filter(Predicates.sequenceEvent.id.eql(eid), child)))
+        }
+      }
+    }
+
+  private lazy val AddStepEvent: MutationField =
+    MutationField("addStepEvent", AddStepEventInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        import ExecutionEventService.InsertEventResponse.*
+        executionEventService.insertStepEvent(input.stepId, input.sequenceType, input.stepStage).map[Result[Query]] {
+          case NotAuthorized(user) =>
+            Result.failure(s"User '${user.id}' is not authorized to perform this action")
+          case StepNotFound(id)    =>
+            Result.failure(s"Step id '$id' not found")
+          case VisitNotFound(id)   =>
+            Result.internalError(s"VisitNotFound($id) result not possible in addStepEvent")
+          case Success(eid)        =>
+            Result(Unique(Filter(Predicates.stepEvent.id.eql(eid), child)))
         }
       }
     }
