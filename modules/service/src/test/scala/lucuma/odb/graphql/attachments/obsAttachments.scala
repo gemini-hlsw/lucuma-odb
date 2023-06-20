@@ -98,7 +98,7 @@ class obsAttachments extends ObsAttachmentsSuite {
   val invalidPreImgExt  = TestAttachment("file.jpg", "pre_imaging", none, "Doesn't matter")
 
   val invalidFitsMsg = "Invalid file. Must be a FITS file."
-  val invalidFinderMsg = "Invalid file. Must be one of: JPG, PNG"
+  val invalidFinderMsg = "Invalid file. Must be one of: JPEG, JPG, PNG"
 
   test("successful insert, download and delete") {
     for {
