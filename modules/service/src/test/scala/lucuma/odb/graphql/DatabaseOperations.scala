@@ -447,7 +447,7 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       )
 
-  private def staticConfigObject(instrument: Instrument): String =
+  protected def staticConfig(instrument: Instrument): String =
     instrument match {
       case Instrument.GmosNorth =>
         """
@@ -467,6 +467,56 @@ trait DatabaseOperations { this: OdbSuite =>
 
     }
 
+  protected def dynamicConfig(instrument: Instrument): String =
+    s"""
+      instrument: {
+        exposure: {
+          seconds: 1200
+        },
+        readout: {
+          xBin: ONE,
+          yBin: ONE,
+          ampCount: TWELVE,
+          ampGain: LOW,
+          ampRead: SLOW
+        },
+        dtax: TWO,
+        roi: FULL_FRAME,
+        gratingConfig: {
+          grating: ${instrument match {
+            case Instrument.GmosNorth => "B1200_G5301"
+            case Instrument.GmosSouth => "B1200_G5321"
+            case _                    => "EXPECTING_GMOS"
+          }},
+          order: ONE,
+          wavelength: {
+            nanometers: 600
+          }
+        },
+        fpu: {
+          builtin: LONG_SLIT_0_50
+        }
+      }
+    """
+
+  val stepConfigScience: String =
+    """
+      stepConfig: {
+        science: {
+          offset: {
+             p: {
+               arcseconds: 0
+             },
+             q: {
+               arcseconds: 10
+             }
+          },
+          guiding: ENABLED
+        }
+      }
+    """
+
+
   def recordVisitAs(user: User, instrument: Instrument, oid: Observation.Id): IO[Visit.Id] = {
     val name = s"record${instrument.tag}Visit"
 
@@ -477,7 +527,7 @@ trait DatabaseOperations { this: OdbSuite =>
           mutation {
             $name(input: {
               observationId: ${oid.asJson},
-              static: ${staticConfigObject(instrument)}
+              static: ${staticConfig(instrument)}
             }) {
               visit {
                 id
@@ -489,6 +539,9 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields(name, "visit", "id").require[Visit.Id]
     }
   }
+
+  def recordStepAs(user: User, instrument: Instrument, vid: Visit.Id): IO[Step.Id] =
+    recordStepAs(user, vid, instrument, dynamicConfig(instrument), stepConfigScience)
 
   def recordStepAs(
     user:       User,

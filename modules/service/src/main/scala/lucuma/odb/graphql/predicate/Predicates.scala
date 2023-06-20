@@ -36,6 +36,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val proposalClass          = ProposalClassPredicates(Path.from(ProposalClassType))
     val sequenceEvent          = ExecutionEventPredicates(Path.from(SequenceEventType))
     val setAllocationResult    = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
+    val stepEvent              = ExecutionEventPredicates(Path.from(StepEventType))
     val target                 = TargetPredicates(Path.from(TargetType))
     val targetEdit             = TargetEditPredicates(Path.from(TargetEditType))
     val targetGroup            = TargetGroupPredicates(Path.from(TargetGroupType))
