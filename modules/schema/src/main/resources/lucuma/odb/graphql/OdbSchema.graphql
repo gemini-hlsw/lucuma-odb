@@ -11,9 +11,7 @@ type AddDatasetEventResult {
   event: DatasetEvent!
 }
 
-"""
-SequenceEvent creation parameters.
-"""
+"SequenceEvent creation parameters."
 input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
@@ -25,11 +23,13 @@ type AddSequenceEventResult {
   event: SequenceEvent!
 }
 
-# StepEvent creation parameters
+"StepEvent creation parameters"
 input AddStepEventInput {
-  visitId: VisitId!
-  location: StepEventLocationInput!
-  payload: StepEventPayloadInput!
+  stepId:  StepId!
+
+  sequenceType: SequenceType!
+
+  stepStage: StepStage!
 }
 
 # The result of adding a step event.
@@ -1637,34 +1637,40 @@ type Mutation {
     input: AddDatasetEventInput!
   ): AddDatasetEventResult!
 
-  # Adds a sequence event associated with the given visit. Multiple events
-  # will be produced during the execution of a sequence as it is started,
-  # paused, continued, etc.
-  #
+  """
+  Adds a sequence event associated with the given visit. Multiple events
+  will be produced during the execution of a sequence as it is started,
+  paused, continued, etc.
+  """
   addSequenceEvent(
-    # Describes the sequence event to add.  All events are associated with a
-    # particular visit (see 'record{InstrumentName}Visit').  Sequence events
-    # are further associated with an observation (i.e., its 'location').
-    # Each sequence event 'payload' identifies the sequence command that
-    # acted upon the sequence.
-    #
+
+    """
+    Describes the sequence event to add.  All events are associated with a
+    particular visit (see 'record{InstrumentName}Visit').  Sequence events
+    are further associated with an observation.  Each sequence event identifies
+    the sequence command that acted upon the sequence.
+    """
     input: AddSequenceEventInput!
+
   ): AddSequenceEventResult!
 
-  # Adds a new step event associated with the given visit. Multiple events
-  # will be produced during the execution of a single step as it
-  # transitions through configure and observe stages.
-  #
+  """
+  Adds a new step event associated with the given step. Multiple events
+  will be produced during the execution of a single step as it
+  transitions through configure and observe stages.
+  """
   addStepEvent(
-    # Describes the step event to add.  All events are associated with a
-    # particular visit (see 'record{InstrumentName}Visit'.  Step events are
-    # further associated with an observation and step (i.e., its 'location').
-    # (See also 'record{InstrumentName}Step'.) Each step event 'payload'
-    # identifies the sequence type (acquisition or science) and the stage
-    # through which the step execution is passing.
-    #
+
+    """
+    Describes the step event to add.  All events are associated with a
+    particular step (see 'record{InstrumentName}Step'. Each step event
+    identifies the sequence type (acquisition or science) and the stage
+    through which the step execution is passing.
+    """
     input: AddStepEventInput!
+
   ): AddStepEventResult!
+
   cloneObservation(
     # Parameters for cloning an existing observation
     input: CloneObservationInput!
@@ -2419,18 +2425,6 @@ SmartGcal step creation input
 input StepConfigSmartGcalInput {
   # Smart Gcal type
   smartGcalType: SmartGcalType!
-}
-
-# StepEvent location parameters
-input StepEventLocationInput {
-  observationId: ObservationId!
-  stepId: StepId!
-}
-
-# StepEvent payload parameters
-input StepEventPayloadInput {
-  sequenceType: SequenceType!
-  stepStage: StepStage!
 }
 
 # Step QA State
@@ -5860,66 +5854,48 @@ enum StellarLibrarySpectrum {
   M9_III
 }
 
-# Step-level events.  The execution of a single step will generate multiple events.
-type StepEvent implements ExecutionEvent {
-  # Identifies the step to which the event refers
-  location: StepEventLocation!
+"""
+Step-level events.  The execution of a single step will generate multiple events.
+"""
+type StepEvent {
 
-  # Step event data including the stage of execution through which it is passing.
-  payload: StepEventPayload!
-
-  # Event id
+  "Event id"
   id: ExecutionEventId!
 
-  # Associated visit
+  "Identifies the step to which the event refers."
+  stepId: StepId!
+
+  "Associated visit."
   visitId: VisitId!
 
-  # Observation whose execution produced this event
+  "Whether this is an acquisition or science sequence step."
+  sequenceType: SequenceType!
+
+  "Step execution stage."
+  stepStage: StepStage!
+
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  # Time at which this event was received
+  "Time at which this event was received"
   received: Timestamp!
 }
 
-# Step event location, i.e., to which step the event refers
-type StepEventLocation {
-  # Observation containing the step
-  observationId: ObservationId!
-
-  # The step id itself
-  stepId: StepId!
-}
-
-# Step event data
-type StepEventPayload {
-  # Sequence type
-  sequenceType: SequenceType!
-
-  # Step execution stage
-  stepStage: StepStage!
-}
-
-# StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
 scalar StepId
 
-# Execution stage or phase of an individual step
+"Execution stage or phase of an individual step"
 enum StepStage {
-  # StepStage END_CONFIGURE
   END_CONFIGURE
 
-  # StepStage END_OBSERVE
   END_OBSERVE
 
-  # StepStage END_STEP
   END_STEP
 
-  # StepStage START_CONFIGURE
   START_CONFIGURE
 
-  # StepStage START_OBSERVE
   START_OBSERVE
 
-  # StepStage START_STEP
   START_STEP
 }
 
