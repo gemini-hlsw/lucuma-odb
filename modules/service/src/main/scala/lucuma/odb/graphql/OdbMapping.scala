@@ -119,6 +119,7 @@ object OdbMapping {
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
           with AddSequenceEventResultMapping[F]
+          with AddStepEventResultMapping[F]
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
@@ -193,6 +194,7 @@ object OdbMapping {
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
+          with StepEventMapping[F]
           with SubscriptionMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
@@ -229,6 +231,7 @@ object OdbMapping {
           override val typeMappings: List[TypeMapping] =
             List(
               AddSequenceEventResultMapping,
+              AddStepEventResultMapping,
               AirMassRangeMapping,
               AllocationMapping,
               AngleMapping,
@@ -314,6 +317,7 @@ object OdbMapping {
               StepConfigGcalMapping,
               StepConfigScienceMapping,
               StepConfigSmartGcalMapping,
+              StepEventMapping,
               SubscriptionMapping,
               TargetEditMapping,
               TargetEnvironmentMapping,

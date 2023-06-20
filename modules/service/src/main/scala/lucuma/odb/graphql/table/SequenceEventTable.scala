@@ -6,7 +6,6 @@ package lucuma.odb.graphql.table
 import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.execution_event_id
-import lucuma.odb.util.Codecs.instrument
 import lucuma.odb.util.Codecs.sequence_command
 import lucuma.odb.util.Codecs.visit_id
 
