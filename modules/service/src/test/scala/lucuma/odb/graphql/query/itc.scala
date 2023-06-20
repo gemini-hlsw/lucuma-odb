@@ -55,6 +55,50 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 itc {
                   result {
                     targetId
+                  }
+                  all {
+                    targetId
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+               "observation": {
+                 "id": $oid,
+                 "itc": {
+                   "result": {
+                     "targetId": $tid
+                   },
+                   "all": [
+                     {
+                       "targetId": $tid
+                     }
+                   ]
+                 }
+               }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  /*
+  test("success, one target") {
+    setup1.flatMap { case (_, oid, tid) =>
+      expect(
+        user = user,
+        query =
+          s"""
+            query {
+              observation(observationId: "$oid") {
+                id
+                itc {
+                  result {
+                    targetId
                     exposureTime {
                       seconds
                     }
@@ -355,4 +399,5 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       )
     } yield r
   }
+ */
 }

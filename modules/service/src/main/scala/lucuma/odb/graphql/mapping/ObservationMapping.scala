@@ -131,16 +131,15 @@ trait ObservationMapping[F[_]]
 
         val res = for {
           ids <- ResultT(extractIds(queries).pure[F])
-          distinct = ids.distinct
-          itc <- distinct.traverse { case (pid, oid) => ResultT(callItc(pid, oid)) }
+          itc <- ids.distinct.traverse { case (pid, oid) => ResultT(callItc(pid, oid)) }
         } yield
-
-          ids.flatMap { case (_, oid) => itc.find(_._1 === oid).map(_._2).toList }
-             .zip(children)
-             .map { case (itcResultSet, (ctx, child, parentCursor)) =>
-               val cursor: Cursor = CirceCursor(ctx, itcResultSet.asJson, Some(parentCursor), parentCursor.fullEnv)
-               (child, cursor)
-             }
+          ids.flatMap { case (_, oid) =>
+             itc.find(_._1 === oid).map(_._2).toList
+          }
+          .zip(children)
+          .map { case (itcResultSet, (ctx, child, parentCursor)) =>
+            (child, CirceCursor(ctx, itcResultSet.asJson, Some(parentCursor), parentCursor.fullEnv): Cursor)
+          }
 
         res.value
       }
