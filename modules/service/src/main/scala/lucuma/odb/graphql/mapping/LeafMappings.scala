@@ -50,6 +50,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[Tag](ConditionsExpectationTypeType),
+      LeafMapping[Tag](ConditionsSourceType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
@@ -103,6 +105,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ScienceMode](ScienceModeType),
+      LeafMapping[Tag](SeeingTrendType),
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[SkyBackground](SkyBackgroundType),
@@ -120,7 +123,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
-      LeafMapping[WaterVapor](WaterVaporType)
+      LeafMapping[WaterVapor](WaterVaporType),
     )
 
 }

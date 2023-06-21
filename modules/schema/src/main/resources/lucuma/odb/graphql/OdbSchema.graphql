@@ -256,7 +256,7 @@ type ConditionsMeasurement {
   elevation:  Angle
 }
 
-input ConditionsMeasurement {
+input ConditionsMeasurementInput {
   source:     ConditionsMeasurementSource!
   seeing:     AngleInput
   extinction: ExtinctionInput
@@ -304,7 +304,7 @@ enum SeeingTrend {
 }
 
 enum ConditionsMeasurementSource {
-  'observer'
+  OBSERVER
 }
 
 enum ExtinctionUnits {
@@ -1736,9 +1736,9 @@ type Mutation {
 
   # Logs  observing conditions to the Chronicle. This operation is permitted only for staff and
   # service users.
-  addObservedConditions(
-    input: ConditionsObservationInput
-  ): ConditionsObservation!
+  # addObservedConditions(
+  #   input: ConditionsObservationInput
+  # ): ConditionsObservation!
 
   # Adds a new dataset event associated with the given visit.  The
   # generation of a single dataset will produce multiple events as it
