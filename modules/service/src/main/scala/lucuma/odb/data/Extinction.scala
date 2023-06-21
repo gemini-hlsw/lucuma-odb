@@ -18,4 +18,6 @@ object Extinction:
   val FromMags: Format[Float, Extinction] =
     FromMillimags.imapA(_ / 1000f, f => (f * 1000f).toShort)
 
+  extension (e: Extinction)
+    def transmission: Double = math.pow(10.0, e.value * 1000.0 / -2.5)
   
