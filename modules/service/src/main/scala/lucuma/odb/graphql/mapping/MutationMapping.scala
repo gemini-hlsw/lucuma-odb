@@ -87,6 +87,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
+      // AddObservedConditions,
       AddSequenceEvent,
       CloneObservation,
       CloneTarget,
@@ -193,6 +194,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   // Field definitions
+
+  // private lazy val AddObservedConditions: MutationField =
+  //   MutationField("addObservedConditions", ObservedConditionsInput.Binding) { (input, child) =>
+  //     services.useTransactionally {
+  //       chronicleService.insertObservedConditions(input).map { id =>
+  //         Result.failure(s"insert worked, id is $id .. otherwise unimplemeted")
+  //       }
+  //     }  
+  //   }
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
