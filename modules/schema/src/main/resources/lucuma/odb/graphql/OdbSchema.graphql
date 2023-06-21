@@ -247,6 +247,9 @@ input ConditionsEntryInput {
   intuition: ConditionsIntuitionInput
 }
 
+"Non-negative floating-point value."
+scalar Extinction
+
 type ConditionsMeasurement {
   source:     ConditionsMeasurementSource!
   seeing:     Angle
@@ -259,7 +262,7 @@ type ConditionsMeasurement {
 input ConditionsMeasurementInput {
   source:     ConditionsMeasurementSource!
   seeing:     AngleInput
-  extinction: ExtinctionInput
+  extinction: Extinction
   wavelength: WavelengthInput
   azimuth:    AngleInput
   elevation:  AngleInput
@@ -285,17 +288,6 @@ input ConditionsExpectationInput {
   timeframe: TimeSpanInput!
 }
 
-type Extinction {
-  percent: NonNegBigDecimal!
-  mags: BigDecimal!
-}
-
-
-input ExtinctionInput {
-  value: BigDecimal!
-  units: ExtinctionUnits!
-}
-
 enum SeeingTrend {
   GETTING_BETTER,
   STAYING_THE_SAME,
@@ -305,11 +297,6 @@ enum SeeingTrend {
 
 enum ConditionsMeasurementSource {
   OBSERVER
-}
-
-enum ExtinctionUnits {
-  PERCENT,
-  MAGS
 }
 
 enum ConditionsExpectationType {
