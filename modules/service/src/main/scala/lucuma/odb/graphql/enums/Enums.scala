@@ -114,6 +114,9 @@ object Enums {
                ProposalAttachmentTypeEnumType.fetch(s),
                FilterTypeEnumType.fetch(s),
                PartnerEnumType.fetch(s),
+               ConditionsExpectationTypeEnumType.fetch(s),
+               ConditionsSourceEnumType.fetch(s),
+               SeeingTrendEnumType.fetch(s),
              ).sequence
     } yield Enums(Meta(te, un))
 
