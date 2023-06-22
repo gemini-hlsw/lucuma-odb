@@ -82,6 +82,7 @@ object OdbMapping {
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
           with AddConditionsEntryResultMapping[F]
+          with AddDatasetEventResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddStepEventResultMapping[F]
           with AirMassRangeMapping[F]
@@ -105,6 +106,8 @@ object OdbMapping {
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
           with DeclinationMapping[F]
+          with DatasetIdMapping[F]
+          with DatasetEventMapping[F]
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
@@ -199,6 +202,7 @@ object OdbMapping {
           override val typeMappings: List[TypeMapping] =
             List(
               AddConditionsEntryResultMapping,
+              AddDatasetEventResultMapping,
               AddSequenceEventResultMapping,
               AddStepEventResultMapping,
               AirMassRangeMapping,
@@ -221,6 +225,8 @@ object OdbMapping {
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
+              DatasetIdMapping,
+              DatasetEventMapping,
               DeclinationMapping,
               ElevationRangeMapping,
               FilterTypeMetaMapping,
