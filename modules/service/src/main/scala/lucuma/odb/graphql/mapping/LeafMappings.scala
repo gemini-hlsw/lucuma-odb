@@ -51,6 +51,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](ConditionsExpectationTypeType),
       LeafMapping[Tag](ConditionsMeasurementSourceType),
       LeafMapping[Tag](ConditionsSourceType),
+      LeafMapping[NonEmptyString](DatasetFilenameType),
+      LeafMapping[DatasetStage](DatasetStageType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
