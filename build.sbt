@@ -131,6 +131,7 @@ lazy val service = project
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
+      "org.typelevel"  %% "discipline-munit"                   % munitDisciplineVersion     % Test,
       "edu.gemini"     %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
       "org.typelevel"  %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
