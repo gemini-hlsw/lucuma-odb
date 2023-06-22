@@ -12,7 +12,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
