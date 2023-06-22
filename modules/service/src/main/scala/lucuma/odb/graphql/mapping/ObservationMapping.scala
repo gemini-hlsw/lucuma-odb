@@ -20,7 +20,7 @@ import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax.*
-import io.circe.literal.*
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -122,27 +122,20 @@ trait ObservationMapping[F[_]]
             }
         }
 
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] = {
-        val children = queries.flatMap {
-          case (PossiblyRenamedSelect(Select(name, _, child), alias), parentCursor) =>
-            parentCursor.context.forField(name, alias).toList.map(ctx => (ctx, child, parentCursor))
-          case _ => Nil
-        }
-
-        val res = for {
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
+        (for {
           ids <- ResultT(extractIds(queries).pure[F])
           itc <- ids.distinct.traverse { case (pid, oid) => ResultT(callItc(pid, oid)) }
         } yield
-          ids.flatMap { case (_, oid) =>
-             itc.find(_._1 === oid).map(_._2).toList
-          }
-          .zip(children)
-          .map { case (itcResultSet, (ctx, child, parentCursor)) =>
-            (child, CirceCursor(ctx, itcResultSet.asJson, Some(parentCursor), parentCursor.fullEnv): Cursor)
-          }
-
-        res.value
-      }
+          ids
+            .flatMap { case (_, oid) => itc.find(_._1 === oid).map(_._2).toList }
+            .zip(queries)
+            .map { case (itcResultSet, (child, parentCursor)) =>
+              val itc: Json      = Json.fromFields(List("itc" -> itcResultSet.asJson))
+              val cursor: Cursor = CirceCursor(parentCursor.context, itc, Some(parentCursor), parentCursor.fullEnv)
+              (child, cursor)
+            }
+        ).value
     }
 
 }
