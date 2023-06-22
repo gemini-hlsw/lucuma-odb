@@ -55,50 +55,6 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 itc {
                   result {
                     targetId
-                  }
-                  all {
-                    targetId
-                  }
-                }
-              }
-            }
-          """,
-        expected = Right(
-          json"""
-            {
-               "observation": {
-                 "id": $oid,
-                 "itc": {
-                   "result": {
-                     "targetId": $tid
-                   },
-                   "all": [
-                     {
-                       "targetId": $tid
-                     }
-                   ]
-                 }
-               }
-            }
-          """
-        )
-      )
-    }
-  }
-
-  /*
-  test("success, one target") {
-    setup1.flatMap { case (_, oid, tid) =>
-      expect(
-        user = user,
-        query =
-          s"""
-            query {
-              observation(observationId: "$oid") {
-                id
-                itc {
-                  result {
-                    targetId
                     exposureTime {
                       seconds
                     }
@@ -141,18 +97,20 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("success, two targets") {
-    setup2.flatMap { case (pid, oid, tid0, tid1) =>
+    setup2.flatMap { case (_, oid, tid0, tid1) =>
       expect(
         user = user,
         query =
           s"""
             query {
-              itc(programId: "$pid", observationId: "$oid") {
-                result {
-                  targetId
-                }
-                all {
-                  targetId
+              observation(observationId: "$oid") {
+                itc {
+                  result {
+                    targetId
+                  }
+                  all {
+                    targetId
+                  }
                 }
               }
             }
@@ -160,18 +118,20 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-               "itc": {
-                 "result": {
-                   "targetId": $tid1
-                 },
-                 "all": [
-                   {
-                     "targetId": $tid0
-                   },
-                   {
+               "observation": {
+                 "itc": {
+                   "result": {
                      "targetId": $tid1
-                   }
-                 ]
+                   },
+                   "all": [
+                     {
+                       "targetId": $tid0
+                     },
+                     {
+                       "targetId": $tid1
+                     }
+                   ]
+                 }
                }
             }
           """
@@ -179,6 +139,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       )
     }
   }
+
 
   test("observation missing observingMode") {
     def createObservation(pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
@@ -236,9 +197,11 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         query =
           s"""
             query {
-              itc(programId: "$p", observationId: "$o") {
-                result {
-                  targetId
+              observation(observationId: "$o") {
+                itc {
+                  result {
+                    targetId
+                  }
                 }
               }
             }
@@ -312,9 +275,11 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         query =
           s"""
             query {
-              itc(programId: "$p", observationId: "$o") {
-                result {
-                  targetId
+              observation(observationId: "$o") {
+                itc {
+                  result {
+                    targetId
+                  }
                 }
               }
             }
@@ -386,9 +351,11 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         query =
           s"""
             query {
-              itc(programId: "$p", observationId: "$o") {
-                result {
-                  targetId
+              observation(observationId: "$o") {
+                itc {
+                  result {
+                    targetId
+                  }
                 }
               }
             }
@@ -399,5 +366,5 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       )
     } yield r
   }
- */
+
 }
