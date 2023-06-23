@@ -12,8 +12,6 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import skunk.*
-import skunk.syntax.all.*
 
 class obsAttachmentsAssignments extends ObsAttachmentsSuite {
 
