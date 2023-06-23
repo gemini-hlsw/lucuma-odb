@@ -9,9 +9,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.ToOActivation
 import lucuma.core.model.GuestRole
-import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
@@ -21,7 +19,6 @@ import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
-import lucuma.odb.graphql.input.ProposalInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._

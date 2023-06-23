@@ -4,7 +4,6 @@
 package lucuma.odb.smartgcal.parsers
 
 import cats.data.NonEmptySet
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.show.*
 import eu.timepit.refined.types.numeric.PosInt

@@ -10,12 +10,10 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import natchez.Trace
-import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -55,7 +53,7 @@ trait ProposalAttachmentFileService[F[_]] {
 
   /** Deletes the file from the database and then removes it from S3. */
   def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[Unit]
-  
+
   def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[String]
 }
 
@@ -93,7 +91,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("insertProposalAttachment") {
-        val af   = 
+        val af   =
           Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.command
         session
@@ -103,7 +101,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
               .void
               // TODO: Handle 2 constraint violations
               .recoverWith {
-                // This seems a bit brittle. But this can only happen if something changes between the 
+                // This seems a bit brittle. But this can only happen if something changes between the
                 // initial checks for duplication and this function is called after the upload.
                 case SqlState.UniqueViolation(e) =>
                   if (e.constraintName.contains("t_proposal_attachment_pkey"))
@@ -135,7 +133,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 else MonadCancelThrow[F].raiseError(FileNotFound)
               )
               .recoverWith {
-                case SqlState.UniqueViolation(_) => 
+                case SqlState.UniqueViolation(_) =>
                   MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate file name"))
               }
           )
@@ -174,7 +172,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           .prepareR(stmt)
           .use(pg =>
             pg.option(af.argument)
-              .flatMap { 
+              .flatMap {
                 case None    => MonadCancelThrow[F].raiseError(FileNotFound)
                 case Some(s) => MonadCancelThrow[F].pure(s)
                 }
@@ -187,7 +185,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       attachmentType: Tag
     ): F[Unit] =
       getOptionalRemotePath(user, programId, attachmentType)
-        .flatMap { 
+        .flatMap {
           case Some(_) => MonadCancelThrow[F].raiseError(InvalidRequest("Duplicate attachment type"))
           case None    => MonadCancelThrow[F].unit
           }
@@ -252,7 +250,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         attachmentType: Tag,
         fileName: String,
         description: Option[NonEmptyString],
-        data: Stream[F, Byte])(using NoTransaction[F]): F[Unit] = 
+        data: Stream[F, Byte])(using NoTransaction[F]): F[Unit] =
         FileName
           .fromString(fileName)
           .fold(
@@ -280,14 +278,14 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         fileName: String,
         description: Option[NonEmptyString],
         data: Stream[F, Byte]
-      )(using NoTransaction[F]): F[Unit] = 
+      )(using NoTransaction[F]): F[Unit] =
         FileName
           .fromString(fileName)
           .fold(
             e  => MonadCancelThrow[F].raiseError(e),
             fn =>
               for {
-                oldPath <- services.transactionally {                
+                oldPath <- services.transactionally {
                   checkAccess(session, user, programId) >>
                   checkAttachmentType(attachmentType) >>
                   checkExtension(fn, allowedExtensions) >>
@@ -301,8 +299,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 _       <- s3FileSvc.delete(oldPath)
               } yield ()
           )
-        
-      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[Unit] = 
+
+      def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[F]): F[Unit] =
         for {
           path <- services.transactionally {
             checkAccess(session, user, programId) >>
@@ -310,7 +308,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
             deleteAttachmentFromDB(user, programId, attachmentType)
           }
           _    <-
-            // We'll trap errors from the remote delete because, although not ideal, we don't 
+            // We'll trap errors from the remote delete because, although not ideal, we don't
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
             s3FileSvc.delete(path).handleError{ case _ => () }
         } yield ()
@@ -347,8 +345,8 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           c_description,
           c_file_size,
           c_remote_path
-        ) 
-        SELECT 
+        )
+        SELECT
           $program_id,
           $tag,
           $text_nonempty,

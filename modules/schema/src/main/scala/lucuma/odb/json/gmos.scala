@@ -6,11 +6,9 @@ package lucuma.odb.json
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
-import io.circe.Codec
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
-import io.circe.HCursor
 import io.circe.Json
 import io.circe.refined._
 import io.circe.syntax._
@@ -51,7 +49,6 @@ trait GmosCodec {
   import offset.decoder.given
   import time.decoder.given
   import wavelength.decoder.given
-  import sequence.given
 
   given Decoder[GmosNodAndShuffle] =
     Decoder.instance { c =>

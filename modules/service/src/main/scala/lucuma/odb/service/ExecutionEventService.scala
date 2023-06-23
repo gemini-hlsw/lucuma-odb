@@ -8,13 +8,11 @@ import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
-import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step

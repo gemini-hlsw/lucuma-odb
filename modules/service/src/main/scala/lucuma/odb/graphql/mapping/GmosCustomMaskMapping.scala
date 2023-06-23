@@ -4,8 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import edu.gemini.grackle.TypeRef
-
 import table.GmosDynamicTables
 
 trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {

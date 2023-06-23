@@ -3,7 +3,6 @@
 
 package lucuma.odb.data
 
-import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 
 // The name "TimingWindowEndType" conflicts with the TypeRef for TimingWindowEnd.

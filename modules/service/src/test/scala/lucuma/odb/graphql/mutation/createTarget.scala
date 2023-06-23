@@ -10,7 +10,6 @@ import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph

@@ -15,9 +15,9 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.8"
 val log4catsVersion            = "2.6.0"
-val lucumaCoreVersion          = "0.80.0"
+val lucumaCoreVersion          = "0.80.1"
 val lucumaGraphQLRoutesVersion = "0.6.5"
-val lucumaItcVersion           = "0.15.2"
+val lucumaItcVersion           = "0.16.0"
 val lucumaSsoVersion           = "0.5.13"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -45,7 +45,7 @@ ThisBuild / githubWorkflowBuild +=
     cond = Some("github.event_name == 'pull_request'")
   )
 
-lazy val schema = 
+lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
     .in(file("modules/schema"))

@@ -5,7 +5,6 @@ package lucuma.odb.util
 
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain

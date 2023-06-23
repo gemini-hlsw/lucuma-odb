@@ -6,14 +6,7 @@ package mapping
 
 import cats.syntax.all.*
 import coulomb.*
-import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate.*
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.PosDouble
 import io.circe.Json
@@ -29,26 +22,15 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
-import lucuma.core.enums.Site
-import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
-import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition
-import lucuma.core.model.UnnormalizedSED
-import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.input.*
-import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
-import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.Config
 
 import java.math.RoundingMode
-import scala.collection.immutable.SortedMap
 import scala.reflect.ClassTag
 
 trait GmosLongSlitMapping[F[_]]

@@ -10,13 +10,9 @@ import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import lucuma.core.enums.Instrument
-import lucuma.core.model.Access.Admin
-import lucuma.core.model.Access.Service
-import lucuma.core.model.Access.Staff
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit

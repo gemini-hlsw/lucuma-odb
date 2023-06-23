@@ -17,12 +17,9 @@ import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
-import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
-import skunk.Query
 import skunk.*
 import skunk.implicits.*
 

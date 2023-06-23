@@ -16,12 +16,10 @@ import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
 import lucuma.odb.util.Codecs._
 import org.typelevel.log4cats.Logger
-import skunk.Query
 import skunk._
 import skunk.implicits._
 
@@ -66,13 +64,13 @@ object ProgramTopic {
     s: Session[F],
     pid: Program.Id,
   ): F[List[User.Id]] =
-    val q = 
+    val q =
       sql"""
         select c_pi_user_id from t_program where c_program_id = '#${pid.toString}'
         and c_pi_user_id is not null
         union
         select c_user_id from t_program_user where c_program_id = '#${pid.toString}'
-        """.query(user_id) 
+        """.query(user_id)
     s.execute(q)
 
   // def SelectProgramUsers: Query[Program.Id, User.Id] =

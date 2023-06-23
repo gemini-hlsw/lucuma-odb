@@ -9,7 +9,6 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
-import lucuma.odb.graphql.util.MappingExtras
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
@@ -40,7 +39,7 @@ trait WavelengthMapping[F[_]]
   }
 
   import ObservationView.ScienceRequirements.Spectroscopy
-  
+
   lazy val WavelengthMapping: TypeMapping =
     SwitchMapping(
       WavelengthType,

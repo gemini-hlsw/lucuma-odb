@@ -6,10 +6,6 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
-import lucuma.core.model.ObsAttachment
-import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.ProposalAttachmentPropertiesInput
@@ -33,9 +29,9 @@ object ProposalAttachmentMetadataService {
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProposalAttachmentMetadataService[F] =
     new ProposalAttachmentMetadataService[F] {
       def updateProposalAttachments(
-          SET: ProposalAttachmentPropertiesInput.Edit, 
+          SET: ProposalAttachmentPropertiesInput.Edit,
           which: AppliedFragment
-      )(using Transaction[F]): F[List[Tag]] = 
+      )(using Transaction[F]): F[List[Tag]] =
         Statements.updateProposalAttachments(SET, which).fold(Nil.pure[F]) { af =>
           session.prepareR(af.fragment.query(tag)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList
@@ -48,7 +44,7 @@ object ProposalAttachmentMetadataService {
     def updates(SET: ProposalAttachmentPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
       val upDescription = sql"c_description = ${text_nonempty.opt}"
       val upChecked     = sql"c_checked = $bool"
-      
+
       NonEmptyList.fromList(
         List(
           SET.description match {
@@ -64,7 +60,7 @@ object ProposalAttachmentMetadataService {
     def updateProposalAttachments(
       SET: ProposalAttachmentPropertiesInput.Edit,
       which: AppliedFragment
-    ): Option[AppliedFragment] = 
+    ): Option[AppliedFragment] =
       updates(SET).map {us =>
         void"UPDATE t_proposal_attachment "  |+|
         void"SET " |+| us.intercalate(void", ") |+| void" " |+|

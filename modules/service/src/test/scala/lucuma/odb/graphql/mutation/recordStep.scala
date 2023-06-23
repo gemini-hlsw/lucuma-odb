@@ -5,27 +5,16 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.*
-import lucuma.core.math.Offset
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.gmos.DynamicConfig
-import lucuma.core.model.sequence.gmos.GmosCcdMode
-import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.model.sequence.gmos.GmosGratingConfig
-import lucuma.core.syntax.timespan.*
-import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ObservingModeType
 
 class recordStep extends OdbSuite {

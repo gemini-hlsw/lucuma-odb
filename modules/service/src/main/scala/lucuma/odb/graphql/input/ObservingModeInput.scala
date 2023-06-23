@@ -7,7 +7,6 @@ package input
 
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.binding.*
 

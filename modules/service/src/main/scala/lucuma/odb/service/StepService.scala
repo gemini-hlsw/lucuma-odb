@@ -7,14 +7,10 @@ import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
-import cats.syntax.applicative.*
 import cats.syntax.eq.*
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import lucuma.core.enums.GuideState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepType
-import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit

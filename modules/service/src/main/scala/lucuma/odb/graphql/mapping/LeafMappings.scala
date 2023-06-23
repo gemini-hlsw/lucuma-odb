@@ -5,9 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.Mapping
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -26,7 +24,6 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step

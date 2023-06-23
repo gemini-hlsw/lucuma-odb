@@ -5,13 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.TypeRef
-import io.circe.Json
-import io.circe.syntax.*
-import lucuma.core.enums.GmosAmpCount
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
 
 import table.GmosDynamicTables
 

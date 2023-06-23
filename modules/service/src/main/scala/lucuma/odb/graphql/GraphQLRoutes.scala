@@ -22,7 +22,6 @@ import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
-import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
@@ -55,10 +54,10 @@ object GraphQLRoutes {
 
       // Sometimes we get invalid cursors on startup; this works around the error by doing the thing again.
       extension [A](fa: F[A]) def retryOnInvalidCursorName: F[A] =
-        fa.recoverWith { 
+        fa.recoverWith {
           case SqlState.InvalidCursorName(_) =>
             Logger[F].warn(s"Invalid cursor; retrying (once).") >> fa
-        }                          
+        }
 
       // Log a message with the user
       def info(user: User, message: String): F[Unit] =
@@ -87,11 +86,11 @@ object GraphQLRoutes {
                       // If the user has never hit the ODB using http then there will be no user
                       // entry in the database. So go ahead and [re]canonicalize here to be sure.
                       _    <- OptionT.liftF(userSvc.canonicalizeUser(user).retryOnInvalidCursorName)
-                      
+
                       _    <- OptionT.liftF(info(user, s"New service instance."))
                       map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc)
                       svc   = new GrackleGraphQLService(map) {
-                        override def query(request: ParsedGraphQLRequest): F[Either[Throwable, Json]] = 
+                        override def query(request: ParsedGraphQLRequest): F[Either[Throwable, Json]] =
                           super.query(request).retryOnInvalidCursorName.flatTap {
                             case Left(t)  => warn(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}")
                             case Right(j) => debug(user, s"Query (success).")

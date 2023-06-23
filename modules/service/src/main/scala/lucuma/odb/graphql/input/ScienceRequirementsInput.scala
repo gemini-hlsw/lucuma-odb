@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.option._
 import cats.syntax.parallel._
 import lucuma.core.enums.ScienceMode
 import lucuma.odb.graphql.binding.Matcher
