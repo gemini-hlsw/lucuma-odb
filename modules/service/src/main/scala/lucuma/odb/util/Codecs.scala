@@ -3,12 +3,8 @@
 
 package lucuma.odb.util
 
-import cats.data.NonEmptySet
 import cats.syntax.apply.*
-import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -50,7 +46,6 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
-import skunk.implicits.*
 import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound

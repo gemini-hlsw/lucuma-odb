@@ -8,7 +8,6 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
-import fs2.text
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -20,7 +19,6 @@ import lucuma.refined.*
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
-import skunk.Transaction
 
 class obsAttachmentRoutes extends AttachmentRoutesSuite {
 
@@ -53,13 +51,13 @@ class obsAttachmentRoutes extends AttachmentRoutesSuite {
       fileName: String,
       description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
-    )(using NoTransaction[IO]): IO[Unit] = 
+    )(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
     def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[IO]): IO[String] = 
+    def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[IO]): IO[String] =
       getError(user).fold(IO(presignedUrl))(IO.raiseError)
   }
 

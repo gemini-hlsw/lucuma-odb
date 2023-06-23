@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql
 
-import cats.data.ValidatedNel
 import cats.effect._
 import cats.effect.std.UUIDGen
 import cats.implicits._
@@ -11,18 +10,15 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ObsAttachmentFileService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.implicits._
 import org.http4s.server.middleware.EntityLimiter
 import skunk.Session
 
@@ -41,19 +37,19 @@ object ObsAttachmentRoutes {
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
     maxUploadMb:           Int,
-  ): HttpRoutes[F] = 
+  ): HttpRoutes[F] =
     apply(
       [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u)).map(_.obsAttachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )
-  
+
   // used by tests
   def apply[F[_]: Async: Trace](
     service:     ObsAttachmentFileService[F],
     ssoClient:   SsoClient[F, User],
     maxUploadMb: Int,
-  ): HttpRoutes[F] = 
+  ): HttpRoutes[F] =
     apply(
       [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => fa(service),
       ssoClient,
@@ -134,7 +130,7 @@ object ObsAttachmentRoutes {
               .recoverWith { case e: AttachmentException => e.toResponse }
           }
         }
-      
+
       case req @ GET -> Root / "attachment" / "obs" / "url" / ProgramId(programId) / ObsAttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>

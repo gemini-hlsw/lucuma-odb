@@ -33,7 +33,6 @@ import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.model.GuestUser
-import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
@@ -46,7 +45,6 @@ import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.AsterismService
 
 import java.time.LocalDateTime
-import scala.collection.immutable.SortedMap
 
 class createObservation extends OdbSuite {
 

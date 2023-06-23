@@ -7,7 +7,6 @@ package data
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.eq.*
-import eu.timepit.refined.cats.*
 import lucuma.core.model.Target
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 

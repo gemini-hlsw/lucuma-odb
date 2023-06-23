@@ -7,13 +7,8 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.all.*
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 
 final case class CloneTargetInput(

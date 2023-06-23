@@ -6,12 +6,9 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.effect.kernel.Par
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Cursor.ListTransformCursor
-import edu.gemini.grackle.ListType
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -19,11 +16,8 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
-import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.ProgramType
 import lucuma.core.model
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Tag
@@ -38,10 +32,8 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.service.SmartGcalService
 
 import scala.reflect.ClassTag
 
@@ -68,7 +60,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     oid:      model.Observation.Id,
     useCache: Boolean
   ): F[Result[Json]] =
-    services.useTransactionally { 
+    services.useTransactionally {
       itc(itcClient)
         .lookup(pid, oid, useCache)
         .map {
@@ -76,7 +68,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           case Right(resultSet) => Result(resultSet.asJson)
         }
     }
-  
+
   def sequence(
     path:        Path,
     pid:         model.Program.Id,
@@ -159,7 +151,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   // Elaborators below
 
-  private lazy val AsterismGroup: PartialFunction[Select, Result[Query]] = 
+  private lazy val AsterismGroup: PartialFunction[Select, Result[Query]] =
     val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches")
     {
       case Select("asterismGroup", List(
@@ -170,7 +162,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-          ResultMapping.selectResult("asterismGroup", child, limit) { q =>         
+          ResultMapping.selectResult("asterismGroup", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
@@ -201,7 +193,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentTypeMetaType / "tag"))), child)
       ))
 
-  private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] = 
+  private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] =
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
     {
       case Select("constraintSetGroup", List(
@@ -212,7 +204,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-          ResultMapping.selectResult("constraintSetGroup", child, limit) { q =>         
+          ResultMapping.selectResult("constraintSetGroup", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
@@ -339,7 +331,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-          ResultMapping.selectResult("programs", child, limit) { q =>           
+          ResultMapping.selectResult("programs", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
@@ -398,7 +390,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         )
       }
 
-  private lazy val TargetGroup: PartialFunction[Select, Result[Query]] = 
+  private lazy val TargetGroup: PartialFunction[Select, Result[Query]] =
     val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches")
     {
       case Select("targetGroup", List(
@@ -409,7 +401,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ), child) =>
         (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-          ResultMapping.selectResult("targetGroup", child, limit) { q =>         
+          ResultMapping.selectResult("targetGroup", child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
                 and(List(
@@ -457,10 +449,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
               offset = None,
               limit = Some(limit + 1), // Select one extra row here.
               child = q
-            )          
+            )
           }
         }
-      }        
+      }
   }
 
 }

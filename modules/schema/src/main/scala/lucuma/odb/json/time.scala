@@ -3,21 +3,14 @@
 
 package lucuma.odb.json
 
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
-import io.circe.Codec
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
-import io.circe.HCursor
 import io.circe.Json
-import io.circe.refined._
 import io.circe.syntax._
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
-
-import java.time.temporal.ChronoUnit.MICROS
-import scala.util.Try
 
 object time {
 

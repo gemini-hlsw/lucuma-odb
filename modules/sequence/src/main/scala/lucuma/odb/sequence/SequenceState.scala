@@ -4,11 +4,6 @@
 package lucuma.odb.sequence
 
 import cats.data.State
-import cats.syntax.option.*
-import lucuma.core.enums.GcalContinuum
-import lucuma.core.enums.GcalDiffuser
-import lucuma.core.enums.GcalFilter
-import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.GuideState.Enabled
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType.Flat

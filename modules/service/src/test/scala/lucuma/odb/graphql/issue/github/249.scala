@@ -13,7 +13,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 // https://github.com/gemini-hlsw/lucuma-odb/issues/249
 class GitHub_249 extends OdbSuite {

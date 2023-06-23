@@ -8,13 +8,9 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Result
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
-import lucuma.itc.client.GmosFpu
-import lucuma.itc.client.InstrumentMode
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
-import skunk.Session
 import skunk.Transaction
 
 import Services.Syntax.*

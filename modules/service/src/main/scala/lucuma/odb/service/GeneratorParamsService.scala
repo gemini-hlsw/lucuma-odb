@@ -3,24 +3,18 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
-import cats.Functor
 import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.ValidatedNel
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import cats.syntax.validated.*
-import edu.gemini.grackle.Result
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
@@ -38,7 +32,6 @@ import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.json.angle.decoder.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.util.Codecs.*

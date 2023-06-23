@@ -5,19 +5,12 @@ package lucuma.odb.smartgcal.parsers
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
-import cats.syntax.functor.*
 import cats.syntax.option.*
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
 import lucuma.odb.smartgcal.data.Gmos.FileEntry
 import lucuma.odb.smartgcal.data.Gmos.FileKey
-
-import scala.collection.immutable.ListMap
 
 trait GmosSouthParsers extends GmosCommonParsers {
   import common.*

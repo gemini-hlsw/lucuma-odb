@@ -5,7 +5,6 @@ package lucuma.odb.json
 
 import cats.data.NonEmptyMap
 import cats.instances.order._
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
@@ -27,7 +26,6 @@ import lucuma.core.math.Angle
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.BrightnessValue
 import lucuma.core.math.FluxDensityContinuumValue
-import lucuma.core.math.HourAngle
 import lucuma.core.math.LineFluxValue
 import lucuma.core.math.LineWidthValue
 import lucuma.core.math.Wavelength

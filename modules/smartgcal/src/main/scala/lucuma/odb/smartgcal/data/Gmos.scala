@@ -25,8 +25,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
-import lucuma.core.syntax.enumerated.*
-import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import monocle.Focus

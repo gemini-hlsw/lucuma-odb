@@ -11,7 +11,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
@@ -24,7 +23,6 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -34,7 +32,6 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services
-import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
 import lucuma.odb.smartgcal.data.Gmos.TableRow

@@ -15,8 +15,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.aws.s3.S3
 import fs2.aws.s3.models.Models.FileKey
-import fs2.aws.s3.models.Models.PartSizeMB
-import fs2.io.file.Path
 import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.Program
@@ -38,8 +36,8 @@ import java.util.UUID
 
 /**
   * Service for dealing with the files in S3.
-  * Because we are careful to only have file metadata in the database for 
-    files we are certain are in S3, we don't handle any errors here. If we 
+  * Because we are careful to only have file metadata in the database for
+    files we are certain are in S3, we don't handle any errors here. If we
     get an error from S3, it is either a configuration problem, a network issue,
      or our DB is out of sync.
   */
@@ -53,7 +51,7 @@ trait S3FileService[F[_]] {
 
   /**
     * A convenience method for verifying eistence of and access to the file.
-    * In Http4s, if we don't do this check first and there is an issue, the request 
+    * In Http4s, if we don't do this check first and there is an issue, the request
     * terminates without a response code. This allows the request to at least finish
     * with Internal Server Error most of the time.
     */

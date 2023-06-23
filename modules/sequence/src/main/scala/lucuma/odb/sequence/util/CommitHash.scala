@@ -6,7 +6,6 @@ package lucuma.odb.sequence.util
 import cats.Order
 import cats.Show
 import cats.syntax.eq.*
-import cats.syntax.option.*
 import lucuma.core.optics.Format
 
 import java.util.HexFormat

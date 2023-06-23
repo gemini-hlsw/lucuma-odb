@@ -5,13 +5,11 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
-import cats.syntax.all.given
 import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
-import skunk.Session
 import skunk.Transaction
 import skunk.codec.numeric.*
 import skunk.syntax.all.*
@@ -88,12 +86,12 @@ object Statements {
             int4.opt
           ).values.list(timingWindows.length).list(observationIds.length)}
         """
-        .apply( 
+        .apply(
           observationIds.map( obsId =>
             timingWindows.map { tw => (
-              obsId , 
-              tw.inclusion  , 
-              tw.startUtc      , 
+              obsId ,
+              tw.inclusion  ,
+              tw.startUtc      ,
               tw.end.flatMap(_.atUtc) ,
               tw.end.flatMap(_.after) ,
               tw.end.flatMap(_.repeat.map(_.period)) ,
@@ -113,7 +111,7 @@ object Statements {
         c_repeat_period,
         c_repeat_times
       )
-      SELECT 
+      SELECT
         $observation_id,
         t_timing_window.c_inclusion,
         t_timing_window.c_start,

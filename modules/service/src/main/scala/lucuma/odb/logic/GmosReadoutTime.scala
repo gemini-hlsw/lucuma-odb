@@ -8,12 +8,10 @@ import cats.Order
 import cats.Order.catsKernelOrderingForOrder
 import cats.syntax.applicative.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
@@ -25,8 +23,6 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
-import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.GmosCodecs.*
 import monocle.Focus
 import monocle.Lens
 import skunk.*

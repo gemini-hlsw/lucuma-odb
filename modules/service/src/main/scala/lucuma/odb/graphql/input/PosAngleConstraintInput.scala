@@ -7,7 +7,6 @@ package input
 import cats.syntax.parallel._
 import lucuma.core.math.Angle
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.graphql.binding.AngleBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosAngleConstraintModeBinding

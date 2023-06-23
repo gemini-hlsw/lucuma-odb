@@ -6,11 +6,9 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
-import coulomb.rational.typeexpr.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Group
 import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
@@ -76,14 +74,14 @@ object GroupService {
     val InsertGroup: Query[CreateGroupInput ~ NonNegShort, Group.Id] =
       sql"""
       insert into t_group (
-        c_program_id,   
-        c_parent_id,    
-        c_parent_index, 
-        c_name,         
-        c_description,  
-        c_min_required, 
-        c_ordered,      
-        c_min_interval, 
+        c_program_id,
+        c_parent_id,
+        c_parent_index,
+        c_name,
+        c_description,
+        c_min_required,
+        c_ordered,
+        c_min_interval,
         c_max_interval
       ) values (
         $program_id,

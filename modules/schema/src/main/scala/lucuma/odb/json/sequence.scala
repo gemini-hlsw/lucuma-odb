@@ -6,19 +6,15 @@ package lucuma.odb.json
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
-import cats.syntax.foldable.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.JsonObject
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
-import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
@@ -33,10 +29,7 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
-import lucuma.core.model.sequence.gmos.DynamicConfig
-import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Uid
 
 import scala.collection.immutable.SortedSet
 
@@ -46,8 +39,6 @@ trait SequenceCodec {
 
   import offset.decoder.given
   import stepconfig.given
-  import time.decoder.given
-  import zipper.given
   import plannedtime.given
 
   given [D: Decoder]: Decoder[Step[D]] =

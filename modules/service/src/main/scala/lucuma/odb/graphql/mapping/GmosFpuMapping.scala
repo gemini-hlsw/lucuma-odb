@@ -4,11 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.apply.*
 import edu.gemini.grackle.TypeRef
-import io.circe.Json
-import io.circe.syntax.*
-import lucuma.core.enums.GmosCustomSlitWidth
 
 import table.GmosDynamicTables
 

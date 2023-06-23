@@ -9,13 +9,8 @@ import edu.gemini.grackle.Directive
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.ObjectType
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.Select
-import edu.gemini.grackle.QueryCompiler
-import edu.gemini.grackle.Result
 import edu.gemini.grackle.Schema
 import edu.gemini.grackle.Type
-import edu.gemini.grackle.TypeRef
 import org.tpolecat.sourcepos.SourcePos
 
 /** A mixin that provides Semigroup[Schema]. */
@@ -55,9 +50,6 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
   private def concatAndMergeWhen[A: Semigroup](left: List[A], right: List[A])(matches: (A, A) => Boolean): List[A] =
     left.map(la => right.find(ra => matches(la, ra)).foldLeft(la)(_ |+| _)) ++
     right.filterNot(ra => left.exists(matches(_, ra)))
-
-  private def sameName(a: TypeMapping, b: TypeMapping): Boolean =
-    sameName(a.tpe, b.tpe)
 
   private def sameName(a: Type, b: Type): Boolean =
     (a.asNamed, b.asNamed) match {

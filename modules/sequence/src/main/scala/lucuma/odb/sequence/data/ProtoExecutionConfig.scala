@@ -3,15 +3,7 @@
 
 package lucuma.odb.sequence.data
 
-import cats.Applicative
-import cats.Eq
-import cats.Eval
-import cats.Traverse
 import cats.syntax.apply.*
-import cats.syntax.foldable.*
-import cats.syntax.functor.*
-import cats.syntax.traverse.*
-import fs2.Pure
 import fs2.Stream
 
 case class ProtoExecutionConfig[F[_], S, A](

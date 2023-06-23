@@ -9,8 +9,6 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
-import fs2.text
-import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
@@ -20,10 +18,9 @@ import lucuma.odb.service.ProposalAttachmentFileService
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
-import skunk.Transaction
 
 class proposalAttachmentRoutes extends AttachmentRoutesSuite {
-  
+
   private val service: ProposalAttachmentFileService[IO] = new ProposalAttachmentFileService[IO] {
     def getAttachment(
       user: User,
@@ -41,7 +38,7 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
       fileName: String,
       description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
-    )(using NoTransaction[IO]): IO[Unit] = 
+    )(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
     def updateAttachment(
@@ -54,7 +51,7 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
     )(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
-    def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[IO]): IO[Unit] = 
+    def deleteAttachment(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
 
     def getPresignedUrl(user: User, programId: Program.Id, attachmentType: Tag)(using NoTransaction[IO]): IO[String] =

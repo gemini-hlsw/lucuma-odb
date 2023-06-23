@@ -8,8 +8,6 @@ package mapping
 import cats.data.Nested
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result

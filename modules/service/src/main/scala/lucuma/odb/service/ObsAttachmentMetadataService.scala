@@ -6,9 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
 import lucuma.core.model.ObsAttachment
-import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.ObsAttachmentPropertiesInput
 import lucuma.odb.graphql.input.ObsAttachmentPropertiesInput.Edit
@@ -29,9 +27,9 @@ trait ObsAttachmentMetadataService [F[_]] {
 
 object ObsAttachmentMetadataService {
 
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObsAttachmentMetadataService[F] = 
+  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObsAttachmentMetadataService[F] =
     new ObsAttachmentMetadataService[F] {
-      def updateObsAttachments(SET: Edit, which: AppliedFragment)(using Transaction[F]): F[List[ObsAttachment.Id]] = 
+      def updateObsAttachments(SET: Edit, which: AppliedFragment)(using Transaction[F]): F[List[ObsAttachment.Id]] =
         Statements.updateObsAttachments(SET, which).fold(Nil.pure[F]) { af =>
           session.prepareR(af.fragment.query(obs_attachment_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList

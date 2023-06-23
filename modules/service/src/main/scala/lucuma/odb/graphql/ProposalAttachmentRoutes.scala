@@ -3,24 +3,20 @@
 
 package lucuma.odb.graphql
 
-import cats.data.ValidatedNel
 import cats.effect._
 import cats.implicits._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalAttachmentFileService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.implicits._
 import org.http4s.server.middleware.EntityLimiter
 import skunk.Session
 
@@ -40,19 +36,19 @@ object ProposalAttachmentRoutes {
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
     maxUploadMb:           Int,
-  ): HttpRoutes[F] = 
+  ): HttpRoutes[F] =
     apply(
       [A] => (u: User) => (fa :ProposalAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u)).map(_.proposalAttachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )
-  
+
   // used by tests
   def apply[F[_]: Async: Trace](
     service:     ProposalAttachmentFileService[F],
     ssoClient:   SsoClient[F, User],
     maxUploadMb: Int,
-  ): HttpRoutes[F] = 
+  ): HttpRoutes[F] =
     apply(
       [A] => (u: User) => (fa :ProposalAttachmentFileService[F] => F[A]) => fa(service),
       ssoClient,
@@ -89,7 +85,7 @@ object ProposalAttachmentRoutes {
               case Right(stream) => Async[F].pure(Response(Status.Ok, body = stream))
             }
           }
-        }        
+        }
 
       case req @ POST -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>

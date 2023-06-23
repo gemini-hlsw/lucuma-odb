@@ -27,12 +27,9 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ North => GmosNorthSearchKey}
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ South => GmosSouthSearchKey}
-import lucuma.odb.smartgcal.data.Gmos.TableKey.{ North  => GmosNorthTableKey}
-import lucuma.odb.smartgcal.data.Gmos.TableKey.{ South  => GmosSouthTableKey}
 import lucuma.odb.smartgcal.data.Gmos.TableRow.{ North  => GmosNorthTableRow}
 import lucuma.odb.smartgcal.data.Gmos.TableRow.{ South  => GmosSouthTableRow}
 import lucuma.odb.util.Codecs.*

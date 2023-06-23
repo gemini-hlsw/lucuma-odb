@@ -12,7 +12,6 @@ import com.comcast.ip4s.Port
 import com.monovore.decline._
 import com.monovore.decline.effect.CommandIOApp
 import edu.gemini.grackle.skunk.SkunkMonitor
-import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
@@ -23,8 +22,6 @@ import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ObsAttachmentFileService
-import lucuma.odb.service.ProposalAttachmentFileService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
@@ -37,7 +34,6 @@ import org.flywaydb.core.api.output.MigrateResult
 import org.http4s._
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.implicits._
-import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.server._
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger

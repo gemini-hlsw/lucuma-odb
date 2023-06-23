@@ -5,13 +5,11 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-
 
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
