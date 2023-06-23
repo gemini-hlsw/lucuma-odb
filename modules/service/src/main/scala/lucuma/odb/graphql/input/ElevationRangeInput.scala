@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import edu.gemini.grackle.Result
