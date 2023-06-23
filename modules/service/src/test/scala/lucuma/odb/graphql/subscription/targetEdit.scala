@@ -6,7 +6,6 @@ package subscription
 
 import cats.effect.IO
 import cats.syntax.show.*
-import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Program

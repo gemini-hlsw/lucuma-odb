@@ -4,7 +4,6 @@
 package lucuma.odb.util
 
 import cats.syntax.apply.*
-import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
