@@ -4,8 +4,6 @@
 package lucuma.odb.graphql.predicate
 
 import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
 import lucuma.core.model.ObsAttachment
 
 class ObsAttachmentPredicates(path: Path) {

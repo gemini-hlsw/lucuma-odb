@@ -13,8 +13,6 @@ import lucuma.core.syntax.string.*
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.util.Codecs.*
 import skunk.Encoder
-import skunk.codec.temporal.interval
-import skunk.implicits.*
 
 trait SmartGcalTable {
 

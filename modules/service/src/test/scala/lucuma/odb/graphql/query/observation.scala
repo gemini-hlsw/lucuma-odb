@@ -5,14 +5,11 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
-import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.core.model.User
 
 class observation extends OdbSuite {
 
@@ -83,7 +80,7 @@ class observation extends OdbSuite {
       for {
         pid  <- createProgramAs(pi)
         tid1 <- createTargetAs(pi, pid)
-        tid2 <- createTargetAs(pi, pid, sourceProfile = anotherSourceProfile) 
+        tid2 <- createTargetAs(pi, pid, sourceProfile = anotherSourceProfile)
         oid  <- createObservation(pid, tid1, tid2)
        } yield oid
 
@@ -101,7 +98,7 @@ class observation extends OdbSuite {
                 }
                 targetEnvironment {
                   asterism {
-                    id                    
+                    id
                   }
                 }
               }
@@ -132,7 +129,7 @@ class observation extends OdbSuite {
         )
       )
     }
-    
+
 
   }
 

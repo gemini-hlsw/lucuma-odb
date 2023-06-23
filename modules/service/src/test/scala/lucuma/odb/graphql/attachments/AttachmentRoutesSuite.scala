@@ -7,12 +7,10 @@ package attachments
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.text
 import lucuma.core.model.User
 import lucuma.odb.service.AttachmentFileService.AttachmentException
-import lucuma.refined
 import munit.CatsEffectSuite
 import org.http4s.*
 

@@ -5,14 +5,12 @@ package lucuma.odb.service
 
 import cats.MonadThrow
 import cats.syntax.all._
-import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.io.file.Path
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.NewType
-import natchez.Trace
 import skunk.*
 
 import Services.Syntax.*
@@ -26,7 +24,6 @@ trait AttachmentFileService {
   protected object FileName extends NewType[NonEmptyString] {
     def fromString(name: String): Either[AttachmentException, FileName] = {
       val path         = Path(name)
-      val segmentCount = path.names.length
       val fileName     = NonEmptyString.from(path.fileName.toString).toOption
 
       fileName.fold(
@@ -79,7 +76,7 @@ trait AttachmentFileService {
 object AttachmentFileService {
 
   sealed trait AttachmentException extends Exception
-  
+
   object AttachmentException {
     case object Forbidden                   extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException

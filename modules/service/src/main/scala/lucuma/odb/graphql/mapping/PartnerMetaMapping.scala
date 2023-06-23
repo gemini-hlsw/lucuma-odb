@@ -8,8 +8,6 @@ package mapping
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.PartnerTable
 
-import table.ObservationView
-
 trait PartnerMetaMapping[F[_]] extends PartnerTable[F] {
 
   lazy val PartnerMetaMapping =

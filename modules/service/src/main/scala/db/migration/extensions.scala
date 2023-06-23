@@ -5,7 +5,6 @@ package db.migration
 
 import cats.effect.IO
 import cats.effect.Resource
-import cats.syntax.functor.*
 import org.postgresql.copy.CopyManager
 import org.postgresql.core.BaseConnection
 

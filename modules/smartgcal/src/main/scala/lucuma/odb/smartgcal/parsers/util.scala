@@ -7,10 +7,8 @@ import cats.data.NonEmptyList
 import cats.parse.Parser
 import cats.parse.Rfc5234.char
 import cats.syntax.either.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.parser.MiscParsers.comma
 import lucuma.core.util.Enumerated
 

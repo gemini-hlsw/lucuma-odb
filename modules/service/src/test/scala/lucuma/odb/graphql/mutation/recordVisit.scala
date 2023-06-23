@@ -8,12 +8,8 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
-import lucuma.core.model.Group
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.model.Visit
 import lucuma.odb.data.ObservingModeType
 
 class recordVisit extends OdbSuite {

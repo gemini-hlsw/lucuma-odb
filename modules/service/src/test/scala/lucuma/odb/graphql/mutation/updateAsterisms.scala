@@ -4,13 +4,9 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.foldable.*
-import cats.syntax.show.*
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -93,7 +89,7 @@ class updateAsterisms extends OdbSuite {
             "c_observation_id" : $oid
           }
           """
-        )      
+        )
       )
     } yield ()
   }
@@ -242,7 +238,7 @@ class updateAsterisms extends OdbSuite {
             "c_observation_id" : $o1
           }
           """
-        ).map(_.spaces2)      
+        ).map(_.spaces2)
       )
     } yield ()
   }

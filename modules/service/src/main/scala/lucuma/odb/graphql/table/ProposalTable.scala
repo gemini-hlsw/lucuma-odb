@@ -7,8 +7,6 @@ package table
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
-import skunk.codec.all._
-import skunk.data.Type
 
 trait ProposalTable[F[_]] extends BaseMapping[F] {
 

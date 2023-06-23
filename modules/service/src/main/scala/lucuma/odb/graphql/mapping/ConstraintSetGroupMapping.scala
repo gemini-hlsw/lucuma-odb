@@ -6,8 +6,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.all._
-import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -16,20 +14,15 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.core.model.User
-import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ConstraintSetGroupView
 
 import table.ObservationView
 import binding._
-import input._
-import table._
 
 trait ConstraintSetGroupMapping[F[_]]
-  extends ConstraintSetGroupView[F] 
-     with ObservationView[F] 
+  extends ConstraintSetGroupView[F]
+     with ObservationView[F]
      with Predicates[F] {
 
   lazy val ConstraintSetGroupMapping =
@@ -61,10 +54,10 @@ trait ConstraintSetGroupMapping[F[_]]
                 ))),
                 oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
                 offset = None,
-                limit = Some(limit + 1),  
+                limit = Some(limit + 1),
                 q
               )
-            }              
+            }
           }
       }
     )

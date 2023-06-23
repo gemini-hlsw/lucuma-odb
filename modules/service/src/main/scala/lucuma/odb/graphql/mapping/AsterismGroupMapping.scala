@@ -4,10 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.Filter
-import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
 import edu.gemini.grackle.Query.Select
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
@@ -15,10 +13,10 @@ import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table._
 
-trait AsterismGroupMapping[F[_]] 
-  extends AsterismGroupView[F] 
+trait AsterismGroupMapping[F[_]]
+  extends AsterismGroupView[F]
     with AsterismTargetTable[F]
-    with ObservationView[F] 
+    with ObservationView[F]
     with ProgramTable[F]
     with TargetView[F]
     with Predicates[F] {
@@ -45,7 +43,7 @@ trait AsterismGroupMapping[F[_]]
       AsterismGroupType -> {
         case Select("asterism", Nil, child) =>
           Result(
-            Select("asterism", Nil, 
+            Select("asterism", Nil,
               Filter(
                 Predicates.target.existence.eql(Existence.Present),
                 child

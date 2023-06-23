@@ -3,39 +3,25 @@
 
 package lucuma.odb.logic
 
-import cats.Functor
-import cats.Monoid
 import cats.data.EitherT
 import cats.data.NonEmptyList
-import cats.data.NonEmptySet
-import cats.data.NonEmptyVector
 import cats.effect.Concurrent
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.monoid.*
-import cats.syntax.option.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
-import eu.timepit.refined.refineV
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Pure
 import fs2.Stream
-import io.circe.Encoder
-import lucuma.core.data.Zipper
-import lucuma.core.enums.Breakpoint
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.ConfigChangeEstimate
-import lucuma.core.model.sequence.DetectorEstimate
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
@@ -45,9 +31,6 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
-import lucuma.core.model.sequence.gmos.DynamicConfig
-import lucuma.core.util.TimeSpan
-import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
@@ -60,10 +43,8 @@ import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.service.SmartGcalService
 import skunk.Transaction
 
-import java.io.ObjectOutputStream
 import java.util.UUID
 
 import Generator.FutureLimit
@@ -95,7 +76,7 @@ object Generator {
         }
       }
   }
-  
+
   sealed trait Result
   sealed trait Error extends Result {
     def format: String

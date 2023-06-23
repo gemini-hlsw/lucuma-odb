@@ -7,7 +7,6 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
-import lucuma.odb.graphql.util.MappingExtras
 
 import table.TargetView
 import table.ProgramTable

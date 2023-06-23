@@ -8,7 +8,6 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import cats.syntax.validated.*
 import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.PosBigDecimal

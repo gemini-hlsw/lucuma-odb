@@ -5,7 +5,6 @@ package lucuma.odb.smartgcal
 
 import cats.ApplicativeError
 import cats.parse.Parser
-import cats.syntax.functor.*
 import cats.syntax.show.*
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe

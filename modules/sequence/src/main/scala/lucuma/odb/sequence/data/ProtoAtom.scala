@@ -8,9 +8,7 @@ import cats.Eq
 import cats.Eval
 import cats.Traverse
 import cats.data.NonEmptyList
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
 
 case class ProtoAtom[A](

@@ -11,7 +11,6 @@ import fs2.Stream
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -54,7 +53,7 @@ trait ObsAttachmentFileService[F[_]] {
 
   /** Deletes the file from the database and then removes it from S3. */
   def deleteAttachment(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[F]): F[Unit]
-  
+
   def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[F]): F[String]
 }
 
@@ -86,18 +85,18 @@ object ObsAttachmentFileService extends AttachmentFileService {
       attachmentType: Tag,
       fileName:       FileName,
       description:    Option[NonEmptyString],
-      fileSize:       Long, 
+      fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[ObsAttachment.Id] =
       Trace[F].span("insertObsAttachment") {
-        val af   = 
+        val af   =
           Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.query(obs_attachment_id)
         session.prepareR(stmt)
           .use(pg =>
             pg.unique(af.argument)
               .recoverWith {
-                case SqlState.UniqueViolation(_) => 
+                case SqlState.UniqueViolation(_) =>
                   Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
@@ -109,22 +108,22 @@ object ObsAttachmentFileService extends AttachmentFileService {
       attachmentId:   ObsAttachment.Id,
       fileName:       FileName,
       description:    Option[NonEmptyString],
-      fileSize:       Long, 
+      fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("updateObsAttachment") {
-        val af   = 
+        val af   =
           Statements.updateAttachment(user, programId, attachmentId, fileName.value, description, fileSize, remotePath)
         val stmt = af.fragment.query(bool)
         session.prepareR(stmt)
           .use(pg =>
             pg.unique(af.argument)
               .flatMap(b =>
-                if (b) Concurrent[F].unit 
+                if (b) Concurrent[F].unit
                 else Concurrent[F].raiseError(FileNotFound)
               )
               .recoverWith {
-                case SqlState.UniqueViolation(_) => 
+                case SqlState.UniqueViolation(_) =>
                   Concurrent[F].raiseError(InvalidRequest("Duplicate file name"))
               }
            )
@@ -265,7 +264,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         fileName: String,
         description: Option[NonEmptyString],
         data: Stream[F, Byte]
-      )(using NoTransaction[F]): F[Unit] = 
+      )(using NoTransaction[F]): F[Unit] =
         FileName
           .fromString(fileName)
           .fold(
@@ -296,13 +295,13 @@ object ObsAttachmentFileService extends AttachmentFileService {
             checkAccess(session, user, programId) >>
             deleteAttachmentFromDB(user, programId, attachmentId)
           }
-          res  <- 
-            // We'll trap errors from the remote delete because, although not ideal, we don't 
+          res  <-
+            // We'll trap errors from the remote delete because, although not ideal, we don't
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
             s3FileSvc.delete(path).handleError{ case _ => () }
         } yield res
 
-      def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[F]): F[String] = 
+      def getPresignedUrl(user: User, programId: Program.Id, attachmentId: ObsAttachment.Id)(using NoTransaction[F]): F[String] =
         for {
           path <- services.transactionally {
             checkAccess(session, user, programId) >>
@@ -333,8 +332,8 @@ object ObsAttachmentFileService extends AttachmentFileService {
           c_description,
           c_file_size,
           c_remote_path
-        ) 
-        SELECT 
+        )
+        SELECT
           $program_id,
           $tag,
           $text_nonempty,

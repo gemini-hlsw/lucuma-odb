@@ -7,7 +7,6 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -21,10 +20,6 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
-import lucuma.core.model.User
-import lucuma.odb.data.Nullable
-import lucuma.odb.data.Nullable.Absent
-import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -90,7 +85,7 @@ trait GmosLongSlitService[F[_]] {
   def cloneSouth(
     originalId: Observation.Id,
     newId: Observation.Id,
-  ): F[Unit] 
+  ): F[Unit]
 
 }
 
@@ -213,7 +208,7 @@ object GmosLongSlitService {
         originalId: Observation.Id,
         newId: Observation.Id,
       ): F[Unit] =
-        exec(Statements.cloneGmosSouthLongSlit(originalId, newId))      
+        exec(Statements.cloneGmosSouthLongSlit(originalId, newId))
 
     }
 
@@ -526,7 +521,7 @@ object GmosLongSlitService {
 
     private def cloneGmosLongSlit(
       table: String,
-      originalId: Observation.Id, 
+      originalId: Observation.Id,
       newId: Observation.Id
     ): AppliedFragment =
       sql"""

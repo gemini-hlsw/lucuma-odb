@@ -5,24 +5,9 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.syntax.functor.*
-import cats.syntax.option.*
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.core.model.Target
-import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.table.AsterismTargetTable
 
-import binding._
-import input._
 import table._
 
 trait ObservingModeMapping[F[_]]
@@ -34,7 +19,7 @@ trait ObservingModeMapping[F[_]]
       tpe = ObservingModeType,
       fieldMappings = List(
         SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
-          
+
         FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
         SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 

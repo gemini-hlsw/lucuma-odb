@@ -13,7 +13,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
-import lucuma.odb.graphql.mutation.createTarget
 
 import scala.concurrent.duration._
 

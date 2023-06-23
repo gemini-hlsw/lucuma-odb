@@ -3,13 +3,8 @@
 
 package lucuma.odb.graphql.mapping
 
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Result
-import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.graphql.table.ObservationPairsView
 import lucuma.odb.graphql.table.ObservationView
-
-import scala.tools.util.PathResolver.Environment
 
 trait CloneObservationResultMapping[F[_]] extends ResultMapping[F] with ObservationView[F] with ObservationPairsView[F] {
 

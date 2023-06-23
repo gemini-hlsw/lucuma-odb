@@ -5,10 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.kernel.Order
 import cats.syntax.all._
-import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -20,15 +17,12 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.data.Existence
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 
 import binding._
-import input._
 import table._
 
 trait ProgramMapping[F[_]]
@@ -40,7 +34,7 @@ trait ProgramMapping[F[_]]
      with ObsAttachmentTable[F]
      with Predicates[F]
      with ProposalAttachmentTable[F]
-     with ResultMapping[F] 
+     with ResultMapping[F]
      with GroupElementView[F] {
 
   def user: User
@@ -83,10 +77,10 @@ trait ProgramMapping[F[_]]
                 ))),
                 oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
                 offset = None,
-                limit = Some(limit + 1),  
+                limit = Some(limit + 1),
                 q
               )
-            }              
+            }
           }
         case Select("groupElements", Nil, child) =>
           Result(
@@ -96,7 +90,7 @@ trait ProgramMapping[F[_]]
                 oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
                 offset = None,
                 limit = None,
-                child              
+                child
               )
             )
           )
@@ -106,12 +100,12 @@ trait ProgramMapping[F[_]]
               FilterOrderByOffsetLimit(
                 pred = None,
                 oss = Some(List(
-                  OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true), 
+                  OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
                   OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
                 )),
                 offset = None,
                 limit = None,
-                child              
+                child
               )
             )
           )

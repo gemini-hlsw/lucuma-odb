@@ -3,10 +3,8 @@
 
 package lucuma.odb.smartgcal.parsers
 
-import cats.data.NonEmptyList
 import cats.data.NonEmptySet
 import cats.parse.Parser
-import cats.parse.Parser0
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum

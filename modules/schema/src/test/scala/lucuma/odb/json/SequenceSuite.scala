@@ -11,20 +11,17 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.arb.ArbAtom
 import lucuma.core.model.sequence.arb.ArbExecutionConfig
 import lucuma.core.model.sequence.arb.ArbExecutionSequence
 import lucuma.core.model.sequence.arb.ArbInstrumentExecutionConfig
 import lucuma.core.model.sequence.arb.ArbSequenceDigest
 import lucuma.core.model.sequence.arb.ArbStep
-import lucuma.core.model.sequence.arb.ArbStepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import munit.DisciplineSuite
-import org.scalacheck.Test
 
 class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
 
@@ -36,7 +33,6 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   import ArbSequenceDigest.given
   import ArbStaticConfig._
   import ArbStep.given
-  import ArbStepEstimate.given
 
   import offset.query.given
   import sequence.given

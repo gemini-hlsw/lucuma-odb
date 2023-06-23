@@ -3,8 +3,6 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.parallel.*
-import lucuma.core.enums.GuideState.Enabled
 import lucuma.core.model.sequence.StepConfig.SmartGcal
 import lucuma.odb.graphql.binding.*
 
