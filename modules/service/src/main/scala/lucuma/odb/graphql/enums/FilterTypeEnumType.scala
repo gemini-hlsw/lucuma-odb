@@ -7,7 +7,6 @@ import cats.Functor
 import cats.syntax.all._
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.EnumValue
-import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._

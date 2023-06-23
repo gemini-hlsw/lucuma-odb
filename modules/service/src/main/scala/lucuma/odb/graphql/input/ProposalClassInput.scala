@@ -7,11 +7,8 @@ package input
 
 import cats.syntax.all._
 import edu.gemini.grackle.Result
-import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Existence
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 

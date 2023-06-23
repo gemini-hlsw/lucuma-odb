@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
-import edu.gemini.grackle.sql.SqlMapping
 
 import table.ObservationView
 

@@ -9,7 +9,6 @@ import cats.syntax.all._
 import ciris._
 import ciris.refined._
 import com.comcast.ip4s.Port
-import eu.timepit.refined.cats._
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
@@ -155,14 +154,14 @@ object Config {
     secretKey:       NonEmptyString,
     basePath:        NonEmptyString,
     bucketName:      BucketName,
-    fileUploadMaxMb: Int 
+    fileUploadMaxMb: Int
   ) {
     // Within the ODB we work with the filepath, which is the S3 FileKey
     // minus the basePath. The s3FileService adds the basePath using
     // `fileKey` as needed.
-    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString): NonEmptyString = 
+    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString): NonEmptyString =
       NonEmptyString.unsafeFrom(s"$programId/$remoteId/$fileName")
-    
+
     def fileKey(path: NonEmptyString): FileKey =
       FileKey(NonEmptyString.unsafeFrom(s"$basePath/$path"))
   }
@@ -170,9 +169,9 @@ object Config {
   object Aws {
     private implicit val showPath: Show[Uri.Path] = Show.fromToString
 
-    private implicit val uriPath: ConfigDecoder[Uri, Uri.Path] = 
+    private implicit val uriPath: ConfigDecoder[Uri, Uri.Path] =
       ConfigDecoder[Uri].mapOption("Path")(_.path.some)
-      
+
     // The basePath must be nonEmpty
     private implicit val pathNES: ConfigDecoder[Uri.Path, NonEmptyString] =
       ConfigDecoder[Uri.Path].mapOption("NonEmptyPath"){ p =>
@@ -180,14 +179,14 @@ object Config {
         NonEmptyString.from(str).toOption
       }
 
-    private implicit val bucketName: ConfigDecoder[Uri, BucketName] = 
-      ConfigDecoder[Uri].mapOption("BucketName"){ uri => 
-        uri.host.flatMap{ h => 
+    private implicit val bucketName: ConfigDecoder[Uri, BucketName] =
+      ConfigDecoder[Uri].mapOption("BucketName"){ uri =>
+        uri.host.flatMap{ h =>
           h.value.split("\\.").headOption
          }.flatMap { b =>
           NonEmptyString.from(b).toOption
-          .map(BucketName.apply) 
-        } 
+          .map(BucketName.apply)
+        }
       }
 
     lazy val fromCiris: ConfigValue[Effect, Aws] = (

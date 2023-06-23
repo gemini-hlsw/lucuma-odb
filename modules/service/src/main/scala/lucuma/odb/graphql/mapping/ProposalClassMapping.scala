@@ -6,19 +6,13 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ProposalTable
-import lucuma.odb.graphql.util.MappingExtras
-
-import table.TargetView
-import table.ProgramTable
 
 trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
 
@@ -100,5 +94,4 @@ trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
     }
 
 }
-
 

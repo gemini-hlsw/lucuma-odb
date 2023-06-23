@@ -6,7 +6,6 @@ package mapping
 
 import edu.gemini.grackle.TypeRef
 import lucuma.core.math.Angle
-import lucuma.core.math.Offset
 
 import table.StepTable
 

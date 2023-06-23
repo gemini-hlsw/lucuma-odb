@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 
 import cats.effect.*
-import cats.syntax.all.*
 import com.dimafeng.testcontainers.LocalStackV2Container
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.S3
@@ -13,8 +12,6 @@ import fs2.aws.s3.models.Models.FileKey
 import fs2.text
 import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
-import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.odb.Config
 import lucuma.refined.*
 import org.testcontainers.containers.localstack.LocalStackContainer.Service
@@ -35,7 +32,7 @@ abstract class OdbSuiteWithS3 extends OdbSuite {
     s3Container.start()
     s3ClientOpsResource
       .use(s3Ops =>
-        s3Ops.createBucket(CreateBucketRequest.builder().bucket(bucketName.value.value).build())
+        s3Ops.createBucket(CreateBucketRequest.builder().bucket(bucketName.value.value).build()).void
       )
       .unsafeRunSync()
   }
@@ -66,7 +63,7 @@ abstract class OdbSuiteWithS3 extends OdbSuite {
         )
         .region(Region.of(s3Container.container.getRegion()))
     )
-  
+
   override protected def s3PresignerResource: Resource[IO, S3Presigner] = {
     val builder     =
       S3Presigner

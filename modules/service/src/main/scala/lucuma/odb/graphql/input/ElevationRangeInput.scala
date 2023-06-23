@@ -7,11 +7,9 @@ package input
 import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import cats.syntax.validated.*
 import edu.gemini.grackle.Result
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass
-import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.odb.graphql.binding._
 
 final case class ElevationRangeInput(

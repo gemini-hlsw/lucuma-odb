@@ -6,13 +6,10 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.NullableType
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
 import edu.gemini.grackle.TypeRef
-import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.graphql.table.TimingWindowView
 
@@ -36,7 +33,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
   lazy val TimingWindowEndMapping: ObjectMapping =
     SqlUnionMapping(
       tpe = TimingWindowEndType,
-      fieldMappings = 
+      fieldMappings =
         List(
           SqlField("id", TimingWindowView.End.SyntheticId, key = true),
           SqlField("endType", TimingWindowView.End.Type, discriminator = true, hidden = true),
@@ -68,7 +65,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
   lazy val TimingWindowEndAtMapping =
     ObjectMapping(
       tpe = TimingWindowEndAtType,
-      fieldMappings = 
+      fieldMappings =
         List(
           SqlField("id", TimingWindowView.End.SyntheticId, key = true),
           SqlField("atUtc", TimingWindowView.End.At),
@@ -79,7 +76,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
   lazy val TimingWindowEndAfterMapping =
     ObjectMapping(
       tpe = TimingWindowEndAfterType,
-      fieldMappings = 
+      fieldMappings =
         List(
           SqlField("id", TimingWindowView.End.SyntheticId, key = true),
           SqlObject("after"),
@@ -91,7 +88,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
   lazy val TimingWindowRepeatMapping =
     ObjectMapping(
       tpe = TimingWindowRepeatType,
-      fieldMappings = 
+      fieldMappings =
         List(
           SqlField("id", TimingWindowView.End.Repeat.SyntheticId, key = true),
           SqlObject("period"),

@@ -8,8 +8,6 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -18,11 +16,10 @@ import lucuma.odb.util.Codecs.*
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import skunk.*
-import skunk.codec.all.*
 import skunk.syntax.all.*
 
 class obsAttachments extends ObsAttachmentsSuite {
-  
+
   def assertAttachmentsGql(
     user:        User,
     programId:   Program.Id,

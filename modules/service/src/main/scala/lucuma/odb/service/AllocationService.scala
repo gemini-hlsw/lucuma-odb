@@ -9,7 +9,6 @@ import cats.syntax.all._
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
@@ -18,8 +17,6 @@ import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
 import skunk._
 import skunk.implicits._
-
-import java.time.Duration
 
 import Services.Syntax.*
 

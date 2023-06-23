@@ -4,12 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Applicative
-import cats.data.Ior
 import cats.data.Nested
-import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
@@ -25,7 +21,6 @@ import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -62,13 +57,9 @@ import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
-import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
-import lucuma.odb.service.ObsAttachmentMetadataService
-import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
-import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.ProposalService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -215,7 +206,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import UpdateTargetsResponse.{ SourceProfileUpdatesFailed, TrackingSwitchFailed }
     MutationField("cloneTarget", CloneTargetInput.Binding) { (input, child) =>
       services.useTransactionally {
-        targetService.cloneTarget(input).map {          
+        targetService.cloneTarget(input).map {
 
           // Typical case
           case Success(oldTargetId, newTargetId) =>
@@ -469,9 +460,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         val selectObservations: F[Result[(List[Observation.Id], Query)]] =
           idSelect.traverse { which =>
-            observationService.selectObservations(which)            
-          } map { r => 
-            r.flatMap { oids => 
+            observationService.selectObservations(which)
+          } map { r =>
+            r.flatMap { oids =>
               observationResultSubquery(oids, input.LIMIT, child)
                 .tupleLeft(oids)
             }
@@ -504,9 +495,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             input.WHERE.getOrElse(True)
           ))
 
-          val idSelect: Result[AppliedFragment] = 
+          val idSelect: Result[AppliedFragment] =
             MappedQuery(
-              Filter(filterPredicate, Select("id", Nil, Empty)), 
+              Filter(filterPredicate, Select("id", Nil, Empty)),
               Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
             ).flatMap(_.fragment)
 
@@ -527,8 +518,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           idSelect.flatTraverse { which =>
             observationService
               .updateObservations(input.programId, input.SET, which)
-              .map { r => 
-                r.flatMap { oids => 
+              .map { r =>
+                r.flatMap { oids =>
                   observationResultSubquery(oids, input.LIMIT, child)
                     .tupleLeft(oids)
                 }
@@ -587,9 +578,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             input.WHERE.getOrElse(True)
           ))
 
-          val typeSelect: Result[AppliedFragment] = 
+          val typeSelect: Result[AppliedFragment] =
             MappedQuery(
-              Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
+              Filter(filterPredicate, Select("attachmentType", Nil, Empty)),
               Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
             ).flatMap(_.fragment)
 
@@ -598,7 +589,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               .updateProposalAttachments(input.SET, which)
               .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
           }
-          
+
         }
       }
 

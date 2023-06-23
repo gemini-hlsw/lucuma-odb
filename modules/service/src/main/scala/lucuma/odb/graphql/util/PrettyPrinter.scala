@@ -8,7 +8,6 @@ import edu.gemini.grackle.Cursor.Env.EmptyEnv
 import edu.gemini.grackle.Cursor.Env.NonEmptyEnv
 import edu.gemini.grackle.PathTerm
 import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate.ToLowerCase.apply
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Term
@@ -50,13 +49,13 @@ object PrettyPrinter {
 
   def query(q: Query): Doc =
     q match
- 
-      case Select(name, args, child) => 
+
+      case Select(name, args, child) =>
         var props = List("name" -> quoted(name))
         if args.nonEmpty then props :+= "args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close)
         if child != Query.Empty then props :+= "child" -> query(child)
         if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
- 
+
       case Group(queries)                  => obj("Group", queries.map(query):_*)
       case Unique(child)                   => obj("Unique", query(child))
       case Filter(pred, child)             => obj("Filter", "pred" -> predicate(pred), "child" -> query(child))
@@ -76,7 +75,7 @@ object PrettyPrinter {
       case TransformCursor(f, child)       => obj("TransformCursor", "f" -> text("<function>"), "child" -> query(child))
       case Skipped                         => text("Skipped")
       case Empty                           => text("Empty")
-    
+
   def binding(b: Binding): Doc =
     obj("Binding", "name" -> quoted(b.name), "value" -> str(b.value))
 
@@ -84,7 +83,7 @@ object PrettyPrinter {
     e match
       case EmptyEnv => text("{}")
       case NonEmptyEnv(kvs) => elems(kvs.toList.map((k, v) => prop(k, str(v)))).tightBracketBy(char('{'), char('}'))
-    
+
   def orderSelections(sel: OrderSelections): Doc =
     elems(sel.selections.map(orderSelection)).tightBracketBy(Bracket.Open, Bracket.Close)
 

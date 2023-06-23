@@ -7,7 +7,6 @@ package input
 
 import cats.syntax.all._
 import edu.gemini.grackle.Result
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag

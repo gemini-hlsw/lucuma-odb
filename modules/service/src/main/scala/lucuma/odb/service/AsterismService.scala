@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.data.NonEmptyMap
 import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -248,7 +247,7 @@ object AsterismService {
           c_observation_id,
           c_target_id
         )
-        SELECT 
+        SELECT
           t_asterism_target.c_program_id,
           $observation_id,
           t_asterism_target.c_target_id
@@ -257,7 +256,7 @@ object AsterismService {
         WHERE c_observation_id = $observation_id
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid, originalOid)
-    
+
   }
 
 }

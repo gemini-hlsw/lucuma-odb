@@ -7,14 +7,11 @@ package query
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
-import io.circe.JsonObject
 import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 class timingWindows extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)

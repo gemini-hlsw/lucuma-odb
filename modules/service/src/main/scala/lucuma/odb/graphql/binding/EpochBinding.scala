@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
 import lucuma.core.math.Epoch
 
 val EpochBinding: Matcher[Epoch] =

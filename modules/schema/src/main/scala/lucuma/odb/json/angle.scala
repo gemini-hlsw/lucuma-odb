@@ -4,13 +4,10 @@
 package lucuma.odb.json
 
 import cats.syntax.either.*
-import io.circe.Codec
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
-import io.circe.HCursor
 import io.circe.Json
-import io.circe.refined._
 import io.circe.syntax._
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle

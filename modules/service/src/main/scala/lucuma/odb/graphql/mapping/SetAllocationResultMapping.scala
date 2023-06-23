@@ -8,8 +8,6 @@ package mapping
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.AllocationTable
 
-import table.AllocationTable
-
 trait SetAllocationResultMapping[F[_]] extends AllocationTable[F] {
 
   lazy val SetAllocationResultMapping =

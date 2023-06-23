@@ -7,7 +7,6 @@ import cats.syntax.all._
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Cursor.ListTransformCursor
-import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
@@ -42,9 +41,9 @@ object ResultMapping {
         else ListTransformCursor(c, size - 1, elems.init)
       }
   }
- 
+
   extension (self: Query.type)
-    def mapSomeFields(query: Query)(f: PartialFunction[Query, Result[Query]]): Result[Query] = 
+    def mapSomeFields(query: Query)(f: PartialFunction[Query, Result[Query]]): Result[Query] =
       self.mapFields(query)(f.applyOrElse(_, Result.apply))
 
   private def result(field: Option[String], child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] = {
@@ -60,7 +59,7 @@ object ResultMapping {
 
     // If we're selecting collectionField then continue by transforming the child query, otherwise
     // punt because there's really no point in doing such a selection.
-    if !Query.hasField(child, collectionField) 
+    if !Query.hasField(child, collectionField)
     then Result.failure(s"Field `$collectionField` must be selected.") // meh
     else
       transformMatches(child).map { child =>
@@ -76,7 +75,7 @@ object ResultMapping {
 
   }
 
-  def selectResult(field: String, child: Query, limit: Int)(transform: Query => Query): Result[Query] = 
+  def selectResult(field: String, child: Query, limit: Int)(transform: Query => Query): Result[Query] =
     result(Some(field), child, limit, "matches")(transform)
 
   def mutationResult(child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] =

@@ -5,7 +5,6 @@ package lucuma.odb.logic
 
 import cats.MonadError
 import cats.syntax.functor.*
-import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
 import skunk.Session
 

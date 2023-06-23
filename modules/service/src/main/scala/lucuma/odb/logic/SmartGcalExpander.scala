@@ -3,7 +3,6 @@
 
 package lucuma.odb.logic
 
-import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
@@ -11,9 +10,7 @@ import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import fs2.Pipe
-import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
@@ -21,7 +18,6 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Gmos

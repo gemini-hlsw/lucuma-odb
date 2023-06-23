@@ -6,20 +6,13 @@ package attachments
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.FMain
-import lucuma.odb.util.Codecs.*
-import natchez.Trace.Implicits.noop
-import org.http4s.*
 import skunk.*
-import skunk.codec.all.*
 import skunk.syntax.all.*
 
 class obsAttachmentsAssignments extends ObsAttachmentsSuite {
@@ -44,7 +37,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
     pid:         Program.Id,
     oid:         Observation.Id,
     attachments: (ObsAttachment.Id, TestAttachment)*
-  ): IO[Unit] = 
+  ): IO[Unit] =
     expect(
       user: User,
       query = s"""
@@ -67,7 +60,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
     user:        User,
     pid:         Program.Id,
     attachments: (ObsAttachment.Id, TestAttachment)*
-  ): IO[Observation.Id] = 
+  ): IO[Observation.Id] =
     query(
       user = user,
       query = s"""
@@ -81,12 +74,12 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
             }
           ) {
             observation {
-             id 
+             id
             }
           }
         }
       """
-    ).map { json => 
+    ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
@@ -94,7 +87,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
     user: User,
     pid:  Program.Id,
     oid:  Observation.Id
-  ): IO[Unit] = 
+  ): IO[Unit] =
     expect(
       user = user,
       query = s"""
@@ -113,7 +106,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
             }
           ) {
             observations {
-             id 
+             id
             }
           }
         }
@@ -190,7 +183,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
   val file2 = TestAttachment("file2.jpg", "finder", "jpg file".some, "A finder JPG file")
 
   val updateEmpty: UpdateInput.Values = UpdateInput.Values(List.empty)
-  def updateFile1(aid: ObsAttachment.Id): UpdateInput.Values = 
+  def updateFile1(aid: ObsAttachment.Id): UpdateInput.Values =
     UpdateInput.Values(List((aid, file1)))
   def updateBothFiles(aid1: ObsAttachment.Id, aid2: ObsAttachment.Id): UpdateInput.Values =
     UpdateInput.Values(List((aid1, file1), (aid2, file2)))

@@ -5,7 +5,6 @@ package db.migration
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -23,9 +22,6 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Encoder
 import skunk.codec.temporal.interval
-import skunk.implicits.*
-
-import java.io.InputStream
 
 object SmartGmosLoader {
 

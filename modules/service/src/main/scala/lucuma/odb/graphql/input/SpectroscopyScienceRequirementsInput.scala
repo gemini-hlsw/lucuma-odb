@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel._
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.SpectroscopyCapabilities
@@ -15,7 +14,6 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.graphql.binding.PosBigDecimalBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.binding.SignalToNoiseBinding
 import lucuma.odb.graphql.binding.enumeratedBinding

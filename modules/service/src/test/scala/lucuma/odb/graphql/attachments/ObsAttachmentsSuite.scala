@@ -8,13 +8,10 @@ import cats.Order.given
 import cats.effect.IO
 import cats.effect.Resource
 import io.circe.Json
-import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
-import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import natchez.Trace.Implicits.noop
 import org.http4s.*
 
 abstract class ObsAttachmentsSuite extends AttachmentsSuite {

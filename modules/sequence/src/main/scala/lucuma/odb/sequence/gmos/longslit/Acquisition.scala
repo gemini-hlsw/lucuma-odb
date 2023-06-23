@@ -7,14 +7,9 @@ package longslit
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
-import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric._
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.numeric.NonNegLong
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -28,22 +23,14 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
-import lucuma.core.model.NonNegDuration
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.model.syntax.nonnegduration.*
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.optics.syntax.optional.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.SequenceState
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.refined.*
-
-import scala.collection.immutable.LazyList
 
 sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
 

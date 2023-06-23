@@ -6,11 +6,8 @@ package gmos
 package longslit
 
 import cats.data.NonEmptyList
-import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import coulomb.Quantity
-import eu.timepit.refined.auto.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
@@ -28,20 +25,14 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.syntax.int.*
-import lucuma.core.math.units.Nanometer
 import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
-import lucuma.odb.sequence.SequenceState
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
-
-import scala.collection.immutable.LazyList
 
 /**
  * GMOS long slit science atoms

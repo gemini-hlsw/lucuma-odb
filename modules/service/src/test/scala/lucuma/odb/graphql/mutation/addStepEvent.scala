@@ -5,12 +5,10 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit

@@ -4,13 +4,8 @@
 package lucuma.odb.graphql
 package issue.shortcut
 
-import cats.effect.IO
-import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
-import lucuma.core.model.Partner
-import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 // https://app.shortcut.com/lucuma/story/1939
 class Shortcut_1939 extends OdbSuite {
@@ -132,7 +127,7 @@ class Shortcut_1939 extends OdbSuite {
       )
     }
   }
-  
+
   test("RA microarcseconds should round down (when not divisible by 15)") {
     createProgramAs(pi).flatMap { pid =>
       expect(

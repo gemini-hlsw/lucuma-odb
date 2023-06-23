@@ -4,10 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.core.math.Angle
-import lucuma.odb.graphql.util.MappingExtras
 
 import table.ObservationView
 

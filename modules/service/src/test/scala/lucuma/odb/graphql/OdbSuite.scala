@@ -12,7 +12,6 @@ import cats.implicits.*
 import clue.ErrorPolicy
 import clue.FetchClient
 import clue.GraphQLOperation
-import clue.PersistentStreamingClient
 import clue.ResponseException
 import clue.http4s.Http4sHttpBackend
 import clue.http4s.Http4sHttpClient
@@ -23,17 +22,13 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.skunk.SkunkMonitor
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.JsonObject
-import io.circe.literal.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.math.SignalToNoise
-import lucuma.core.model.NonNegDuration
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
@@ -45,7 +40,6 @@ import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
-import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
@@ -57,7 +51,6 @@ import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.blaze.server.BlazeServerBuilder
-import org.http4s.client.websocket.WSClient
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -75,7 +68,6 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
-import java.time.Duration
 import scala.concurrent.duration.*
 
 object OdbSuite:
@@ -126,8 +118,12 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     override def createContainer(): PostgreSQLContainer = {
       val c = super.createContainer()
       c.container.withClasspathResourceMapping("/db/migration", "/docker-entrypoint-initdb.d/", BindMode.READ_ONLY)
-      if (debug)
-        c.container.withLogConsumer(f => jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}"))
+      if (debug) {
+        c.container.withLogConsumer{f =>
+          jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
+        }
+        ()
+      }
       container = c
       c
     }

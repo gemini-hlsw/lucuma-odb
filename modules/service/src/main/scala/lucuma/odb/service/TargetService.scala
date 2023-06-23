@@ -3,10 +3,8 @@
 
 package lucuma.odb.service
 
-import cats.data.Ior
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
 import cats.effect.*
 import cats.syntax.all._
 import edu.gemini.grackle.Problem
@@ -16,13 +14,11 @@ import fs2.Stream
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.ProperMotion
-import lucuma.core.model.CatalogInfo
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
-import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.StandardRole.Admin
 import lucuma.core.model.StandardRole.Ngo
@@ -32,21 +28,17 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Nullable.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
-import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Encoder
-import skunk.Query
-import skunk.Session
 import skunk.SqlState
 import skunk.Transaction
 import skunk.Void
@@ -54,7 +46,7 @@ import skunk.circe.codec.all._
 import skunk.codec.all._
 import skunk.implicits._
 
-import Services.Syntax.* 
+import Services.Syntax.*
 
 trait TargetService[F[_]] {
   import TargetService.{ CloneTargetResponse, CreateTargetResponse, UpdateTargetsResponse }
@@ -115,7 +107,7 @@ object TargetService {
           val update = Statements.updateTargets(input, which)
           Stream.resource(session.prepareR(update.fragment.query(target_id))).flatMap { ps =>
             ps.stream(update.argument, 1024)
-          }          
+          }
         }
 
         input.sourceProfile match {
@@ -147,7 +139,7 @@ object TargetService {
                 case Result.Warning(ps, ids)  => transaction.rollback.as(UpdateTargetsResponse.SourceProfileUpdatesFailed(ps))
                 case Result.InternalError(th) => Concurrent[F].raiseError(th) // ok? or should we do something else here?
               }
-              
+
             }
 
           } recover {
@@ -162,19 +154,19 @@ object TargetService {
           session.prepareR(sql"select c_program_id from t_target where c_target_id = $target_id".query(program_id)).use { ps =>
             ps.option(input.targetId)
           }
-          
+
         def clone(pid: Program.Id): F[Option[Target.Id]] =
           val stmt = Statements.cloneTarget(pid, input.targetId, user)
           session.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
 
-        def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] = 
+        def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
           input.SET.traverse(updateTargetsʹ(_, sql"SELECT $target_id".apply(tid)))
-        
+
         def replaceIn(tid: Target.Id): F[Unit] =
           input.REPLACE_IN.traverse_ { which =>
             val stmt = Statements.replaceTargetIn(which, input.targetId, tid)
-            session.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))               
-          } 
+            session.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))
+          }
 
         pid.flatMap {
           case None => NoSuchTarget(input.targetId).pure[F] // doesn't exist at all
@@ -182,7 +174,7 @@ object TargetService {
             clone(pid).flatMap {
               case None => NoSuchTarget(input.targetId).pure[F] // not authorized
               case Some(tid) =>
-                update(tid).flatMap {              
+                update(tid).flatMap {
                   case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
                   case _ => replaceIn(tid) as Success(input.targetId, tid)
                 }
@@ -317,7 +309,7 @@ object TargetService {
             sql"c_sid_pm_dec = ${int8.opt}"(odec),
           )
       }
-      
+
     // Either no updates, set the Catalog Info to null, or set it to the provided value
     def catalogInfoUpdates(nci: Nullable[CatalogInfoInput]): List[AppliedFragment] =
       nci.toOptionOption.toList.map(_.getOrElse(CatalogInfoInput.Empty)).flatMap { ci =>
@@ -333,12 +325,12 @@ object TargetService {
     // specify every field. We can catch this case and report a useful error.
     def trackingUpdates(tracking: Either[SiderealInput.Edit, EphemerisKey]): List[AppliedFragment] =
       tracking match {
-        case Left(sid)   => 
+        case Left(sid)   =>
           List(
             sid.ra.asUpdate("c_sid_ra", right_ascension),
             sid.dec.asUpdate("c_sid_dec", declination),
             sid.epoch.asUpdate("c_sid_epoch", epoch),
-            sid.radialVelocity.asUpdate("c_sid_rv", radial_velocity),          
+            sid.radialVelocity.asUpdate("c_sid_rv", radial_velocity),
             sid.parallax.asUpdate("c_sid_parallax", parallax),
           ).flatten ++
           properMotionUpdates(sid.properMotion) ++
@@ -370,7 +362,7 @@ object TargetService {
             void"c_sid_catalog_object_type = null",
           )
       }
-      
+
     def updates(SET: TargetPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
@@ -378,7 +370,7 @@ object TargetService {
           SET.name.map(sql"c_name = $text_nonempty"),
         ).flatten ++
         SET.tracking.toList.flatMap(trackingUpdates)
-      )    
+      )
 
     // Contruct an update (or am select in the case of no updates) performing the requested updates on
     // targes matching `which` and returning the ids of the affected targets. Note that the source
@@ -417,7 +409,7 @@ object TargetService {
           c_nsid_key,
           c_source_profile
         )
-        SELECT 
+        SELECT
           c_program_id,
           c_name,
           c_type,

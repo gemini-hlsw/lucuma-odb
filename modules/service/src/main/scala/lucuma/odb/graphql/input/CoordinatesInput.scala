@@ -6,7 +6,6 @@ package input
 
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import cats.syntax.validated.*
 import edu.gemini.grackle.Result
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination

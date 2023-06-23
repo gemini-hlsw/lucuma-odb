@@ -9,12 +9,9 @@ import cats.syntax.parallel._
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.mapping.TargetMapping
 
 object WhereTarget {
 
@@ -27,7 +24,7 @@ object WhereTarget {
       case List(
         WhereTargetBinding.List.Option("AND", rAND),
         WhereTargetBinding.List.Option("OR", rOR),
-        WhereTargetBinding.Option("NOT", rNOT),        
+        WhereTargetBinding.Option("NOT", rNOT),
         WhereOrderTargetIdBinding.Option("id", rId),
         WhereOrderProgramIdBinding.Option("programId", rPid),
         WhereNameBinding.Option("name", rName),

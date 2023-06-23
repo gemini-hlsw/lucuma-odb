@@ -5,10 +5,8 @@ package lucuma.odb.sequence.gmos.longslit
 
 import cats.Eq
 import cats.Order
-import cats.syntax.either.*
 import cats.syntax.order.*
 import coulomb.*
-import coulomb.units.accepted.ArcSecond
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosAmpGain
@@ -30,7 +28,6 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.units.Nanometer
 import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels

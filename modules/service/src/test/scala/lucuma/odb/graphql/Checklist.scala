@@ -5,14 +5,7 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.all._
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.InputObjectType
-import edu.gemini.grackle.InterfaceType
-import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.ObjectType
-import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.UnionType
 
 @munit.IgnoreSuite // comment this out if you want to run this. there's probably a better way to do this
 class Checklist extends OdbSuite {
@@ -52,12 +45,12 @@ class Checklist extends OdbSuite {
     else
       m.typeMapping(t) match
         case None    => IO.println(s"- [ ] ${t.name}")
-        case Some(om: m.ObjectMapping) => 
+        case Some(om: m.ObjectMapping) =>
           IO.println(s"- [x] ${t.name}") >>
           t.fields.traverse_ { f =>
             om.fieldMapping(f.name) match
               case None => IO.println(s"  - [ ] ${f.name}")
-              case Some(_) => IO.println(s"  - [x] ${f.name}")        
+              case Some(_) => IO.println(s"  - [x] ${f.name}")
           }
         case Some(sm: m.SwitchMapping) =>
           sm.lookup.traverse_ { (p, om) =>
@@ -65,9 +58,9 @@ class Checklist extends OdbSuite {
             t.fields.traverse_ { f =>
               om.fieldMapping(f.name) match
                 case None => IO.println(s"  - [ ] ${f.name}")
-                case Some(_) => IO.println(s"  - [x] ${f.name}")        
+                case Some(_) => IO.println(s"  - [x] ${f.name}")
             }
-          }      
+          }
         case m => fail(s"Can't handle object mapping $m")
 
   def printChecklist(m: BaseMapping[IO]): IO[Unit] = {

@@ -6,13 +6,10 @@ package lucuma.odb.logic
 import cats.Eq
 import cats.syntax.eq.*
 import cats.syntax.functorFilter.*
-import cats.syntax.option.*
-import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.data.ProtoStep

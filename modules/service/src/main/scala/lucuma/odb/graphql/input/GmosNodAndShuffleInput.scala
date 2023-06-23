@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import lucuma.core.enums.GmosEOffsetting
 import lucuma.core.model.sequence.gmos.GmosNodAndShuffle
 import lucuma.odb.graphql.binding.*
 

@@ -5,25 +5,16 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.syntax.all._
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
-import lucuma.core.model.Observation
 import lucuma.odb.graphql.predicate.Predicates
 
-import binding._
 import table.ObsAttachmentTable
 import table.ProgramTable
 
-trait ObsAttachmentMapping[F[_]] 
+trait ObsAttachmentMapping[F[_]]
   extends ObsAttachmentTable[F]
      with ProgramTable[F]
      with Predicates[F] {
-  
+
   lazy val ObsAttachmentMapping =
     ObjectMapping(
       tpe = ObsAttachmentType,
