@@ -56,6 +56,8 @@ create view v_chron_conditions_entry as
   case when num_nulls(c_measurement_source, c_measurement_seeing, c_measurement_extinction_pct, c_measurement_wavelength, c_measurement_azimuth, c_measurement_elevation) < 6 then c_chron_id end as c_measurement_id,
   case when num_nulls(c_intuition_expectation, c_intuition_timespan, c_intuition_seeing_trend) < 3 then c_chron_id end as c_intuition_id,
   case when num_nulls(c_intuition_expectation, c_intuition_timespan) < 2 then c_chron_id end as c_expectation_id,
-  case when c_measurement_wavelength is not null then c_chron_id end as c_wavelength_id
+  case when c_measurement_wavelength is not null then c_chron_id end as c_wavelength_id,
+  case when c_measurement_seeing is not null then c_chron_id end as c_measurement_seeing_id,
+  case when c_measurement_azimuth is not null then c_chron_id end as c_measurement_pointing_id
   from t_chron_conditions_entry;
 
