@@ -9,10 +9,12 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
-     with ObservationView[F] {
+     with ObservationView[F] 
+     with ChronConditionsEntryView[F] {
 
   private def wavelengthMapping(
     idColumn: ColumnRef,
@@ -43,6 +45,7 @@ trait WavelengthMapping[F[_]]
     SwitchMapping(
       WavelengthType,
       List(
+        ConditionsMeasurementType / "wavelength"                   -> wavelengthMapping(ChronConditionsEntryView.Measurement.Wavelength.SyntheticId, ChronConditionsEntryView.Measurement.Wavelength.Value),
         GmosNorthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength),
         GmosNorthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength),
         GmosSouthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.CentralWavelength),

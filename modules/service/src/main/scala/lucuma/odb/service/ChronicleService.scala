@@ -13,38 +13,64 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
+import lucuma.odb.graphql.input.ConditionsEntryInput
 
-trait ChronicleService[F[_]]//:
-  // def insertObservedConditions(input: ObservedConditionsInput)(using Transaction[F]): F[Long]
+trait ChronicleService[F[_]]:
+  def addConditionsEntry(input: ConditionsEntryInput): F[Long]
 
-object ChronicleService:
+object ChronicleService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): ChronicleService[F] =
-    new ChronicleService[F] {}//:
+    new ChronicleService[F]:
+      def addConditionsEntry(input: ConditionsEntryInput): F[Long] =
+        user.verifyAccess(Access.Staff) >>
+        session.prepareR(Statements.InsertConditionsEntry).use { pq =>
+          pq.unique(input)
+        }
 
-  //     def insertObservedConditions(input: ObservedConditionsInput)(using Transaction[F]): F[Long] =
-  //       user.verifyAccess(Access.Staff) >> // only staff or better can log conditions
-  //       session.prepareR(InsertObservedConditions).use { pq =>
-  //         pq.unique(input)
-  //       }
+  object Statements {
+    
+    val InsertConditionsEntry: Query[ConditionsEntryInput, Long] =
+      sql"""
+        INSERT INTO t_chron_conditions_entry (
+          c_measurement_source,        
+          c_measurement_seeing,        
+          c_measurement_extinction_pct,
+          c_measurement_wavelength,    
+          c_measurement_azimuth,       
+          c_measurement_elevation,     
+          c_intuition_expectation,     
+          c_intuition_timespan,        
+          c_intuition_seeing_trend    
+        ) VALUES (
+          ${tag.opt},
+          ${angle_µas.opt},
+          ${int2.opt},
+          ${wavelength_pm.opt},
+          ${angle_µas.opt},
+          ${angle_µas.opt},
+          ${tag.opt},
+          ${time_span.opt},
+          ${tag.opt}
+        ) RETURNING c_chron_id
+      """.query(int8).contramap[ConditionsEntryInput] { cie =>
 
-  object Statements//:
+        val omeas = cie.value.left
+        val ointu = cie.value.right
 
-    // val InsertObservedConditions: Query[ObservedConditionsInput, Long] =
-    //   sql"""
-    //     INSERT INTO t_chron_observed_conditions (
-    //       c_cloud_extinction,
-    //       c_image_quality,   
-    //       c_sky_background,  
-    //       c_water_vapor
-    //     ) VALUES (
-    //       ${cloud_extinction.opt},
-    //       ${image_quality.opt},
-    //       ${sky_background.opt},
-    //       ${water_vapor.opt}
-    //     )
-    //     RETURNING c_chron_id
-    //   """.query(int8)
-    //     .contramap[ObservedConditionsInput] { oci =>
-    //       (oci.cloudExtinction, oci.imageQuality, oci.skyBackground, oci.waterVapor)  
-    //     }
+        omeas.map(_.source)                                 *:
+        omeas.flatMap(_.seeing)                             *:
+        omeas.flatMap(_.extinction.map(_.underlying.value)) *:
+        omeas.flatMap(_.wavelength)                         *:
+        omeas.flatMap(_.azimuth)                            *:
+        omeas.flatMap(_.elevation)                          *:
+        ointu.flatMap(_.value.left.map(_.tpe))              *:
+        ointu.flatMap(_.value.left.map(_.timespan))         *:
+        ointu.flatMap(_.value.right)                        *:
+        EmptyTuple
+
+      }
+
+  }
+
+}

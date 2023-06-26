@@ -48,15 +48,18 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
   lazy val LeafMappings: List[TypeMapping] =
     List(
       LeafMapping[BigDecimal](BigDecimalType),
+      LeafMapping[Long](ChronicleIdType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
+      LeafMapping[Tag](ConditionsMeasurementSourceType),
       LeafMapping[Tag](ConditionsSourceType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[Existence](ExistenceType),
+      LeafMapping[IntPercent](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[GcalArc](GcalArcType),

@@ -11,13 +11,15 @@ import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.table.TimingWindowView
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 
-trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] {
+trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] with ChronConditionsEntryView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
     SwitchMapping(
       TimeSpanType,
       List(
+        ConditionsExpectationType / "timeframe"       -> timeSpanMapping(ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
         ProgramType / "plannedTime" / "pi"            -> timeSpanMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
         ProgramType / "plannedTime" / "uncharged"     -> timeSpanMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
         ProgramType / "plannedTime" / "execution"     -> timeSpanMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
