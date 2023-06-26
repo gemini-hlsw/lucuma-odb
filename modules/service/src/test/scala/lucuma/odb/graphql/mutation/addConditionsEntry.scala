@@ -190,11 +190,11 @@ class addConditionsEntry extends OdbSuite {
               }
               measurement {
                 source
-                #seeing { arcseconds }
+                seeing { arcseconds }
                 extinction
                 wavelength { micrometers }
-                #azimuth { degrees }
-                #elevation { degrees }                
+                azimuth { degrees }
+                elevation { degrees }                
               }
               intuition {
                 seeingTrend
@@ -216,11 +216,20 @@ class addConditionsEntry extends OdbSuite {
                   "id" : ${staff.id}
                  },
                  "measurement" : {
-                   "source" : "OBSERVER",
-                   "extinction" : 2,
-                   "wavelength" : {
-                     "micrometers" : 1.000000
-                   }
+                    "source" : "OBSERVER",
+                    "seeing" : {
+                      "arcseconds" : 0.4
+                    },
+                    "extinction" : 2,
+                    "wavelength" : {
+                      "micrometers" : 1.000000
+                    },
+                    "azimuth" : {
+                      "degrees" : 20
+                    },
+                    "elevation" : {
+                      "degrees" : 30
+                    }
                  },
                  "intuition" : {
                    "seeingTrend" : "VARIABLE",

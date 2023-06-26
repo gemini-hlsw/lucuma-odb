@@ -54,9 +54,9 @@ trait AngleMapping[F[_]] extends ObservationView[F] with ChronConditionsEntryVie
       List(
         PosAngleConstraintType / "angle"                        -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
         SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(Spectroscopy.FocalPlaneAngle.SyntheticId, Spectroscopy.FocalPlaneAngle.Value),
-        ConditionsMeasurementType / "seeing"                    -> angleMapping(ChronConditionsEntryView.Measurement.SyntheticId, ChronConditionsEntryView.Measurement.Seeing),
-        ConditionsMeasurementType / "elevation"                 -> angleMapping(ChronConditionsEntryView.Measurement.SyntheticId, ChronConditionsEntryView.Measurement.Elevation),
-        ConditionsMeasurementType / "azimuth"                   -> angleMapping(ChronConditionsEntryView.Measurement.SyntheticId, ChronConditionsEntryView.Measurement.Azimuth),
+        ConditionsMeasurementType / "seeing"                    -> angleMapping(ChronConditionsEntryView.Measurement.Seeing.SyntheticId, ChronConditionsEntryView.Measurement.Seeing.Value),
+        ConditionsMeasurementType / "elevation"                 -> angleMapping(ChronConditionsEntryView.Measurement.Pointing.SyntheticId, ChronConditionsEntryView.Measurement.Pointing.Elevation),
+        ConditionsMeasurementType / "azimuth"                   -> angleMapping(ChronConditionsEntryView.Measurement.Pointing.SyntheticId, ChronConditionsEntryView.Measurement.Pointing.Azimuth),
       )
     )
 }
