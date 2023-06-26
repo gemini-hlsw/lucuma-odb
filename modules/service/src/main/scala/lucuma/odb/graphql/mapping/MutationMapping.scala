@@ -82,12 +82,14 @@ import skunk.AppliedFragment
 import skunk.Transaction
 
 import scala.reflect.ClassTag
+import lucuma.odb.graphql.input.ConditionsEntryInput
+import lucuma.core.model.Access
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
-      // AddObservedConditions,
+      AddConditionsEntry,
       AddSequenceEvent,
       CloneObservation,
       CloneTarget,
@@ -195,14 +197,20 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   // Field definitions
 
-  // private lazy val AddObservedConditions: MutationField =
-  //   MutationField("addObservedConditions", ObservedConditionsInput.Binding) { (input, child) =>
-  //     services.useTransactionally {
-  //       chronicleService.insertObservedConditions(input).map { id =>
-  //         Result.failure(s"insert worked, id is $id .. otherwise unimplemeted")
-  //       }
-  //     }  
-  //   }
+  private lazy val AddConditionsEntry: MutationField =
+    MutationField("addConditionsEntry", ConditionsEntryInput.Binding) { (input, child) =>
+      if user.role.access < Access.Staff then {
+        Result.failure(s"This action is restricted to staff users.").pure[F]
+      } else {
+        services.useTransactionally {
+          chronicleService.addConditionsEntry(input).map { id =>
+            Result(
+              Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
+            )
+          }
+        }  
+      }
+    }
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>

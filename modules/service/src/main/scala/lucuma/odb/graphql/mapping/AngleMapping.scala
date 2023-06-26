@@ -9,9 +9,10 @@ import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 
 
-trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
+trait AngleMapping[F[_]] extends ObservationView[F] with ChronConditionsEntryView[F] with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
   private val µPerSec: Long   = 1000L * µPerMilli
@@ -53,6 +54,9 @@ trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
       List(
         PosAngleConstraintType / "angle"                        -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
         SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(Spectroscopy.FocalPlaneAngle.SyntheticId, Spectroscopy.FocalPlaneAngle.Value),
+        ConditionsMeasurementType / "seeing"                    -> angleMapping(ChronConditionsEntryView.Measurement.SyntheticId, ChronConditionsEntryView.Measurement.Seeing),
+        ConditionsMeasurementType / "elevation"                 -> angleMapping(ChronConditionsEntryView.Measurement.SyntheticId, ChronConditionsEntryView.Measurement.Elevation),
+        ConditionsMeasurementType / "azimuth"                   -> angleMapping(ChronConditionsEntryView.Measurement.SyntheticId, ChronConditionsEntryView.Measurement.Azimuth),
       )
     )
 }

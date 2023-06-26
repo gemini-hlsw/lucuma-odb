@@ -233,7 +233,7 @@ interface ChronicleEntry {
   timestamp: Timestamp!
 }
 
-type ConditionsEntry implements ChronicleEntry {
+type ConditionsEntry { # implements ChronicleEntry
   id: ChronicleId!
   transactionId: TransactionId
   user: User
@@ -306,7 +306,9 @@ enum ConditionsExpectationType {
   CLEAR_SKIES
 }
 
-
+type AddConditionsEntryResult {
+  conditionsEntry: ConditionsEntry!
+}
 
 
 
@@ -1723,9 +1725,9 @@ type Mutation {
 
   # Logs  observing conditions to the Chronicle. This operation is permitted only for staff and
   # service users.
-  # addObservedConditions(
-  #   input: ConditionsObservationInput
-  # ): ConditionsObservation!
+  addConditionsEntry(
+    input: ConditionsEntryInput
+  ): AddConditionsEntryResult!
 
   # Adds a new dataset event associated with the given visit.  The
   # generation of a single dataset will produce multiple events as it
