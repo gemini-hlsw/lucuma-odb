@@ -3,18 +3,18 @@
 
 package lucuma.odb.data
 
+import eu.timepit.refined.scalacheck.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.data.Zipper
 import lucuma.core.data.arb.ArbZipper
-import munit.DisciplineSuite
 import lucuma.core.optics.laws.discipline.FormatTests
-import org.scalacheck.Arbitrary
-import org.scalacheck.Gen
-import eu.timepit.refined.scalacheck.all.*
-import eu.timepit.refined.types.numeric.NonNegShort
 import monocle.law.discipline.PrismTests
+import munit.DisciplineSuite
+import org.scalacheck.Arbitrary
 import org.scalacheck.Cogen
+import org.scalacheck.Gen
 
 class ExtinctionSuite extends DisciplineSuite with ArbitraryInstances {
 

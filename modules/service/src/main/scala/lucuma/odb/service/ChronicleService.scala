@@ -7,13 +7,13 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.model.Access
 import lucuma.core.model.StandardUser
+import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import lucuma.odb.graphql.input.ConditionsEntryInput
 
 trait ChronicleService[F[_]]:
   def addConditionsEntry(input: ConditionsEntryInput): F[Long]

@@ -3,12 +3,12 @@
 
 package lucuma.odb.data
 
-import eu.timepit.refined.types.numeric.NonNegShort
-import lucuma.core.optics.SplitMono
-import lucuma.core.optics.Format
 import cats.kernel.Order
-import monocle.Prism
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.optics.Format
+import lucuma.core.optics.SplitMono
+import monocle.Prism
 
 /** Extinction in mags, a non-negative number with two decimal points of precision, in [0.00, 327.67]. */
 opaque type Extinction = NonNegShort

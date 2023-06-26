@@ -26,6 +26,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -39,6 +40,7 @@ import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -82,8 +84,6 @@ import skunk.AppliedFragment
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.input.ConditionsEntryInput
-import lucuma.core.model.Access
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
