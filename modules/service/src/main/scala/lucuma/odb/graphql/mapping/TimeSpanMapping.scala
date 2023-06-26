@@ -6,12 +6,12 @@ package lucuma.odb.graphql.mapping
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.table.TimingWindowView
-import lucuma.odb.graphql.table.ChronConditionsEntryView
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] with ChronConditionsEntryView[F] {
 

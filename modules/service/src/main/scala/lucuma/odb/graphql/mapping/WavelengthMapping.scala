@@ -6,10 +6,10 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
-import lucuma.odb.graphql.table.ChronConditionsEntryView
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]

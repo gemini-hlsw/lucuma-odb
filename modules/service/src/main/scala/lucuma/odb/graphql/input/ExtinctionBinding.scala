@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.input
 
-import lucuma.odb.graphql.binding.FloatBinding
 import lucuma.odb.data.Extinction
+import lucuma.odb.graphql.binding.FloatBinding
 
 val ExtinctionBinding =
   FloatBinding.emap { d =>

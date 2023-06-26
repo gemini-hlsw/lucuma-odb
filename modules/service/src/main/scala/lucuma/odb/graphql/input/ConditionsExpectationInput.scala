@@ -13,10 +13,10 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.binding._
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.binding._
 
 final case class ConditionsExpectationInput(
    tpe: Tag,

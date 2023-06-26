@@ -9,17 +9,17 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
+import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.math.Angle
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.binding._
-import lucuma.core.math.Angle
-import lucuma.core.math.Wavelength
-import lucuma.odb.data.Tag
-import edu.gemini.grackle.Result
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.Tag
+import lucuma.odb.graphql.binding._
 
 final case class ConditionsMeasurementInput(
   source: Tag,

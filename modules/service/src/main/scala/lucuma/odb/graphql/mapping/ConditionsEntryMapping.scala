@@ -6,11 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.UserTable
 
 import table.TargetView
 import table.ProgramTable
-import lucuma.odb.graphql.table.ChronConditionsEntryView
-import lucuma.odb.graphql.table.UserTable
 
 trait ConditionsEntryMapping[F[_]] extends ChronConditionsEntryView[F] with UserTable[F]  {
 
