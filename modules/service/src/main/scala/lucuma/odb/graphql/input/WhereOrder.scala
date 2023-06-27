@@ -9,9 +9,6 @@ import cats.syntax.parallel._
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.odb.graphql.binding._
 
 object WhereOrder {

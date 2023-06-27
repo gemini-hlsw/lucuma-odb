@@ -3,15 +3,9 @@
 
 package lucuma.odb.graphql.mapping
 
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Result
-import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.graphql.table.*
-import skunk.codec.numeric.int8
 
-import scala.tools.util.PathResolver.Environment
-
-trait ObservationSelectResultMapping[F[_]] 
+trait ObservationSelectResultMapping[F[_]]
   extends ConstraintSetGroupView[F]
      with ObservationView[F]
      with ProgramTable[F]
@@ -24,7 +18,7 @@ trait ObservationSelectResultMapping[F[_]]
 
   lazy val ObservationSelectResultMapping: TypeMapping =
     SwitchMapping(
-      ObservationSelectResultType, 
+      ObservationSelectResultType,
       List(
         QueryType / "observations"              -> topLevelSelectResultMapping(ObservationSelectResultType),
         ProgramType / "observations"            -> nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)),
@@ -34,5 +28,5 @@ trait ObservationSelectResultMapping[F[_]]
         ObsAttachmentType / "observations"      -> nestedSelectResultMapping(ObservationSelectResultType, ObsAttachmentTable.Id, Join(ObsAttachmentTable.Id, ObsAttachmentAssignmentTable.ObsAttachmentId), Join(ObsAttachmentAssignmentTable.ObservationId, ObservationView.Id))
       )
     )
-    
+
 }

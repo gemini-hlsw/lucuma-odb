@@ -3,12 +3,8 @@
 
 package lucuma.odb.util
 
-import cats.data.NonEmptySet
 import cats.syntax.apply.*
-import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -51,7 +47,6 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
-import skunk.implicits.*
 import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
@@ -302,6 +297,9 @@ trait Codecs {
   val sequence_command: Codec[SequenceCommand] =
     enumerated[SequenceCommand](Type("e_sequence_command"))
 
+  val sequence_type: Codec[SequenceType] =
+    enumerated[SequenceType](Type("e_sequence_type"))
+
   val science_mode: Codec[ScienceMode] =
     enumerated[ScienceMode](Type.varchar)
 
@@ -327,6 +325,9 @@ trait Codecs {
 
   val step_id: Codec[Step.Id] =
     uid[Step.Id]
+
+  val step_stage: Codec[StepStage] =
+    enumerated(Type("e_step_stage"))
 
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))

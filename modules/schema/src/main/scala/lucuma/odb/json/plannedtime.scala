@@ -5,10 +5,8 @@ package lucuma.odb.json
 
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Decoder
-import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.JsonObject
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
@@ -20,7 +18,6 @@ import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.util.TimeSpan
-
 
 trait PlannedTimeCodec {
 

@@ -4,7 +4,6 @@
 package lucuma.odb.graphql.predicate
 
 import edu.gemini.grackle.Path
-import lucuma.core.model.Program
 
 class TargetGroupPredicates(path: Path) {
   val program = ProgramPredicates(path / "program")

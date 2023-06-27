@@ -11,7 +11,6 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Group
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 

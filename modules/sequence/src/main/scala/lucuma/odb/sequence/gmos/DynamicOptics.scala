@@ -3,7 +3,6 @@
 
 package lucuma.odb.sequence.gmos
 
-import cats.syntax.functor.*
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -12,11 +11,9 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
-import monocle.Focus
 import monocle.Iso
 import monocle.Lens
 import monocle.Optional
-import monocle.macros.GenIso
 
 /**
  * Abstracts the optics for updating GMOS dynamic (changing) configurations,

@@ -9,8 +9,6 @@ import lucuma.core.model.User
 
 class updateTargets extends OdbSuite {
 
-  import createTarget.FullTargetGraph                            
-
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
 
   override lazy val validUsers: List[User] = List(pi)
@@ -47,11 +45,11 @@ class updateTargets extends OdbSuite {
             }
           """
         )
-       )            
-      }    
+       )
+      }
     }
   }
-  
+
   test("update name") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1").flatMap { tid =>
@@ -88,8 +86,8 @@ class updateTargets extends OdbSuite {
             }
           """
         )
-       )          
-      }    
+       )
+      }
     }
   }
 
@@ -116,8 +114,8 @@ class updateTargets extends OdbSuite {
           }
         """,
         expected = Left(List("Argument 'input.SET.name' is invalid: cannot be null"))
-       )          
-      }    
+       )
+      }
     }
   }
 
@@ -131,7 +129,7 @@ class updateTargets extends OdbSuite {
             updateTargets(input: {
               SET: {
                 sidereal: {
-                  ra: { degrees: 42 }                  
+                  ra: { degrees: 42 }
                 }
               }
               WHERE: {
@@ -165,8 +163,8 @@ class updateTargets extends OdbSuite {
             }
           """
         )
-       )          
-      }    
+       )
+      }
     }
   }
 
@@ -221,8 +219,8 @@ class updateTargets extends OdbSuite {
             }
           """
         )
-       )          
-      }    
+       )
+      }
     }
   }
 
@@ -298,8 +296,8 @@ class updateTargets extends OdbSuite {
             }
           """,
           expected = Left(List("Sidereal targets require RA, Dec, and Epoch to be defined."))
-        )          
-      }    
+        )
+      }
     }
   }
 
@@ -395,8 +393,8 @@ class updateTargets extends OdbSuite {
               }
             """
           )
-        )          
-      }    
+        )
+      }
     }
   }
 
@@ -455,11 +453,11 @@ class updateTargets extends OdbSuite {
                     }
                   ]
                 }
-              }            
+              }
             """
           )
-        )          
-      }    
+        )
+      }
     }
   }
 
@@ -765,8 +763,8 @@ class updateTargets extends OdbSuite {
             }
           """,
           expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
-        )          
-      }    
+        )
+      }
     }
   }
 
@@ -850,8 +848,8 @@ class updateTargets extends OdbSuite {
               }
             """
           )
-        )          
-      }    
+        )
+      }
     }
   }
 

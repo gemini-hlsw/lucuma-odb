@@ -5,9 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.Mapping
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -26,7 +24,6 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.core.model.TimingWindow
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
@@ -67,9 +64,12 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GcalDiffuser](GcalDiffuserType),
       LeafMapping[GcalFilter](GcalFilterType),
       LeafMapping[GcalShutter](GcalShutterType),
-      LeafMapping[GmosNorthGrating](GmosNorthGratingType),
+      LeafMapping[GmosAmpCount](GmosAmpCountType),
       LeafMapping[GmosAmpGain](GmosAmpGainType),
       LeafMapping[GmosAmpReadMode](GmosAmpReadModeType),
+      LeafMapping[GmosCustomSlitWidth](GmosCustomSlitWidthType),
+      LeafMapping[GmosDtax](GmosDtaxType),
+      LeafMapping[GmosGratingOrder](GmosGratingOrderType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),
@@ -110,12 +110,14 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[Tag](SeeingTrendType),
       LeafMapping[SequenceCommand](SequenceCommandType),
+      LeafMapping[SequenceType](SequenceTypeType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[SkyBackground](SkyBackgroundType),
-      LeafMapping[SmartGcalType](SmartGcalType),
+      LeafMapping[SmartGcalType](SmartGcalTypeType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
       LeafMapping[Step.Id](StepIdType),
-      LeafMapping[StepType](StepType),
+      LeafMapping[StepStage](StepStageType),
+      LeafMapping[StepType](StepTypeType),
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),

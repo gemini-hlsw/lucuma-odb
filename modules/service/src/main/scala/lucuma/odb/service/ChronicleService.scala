@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.model.Access
-import lucuma.core.model.StandardUser
 import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.util.Codecs.*
 import skunk.*

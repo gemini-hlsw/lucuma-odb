@@ -4,17 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.StepTable
+import table.StepEventTable
 
-trait GmosNorthStepRecordMapping[F[_]] extends StepTable[F] {
+trait AddStepEventResultMapping[F[_]] extends StepEventTable[F] {
 
-  lazy val GmosNorthStepRecordMapping: ObjectMapping =
+  lazy val AddStepEventResultMapping: ObjectMapping =
     ObjectMapping(
-      tpe = GmosNorthStepRecordType,
+      tpe = AddStepEventResultType,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true),
-        // TBD - more fields!
+        SqlField("id", StepEventTable.Id, key = true, hidden = true),
+        SqlObject("event")
       )
     )
-
 }

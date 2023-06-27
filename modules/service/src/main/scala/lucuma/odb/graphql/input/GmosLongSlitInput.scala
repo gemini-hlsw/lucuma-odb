@@ -4,14 +4,11 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.NonEmptyList
-import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
 import edu.gemini.grackle.Result
-import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -23,14 +20,11 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.units.Picometer
-import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
@@ -38,7 +32,6 @@ import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.gmos.longslit.Config
 
 import scala.util.Try
-import scala.util.control.Exception.*
 
 object GmosLongSlitInput {
 
@@ -271,7 +264,7 @@ object GmosLongSlitInput {
         case Site.GN => "North"
         case Site.GS => "South"
       }
-          
+
       Result.fromOption(oa, s"A $itemName is required in order to create a GMOS ${siteName} Long Slit observing mode.")
     }
 
@@ -329,7 +322,7 @@ object GmosLongSlitInput {
 
         }
     }
-    
+
     final case class South(
       grating: Option[GmosSouthGrating],
       filter:  Nullable[GmosSouthFilter],
@@ -383,7 +376,7 @@ object GmosLongSlitInput {
             ))
 
         }
-    }    
+    }
   }
 
 

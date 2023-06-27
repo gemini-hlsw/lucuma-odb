@@ -6,15 +6,11 @@ package lucuma.odb.logic
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.GmosNorthDetector
-import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
-import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.data.ProtoStep
 
 /**

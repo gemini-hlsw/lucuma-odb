@@ -11,9 +11,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 class observations extends OdbSuite {
 

@@ -7,12 +7,10 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import lucuma.core.math.Offset.P
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
-import lucuma.odb.graphql.OdbSuite
 
 class updatePrograms extends OdbSuite {
 
@@ -791,7 +789,7 @@ class updatePrograms extends OdbSuite {
                     "name" : "updated"
                   }
                 ]
-              } 
+              }
             }
           """
         )

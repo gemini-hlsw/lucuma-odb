@@ -10,7 +10,6 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -20,10 +19,7 @@ import lucuma.odb.util.Codecs.*
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import skunk.*
-import skunk.codec.all.*
 import skunk.syntax.all.*
-
-import java.util.UUID
 
 class proposalAttachments extends AttachmentsSuite {
 
@@ -159,7 +155,7 @@ class proposalAttachments extends AttachmentsSuite {
 
       client.run(request)
     }
-  
+
   def getPresignedUrl(
     user:      User,
     programId: Program.Id,
@@ -193,9 +189,9 @@ class proposalAttachments extends AttachmentsSuite {
     }
 
   def getRemotePathFromDb(pid: Program.Id, ta: TestAttachment): IO[NonEmptyString] = {
-    val query = 
+    val query =
       sql"""
-        select c_remote_path from t_proposal_attachment 
+        select c_remote_path from t_proposal_attachment
         where c_program_id = $program_id and c_attachment_type = $tag
       """.query(text_nonempty)
     FMain.databasePoolResource[IO](databaseConfig).flatten
@@ -412,7 +408,7 @@ class proposalAttachments extends AttachmentsSuite {
       _   <- updateAttachment(pi, pid, fileWithPath).withExpectation(Status.BadRequest, "File name cannot include a path")
     } yield ()
   }
-  
+
   test("file name with missing extension insert fails") {
     for {
       pid <- createProgramAs(pi)

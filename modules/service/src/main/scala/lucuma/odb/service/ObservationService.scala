@@ -4,8 +4,6 @@
 package lucuma.odb.service
 
 import cats.Applicative
-import cats.data.Ior
-import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
@@ -18,11 +16,8 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Problem
 import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -45,13 +40,9 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
-import lucuma.core.model.ElevationRange.AirMass.DecimalValue
-import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
 import lucuma.core.model.Group
-import lucuma.core.model.GuestRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
@@ -61,13 +52,10 @@ import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
-import lucuma.odb.graphql.input.AirMassRangeInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
-import lucuma.odb.graphql.input.HourAngleRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
@@ -76,7 +64,6 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.Codecs.gid
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
@@ -87,7 +74,6 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 sealed trait ObservationService[F[_]] {
-  import ObservationService._
 
   def createObservation(
     programId: Program.Id,
@@ -350,7 +336,7 @@ object ObservationService {
             // None then it means the user doesn't have permission to see the obs.
             val cObsStmt = Statements.cloneObservation(pid, input.observationId, user, destGroupIndex)
             val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
-            
+
             // Action to open a hole in the destination program/group after the observation we're cloning
             val openHole: F[NonNegShort] =
               session.execute(sql"set constraints all deferred".command) >>
@@ -361,7 +347,7 @@ object ObservationService {
             // Ok let's do the clone.
             (openHole >> cloneObs).flatMap {
 
-              case None => 
+              case None =>
                 // User doesn't have permission to see the obs
                 Result.failure(s"No such observation: ${input.observationId}").pure[F]
 
@@ -376,16 +362,16 @@ object ObservationService {
                 val doUpdate =
                   input.SET match
                     case None    => Result(oid2).pure[F] // nothing to do
-                    case Some(s) => 
+                    case Some(s) =>
                       updateObservations(pid, s, sql"select $observation_id".apply(oid2))
                         .map { r =>
                           // We probably don't need to check this return value, but I feel bad not doing it.
                           r.flatMap {
                             case List(`oid2`) => Result(oid2)
                             case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
-                          }  
+                          }
                         }
-                        .flatTap { 
+                        .flatTap {
                           r => transaction.rollback.unlessA(r.hasValue)
                         }
 
@@ -781,7 +767,7 @@ object ObservationService {
             sql"c_instrument = ${instrument.opt}"(newMode.map(_.instrument)) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 
-    /** 
+    /**
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original
      * doesn't exist or isn't accessible.
      */
@@ -823,7 +809,7 @@ object ObservationService {
           c_spec_capability,
           c_observing_mode_type
         )
-        SELECT 
+        SELECT
           c_program_id,
           c_group_id,
           $int2_nonneg,

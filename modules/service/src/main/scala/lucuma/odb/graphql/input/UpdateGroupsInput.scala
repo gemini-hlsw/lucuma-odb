@@ -5,13 +5,10 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.model.Program
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 
 final case class UpdateGroupsInput(

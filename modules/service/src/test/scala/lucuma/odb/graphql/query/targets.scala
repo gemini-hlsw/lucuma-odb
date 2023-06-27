@@ -4,15 +4,12 @@
 package lucuma.odb.graphql
 package query
 
-import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
-import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 class targets extends OdbSuite {
 
@@ -54,7 +51,7 @@ class targets extends OdbSuite {
                 )
               )
             )
-          )              
+          )
         )
       }
     }
@@ -93,7 +90,7 @@ class targets extends OdbSuite {
                 )
               )
             )
-          )              
+          )
         )
       }
     }

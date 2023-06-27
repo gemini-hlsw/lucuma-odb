@@ -24,7 +24,6 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
-import org.checkerframework.checker.units.qual.s
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -57,9 +56,9 @@ trait DatabaseOperations { this: OdbSuite =>
           focalPlaneAngle: { microarcseconds: 0 }
         }
       }"""
-    
+
   private def observingModeObject(observingMode: ObservingModeType): String =
-    observingMode match    
+    observingMode match
       case ObservingModeType.GmosNorthLongSlit =>
         """{
           gmosNorthLongSlit: {
@@ -105,7 +104,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         """
-    ).map { json => 
+    ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
@@ -128,7 +127,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         """
-    ).map { json => 
+    ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
@@ -295,7 +294,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs(_)) // TODO: something cheaper
 
-  def updateAsterisms( 
+  def updateAsterisms(
     user: User,
     pid:  Program.Id,
     oids: List[Observation.Id],
@@ -343,7 +342,7 @@ trait DatabaseOperations { this: OdbSuite =>
         json"""
         {
           "updateAsterisms": {
-            "observations": 
+            "observations":
               ${exp.map { case (oid, ts) =>
                 json"""
                   {
@@ -431,7 +430,7 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { json =>
       json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
     }
-        
+
   def groupElementsAs(user: User, pid: Program.Id, gid: Option[Group.Id]): IO[List[Either[Group.Id, Observation.Id]]] =
     query(user, s"""query { program(programId: "$pid") { allGroupElements { parentGroupId group { id } observation { id } } } }""")
       .map(_
@@ -440,14 +439,14 @@ trait DatabaseOperations { this: OdbSuite =>
         .require[List[Json]]
         .flatMap { json =>
           val parentId = json.hcursor.downField("parentGroupId").require[Option[Group.Id]]
-          if (parentId === gid) then 
+          if (parentId === gid) then
             val id = json.hcursor.downFields("group", "id").as[Group.Id].toOption.toLeft(json.hcursor.downFields("observation", "id").require[Observation.Id])
             List(id)
           else Nil
         }
       )
 
-  private def staticConfigObject(instrument: Instrument): String =
+  protected def staticConfig(instrument: Instrument): String =
     instrument match {
       case Instrument.GmosNorth =>
         """
@@ -467,6 +466,56 @@ trait DatabaseOperations { this: OdbSuite =>
 
     }
 
+  protected def dynamicConfig(instrument: Instrument): String =
+    s"""
+      instrument: {
+        exposure: {
+          seconds: 1200
+        },
+        readout: {
+          xBin: ONE,
+          yBin: ONE,
+          ampCount: TWELVE,
+          ampGain: LOW,
+          ampRead: SLOW
+        },
+        dtax: TWO,
+        roi: FULL_FRAME,
+        gratingConfig: {
+          grating: ${instrument match {
+            case Instrument.GmosNorth => "B1200_G5301"
+            case Instrument.GmosSouth => "B1200_G5321"
+            case _                    => "EXPECTING_GMOS"
+          }},
+          order: ONE,
+          wavelength: {
+            nanometers: 600
+          }
+        },
+        fpu: {
+          builtin: LONG_SLIT_0_50
+        }
+      }
+    """
+
+  val stepConfigScience: String =
+    """
+      stepConfig: {
+        science: {
+          offset: {
+             p: {
+               arcseconds: 0
+             },
+             q: {
+               arcseconds: 10
+             }
+          },
+          guiding: ENABLED
+        }
+      }
+    """
+
+
   def recordVisitAs(user: User, instrument: Instrument, oid: Observation.Id): IO[Visit.Id] = {
     val name = s"record${instrument.tag}Visit"
 
@@ -477,7 +526,7 @@ trait DatabaseOperations { this: OdbSuite =>
           mutation {
             $name(input: {
               observationId: ${oid.asJson},
-              static: ${staticConfigObject(instrument)}
+              static: ${staticConfig(instrument)}
             }) {
               visit {
                 id
@@ -489,6 +538,9 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields(name, "visit", "id").require[Visit.Id]
     }
   }
+
+  def recordStepAs(user: User, instrument: Instrument, vid: Visit.Id): IO[Step.Id] =
+    recordStepAs(user, vid, instrument, dynamicConfig(instrument), stepConfigScience)
 
   def recordStepAs(
     user:       User,

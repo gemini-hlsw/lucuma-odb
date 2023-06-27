@@ -6,8 +6,6 @@ package lucuma.odb.graphql.binding
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 
-import scala.util.control.Exception.catching
-
 object TimeSpanBinding {
 
   val Microseconds: Matcher[TimeSpan] =

@@ -8,11 +8,6 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.functor.*
-import lucuma.core.enums.GmosNorthDetector
-import lucuma.core.enums.GmosNorthStageMode
-import lucuma.core.enums.GmosSouthDetector
-import lucuma.core.enums.GmosSouthStageMode
-import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step

@@ -3,21 +3,12 @@
 
 package lucuma.odb.json
 
-import cats.syntax.eq.*
-import cats.syntax.functor.*
-import cats.syntax.traverse.*
-import io.circe.Codec
-import io.circe.Decoder
 import io.circe.Encoder
-import io.circe.Json
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Angle
 import lucuma.core.math.arb.ArbAngle.*
 import munit.DisciplineSuite
-import org.scalacheck.Arbitrary
-import org.scalacheck.Prop
-import org.scalacheck.Prop.*
 
 abstract class AngleSuite(using Encoder[Angle]) extends DisciplineSuite with ArbitraryInstances {
 

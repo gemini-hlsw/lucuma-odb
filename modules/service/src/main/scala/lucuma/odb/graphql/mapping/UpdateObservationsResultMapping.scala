@@ -3,13 +3,6 @@
 
 package lucuma.odb.graphql.mapping
 
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Result
-import lucuma.odb.graphql.BaseMapping
-import skunk.codec.numeric.int8
-
-import scala.tools.util.PathResolver.Environment
-
 trait UpdateObservationsResultMapping[F[_]] extends ResultMapping[F] {
 
   lazy val UpdateObservationsResultMapping: ObjectMapping =

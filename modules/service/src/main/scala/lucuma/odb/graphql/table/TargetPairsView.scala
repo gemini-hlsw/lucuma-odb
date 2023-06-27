@@ -7,7 +7,6 @@ package table
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
-import skunk.codec.all._
 
 trait TargetPairsView[F[_]] extends BaseMapping[F] {
 

@@ -9,9 +9,6 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.UserTable
 
-import table.TargetView
-import table.ProgramTable
-
 trait ConditionsEntryMapping[F[_]] extends ChronConditionsEntryView[F] with UserTable[F]  {
 
   lazy val ConditionsEntryMapping =

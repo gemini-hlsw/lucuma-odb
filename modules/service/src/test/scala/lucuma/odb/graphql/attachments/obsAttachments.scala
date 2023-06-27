@@ -8,8 +8,6 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -18,11 +16,10 @@ import lucuma.odb.util.Codecs.*
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import skunk.*
-import skunk.codec.all.*
 import skunk.syntax.all.*
 
 class obsAttachments extends ObsAttachmentsSuite {
-  
+
   def assertAttachmentsGql(
     user:        User,
     programId:   Program.Id,
@@ -98,7 +95,7 @@ class obsAttachments extends ObsAttachmentsSuite {
   val invalidPreImgExt  = TestAttachment("file.jpg", "pre_imaging", none, "Doesn't matter")
 
   val invalidFitsMsg = "Invalid file. Must be a FITS file."
-  val invalidFinderMsg = "Invalid file. Must be one of: JPG, PNG"
+  val invalidFinderMsg = "Invalid file. Must be one of: JPEG, JPG, PNG"
 
   test("successful insert, download and delete") {
     for {

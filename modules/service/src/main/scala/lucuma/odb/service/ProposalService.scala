@@ -3,31 +3,20 @@
 
 package lucuma.odb.service
 
-import cats.Monad
 import cats.Semigroup
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.ToOActivation
-import lucuma.core.math.Offset.P
-import lucuma.core.model.GuestRole
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
-import lucuma.core.model.ServiceRole
-import lucuma.core.model.ServiceUser
-import lucuma.core.model.StandardRole
-import lucuma.core.model.StandardRole.Ngo
-import lucuma.core.model.StandardRole.Pi
-import lucuma.core.model.User
 import lucuma.odb.data._
-import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProposalClassInput
 import lucuma.odb.graphql.input.ProposalInput
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
-import skunk.codec.all._
 import skunk.syntax.all._
 
 import Services.Syntax.*

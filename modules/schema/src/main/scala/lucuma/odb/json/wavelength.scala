@@ -3,18 +3,13 @@
 
 package lucuma.odb.json
 
-import io.circe.Codec
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
-import io.circe.HCursor
 import io.circe.Json
-import io.circe.refined._
 import io.circe.syntax._
 import lucuma.core.math.Wavelength
 import lucuma.core.optics.Format
-
-import java.math.RoundingMode.HALF_UP
 
 object wavelength {
 

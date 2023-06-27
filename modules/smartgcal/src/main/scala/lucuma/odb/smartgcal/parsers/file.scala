@@ -4,7 +4,6 @@
 package lucuma.odb.smartgcal.parsers
 
 import cats.parse.Parser
-import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.parser.MiscParsers.comma
 import lucuma.core.parser.MiscParsers.posInt
 import lucuma.core.util.parser.UtilParsers.posSecondsTimeSpan

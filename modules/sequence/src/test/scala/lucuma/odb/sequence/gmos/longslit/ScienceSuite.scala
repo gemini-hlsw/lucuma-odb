@@ -8,16 +8,11 @@ package longslit
 import eu.timepit.refined.types.numeric.PosDouble
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.ImageQuality
-import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.arb.ArbSourceProfile
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.util.arb.ArbEnumerated
@@ -26,8 +21,6 @@ import lucuma.odb.sequence.data.SciExposureTime
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import munit.Location
 import munit.ScalaCheckSuite
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Prop.*
 
 import java.time.Duration

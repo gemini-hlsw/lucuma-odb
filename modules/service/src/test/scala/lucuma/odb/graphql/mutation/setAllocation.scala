@@ -6,17 +6,11 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.literal._
-import io.circe.syntax._
 import lucuma.core.model.Partner
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.OdbSuite
-
-import java.time.Duration
 
 class setAllocation extends OdbSuite {
 

@@ -13,7 +13,6 @@ import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.mapping.ObservationMapping
 
 object WhereObservation {
 

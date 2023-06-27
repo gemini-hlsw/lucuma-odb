@@ -7,30 +7,33 @@ import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.table.TimingWindowView
 
-trait TimeSpanMapping[F[_]] extends AllocationTable[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] with ChronConditionsEntryView[F] {
+trait TimeSpanMapping[F[_]] extends AllocationTable[F] with GmosDynamicTables[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] with ChronConditionsEntryView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
     SwitchMapping(
       TimeSpanType,
       List(
+        AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
         ConditionsExpectationType / "timeframe"       -> timeSpanMapping(ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
-        ProgramType / "plannedTime" / "pi"            -> timeSpanMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
-        ProgramType / "plannedTime" / "uncharged"     -> timeSpanMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
-        ProgramType / "plannedTime" / "execution"     -> timeSpanMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
-        ObservationType / "plannedTime" / "pi"        -> timeSpanMapping(ObservationView.PlannedTime.Pi)(ObservationView.Id),
-        ObservationType / "plannedTime" / "uncharged" -> timeSpanMapping(ObservationView.PlannedTime.Uncharged)(ObservationView.Id),
-        ObservationType / "plannedTime" / "execution" -> timeSpanMapping(ObservationView.PlannedTime.Execution)(ObservationView.Id),
+        GmosNorthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
+        GmosSouthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
+        GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
+        GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
         IntensiveType / "totalTime"                   -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         LargeProgramType / "totalTime"                -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
-        GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
-        GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
+        ObservationType / "plannedTime" / "execution" -> timeSpanMapping(ObservationView.PlannedTime.Execution)(ObservationView.Id),
+        ObservationType / "plannedTime" / "pi"        -> timeSpanMapping(ObservationView.PlannedTime.Pi)(ObservationView.Id),
+        ObservationType / "plannedTime" / "uncharged" -> timeSpanMapping(ObservationView.PlannedTime.Uncharged)(ObservationView.Id),
+        ProgramType / "plannedTime" / "execution"     -> timeSpanMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
+        ProgramType / "plannedTime" / "pi"            -> timeSpanMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
+        ProgramType / "plannedTime" / "uncharged"     -> timeSpanMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
         TimingWindowEndAfterType / "after"            -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
         TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )

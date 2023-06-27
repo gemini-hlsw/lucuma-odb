@@ -15,10 +15,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.ObservationService
 
-class updateObservations extends OdbSuite                          
+class updateObservations extends OdbSuite
                             with UpdateConstraintSetOps {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
@@ -1500,7 +1499,7 @@ class updateObservations extends OdbSuite
           updateObservations(input: {
             programId: ${pid.asJson}
             SET: {
-              groupId: ${gid.asJson}              
+              groupId: ${gid.asJson}
               ${index.map(_.value.asJson).foldMap(j => s"groupIndex: $j")}
             },
             WHERE: {
@@ -1527,7 +1526,7 @@ class updateObservations extends OdbSuite
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
       assertEquals(es.drop(1).toSet, Set(Right(o2), Right(o1)))
-    }  
+    }
   }
 
   test("grouping: move observations into a group (at beginning)") {
@@ -1573,7 +1572,7 @@ class updateObservations extends OdbSuite
     } yield {
       assertEquals(es.take(2), List(Left(gid), Right(o1)))
       assertEquals(es.drop(2).toSet, Set(Right(o2), Right(o3)))
-    }  
+    }
   }
 
   test("grouping: move observations out of a group (at beginning of program)") {
@@ -1588,9 +1587,9 @@ class updateObservations extends OdbSuite
     } yield {
       assertEquals(es.take(2).toSet, Set(Right(o2), Right(o3)))
       assertEquals(es.drop(2), List(Left(gid), Right(o1)))
-    }  
+    }
   }
-  
+
   test("grouping: move observations out of a group (in the middle of program)") {
     for {
       pid <- createProgramAs(pi)
@@ -1604,7 +1603,7 @@ class updateObservations extends OdbSuite
       assertEquals(es(0), Left(gid))
       assertEquals(es.drop(1).take(2).toSet, Set(Right(o2), Right(o3)))
       assertEquals(es(3), Right(o1))
-    }  
+    }
   }
 
   test("grouping: move observations between groups") {
@@ -1621,7 +1620,7 @@ class updateObservations extends OdbSuite
     } yield {
       assertEquals(e1, List(Right(o1)))
       assertEquals(e2.toSet, Set(Right(o2), Right(o3)))
-    }  
+    }
   }
 
   test("grouping: Hugo's example") {

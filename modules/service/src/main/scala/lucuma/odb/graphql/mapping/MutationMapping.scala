@@ -4,12 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Applicative
-import cats.data.Ior
 import cats.data.Nested
-import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
@@ -25,7 +21,6 @@ import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -38,6 +33,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddSequenceEventInput
+import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
@@ -63,13 +59,9 @@ import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
-import lucuma.odb.service.AsterismService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
-import lucuma.odb.service.ObsAttachmentMetadataService
-import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ProgramService
-import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.ProposalService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -91,6 +83,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     List(
       AddConditionsEntry,
       AddSequenceEvent,
+      AddStepEvent,
       CloneObservation,
       CloneTarget,
       CreateGroup,
@@ -231,7 +224,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import UpdateTargetsResponse.{ SourceProfileUpdatesFailed, TrackingSwitchFailed }
     MutationField("cloneTarget", CloneTargetInput.Binding) { (input, child) =>
       services.useTransactionally {
-        targetService.cloneTarget(input).map {          
+        targetService.cloneTarget(input).map {
 
           // Typical case
           case Success(oldTargetId, newTargetId) =>
@@ -332,13 +325,32 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("addSequenceEvent", AddSequenceEventInput.Binding) { (input, child) =>
       services.useTransactionally {
         import ExecutionEventService.InsertEventResponse.*
-        executionEventService.insertExecutionEvent(input.visitId, input.command).map[Result[Query]] {
+        executionEventService.insertSequenceEvent(input.visitId, input.command).map[Result[Query]] {
           case NotAuthorized(user) =>
             Result.failure(s"User '${user.id}' is not authorized to perform this action")
+          case StepNotFound(id)    =>
+            Result.internalError(s"StepNotFound($id) result not possible in addSequenceEvent")
           case VisitNotFound(id)   =>
             Result.failure(s"Visit id '$id' not found")
           case Success(eid)        =>
             Result(Unique(Filter(Predicates.sequenceEvent.id.eql(eid), child)))
+        }
+      }
+    }
+
+  private lazy val AddStepEvent: MutationField =
+    MutationField("addStepEvent", AddStepEventInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        import ExecutionEventService.InsertEventResponse.*
+        executionEventService.insertStepEvent(input.stepId, input.sequenceType, input.stepStage).map[Result[Query]] {
+          case NotAuthorized(user) =>
+            Result.failure(s"User '${user.id}' is not authorized to perform this action")
+          case StepNotFound(id)    =>
+            Result.failure(s"Step id '$id' not found")
+          case VisitNotFound(id)   =>
+            Result.internalError(s"VisitNotFound($id) result not possible in addStepEvent")
+          case Success(eid)        =>
+            Result(Unique(Filter(Predicates.stepEvent.id.eql(eid), child)))
         }
       }
     }
@@ -466,9 +478,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         val selectObservations: F[Result[(List[Observation.Id], Query)]] =
           idSelect.traverse { which =>
-            observationService.selectObservations(which)            
-          } map { r => 
-            r.flatMap { oids => 
+            observationService.selectObservations(which)
+          } map { r =>
+            r.flatMap { oids =>
               observationResultSubquery(oids, input.LIMIT, child)
                 .tupleLeft(oids)
             }
@@ -501,9 +513,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             input.WHERE.getOrElse(True)
           ))
 
-          val idSelect: Result[AppliedFragment] = 
+          val idSelect: Result[AppliedFragment] =
             MappedQuery(
-              Filter(filterPredicate, Select("id", Nil, Empty)), 
+              Filter(filterPredicate, Select("id", Nil, Empty)),
               Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
             ).flatMap(_.fragment)
 
@@ -524,8 +536,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           idSelect.flatTraverse { which =>
             observationService
               .updateObservations(input.programId, input.SET, which)
-              .map { r => 
-                r.flatMap { oids => 
+              .map { r =>
+                r.flatMap { oids =>
                   observationResultSubquery(oids, input.LIMIT, child)
                     .tupleLeft(oids)
                 }
@@ -584,9 +596,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             input.WHERE.getOrElse(True)
           ))
 
-          val typeSelect: Result[AppliedFragment] = 
+          val typeSelect: Result[AppliedFragment] =
             MappedQuery(
-              Filter(filterPredicate, Select("attachmentType", Nil, Empty)), 
+              Filter(filterPredicate, Select("attachmentType", Nil, Empty)),
               Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
             ).flatMap(_.fragment)
 
@@ -595,7 +607,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               .updateProposalAttachments(input.SET, which)
               .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
           }
-          
+
         }
       }
 

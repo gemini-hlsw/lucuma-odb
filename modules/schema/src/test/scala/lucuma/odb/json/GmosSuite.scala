@@ -15,7 +15,6 @@ class GmosSuite extends DisciplineSuite with ArbitraryInstances {
 
   import ArbDynamicConfig.*
   import ArbStaticConfig.*
-  import angle.query.given
   import gmos.given
   import offset.query.given
   import time.query.given

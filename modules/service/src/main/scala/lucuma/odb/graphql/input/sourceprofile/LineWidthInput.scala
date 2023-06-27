@@ -6,7 +6,6 @@ package input
 package sourceprofile
 
 import coulomb.Quantity
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.BrightnessUnits.LineWidthQuantity
 import lucuma.core.math.LineWidthValue
 import lucuma.core.math.units._

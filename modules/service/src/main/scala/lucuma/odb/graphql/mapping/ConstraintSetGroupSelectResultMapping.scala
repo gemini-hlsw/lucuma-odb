@@ -6,12 +6,9 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ConstraintSetGroupView
-
-import table.ObservationView
 
 trait ConstraintSetGroupSelectResultMapping[F[_]] extends ResultMapping[F] {
-  
+
   lazy val ConstraintSetGroupSelectResultMapping: ObjectMapping =
     topLevelSelectResultMapping(ConstraintSetGroupSelectResultType)
 

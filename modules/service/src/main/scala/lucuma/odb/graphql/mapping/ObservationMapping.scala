@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
@@ -22,7 +21,7 @@ import table.ProgramTable
 
 trait ObservationMapping[F[_]]
   extends ObservationView[F]
-     with ProgramTable[F]  
+     with ProgramTable[F]
      with TimingWindowView[F]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F] {

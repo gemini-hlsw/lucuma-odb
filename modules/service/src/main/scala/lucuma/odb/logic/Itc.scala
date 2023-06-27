@@ -12,9 +12,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -32,8 +30,6 @@ import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
-
-import java.security.Provider.Service
 
 sealed trait Itc[F[_]] {
 

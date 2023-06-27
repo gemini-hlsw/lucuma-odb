@@ -8,7 +8,6 @@ package input
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 
 object ProposalAttachmentPropertiesInput {

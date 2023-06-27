@@ -7,10 +7,7 @@ package subscription
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
-import munit.IgnoreSuite
 
 import scala.concurrent.duration._
 

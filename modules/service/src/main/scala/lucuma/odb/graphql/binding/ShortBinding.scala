@@ -3,10 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value.IntValue
-
 val ShortBinding: Matcher[Short] =
-  IntBinding.emap { n => 
+  IntBinding.emap { n =>
     if n.isValidShort then Right(n.toShort)
-    else Left(s"Short: expected value in [${Short.MinValue} .. ${Short.MaxValue}], found $n") 
+    else Left(s"Short: expected value in [${Short.MinValue} .. ${Short.MaxValue}], found $n")
   }

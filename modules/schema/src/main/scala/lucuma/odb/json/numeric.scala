@@ -10,9 +10,7 @@ import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.HCursor
 import io.circe.Json
-import io.circe.refined._
 import io.circe.syntax._
-
 
 trait NumericCodec {
 
