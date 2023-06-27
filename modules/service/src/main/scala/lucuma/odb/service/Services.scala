@@ -67,6 +67,9 @@ trait Services[F[_]]:
   /** The `AsterismService`. */
   def asterismService: AsterismService[F]
 
+  /** The `ChronicleService`. */
+  def chronicleService: ChronicleService[F]
+
   /** The `ExecutionEventService`. */
   def executionEventService: ExecutionEventService[F]
   
@@ -163,6 +166,7 @@ object Services:
       // instantiating anything we're not using.
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
+      lazy val chronicleService = ChronicleService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
@@ -202,6 +206,7 @@ object Services:
     def user[F[_]](using Services[F]): User = summon[Services[F]].user
     def allocationService[F[_]](using Services[F]): AllocationService[F] = summon[Services[F]].allocationService
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
+    def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
