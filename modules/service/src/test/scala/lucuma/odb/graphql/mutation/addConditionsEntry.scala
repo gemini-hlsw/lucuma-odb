@@ -97,6 +97,60 @@ class addConditionsEntry extends OdbSuite {
     )
   }
 
+  test("input validation: if azimuth is present, so is elevation") {
+    expect(
+      pi,
+      """
+        mutation {
+          addConditionsEntry(
+            input: {
+              measurement: {
+                source: OBSERVER
+                azimuth: { degrees: 20 }
+              }
+            }
+          ) {
+            conditionsEntry {
+              user {
+                id
+              }
+            }
+          }
+        }
+      """,
+      expected = Left(List(
+        "Argument 'input.measurement' is invalid: Azimuth and elevation must both be defined, or must both be empty."
+      ))
+    )
+  }
+
+  test("input validation: if elevation is present, so is azimuth") {
+    expect(
+      pi,
+      """
+        mutation {
+          addConditionsEntry(
+            input: {
+              measurement: {
+                source: OBSERVER
+                elevation: { degrees: 30 }
+              }
+            }
+          ) {
+            conditionsEntry {
+              user {
+                id
+              }
+            }
+          }
+        }
+      """,
+      expected = Left(List(
+        "Argument 'input.measurement' is invalid: Azimuth and elevation must both be defined, or must both be empty."
+      ))
+    )
+  }
+
   test("input validation: intuition can't be empty") {
     expect(
       pi,
@@ -157,6 +211,73 @@ class addConditionsEntry extends OdbSuite {
       expected = Left(List(
         "This action is restricted to staff users."
       ))
+    )
+  }
+
+    test("staff user can add an entry (minimal)") {
+    expect(
+      staff,
+      """
+        mutation {
+          addConditionsEntry(
+            input: {
+              measurement: {
+                source: OBSERVER
+                extinction: 2.34
+              }
+              intuition: {
+                seeingTrend: VARIABLE
+              }
+            }
+          ) {
+            conditionsEntry {
+              user {
+                id
+              }
+              measurement {
+                source
+                seeing { arcseconds }
+                extinction
+                wavelength { micrometers }
+                azimuth { degrees }
+                elevation { degrees }                
+              }
+              intuition {
+                seeingTrend
+                expectation {
+                  type
+                  timeframe { hours }
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "addConditionsEntry" : {
+              "conditionsEntry" : {
+                "user" : {
+                  "id" : ${staff.id}
+                },
+                "measurement" : {
+                  "source" : "OBSERVER",
+                  "seeing" : null,
+                  "extinction" : 2.34,
+                  "wavelength" : null,
+                  "azimuth" : null,
+                  "elevation" : null
+                },
+                "intuition" : {
+                  "seeingTrend" : "VARIABLE",
+                  "expectation" : null
+                }
+              }
+            }
+          }
+        """
+      )
     )
   }
 
@@ -386,5 +507,4 @@ class addConditionsEntry extends OdbSuite {
     )
   }
 
-  
 }
