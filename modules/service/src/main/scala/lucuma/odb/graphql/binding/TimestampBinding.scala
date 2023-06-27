@@ -5,8 +5,5 @@ package lucuma.odb.graphql.binding
 
 import lucuma.core.util.Timestamp
 
-import java.time.Instant
-import java.time.format.DateTimeParseException
-
 val TimestampBinding: Matcher[Timestamp] =
   StringBinding.emap(Timestamp.parse)

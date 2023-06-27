@@ -5,38 +5,18 @@ package lucuma.odb.graphql
 
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
-import cats.Applicative
-import cats.ApplicativeError
 import cats.Monoid
-import cats.data.EitherNel
-import cats.data.EitherT
-import cats.data.NonEmptyList
-import cats.data.ValidatedNel
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
-import edu.gemini.grackle.Cursor.Context
-import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.QueryCompiler.SelectElaborator
 import edu.gemini.grackle._
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.skunk.SkunkMonitor
-import edu.gemini.grackle.sql.SqlMapping
-import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.numeric.PosDouble
-import fs2.Stream
 import fs2.concurrent.Topic
-import io.circe.Json
-import io.circe.literal.*
-import io.circe.syntax.*
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
-import lucuma.odb.graphql._
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.CreateGroupResultMapping
 import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
@@ -46,26 +26,9 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
-import lucuma.odb.json.all.query.given
-import lucuma.odb.logic.Generator
-import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
-import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.AllocationService
-import lucuma.odb.service.AsterismService
-import lucuma.odb.service.GeneratorParamsService
-import lucuma.odb.service.GroupService
-import lucuma.odb.service.ObsAttachmentMetadataService
-import lucuma.odb.service.ObservationService
-import lucuma.odb.service.ObservingModeServices
-import lucuma.odb.service.ProgramService
-import lucuma.odb.service.ProposalAttachmentMetadataService
 import lucuma.odb.service.Services
-import lucuma.odb.service.SmartGcalService
-import lucuma.odb.service.TargetService
-import lucuma.odb.service.TimingWindowService
-import lucuma.odb.service.VisitService
 import lucuma.odb.util.Codecs.DomainCodec
 import natchez.Trace
 import org.tpolecat.sourcepos.SourcePos
@@ -120,6 +83,7 @@ object OdbMapping {
           with BaseMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddSequenceEventResultMapping[F]
+          with AddStepEventResultMapping[F]
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
@@ -143,13 +107,17 @@ object OdbMapping {
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with FilterTypeMetaMapping[F]
+          with GmosCcdModeMapping[F]
+          with GmosCustomMaskMapping[F]
+          with GmosDynamicMapping[F]
+          with GmosFpuMapping[F]
+          with GmosGratingConfigMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
-          with GmosNorthStepRecordMapping[F]
           with GmosNorthVisitMapping[F]
           with GmosSouthStaticMapping[F]
-          with GmosSouthStepRecordMapping[F]
           with GmosSouthVisitMapping[F]
+          with GmosStepRecordMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
           with GroupElementMapping[F]
@@ -165,6 +133,7 @@ object OdbMapping {
           with ObservationMapping[F]
           with ObservingModeMapping[F]
           with ObservationSelectResultMapping[F]
+          with OffsetMapping[F]
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
@@ -183,16 +152,17 @@ object OdbMapping {
           with ProposalAttachmentTypeMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
-          with RecordGmosNorthStepResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
-          with RecordGmosSouthStepResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
+          with RecordGmosStepResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SequenceEventMapping[F]
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
+          with StepConfigMapping[F]
+          with StepEventMapping[F]
           with SubscriptionMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
@@ -230,6 +200,7 @@ object OdbMapping {
             List(
               AddConditionsEntryResultMapping,
               AddSequenceEventResultMapping,
+              AddStepEventResultMapping,
               AirMassRangeMapping,
               AllocationMapping,
               AngleMapping,
@@ -253,10 +224,18 @@ object OdbMapping {
               DeclinationMapping,
               ElevationRangeMapping,
               FilterTypeMetaMapping,
+              GmosCcdModeMapping,
+              GmosCustomMaskMapping,
+              GmosNorthDynamicMapping,
+              GmosNorthFpuMapping,
+              GmosNorthGratingConfigMapping,
               GmosNorthLongSlitMapping,
               GmosNorthStaticMapping,
               GmosNorthStepRecordMapping,
               GmosNorthVisitMapping,
+              GmosSouthDynamicMapping,
+              GmosSouthFpuMapping,
+              GmosSouthGratingConfigMapping,
               GmosSouthLongSlitMapping,
               GmosSouthStaticMapping,
               GmosSouthStepRecordMapping,
@@ -275,6 +254,9 @@ object OdbMapping {
               ObservationMapping,
               ObservingModeMapping,
               ObservationSelectResultMapping,
+              OffsetMapping,
+              OffsetPMapping,
+              OffsetQMapping,
               ParallaxMapping,
               PartnerMetaMapping,
               PartnerSplitMapping,
@@ -302,6 +284,13 @@ object OdbMapping {
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SiderealMapping,
+              StepConfigMapping,
+              StepConfigBiasMapping,
+              StepConfigDarkMapping,
+              StepConfigGcalMapping,
+              StepConfigScienceMapping,
+              StepConfigSmartGcalMapping,
+              StepEventMapping,
               SubscriptionMapping,
               TargetEditMapping,
               TargetEnvironmentMapping,

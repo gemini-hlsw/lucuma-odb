@@ -11,9 +11,7 @@ type AddDatasetEventResult {
   event: DatasetEvent!
 }
 
-"""
-SequenceEvent creation parameters.
-"""
+"SequenceEvent creation parameters."
 input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
@@ -25,11 +23,13 @@ type AddSequenceEventResult {
   event: SequenceEvent!
 }
 
-# StepEvent creation parameters
+"StepEvent creation parameters"
 input AddStepEventInput {
-  visitId: VisitId!
-  location: StepEventLocationInput!
-  payload: StepEventPayloadInput!
+  stepId:  StepId!
+
+  sequenceType: SequenceType!
+
+  stepStage: StepStage!
 }
 
 # The result of adding a step event.
@@ -1727,34 +1727,40 @@ type Mutation {
     input: AddDatasetEventInput!
   ): AddDatasetEventResult!
 
-  # Adds a sequence event associated with the given visit. Multiple events
-  # will be produced during the execution of a sequence as it is started,
-  # paused, continued, etc.
-  #
+  """
+  Adds a sequence event associated with the given visit. Multiple events
+  will be produced during the execution of a sequence as it is started,
+  paused, continued, etc.
+  """
   addSequenceEvent(
-    # Describes the sequence event to add.  All events are associated with a
-    # particular visit (see 'record{InstrumentName}Visit').  Sequence events
-    # are further associated with an observation (i.e., its 'location').
-    # Each sequence event 'payload' identifies the sequence command that
-    # acted upon the sequence.
-    #
+
+    """
+    Describes the sequence event to add.  All events are associated with a
+    particular visit (see 'record{InstrumentName}Visit').  Sequence events
+    are further associated with an observation.  Each sequence event identifies
+    the sequence command that acted upon the sequence.
+    """
     input: AddSequenceEventInput!
+
   ): AddSequenceEventResult!
 
-  # Adds a new step event associated with the given visit. Multiple events
-  # will be produced during the execution of a single step as it
-  # transitions through configure and observe stages.
-  #
+  """
+  Adds a new step event associated with the given step. Multiple events
+  will be produced during the execution of a single step as it
+  transitions through configure and observe stages.
+  """
   addStepEvent(
-    # Describes the step event to add.  All events are associated with a
-    # particular visit (see 'record{InstrumentName}Visit'.  Step events are
-    # further associated with an observation and step (i.e., its 'location').
-    # (See also 'record{InstrumentName}Step'.) Each step event 'payload'
-    # identifies the sequence type (acquisition or science) and the stage
-    # through which the step execution is passing.
-    #
+
+    """
+    Describes the step event to add.  All events are associated with a
+    particular step (see 'record{InstrumentName}Step'. Each step event
+    identifies the sequence type (acquisition or science) and the stage
+    through which the step execution is passing.
+    """
     input: AddStepEventInput!
+
   ): AddStepEventResult!
+
   cloneObservation(
     # Parameters for cloning an existing observation
     input: CloneObservationInput!
@@ -1993,10 +1999,10 @@ input ObservationPropertiesInput {
 
 type Offset {
   # Offset in p
-  p: p!
+  p: OffsetP!
 
   # Offset in q
-  q: q!
+  q: OffsetQ!
 }
 
 """
@@ -2176,10 +2182,10 @@ input ProposalInput {
   proposalClass: ProposalClassInput
 
   # The category field may be unset by assigning a null value, or ignored by skipping it altogether
-  category: tacCategory
+  category: TacCategory
 
   # The toOActivation field is required when creating a new instance of proposal, but optional when editing
-  toOActivation: toOActivation
+  toOActivation: ToOActivation
 
   # The abstract field may be unset by assigning a null value, or ignored by skipping it altogether
   abstract: NonEmptyString
@@ -2471,6 +2477,11 @@ input StepConfigInput {
   """
   science: StepConfigScienceInput
 
+  """
+  Smart gcal creation option
+  """
+  smartGcal: StepConfigSmartGcalInput
+
 }
 
 """
@@ -2498,16 +2509,12 @@ input StepConfigScienceInput {
   guiding: GuideState
 }
 
-# StepEvent location parameters
-input StepEventLocationInput {
-  observationId: ObservationId!
-  stepId: StepId!
-}
-
-# StepEvent payload parameters
-input StepEventPayloadInput {
-  sequenceType: SequenceType!
-  stepStage: StepStage!
+"""
+SmartGcal step creation input
+"""
+input StepConfigSmartGcalInput {
+  # Smart Gcal type
+  smartGcalType: SmartGcalType!
 }
 
 # Step QA State
@@ -2945,7 +2952,7 @@ input WavelengthDitherInput {
   micrometers: BigDecimal
 }
 
-type p {
+type OffsetP {
   # p offset in µas
   microarcseconds: Long!
 
@@ -2954,84 +2961,6 @@ type p {
 
   # p offset in arcsec
   arcseconds: BigDecimal!
-}
-
-# TAC category
-enum tacCategory {
-  # tacCategory SmallBodies
-  SMALL_BODIES
-
-  # tacCategory PlanetaryAtmospheres
-  PLANETARY_ATMOSPHERES
-
-  # tacCategory PlanetarySurfaces
-  PLANETARY_SURFACES
-
-  # tacCategory SolarSystemOther
-  SOLAR_SYSTEM_OTHER
-
-  # tacCategory ExoplanetRadialVelocities
-  EXOPLANET_RADIAL_VELOCITIES
-
-  # tacCategory ExoplanetAtmospheresActivity
-  EXOPLANET_ATMOSPHERES_ACTIVITY
-
-  # tacCategory ExoplanetTransits
-  EXOPLANET_TRANSITS
-
-  # tacCategory ExoplanetHostStar
-  EXOPLANET_HOST_STAR
-
-  # tacCategory ExoplanetOther
-  EXOPLANET_OTHER
-
-  # tacCategory StellarAstrophysics
-  STELLAR_ASTROPHYSICS
-
-  # tacCategory StellarPopulations
-  STELLAR_POPULATIONS
-
-  # tacCategory StarFormation
-  STAR_FORMATION
-
-  # tacCategory GaseousAstrophysics
-  GASEOUS_ASTROPHYSICS
-
-  # tacCategory StellarRemnants
-  STELLAR_REMNANTS
-
-  # tacCategory GalacticOther
-  GALACTIC_OTHER
-
-  # tacCategory Cosmology
-  COSMOLOGY
-
-  # tacCategory ClustersOfGalaxies
-  CLUSTERS_OF_GALAXIES
-
-  # tacCategory HighZUniverse
-  HIGH_Z_UNIVERSE
-
-  # tacCategory LowZUniverse
-  LOW_Z_UNIVERSE
-
-  # tacCategory ActiveGalaxies
-  ACTIVE_GALAXIES
-
-  # tacCategory ExtragalacticOther
-  EXTRAGALACTIC_OTHER
-}
-
-# Target of opportunity activation
-enum toOActivation {
-  # toOActivation None
-  NONE
-
-  # toOActivation Standard
-  STANDARD
-
-  # toOActivation Rapid
-  RAPID
 }
 
 type AirMassRange {
@@ -4163,14 +4092,14 @@ type GmosNorthLongSlit {
 
   # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   # or else taken from defaultSpatialOffsets
-  spatialOffsets: [q!]!
+  spatialOffsets: [OffsetQ!]!
 
   # Default spatial offsets.
-  defaultSpatialOffsets: [q!]!
+  defaultSpatialOffsets: [OffsetQ!]!
 
   # Optional explicitly specified spatial q offsets. If set it overrides the
   # the default.
-  explicitSpatialOffsets: [q!]
+  explicitSpatialOffsets: [OffsetQ!]
 
   # The grating as it was initially selected.  See the `grating` field for the
   # grating that will be used in the observation.
@@ -4474,14 +4403,14 @@ type GmosSouthLongSlit {
 
   # Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   # or else taken from defaultSpatialOffsets
-  spatialOffsets: [q!]!
+  spatialOffsets: [OffsetQ!]!
 
   # Default spatial offsets.
-  defaultSpatialOffsets: [q!]!
+  defaultSpatialOffsets: [OffsetQ!]!
 
   # Optional explicitly specified spatial q offsets. If set it overrides the
   # the default.
-  explicitSpatialOffsets: [q!]
+  explicitSpatialOffsets: [OffsetQ!]
 
   # The grating as it was initially selected.  See the `grating` field for the
   # grating that will be used in the observation.
@@ -6015,66 +5944,48 @@ enum StellarLibrarySpectrum {
   M9_III
 }
 
-# Step-level events.  The execution of a single step will generate multiple events.
-type StepEvent implements ExecutionEvent {
-  # Identifies the step to which the event refers
-  location: StepEventLocation!
+"""
+Step-level events.  The execution of a single step will generate multiple events.
+"""
+type StepEvent {
 
-  # Step event data including the stage of execution through which it is passing.
-  payload: StepEventPayload!
-
-  # Event id
+  "Event id"
   id: ExecutionEventId!
 
-  # Associated visit
+  "Identifies the step to which the event refers."
+  stepId: StepId!
+
+  "Associated visit."
   visitId: VisitId!
 
-  # Observation whose execution produced this event
+  "Whether this is an acquisition or science sequence step."
+  sequenceType: SequenceType!
+
+  "Step execution stage."
+  stepStage: StepStage!
+
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  # Time at which this event was received
+  "Time at which this event was received"
   received: Timestamp!
 }
 
-# Step event location, i.e., to which step the event refers
-type StepEventLocation {
-  # Observation containing the step
-  observationId: ObservationId!
-
-  # The step id itself
-  stepId: StepId!
-}
-
-# Step event data
-type StepEventPayload {
-  # Sequence type
-  sequenceType: SequenceType!
-
-  # Step execution stage
-  stepStage: StepStage!
-}
-
-# StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+"StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
 scalar StepId
 
-# Execution stage or phase of an individual step
+"Execution stage or phase of an individual step"
 enum StepStage {
-  # StepStage END_CONFIGURE
   END_CONFIGURE
 
-  # StepStage END_OBSERVE
   END_OBSERVE
 
-  # StepStage END_STEP
   END_STEP
 
-  # StepStage START_CONFIGURE
   START_CONFIGURE
 
-  # StepStage START_OBSERVE
   START_OBSERVE
 
-  # StepStage START_STEP
   START_STEP
 }
 
@@ -7441,7 +7352,7 @@ input WhereTarget {
   name: WhereString
 }
 
-type q {
+type OffsetQ {
   # q offset in µas
   microarcseconds: Long!
 

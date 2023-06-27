@@ -4,17 +4,13 @@
 package lucuma.odb.logic
 
 import cats.MonadError
-import cats.data.NonEmptyList
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import fs2.Pipe
-import fs2.Stream
-import lucuma.core.data.Zipper
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep

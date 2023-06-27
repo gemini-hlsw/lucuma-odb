@@ -3,12 +3,7 @@
 
 package lucuma.odb.data
 
-import lucuma.core.model.GuestUser
-import lucuma.core.model.ServiceUser
-import lucuma.core.model.StandardUser
-import lucuma.core.model.User
 import lucuma.core.util.Enumerated
-
 
 sealed abstract class EditType(val tag: String) extends Product with Serializable
 

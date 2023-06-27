@@ -7,7 +7,6 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Parallax
-import lucuma.odb.graphql.util.MappingExtras
 
 import java.math.MathContext
 

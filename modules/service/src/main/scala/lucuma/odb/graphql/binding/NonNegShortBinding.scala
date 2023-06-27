@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
 import eu.timepit.refined.types.numeric.NonNegShort
 
 val NonNegShortBinding: Matcher[NonNegShort] =

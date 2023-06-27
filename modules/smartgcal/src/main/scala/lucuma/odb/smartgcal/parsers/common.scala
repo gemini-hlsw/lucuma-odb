@@ -3,21 +3,15 @@
 
 package lucuma.odb.smartgcal.parsers
 
-import cats.parse.Numbers
 import cats.parse.Parser
-import cats.parse.Parser0
 import cats.parse.Rfc5234.alpha
-import cats.parse.Rfc5234.wsp
 import cats.syntax.apply.*
-import eu.timepit.refined.types.numeric.PosBigDecimal
-import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.parser.MiscParsers.comma
 import lucuma.core.parser.MiscParsers.dash
 import lucuma.core.parser.MiscParsers.int
 import lucuma.core.parser.MiscParsers.maybeWhiteSpace
-import lucuma.core.util.TimeSpan
 
 import java.time.Instant
 import java.time.ZonedDateTime

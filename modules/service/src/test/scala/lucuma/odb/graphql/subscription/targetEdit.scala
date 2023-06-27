@@ -6,14 +6,12 @@ package subscription
 
 import cats.effect.IO
 import cats.syntax.show.*
-import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
-import lucuma.odb.graphql.mutation.createTarget
 
 import scala.concurrent.duration._
 

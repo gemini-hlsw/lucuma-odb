@@ -6,7 +6,6 @@ package input
 package sourceprofile
 
 import edu.gemini.grackle.Result
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.LineFluxValue
 import lucuma.core.math.dimensional.Measure

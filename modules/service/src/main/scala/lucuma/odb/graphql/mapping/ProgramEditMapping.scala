@@ -9,7 +9,6 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.data.EditType
 
-import table.ProgramEditTable
 import table.ProgramTable
 
 trait ProgramEditMapping[F[_]] extends ProgramTable[F]  {

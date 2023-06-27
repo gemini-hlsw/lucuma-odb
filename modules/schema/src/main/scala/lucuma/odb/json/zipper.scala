@@ -4,16 +4,12 @@
 package lucuma.odb.json
 
 import cats.Eq
-import cats.data.NonEmptyList
-import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 
@@ -26,8 +22,8 @@ trait ZipperCodec {
     Decoder.instance { c =>
       for
         list   <- c.downField("all").as[List[A]]
-        idx    <- c.downField("index").as[Int] orElse 
-                    c.downField("selected").as[A].flatMap(a => 
+        idx    <- c.downField("index").as[Int] orElse
+                    c.downField("selected").as[A].flatMap(a =>
                       list
                         .indexWhere(_ === a)
                         .some

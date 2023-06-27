@@ -6,7 +6,6 @@ package query
 
 import cats.syntax.all._
 import io.circe.literal._
-import lucuma.odb.graphql.OdbSuite
 
 class partnerMeta extends OdbSuite {
 

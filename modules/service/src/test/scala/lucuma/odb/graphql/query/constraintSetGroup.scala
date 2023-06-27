@@ -14,7 +14,6 @@ import lucuma.core.enums.SkyBackground
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.graphql.OdbSuite
 
 class constraintSetGroup extends OdbSuite {
 
@@ -42,7 +41,7 @@ class constraintSetGroup extends OdbSuite {
             }
           }
         """
-    ).map { json => 
+    ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
@@ -51,7 +50,7 @@ class constraintSetGroup extends OdbSuite {
       createProgramAs(user).flatMap { pid =>
         def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
         (
-          create2(ImageQuality.OnePointFive, SkyBackground.Bright), 
+          create2(ImageQuality.OnePointFive, SkyBackground.Bright),
           create2(ImageQuality.PointOne, SkyBackground.Bright),
           create2(ImageQuality.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
@@ -110,7 +109,7 @@ class constraintSetGroup extends OdbSuite {
                       }
                     ]
                   }
-                }             
+                }
               """
             )
           )

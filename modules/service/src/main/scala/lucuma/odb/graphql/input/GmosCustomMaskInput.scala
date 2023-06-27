@@ -7,7 +7,6 @@ package input
 import cats.syntax.parallel.*
 import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.model.sequence.gmos.GmosFpuMask.Custom
 import lucuma.odb.graphql.binding.*
 

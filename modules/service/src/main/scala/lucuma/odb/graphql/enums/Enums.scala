@@ -3,22 +3,17 @@
 
 package lucuma.odb.graphql.enums
 
-import cats.Applicative
 import cats.Monad
-import cats.data.NonEmptyMap
-import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Directive
 import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.EnumValue
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.Schema
 import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Tag
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import skunk.Session

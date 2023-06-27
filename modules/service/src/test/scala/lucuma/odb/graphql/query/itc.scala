@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package query
 
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.traverse.*
 import io.circe.literal.*
@@ -14,7 +13,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.util.TimeSpan
 
 class itc extends OdbSuite with ObservingModeSetupOperations {
 

@@ -11,7 +11,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
@@ -24,7 +23,6 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -34,7 +32,6 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services
-import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
 import lucuma.odb.smartgcal.data.Gmos.TableRow
@@ -132,7 +129,16 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                                xBin
                                yBin
                              }
-                             roi,
+                             dtax
+                             roi
+                             gratingConfig {
+                               grating
+                               order
+                               wavelength {
+                                 nanometers
+                               }
+                             }
+                             filter
                              fpu {
                                builtin
                              }
@@ -191,7 +197,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               "xBin": "TWO",
                               "yBin": "TWO"
                             },
+                            "dtax": "ZERO",
                             "roi": "CCD2",
+                            "gratingConfig": null,
+                            "filter": "G_PRIME",
                             "fpu": null
                           },
                           "stepConfig": {
@@ -215,7 +224,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               "xBin": "ONE",
                               "yBin": "ONE"
                             },
+                            "dtax": "ZERO",
                             "roi": "CENTRAL_STAMP",
+                            "gratingConfig": null,
+                            "filter": "G_PRIME",
                             "fpu": {
                               "builtin": "LONG_SLIT_0_50"
                             }
@@ -241,7 +253,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               "xBin": "ONE",
                               "yBin": "ONE"
                             },
+                            "dtax": "ZERO",
                             "roi": "CENTRAL_STAMP",
+                            "gratingConfig": null,
+                            "filter": "G_PRIME",
                             "fpu": {
                               "builtin": "LONG_SLIT_0_50"
                             }
@@ -295,6 +310,17 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                        }
                        possibleFuture {
                          observeClass
+                         steps {
+                           instrumentConfig {
+                             gratingConfig {
+                               grating
+                               order
+                               wavelength {
+                                 nanometers
+                               }
+                             }
+                           }
+                         }
                        }
                        hasMore
                      }
@@ -315,7 +341,31 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                     },
                     "possibleFuture": [
                       {
-                        "observeClass": "SCIENCE"
+                        "observeClass": "SCIENCE",
+                        "steps" : [
+                          {
+                            "instrumentConfig" : {
+                              "gratingConfig" : {
+                                "grating" : "R831_G5302",
+                                "order" : "ONE",
+                                "wavelength" : {
+                                  "nanometers" : 505.000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig" : {
+                              "gratingConfig" : {
+                                "grating" : "R831_G5302",
+                                "order" : "ONE",
+                                "wavelength" : {
+                                  "nanometers" : 505.000
+                                }
+                              }
+                            }
+                          }
+                        ]
                       }
                     ],
                     "hasMore": true

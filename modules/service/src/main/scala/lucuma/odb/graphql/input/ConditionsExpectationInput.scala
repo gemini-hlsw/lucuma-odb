@@ -5,16 +5,8 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.data.NonEmptyList
 import cats.syntax.all.*
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 

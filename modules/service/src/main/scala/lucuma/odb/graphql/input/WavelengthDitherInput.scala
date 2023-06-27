@@ -4,19 +4,11 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.either.*
 import cats.syntax.parallel.*
-import coulomb.Quantity
-import coulomb.syntax.withUnit
 import edu.gemini.grackle.Result
-import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.optics.Format
 import lucuma.odb.graphql.binding.*
-
-import java.math.RoundingMode
-import scala.util.control.Exception.*
 
 object WavelengthDitherInput {
 

@@ -18,8 +18,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 
 class cloneObservation extends OdbSuite {
-  import createTarget.FullTargetGraph
-
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
   lazy val validUsers = List(pi, pi2)
 

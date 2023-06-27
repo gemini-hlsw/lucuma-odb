@@ -12,7 +12,7 @@ trait AddSequenceEventResultMapping[F[_]] extends SequenceEventTable[F] {
     ObjectMapping(
       tpe = AddSequenceEventResultType,
       fieldMappings = List(
-        SqlField("id", SequenceEventTable.Id, key = true),
+        SqlField("id", SequenceEventTable.Id, key = true, hidden = true),
         SqlObject("event")
       )
     )

@@ -8,9 +8,7 @@ package mapping
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalTable
-import lucuma.odb.graphql.util.MappingExtras
 
-import table.TargetView
 import table.ProgramTable
 
 trait ProposalMapping[F[_]] extends PartnerSplitTable[F] with ProgramTable[F] with ProposalTable[F] {

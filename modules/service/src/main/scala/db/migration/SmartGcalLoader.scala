@@ -7,7 +7,6 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.foldable.*
-import cats.syntax.traverse.*
 import fs2.Pipe
 import fs2.Stream
 import org.postgresql.core.BaseConnection
