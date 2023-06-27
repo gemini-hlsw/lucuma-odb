@@ -44,7 +44,12 @@ object ConditionsMeasurementInput {
       ) =>
         (rSource, rSeeing, rExtinction, rWavelength, rAzimuth, rElevation).parTupled.flatMap { (source, seeing, extinction, wavelength, azimuth, elevation) =>
           if List(seeing, extinction, wavelength, azimuth, elevation).exists(_.isDefined) then
-            Result(ConditionsMeasurementInput(source, seeing, extinction, wavelength, azimuth, elevation))
+            (azimuth, elevation) match {
+              case (None, None) | (Some(_), Some(_)) =>
+                Result(ConditionsMeasurementInput(source, seeing, extinction, wavelength, azimuth, elevation))
+              case _ =>
+                Result.failure("Azimuth and elevation must both be defined, or must both be empty.")                  
+            }
           else
             Result.failure("At least one of seeing, wavelength, extinction, azimuth, and elevation must be defined.")                  
         }

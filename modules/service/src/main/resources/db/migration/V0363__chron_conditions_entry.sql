@@ -44,9 +44,17 @@ create table t_chron_conditions_entry (
 
   c_intuition_seeing_trend     d_tag references t_seeing_trend (c_tag),
   c_intuition_expectation      d_tag references t_conditions_expectation_type (c_tag),
-  c_intuition_timespan         interval(6)
+  c_intuition_timespan         interval(6),
 
-  -- TODO: check constraints
+  -- at least one data field must be defined, and el/az must be defined together
+  check(
+    (
+      num_nulls(c_measurement_source, c_measurement_seeing, c_measurement_extinction_millimags, c_measurement_wavelength, c_measurement_azimuth, c_measurement_elevation) < 6 OR
+      num_nulls(c_intuition_expectation, c_intuition_timespan, c_intuition_seeing_trend) < 3 
+    ) AND (
+      (c_measurement_azimuth is null) = (c_measurement_elevation is null)
+    )
+  )
 
 );
 
