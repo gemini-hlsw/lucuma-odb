@@ -26,7 +26,7 @@ object Extinction:
 
   val FromMags: Format[Double, Extinction] =
     Format(
-      d => if d.isNaN then None else FromMillimags.getOption(BigDecimal(d).bigDecimal.movePointRight(2).shortValue),
+      d => if d.isNaN || d.isInfinite then None else FromMillimags.getOption(BigDecimal(d).bigDecimal.movePointRight(2).shortValue),
       e => BigDecimal(FromMillimags.reverseGet(e)).bigDecimal.movePointLeft(2).doubleValue 
     )
 
