@@ -288,24 +288,6 @@ input ConditionsExpectationInput {
   timeframe: TimeSpanInput!
 }
 
-enum SeeingTrend {
-  GETTING_BETTER,
-  STAYING_THE_SAME,
-  GETTING_WORSE,
-  VARIABLE
-}
-
-enum ConditionsMeasurementSource {
-  OBSERVER
-}
-
-enum ConditionsExpectationType {
-  THIN_CLOUDS,
-  THICK_CLOUDS,
-  FOG,
-  CLEAR_SKIES
-}
-
 type AddConditionsEntryResult {
   conditionsEntry: ConditionsEntry!
 }
