@@ -220,7 +220,7 @@ class addConditionsEntry extends OdbSuite {
                     "seeing" : {
                       "arcseconds" : 0.4
                     },
-                    "extinction" : 2,
+                    "extinction" : 2.34,
                     "wavelength" : {
                       "micrometers" : 1.000000
                     },
@@ -301,7 +301,7 @@ class addConditionsEntry extends OdbSuite {
                   "seeing" : {
                     "arcseconds" : 0.4
                   },
-                  "extinction" : 2,
+                  "extinction" : 2.34,
                   "wavelength" : {
                     "micrometers" : 1.000000
                   },

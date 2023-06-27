@@ -9,6 +9,8 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.optics.Format
 import lucuma.core.optics.SplitMono
 import monocle.Prism
+import io.circe.Encoder
+import java.math.MathContext
 
 /** Extinction in mags, a non-negative number with two decimal points of precision, in [0.00, 327.67]. */
 opaque type Extinction = NonNegShort
@@ -21,11 +23,17 @@ object Extinction:
   val FromMillimags: Prism[Short, Extinction] =
     Prism((s: Short) => NonNegShort.from(s).toOption)(_.value)
 
-  val FromMags: Format[Float, Extinction] =
-    Format.fromPrism(FromMillimags).imapA(_.toFloat, _.toShort)
+  val FromMags: Format[Double, Extinction] =
+    Format.fromPrism(FromMillimags).imapA(
+      s => BigDecimal(s).bigDecimal.movePointLeft(2).doubleValue, 
+      d => BigDecimal(d).bigDecimal.movePointRight(2).shortValue
+    )
 
   given Order[Extinction] =
     Order.by(_.value)
+
+  given Encoder[Extinction] =
+    Encoder[Double].contramap(FromMags.reverseGet)
 
   extension (e: Extinction)
     def underlying: NonNegShort = e

@@ -21,7 +21,7 @@ trait ChronConditionsEntryView[F[_]] extends BaseMapping[F] {
         val SyntheticId = col("c_measurement_seeing_id", int8.embedded)
         val Value       = col("c_measurement_seeing", angle_µas.embedded)
       }
-      val ExtinctionPct = col("c_measurement_extinction_pct", int_percent.opt)
+      val Extinction = col("c_measurement_extinction_millimags", extinction.opt)
       object Pointing {
         val SyntheticId  = col("c_measurement_pointing_id", int8.embedded)
         val Azimuth      = col("c_measurement_azimuth", angle_µas.embedded)

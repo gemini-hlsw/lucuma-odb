@@ -20,7 +20,7 @@ trait ConditionsMeasurementMapping[F[_]] extends ChronConditionsEntryView[F] {
         SqlField("synthetic-id", ChronConditionsEntryView.Measurement.SyntheticId, key = true, hidden = true),
         SqlField("source", ChronConditionsEntryView.Measurement.Source),
         SqlObject("seeing"),
-        SqlField("extinction", ChronConditionsEntryView.Measurement.ExtinctionPct),
+        SqlField("extinction", ChronConditionsEntryView.Measurement.Extinction),
         SqlObject("wavelength"),
         SqlObject("azimuth"),
         SqlObject("elevation"),

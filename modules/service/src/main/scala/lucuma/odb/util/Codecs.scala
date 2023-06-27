@@ -57,6 +57,7 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
+import lucuma.odb.data.Extinction
 
 
 // Codecs for some atomic types.
@@ -461,6 +462,9 @@ trait Codecs {
   val void: Codec[Unit] =
     val rightUnit = Right(())
     Codec.simple(_ => "", _ => rightUnit, Type.void)
+
+  val extinction: Codec[Extinction] =
+    int2_nonneg.imap(Extinction.apply)(_.underlying)
 
 }
 

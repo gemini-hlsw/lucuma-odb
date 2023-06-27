@@ -8,5 +8,5 @@ import lucuma.odb.graphql.binding.FloatBinding
 
 val ExtinctionBinding =
   FloatBinding.emap { d =>
-    Extinction.FromMags.getOption(d.toFloat).toRight(s"Invalid Extinction: $d")
+    Extinction.FromMags.getOption(d).toRight(s"Invalid Extinction: $d")
   }
