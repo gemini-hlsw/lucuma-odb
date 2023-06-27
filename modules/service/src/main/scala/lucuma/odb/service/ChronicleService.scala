@@ -35,7 +35,7 @@ object ChronicleService {
         INSERT INTO t_chron_conditions_entry (
           c_measurement_source,        
           c_measurement_seeing,        
-          c_measurement_extinction_pct,
+          c_measurement_extinction_millimags,
           c_measurement_wavelength,    
           c_measurement_azimuth,       
           c_measurement_elevation,     
@@ -45,7 +45,7 @@ object ChronicleService {
         ) VALUES (
           ${tag.opt},
           ${angle_µas.opt},
-          ${int2.opt},
+          ${extinction.opt},
           ${wavelength_pm.opt},
           ${angle_µas.opt},
           ${angle_µas.opt},
@@ -58,15 +58,15 @@ object ChronicleService {
         val omeas = cie.value.left
         val ointu = cie.value.right
 
-        omeas.map(_.source)                                 *:
-        omeas.flatMap(_.seeing)                             *:
-        omeas.flatMap(_.extinction.map(_.underlying.value)) *:
-        omeas.flatMap(_.wavelength)                         *:
-        omeas.flatMap(_.azimuth)                            *:
-        omeas.flatMap(_.elevation)                          *:
-        ointu.flatMap(_.value.left.map(_.tpe))              *:
-        ointu.flatMap(_.value.left.map(_.timespan))         *:
-        ointu.flatMap(_.value.right)                        *:
+        omeas.map(_.source)                         *:
+        omeas.flatMap(_.seeing)                     *:
+        omeas.flatMap(_.extinction)                 *:
+        omeas.flatMap(_.wavelength)                 *:
+        omeas.flatMap(_.azimuth)                    *:
+        omeas.flatMap(_.elevation)                  *:
+        ointu.flatMap(_.value.left.map(_.tpe))      *:
+        ointu.flatMap(_.value.left.map(_.timespan)) *:
+        ointu.flatMap(_.value.right)                *:
         EmptyTuple
 
       }

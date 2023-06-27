@@ -36,9 +36,9 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.Extinction
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -59,7 +59,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[Existence](ExistenceType),
-      LeafMapping[IntPercent](ExtinctionType),
+      LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[GcalArc](GcalArcType),

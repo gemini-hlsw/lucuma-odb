@@ -35,12 +35,12 @@ create table t_chron_conditions_entry (
   c_user            d_user_id   null references t_user(c_user_id) default current_setting('lucuma.user', true),
   c_transaction_id  xid8        not null default pg_current_xact_id(),
 
-  c_measurement_source         d_tag references t_conditions_source (c_tag),
-  c_measurement_seeing         d_angle_µas,
-  c_measurement_extinction_pct d_int_percentage,
-  c_measurement_wavelength     d_wavelength_pm,
-  c_measurement_azimuth        d_angle_µas,
-  c_measurement_elevation      d_angle_µas,
+  c_measurement_source               d_tag references t_conditions_source (c_tag),
+  c_measurement_seeing               d_angle_µas,
+  c_measurement_extinction_millimags int2,
+  c_measurement_wavelength           d_wavelength_pm,
+  c_measurement_azimuth              d_angle_µas,
+  c_measurement_elevation            d_angle_µas,
 
   c_intuition_seeing_trend     d_tag references t_seeing_trend (c_tag),
   c_intuition_expectation      d_tag references t_conditions_expectation_type (c_tag),
@@ -53,7 +53,7 @@ create table t_chron_conditions_entry (
 
 create view v_chron_conditions_entry as
   select *,
-  case when num_nulls(c_measurement_source, c_measurement_seeing, c_measurement_extinction_pct, c_measurement_wavelength, c_measurement_azimuth, c_measurement_elevation) < 6 then c_chron_id end as c_measurement_id,
+  case when num_nulls(c_measurement_source, c_measurement_seeing, c_measurement_extinction_millimags, c_measurement_wavelength, c_measurement_azimuth, c_measurement_elevation) < 6 then c_chron_id end as c_measurement_id,
   case when num_nulls(c_intuition_expectation, c_intuition_timespan, c_intuition_seeing_trend) < 3 then c_chron_id end as c_intuition_id,
   case when num_nulls(c_intuition_expectation, c_intuition_timespan) < 2 then c_chron_id end as c_expectation_id,
   case when c_measurement_wavelength is not null then c_chron_id end as c_wavelength_id,
