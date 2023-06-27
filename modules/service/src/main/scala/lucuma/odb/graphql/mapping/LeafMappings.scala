@@ -33,10 +33,10 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.Extinction
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 

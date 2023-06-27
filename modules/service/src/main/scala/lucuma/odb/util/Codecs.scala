@@ -38,6 +38,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -57,7 +58,6 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import lucuma.odb.data.Extinction
 
 
 // Codecs for some atomic types.
