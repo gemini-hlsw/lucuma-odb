@@ -15,7 +15,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Cogen
 
 class ExtinctionSuite extends DisciplineSuite with ArbitraryInstances {
-
+  
   given Arbitrary[Extinction] =
     Arbitrary(Arbitrary.arbitrary[NonNegShort].map(Extinction.apply))
 
