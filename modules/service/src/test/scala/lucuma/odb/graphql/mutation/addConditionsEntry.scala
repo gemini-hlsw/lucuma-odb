@@ -269,6 +269,21 @@ class addConditionsEntry extends OdbSuite {
               user {
                 id
               }
+              measurement {
+                source
+                seeing { arcseconds }
+                extinction
+                wavelength { micrometers }
+                azimuth { degrees }
+                elevation { degrees }                
+              }
+              intuition {
+                seeingTrend
+                expectation {
+                  type
+                  timeframe { hours }
+                }
+              }
             }
           }
         }
@@ -280,7 +295,24 @@ class addConditionsEntry extends OdbSuite {
               "conditionsEntry" : {
                 "user" : {
                   "id" : ${staff.id}
-                }
+                },
+                "measurement" : {
+                  "source" : "OBSERVER",
+                  "seeing" : {
+                    "arcseconds" : 0.4
+                  },
+                  "extinction" : 2,
+                  "wavelength" : {
+                    "micrometers" : 1.000000
+                  },
+                  "azimuth" : {
+                    "degrees" : 20
+                  },
+                  "elevation" : {
+                    "degrees" : 30
+                  }
+                },
+                "intuition" : null
               }
             }
           }
@@ -309,6 +341,21 @@ class addConditionsEntry extends OdbSuite {
               user {
                 id
               }
+              measurement {
+                source
+                seeing { arcseconds }
+                extinction
+                wavelength { micrometers }
+                azimuth { degrees }
+                elevation { degrees }                
+              }
+              intuition {
+                seeingTrend
+                expectation {
+                  type
+                  timeframe { hours }
+                }
+              }
             }
           }
         }
@@ -320,6 +367,16 @@ class addConditionsEntry extends OdbSuite {
               "conditionsEntry" : {
                 "user" : {
                   "id" : ${staff.id}
+                },
+                "measurement" : null,
+                "intuition" : {
+                  "seeingTrend" : "VARIABLE",
+                  "expectation" : {
+                    "type" : "THIN_CLOUDS",
+                    "timeframe" : {
+                      "hours" : 1.500000
+                    }
+                  }
                 }
               }
             }
