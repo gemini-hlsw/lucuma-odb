@@ -21,6 +21,7 @@ import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -35,6 +36,7 @@ import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -79,6 +81,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
+      AddConditionsEntry,
       AddSequenceEvent,
       AddStepEvent,
       CloneObservation,
@@ -186,6 +189,21 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   // Field definitions
+
+  private lazy val AddConditionsEntry: MutationField =
+    MutationField("addConditionsEntry", ConditionsEntryInput.Binding) { (input, child) =>
+      if user.role.access < Access.Staff then {
+        Result.failure(s"This action is restricted to staff users.").pure[F]
+      } else {
+        services.useTransactionally {
+          chronicleService.addConditionsEntry(input).map { id =>
+            Result(
+              Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
+            )
+          }
+        }  
+      }
+    }
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>

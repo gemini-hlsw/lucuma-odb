@@ -81,6 +81,7 @@ object OdbMapping {
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
+          with AddConditionsEntryResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddStepEventResultMapping[F]
           with AirMassRangeMapping[F]
@@ -91,6 +92,10 @@ object OdbMapping {
           with CatalogInfoMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
+          with ConditionsEntryMapping[F]
+          with ConditionsExpectationMapping[F]
+          with ConditionsIntuitionMapping[F]
+          with ConditionsMeasurementMapping[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
@@ -193,6 +198,7 @@ object OdbMapping {
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
             List(
+              AddConditionsEntryResultMapping,
               AddSequenceEventResultMapping,
               AddStepEventResultMapping,
               AirMassRangeMapping,
@@ -203,6 +209,10 @@ object OdbMapping {
               CatalogInfoMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
+              ConditionsEntryMapping,
+              ConditionsExpectationMapping,
+              ConditionsIntuitionMapping,
+              ConditionsMeasurementMapping,
               ConstraintSetGroupMapping,
               ConstraintSetGroupSelectResultMapping,
               ConstraintSetMapping,

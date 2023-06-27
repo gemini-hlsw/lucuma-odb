@@ -216,6 +216,89 @@ input ConstraintSetInput {
   elevationRange: ElevationRangeInput
 }
 
+
+
+
+
+
+
+
+scalar ChronicleId
+scalar TransactionId
+
+interface ChronicleEntry {
+  id: ChronicleId!
+  transactionId: TransactionId
+  user: User
+  timestamp: Timestamp!
+}
+
+type ConditionsEntry { # implements ChronicleEntry
+  id: ChronicleId!
+  transactionId: TransactionId
+  user: User
+  timestamp: Timestamp!
+  measurement: ConditionsMeasurement
+  intuition: ConditionsIntuition
+}
+
+input ConditionsEntryInput {
+  measurement: ConditionsMeasurementInput
+  intuition: ConditionsIntuitionInput
+}
+
+"Non-negative floating-point value."
+scalar Extinction
+
+type ConditionsMeasurement {
+  source:     ConditionsMeasurementSource!
+  seeing:     Angle
+  extinction: Extinction
+  wavelength: Wavelength
+  azimuth:    Angle
+  elevation:  Angle
+}
+
+input ConditionsMeasurementInput {
+  source:     ConditionsMeasurementSource!
+  seeing:     AngleInput
+  extinction: Extinction
+  wavelength: WavelengthInput
+  azimuth:    AngleInput
+  elevation:  AngleInput
+}
+
+type ConditionsIntuition {
+  expectation: ConditionsExpectation
+  seeingTrend: SeeingTrend
+}
+
+input ConditionsIntuitionInput {
+  expectation: ConditionsExpectationInput
+  seeingTrend: SeeingTrend
+}
+
+type ConditionsExpectation {
+  type: ConditionsExpectationType!
+  timeframe: TimeSpan!
+}
+
+input ConditionsExpectationInput {
+  type: ConditionsExpectationType!
+  timeframe: TimeSpanInput!
+}
+
+type AddConditionsEntryResult {
+  conditionsEntry: ConditionsEntry!
+}
+
+
+
+
+
+
+
+
 # Absolute coordinates relative base epoch
 input CoordinatesInput {
   ra: RightAscensionInput
@@ -1621,6 +1704,13 @@ enum MosPreImaging {
 }
 
 type Mutation {
+
+  # Logs  observing conditions to the Chronicle. This operation is permitted only for staff and
+  # service users.
+  addConditionsEntry(
+    input: ConditionsEntryInput
+  ): AddConditionsEntryResult!
+
   # Adds a new dataset event associated with the given visit.  The
   # generation of a single dataset will produce multiple events as it
   # transitions through the observe, readout and write stages.

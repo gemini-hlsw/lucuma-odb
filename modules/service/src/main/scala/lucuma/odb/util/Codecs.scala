@@ -34,6 +34,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -462,6 +463,9 @@ trait Codecs {
   val void: Codec[Unit] =
     val rightUnit = Right(())
     Codec.simple(_ => "", _ => rightUnit, Type.void)
+
+  val extinction: Codec[Extinction] =
+    int2_nonneg.imap(Extinction.apply)(_.underlying)
 
 }
 
