@@ -6,10 +6,11 @@ package lucuma.odb.data
 import cats.kernel.Order
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.Encoder
 import lucuma.core.optics.Format
 import lucuma.core.optics.SplitMono
 import monocle.Prism
-import io.circe.Encoder
+
 import java.math.MathContext
 
 /** Extinction in mags, a non-negative number with two decimal points of precision, in [0.00, 327.67]. */
