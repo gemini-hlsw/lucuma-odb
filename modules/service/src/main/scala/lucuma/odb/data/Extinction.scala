@@ -4,16 +4,16 @@
 package lucuma.odb.data
 
 import cats.kernel.Order
-import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import io.circe.Decoder
 import io.circe.Encoder
 import lucuma.core.optics.Format
-import lucuma.core.optics.SplitMono
 import monocle.Prism
 
-import java.math.MathContext
-
-/** Extinction in mags, a non-negative number with two decimal points of precision, in [0.00, 327.67]. */
+/** 
+ * Extinction in mags, a non-negative number with two decimal points of precision, 
+ * in [0.00, 327.67].
+ */
 opaque type Extinction = NonNegShort
 
 object Extinction:
@@ -25,9 +25,9 @@ object Extinction:
     Prism((s: Short) => NonNegShort.from(s).toOption)(_.value)
 
   val FromMags: Format[Double, Extinction] =
-    Format.fromPrism(FromMillimags).imapA(
-      s => BigDecimal(s).bigDecimal.movePointLeft(2).doubleValue, 
-      d => BigDecimal(d).bigDecimal.movePointRight(2).shortValue
+    Format(
+      d => if d.isNaN then None else FromMillimags.getOption(BigDecimal(d).bigDecimal.movePointRight(2).shortValue),
+      e => BigDecimal(FromMillimags.reverseGet(e)).bigDecimal.movePointLeft(2).doubleValue 
     )
 
   given Order[Extinction] =
@@ -35,6 +35,9 @@ object Extinction:
 
   given Encoder[Extinction] =
     Encoder[Double].contramap(FromMags.reverseGet)
+
+  given Decoder[Extinction] =
+    Decoder[Double].emap(d => FromMags.getOption(d).toRight(s"Invalid extinction: $d"))
 
   extension (e: Extinction)
     def underlying: NonNegShort = e

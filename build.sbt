@@ -128,6 +128,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.450"                 % Test,
+      "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
