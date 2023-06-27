@@ -11,12 +11,12 @@ import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
 
-object ConditionsSourceEnumType {
+object ConditionsMeasurementSourceEnumType {
 
   def fetch[F[_]: Functor](s: Session[F]): F[EnumType] =
     s.execute(sql"select c_tag, c_name from t_conditions_source order by c_tag".query(varchar ~ varchar)).map { elems =>
       EnumType(
-        "ConditionsSource",
+        "ConditionsMeasurementSource",
         Some("Enumerated type of sources for observed conditions."),
         elems.map { case (tag, desc) => EnumValue(tag.toUpperCase, Some(desc)) }
       )
