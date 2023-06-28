@@ -12,6 +12,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
@@ -25,6 +26,7 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.logic.Itc
 import lucuma.odb.service.Services
@@ -42,6 +44,9 @@ trait ObservationMapping[F[_]]
      with TimingWindowView[F]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F] {
+
+  private val UseCacheParam   = "useCache"
+  private val UseCacheDefault = true
 
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
@@ -98,36 +103,51 @@ trait ObservationMapping[F[_]]
               OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
             )
           )
+
+        case Select("itc", List(
+          BooleanBinding.Option("useCache", rUseCache)
+        ), child) =>
+          rUseCache.map { useCache =>
+            Environment(
+              Env(UseCacheParam -> useCache.getOrElse(UseCacheDefault)),
+              Select("itc", Nil, child)
+            )
+          }
       }
     )
 
   def itcQueryHandler: EffectHandler[F] =
     new EffectHandler[F] {
-      private def extractIds(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id)]] =
+      private def extractIds(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Boolean)]] =
         queries.traverse { case (_, cursor) =>
           for {
             p <- cursor.fieldAs[Program.Id]("programId")
             o <- cursor.fieldAs[Observation.Id]("id")
-          } yield (p, o)
+            c <- cursor.fullEnv.getR[Boolean](UseCacheParam)
+          } yield (p, o, c)
         }
 
-      private def callItc(pid: Program.Id, oid: Observation.Id): F[Result[(Observation.Id, Itc.ResultSet)]] =
+      private def callItc(
+        pid:      Program.Id,
+        oid:      Observation.Id,
+        useCache: Boolean
+      ): F[Result[((Observation.Id, Boolean), Itc.ResultSet)]] =
         services.useTransactionally {
           itc(itcClient)
-            .lookup(pid, oid, useCache = true)
+            .lookup(pid, oid, useCache)
             .map {
               case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-              case Right(resultSet) => (oid, resultSet).success
+              case Right(resultSet) => ((oid, useCache), resultSet).success
             }
         }
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
         (for {
           ids <- ResultT(extractIds(queries).pure[F])
-          itc <- ids.distinct.traverse { case (pid, oid) => ResultT(callItc(pid, oid)) }
+          itc <- ids.distinct.traverse { case (pid, oid, useCache) => ResultT(callItc(pid, oid, useCache)) }
         } yield
           ids
-            .flatMap { case (_, oid) => itc.find(_._1 === oid).map(_._2).toList }
+            .flatMap { case (_, oid, useCache) => itc.find(_._1 === (oid, useCache)).map(_._2).toList }
             .zip(queries)
             .map { case (itcResultSet, (child, parentCursor)) =>
               val itc: Json      = Json.fromFields(List("itc" -> itcResultSet.asJson))

@@ -96,6 +96,59 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("success, one target -- no cache") {
+    setup1.flatMap { case (_, oid, tid) =>
+      expect(
+        user = user,
+        query =
+          s"""
+            query {
+              observation(observationId: "$oid") {
+                id
+                itc(useCache: false) {
+                  result {
+                    targetId
+                    exposureTime {
+                      seconds
+                    }
+                    exposures
+                    signalToNoise
+                  }
+                  all {
+                    targetId
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+               "observation": {
+                 "id": $oid,
+                 "itc": {
+                   "result": {
+                     "targetId": $tid,
+                     "exposureTime": {
+                       "seconds": 11.000000
+                     },
+                     "exposures": ${FakeItcResultNoCache.exposures.value},
+                     "signalToNoise": ${FakeItcResultNoCache.signalToNoise.toBigDecimal}
+                   },
+                   "all": [
+                     {
+                       "targetId": $tid
+                     }
+                   ]
+                 }
+               }
+            }
+          """
+        )
+      )
+    }
+  }
+
   test("success, two targets") {
     setup2.flatMap { case (_, oid, tid0, tid1) =>
       expect(
