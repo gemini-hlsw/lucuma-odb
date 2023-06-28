@@ -25,6 +25,7 @@ import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.Group
 import lucuma.core.model.*
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.Enumerated
@@ -34,6 +35,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -146,6 +148,9 @@ trait Codecs {
       ldt => Timestamp.FromLocalDateTime.getOption(ldt).toRight(s"Invalid Timestamp: $ldt"))(
       _.toLocalDateTime
     )
+
+  val dataset_stage: Codec[DatasetStage] =
+    enumerated(Type("e_dataset_stage"))
 
   val declination: Codec[Declination] =
     angle_µas.eimap(
@@ -412,6 +417,16 @@ trait Codecs {
      elevation_range
     ).to[ConstraintSet]
 
+  val dataset_id: Codec[Dataset.Id] =
+    (step_id *: int2_nonneg).to[Dataset.Id]
+
+  val dataset_filename: Codec[Dataset.Filename] =
+    (site *: date *: pos_int).eimap { case (s, d, p) =>
+      Dataset.Filename.from(s, d, p).toRight(s"Unsupported date: $d")
+    } { f =>
+      (f.site, f.localDate, f.index)
+    }
+
   val offset: Codec[Offset] =
     (angle_µas *: angle_µas).imap { (p, q) =>
       Offset(Offset.P(p), Offset.Q(q))
@@ -462,6 +477,9 @@ trait Codecs {
   val void: Codec[Unit] =
     val rightUnit = Right(())
     Codec.simple(_ => "", _ => rightUnit, Type.void)
+
+  val extinction: Codec[Extinction] =
+    int2_nonneg.imap(Extinction.apply)(_.underlying)
 
 }
 

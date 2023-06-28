@@ -7,11 +7,12 @@ package mapping
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.util.MappingExtras
 
 
-trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
+trait AngleMapping[F[_]] extends ObservationView[F] with ChronConditionsEntryView[F] with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
   private val µPerSec: Long   = 1000L * µPerMilli
@@ -53,6 +54,9 @@ trait AngleMapping[F[_]] extends ObservationView[F] with MappingExtras[F]  {
       List(
         PosAngleConstraintType / "angle"                        -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
         SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(Spectroscopy.FocalPlaneAngle.SyntheticId, Spectroscopy.FocalPlaneAngle.Value),
+        ConditionsMeasurementType / "seeing"                    -> angleMapping(ChronConditionsEntryView.Measurement.Seeing.SyntheticId, ChronConditionsEntryView.Measurement.Seeing.Value),
+        ConditionsMeasurementType / "elevation"                 -> angleMapping(ChronConditionsEntryView.Measurement.Pointing.SyntheticId, ChronConditionsEntryView.Measurement.Pointing.Elevation),
+        ConditionsMeasurementType / "azimuth"                   -> angleMapping(ChronConditionsEntryView.Measurement.Pointing.SyntheticId, ChronConditionsEntryView.Measurement.Pointing.Azimuth),
       )
     )
 }

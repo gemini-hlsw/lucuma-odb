@@ -1,14 +1,23 @@
-# DatasetEvent creation parameters
+"DatasetEvent creation parameters."
 input AddDatasetEventInput {
-  visitId: VisitId!
-  location: DatasetIdInput!
-  payload: DatasetEventPayloadInput!
+
+  "Dataset id"
+  datasetId: DatasetIdInput!
+
+  "Dataset execution stage."
+  datasetStage: DatasetStage!
+
+  "Dataset filename, if known."
+  filename: DatasetFilename
+
 }
 
-# The result of adding a dataset event.
+"The result of adding a dataset event."
 type AddDatasetEventResult {
-  # The new dataset event that was added.
+
+  "The new dataset event that was added."
   event: DatasetEvent!
+
 }
 
 "SequenceEvent creation parameters."
@@ -17,13 +26,15 @@ input AddSequenceEventInput {
   command: SequenceCommand!
 }
 
-# The result of adding a sequence event.
+"The result of adding a sequence event."
 type AddSequenceEventResult {
-  # The new sequence event that was added.
+
+  "The new sequence event that was added."
   event: SequenceEvent!
+
 }
 
-"StepEvent creation parameters"
+"StepEvent creation parameters."
 input AddStepEventInput {
   stepId:  StepId!
 
@@ -32,10 +43,12 @@ input AddStepEventInput {
   stepStage: StepStage!
 }
 
-# The result of adding a step event.
+"The result of adding a step event."
 type AddStepEventResult {
-  # The new step event that was added.
+
+  "The new step event that was added."
   event: StepEvent!
+
 }
 
 # Air mass range creation and edit parameters
@@ -216,6 +229,75 @@ input ConstraintSetInput {
   elevationRange: ElevationRangeInput
 }
 
+scalar ChronicleId
+scalar TransactionId
+
+interface ChronicleEntry {
+  id: ChronicleId!
+  transactionId: TransactionId
+  user: User
+  timestamp: Timestamp!
+}
+
+type ConditionsEntry { # implements ChronicleEntry
+  id: ChronicleId!
+  transactionId: TransactionId
+  user: User
+  timestamp: Timestamp!
+  measurement: ConditionsMeasurement
+  intuition: ConditionsIntuition
+}
+
+input ConditionsEntryInput {
+  measurement: ConditionsMeasurementInput
+  intuition: ConditionsIntuitionInput
+}
+
+"Non-negative floating-point value."
+scalar Extinction
+
+type ConditionsMeasurement {
+  source:     ConditionsMeasurementSource!
+  seeing:     Angle
+  extinction: Extinction
+  wavelength: Wavelength
+  azimuth:    Angle
+  elevation:  Angle
+}
+
+input ConditionsMeasurementInput {
+  source:     ConditionsMeasurementSource!
+  seeing:     AngleInput
+  extinction: Extinction
+  wavelength: WavelengthInput
+  azimuth:    AngleInput
+  elevation:  AngleInput
+}
+
+type ConditionsIntuition {
+  expectation: ConditionsExpectation
+  seeingTrend: SeeingTrend
+}
+
+input ConditionsIntuitionInput {
+  expectation: ConditionsExpectationInput
+  seeingTrend: SeeingTrend
+}
+
+type ConditionsExpectation {
+  type: ConditionsExpectationType!
+  timeframe: TimeSpan!
+}
+
+input ConditionsExpectationInput {
+  type: ConditionsExpectationType!
+  timeframe: TimeSpanInput!
+}
+
+type AddConditionsEntryResult {
+  conditionsEntry: ConditionsEntry!
+}
+
 # Absolute coordinates relative base epoch
 input CoordinatesInput {
   ra: RightAscensionInput
@@ -261,12 +343,6 @@ type CreateTargetResult {
 type Dark implements StepConfig {
   # Step type
   stepType: StepType!
-}
-
-# DatasetEvent payload parameters
-input DatasetEventPayloadInput {
-  datasetStage: DatasetStage!
-  filename: DatasetFilename
 }
 
 # Editable dataset properties
@@ -1621,20 +1697,28 @@ enum MosPreImaging {
 }
 
 type Mutation {
-  # Adds a new dataset event associated with the given visit.  The
-  # generation of a single dataset will produce multiple events as it
-  # transitions through the observe, readout and write stages.
-  #
+
+  # Logs  observing conditions to the Chronicle. This operation is permitted only for staff and
+  # service users.
+  addConditionsEntry(
+    input: ConditionsEntryInput
+  ): AddConditionsEntryResult!
+
+  """
+  Adds a new dataset event associated with the given visit.  The
+  generation of a single dataset will produce multiple events as it
+  transitions through the observe, readout and write stages.
+  """
   addDatasetEvent(
-    # Describes the dataset event to add.  All events are associated with a
-    # particular visit (see 'record{InstrumentName}Visit').  Dataset events
-    # are further associated with an |observation, step and index because a
-    # step may produce multiple datasets.  The three form its 'location'.
-    # (See also 'record{InstrumentName}Step'.) Each dataset event 'payload'
-    # identifies the stage (observe, readout, or write) and possibly the
-    # dataset filename.
-    #
+
+    """
+    Describes the dataset event to add.  All events are associated with a
+    particular visit (see 'record{InstrumentName}Visit').  Dataset events
+    are further associated with an observation, step and index because a
+    step may produce multiple datasets. (See also 'record{InstrumentName}Step'.)
+    """
     input: AddDatasetEventInput!
+
   ): AddDatasetEventResult!
 
   """
@@ -3324,60 +3408,52 @@ type Dataset {
   qaState: DatasetQaState
 }
 
-# Dataset-level events.  A single dataset will be associated with multiple events.
-type DatasetEvent implements ExecutionEvent {
-  # Identifies the associated dataset
-  datasetId: DatasetId!
+"""
+Dataset-level events.  A single dataset will be associated with multiple events
+as it makes its way through observe, readout and write stages.
+"""
+type DatasetEvent {
 
-  # Dataset event payload, identifying the associated filename and stage of dataset execution
-  payload: DatasetEventPayload!
-
-  # Event id
+  "Event id."
   id: ExecutionEventId!
 
-  # Associated visit
+  "Identifies the associated dataset."
+  datasetId: DatasetId!
+
+  "Associated visit."
   visitId: VisitId!
 
-  # Observation whose execution produced this event
+  "Dataset filename, when known."
+  filename: DatasetFilename
+
+  "Dataset execution stage."
+  datasetStage: DatasetStage!
+
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  # Time at which this event was received
+  "Time at which this event was received."
   received: Timestamp!
 }
 
-# Dataset event payload.
-type DatasetEventPayload {
-  # Dataset filename, when known
-  filename: DatasetFilename
-
-  # Dataset execution stage
-  datasetStage: DatasetStage!
-}
-
-# Dataset filename in standard format in format 'N20210519S0001.fits'
+"Dataset filename in standard format."
 scalar DatasetFilename
 
 type DatasetId {
-  # Observation ID
-  observationId: ObservationId!
-
-  # Step ID
+  "Step ID."
   stepId: StepId!
 
-  # Dataset index
-  index: PosInt!
+  "Dataset index."
+  index: NonNegShort!
 }
 
-# Dataset ID input type
 input DatasetIdInput {
-  # Associated observation id.
-  observationId: ObservationId!
 
-  # Associated step id.
+  "Step ID."
   stepId: StepId!
 
-  # Dataset index within the step.
-  index: PosInt!
+  "Dataset index."
+  index: NonNegShort!
 }
 
 # Dataset QA State
@@ -3401,24 +3477,19 @@ type DatasetSelectResult {
   hasMore: Boolean!
 }
 
-# Execution stage or phase of an individual dataset
+"Execution stage or phase of an individual dataset."
 enum DatasetStage {
-  # DatasetStage END_OBSERVE
+
   END_OBSERVE
 
-  # DatasetStage END_READOUT
   END_READOUT
 
-  # DatasetStage END_WRITE
   END_WRITE
 
-  # DatasetStage START_OBSERVE
   START_OBSERVE
 
-  # DatasetStage START_READOUT
   START_READOUT
 
-  # DatasetStage START_WRITE
   START_WRITE
 }
 
@@ -4793,6 +4864,12 @@ type Observation {
 
   # Execution sequence and runtime artifacts
   execution: Execution!
+
+  """
+  The ITC result for this observation, assuming it has associated target(s)
+  and a selected observing mode.
+  """
+  itc: ItcResultSet
 }
 
 # ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`
@@ -5211,15 +5288,18 @@ type Query {
   # Metadata for `enum FilterType`
   filterTypeMeta: [FilterTypeMeta!]!
 
-  # ITC execution results
+  """
+  ITC execution results.  DEPRECATED (use the `observation` query and select the
+  `itc` field instead).
+  """
   itc(
     programId:     ProgramId!
 
     observationId: ObservationId!
 
-    # Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    "Whether to use cached results (true) or ignore the cache and make a remote ITC call (false)."
     useCache: Boolean! = true
-  ): ItcResultSet
+  ): ItcResultSet @deprecated(reason: "use observation(observationId: \"o-111\") { itc {...} } instead")
 
   # Returns the observation with the given id, if any.
   observation(

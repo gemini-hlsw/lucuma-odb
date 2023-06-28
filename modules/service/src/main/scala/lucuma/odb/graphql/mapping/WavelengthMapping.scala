@@ -6,12 +6,14 @@ package mapping
 
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
+     with ChronConditionsEntryView[F]
      with GmosDynamicTables[F]
      with ObservationView[F] {
 
@@ -44,6 +46,7 @@ trait WavelengthMapping[F[_]]
     SwitchMapping(
       WavelengthType,
       List(
+        ConditionsMeasurementType / "wavelength"                   -> wavelengthMapping(ChronConditionsEntryView.Measurement.Wavelength.SyntheticId, ChronConditionsEntryView.Measurement.Wavelength.Value),
         GmosNorthStepRecordType / "instrumentConfig" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosNorthDynamicTable.Id, GmosNorthDynamicTable.Grating.Wavelength),
         GmosNorthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength),
         GmosNorthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength),

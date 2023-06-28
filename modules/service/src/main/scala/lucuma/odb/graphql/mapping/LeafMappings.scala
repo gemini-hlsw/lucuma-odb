@@ -30,12 +30,12 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
-
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -45,13 +45,20 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
   lazy val LeafMappings: List[TypeMapping] =
     List(
       LeafMapping[BigDecimal](BigDecimalType),
+      LeafMapping[Long](ChronicleIdType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[Tag](ConditionsExpectationTypeType),
+      LeafMapping[Tag](ConditionsMeasurementSourceType),
+      LeafMapping[Tag](ConditionsSourceType),
+      LeafMapping[NonEmptyString](DatasetFilenameType),
+      LeafMapping[DatasetStage](DatasetStageType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[Existence](ExistenceType),
+      LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[GcalArc](GcalArcType),
@@ -103,6 +110,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ScienceMode](ScienceModeType),
+      LeafMapping[Tag](SeeingTrendType),
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SequenceType](SequenceTypeType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
@@ -122,7 +130,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[User.Id](UserIdType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
-      LeafMapping[WaterVapor](WaterVaporType)
+      LeafMapping[WaterVapor](WaterVaporType),
     )
 
 }

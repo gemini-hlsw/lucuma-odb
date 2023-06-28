@@ -9,12 +9,14 @@ import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
+import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -24,6 +26,12 @@ import Services.Syntax.*
 
 
 trait ExecutionEventService[F[_]] {
+
+  def insertDatasetEvent(
+    datasetId:    Dataset.Id,
+    datasetStage: DatasetStage,
+    filename:     Option[Dataset.Filename]
+  )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse]
 
   def insertSequenceEvent(
     visitId: Visit.Id,
@@ -62,6 +70,29 @@ object ExecutionEventService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F] with ExecutionUserCheck {
+
+      override def insertDatasetEvent(
+        datasetId:    Dataset.Id,
+        datasetStage: DatasetStage,
+        filename:     Option[Dataset.Filename]
+      )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
+
+        import InsertEventResponse.*
+
+        val insert: F[Either[StepNotFound, ExecutionEvent.Id]] =
+          session
+            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, filename, datasetId.stepId)
+            .map(_.toRight(StepNotFound(datasetId.stepId)))
+            .recover {
+              case SqlState.ForeignKeyViolation(_) => StepNotFound(datasetId.stepId).asLeft
+            }
+
+        (for {
+          _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
+          e <- EitherT(insert).leftWiden[InsertEventResponse]
+        } yield Success(e)).merge
+
+      }
 
       override def insertSequenceEvent(
         visitId: Visit.Id,
@@ -109,6 +140,30 @@ object ExecutionEventService {
 
   object Statements {
 
+    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Option[Dataset.Filename], Step.Id), ExecutionEvent.Id] =
+      sql"""
+        INSERT INTO t_dataset_event (
+          c_visit_id,
+          c_step_id,
+          c_index,
+          c_dataset_stage,
+          c_file_site,
+          c_file_date,
+          c_file_index
+        )
+        SELECT
+          c_visit_id,
+          $dataset_id,
+          $dataset_stage,
+          ${dataset_filename.opt}
+        FROM
+          t_step
+        WHERE
+          t_step.c_step_id = $step_id
+        RETURNING
+          c_execution_event_id
+      """.query(execution_event_id)
+
     val InsertSequenceEvent: Query[(Visit.Id, SequenceCommand), ExecutionEvent.Id] =
       sql"""
         INSERT INTO t_sequence_event (
@@ -139,7 +194,6 @@ object ExecutionEventService {
           t_step
         WHERE
           t_step.c_step_id = $step_id
-
         RETURNING
           c_execution_event_id
       """.query(execution_event_id)
