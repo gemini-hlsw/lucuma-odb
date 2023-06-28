@@ -142,19 +142,26 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
+  val FakeItcResultNoCache: IntegrationTime =
+    IntegrationTime(
+      11.secTimeSpan,
+      PosInt.unsafeFrom(7),
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+    )
+
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          NonEmptyList.one(FakeItcResult)
+          NonEmptyList.one(if (useCache) FakeItcResult else FakeItcResultNoCache)
         ).pure[IO]
 
       override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          NonEmptyList.one(FakeItcResult)
+          NonEmptyList.one(if (useCache) FakeItcResult else FakeItcResultNoCache)
         ).pure[IO]
 
       def optimizedSpectroscopyGraph(
