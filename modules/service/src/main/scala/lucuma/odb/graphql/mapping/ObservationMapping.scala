@@ -127,13 +127,17 @@ trait ObservationMapping[F[_]]
           } yield (p, o, c)
         }
 
-      private def callItc(pid: Program.Id, oid: Observation.Id, useCache: Boolean): F[Result[(Observation.Id, Itc.ResultSet)]] =
+      private def callItc(
+        pid:      Program.Id,
+        oid:      Observation.Id,
+        useCache: Boolean
+      ): F[Result[((Observation.Id, Boolean), Itc.ResultSet)]] =
         services.useTransactionally {
           itc(itcClient)
             .lookup(pid, oid, useCache)
             .map {
               case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-              case Right(resultSet) => (oid, resultSet).success
+              case Right(resultSet) => ((oid, useCache), resultSet).success
             }
         }
 
@@ -143,7 +147,7 @@ trait ObservationMapping[F[_]]
           itc <- ids.distinct.traverse { case (pid, oid, useCache) => ResultT(callItc(pid, oid, useCache)) }
         } yield
           ids
-            .flatMap { case (_, oid, _) => itc.find(_._1 === oid).map(_._2).toList }
+            .flatMap { case (_, oid, useCache) => itc.find(_._1 === (oid, useCache)).map(_._2).toList }
             .zip(queries)
             .map { case (itcResultSet, (child, parentCursor)) =>
               val itc: Json      = Json.fromFields(List("itc" -> itcResultSet.asJson))
