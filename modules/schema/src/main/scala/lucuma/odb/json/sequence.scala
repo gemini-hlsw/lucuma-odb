@@ -20,6 +20,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
@@ -40,6 +41,14 @@ trait SequenceCodec {
   import offset.decoder.given
   import stepconfig.given
   import plannedtime.given
+
+  given Decoder[Dataset.Filename] =
+    Decoder[String].emap { s =>
+      Dataset.Filename.FromString.getOption(s).toRight(s"Invalid dataset filename: $s")
+    }
+
+  given Encoder[Dataset.Filename] =
+    Encoder[String].contramap[Dataset.Filename](_.format)
 
   given [D: Decoder]: Decoder[Step[D]] =
     Decoder.instance { c =>

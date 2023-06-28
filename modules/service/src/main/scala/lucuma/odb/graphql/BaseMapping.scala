@@ -14,6 +14,7 @@ trait BaseMapping[F[_]]
 
   // TODO: auto-generate this
   lazy val AddConditionsEntryResultType        = schema.ref("AddConditionsEntryResult")
+  lazy val AddDatasetEventResultType           = schema.ref("AddDatasetEventResult")
   lazy val AddSequenceEventResultType          = schema.ref("AddSequenceEventResult")
   lazy val AddStepEventResultType              = schema.ref("AddStepEventResult")
   lazy val AirMassRangeType                    = schema.ref("AirMassRange")
@@ -46,6 +47,10 @@ trait BaseMapping[F[_]]
   lazy val CreateProgramResultType             = schema.ref("CreateProgramResult")
   lazy val CreateTargetResultType              = schema.ref("CreateTargetResult")
   lazy val DarkType                            = schema.ref("Dark")
+  lazy val DatasetEventType                    = schema.ref("DatasetEvent")
+  lazy val DatasetIdType                       = schema.ref("DatasetId")
+  lazy val DatasetFilenameType                 = schema.ref("DatasetFilename")
+  lazy val DatasetStageType                    = schema.ref("DatasetStage")
   lazy val DeclinationType                     = schema.ref("Declination")
   lazy val DemoScienceType                     = schema.ref("DemoScience")
   lazy val DirectorsTimeType                   = schema.ref("DirectorsTime")
