@@ -6,6 +6,8 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Eq
+import cats.data.EitherT
+import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.syntax.applicative.*
 import cats.syntax.eq.*
@@ -36,7 +38,6 @@ import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
@@ -146,13 +147,16 @@ trait ObservationMapping[F[_]]
 
     val calculate: (Program.Id, Observation.Id, Boolean) => F[Result[Itc.ResultSet]] =
       (pid, oid, useCache) =>
-        services.useTransactionally {
-          itc(itcClient)
-            .lookup(pid, oid, useCache)
-            .map {
-              case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-              case Right(resultSet) => resultSet.success
-            }
+        services.use { s =>
+          val itcService = s.itc(itcClient)
+
+          (for {
+            p <- EitherT(s.transactionally(itcService.selectParams(pid, oid)))
+            r <- EitherT(itcService.callService(p, useCache))
+          } yield r).value.map {
+            case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
+            case Right(resultSet) => resultSet.success
+          }
         }
 
     effectHandler("itc", readEnv, calculate)
@@ -172,23 +176,29 @@ trait ObservationMapping[F[_]]
         f <- env.getR[Generator.FutureLimit](FutureLimitParam)
       } yield SequenceEnv(c, f)
 
-    val calculate: (Program.Id, Observation.Id, SequenceEnv) => F[Result[Json]] = (pid, oid, env) =>
-      services.useTransactionally {
-        generator(commitHash, itcClient, plannedTimeCalculator)
-          .generate(pid, oid, env.useCache, env.limit)
-          .map {
-            case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
-            case e: Generator.Error                         => Result.failure(e.format)
-              case Generator.Result.Success(_, itc, exec, d)  =>
-                Result(Json.obj(
-                  "programId"       -> pid.asJson,
-                  "observationId"   -> oid.asJson,
-                  "itcResult"       -> itc.asJson,
-                  "executionConfig" -> exec.asJson,
-                  "scienceDigest"   -> d.asJson
-                ))
-          }
+    val calculate: (Program.Id, Observation.Id, SequenceEnv) => F[Result[Json]] = (pid, oid, env) => {
+      val mapResult: Generator.Result => Result[Json] = {
+        case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
+        case e: Generator.Error                         => Result.failure(e.format)
+        case Generator.Result.Success(_, itc, exec, d)  =>
+            Result(Json.obj(
+              "programId"       -> pid.asJson,
+              "observationId"   -> oid.asJson,
+              "itcResult"       -> itc.asJson,
+              "executionConfig" -> exec.asJson,
+              "scienceDigest"   -> d.asJson
+            ))
       }
+
+      services.use { s =>
+        val generatorService = s.generator(commitHash, itcClient, plannedTimeCalculator)
+
+        (for {
+          p <- EitherT(s.transactionally(generatorService.selectParams(pid, oid)))
+          r <- EitherT(generatorService.generate(oid, p, env.useCache, env.limit))
+        } yield r).value.map(result => mapResult(result.merge))
+      }
+    }
 
     effectHandler("sequence", readEnv, calculate)
   }

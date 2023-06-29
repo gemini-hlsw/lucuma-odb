@@ -43,7 +43,7 @@ trait Services[F[_]]:
    * with `user` (see above) set in a transaction-local variable `lucuma.user` in the database,
    * available in PostgreSQL as `current_setting('lucuma.user', true)` 
    * 
-   * Within the pased block `fa` the current `Transaction` is implicit, as well as this `Services`
+   * Within the passed block `fa` the current `Transaction` is implicit, as well as this `Services`
    * instance. The purpose is as follows:
    *
    *   - When `Services` is `given` and `Services.Syntax.*` is imported, all members here are 
@@ -61,7 +61,7 @@ trait Services[F[_]]:
    */
   def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(using NoTransaction[F]): F[A]
 
-  /** The `AllocationService`. */
+    /** The `AllocationService`. */
   def allocationService: AllocationService[F]
   
   /** The `AsterismService`. */
