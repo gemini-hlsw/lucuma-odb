@@ -20,7 +20,6 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
@@ -32,7 +31,6 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
@@ -41,6 +39,7 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
@@ -51,12 +50,17 @@ import Generator.FutureLimit
 
 sealed trait Generator[F[_]] {
 
-  def generate(
+  def selectParams(
     programId:     Program.Id,
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Either[Generator.Error, GeneratorParams]]
+
+  def generate(
     observationId: Observation.Id,
+    params:        GeneratorParams,
     useCache:      Boolean     = true,
     futureLimit:   FutureLimit = FutureLimit.Default
-  )(using Transaction[F]): F[Generator.Result]
+  )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Result.Success]]
 
 }
 
@@ -143,89 +147,81 @@ object Generator {
 
       private val exp = SmartGcalExpander.fromService(smartGcalService)
 
-      override def generate(
-        programId:     Program.Id,
-        observationId: Observation.Id,
-        useCache:      Boolean,
-        futureLimit:   FutureLimit
-      )(using Transaction[F]): F[Result] =
-        (for {
-          params <- selectParams(programId, observationId)
-          res    <- generateSequence(observationId, params, useCache, futureLimit)
-        } yield res).merge
-
-      private def selectParams(
+      override def selectParams(
         pid: Program.Id,
         oid: Observation.Id
-      )(using Transaction[F]): EitherT[F, Error, GeneratorParams] =
-        EitherT(
-          generatorParamsService
-            .select(pid, oid)
-            .map {
-              case None                => ObservationNotFound(pid, oid).asLeft
-              case Some(Left(missing)) => MissingParams(missing).asLeft
-              case Some(Right(params)) => params.asRight
-            }
-        )
+      )(using Transaction[F]): F[Either[Error, GeneratorParams]] =
+        generatorParamsService
+          .select(pid, oid)
+          .map {
+            case None                => ObservationNotFound(pid, oid).asLeft
+            case Some(Left(missing)) => MissingParams(missing).asLeft
+            case Some(Right(params)) => params.asRight
+          }
+
+
+      override def generate(
+        observationId: Observation.Id,
+        params:        GeneratorParams,
+        useCache:      Boolean     = true,
+        futureLimit:   FutureLimit = FutureLimit.Default
+      )(using NoTransaction[F]): F[Either[Error, Generator.Result.Success]] = {
+        val callItc: F[Either[Error, Itc.ResultSet]] =
+          itc(itcClient)
+            .callService(params, useCache)
+            .map(_.leftMap(errors => ItcServiceError(errors)))
+
+        (for {
+          r <- EitherT(callItc)
+          s <- generateSequence(observationId, params, r, futureLimit)
+        } yield s).value
+      }
 
       // Generate a sequence for the observation, which will depend on the
       // observation's observing mode.
       private def generateSequence(
         oid:         Observation.Id,
         params:      GeneratorParams,
-        useCache:    Boolean,
+        resultSet:   Itc.ResultSet,
         futureLimit: FutureLimit
-      ): EitherT[F, Error, Success] = {
+      )(using NoTransaction[F]): EitherT[F, Error, Success] = {
         val namespace = SequenceIds.namespace(commitHash, oid, params)
 
         params match {
-          case GeneratorParams.GmosNorthLongSlit(itcInput, config) =>
+          case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
-              tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosNorth, useCache)
-              (itc, p0) = tup
+              p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosNorth)
               p1  <- expandAndEstimate(p0, exp.gmosNorth, calculator.gmosNorth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, futureLimit))
-            } yield Success(oid, itc, InstrumentExecutionConfig.GmosNorth(res), res.science.map(_.digest))
+            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosNorth(res), res.science.map(_.digest))
 
-          case GeneratorParams.GmosSouthLongSlit(itcInput, config) =>
+          case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
-              tup <- gmosLongSlit(itcInput, config, gmos.longslit.Generator.GmosSouth, useCache)
-              (itc, p0) = tup
+              p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosSouth)
               p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, futureLimit))
-            } yield Success(oid, itc, InstrumentExecutionConfig.GmosSouth(res), res.science.map(_.digest))
+            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosSouth(res), res.science.map(_.digest))
         }
       }
 
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
       // or planned time calculation.
       private def gmosLongSlit[S, D, G, L, U](
-        itcInput:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
+        itcResult: Itc.Result.Success,
         config:    gmos.longslit.Config[G, L, U],
-        generator: gmos.longslit.Generator[S, D, G, L, U],
-        useCache:  Boolean
-      ): EitherT[F, Error, (Itc.ResultSet, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]])] = {
-
-        def generate(s: Itc.Result.Success): Either[Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
+        generator: gmos.longslit.Generator[S, D, G, L, U]
+      ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
+        EitherT.fromEither[F](
           generator.generate(
-            s.value,
-            s.input.sourceProfile,
-            s.input.constraints.imageQuality,
+            itcResult.value,
+            itcResult.input.sourceProfile,
+            itcResult.input.constraints.imageQuality,
             config
           ) match {
             case Left(msg)    => InvalidData(msg).asLeft
-            case Right(proto) => proto.mapSequences(_.take(1), _.take(s.value.exposures.value)).asRight[Error]
+            case Right(proto) => proto.mapSequences(_.take(1), _.take(itcResult.value.exposures.value)).asRight[Error]
           }
-
-        EitherT(
-          itc(itcClient)
-            .spectroscopy(itcInput, useCache)
-            .map {
-              case Left(errors) => ItcServiceError(errors).asLeft
-              case Right(rs)    => generate(rs.value.focus).tupleLeft(rs)
-            }
         )
-      }
 
       // Performs smart-gcal expansion and planned time calculation.
       private def expandAndEstimate[S, K, D](
