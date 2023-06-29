@@ -61,7 +61,7 @@ trait Services[F[_]]:
    */
   def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(using NoTransaction[F]): F[A]
 
-    /** The `AllocationService`. */
+  /** The `AllocationService`. */
   def allocationService: AllocationService[F]
   
   /** The `AsterismService`. */
