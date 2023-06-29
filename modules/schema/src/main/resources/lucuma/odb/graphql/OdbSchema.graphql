@@ -4876,8 +4876,7 @@ type Observation {
 
   """
   Produces the execution configuration with its acquisition and science
-  sequences for this observation.  DEPRECATED (use the `observation` query and
-  select the `sequence` field instead.
+  sequences for this observation.
   """
   sequence(
 
