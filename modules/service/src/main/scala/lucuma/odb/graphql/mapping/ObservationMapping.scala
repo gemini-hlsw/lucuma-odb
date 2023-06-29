@@ -5,11 +5,13 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.Eq
 import cats.effect.Resource
 import cats.syntax.applicative.*
 import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
@@ -28,7 +30,11 @@ import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
+import lucuma.odb.json.all.query.given
+import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Itc
+import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
@@ -45,11 +51,14 @@ trait ObservationMapping[F[_]]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F] {
 
-  private val UseCacheParam   = "useCache"
-  private val UseCacheDefault = true
+  private val UseCacheParam      = "useCache"
+  private val UseCacheDefault    = true
+  private val FutureLimitParam   = "futureLimit"
 
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
+  def commitHash: CommitHash
+  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(
@@ -75,7 +84,8 @@ trait ObservationMapping[F[_]]
         SqlField("instrument", ObservationView.Instrument),
         SqlObject("plannedTime"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
-        EffectField("itc", itcQueryHandler, List("id", "programId"))
+        EffectField("itc", itcQueryHandler, List("id", "programId")),
+        EffectField("sequence", sequenceQueryHandler, List("id", "programId"))
       )
     )
 
@@ -113,48 +123,110 @@ trait ObservationMapping[F[_]]
               Select("itc", Nil, child)
             )
           }
+
+        case Select("sequence", List(
+          BooleanBinding.Option(UseCacheParam, rUseCache),
+          Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
+        ), child) =>
+          (rUseCache, rFutureLimit).parMapN { case (useCache, futureLimit) =>
+            Environment(
+              Env(
+                UseCacheParam    -> useCache.getOrElse(UseCacheDefault),
+                FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)
+              ),
+              Select("sequence", Nil, child)
+            )
+          }
       }
     )
 
-  def itcQueryHandler: EffectHandler[F] =
-    new EffectHandler[F] {
-      private def extractIds(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Boolean)]] =
-        queries.traverse { case (_, cursor) =>
-          for {
-            p <- cursor.fieldAs[Program.Id]("programId")
-            o <- cursor.fieldAs[Observation.Id]("id")
-            c <- cursor.fullEnv.getR[Boolean](UseCacheParam)
-          } yield (p, o, c)
-        }
+  def itcQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[Boolean] =
+      env => env.getR[Boolean](UseCacheParam)
 
-      private def callItc(
-        pid:      Program.Id,
-        oid:      Observation.Id,
-        useCache: Boolean
-      ): F[Result[((Observation.Id, Boolean), Itc.ResultSet)]] =
+    val calculate: (Program.Id, Observation.Id, Boolean) => F[Result[Itc.ResultSet]] =
+      (pid, oid, useCache) =>
         services.useTransactionally {
           itc(itcClient)
             .lookup(pid, oid, useCache)
             .map {
               case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-              case Right(resultSet) => ((oid, useCache), resultSet).success
+              case Right(resultSet) => resultSet.success
             }
+        }
+
+    effectHandler("itc", readEnv, calculate)
+  }
+
+  def sequenceQueryHandler: EffectHandler[F] = {
+    case class SequenceEnv(
+      useCache: Boolean,
+      limit:    Generator.FutureLimit
+    )
+
+    given Eq[SequenceEnv] = Eq.by(a => (a.useCache, a.limit.value))
+
+    val readEnv: Env => Result[SequenceEnv] = env =>
+      for {
+        c <- env.getR[Boolean](UseCacheParam)
+        f <- env.getR[Generator.FutureLimit](FutureLimitParam)
+      } yield SequenceEnv(c, f)
+
+    val calculate: (Program.Id, Observation.Id, SequenceEnv) => F[Result[Json]] = (pid, oid, env) =>
+      services.useTransactionally {
+        generator(commitHash, itcClient, plannedTimeCalculator)
+          .generate(pid, oid, env.useCache, env.limit)
+          .map {
+            case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
+            case e: Generator.Error                         => Result.failure(e.format)
+              case Generator.Result.Success(_, itc, exec, d)  =>
+                Result(Json.obj(
+                  "programId"       -> pid.asJson,
+                  "observationId"   -> oid.asJson,
+                  "itcResult"       -> itc.asJson,
+                  "executionConfig" -> exec.asJson,
+                  "scienceDigest"   -> d.asJson
+                ))
+          }
+      }
+
+    effectHandler("sequence", readEnv, calculate)
+  }
+
+  private def effectHandler[E, R](
+    fieldName: String,
+    readEnv:   Env => Result[E],
+    calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
+  )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
+
+    new EffectHandler[F] {
+
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, E)]] =
+        queries.traverse { case (_, cursor) =>
+          for {
+            p <- cursor.fieldAs[Program.Id]("programId")
+            o <- cursor.fieldAs[Observation.Id]("id")
+            e <- readEnv(cursor.fullEnv)
+          } yield (p, o, e)
         }
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
         (for {
-          ids <- ResultT(extractIds(queries).pure[F])
-          itc <- ids.distinct.traverse { case (pid, oid, useCache) => ResultT(callItc(pid, oid, useCache)) }
+          ctx <- ResultT(queryContext(queries).pure[F])
+          res <- ctx.distinct.traverse { case (pid, oid, env) =>
+                   ResultT(calculate(pid, oid, env)).map((oid, env, _))
+                 }
         } yield
-          ids
-            .flatMap { case (_, oid, useCache) => itc.find(_._1 === (oid, useCache)).map(_._2).toList }
+          ctx
+            .flatMap { case (_, oid, env) => res.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
             .zip(queries)
-            .map { case (itcResultSet, (child, parentCursor)) =>
-              val itc: Json      = Json.fromFields(List("itc" -> itcResultSet.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, itc, Some(parentCursor), parentCursor.fullEnv)
+            .map { case (result, (child, parentCursor)) =>
+              val json: Json     = Json.fromFields(List(fieldName -> result.asJson))
+              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
               (child, cursor)
             }
         ).value
+
     }
 
 }

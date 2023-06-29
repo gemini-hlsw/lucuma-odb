@@ -95,69 +95,70 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { case (_, oid, _) =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     static {
-                       stageMode
-                       detector
-                       mosPreImaging
-                       nodAndShuffle {
-                         posA { p { microarcseconds } }
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       static {
+                         stageMode
+                         detector
+                         mosPreImaging
+                         nodAndShuffle {
+                           posA { p { microarcseconds } }
+                         }
                        }
-                     }
-                     acquisition {
-                       digest {
-                         observeClass
-                       }
-                       nextAtom {
-                         observeClass
-                         steps {
+                       acquisition {
+                         digest {
                            observeClass
-                           instrumentConfig {
-                             exposure {
-                               seconds
-                             }
-                             readout {
-                               xBin
-                               yBin
-                             }
-                             dtax
-                             roi
-                             gratingConfig {
-                               grating
-                               order
-                               wavelength {
-                                 nanometers
+                         }
+                         nextAtom {
+                           observeClass
+                           steps {
+                             observeClass
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
+                               readout {
+                                 xBin
+                                 yBin
+                               }
+                               dtax
+                               roi
+                               gratingConfig {
+                                 grating
+                                 order
+                                 wavelength {
+                                   nanometers
+                                 }
+                               }
+                               filter
+                               fpu {
+                                 builtin
                                }
                              }
-                             filter
-                             fpu {
-                               builtin
-                             }
-                           }
-                           stepConfig {
-                             ... on Science {
-                               offset {
-                                 p { arcseconds }
-                                 q { arcseconds }
+                             stepConfig {
+                               ... on Science {
+                                 offset {
+                                   p { arcseconds }
+                                   q { arcseconds }
+                                 }
                                }
                              }
                            }
                          }
-                       }
-                       possibleFuture {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+                         possibleFuture {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
                            }
                          }
@@ -171,110 +172,111 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "programId": $pid,
-                "executionConfig": {
-                  "static": {
-                    "stageMode": "FOLLOW_XY",
-                    "detector": "HAMAMATSU",
-                    "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
-                    "nodAndShuffle": null
-                  },
-                  "acquisition": {
-                    "digest": {
-                      "observeClass": "ACQUISITION"
+              "observation": {
+                "sequence": {
+                  "executionConfig": {
+                    "static": {
+                      "stageMode": "FOLLOW_XY",
+                      "detector": "HAMAMATSU",
+                      "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
+                      "nodAndShuffle": null
                     },
-                    "nextAtom": {
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        {
-                          "observeClass": "ACQUISITION",
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 10.000000
-                            },
-                            "readout": {
-                              "xBin": "TWO",
-                              "yBin": "TWO"
-                            },
-                            "dtax": "ZERO",
-                            "roi": "CCD2",
-                            "gratingConfig": null,
-                            "filter": "G_PRIME",
-                            "fpu": null
-                          },
-                          "stepConfig": {
-                            "offset": {
-                              "p": {
-                                "arcseconds": 0.000000
+                    "acquisition": {
+                      "digest": {
+                        "observeClass": "ACQUISITION"
+                      },
+                      "nextAtom": {
+                        "observeClass": "ACQUISITION",
+                        "steps": [
+                          {
+                            "observeClass": "ACQUISITION",
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 10.000000
                               },
-                              "q": {
-                                "arcseconds": 0.000000
+                              "readout": {
+                                "xBin": "TWO",
+                                "yBin": "TWO"
+                              },
+                              "dtax": "ZERO",
+                              "roi": "CCD2",
+                              "gratingConfig": null,
+                              "filter": "G_PRIME",
+                              "fpu": null
+                            },
+                            "stepConfig": {
+                              "offset": {
+                                "p": {
+                                  "arcseconds": 0.000000
+                                },
+                                "q": {
+                                  "arcseconds": 0.000000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "observeClass": "ACQUISITION",
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 20.000000
+                              },
+                              "readout": {
+                                "xBin": "ONE",
+                                "yBin": "ONE"
+                              },
+                              "dtax": "ZERO",
+                              "roi": "CENTRAL_STAMP",
+                              "gratingConfig": null,
+                              "filter": "G_PRIME",
+                              "fpu": {
+                                "builtin": "LONG_SLIT_0_50"
+                              }
+                            },
+                            "stepConfig": {
+                              "offset": {
+                                "p": {
+                                  "arcseconds": 10.000000
+                                },
+                                "q": {
+                                  "arcseconds": 0.000000
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "observeClass": "ACQUISITION",
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 40.000000
+                              },
+                              "readout": {
+                                "xBin": "ONE",
+                                "yBin": "ONE"
+                              },
+                              "dtax": "ZERO",
+                              "roi": "CENTRAL_STAMP",
+                              "gratingConfig": null,
+                              "filter": "G_PRIME",
+                              "fpu": {
+                                "builtin": "LONG_SLIT_0_50"
+                              }
+                            },
+                            "stepConfig": {
+                              "offset": {
+                                "p": {
+                                  "arcseconds": 0.000000
+                                },
+                                "q": {
+                                  "arcseconds": 0.000000
+                                }
                               }
                             }
                           }
-                        },
-                        {
-                          "observeClass": "ACQUISITION",
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 20.000000
-                            },
-                            "readout": {
-                              "xBin": "ONE",
-                              "yBin": "ONE"
-                            },
-                            "dtax": "ZERO",
-                            "roi": "CENTRAL_STAMP",
-                            "gratingConfig": null,
-                            "filter": "G_PRIME",
-                            "fpu": {
-                              "builtin": "LONG_SLIT_0_50"
-                            }
-                          },
-                          "stepConfig": {
-                            "offset": {
-                              "p": {
-                                "arcseconds": 10.000000
-                              },
-                              "q": {
-                                "arcseconds": 0.000000
-                              }
-                            }
-                          }
-                        },
-                        {
-                          "observeClass": "ACQUISITION",
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 40.000000
-                            },
-                            "readout": {
-                              "xBin": "ONE",
-                              "yBin": "ONE"
-                            },
-                            "dtax": "ZERO",
-                            "roi": "CENTRAL_STAMP",
-                            "gratingConfig": null,
-                            "filter": "G_PRIME",
-                            "fpu": {
-                              "builtin": "LONG_SLIT_0_50"
-                            }
-                          },
-                          "stepConfig": {
-                            "offset": {
-                              "p": {
-                                "arcseconds": 0.000000
-                              },
-                              "q": {
-                                "arcseconds": 0.000000
-                              }
-                            }
-                          }
-                        }
-                      ]
-                    },
-                    "possibleFuture": []
+                        ]
+                      },
+                      "possibleFuture": []
+                    }
                   }
                 }
               }
@@ -294,35 +296,36 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { case (_, oid, _) =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid", futureLimit: 1) {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       nextAtom {
-                         observeClass
-                       }
-                       possibleFuture {
-                         observeClass
-                         steps {
-                           instrumentConfig {
-                             gratingConfig {
-                               grating
-                               order
-                               wavelength {
-                                 nanometers
+               observation(observationId: "$oid") {
+                 sequence(futureLimit: 1) {
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           observeClass
+                         }
+                         possibleFuture {
+                           observeClass
+                           steps {
+                             instrumentConfig {
+                               gratingConfig {
+                                 grating
+                                 order
+                                 wavelength {
+                                   nanometers
+                                 }
                                }
                              }
                            }
                          }
+                         hasMore
                        }
-                       hasMore
                      }
                    }
                  }
@@ -332,43 +335,44 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected =
           json"""
             {
-              "sequence": {
-                "programId": $pid,
-                "executionConfig": {
-                  "science": {
-                    "nextAtom": {
-                      "observeClass": "SCIENCE"
-                    },
-                    "possibleFuture": [
-                      {
-                        "observeClass": "SCIENCE",
-                        "steps" : [
-                          {
-                            "instrumentConfig" : {
-                              "gratingConfig" : {
-                                "grating" : "R831_G5302",
-                                "order" : "ONE",
-                                "wavelength" : {
-                                  "nanometers" : 505.000
+              "observation": {
+                "sequence": {
+                  "executionConfig": {
+                    "science": {
+                      "nextAtom": {
+                        "observeClass": "SCIENCE"
+                      },
+                      "possibleFuture": [
+                        {
+                          "observeClass": "SCIENCE",
+                          "steps" : [
+                            {
+                              "instrumentConfig" : {
+                                "gratingConfig" : {
+                                  "grating" : "R831_G5302",
+                                  "order" : "ONE",
+                                  "wavelength" : {
+                                    "nanometers" : 505.000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "instrumentConfig" : {
+                                "gratingConfig" : {
+                                  "grating" : "R831_G5302",
+                                  "order" : "ONE",
+                                  "wavelength" : {
+                                    "nanometers" : 505.000
+                                  }
                                 }
                               }
                             }
-                          },
-                          {
-                            "instrumentConfig" : {
-                              "gratingConfig" : {
-                                "grating" : "R831_G5302",
-                                "order" : "ONE",
-                                "wavelength" : {
-                                  "nanometers" : 505.000
-                                }
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ],
-                    "hasMore": true
+                          ]
+                        }
+                      ],
+                      "hasMore": true
+                    }
                   }
                 }
               }
@@ -393,13 +397,15 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid", futureLimit: 101) {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       possibleFuture {
-                         observeClass
+               observation(observationId: "$oid") {
+                 sequence(futureLimit: 101) {
+                   programId
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         possibleFuture {
+                           observeClass
+                         }
                        }
                      }
                    }
@@ -436,43 +442,44 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         )
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, tid) =>
+    setup.flatMap { case (_, oid, _) =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       digest {
-                         offsets {
-                           q { arcseconds }
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         digest {
+                           offsets {
+                             q { arcseconds }
+                           }
                          }
-                       }
-                       nextAtom {
-                         description
-                         steps {
-                           stepConfig {
-                             stepType
-                             ... on Science {
-                               offset {
-                                 q { arcseconds }
+                         nextAtom {
+                           description
+                           steps {
+                             stepConfig {
+                               stepType
+                               ... on Science {
+                                 offset {
+                                   q { arcseconds }
+                                 }
                                }
                              }
                            }
                          }
-                       }
-                       possibleFuture {
-                         description
-                         steps {
-                           stepConfig {
-                             stepType
-                             ... on Science {
-                               offset {
-                                 q { arcseconds }
+                         possibleFuture {
+                           description
+                           steps {
+                             stepConfig {
+                               stepType
+                               ... on Science {
+                                 offset {
+                                   q { arcseconds }
+                                 }
                                }
                              }
                            }
@@ -487,106 +494,25 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "programId": $pid,
-                "executionConfig": {
-                  "science": {
-                    "digest": {
-                      "offsets": [
-                        {
-                          "q": {
-                            "arcseconds": -15.000000
-                          }
-                        },
-                        {
-                          "q": {
-                            "arcseconds": 15.000000
-                          }
-                        }
-                      ]
-                    },
-                    "nextAtom": {
-                      "description": "q -15.0″, λ 500.0 nm",
-                      "steps": [
-                        {
-                          "stepConfig": {
-                            "stepType": "SCIENCE",
-                            "offset": {
-                              "q": {
-                                "arcseconds": -15.000000
-                              }
-                            }
-                          }
-                        },
-                        {
-                          "stepConfig": {
-                            "stepType": "GCAL"
-                          }
-                        }
-                      ]
-                    },
-                    "possibleFuture": [
-                      {
-                        "description": "q 15.0″, λ 505.0 nm",
-                        "steps": [
+              "observation": {
+                "sequence": {
+                  "executionConfig": {
+                    "science": {
+                      "digest": {
+                        "offsets": [
                           {
-                            "stepConfig": {
-                              "stepType": "GCAL"
+                            "q": {
+                              "arcseconds": -15.000000
                             }
                           },
                           {
-                            "stepConfig": {
-                              "stepType": "SCIENCE",
-                              "offset": {
-                                "q": {
-                                  "arcseconds": 15.000000
-                                }
-                              }
+                            "q": {
+                              "arcseconds": 15.000000
                             }
                           }
                         ]
                       },
-                      {
-                        "description": "q 15.0″, λ 505.0 nm",
-                        "steps": [
-                          {
-                            "stepConfig": {
-                              "stepType": "SCIENCE",
-                              "offset": {
-                                "q": {
-                                  "arcseconds": 15.000000
-                                }
-                              }
-                            }
-                          },
-                          {
-                            "stepConfig": {
-                              "stepType": "GCAL"
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "description": "q -15.0″, λ 500.0 nm",
-                        "steps": [
-                          {
-                            "stepConfig": {
-                              "stepType": "GCAL"
-                            }
-                          },
-                          {
-                            "stepConfig": {
-                              "stepType": "SCIENCE",
-                              "offset": {
-                                "q": {
-                                  "arcseconds": -15.000000
-                                }
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
+                      "nextAtom": {
                         "description": "q -15.0″, λ 500.0 nm",
                         "steps": [
                           {
@@ -606,27 +532,109 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                           }
                         ]
                       },
-                      {
-                        "description": "q 15.0″, λ 505.0 nm",
-                        "steps": [
-                          {
-                            "stepConfig": {
-                              "stepType": "GCAL"
-                            }
-                          },
-                          {
-                            "stepConfig": {
-                              "stepType": "SCIENCE",
-                              "offset": {
-                                "q": {
-                                  "arcseconds": 15.000000
+                      "possibleFuture": [
+                        {
+                          "description": "q 15.0″, λ 505.0 nm",
+                          "steps": [
+                            {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE",
+                                "offset": {
+                                  "q": {
+                                    "arcseconds": 15.000000
+                                  }
                                 }
                               }
                             }
-                          }
-                        ]
-                      }
-                    ]
+                          ]
+                        },
+                        {
+                          "description": "q 15.0″, λ 505.0 nm",
+                          "steps": [
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE",
+                                "offset": {
+                                  "q": {
+                                    "arcseconds": 15.000000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "description": "q -15.0″, λ 500.0 nm",
+                          "steps": [
+                            {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE",
+                                "offset": {
+                                  "q": {
+                                    "arcseconds": -15.000000
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "description": "q -15.0″, λ 500.0 nm",
+                          "steps": [
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE",
+                                "offset": {
+                                  "q": {
+                                    "arcseconds": -15.000000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "description": "q 15.0″, λ 505.0 nm",
+                          "steps": [
+                            {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE",
+                                "offset": {
+                                  "q": {
+                                    "arcseconds": 15.000000
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -661,33 +669,34 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         )
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, tid) =>
+    setup.flatMap { case (_, oid, _) =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       nextAtom {
-                         description
-                         steps {
-                           instrumentConfig {
-                             gratingConfig {
-                               wavelength { nanometers }
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           description
+                           steps {
+                             instrumentConfig {
+                               gratingConfig {
+                                 wavelength { nanometers }
+                               }
                              }
                            }
                          }
-                       }
-                       possibleFuture {
-                         description
-                         steps {
-                           instrumentConfig {
-                             gratingConfig {
-                               wavelength { nanometers }
+                         possibleFuture {
+                           description
+                           steps {
+                             instrumentConfig {
+                               gratingConfig {
+                                 wavelength { nanometers }
+                               }
                              }
                            }
                          }
@@ -701,81 +710,11 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "programId": $pid,
-                "executionConfig": {
-                  "science": {
-                    "nextAtom": {
-                      "description": "q 0.0″, λ 495.0 nm",
-                      "steps": [
-                        {
-                          "instrumentConfig": {
-                            "gratingConfig": {
-                              "wavelength": {
-                                "nanometers": 495.000
-                              }
-                            }
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "gratingConfig": {
-                              "wavelength": {
-                                "nanometers": 495.000
-                              }
-                            }
-                          }
-                        }
-                      ]
-                    },
-                    "possibleFuture": [
-                      {
-                        "description": "q 15.0″, λ 500.0 nm",
-                        "steps": [
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 500.000
-                                }
-                              }
-                            }
-                          },
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 500.000
-                                }
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "description": "q 15.0″, λ 505.0 nm",
-                        "steps": [
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 505.000
-                                }
-                              }
-                            }
-                          },
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 505.000
-                                }
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
+              "observation": {
+                "sequence": {
+                  "executionConfig": {
+                    "science": {
+                      "nextAtom": {
                         "description": "q 0.0″, λ 495.0 nm",
                         "steps": [
                           {
@@ -796,56 +735,127 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                               }
                             }
                           }
+                        ]
+                      },
+                      "possibleFuture": [
+                        {
+                          "description": "q 15.0″, λ 500.0 nm",
+                          "steps": [
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 500.000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 500.000
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "description": "q 15.0″, λ 505.0 nm",
+                          "steps": [
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 505.000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 505.000
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "description": "q 0.0″, λ 495.0 nm",
+                          "steps": [
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 495.000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 495.000
+                                  }
+                                }
+                              }
+                            }
 
-                        ]
-                      },
-                      {
-                        "description": "q 0.0″, λ 500.0 nm",
-                        "steps": [
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 500.000
+                          ]
+                        },
+                        {
+                          "description": "q 0.0″, λ 500.0 nm",
+                          "steps": [
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 500.000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 500.000
+                                  }
                                 }
                               }
                             }
-                          },
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 500.000
+                          ]
+                        },
+                        {
+                          "description": "q 15.0″, λ 505.0 nm",
+                          "steps": [
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 505.000
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "gratingConfig": {
+                                  "wavelength": {
+                                    "nanometers": 505.000
+                                  }
                                 }
                               }
                             }
-                          }
-                        ]
-                      },
-                      {
-                        "description": "q 15.0″, λ 505.0 nm",
-                        "steps": [
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 505.000
-                                }
-                              }
-                            }
-                          },
-                          {
-                            "instrumentConfig": {
-                              "gratingConfig": {
-                                "wavelength": {
-                                  "nanometers": 505.000
-                                }
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
+                          ]
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -871,9 +881,11 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   instrument
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     instrument
+                   }
                  }
                }
              }
@@ -881,41 +893,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": null
-            }
-          """
-        )
-      )
-    }
-
-  }
-
-  test("observation doesn't correspond to program") {
-    val setup: IO[(Program.Id, Program.Id, Observation.Id, Target.Id)] =
-      for {
-        p0 <- createProgramAs(pi, "foo")
-        p1 <- createProgram
-        t  <- createTargetWithProfileAs(user, p1)
-        o  <- createGmosNorthLongSlitObservationAs(user, p1, t)
-      } yield (p0, p1, o, t)
-
-    setup.flatMap { case (pid0, pid1, oid, _) =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               sequence(programId: "$pid0", observationId: "$oid") {
-                 executionConfig {
-                   instrument
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "sequence": null
+              "observation": null
             }
           """
         )
@@ -938,15 +916,17 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   ... on GmosSouthExecutionConfig {
-                     science {
-                       nextAtom {
-                         steps {
-                           instrumentConfig {
-                             gratingConfig {
-                               wavelength { nanometers }
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     ... on GmosSouthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               gratingConfig {
+                                 wavelength { nanometers }
+                               }
                              }
                            }
                          }
@@ -960,8 +940,10 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "executionConfig": {
+              "observation": {
+                "sequence": {
+                  "executionConfig": {
+                  }
                 }
               }
             }
@@ -982,7 +964,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { case (_, oid, _) =>
       expect(
         user  = user,
         query =
@@ -1089,16 +1071,17 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
              }
 
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     acquisition {
-                       nextAtom {
-                         ...gmosNorthAtomFields
-                       }
-                       possibleFuture {
-                         ...gmosNorthAtomFields
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       acquisition {
+                         nextAtom {
+                           ...gmosNorthAtomFields
+                         }
+                         possibleFuture {
+                           ...gmosNorthAtomFields
+                         }
                        }
                      }
                    }
@@ -1109,50 +1092,27 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "programId": $pid,
-                "executionConfig": {
-                  "acquisition": {
-                    "nextAtom": {
-                       "steps": [
-                        {
-                          "instrumentConfig" : {
-                            "readout" : {
-                              "xBin" : "TWO",
-                              "yBin" : "TWO",
-                              "ampCount" : "TWELVE",
-                              "ampGain" : "LOW",
-                              "ampReadMode" : "FAST"
-                            },
-                            "roi" : "CCD2"
-                          },
-                          "estimate": {
-                            "configChange": null,
-                            "detector": {
-                              "selected": {
-                                "name": "GMOS North",
-                                "description": "GMOS North Hamamatsu Detector Array",
-                                "dataset": {
-                                  "estimate": {
-                                    "seconds": 29.700000
-                                  },
-                                  "exposure": {
-                                    "seconds": 10.000000
-                                  },
-                                  "readout": {
-                                    "seconds": 9.700000
-                                  },
-                                  "write": {
-                                    "seconds": 10.000000
-                                  }
-                                },
-                                "count": 1,
-                                "estimate": {
-                                  "seconds": 29.700000
-                                }
+              "observation": {
+                "sequence": {
+                  "executionConfig": {
+                    "acquisition": {
+                      "nextAtom": {
+                         "steps": [
+                          {
+                            "instrumentConfig" : {
+                              "readout" : {
+                                "xBin" : "TWO",
+                                "yBin" : "TWO",
+                                "ampCount" : "TWELVE",
+                                "ampGain" : "LOW",
+                                "ampReadMode" : "FAST"
                               },
-                              "all": [
-                                {
+                              "roi" : "CCD2"
+                            },
+                            "estimate": {
+                              "configChange": null,
+                              "detector": {
+                                "selected": {
                                   "name": "GMOS North",
                                   "description": "GMOS North Hamamatsu Detector Array",
                                   "dataset": {
@@ -1173,82 +1133,82 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                                   "estimate": {
                                     "seconds": 29.700000
                                   }
+                                },
+                                "all": [
+                                  {
+                                    "name": "GMOS North",
+                                    "description": "GMOS North Hamamatsu Detector Array",
+                                    "dataset": {
+                                      "estimate": {
+                                        "seconds": 29.700000
+                                      },
+                                      "exposure": {
+                                        "seconds": 10.000000
+                                      },
+                                      "readout": {
+                                        "seconds": 9.700000
+                                      },
+                                      "write": {
+                                        "seconds": 10.000000
+                                      }
+                                    },
+                                    "count": 1,
+                                    "estimate": {
+                                      "seconds": 29.700000
+                                    }
+                                  }
+                                ],
+                                "estimate": {
+                                  "seconds": 29.700000
                                 }
-                              ],
-                              "estimate": {
+                              },
+                              "total": {
                                 "seconds": 29.700000
                               }
-                            },
-                            "total": {
-                              "seconds": 29.700000
                             }
-                          }
-                        },
-                      {
-                        "instrumentConfig" : {
-                          "readout" : {
-                            "xBin" : "ONE",
-                            "yBin" : "ONE",
-                            "ampCount" : "TWELVE",
-                            "ampGain" : "LOW",
-                            "ampReadMode" : "FAST"
                           },
-                          "roi" : "CENTRAL_STAMP"
-                        },
-                        "estimate" : {
-                          "configChange" : {
-                            "selected" : {
-                              "name" : "GMOS North FPU",
-                              "description" : "GMOS North FPU change cost",
-                              "estimate" : {
-                                "seconds" : 60.000000
-                              }
+                        {
+                          "instrumentConfig" : {
+                            "readout" : {
+                              "xBin" : "ONE",
+                              "yBin" : "ONE",
+                              "ampCount" : "TWELVE",
+                              "ampGain" : "LOW",
+                              "ampReadMode" : "FAST"
                             },
-                            "all" : [
-                              {
+                            "roi" : "CENTRAL_STAMP"
+                          },
+                          "estimate" : {
+                            "configChange" : {
+                              "selected" : {
                                 "name" : "GMOS North FPU",
                                 "description" : "GMOS North FPU change cost",
                                 "estimate" : {
                                   "seconds" : 60.000000
                                 }
                               },
-                              {
-                                "name" : "Offset",
-                                "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
-                                "estimate" : {
-                                  "seconds" : 7.062500
+                              "all" : [
+                                {
+                                  "name" : "GMOS North FPU",
+                                  "description" : "GMOS North FPU change cost",
+                                  "estimate" : {
+                                    "seconds" : 60.000000
+                                  }
+                                },
+                                {
+                                  "name" : "Offset",
+                                  "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
+                                  "estimate" : {
+                                    "seconds" : 7.062500
+                                  }
                                 }
-                              }
-                            ],
-                            "estimate" : {
-                              "seconds" : 60.000000
-                            }
-                          },
-                          "detector" : {
-                            "selected" : {
-                              "name" : "GMOS North",
-                              "description" : "GMOS North Hamamatsu Detector Array",
-                              "dataset" : {
-                                "estimate" : {
-                                  "seconds" : 34.200000
-                                },
-                                "exposure" : {
-                                  "seconds" : 20.000000
-                                },
-                                "readout" : {
-                                  "seconds" : 4.200000
-                                },
-                                "write" : {
-                                  "seconds" : 10.000000
-                                }
-                              },
-                              "count" : 1,
+                              ],
                               "estimate" : {
-                                "seconds" : 34.200000
+                                "seconds" : 60.000000
                               }
                             },
-                            "all" : [
-                              {
+                            "detector" : {
+                              "selected" : {
                                 "name" : "GMOS North",
                                 "description" : "GMOS North Hamamatsu Detector Array",
                                 "dataset" : {
@@ -1269,75 +1229,75 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                                 "estimate" : {
                                   "seconds" : 34.200000
                                 }
-                              }
-                            ],
-                            "estimate" : {
-                              "seconds" : 34.200000
-                            }
-                          },
-                          "total" : {
-                            "seconds" : 94.200000
-                          }
-                        }
-                      },
-                      {
-                        "instrumentConfig" : {
-                          "readout" : {
-                            "xBin" : "ONE",
-                            "yBin" : "ONE",
-                            "ampCount" : "TWELVE",
-                            "ampGain" : "LOW",
-                            "ampReadMode" : "FAST"
-                          },
-                          "roi" : "CENTRAL_STAMP"
-                        },
-                        "estimate" : {
-                          "configChange" : {
-                            "selected" : {
-                              "name" : "Offset",
-                              "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
+                              },
+                              "all" : [
+                                {
+                                  "name" : "GMOS North",
+                                  "description" : "GMOS North Hamamatsu Detector Array",
+                                  "dataset" : {
+                                    "estimate" : {
+                                      "seconds" : 34.200000
+                                    },
+                                    "exposure" : {
+                                      "seconds" : 20.000000
+                                    },
+                                    "readout" : {
+                                      "seconds" : 4.200000
+                                    },
+                                    "write" : {
+                                      "seconds" : 10.000000
+                                    }
+                                  },
+                                  "count" : 1,
+                                  "estimate" : {
+                                    "seconds" : 34.200000
+                                  }
+                                }
+                              ],
                               "estimate" : {
-                                "seconds" : 7.062500
+                                "seconds" : 34.200000
                               }
                             },
-                            "all" : [
-                              {
+                            "total" : {
+                              "seconds" : 94.200000
+                            }
+                          }
+                        },
+                        {
+                          "instrumentConfig" : {
+                            "readout" : {
+                              "xBin" : "ONE",
+                              "yBin" : "ONE",
+                              "ampCount" : "TWELVE",
+                              "ampGain" : "LOW",
+                              "ampReadMode" : "FAST"
+                            },
+                            "roi" : "CENTRAL_STAMP"
+                          },
+                          "estimate" : {
+                            "configChange" : {
+                              "selected" : {
                                 "name" : "Offset",
                                 "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
                                 "estimate" : {
                                   "seconds" : 7.062500
                                 }
-                              }
-                            ],
-                            "estimate" : {
-                              "seconds" : 7.062500
-                            }
-                          },
-                          "detector" : {
-                            "selected" : {
-                              "name" : "GMOS North",
-                              "description" : "GMOS North Hamamatsu Detector Array",
-                              "dataset" : {
-                                "estimate" : {
-                                  "seconds" : 54.200000
-                                },
-                                "exposure" : {
-                                  "seconds" : 40.000000
-                                },
-                                "readout" : {
-                                  "seconds" : 4.200000
-                                },
-                                "write" : {
-                                  "seconds" : 10.000000
-                                }
                               },
-                              "count" : 1,
+                              "all" : [
+                                {
+                                  "name" : "Offset",
+                                  "description" : "Offset cost, 7 (constant) + 0.0625 (distance)",
+                                  "estimate" : {
+                                    "seconds" : 7.062500
+                                  }
+                                }
+                              ],
                               "estimate" : {
-                                "seconds" : 54.200000
+                                "seconds" : 7.062500
                               }
                             },
-                            "all" : [
-                              {
+                            "detector" : {
+                              "selected" : {
                                 "name" : "GMOS North",
                                 "description" : "GMOS North Hamamatsu Detector Array",
                                 "dataset" : {
@@ -1358,20 +1318,44 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                                 "estimate" : {
                                   "seconds" : 54.200000
                                 }
+                              },
+                              "all" : [
+                                {
+                                  "name" : "GMOS North",
+                                  "description" : "GMOS North Hamamatsu Detector Array",
+                                  "dataset" : {
+                                    "estimate" : {
+                                      "seconds" : 54.200000
+                                    },
+                                    "exposure" : {
+                                      "seconds" : 40.000000
+                                    },
+                                    "readout" : {
+                                      "seconds" : 4.200000
+                                    },
+                                    "write" : {
+                                      "seconds" : 10.000000
+                                    }
+                                  },
+                                  "count" : 1,
+                                  "estimate" : {
+                                    "seconds" : 54.200000
+                                  }
+                                }
+                              ],
+                              "estimate" : {
+                                "seconds" : 54.200000
                               }
-                            ],
-                            "estimate" : {
-                              "seconds" : 54.200000
+                            },
+                            "total" : {
+                              "seconds" : 61.262500
                             }
-                          },
-                          "total" : {
-                            "seconds" : 61.262500
                           }
-                        }
-                       }
-                      ]
-                    },
-                    "possibleFuture": []
+                         }
+                        ]
+                      },
+                      "possibleFuture": []
+                    }
                   }
                 }
               }
@@ -1391,7 +1375,7 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
       } yield (p, o, t)
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { case (_, oid, _) =>
       expect(
         user  = user,
         query =
@@ -1423,29 +1407,30 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
              }
 
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 programId
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     setup {
-                       full {
-                         seconds
-                       }
-                       reacquisition {
-                         seconds
-                       }
-                     }
-                     science {
-                       digest {
-                         plannedTime {
-                           ...plannedTimeFields
+               observation(observationId: "$oid") {
+                 sequence {
+                   executionConfig {
+                     ... on GmosNorthExecutionConfig {
+                       setup {
+                         full {
+                           seconds
+                         }
+                         reacquisition {
+                           seconds
                          }
                        }
-                       nextAtom {
-                         ...gmosNorthAtomFields
-                       }
-                       possibleFuture {
-                         ...gmosNorthAtomFields
+                       science {
+                         digest {
+                           plannedTime {
+                             ...plannedTimeFields
+                           }
+                         }
+                         nextAtom {
+                           ...gmosNorthAtomFields
+                         }
+                         possibleFuture {
+                           ...gmosNorthAtomFields
+                         }
                        }
                      }
                    }
@@ -1456,155 +1441,156 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "programId": $pid,
-                "executionConfig" : {
-                  "setup": {
-                    "full": {
-                      "seconds": 960.000000
+              "observation": {
+                "sequence": {
+                  "executionConfig" : {
+                    "setup": {
+                      "full": {
+                        "seconds": 960.000000
+                      },
+                      "reacquisition": {
+                        "seconds": 300.000000
+                      }
                     },
-                    "reacquisition": {
-                      "seconds": 300.000000
-                    }
-                  },
-                  "science" : {
-                    "digest": {
-                      "plannedTime" : {
-                        "total" : {
-                          "seconds" : 769.200000
-                        },
-                        "charges" : [
+                    "science" : {
+                      "digest": {
+                        "plannedTime" : {
+                          "total" : {
+                            "seconds" : 769.200000
+                          },
+                          "charges" : [
+                            {
+                              "chargeClass" : "NON_CHARGED",
+                              "time" : {
+                                "seconds" : 0.000000
+                              }
+                            },
+                            {
+                              "chargeClass" : "PARTNER",
+                              "time" : {
+                                "seconds" : 357.600000
+                              }
+                            },
+                            {
+                              "chargeClass" : "PROGRAM",
+                              "time" : {
+                                "seconds" : 411.600000
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "nextAtom" : {
+                        "steps" : [
                           {
-                            "chargeClass" : "NON_CHARGED",
-                            "time" : {
-                              "seconds" : 0.000000
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 61.100000
+                              }
                             }
                           },
                           {
-                            "chargeClass" : "PARTNER",
-                            "time" : {
-                              "seconds" : 357.600000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PROGRAM",
-                            "time" : {
-                              "seconds" : 411.600000
+                            "estimate" : {
+                              "total" : {
+                                "seconds" : 67.100000
+                              }
                             }
                           }
                         ]
-                      }
-                    },
-                    "nextAtom" : {
-                      "steps" : [
+                      },
+                      "possibleFuture" : [
                         {
-                          "estimate" : {
-                            "total" : {
-                              "seconds" : 61.100000
+                          "steps" : [
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 52.100000
+                                }
+                              }
+                            },
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 76.100000
+                                }
+                              }
                             }
-                          }
+                          ]
                         },
                         {
-                          "estimate" : {
-                            "total" : {
-                              "seconds" : 67.100000
+                          "steps" : [
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 61.100000
+                                }
+                              }
+                            },
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 67.100000
+                                }
+                              }
                             }
-                          }
+                          ]
+                        },
+                        {
+                          "steps" : [
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 52.100000
+                                }
+                              }
+                            },
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 76.100000
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "steps" : [
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 61.100000
+                                }
+                              }
+                            },
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 67.100000
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "steps" : [
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 52.100000
+                                }
+                              }
+                            },
+                            {
+                              "estimate" : {
+                                "total" : {
+                                  "seconds" : 76.100000
+                                }
+                              }
+                            }
+                          ]
                         }
                       ]
-                    },
-                    "possibleFuture" : [
-                      {
-                        "steps" : [
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 52.100000
-                              }
-                            }
-                          },
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 76.100000
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 61.100000
-                              }
-                            }
-                          },
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 67.100000
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 52.100000
-                              }
-                            }
-                          },
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 76.100000
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 61.100000
-                              }
-                            }
-                          },
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 67.100000
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 52.100000
-                              }
-                            }
-                          },
-                          {
-                            "estimate" : {
-                              "total" : {
-                                "seconds" : 76.100000
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
+                    }
                   }
                 }
               }
