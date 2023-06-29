@@ -4874,6 +4874,28 @@ type Observation {
     useCache: Boolean = true
   ): ItcResultSet
 
+  """
+  Produces the execution configuration with its acquisition and science
+  sequences for this observation.
+  """
+  sequence(
+
+    """
+    Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
+    """
+    useCache: Boolean = true
+
+    """
+    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
+    sequence has `hasMore` and `atomCount` fields that can be used to determine
+    whether and how many remaining atoms are yet to be executed.
+    """
+    futureLimit: PosInt = 25
+
+  ): SequenceGenerationResult
+
 }
 
 # ObservationId id formatted as `o-[1-9a-f][0-9a-f]*`
@@ -5388,7 +5410,8 @@ type Query {
 
   """
   Produces the execution configuration with its acquisition and science
-  sequences for this observation.
+  sequences for this observation.  DEPRECATED (use the `observation` query and
+  select the `sequence` field instead.
   """
   sequence(
     programId:     ProgramId!
@@ -5409,7 +5432,7 @@ type Query {
     """
     futureLimit: PosInt! = 25
 
-  ): SequenceGenerationResult
+  ): SequenceGenerationResult @deprecated(reason: "use observation(observationId: \"o-111\") { sequence {...} } instead")
 
   # Retrieves the target with the given id, if it exists
   target(
