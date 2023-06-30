@@ -6,6 +6,7 @@ package lucuma.odb.json
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
@@ -156,35 +157,34 @@ trait SequenceCodec {
 
   import lucuma.odb.json.gmos.given
 
-  private def rootDecoder[R, S: Decoder, D: Decoder](name: String)(instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
+  private def rootDecoder[R, S: Decoder, D: Decoder](instrument: Instrument)(instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
     Decoder.instance { c =>
       for {
-        _ <- c.downField(name).as[Boolean]
+        _ <- c.downField("instrument").as[Instrument].filterOrElse(_ === instrument, DecodingFailure(s"Expected instrument $instrument", c.history))
         r <- c.as[ExecutionConfig[S, D]]
       } yield instrumentExecutionConfig(r)
     }
 
   given Decoder[InstrumentExecutionConfig.GmosNorth] =
-    rootDecoder("gmosNorth")(InstrumentExecutionConfig.GmosNorth.apply)
+    rootDecoder(Instrument.GmosNorth)(InstrumentExecutionConfig.GmosNorth.apply)
 
   given Decoder[InstrumentExecutionConfig.GmosSouth] =
-    rootDecoder("gmosSouth")(InstrumentExecutionConfig.GmosSouth.apply)
+    rootDecoder(Instrument.GmosSouth)(InstrumentExecutionConfig.GmosSouth.apply)
 
   private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
-    name:       String,
     instrument: Instrument
   )(root: R => ExecutionConfig[S, D]): Encoder[R] =
     Encoder.instance { (a: R) =>
       root(a).asJson.mapObject { obj =>
-        ("instrument", instrument.asJson) +: (name, true.asJson) +: obj
+        ("instrument", instrument.asJson) +: obj
       }
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =
-    rootEncoder("gmosNorth", Instrument.GmosNorth)(_.executionConfig)
+    rootEncoder(Instrument.GmosNorth)(_.executionConfig)
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
-    rootEncoder("gmosSouth", Instrument.GmosSouth)(_.executionConfig)
+    rootEncoder(Instrument.GmosSouth)(_.executionConfig)
 
   given Decoder[InstrumentExecutionConfig] =
     Decoder.instance { c =>
