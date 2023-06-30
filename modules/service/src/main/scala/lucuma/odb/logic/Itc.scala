@@ -6,7 +6,6 @@ package lucuma.odb.logic
 import cats.MonadThrow
 import cats.Order
 import cats.data.EitherNel
-import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
@@ -27,22 +26,22 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
 sealed trait Itc[F[_]] {
 
-  def lookup(
-    programId:     Program.Id,
-    observationId: Observation.Id,
-    useCache:      Boolean
-  )(using Transaction[F]): F[EitherNel[Itc.Error, Itc.ResultSet]]
+  def selectParams(
+    pid: Program.Id,
+    oid: Observation.Id
+  )(using Transaction[F]): F[EitherNel[Itc.Error, GeneratorParams]]
 
-  def spectroscopy(
-    targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
+  def callService(
+    params:   GeneratorParams,
     useCache: Boolean
-  ): F[EitherNel[Itc.Error, Itc.ResultSet]]
+  )(using NoTransaction[F]): F[EitherNel[Itc.Error, Itc.ResultSet]]
 
 }
 
@@ -134,46 +133,28 @@ object Itc {
 
       import Result.*
 
-      override def lookup(
-        programId:     Program.Id,
-        observationId: Observation.Id,
-        useCache:      Boolean
-      )(using Transaction[F]): F[EitherNel[Error, ResultSet]] =
-        (for {
-          params <- selectParams(programId, observationId).leftMap(NonEmptyList.one)
-          result <- callItc(params, useCache)
-        } yield result).value
-
-
-      private def selectParams(
+      override def selectParams(
         pid: Program.Id,
         oid: Observation.Id
-      )(using Transaction[F]): EitherT[F, Error, GeneratorParams] =
-        EitherT(
-          generatorParamsService
-            .select(pid, oid)
-            .map {
-              case None                => ObservationNotFound(pid, oid).asLeft
-              case Some(Left(missing)) => MissingParams(missing).asLeft
-              case Some(Right(params)) => params.asRight
-            }
-        )
+      )(using Transaction[F]): F[EitherNel[Error, GeneratorParams]] =
+        generatorParamsService
+          .select(pid, oid)
+          .map {
+            case None                => NonEmptyList.one(ObservationNotFound(pid, oid)).asLeft
+            case Some(Left(missing)) => NonEmptyList.one(MissingParams(missing)).asLeft
+            case Some(Right(params)) => params.asRight
+          }
 
-      private def callItc(
+      override def callService(
         params:   GeneratorParams,
         useCache: Boolean
-      ): EitherT[F, NonEmptyList[Error], ResultSet] =
-
+      )(using NoTransaction[F]): F[EitherNel[Error, ResultSet]] =
         params match {
-          case GeneratorParams.GmosNorthLongSlit(itc, _) =>
-            EitherT(spectroscopy(itc, useCache))
-
-          case GeneratorParams.GmosSouthLongSlit(itc, _) =>
-            EitherT(spectroscopy(itc, useCache))
+          case GeneratorParams.GmosNorthLongSlit(itc, _) => spectroscopy(itc, useCache)
+          case GeneratorParams.GmosSouthLongSlit(itc, _) => spectroscopy(itc, useCache)
         }
 
-
-      override def spectroscopy(
+      private def spectroscopy(
         targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
         useCache: Boolean
       ): F[EitherNel[Error, ResultSet]] =
