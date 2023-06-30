@@ -172,19 +172,20 @@ trait SequenceCodec {
     rootDecoder(Instrument.GmosSouth)(InstrumentExecutionConfig.GmosSouth.apply)
 
   private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
+    name:       String,
     instrument: Instrument
   )(root: R => ExecutionConfig[S, D]): Encoder[R] =
     Encoder.instance { (a: R) =>
       root(a).asJson.mapObject { obj =>
-        ("instrument", instrument.asJson) +: obj
+        ("instrument", instrument.asJson) +: (name, true.asJson) +: obj
       }
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =
-    rootEncoder(Instrument.GmosNorth)(_.executionConfig)
+    rootEncoder("gmosNorth", Instrument.GmosNorth)(_.executionConfig)
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
-    rootEncoder(Instrument.GmosSouth)(_.executionConfig)
+    rootEncoder("gmosSouth", Instrument.GmosSouth)(_.executionConfig)
 
   given Decoder[InstrumentExecutionConfig] =
     Decoder.instance { c =>
