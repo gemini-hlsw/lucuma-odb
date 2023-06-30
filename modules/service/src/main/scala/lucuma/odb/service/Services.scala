@@ -12,7 +12,6 @@ import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
@@ -84,7 +83,7 @@ trait Services[F[_]]:
   
   /** The `GroupService`. */
   def groupService: GroupService[F]
-  
+
   /** The `ObsAttachmentAssignmentService`. */
   def obsAttachmentAssignmentService: ObsAttachmentAssignmentService[F]
 
@@ -130,8 +129,8 @@ trait Services[F[_]]:
   /** The `VisitService` */
   def visitService: VisitService[F]
 
-  /** Construct an `Itc` service, given an `ItcClient`.*/
-  def itc(itcClient: ItcClient[F]): Itc[F]
+  /** Construct an `ItcService`, given an `ItcClient`.*/
+  def itcService(itcClient: ItcClient[F]): ItcService[F]
 
   /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
   def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): Generator[F]
@@ -191,7 +190,7 @@ object Services:
       // `Services` instance.
       def proposalAttachmentFileService(s3: S3FileService[F]) = ProposalAttachmentFileService.instantiate(s3)
       def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
-      def itc(itcClient: ItcClient[F]) = Itc.instantiate(itcClient)
+      def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
 
 
@@ -212,7 +211,7 @@ object Services:
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
-    def obsAttachmentAssignmentService[F[_]](using Services[F]):ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
+    def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
     def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
     def obsAttachmentMetadataService[F[_]](using Services[F]): ObsAttachmentMetadataService[F] = summon[Services[F]].obsAttachmentMetadataService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
@@ -227,7 +226,7 @@ object Services:
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
-    def itc[F[_]](client: ItcClient[F])(using Services[F]): Itc[F] = summon[Services[F]].itc(client)
+    def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])

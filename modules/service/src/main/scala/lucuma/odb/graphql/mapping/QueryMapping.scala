@@ -5,8 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
@@ -32,9 +30,9 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
@@ -64,12 +62,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     oid:      model.Observation.Id,
     useCache: Boolean
   ): F[Result[Json]] =
-    (for {
-      p <- EitherT(services.useTransactionally(itc(itcClient).selectParams(pid, oid)))
-      r <- EitherT(services.useNonTransactionally(itc(itcClient).callService(p, useCache)))
-    } yield r).value.map {
-      case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-      case Right(resultSet) => resultSet.asJson.success
+    services.useNonTransactionally {
+      itcService(itcClient)
+        .lookup(pid, oid, useCache)
+        .map {
+          case Left(e)  => Result.failure(e.format)
+          case Right(s) => s.result.asJson.success
+        }
     }
 
   // TODO: this is used by a now deprecated part of the schema.  Remove when possible.
@@ -81,26 +80,26 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     futureLimit: Generator.FutureLimit
   ): F[Result[Json]] = {
 
-    val mapResult: Generator.Result => Result[Json] = {
-      case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
-      case e: Generator.Error                         => Result.failure(e.format)
-      case Generator.Result.Success(_, itc, exec, d)  =>
-          Result(Json.obj(
-            "programId"       -> pid.asJson,
-            "observationId"   -> oid.asJson,
-            "itcResult"       -> itc.asJson,
-            "executionConfig" -> exec.asJson,
-            "scienceDigest"   -> d.asJson
-          ))
+    val mapError: Generator.Error => Result[Json] = {
+      case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
+        Result(Json.Null)
+      case e: Generator.Error                                                   =>
+       Result.failure(e.format)
     }
 
-    services.use { s =>
-      val generatorService = s.generator(commitHash, itcClient, plannedTimeCalculator)
+    def mapSuccess(s: Generator.Success): Result[Json] =
+      Json.obj(
+        "programId"       -> pid.asJson,
+        "observationId"   -> oid.asJson,
+        "itcResult"       -> s.itc.asJson,
+        "executionConfig" -> s.value.asJson,
+        "scienceDigest"   -> s.scienceDigest.asJson
+      ).success
 
-      (for {
-        p <- EitherT(s.transactionally(generatorService.selectParams(pid, oid)))
-        r <- EitherT(generatorService.generate(oid, p, useCache, futureLimit))
-      } yield r).value.map(result => mapResult(result.merge))
+    services.use { s =>
+      s.generator(commitHash, itcClient, plannedTimeCalculator)
+       .generate(pid, oid, useCache, futureLimit)
+       .map(_.bimap(mapError, mapSuccess).merge)
     }
 
   }
