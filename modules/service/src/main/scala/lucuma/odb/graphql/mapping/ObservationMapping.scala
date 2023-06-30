@@ -6,12 +6,10 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Eq
-import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.syntax.applicative.*
+import cats.syntax.bifunctor.*
 import cats.syntax.eq.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -34,9 +32,9 @@ import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
 import table.ObsAttachmentAssignmentTable
@@ -145,18 +143,15 @@ trait ObservationMapping[F[_]]
     val readEnv: Env => Result[Boolean] =
       env => env.getR[Boolean](UseCacheParam)
 
-    val calculate: (Program.Id, Observation.Id, Boolean) => F[Result[Itc.ResultSet]] =
+    val calculate: (Program.Id, Observation.Id, Boolean) => F[Result[ItcService.AsterismResult]] =
       (pid, oid, useCache) =>
         services.use { s =>
-          val itcService = s.itc(itcClient)
-
-          (for {
-            p <- EitherT(s.transactionally(itcService.selectParams(pid, oid)))
-            r <- EitherT(itcService.callService(p, useCache))
-          } yield r).value.map {
-            case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-            case Right(resultSet) => resultSet.success
-          }
+          s.itcService(itcClient)
+           .lookup(pid, oid, useCache)
+           .map {
+             case Left(e)  => Result.failure(e.format)
+             case Right(s) => s.result.success
+           }
         }
 
     effectHandler("itc", readEnv, calculate)
@@ -177,26 +172,26 @@ trait ObservationMapping[F[_]]
       } yield SequenceEnv(c, f)
 
     val calculate: (Program.Id, Observation.Id, SequenceEnv) => F[Result[Json]] = (pid, oid, env) => {
-      val mapResult: Generator.Result => Result[Json] = {
-        case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
-        case e: Generator.Error                         => Result.failure(e.format)
-        case Generator.Result.Success(_, itc, exec, d)  =>
-            Result(Json.obj(
-              "programId"       -> pid.asJson,
-              "observationId"   -> oid.asJson,
-              "itcResult"       -> itc.asJson,
-              "executionConfig" -> exec.asJson,
-              "scienceDigest"   -> d.asJson
-            ))
+      val mapError: Generator.Error => Result[Json] = {
+        case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
+          Result(Json.Null)
+        case e: Generator.Error                                                   =>
+         Result.failure(e.format)
       }
 
-      services.use { s =>
-        val generatorService = s.generator(commitHash, itcClient, plannedTimeCalculator)
+      def mapSuccess(s: Generator.Success): Result[Json] =
+        Json.obj(
+          "programId"       -> pid.asJson,
+          "observationId"   -> oid.asJson,
+          "itcResult"       -> s.itc.asJson,
+          "executionConfig" -> s.value.asJson,
+          "scienceDigest"   -> s.scienceDigest.asJson
+        ).success
 
-        (for {
-          p <- EitherT(s.transactionally(generatorService.selectParams(pid, oid)))
-          r <- EitherT(generatorService.generate(oid, p, env.useCache, env.limit))
-        } yield r).value.map(result => mapResult(result.merge))
+      services.use { s =>
+        s.generator(commitHash, itcClient, plannedTimeCalculator)
+         .generate(pid, oid, env.useCache, env.limit)
+         .map(_.bimap(mapError, mapSuccess).merge)
       }
     }
 

@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
@@ -38,11 +37,10 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
-import lucuma.odb.service.GeneratorParamsService
+import lucuma.odb.service.ItcService
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import skunk.Transaction
 
 import java.util.UUID
 
@@ -50,17 +48,12 @@ import Generator.FutureLimit
 
 sealed trait Generator[F[_]] {
 
-  def selectParams(
-    programId:     Program.Id,
-    observationId: Observation.Id
-  )(using Transaction[F]): F[Either[Generator.Error, GeneratorParams]]
-
   def generate(
+    programId:     Program.Id,
     observationId: Observation.Id,
-    params:        GeneratorParams,
     useCache:      Boolean     = true,
     futureLimit:   FutureLimit = FutureLimit.Default
-  )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Result.Success]]
+  )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Success]]
 
 }
 
@@ -81,60 +74,35 @@ object Generator {
       }
   }
 
-  sealed trait Result
-  sealed trait Error extends Result {
+  sealed trait Error {
     def format: String
   }
 
-  object Result {
+  object Error {
 
-    case class ObservationNotFound(
-      programId:     Program.Id,
-      observationId: Observation.Id
-    ) extends Error {
+    case class ItcError(error: ItcService.Error) extends Error {
       def format: String =
-        s"Observation '$observationId' in program '$programId' not found."
+        error.format
     }
 
-    case class MissingParams(
-      missing: NonEmptyList[GeneratorParamsService.MissingData]
-    ) extends Error {
-      def format: String = {
-        val params = missing.map { m =>
-          s"${m.targetId.fold("") { tid => s"(target $tid) " }}${m.paramName}"
-        }.intercalate(", ")
-        s"ITC cannot be queried until the following parameters are defined: $params"
-      }
-    }
-
-    case class ItcServiceError(
-      errors: NonEmptyList[Itc.Error]
-    ) extends Error {
-      def format: String =
-        s"ITC service errors: ${errors.map(_.format).intercalate(", ")}"
-    }
-
-    case class InvalidData(
-      message: String
-    ) extends Error {
+    case class InvalidData(message: String) extends Error {
       def format: String =
         s"Could not generate a sequence from the observation: $message"
     }
 
-    case class MissingSmartGcalDef(
-      key: String
-    ) extends Error {
+    case class MissingSmartGcalDef(key: String) extends Error {
       def format: String =
         s"Could not generate a sequence, missing Smart GCAL mapping: $key"
     }
 
-    case class Success(
-      observationId: Observation.Id,
-      itc:           Itc.ResultSet,
-      value:         InstrumentExecutionConfig,
-      scienceDigest: Option[SequenceDigest]
-    ) extends Result
   }
+
+  case class Success(
+    observationId: Observation.Id,
+    itc:           ItcService.AsterismResult,
+    value:         InstrumentExecutionConfig,
+    scienceDigest: Option[SequenceDigest]
+  )
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
@@ -143,37 +111,24 @@ object Generator {
   )(using Services[F]): Generator[F] =
     new Generator[F] {
 
-      import Result.*
+      import Error.*
 
       private val exp = SmartGcalExpander.fromService(smartGcalService)
 
-      override def selectParams(
-        pid: Program.Id,
-        oid: Observation.Id
-      )(using Transaction[F]): F[Either[Error, GeneratorParams]] =
-        generatorParamsService
-          .select(pid, oid)
-          .map {
-            case None                => ObservationNotFound(pid, oid).asLeft
-            case Some(Left(missing)) => MissingParams(missing).asLeft
-            case Some(Right(params)) => params.asRight
-          }
-
-
       override def generate(
-        observationId: Observation.Id,
-        params:        GeneratorParams,
-        useCache:      Boolean     = true,
-        futureLimit:   FutureLimit = FutureLimit.Default
-      )(using NoTransaction[F]): F[Either[Error, Generator.Result.Success]] = {
-        val callItc: F[Either[Error, Itc.ResultSet]] =
-          itc(itcClient)
-            .callService(params, useCache)
-            .map(_.leftMap(errors => ItcServiceError(errors)))
+        pid:         Program.Id,
+        oid:         Observation.Id,
+        useCache:    Boolean     = true,
+        futureLimit: FutureLimit = FutureLimit.Default
+      )(using NoTransaction[F]): F[Either[Error, Success]] = {
+        val callItc: F[Either[Error, ItcService.Success]] =
+          itcService(itcClient)
+            .lookup(pid, oid, useCache)
+            .map(_.leftMap(error => ItcError(error)))
 
         (for {
           r <- EitherT(callItc)
-          s <- generateSequence(observationId, params, r, futureLimit)
+          s <- generateSequence(oid, r.params, r.result, futureLimit)
         } yield s).value
       }
 
@@ -182,7 +137,7 @@ object Generator {
       private def generateSequence(
         oid:         Observation.Id,
         params:      GeneratorParams,
-        resultSet:   Itc.ResultSet,
+        resultSet:   ItcService.AsterismResult,
         futureLimit: FutureLimit
       )(using NoTransaction[F]): EitherT[F, Error, Success] = {
         val namespace = SequenceIds.namespace(commitHash, oid, params)
@@ -207,7 +162,7 @@ object Generator {
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
       // or planned time calculation.
       private def gmosLongSlit[S, D, G, L, U](
-        itcResult: Itc.Result.Success,
+        itcResult: ItcService.TargetResult,
         config:    gmos.longslit.Config[G, L, U],
         generator: gmos.longslit.Generator[S, D, G, L, U]
       ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
