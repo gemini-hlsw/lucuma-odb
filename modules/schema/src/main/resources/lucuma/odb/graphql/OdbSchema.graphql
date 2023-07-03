@@ -4870,7 +4870,7 @@ type Observation {
   and a selected observing mode.
   """
   itc(
-    "Whether to use cached results (true) or ignore the cache and make a remote ITC call (false)."
+    "deprecated, will be removed"
     useCache: Boolean = true
   ): ItcResultSet
 
@@ -4880,9 +4880,7 @@ type Observation {
   """
   sequence(
 
-    """
-    Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
-    """
+    "deprecated, will be removed"
     useCache: Boolean = true
 
     """
@@ -5323,7 +5321,7 @@ type Query {
 
     observationId: ObservationId!
 
-    "Whether to use cached results (true) or ignore the cache and make a remote ITC call (false)."
+    "deprecated, will be removed"
     useCache: Boolean! = true
   ): ItcResultSet @deprecated(reason: "use observation(observationId: \"o-111\") { itc {...} } instead")
 
@@ -5418,9 +5416,7 @@ type Query {
 
     observationId: ObservationId!
 
-    """
-    Whether to use cached results (true) or ignore the cache and make a remote ITC call (false).
-    """
+    "deprecated, will be removed"
     useCache: Boolean! = true
 
     """

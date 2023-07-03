@@ -60,11 +60,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     path:     Path,
     pid:      model.Program.Id,
     oid:      model.Observation.Id,
-    useCache: Boolean
   ): F[Result[Json]] =
     services.useNonTransactionally {
       itcService(itcClient)
-        .lookup(pid, oid, useCache)
+        .lookup(pid, oid)
         .map {
           case Left(e)  => Result.failure(e.format)
           case Right(s) => s.result.asJson.success
@@ -76,7 +75,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     path:        Path,
     pid:         model.Program.Id,
     oid:         model.Observation.Id,
-    useCache:    Boolean,
     futureLimit: Generator.FutureLimit
   ): F[Result[Json]] = {
 
@@ -98,7 +96,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
     services.use { s =>
       s.generator(commitHash, itcClient, plannedTimeCalculator)
-       .generate(pid, oid, useCache, futureLimit)
+       .generate(pid, oid, futureLimit)
        .map(_.bimap(mapError, mapSuccess).merge)
     }
 
@@ -112,11 +110,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
         RootEffect.computeJson("itc") { (_, path, env) =>
-          val useCache = env.get[Boolean]("useCache").getOrElse(true)
           (env.getR[lucuma.core.model.Program.Id]("programId"),
            env.getR[lucuma.core.model.Observation.Id]("observationId")
           ).parTupled.flatTraverse { case (p, o) =>
-            itcQuery(path, p, o, useCache)
+            itcQuery(path, p, o)
           }
         },
         SqlObject("obsAttachmentTypeMeta"),
@@ -127,12 +124,11 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("programs"),
         SqlObject("proposalAttachmentTypeMeta"),
         RootEffect.computeJson("sequence") { (_, path, env) =>
-          val useCache    = env.get[Boolean]("useCache").getOrElse(true)
           val futureLimit = env.get[Generator.FutureLimit]("futureLimit").getOrElse(Generator.FutureLimit.Default)
           (env.getR[lucuma.core.model.Program.Id]("programId"),
            env.getR[lucuma.core.model.Observation.Id]("observationId")
           ).parTupled.flatTraverse { case (p, o) =>
-            sequence(path, p, o, useCache, futureLimit)
+            sequence(path, p, o, futureLimit)
           }
         },
         SqlObject("target"),
@@ -249,9 +245,9 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ObservationIdBinding("observationId", rOid),
       BooleanBinding("useCache", rUseCache)
     ), child) =>
-      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, useCache) =>
+      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, _) =>
         Environment(
-          Env("programId" -> pid, "observationId" -> oid, "useCache" -> useCache),
+          Env("programId" -> pid, "observationId" -> oid),
           Select("itc", Nil, child)
         )
       }
@@ -371,12 +367,11 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       BooleanBinding("useCache", rUseCache),
       Generator.FutureLimit.Binding("futureLimit", rFutureLimit)
     ), child) =>
-      (rPid, rOid, rUseCache, rFutureLimit).parTupled.map { case (pid, oid, useCache, futureLimit) =>
+      (rPid, rOid, rUseCache, rFutureLimit).parTupled.map { case (pid, oid, _, futureLimit) =>
         Environment(
           Env(
             "programId"     -> pid,
             "observationId" -> oid,
-            "useCache"      -> useCache,
             "futureLimit"   -> futureLimit
           ),
           Select("sequence", Nil, child)
