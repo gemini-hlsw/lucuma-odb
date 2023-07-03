@@ -51,7 +51,6 @@ sealed trait Generator[F[_]] {
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
-    useCache:      Boolean     = true,
     futureLimit:   FutureLimit = FutureLimit.Default
   )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Success]]
 
@@ -118,16 +117,15 @@ object Generator {
       override def generate(
         pid:         Program.Id,
         oid:         Observation.Id,
-        useCache:    Boolean     = true,
         futureLimit: FutureLimit = FutureLimit.Default
       )(using NoTransaction[F]): F[Either[Error, Success]] = {
-        val callItc: F[Either[Error, ItcService.Success]] =
+        val itcResult: F[Either[Error, ItcService.Success]] =
           itcService(itcClient)
-            .lookup(pid, oid, useCache)
+            .lookup(pid, oid)
             .map(_.leftMap(error => ItcError(error)))
 
         (for {
-          r <- EitherT(callItc)
+          r <- EitherT(itcResult)
           s <- generateSequence(oid, r.params, r.result, futureLimit)
         } yield s).value
       }

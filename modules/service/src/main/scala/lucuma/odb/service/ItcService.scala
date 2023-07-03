@@ -45,8 +45,7 @@ sealed trait ItcService[F[_]] {
 
   def lookup(
     programId:     Program.Id,
-    observationId: Observation.Id,
-    useCache:      Boolean
+    observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[ItcService.Error, ItcService.Success]]
 
 }
@@ -154,20 +153,19 @@ object ItcService {
       import Error.*
 
       override def lookup(
-        pid:      Program.Id,
-        oid:      Observation.Id,
-        useCache: Boolean
+        pid: Program.Id,
+        oid: Observation.Id
       )(using NoTransaction[F]): F[Either[Error, Success]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, storedResult) = pr
-          result <- storedResult.fold(EitherT(callAndInsert(pid, oid, params, useCache)))(r => EitherT.pure(r))
+          result <- storedResult.fold(EitherT(callAndInsert(pid, oid, params)))(r => EitherT.pure(r))
         } yield Success(params, result)).value
 
       // Selects the parameters then selects the previously stored result set, if any.
       private def attemptLookup(
-        pid:      Program.Id,
-        oid:      Observation.Id
+        pid: Program.Id,
+        oid: Observation.Id
       )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResult])]] =
         services.transactionally {
           (for {
@@ -218,29 +216,26 @@ object ItcService {
       private def callAndInsert(
         pid:      Program.Id,
         oid:      Observation.Id,
-        params:   GeneratorParams,
-        useCache: Boolean
+        params:   GeneratorParams
       ): F[Either[Error, AsterismResult]] =
         (for {
-          r <- EitherT(callRemote(params, useCache))
+          r <- EitherT(callRemote(params))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
         } yield r).value
 
       private def callRemote(
-        params:   GeneratorParams,
-        useCache: Boolean
+        params:   GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         params match {
-          case GeneratorParams.GmosNorthLongSlit(itc, _) => callRemoteSpectroscopy(itc, useCache)
-          case GeneratorParams.GmosSouthLongSlit(itc, _) => callRemoteSpectroscopy(itc, useCache)
+          case GeneratorParams.GmosNorthLongSlit(itc, _) => callRemoteSpectroscopy(itc)
+          case GeneratorParams.GmosSouthLongSlit(itc, _) => callRemoteSpectroscopy(itc)
         }
 
       private def callRemoteSpectroscopy(
-        targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
-        useCache: Boolean
+        targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)]
       )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         targets.traverse { case (tid, si) =>
-          client.spectroscopy(si, useCache).map {
+          client.spectroscopy(si, useCache = false).map {
             case IntegrationTimeResult(versions, results) =>
               TargetResult(tid, si, results.head, versions).rightNel
           }
