@@ -186,6 +186,9 @@ object ItcService {
             case Some(Right(params)) => params.asRight
           }
 
+      // Selects the asterism result as a whole by selecting all the individual
+      // target results.  If any individual result is not found then the asterism
+      // as a whole is considered not found.
       private def selectResult(
         pid:    Program.Id,
         oid:    Observation.Id,
@@ -213,6 +216,8 @@ object ItcService {
           .map(_.map(lst => AsterismResult(Zipper.fromNel(lst).focusMax)))
       }
 
+      // Calls the remote ITC service and stores the results in a table for
+      // future lookups.
       private def callAndInsert(
         pid:      Program.Id,
         oid:      Observation.Id,
