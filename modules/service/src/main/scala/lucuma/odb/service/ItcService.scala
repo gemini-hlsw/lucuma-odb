@@ -8,14 +8,21 @@ import cats.data.EitherNel
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.OptionT
+import cats.effect.Async
 import cats.effect.Concurrent
+import cats.effect.Resource
+import cats.effect.Temporal
+import cats.effect.syntax.spawn.*
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
+import fs2.Stream
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -28,7 +35,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.NoTransaction
@@ -40,6 +46,7 @@ import skunk.implicits.*
 
 import java.security.MessageDigest
 import java.util.HexFormat
+import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
 
@@ -90,8 +97,7 @@ object ItcService {
   case class TargetResult(
     targetId: Target.Id,
     input:    SpectroscopyIntegrationTimeInput,
-    value:    IntegrationTime,
-    versions: ItcVersions
+    value:    IntegrationTime
   ) {
     def totalTime: Option[TimeSpan] = {
       val total = BigInt(value.exposureTime.toMicroseconds) * value.exposures.value
@@ -147,6 +153,27 @@ object ItcService {
         .digest(input.asJson.noSpaces.getBytes("UTF-8"))
     )
 
+  def pollVersionsForever[F[_]: Async: Temporal](
+    client:     Resource[F, ItcClient[F]],
+    session:    Resource[F, Session[F]],
+    pollPeriod: FiniteDuration
+  ): F[Unit] = {
+    val pollOnce: F[Unit] =
+      for {
+        v <- client.use(_.versions)
+        _ <- session.use { s => s.transaction.use(_ => s.execute(Statements.UpdateItcVersion)(v.server.some, v.data)) }
+      } yield ()
+
+    Stream
+      .fixedDelay(pollPeriod)
+      .zip(Stream.repeatEval(pollOnce))
+      .compile
+      .drain
+      .start
+      .void
+
+  }
+
   def instantiate[F[_]: Concurrent](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
@@ -200,9 +227,9 @@ object ItcService {
           input: SpectroscopyIntegrationTimeInput
         ): F[Option[TargetResult]] =
           session
-            .option(Statements.Select)(pid, oid, tid)
-            .map(_.collect { case (h, time, versions) if h === hash(input) =>
-              TargetResult(tid, input, time, versions)
+            .option(Statements.SelectItcResult)(pid, oid, tid)
+            .map(_.collect { case (h, time) if h === hash(input) =>
+              TargetResult(tid, input, time)
             })
 
         val specs = params match {
@@ -241,8 +268,8 @@ object ItcService {
       )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         targets.traverse { case (tid, si) =>
           client.spectroscopy(si, useCache = false).map {
-            case IntegrationTimeResult(versions, results) =>
-              TargetResult(tid, si, results.head, versions).rightNel
+            case IntegrationTimeResult(_, results) =>
+              TargetResult(tid, si, results.head).rightNel
           }
           .handleError { t => (tid, t.getMessage).leftNel }
         }.map(_.sequence.bimap(
@@ -258,7 +285,7 @@ object ItcService {
 
         def insertOrUpdateSingleTarget(success: TargetResult): F[Unit] = {
           val h = hash(success.input)
-          session.execute(Statements.InsertOrUpdate)(
+          session.execute(Statements.InsertOrUpdateItcResult)(
             pid,
             oid,
             success.targetId,
@@ -266,14 +293,10 @@ object ItcService {
             success.value.exposureTime,
             success.value.exposures,
             success.value.signalToNoise,
-            success.versions.server,
-            success.versions.data,
             h,
             success.value.exposureTime,
             success.value.exposures,
             success.value.signalToNoise,
-            success.versions.server,
-            success.versions.data
           ).void
         }
 
@@ -286,29 +309,34 @@ object ItcService {
     private val integration_time: Codec[IntegrationTime] =
       (time_span *: pos_int *: signal_to_noise).to[IntegrationTime]
 
-    private val itc_versions: Codec[ItcVersions] =
-      (text *: text.opt).to[ItcVersions]
+    val UpdateItcVersion: Command[(
+      Option[String],
+      Option[String]
+    )] =
+      sql"""
+        UPDATE t_itc_version
+           SET c_version = ${text.opt},
+               c_data    = ${text.opt}
+      """.command
 
-    val Select: Query[(
+    val SelectItcResult: Query[(
       Program.Id,
       Observation.Id,
       Target.Id
-    ), (String, IntegrationTime, ItcVersions)] =
+    ), (String, IntegrationTime)] =
       sql"""
         SELECT
           c_hash,
           c_exposure_time,
           c_exposure_count,
-          c_signal_to_noise,
-          c_version,
-          c_data
+          c_signal_to_noise
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id AND
               c_target_id      = $target_id
-      """.query(text *: integration_time *: itc_versions)
+      """.query(text *: integration_time)
 
-    val InsertOrUpdate: Command[(
+    val InsertOrUpdateItcResult: Command[(
       Program.Id,
       Observation.Id,
       Target.Id,
@@ -317,13 +345,9 @@ object ItcService {
       PosInt,
       SignalToNoise,
       String,
-      Option[String],
-      String,
       TimeSpan,
       PosInt,
-      SignalToNoise,
-      String,
-      Option[String]
+      SignalToNoise
     )] =
       sql"""
         INSERT INTO t_itc_result (
@@ -333,9 +357,7 @@ object ItcService {
           c_hash,
           c_exposure_time,
           c_exposure_count,
-          c_signal_to_noise,
-          c_version,
-          c_data
+          c_signal_to_noise
         ) SELECT
           $program_id,
           $observation_id,
@@ -343,17 +365,14 @@ object ItcService {
           $text,
           $time_span,
           $pos_int,
-          $signal_to_noise,
-          $text,
-          ${text.opt}
+          $signal_to_noise
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash            = $text,
               c_exposure_time   = $time_span,
               c_exposure_count  = $pos_int,
-              c_signal_to_noise = $signal_to_noise,
-              c_version         = $text,
-              c_data            = ${text.opt}
+              c_signal_to_noise = $signal_to_noise
       """.command
+
 
   }
 

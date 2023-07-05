@@ -32,10 +32,11 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.security.PublicKey
 import java.util.UUID
+import scala.concurrent.duration.*
 
 case class Config(
   port:       Port,             // Our port, nothing fancy.
-  itcRoot:    Uri,              // ITC service URI
+  itc:        Config.Itc,       // ITC config
   sso:        Config.Sso,       // SSO config
   serviceJwt: String,           // Only service users can exchange API keys, so we need a service user JWT.
   honeycomb:  Config.Honeycomb, // Honeycomb config
@@ -58,7 +59,7 @@ case class Config(
   // ITC client resource
   def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
     httpClientResource[F].evalMap { httpClient =>
-      ItcClient.create(itcRoot, httpClient)
+      ItcClient.create(itc.root, httpClient)
     }
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
@@ -76,6 +77,20 @@ case class Config(
 
 
 object Config {
+
+  case class Itc(
+    root:       Uri,             // Root URI for the ITC server we're using.
+    pollPeriod: FiniteDuration   // How often to poll for ITC version updates.
+  )
+
+  object Itc {
+
+    lazy val fromCiris: ConfigValue[Effect, Itc] = (
+      envOrProp("ODB_ITC_ROOT").as[Uri],
+      envOrProp("ODB_ITC_POLL_PERIOD").as[FiniteDuration].default(5.minutes)
+    ).parMapN(Itc.apply)
+
+  }
 
   case class Sso(
     root:      Uri,       // Root URI for the SSO server we're using.
@@ -219,7 +234,7 @@ object Config {
 
   lazy val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
-    envOrProp("ODB_ITC_ROOT").as[Uri],
+    Itc.fromCiris,
     Sso.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
     Honeycomb.fromCiris,
