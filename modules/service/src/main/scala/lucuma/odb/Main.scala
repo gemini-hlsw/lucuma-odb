@@ -22,6 +22,7 @@ import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
@@ -147,7 +148,7 @@ object FMain extends MainParams {
             |
             |CommitHash.: ${config.commitHash.format}
             |CORS domain: ${config.domain}
-            |ITC Root   : ${config.itcRoot}
+            |ITC Root   : ${config.itc.root}
             |Port       : ${config.port}
             |PID        : ${ProcessHandle.current.pid}
             |
@@ -264,7 +265,7 @@ object FMain extends MainParams {
       password = config.password.some,
       ssl      = SSL.Trusted.withFallback(true)
     )
-}
+  }
 
   def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
 
@@ -303,6 +304,7 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
       ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
+      _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
