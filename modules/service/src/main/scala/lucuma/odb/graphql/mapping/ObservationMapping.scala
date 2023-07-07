@@ -6,12 +6,10 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Eq
-import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.syntax.applicative.*
+import cats.syntax.bifunctor.*
 import cats.syntax.eq.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -24,6 +22,7 @@ import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax.*
+import eu.timepit.refined.cats.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
@@ -34,9 +33,9 @@ import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.Itc
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
 import table.ObsAttachmentAssignmentTable
@@ -52,8 +51,6 @@ trait ObservationMapping[F[_]]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F] {
 
-  private val UseCacheParam      = "useCache"
-  private val UseCacheDefault    = true
   private val FutureLimitParam   = "futureLimit"
 
   def itcClient: ItcClient[F]
@@ -115,26 +112,16 @@ trait ObservationMapping[F[_]]
             )
           )
 
-        case Select("itc", List(
-          BooleanBinding.Option("useCache", rUseCache)
-        ), child) =>
-          rUseCache.map { useCache =>
-            Environment(
-              Env(UseCacheParam -> useCache.getOrElse(UseCacheDefault)),
-              Select("itc", Nil, child)
-            )
-          }
+        case Select("itc", List(BooleanBinding.Option("useCache", rUseCache)), child) =>
+          rUseCache.map { _ => Select("itc", Nil, child) }
 
         case Select("sequence", List(
-          BooleanBinding.Option(UseCacheParam, rUseCache),
+          BooleanBinding.Option("useCache", rUseCache),
           Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
         ), child) =>
-          (rUseCache, rFutureLimit).parMapN { case (useCache, futureLimit) =>
+          (rUseCache, rFutureLimit).parMapN { case (_, futureLimit) =>
             Environment(
-              Env(
-                UseCacheParam    -> useCache.getOrElse(UseCacheDefault),
-                FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)
-              ),
+              Env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)),
               Select("sequence", Nil, child)
             )
           }
@@ -142,63 +129,50 @@ trait ObservationMapping[F[_]]
     )
 
   def itcQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Boolean] =
-      env => env.getR[Boolean](UseCacheParam)
+    val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Boolean) => F[Result[Itc.ResultSet]] =
-      (pid, oid, useCache) =>
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResult]] =
+      (pid, oid, _) =>
         services.use { s =>
-          val itcService = s.itc(itcClient)
-
-          (for {
-            p <- EitherT(s.transactionally(itcService.selectParams(pid, oid)))
-            r <- EitherT(itcService.callService(p, useCache))
-          } yield r).value.map {
-            case Left(errors)     => Result.failure(errors.map(_.format).intercalate(", "))
-            case Right(resultSet) => resultSet.success
-          }
+          s.itcService(itcClient)
+           .lookup(pid, oid)
+           .map {
+             case Left(e)  => Result.failure(e.format)
+             case Right(s) => s.result.success
+           }
         }
 
     effectHandler("itc", readEnv, calculate)
   }
 
   def sequenceQueryHandler: EffectHandler[F] = {
-    case class SequenceEnv(
-      useCache: Boolean,
-      limit:    Generator.FutureLimit
-    )
+    val readEnv: Env => Result[Generator.FutureLimit] =
+      _.getR[Generator.FutureLimit](FutureLimitParam)
 
-    given Eq[SequenceEnv] = Eq.by(a => (a.useCache, a.limit.value))
+    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
+      (pid, oid, limit) => {
+        val mapError: Generator.Error => Result[Json] = {
+          case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
+            Result(Json.Null)
+          case e: Generator.Error                                                   =>
+           Result.failure(e.format)
+        }
 
-    val readEnv: Env => Result[SequenceEnv] = env =>
-      for {
-        c <- env.getR[Boolean](UseCacheParam)
-        f <- env.getR[Generator.FutureLimit](FutureLimitParam)
-      } yield SequenceEnv(c, f)
+        def mapSuccess(s: Generator.Success): Result[Json] =
+          Json.obj(
+            "programId"       -> pid.asJson,
+            "observationId"   -> oid.asJson,
+            "itcResult"       -> s.itc.asJson,
+            "executionConfig" -> s.value.asJson,
+            "scienceDigest"   -> s.scienceDigest.asJson
+          ).success
 
-    val calculate: (Program.Id, Observation.Id, SequenceEnv) => F[Result[Json]] = (pid, oid, env) => {
-      val mapResult: Generator.Result => Result[Json] = {
-        case Generator.Result.ObservationNotFound(_, _) => Result(Json.Null)
-        case e: Generator.Error                         => Result.failure(e.format)
-        case Generator.Result.Success(_, itc, exec, d)  =>
-            Result(Json.obj(
-              "programId"       -> pid.asJson,
-              "observationId"   -> oid.asJson,
-              "itcResult"       -> itc.asJson,
-              "executionConfig" -> exec.asJson,
-              "scienceDigest"   -> d.asJson
-            ))
+        services.use { s =>
+         s.generator(commitHash, itcClient, plannedTimeCalculator)
+          .generate(pid, oid, limit)
+          .map(_.bimap(mapError, mapSuccess).merge)
+        }
       }
-
-      services.use { s =>
-        val generatorService = s.generator(commitHash, itcClient, plannedTimeCalculator)
-
-        (for {
-          p <- EitherT(s.transactionally(generatorService.selectParams(pid, oid)))
-          r <- EitherT(generatorService.generate(oid, p, env.useCache, env.limit))
-        } yield r).value.map(result => mapResult(result.merge))
-      }
-    }
 
     effectHandler("sequence", readEnv, calculate)
   }
