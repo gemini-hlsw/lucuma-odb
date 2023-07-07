@@ -40,6 +40,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
@@ -153,7 +154,7 @@ object ItcService {
         .digest(input.asJson.noSpaces.getBytes("UTF-8"))
     )
 
-  def pollVersionsForever[F[_]: Async: Temporal](
+  def pollVersionsForever[F[_]: Async: Temporal: Logger](
     client:     Resource[F, ItcClient[F]],
     session:    Resource[F, Session[F]],
     pollPeriod: FiniteDuration
@@ -164,9 +165,14 @@ object ItcService {
         _ <- session.use { s => s.transaction.use(_ => s.execute(Statements.UpdateItcVersion)(v.server.some, v.data)) }
       } yield ()
 
+    val pollOnceLogError: F[Unit] =
+      pollOnce.handleErrorWith { t =>
+        Logger[F].info(t)(s"Error while polling ITC versions: ${t.getMessage}")
+      }
+
     Stream
       .fixedDelay(pollPeriod)
-      .zip(Stream.repeatEval(pollOnce))
+      .zip(Stream.repeatEval(pollOnceLogError))
       .compile
       .drain
       .start
