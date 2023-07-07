@@ -234,6 +234,9 @@ trait Codecs {
   val obs_attachment_id: Codec[ObsAttachment.Id] =
     gid[ObsAttachment.Id]
 
+  val obs_class: Codec[ObserveClass] =
+    enumerated(Type("e_obs_class"))
+
   val obs_status: Codec[ObsStatus] =
     enumerated(Type("e_obs_status"))
 
