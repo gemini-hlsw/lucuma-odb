@@ -8,17 +8,16 @@ import cats.effect.Ref
 import cats.effect.Resource
 import cats.syntax.all._
 import eu.timepit.refined._
-import eu.timepit.refined.boolean.Or
-import eu.timepit.refined.generic.Equal
-import eu.timepit.refined.numeric.Greater
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.aws.s3.S3
 import fs2.aws.s3.models.Models.FileKey
+import fs2.aws.s3.models.Models.PartSizeMB
 import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.Program
 import lucuma.odb.Config
+import lucuma.refined._
 import natchez.Trace
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
@@ -72,12 +71,7 @@ trait S3FileService[F[_]] {
 }
 
 object S3FileService {
-
-  // We can switch back to unsafeFrom when a new version of refined is out that fixes
-  // https://github.com/fthomas/refined/issues/1161 or a version of fs2-aws > 6.0.0
-  // is availabile with my PR that changes PartSizeMB to "GreaterEqual[5]"
-  // val partSize = PartSizeMB.unsafeFrom(5)
-  val partSize = refineV[Greater[5] Or Equal[5]](5).toOption.get
+  val partSize: PartSizeMB = 5.refined
 
   def fromS3ConfigAndClient[F[_]: Async: Trace](
     awsConfig: Config.Aws,
