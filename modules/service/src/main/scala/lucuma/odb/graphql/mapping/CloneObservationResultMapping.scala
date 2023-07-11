@@ -12,7 +12,8 @@ trait CloneObservationResultMapping[F[_]] extends ResultMapping[F] with Observat
     ObjectMapping(
       tpe = CloneObservationResultType,
       fieldMappings = List(
-        SqlField("synthetic-id", ObservationPairsView.Left, key = true, hidden = true),
+        SqlField("synthetic-id-1", ObservationPairsView.Left, key = true, hidden = true),
+        SqlField("synthetic-id-2", ObservationPairsView.Right, key = true, hidden = true),
         SqlObject("originalObservation", Join(ObservationPairsView.Left, ObservationView.Id)),
         SqlObject("newObservation", Join(ObservationPairsView.Right, ObservationView.Id)),
       )
