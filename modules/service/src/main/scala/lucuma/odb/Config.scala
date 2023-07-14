@@ -63,7 +63,7 @@ case class Config(
     }
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
-  def ssoClient[F[_]: Async: Trace: Network]: Resource[F, SsoClient[F, User]] =
+  def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =
     httpClientResource[F].evalMap { httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,
