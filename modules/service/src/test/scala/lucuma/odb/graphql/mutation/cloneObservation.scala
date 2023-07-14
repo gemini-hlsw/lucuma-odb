@@ -21,8 +21,6 @@ class cloneObservation extends OdbSuite {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
   lazy val validUsers = List(pi, pi2)
 
-  // N.B. if we include the asterism here we hit a Grakle bug that's not yet minimized
-  // see https://github.com/gemini-hlsw/lucuma-odb/issues/296
   // TODO TimingWindows are omitted on purpose, they can be added by including $TimingWindowsGraph.
   // See https://github.com/gemini-hlsw/lucuma-odb/issues/388
   val ObservationGraph = s"""
@@ -58,6 +56,11 @@ class cloneObservation extends OdbSuite {
           filter 
           fpu 
           centralWavelength { nanometers }
+        }
+      }
+      targetEnvironment {
+        asterism {
+          id
         }
       }
     }
