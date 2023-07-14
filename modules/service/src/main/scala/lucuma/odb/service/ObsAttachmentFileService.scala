@@ -253,6 +253,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
                 uuid   <- UUIDGen[F].randomUUID
                 path    = filePath(programId, uuid, fn.value)
                 size   <- s3FileSvc.upload(path, data)
+                _      <- checkForEmptyFile(size)
                 result <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
               } yield result
           )
@@ -280,6 +281,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
                 uuid    <- UUIDGen[F].randomUUID
                 newPath  = filePath(programId, uuid, fn.value)
                 size    <- s3FileSvc.upload(newPath, data)
+                _       <- checkForEmptyFile(size)
                 _       <- updateAttachmentInDB(user, programId, attachmentId, fn, description, size, newPath)
                 _       <- s3FileSvc.delete(oldPath)
               } yield ()

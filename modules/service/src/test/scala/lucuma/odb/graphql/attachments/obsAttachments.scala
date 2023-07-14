@@ -221,7 +221,6 @@ class obsAttachments extends ObsAttachmentsSuite {
     } yield ()
   }
 
-  // Note: The order in the GQL is not by id. If the order changes, this test could break.
   test("update with duplicate name is a BadRequest") {
     for {
       pid    <- createProgramAs(pi)
@@ -238,7 +237,14 @@ class obsAttachments extends ObsAttachmentsSuite {
     } yield ()
   }
 
-  test("empty file update fails, doesn't overwrite previous") {
+  test("empty file insert is a BadRequest") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, emptyFile).withExpectation(Status.BadRequest, "File cannot be empty")
+    } yield ()
+  }
+
+  test("empty file update is a BadRequest, doesn't overwrite previous") {
     for {
       pid    <- createProgramAs(pi)
       aid    <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
@@ -246,7 +252,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- updateAttachment(pi, pid, aid, emptyFile).withExpectation(Status.InternalServerError)
+      _      <- updateAttachment(pi, pid, aid, emptyFile).withExpectation(Status.BadRequest, "File cannot be empty")
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
     } yield ()

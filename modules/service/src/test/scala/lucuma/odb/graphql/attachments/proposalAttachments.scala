@@ -355,7 +355,14 @@ class proposalAttachments extends AttachmentsSuite {
     } yield ()
   }
 
-  test("empty file update fails, doesn't overwrite previous") {
+  test("empty file insert is a BadRequest") {
+    for {
+      pid    <- createProgramAs(pi)
+      _      <- insertAttachment(pi, pid, file1Empty).withExpectation(Status.BadRequest, "File cannot be empty")
+    } yield ()
+  }
+
+  test("empty file update is a BadRequest, doesn't overwrite previous") {
     for {
       pid    <- createProgramAs(pi)
       _       = assertEquals(file1A.attachmentType, file1Empty.attachmentType)
@@ -364,7 +371,7 @@ class proposalAttachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
-      _      <- updateAttachment(pi, pid, file1Empty).withExpectation(Status.InternalServerError)
+      _      <- updateAttachment(pi, pid, file1Empty).withExpectation(Status.BadRequest, "File cannot be empty")
       _      <- assertS3(fileKey, file1A.content)
       _      <- assertAttachmentsGql(pi, pid, file1A)
     } yield ()
