@@ -59,7 +59,7 @@ trait AttachmentFileService {
   }
 
   def checkForEmptyFile[F[_]: MonadThrow](fileSize: Long): F[Unit] = 
-     if (fileSize === 0) MonadThrow[F].raiseError(InvalidRequest("File cannot be empty"))
+     if (fileSize <= 0) MonadThrow[F].raiseError(InvalidRequest("File cannot be empty"))
      else MonadThrow[F].unit
 
 
