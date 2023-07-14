@@ -21,8 +21,6 @@ class cloneObservation extends OdbSuite {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
   lazy val validUsers = List(pi, pi2)
 
-  // TODO TimingWindows are omitted on purpose, they can be added by including $TimingWindowsGraph.
-  // See https://github.com/gemini-hlsw/lucuma-odb/issues/388
   val ObservationGraph = s"""
     { 
       title
@@ -63,6 +61,7 @@ class cloneObservation extends OdbSuite {
           id
         }
       }
+      $TimingWindowsGraph
     }
     """
 
@@ -327,6 +326,31 @@ class cloneObservation extends OdbSuite {
       coid <- cloneObservationAs(pi, oids(1))
       es   <- groupElementsAs(pi, pid, Some(gid))
     yield assertEquals(es, List(oids(0), oids(1), coid, oids(2)).map(_.asRight))
+  }
+
+  test("https://github.com/gemini-hlsw/lucuma-odb/issues/388") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {observationId: ${oid.asJson}}) {
+                originalObservation {
+                  id     
+                }
+                newObservation {
+                  id
+                  timingWindows {
+                    startUtc
+                  }
+                }
+              }
+            }
+          """
+        )
+      }
+    }
   }
 
 }
