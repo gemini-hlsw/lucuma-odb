@@ -9,6 +9,10 @@ import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
+import java.security.MessageDigest
+import java.util.HexFormat
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
@@ -32,6 +36,8 @@ import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
+import lucuma.core.syntax.enumerated.*
+import lucuma.core.util.Enumerated
 import spire.math.Rational
 
 /**
@@ -41,7 +47,7 @@ import spire.math.Rational
  * @tparam F filter type
  * @tparam U FPU type
  */
-sealed trait Config[G, F, U] extends Product with Serializable {
+sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product with Serializable {
   def grating: G
 
   def filter: Option[F]
@@ -119,9 +125,45 @@ sealed trait Config[G, F, U] extends Product with Serializable {
 
   def explicitSpatialOffsets: Option[List[Q]]
 
+  def hash(
+    sourceProfile: SourceProfile,
+    imageQuality:  ImageQuality,
+    sampling:      PosDouble
+  ): String = {
+
+    val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
+    val out: DataOutputStream      = new DataOutputStream(bao)
+
+    out.writeChars(grating.tag)
+    filter.foreach(f => out.writeChars(f.tag))
+    out.writeChars(fpu.tag)
+    out.writeInt(centralWavelength.toPicometers.value.value)
+    out.writeChars(xBin(sourceProfile, imageQuality, sampling).tag)
+    out.writeChars(yBin.tag)
+    out.writeChars(ampGain.tag)
+    out.writeChars(ampReadMode.tag)
+    out.writeChars(roi.tag)
+    wavelengthDithers.foreach { d =>
+      out.writeInt(d.toPicometers.value)
+    }
+    spatialOffsets.foreach { o =>
+      out.writeLong(o.toAngle.toMicroarcseconds)
+    }
+
+    out.close()
+
+    Config.hex.formatHex(
+      MessageDigest
+        .getInstance("MD5")
+        .digest(bao.toByteArray)
+    )
+  }
+
 }
 
 object Config {
+
+  private val hex = HexFormat.of
 
   final case class GmosNorth(
     grating:             GmosNorthGrating,
