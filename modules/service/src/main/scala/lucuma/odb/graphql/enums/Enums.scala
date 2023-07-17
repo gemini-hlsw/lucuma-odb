@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.enums
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
@@ -79,7 +80,7 @@ final class Enums(
   object TimeEstimate {
 
     given Enumerated[TimeEstimate] =
-      Enumerated.from(values.head, values.tail*).withTag(_.tag)
+      Enumerated.fromNEL(NonEmptyList.fromListUnsafe(values.toList)).withTag(_.tag)
 
   }
 
