@@ -30,6 +30,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
+//import lucuma.odb.graphql.syntax.query.*
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
@@ -174,6 +175,12 @@ trait ObservationMapping[F[_]]
         }
       }
 
+//    def requestsSequence(q: Query): Boolean =
+//      q.exists {
+//        case Select("executionSequence", _, _) => true
+//        case _                                 => false
+//      }
+
     effectHandler("sequence", readEnv, calculate)
   }
 
@@ -186,7 +193,8 @@ trait ObservationMapping[F[_]]
     new EffectHandler[F] {
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, E)]] =
-        queries.traverse { case (_, cursor) =>
+        queries.traverse { case (q, cursor) =>
+          println(q)
           for {
             p <- cursor.fieldAs[Program.Id]("programId")
             o <- cursor.fieldAs[Observation.Id]("id")
