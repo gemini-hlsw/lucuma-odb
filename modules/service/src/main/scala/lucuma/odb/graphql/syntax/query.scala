@@ -13,6 +13,9 @@ trait QueryOps {
 
   extension(q: Query) {
 
+    /**
+     * Extracts the child queries for this `Query`, if any.
+     */
     def children: List[Query] =
       q match {
         case Select(_, _, child)       => List(child)
@@ -37,6 +40,10 @@ trait QueryOps {
         case Query.Empty               => Nil
       }
 
+    /**
+     * A depth-first search of the query tree, finding the first ancestor that
+     * matches the predicate (if any).
+     */
     def find(f: Query => Boolean): Option[Query] = {
 
       @tailrec
