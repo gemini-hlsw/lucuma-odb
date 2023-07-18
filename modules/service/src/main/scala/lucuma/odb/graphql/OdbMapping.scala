@@ -109,6 +109,7 @@ object OdbMapping {
           with DatasetIdMapping[F]
           with DatasetEventMapping[F]
           with ElevationRangeMapping[F]
+          with ExecutionMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
@@ -229,6 +230,7 @@ object OdbMapping {
               DatasetEventMapping,
               DeclinationMapping,
               ElevationRangeMapping,
+              ExecutionMapping,
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
               GmosCustomMaskMapping,
@@ -327,6 +329,7 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 ConstraintSetGroupElaborator,
+                ExecutionElaborator,
                 GroupElaborator,
                 MutationElaborator,
                 ObservationElaborator,

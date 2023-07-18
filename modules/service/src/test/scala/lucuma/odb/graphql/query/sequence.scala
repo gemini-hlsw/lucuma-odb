@@ -102,8 +102,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        static {
                          stageMode
@@ -173,8 +173,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "static": {
                       "stageMode": "FOLLOW_XY",
                       "detector": "HAMAMATSU",
@@ -303,8 +303,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence(futureLimit: 1) {
-                   executionConfig {
+                 execution {
+                   config(futureLimit: 1) {
                      ... on GmosNorthExecutionConfig {
                        science {
                          nextAtom {
@@ -336,8 +336,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "science": {
                       "nextAtom": {
                         "observeClass": "SCIENCE"
@@ -398,9 +398,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence(futureLimit: 101) {
-                   programId
-                   executionConfig {
+                 execution {
+                   config(futureLimit: 101) {
                      ... on GmosNorthExecutionConfig {
                        science {
                          possibleFuture {
@@ -449,8 +448,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        science {
                          digest {
@@ -495,8 +494,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "science": {
                       "digest": {
                         "offsets": [
@@ -676,8 +675,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        science {
                          nextAtom {
@@ -711,8 +710,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "science": {
                       "nextAtom": {
                         "description": "q 0.0″, λ 495.0 nm",
@@ -882,8 +881,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      instrument
                    }
                  }
@@ -917,8 +916,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosSouthExecutionConfig {
                        science {
                          nextAtom {
@@ -941,8 +940,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                   }
                 }
               }
@@ -1072,8 +1071,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        acquisition {
                          nextAtom {
@@ -1093,8 +1092,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "acquisition": {
                       "nextAtom": {
                          "steps": [
@@ -1408,8 +1407,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        setup {
                          full {
@@ -1442,8 +1441,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig" : {
+                "execution": {
+                  "config" : {
                     "setup": {
                       "full": {
                         "seconds": 960.000000

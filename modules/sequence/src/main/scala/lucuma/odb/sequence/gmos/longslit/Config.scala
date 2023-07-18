@@ -9,10 +9,6 @@ import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
-import java.io.ByteArrayOutputStream
-import java.io.DataOutputStream
-import java.security.MessageDigest
-import java.util.HexFormat
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
@@ -39,6 +35,11 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
 import spire.math.Rational
+
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
+import java.security.MessageDigest
+import java.util.HexFormat
 
 /**
  * Configuration for the GMOS Long Slit science mode.  Using these parameters, a

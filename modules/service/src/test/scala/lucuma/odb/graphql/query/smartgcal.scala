@@ -30,7 +30,6 @@ import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
@@ -187,52 +186,54 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("simple GN expansion") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
     // Should pick definition 2, with the 2 second exposure time based on the
     // wavelength range [500, 600), which matches the 500nm observing wavelength
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       nextAtom {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
-                           }
-                           stepConfig {
-                             stepType
-                             ... on Gcal {
-                               filter
+                             stepConfig {
+                               stepType
+                               ... on Gcal {
+                                 filter
+                               }
                              }
                            }
                          }
-                       }
-                       possibleFuture {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+                         possibleFuture {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
-                           }
-                           stepConfig {
-                             stepType
-                             ... on Gcal {
-                               filter
+                             stepConfig {
+                               stepType
+                               ... on Gcal {
+                                 filter
+                               }
                              }
                            }
                          }
@@ -246,161 +247,163 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "executionConfig": {
-                  "science": {
-                    "nextAtom": {
-                      "steps": [
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 10.000000
+              "observation": {
+                "execution": {
+                  "config": {
+                    "science": {
+                      "nextAtom": {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 10.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "SCIENCE"
                             }
                           },
-                          "stepConfig": {
-                            "stepType": "SCIENCE"
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 2.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "GCAL",
+                              "filter": "GMOS"
+                            }
                           }
+                        ]
+                      },
+                      "possibleFuture": [
+                        {
+                          "steps" : [
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 2.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "GCAL",
+                                "filter" : "GMOS"
+                              }
+                            },
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "SCIENCE"
+                              }
+                            }
+                          ]
                         },
                         {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 2.000000
+                          "steps" : [
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "SCIENCE"
+                              }
+                            },
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 2.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "GCAL",
+                                "filter" : "GMOS"
+                              }
                             }
-                          },
-                          "stepConfig": {
-                            "stepType": "GCAL",
-                            "filter": "GMOS"
-                          }
+                          ]
+                        },
+                        {
+                          "steps" : [
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 2.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "GCAL",
+                                "filter" : "GMOS"
+                              }
+                            },
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "SCIENCE"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "steps" : [
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "SCIENCE"
+                              }
+                            },
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 2.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "GCAL",
+                                "filter" : "GMOS"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "steps" : [
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 2.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "GCAL",
+                                "filter" : "GMOS"
+                              }
+                            },
+                            {
+                              "instrumentConfig" : {
+                                "exposure" : {
+                                  "seconds" : 10.000000
+                                }
+                              },
+                              "stepConfig" : {
+                                "stepType" : "SCIENCE"
+                              }
+                            }
+                          ]
                         }
                       ]
-                    },
-                    "possibleFuture": [
-                      {
-                        "steps" : [
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 2.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "GCAL",
-                              "filter" : "GMOS"
-                            }
-                          },
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 10.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "SCIENCE"
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 10.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "SCIENCE"
-                            }
-                          },
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 2.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "GCAL",
-                              "filter" : "GMOS"
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 2.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "GCAL",
-                              "filter" : "GMOS"
-                            }
-                          },
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 10.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "SCIENCE"
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 10.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "SCIENCE"
-                            }
-                          },
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 2.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "GCAL",
-                              "filter" : "GMOS"
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "steps" : [
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 2.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "GCAL",
-                              "filter" : "GMOS"
-                            }
-                          },
-                          {
-                            "instrumentConfig" : {
-                              "exposure" : {
-                                "seconds" : 10.000000
-                              }
-                            },
-                            "stepConfig" : {
-                              "stepType" : "SCIENCE"
-                            }
-                          }
-                        ]
-                      }
-                    ]
+                    }
                   }
                 }
               }
@@ -413,37 +416,39 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("simple GS expansion") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosSouthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
     // Should pick definition 2, with the 2 second exposure time based on the
     // wavelength range [500, 600), which matches the 500nm observing wavelength
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   ... on GmosSouthExecutionConfig {
-                     science {
-                       nextAtom {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosSouthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
-                           }
-                           stepConfig {
-                             stepType
-                             ... on Gcal {
-                               filter
+                             stepConfig {
+                               stepType
+                               ... on Gcal {
+                                 filter
+                               }
                              }
                            }
                          }
@@ -457,33 +462,35 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "executionConfig": {
-                  "science": {
-                    "nextAtom": {
-                      "steps": [
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 10.000000
+              "observation": {
+                "execution": {
+                  "config": {
+                    "science": {
+                      "nextAtom": {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 10.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "SCIENCE"
                             }
                           },
-                          "stepConfig": {
-                            "stepType": "SCIENCE"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 2.000000
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 2.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "GCAL",
+                              "filter": "GMOS"
                             }
-                          },
-                          "stepConfig": {
-                            "stepType": "GCAL",
-                            "filter": "GMOS"
                           }
-                        }
-                      ]
+                        ]
+                      }
                     }
                   }
                 }
@@ -497,7 +504,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("multi steps") {
-    val setup: IO[(Program.Id, Observation.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
@@ -511,32 +518,34 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             }
           """
         )
-      } yield (p, o)
+      } yield o
 
     // Two definitions match the same key, distinguish and sort them by step
     // order.  (def 5 (5 seconds) followed by def 4 (4 seconds)).
 
-    setup.flatMap { case (pid, oid) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       nextAtom {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
-                           }
-                           stepConfig {
-                             stepType
-                             ... on Gcal {
-                               filter
+                             stepConfig {
+                               stepType
+                               ... on Gcal {
+                                 filter
+                               }
                              }
                            }
                          }
@@ -550,44 +559,46 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "executionConfig": {
-                  "science": {
-                    "nextAtom": {
-                      "steps": [
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 10.000000
+              "observation": {
+                "execution": {
+                  "config": {
+                    "science": {
+                      "nextAtom": {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 10.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "SCIENCE"
                             }
                           },
-                          "stepConfig": {
-                            "stepType": "SCIENCE"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 5.000000
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 5.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "GCAL",
+                              "filter": "GMOS"
                             }
                           },
-                          "stepConfig": {
-                            "stepType": "GCAL",
-                            "filter": "GMOS"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 4.000000
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 4.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "GCAL",
+                              "filter": "GMOS"
                             }
-                          },
-                          "stepConfig": {
-                            "stepType": "GCAL",
-                            "filter": "GMOS"
                           }
-                        }
-                      ]
+                        ]
+                      }
                     }
                   }
                 }
@@ -600,7 +611,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("step count") {
-    val setup: IO[(Program.Id, Observation.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
@@ -614,31 +625,33 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             }
           """
         )
-      } yield (p, o)
+      } yield o
 
     // One definition, with a step count of 2 (each 6 second)
 
-    setup.flatMap { case (pid, oid) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       nextAtom {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
-                           }
-                           stepConfig {
-                             stepType
-                             ... on Gcal {
-                               filter
+                             stepConfig {
+                               stepType
+                               ... on Gcal {
+                                 filter
+                               }
                              }
                            }
                          }
@@ -652,44 +665,46 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-              "sequence": {
-                "executionConfig": {
-                  "science": {
-                    "nextAtom": {
-                      "steps": [
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 10.000000
+              "observation": {
+                "execution": {
+                  "config": {
+                    "science": {
+                      "nextAtom": {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 10.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "SCIENCE"
                             }
                           },
-                          "stepConfig": {
-                            "stepType": "SCIENCE"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 6.000000
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 6.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "GCAL",
+                              "filter": "GMOS"
                             }
                           },
-                          "stepConfig": {
-                            "stepType": "GCAL",
-                            "filter": "GMOS"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "exposure": {
-                              "seconds": 6.000000
+                          {
+                            "instrumentConfig": {
+                              "exposure": {
+                                "seconds": 6.000000
+                              }
+                            },
+                            "stepConfig": {
+                              "stepType": "GCAL",
+                              "filter": "GMOS"
                             }
-                          },
-                          "stepConfig": {
-                            "stepType": "GCAL",
-                            "filter": "GMOS"
                           }
-                        }
-                      ]
+                        ]
+                      }
                     }
                   }
                 }
@@ -702,7 +717,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("missing definition") {
-    val setup: IO[(Program.Id, Observation.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
@@ -716,29 +731,31 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             }
           """
         )
-      } yield (p, o)
+      } yield o
 
-    setup.flatMap { case (pid, oid) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
           s"""
              query {
-               sequence(programId: "$pid", observationId: "$oid") {
-                 executionConfig {
-                   ... on GmosNorthExecutionConfig {
-                     science {
-                       nextAtom {
-                         steps {
-                           instrumentConfig {
-                             exposure {
-                               seconds
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               exposure {
+                                 seconds
+                               }
                              }
-                           }
-                           stepConfig {
-                             stepType
-                             ... on Gcal {
-                               filter
+                             stepConfig {
+                               stepType
+                               ... on Gcal {
+                                 filter
+                               }
                              }
                            }
                          }

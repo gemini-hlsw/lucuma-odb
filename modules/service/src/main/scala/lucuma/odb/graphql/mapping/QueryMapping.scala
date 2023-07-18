@@ -7,8 +7,6 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all._
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
@@ -16,11 +14,7 @@ import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import edu.gemini.grackle.syntax.*
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.model
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
@@ -28,15 +22,7 @@ import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.json.all.query.given
-import lucuma.odb.logic.Generator
-import lucuma.odb.logic.PlannedTimeCalculator
-import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
-
-import scala.reflect.ClassTag
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F]
@@ -49,58 +35,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
    with ObservationMapping[F] =>
 
   // Resources defined in the final cake.
-  def commitHash: CommitHash
   def user: model.User
-  def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
-  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
-
-  // TODO: this is used by a now deprecated part of the schema.  Remove when possible.
-  def itcQuery(
-    path:     Path,
-    pid:      model.Program.Id,
-    oid:      model.Observation.Id,
-  ): F[Result[Json]] =
-    services.useNonTransactionally {
-      itcService(itcClient)
-        .lookup(pid, oid)
-        .map {
-          case Left(e)  => Result.failure(e.format)
-          case Right(s) => s.result.asJson.success
-        }
-    }
-
-  // TODO: this is used by a now deprecated part of the schema.  Remove when possible.
-  def sequence(
-    path:        Path,
-    pid:         model.Program.Id,
-    oid:         model.Observation.Id,
-    futureLimit: Generator.FutureLimit
-  ): F[Result[Json]] = {
-
-    val mapError: Generator.Error => Result[Json] = {
-      case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
-        Result(Json.Null)
-      case e: Generator.Error                                                   =>
-       Result.failure(e.format)
-    }
-
-    def mapSuccess(s: Generator.Success): Result[Json] =
-      Json.obj(
-        "programId"       -> pid.asJson,
-        "observationId"   -> oid.asJson,
-        "itcResult"       -> s.itc.asJson,
-        "executionConfig" -> s.value.asJson,
-        "scienceDigest"   -> s.scienceDigest.asJson
-      ).success
-
-    services.use { s =>
-      s.generator(commitHash, itcClient, plannedTimeCalculator)
-       .generate(pid, oid, futureLimit)
-       .map(_.bimap(mapError, mapSuccess).merge)
-    }
-
-  }
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(
@@ -109,13 +45,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("asterismGroup"),
         SqlObject("constraintSetGroup"),
         SqlObject("filterTypeMeta"),
-        RootEffect.computeJson("itc") { (_, path, env) =>
-          (env.getR[lucuma.core.model.Program.Id]("programId"),
-           env.getR[lucuma.core.model.Observation.Id]("observationId")
-          ).parTupled.flatTraverse { case (p, o) =>
-            itcQuery(path, p, o)
-          }
-        },
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
         SqlObject("observations"),
@@ -123,14 +52,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("program"),
         SqlObject("programs"),
         SqlObject("proposalAttachmentTypeMeta"),
-        RootEffect.computeJson("sequence") { (_, path, env) =>
-          val futureLimit = env.get[Generator.FutureLimit]("futureLimit").getOrElse(Generator.FutureLimit.Default)
-          (env.getR[lucuma.core.model.Program.Id]("programId"),
-           env.getR[lucuma.core.model.Observation.Id]("observationId")
-          ).parTupled.flatTraverse { case (p, o) =>
-            sequence(path, p, o, futureLimit)
-          }
-        },
         SqlObject("target"),
         SqlObject("targetGroup"),
         SqlObject("targets"),
@@ -142,7 +63,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       AsterismGroup,
       ConstraintSetGroup,
       FilterTypeMeta,
-      Itc,
       ObsAttachmentTypeMeta,
       Observation,
       Observations,
@@ -150,7 +70,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Program,
       Programs,
       ProposalAttachmentTypeMeta,
-      Sequence,
       Target,
       TargetGroup,
       Targets,
@@ -238,19 +157,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Result(Select("filterTypeMeta", Nil,
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
       ))
-
-  private lazy val Itc: PartialFunction[Select, Result[Query]] =
-    case Select("itc", List(
-      ProgramIdBinding("programId", rPid),
-      ObservationIdBinding("observationId", rOid),
-      BooleanBinding("useCache", rUseCache)
-    ), child) =>
-      (rPid, rOid, rUseCache).parTupled.map { case (pid, oid, _) =>
-        Environment(
-          Env("programId" -> pid, "observationId" -> oid),
-          Select("itc", Nil, child)
-        )
-      }
 
   private lazy val Observation: PartialFunction[Select, Result[Query]] =
     case Select("observation", List(
@@ -359,24 +265,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
       }
   }
-
-  private lazy val Sequence: PartialFunction[Select, Result[Query]] =
-    case Select("sequence", List(
-      ProgramIdBinding("programId", rPid),
-      ObservationIdBinding("observationId", rOid),
-      BooleanBinding("useCache", rUseCache),
-      Generator.FutureLimit.Binding("futureLimit", rFutureLimit)
-    ), child) =>
-      (rPid, rOid, rUseCache, rFutureLimit).parTupled.map { case (pid, oid, _, futureLimit) =>
-        Environment(
-          Env(
-            "programId"     -> pid,
-            "observationId" -> oid,
-            "futureLimit"   -> futureLimit
-          ),
-          Select("sequence", Nil, child)
-        )
-      }
 
   private lazy val Target: PartialFunction[Select, Result[Query]] =
     case Select("target", List(
