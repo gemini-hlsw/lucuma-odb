@@ -40,7 +40,7 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import natchez.Trace.Implicits.noop
 import skunk.Session
 
-class sequence extends OdbSuite with ObservingModeSetupOperations {
+class execution extends OdbSuite with ObservingModeSetupOperations {
 
   val pi: User   = TestUsers.Standard.pi(1, 30)
   val user: User = TestUsers.service(3)
