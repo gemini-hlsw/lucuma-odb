@@ -61,6 +61,7 @@ trait BaseMapping[F[_]]
   lazy val EpochStringType                     = schema.ref("EpochString")
   lazy val ExchangeType                        = schema.ref("Exchange")
   lazy val ExecutionEventIdType                = schema.ref("ExecutionEventId")
+  lazy val ExecutionType                       = schema.ref("Execution")
   lazy val ExistenceType                       = schema.ref("Existence")
   lazy val ExtinctionType                      = schema.ref("Extinction")
   lazy val FastTurnaroundType                  = schema.ref("FastTurnaround")

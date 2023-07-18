@@ -84,6 +84,7 @@ trait ObservationMapping[F[_]]
         SqlObject("plannedTime"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
         EffectField("itc", itcQueryHandler, List("id", "programId")),
+        SqlObject("execution"),
         EffectField("sequence", sequenceQueryHandler, List("id", "programId"))
       )
     )
@@ -175,7 +176,6 @@ trait ObservationMapping[F[_]]
           ).success
 
         services.use { s =>
-          println(force)
           s.generator(commitHash, itcClient, plannedTimeCalculator)
            .generate(pid, oid, limit)
            .map(_.bimap(mapError, mapSuccess).merge)
