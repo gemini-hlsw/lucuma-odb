@@ -30,7 +30,7 @@ trait SmartGcalExpander[F[_], K, D] {
    * Computes a cache of all unique instrument configurations that require a
    * smart gcal definition lookup and their associated gcal configurations (or
    * an error describing the missing definition if not possible).  The cache can
-   * be passed to `expandWithCache`` to avoid additional trips to the database
+   * be passed to `expandWithCache` to avoid additional trips to the database
    * for smart gcal.
    *
    * @param s the sequence to validate

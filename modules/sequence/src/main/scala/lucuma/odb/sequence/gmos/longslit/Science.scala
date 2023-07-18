@@ -34,6 +34,8 @@ import lucuma.core.optics.syntax.optional.*
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
+import scala.annotation.tailrec
+
 /**
  * GMOS long slit science atoms
  *
@@ -54,6 +56,16 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
     sampling:      PosDouble
   ): Stream[Pure, Science.Atom[D]] = {
 
+    @tailrec def gcd(a: BigInt, b: BigInt): BigInt = if (b === 0) a else gcd(b, a%b)
+    def lcm(as: BigInt*): BigInt = as.reduce { (a, b) => a/gcd(a,b)*b }
+
+    // How many potentially unique configs will be generated.
+    val uniqueConfigCount = lcm(
+      2, // to account for alternation between (science, flat), (flat, science)
+      math.max(mode.wavelengthDithers.size, 1),
+      math.max(mode.spatialOffsets.size, 1)
+    )
+
     val λ    = mode.centralWavelength
     val p0   = Offset.P.Zero
     val Δλs  = mode.wavelengthDithers match {
@@ -66,13 +78,13 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
     }
     val xBin = mode.xBin(sourceProfile, imageQuality, sampling)
 
-    def nextAtom(index: Int, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
+    def nextAtom(stepOrder: Science.StepOrder, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
       (for {
         w <- optics.wavelength := λ.offset(Δ).getOrElse(λ)
         s <- scienceStep(Offset(p0, q), ObserveClass.Science)
         f <- flatStep(ObserveClass.PartnerCal)
         label = f"q ${Angle.signedDecimalArcseconds.get(q.toAngle)}%.1f″, λ ${Wavelength.decimalNanometers.reverseGet(w.getOrElse(λ))}%.1f nm"
-      } yield Science.Atom(NonEmptyString.unsafeFrom(label), index, s, f)).runA(d).value
+      } yield Science.Atom(NonEmptyString.unsafeFrom(label), stepOrder, s, f)).runA(d).value
 
     val init: D =
       (for {
@@ -89,30 +101,48 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
         _ <- optics.roi         := mode.roi
       } yield ()).runS(initialConfig).value
 
-    Stream.unfold((0, Δλs, qs, init)) { case (i, wds, sos, d) =>
-      // TODO: head.toList.head ? there's got to be a better way
-      val a = nextAtom(i, wds.head.toList.head, sos.head.toList.head, d)
-      Some((a, (i+1, wds.tail, sos.tail, a.science.value)))
-    }
+    val seq =
+     Stream.unfold((Science.StepOrder.ScienceThenFlat, Δλs, qs, init)) { case (o, wds, sos, d) =>
+       // TODO: head.toList.head ? there's got to be a better way
+       val a = nextAtom(o, wds.head.toList.head, sos.head.toList.head, d)
+       Some((a, (o.next, wds.tail, sos.tail, a.science.value)))
+     }
+
+    // If the number of unique configs is reasonably small (as it almost always
+    // should be), pre-generate them and then just repeat.  Otherwise, we'll
+    // just (re)generate steps as we go.
+    if (uniqueConfigCount > 100) seq
+    else Stream.emits(seq.take(uniqueConfigCount.toLong).toList).repeat
+
   }
 
 }
 
 object Science {
 
+  enum StepOrder:
+    def next: StepOrder =
+      this match {
+        case ScienceThenFlat => FlatThenScience
+        case FlatThenScience => ScienceThenFlat
+      }
+    case ScienceThenFlat, FlatThenScience
+
   /**
    * Science and associated matching flat.
    */
   final case class Atom[D](
     description: NonEmptyString,
-    index:       Int,
+    stepOrder:   StepOrder,
     science:     ProtoStep[D],
     flat:        ProtoStep[D]
   ) {
 
     def steps: NonEmptyList[ProtoStep[D]] =
-      if ((index % 2) === 0) NonEmptyList.of(science, flat)
-      else NonEmptyList.of(flat, science)
+      stepOrder match {
+        case StepOrder.ScienceThenFlat => NonEmptyList.of(science, flat)
+        case StepOrder.FlatThenScience => NonEmptyList.of(flat, science)
+      }
 
   }
 
