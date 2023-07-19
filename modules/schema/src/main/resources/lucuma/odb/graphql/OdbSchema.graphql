@@ -5669,6 +5669,11 @@ enum GmosNorthFilter {
   Y
 
   """
+  GmosNorthFilter RI
+  """
+  RI
+
+  """
   GmosNorthFilter GG455
   """
   GG455
@@ -5717,6 +5722,16 @@ enum GmosNorthFilter {
   GmosNorthFilter OIIIC
   """
   OIIIC
+
+  """
+  GmosNorthFilter OVI
+  """
+  OVI
+
+  """
+  GmosNorthFilter OVIC
+  """
+  OVIC
 
   """
   GmosNorthFilter HeII
@@ -6263,6 +6278,16 @@ enum GmosSouthFilter {
   GmosSouthFilter OIIIC
   """
   OIIIC
+
+  """
+  GmosSouthFilter OVI
+  """
+  OVI
+
+  """
+  GmosSouthFilter OVIC
+  """
+  OVIC
 
   """
   GmosSouthFilter HeII
