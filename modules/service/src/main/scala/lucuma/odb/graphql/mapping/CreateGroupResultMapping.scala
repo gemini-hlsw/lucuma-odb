@@ -10,7 +10,7 @@ import edu.gemini.grackle.skunk.SkunkMapping
 import table.GroupView
 trait CreateGroupResultMapping[F[_]] extends GroupView[F] {
 
-  lazy val CreateGroupResultMapping =
+  lazy val CreateGroupResultMapping: ObjectMapping =
     ObjectMapping(
       tpe = CreateGroupResultType,
       fieldMappings = List(
