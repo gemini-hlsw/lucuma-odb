@@ -6,11 +6,8 @@ package mapping
 
 import cats.Eq
 import cats.effect.Resource
-import cats.syntax.applicative.*
 import cats.syntax.bifunctor.*
-import cats.syntax.eq.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
@@ -18,7 +15,6 @@ import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Query.Environment
 import edu.gemini.grackle.Query.Select
 import edu.gemini.grackle.Result
-import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.syntax.*
 import eu.timepit.refined.cats.*
@@ -34,9 +30,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
-import table.ObservationView
-
-trait ExecutionMapping[F[_]] extends ObservationView[F] {
+trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
 
   private val FutureLimitParam   = "futureLimit"
 
@@ -51,6 +45,7 @@ trait ExecutionMapping[F[_]] extends ObservationView[F] {
       fieldMappings = List(
         SqlField("id", ObservationView.Id, key = true, hidden = true),
         SqlField("programId", ObservationView.ProgramId, hidden = true),
+        EffectField("digest", digestHandler, List("id", "programId")),
         EffectField("config", configHandler, List("id", "programId"))
       )
     )
@@ -86,47 +81,31 @@ trait ExecutionMapping[F[_]] extends ObservationView[F] {
         services.use { s =>
           s.generator(commitHash, itcClient, plannedTimeCalculator)
            .generate(pid, oid, limit)
-           .map(_.bimap(mapError, _.value.asJson.success).merge)
+           .map(_.bimap(mapError, _.config.asJson.success).merge)
         }
       }
 
     effectHandler("config", readEnv, calculate)
   }
 
-  private def effectHandler[E, R](
-    fieldName: String,
-    readEnv:   Env => Result[E],
-    calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
-  )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
-
-    new EffectHandler[F] {
-
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, E)]] =
-        queries.traverse { case (_, cursor) =>
-          for {
-            p <- cursor.fieldAs[Program.Id]("programId")
-            o <- cursor.fieldAs[Observation.Id]("id")
-            e <- readEnv(cursor.fullEnv)
-          } yield (p, o, e)
+  private lazy val digestHandler: EffectHandler[F] = {
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
+      (pid, oid, _) => {
+        val mapError: Generator.Error => Result[Json] = {
+          case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
+            Result(Json.Null)
+          case e: Generator.Error                                                   =>
+            Result.failure(e.format)
         }
 
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
-        (for {
-          ctx <- ResultT(queryContext(queries).pure[F])
-          res <- ctx.distinct.traverse { case (pid, oid, env) =>
-                   ResultT(calculate(pid, oid, env)).map((oid, env, _))
-                 }
-        } yield
-          ctx
-            .flatMap { case (_, oid, env) => res.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
-            .zip(queries)
-            .map { case (result, (child, parentCursor)) =>
-              val json: Json     = Json.fromFields(List(fieldName -> result.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
-              (child, cursor)
-            }
-        ).value
+        services.use { s =>
+          s.generator(commitHash, itcClient, plannedTimeCalculator)
+           .generate(pid, oid, Generator.FutureLimit.Min)
+           .map(_.bimap(mapError, _.config.executionDigest.asJson.success).merge)
+        }
+      }
 
-    }
+    effectHandler("digest", _ => ().success, calculate)
+  }
 
 }

@@ -87,6 +87,176 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("digest") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+    setup.flatMap { case (_, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   digest {
+                     setup {
+                       full { seconds }
+                       reacquisition { seconds }
+                     }
+                     acquisition {
+                       observeClass
+                       plannedTime {
+                         charges {
+                           chargeClass
+                           time { seconds }
+                         }
+                         total { seconds }
+                       }
+                       offsets {
+                         p { arcseconds }
+                         q { arcseconds }
+                       }
+                     }
+                     science {
+                       observeClass
+                       plannedTime {
+                         charges {
+                           chargeClass
+                           time { seconds }
+                         }
+                         total { seconds }
+                       }
+                       offsets {
+                         p { arcseconds }
+                         q { arcseconds }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "digest": {
+                    "setup" : {
+                      "full" : {
+                        "seconds" : 960.000000
+                      },
+                      "reacquisition" : {
+                        "seconds" : 300.000000
+                      }
+                    },
+                    "acquisition" : {
+                      "observeClass" : "ACQUISITION",
+                      "plannedTime" : {
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 185.162500
+                            }
+                          }
+                        ],
+                        "total" : {
+                          "seconds" : 185.162500
+                        }
+                      },
+                      "offsets" : [
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 0.000000
+                          }
+                        },
+                        {
+                          "p" : {
+                            "arcseconds" : 10.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 0.000000
+                          }
+                        }
+                      ]
+                    },
+                    "science" : {
+                      "observeClass" : "SCIENCE",
+                      "plannedTime" : {
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 357.600000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 411.600000
+                            }
+                          }
+                        ],
+                        "total" : {
+                          "seconds" : 769.200000
+                        }
+                      },
+                      "offsets" : [
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 0.000000
+                          }
+                        },
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 15.000000
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
   test("simple generation") {
     val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
       for {

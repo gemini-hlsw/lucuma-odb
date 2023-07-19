@@ -99,8 +99,7 @@ object Generator {
   case class Success(
     observationId: Observation.Id,
     itc:           ItcService.AsterismResult,
-    value:         InstrumentExecutionConfig,
-    scienceDigest: Option[SequenceDigest]
+    config:        InstrumentExecutionConfig
   )
 
   def instantiate[F[_]: Concurrent](
@@ -146,14 +145,14 @@ object Generator {
               p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosNorth)
               p1  <- expandAndEstimate(p0, exp.gmosNorth, calculator.gmosNorth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, futureLimit))
-            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosNorth(res), res.science.map(_.digest))
+            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosNorth(res))
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosSouth)
               p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, futureLimit))
-            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosSouth(res), res.science.map(_.digest))
+            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosSouth(res))
         }
       }
 

@@ -23,6 +23,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.PlannedTime
@@ -110,6 +111,24 @@ trait SequenceCodec {
         "observeClass" -> a.observeClass.asJson,
         "plannedTime"  -> a.plannedTime.asJson,
         "offsets"      -> a.offsets.toList.asJson
+      )
+    }
+
+  given Decoder[ExecutionDigest] =
+    Decoder.instance { c =>
+      for {
+        t <- c.downField("setup").as[SetupTime]
+        a <- c.downField("acquisition").as[SequenceDigest]
+        s <- c.downField("science").as[SequenceDigest]
+      } yield ExecutionDigest(t, a, s)
+    }
+
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
+    Encoder.instance { (a: ExecutionDigest) =>
+      Json.obj(
+        "setup"       -> a.setup.asJson,
+        "acquisition" -> a.acquisition.asJson,
+        "science"     -> a.science.asJson
       )
     }
 

@@ -7,18 +7,14 @@ package mapping
 
 import cats.Eq
 import cats.effect.Resource
-import cats.syntax.applicative.*
 import cats.syntax.bifunctor.*
-import cats.syntax.eq.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
-import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax.*
@@ -30,7 +26,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
-import lucuma.odb.graphql.syntax.query.*
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
@@ -41,12 +36,11 @@ import lucuma.odb.service.Services
 
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
-import table.ObservationView
 import table.ProgramTable
 
 
 trait ObservationMapping[F[_]]
-  extends ObservationView[F]
+  extends ObservationEffectHandler[F]
      with ProgramTable[F]
      with TimingWindowView[F]
      with ObsAttachmentTable[F]
@@ -133,8 +127,8 @@ trait ObservationMapping[F[_]]
   def itcQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Unit, Unit) => F[Result[ItcService.AsterismResult]] =
-      (pid, oid, _, _) =>
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResult]] =
+      (pid, oid, _) =>
         services.use { s =>
           s.itcService(itcClient)
            .lookup(pid, oid)
@@ -144,21 +138,15 @@ trait ObservationMapping[F[_]]
            }
         }
 
-    effectHandler("itc", readEnv, _ => (), calculate)
+    effectHandler("itc", readEnv, calculate)
   }
 
   def sequenceQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Generator.FutureLimit] =
       _.getR[Generator.FutureLimit](FutureLimitParam)
 
-    val requestsSequence: Query => Boolean =
-      _.exists {
-        case Select("executionConfig", _, _) => true
-        case _                               => false
-      }
-
-    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit, Boolean) => F[Result[Json]] =
-      (pid, oid, limit, force) => {
+    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
+      (pid, oid, limit) => {
         val mapError: Generator.Error => Result[Json] = {
           case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
             Result(Json.Null)
@@ -171,8 +159,8 @@ trait ObservationMapping[F[_]]
             "programId"       -> pid.asJson,
             "observationId"   -> oid.asJson,
             "itcResult"       -> s.itc.asJson,
-            "executionConfig" -> s.value.asJson,
-            "scienceDigest"   -> s.scienceDigest.asJson
+            "executionConfig" -> s.config.asJson,
+            "scienceDigest"   -> s.config.executionDigest.science.asJson
           ).success
 
         services.use { s =>
@@ -182,45 +170,8 @@ trait ObservationMapping[F[_]]
         }
       }
 
-    effectHandler("sequence", readEnv, requestsSequence, calculate)
+    effectHandler("sequence", readEnv, calculate)
   }
-
-  private def effectHandler[E, Q, R](
-    fieldName: String,
-    readEnv:   Env => Result[E],
-    readQuery: Query => Q,
-    calculate: (Program.Id, Observation.Id, E, Q) => F[Result[R]]
-  )(using Eq[E], Eq[Q], io.circe.Encoder[R]): EffectHandler[F] =
-
-    new EffectHandler[F] {
-
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, E, Q)]] =
-        queries.traverse { case (query, cursor) =>
-          for {
-            p <- cursor.fieldAs[Program.Id]("programId")
-            o <- cursor.fieldAs[Observation.Id]("id")
-            e <- readEnv(cursor.fullEnv)
-          } yield (p, o, e, readQuery(query))
-        }
-
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
-        (for {
-          ctx <- ResultT(queryContext(queries).pure[F])
-          res <- ctx.distinct.traverse { case (pid, oid, env, q) =>
-                   ResultT(calculate(pid, oid, env, q)).map((oid, env, q, _))
-                 }
-        } yield
-          ctx
-            .flatMap { case (_, oid, env, q) => res.find(r => r._1 === oid && r._2 === env && r._3 === q).map(_._4).toList }
-            .zip(queries)
-            .map { case (result, (child, parentCursor)) =>
-              val json: Json     = Json.fromFields(List(fieldName -> result.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
-              (child, cursor)
-            }
-        ).value
-
-    }
 
 }
 
