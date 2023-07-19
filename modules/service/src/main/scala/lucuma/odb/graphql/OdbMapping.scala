@@ -148,7 +148,7 @@ object OdbMapping {
           with ProgramUserMapping[F]
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
-          with ProperMotionRAMapping[F]
+          with ProperMotionRaMapping[F]
           with ProposalMapping[F]
           with ProposalClassMapping[F]
           with ProposalAttachmentMapping[F]
@@ -274,7 +274,7 @@ object OdbMapping {
               ProgramUserMapping,
               ProperMotionDeclinationMapping,
               ProperMotionMapping,
-              ProperMotionRAMapping,
+              ProperMotionRaMapping,
               ProposalAttachmentMapping,
               ProposalAttachmentTypeMetaMapping,
               ProposalMapping,
