@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Eq
+import cats.data.EitherT
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
@@ -65,23 +66,27 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
       }
     )
 
+  extension (e: Generator.Error) {
+    def toResult: Result[Json] =
+      e match {
+        case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
+          Result(Json.Null)
+        case e: Generator.Error                                                   =>
+          Result.failure(e.format)
+
+      }
+  }
+
   private lazy val configHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Generator.FutureLimit] =
       _.getR[Generator.FutureLimit](FutureLimitParam)
 
     val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
       (pid, oid, limit) => {
-        val mapError: Generator.Error => Result[Json] = {
-          case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
-            Result(Json.Null)
-          case e: Generator.Error                                                   =>
-            Result.failure(e.format)
-        }
-
         services.use { s =>
           s.generator(commitHash, itcClient, plannedTimeCalculator)
-           .generate(pid, oid, limit)
-           .map(_.bimap(mapError, _.config.asJson.success).merge)
+           .lookupAndGenerate(pid, oid, limit)
+           .map(_.bimap(_.toResult, _.config.asJson.success).merge)
         }
       }
 
@@ -91,17 +96,22 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
   private lazy val digestHandler: EffectHandler[F] = {
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, _) => {
-        val mapError: Generator.Error => Result[Json] = {
-          case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
-            Result(Json.Null)
-          case e: Generator.Error                                                   =>
-            Result.failure(e.format)
-        }
-
         services.use { s =>
-          s.generator(commitHash, itcClient, plannedTimeCalculator)
-           .generate(pid, oid, Generator.FutureLimit.Min)
-           .map(_.bimap(mapError, _.config.executionDigest.asJson.success).merge)
+          (for {
+            itc <- EitherT(
+                     s.itcService(itcClient)
+                      .lookup(pid, oid)
+                      .map(_.leftMap {
+                        case ItcService.Error.ObservationNotFound(_, _) => Result(Json.Null)
+                        case e                                          => Result.failure(e.format)
+                      })
+                   )
+            dig <- EitherT(
+                     s.generator(commitHash, itcClient, plannedTimeCalculator)
+                      .generate(oid, itc.params, itc.result, Generator.FutureLimit.Min)
+                      .map(_.bimap(_.toResult, _.config.executionDigest.asJson.success))
+                   )
+          } yield dig).merge
         }
       }
 

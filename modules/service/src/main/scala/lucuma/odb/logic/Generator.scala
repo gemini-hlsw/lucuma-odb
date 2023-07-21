@@ -48,9 +48,16 @@ import Generator.FutureLimit
 
 sealed trait Generator[F[_]] {
 
-  def generate(
+  def lookupAndGenerate(
     programId:     Program.Id,
     observationId: Observation.Id,
+    futureLimit:   FutureLimit = FutureLimit.Default
+  )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Success]]
+
+  def generate(
+    observationId: Observation.Id,
+    params:        GeneratorParams,
+    resultSet:     ItcService.AsterismResult,
     futureLimit:   FutureLimit = FutureLimit.Default
   )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Success]]
 
@@ -113,7 +120,7 @@ object Generator {
 
       private val exp = SmartGcalExpander.fromService(smartGcalService)
 
-      override def generate(
+      override def lookupAndGenerate(
         pid:         Program.Id,
         oid:         Observation.Id,
         futureLimit: FutureLimit = FutureLimit.Default
@@ -125,21 +132,21 @@ object Generator {
 
         (for {
           r <- EitherT(itcResult)
-          s <- generateSequence(oid, r.params, r.result, futureLimit)
+          s <- EitherT(generate(oid, r.params, r.result, futureLimit))
         } yield s).value
       }
 
       // Generate a sequence for the observation, which will depend on the
       // observation's observing mode.
-      private def generateSequence(
+      override def generate(
         oid:         Observation.Id,
         params:      GeneratorParams,
         resultSet:   ItcService.AsterismResult,
         futureLimit: FutureLimit
-      )(using NoTransaction[F]): EitherT[F, Error, Success] = {
+      )(using NoTransaction[F]): F[Either[Error, Success]] = {
         val namespace = SequenceIds.namespace(commitHash, oid, params)
 
-        params match {
+        (params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
               p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosNorth)
@@ -153,7 +160,7 @@ object Generator {
               p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, futureLimit))
             } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosSouth(res))
-        }
+        }).value
       }
 
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
