@@ -8,7 +8,6 @@ package longslit
 import cats.data.NonEmptyList
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
@@ -19,13 +18,11 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -50,10 +47,7 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
 
   def compute(
     mode:          Config[G, F, U],
-    exposureTime:  SciExposureTime,
-    sourceProfile: SourceProfile,
-    imageQuality:  ImageQuality,
-    sampling:      PosDouble
+    exposureTime:  SciExposureTime
   ): Stream[Pure, Science.Atom[D]] = {
 
     @tailrec def gcd(a: BigInt, b: BigInt): BigInt = if (b === 0) a else gcd(b, a%b)
@@ -76,7 +70,7 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
       case Nil => Stream(Offset.Q.Zero).repeat
       case os  => Stream.emits(os).repeat
     }
-    val xBin = mode.xBin(sourceProfile, imageQuality, sampling)
+    val xBin = mode.xBin
 
     def nextAtom(stepOrder: Science.StepOrder, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
       (for {

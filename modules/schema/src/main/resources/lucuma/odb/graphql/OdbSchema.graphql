@@ -5369,9 +5369,7 @@ enum Existence {
   DELETED
 }
 
-"""
-Summarizes the execution setup time and sequences.
-"""
+"Summarizes the execution setup time and sequences."
 type ExecutionDigest {
 
   "Setup time calculations."

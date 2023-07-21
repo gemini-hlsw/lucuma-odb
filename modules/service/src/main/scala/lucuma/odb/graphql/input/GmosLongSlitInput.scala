@@ -9,6 +9,7 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
 import edu.gemini.grackle.Result
+import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -20,11 +21,13 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeType
@@ -97,8 +100,15 @@ object GmosLongSlitInput {
       /**
        * Creates a GMOS Long Slit sequence config based on input parameters.
        */
-      def toSequenceConfig: Config.GmosNorth =
+      def toSequenceConfig(
+        sourceProfile: SourceProfile,
+        imageQuality:  ImageQuality,
+        sampling:      PosDouble
+      ): Config.GmosNorth =
         Config.GmosNorth(
+          sourceProfile,
+          imageQuality,
+          sampling,
           grating,
           filter,
           fpu,
@@ -165,8 +175,15 @@ object GmosLongSlitInput {
       /**
        * Creates a GMOS Long Slit sequence config based on input parameters.
        */
-      def toSequenceConfig: Config.GmosSouth =
+      def toSequenceConfig(
+        sourceProfile: SourceProfile,
+        imageQuality:  ImageQuality,
+        sampling:      PosDouble
+      ): Config.GmosSouth =
         Config.GmosSouth(
+          sourceProfile,
+          imageQuality,
+          sampling,
           grating,
           filter,
           fpu,

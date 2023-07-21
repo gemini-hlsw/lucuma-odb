@@ -41,6 +41,7 @@ import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
 
+import ObservingModeServices.SequenceConfig
 import Services.Syntax.*
 
 trait GeneratorParamsService[F[_]] {
@@ -87,31 +88,13 @@ object GeneratorParamsService {
         which:     List[Observation.Id]
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]] =
         for {
-          ps <- selectParams(programId, which)     // F[List[Params]]
+          ps <- selectParams(programId, which)                  // F[List[Params]]
           oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
-          m  <- observingModeServices.selectSequenceConfig(oms) // F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
+          m  <- observingModeServices.selectSequenceConfig(oms) // F[Map[Observation.Id, SourceProfile => SequenceConfig]]
         } yield
-          ps.groupBy(_.observationId)
-            .map { case (oid, oParams) =>
-              val genParams = m.get(oid).toValidNel(MissingData.nameOnly("observing mode")).andThen {
-                case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _) =>
-                  oParams.traverse { p =>
-                    spectroscopyParams(p, InstrumentMode.GmosNorthSpectroscopy(g, f, GmosFpu.North.builtin(u)), λ)
-                  }.map { itcParams =>
-                    GeneratorParams.GmosNorthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gn)
-                  }
-
-                case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _) =>
-                  oParams.traverse { p =>
-                    spectroscopyParams(p, InstrumentMode.GmosSouthSpectroscopy(g, f, GmosFpu.South.builtin(u)), λ)
-                  }.map { itcParams =>
-                    GeneratorParams.GmosSouthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gs)
-                  }
-
-              }
-              (oid, genParams.toEither)
-            }
-
+          ps.groupBy(_.observationId).map { case (oid, oParams) =>
+            oid -> toGeneratorParams(oParams, m.get(oid))
+          }
 
       private def selectParams(
         programId: Program.Id,
@@ -125,6 +108,50 @@ object GeneratorParamsService {
               .prepareR(af.fragment.query(decoder))
               .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           }
+
+      private def sequenceConfig(
+        params: List[Params],
+        config: Option[SourceProfile => SequenceConfig]
+      ): EitherNel[MissingData, SequenceConfig] = {
+        val configs: EitherNel[MissingData, List[SequenceConfig]] =
+          params.traverse { p =>
+            for {
+              t <- p.targetId.toRightNel(MissingData.nameOnly("target"))
+              s <- p.sourceProfile.toRightNel(MissingData(t.some, "source profile"))
+              f <- config.toRightNel(MissingData.nameOnly("observing mode"))
+            } yield f(s)
+          }
+
+        // All of the SequenceConfigs that we compute have to be the same.
+        // Otherwise we would need to configure the instrument differently for
+        // different stars in the asterism.
+        configs.flatMap { scs =>
+          scs.distinct match {
+            case sc :: Nil => sc.rightNel[MissingData]
+            case _         => MissingData.nameOnly("multiple configs").leftNel[SequenceConfig]  // TODO: ConflictingData error
+          }
+        }
+      }
+
+      private def toGeneratorParams(
+        params: List[Params],
+        config: Option[SourceProfile => SequenceConfig]
+      ): EitherNel[MissingData, GeneratorParams] =
+        sequenceConfig(params, config).flatMap {
+          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
+            params.traverse { p =>
+              spectroscopyParams(p, InstrumentMode.GmosNorthSpectroscopy(g, f, GmosFpu.North.builtin(u)), λ)
+            }.map { itcParams =>
+              GeneratorParams.GmosNorthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gn)
+            }.toEither
+
+          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
+            params.traverse { p =>
+              spectroscopyParams(p, InstrumentMode.GmosSouthSpectroscopy(g, f, GmosFpu.South.builtin(u)), λ)
+            }.map { itcParams =>
+              GeneratorParams.GmosSouthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gs)
+            }.toEither
+        }
 
       private def spectroscopyParams(
         params:     Params,
