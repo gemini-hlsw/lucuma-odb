@@ -14,14 +14,14 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
 import skunk.Transaction
 
-import ObservingModeServices.SequenceConfig
+import lucuma.odb.sequence.ObservingMode
 import Services.Syntax.*
 
 sealed trait ObservingModeServices[F[_]] {
 
-  def selectSequenceConfig(
+  def selectObservingMode(
     which: List[(Observation.Id, ObservingModeType)]
-  )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => SequenceConfig]]
+  )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => ObservingMode]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -47,16 +47,12 @@ sealed trait ObservingModeServices[F[_]] {
 
 object ObservingModeServices {
 
-  type SequenceConfig =
-    lucuma.odb.sequence.gmos.longslit.Config.GmosNorth |
-    lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
-
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): ObservingModeServices[F] =
     new ObservingModeServices[F] {
 
-      override def selectSequenceConfig(
+      override def selectObservingMode(
         which: List[(Observation.Id, ObservingModeType)]
-      )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => SequenceConfig]] = {
+      )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => ObservingMode]] = {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
@@ -64,14 +60,14 @@ object ObservingModeServices {
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
-              .map(_.view.mapValues(_.widen[SequenceConfig]).toMap)
+              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
-              .map(_.view.mapValues(_.widen[SequenceConfig]).toMap)
+              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
-        }.map(_.fold(Map.empty[Observation.Id, SourceProfile => SequenceConfig])(_ ++ _))
+        }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
       }
 
       override def createFunction(

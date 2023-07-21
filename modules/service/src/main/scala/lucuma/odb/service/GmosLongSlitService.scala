@@ -150,13 +150,13 @@ object GmosLongSlitService {
         which: List[Observation.Id]
       ): F[Map[Observation.Id, SourceProfile => GmosNorth]] =
         select(which, Statements.selectGmosNorthLongSlit, north)
-          .map(_.map { case (oid, iq, gn) => (oid, gn.toSequenceConfig(_, iq, Sampling)) }.toMap)
+          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, Sampling)) }.toMap)
 
       override def selectSouth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, SourceProfile => GmosSouth]] =
         select(which, Statements.selectGmosSouthLongSlit, south)
-          .map(_.map { case (oid, iq, gs) => (oid, gs.toSequenceConfig(_, iq, Sampling)) }.toMap)
+          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, Sampling)) }.toMap)
 
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>

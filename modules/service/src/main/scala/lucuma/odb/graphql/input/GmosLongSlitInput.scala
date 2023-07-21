@@ -100,7 +100,7 @@ object GmosLongSlitInput {
       /**
        * Creates a GMOS Long Slit sequence config based on input parameters.
        */
-      def toSequenceConfig(
+      def toObservingMode(
         sourceProfile: SourceProfile,
         imageQuality:  ImageQuality,
         sampling:      PosDouble
@@ -175,7 +175,7 @@ object GmosLongSlitInput {
       /**
        * Creates a GMOS Long Slit sequence config based on input parameters.
        */
-      def toSequenceConfig(
+      def toObservingMode(
         sourceProfile: SourceProfile,
         imageQuality:  ImageQuality,
         sampling:      PosDouble
