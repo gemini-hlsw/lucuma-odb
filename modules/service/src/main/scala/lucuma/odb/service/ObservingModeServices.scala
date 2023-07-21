@@ -9,17 +9,19 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Result
 import lucuma.core.model.Observation
+import lucuma.core.model.SourceProfile
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
 import skunk.Transaction
 
+import ObservingModeServices.SequenceConfig
 import Services.Syntax.*
 
 sealed trait ObservingModeServices[F[_]] {
 
   def selectSequenceConfig(
     which: List[(Observation.Id, ObservingModeType)]
-  )(using Transaction[F]): F[Map[Observation.Id, ObservingModeServices.SequenceConfig]]
+  )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => SequenceConfig]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -54,20 +56,22 @@ object ObservingModeServices {
 
       override def selectSequenceConfig(
         which: List[(Observation.Id, ObservingModeType)]
-      )(using Transaction[F]): F[Map[Observation.Id, SequenceConfig]] = {
+      )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => SequenceConfig]] = {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
+
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
-              .map(_.view.mapValues(_.toSequenceConfig).toMap)
+              .map(_.view.mapValues(_.widen[SequenceConfig]).toMap)
 
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
-              .map(_.view.mapValues(_.toSequenceConfig).toMap)
-        }.map(_.fold(Map.empty[Observation.Id, SequenceConfig])(_ ++ _))
+              .map(_.view.mapValues(_.widen[SequenceConfig]).toMap)
+
+        }.map(_.fold(Map.empty[Observation.Id, SourceProfile => SequenceConfig])(_ ++ _))
       }
 
       override def createFunction(

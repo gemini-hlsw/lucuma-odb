@@ -164,12 +164,7 @@ object Generator {
         generator: gmos.longslit.Generator[S, D, G, L, U]
       ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
         EitherT.fromEither[F](
-          generator.generate(
-            itcResult.value,
-            itcResult.input.sourceProfile,
-            itcResult.input.constraints.imageQuality,
-            config
-          ) match {
+          generator.generate(itcResult.value, config) match {
             case Left(msg)    => InvalidData(msg).asLeft
             case Right(proto) => proto.mapSequences(_.take(1), _.take(itcResult.value.exposures.value)).asRight[Error]
           }
