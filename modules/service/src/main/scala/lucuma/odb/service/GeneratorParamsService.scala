@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Eq
 import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.ValidatedNel
@@ -10,6 +11,7 @@ import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -42,34 +44,47 @@ import skunk.implicits.*
 import scala.collection.immutable.SortedMap
 
 import ObservingModeServices.SequenceConfig
+import GeneratorParamsService.Error
 import Services.Syntax.*
 
 trait GeneratorParamsService[F[_]] {
 
-  import GeneratorParamsService.MissingData
-
   def select(
     programId: Program.Id,
     which:     Observation.Id
-  )(using Transaction[F]): F[Option[EitherNel[MissingData, GeneratorParams]]]
+  )(using Transaction[F]): F[Option[EitherNel[Error, GeneratorParams]]]
 
   def selectAll(
     programId: Program.Id,
     which:     List[Observation.Id]
-  )(using Transaction[F]): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]]
+  )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
 
 object GeneratorParamsService {
 
-  case class MissingData(
-    targetId:  Option[Target.Id],
-    paramName: String
-  )
+//  sealed trait Error extends Product with Serializable
+  enum Error {
+    case MissingData(targetId: Option[Target.Id], paramName: String)
+    case ConflictingData
+  }
 
-  object MissingData {
-    def nameOnly(paramName: String): MissingData =
+  object Error {
+    def missing(paramName: String): Error =
       MissingData(none, paramName)
+
+    def targetMissing(tid: Target.Id, paramName: String): Error =
+      MissingData(tid.some, paramName)
+
+    given Eq[Error] with {
+      def eqv(x: Error, y: Error): Boolean =
+        (x, y) match {
+          case (MissingData(t0, p0), MissingData(t1, p1)) => (t0 === t1) && (p0 === p1)
+          case (ConflictingData, ConflictingData)         => true
+          case _                                          => false
+        }
+    }
+
   }
 
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
@@ -80,13 +95,13 @@ object GeneratorParamsService {
       override def select(
         programId: Program.Id,
         which:     Observation.Id
-      )(using Transaction[F]): F[Option[EitherNel[MissingData, GeneratorParams]]] =
+      )(using Transaction[F]): F[Option[EitherNel[Error, GeneratorParams]]] =
         selectAll(programId, List(which)).map(_.get(which))
 
       override def selectAll(
         programId: Program.Id,
         which:     List[Observation.Id]
-      )(using Transaction[F]): F[Map[Observation.Id, EitherNel[MissingData, GeneratorParams]]] =
+      )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
         for {
           ps <- selectParams(programId, which)                  // F[List[Params]]
           oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
@@ -112,13 +127,13 @@ object GeneratorParamsService {
       private def sequenceConfig(
         params: List[Params],
         config: Option[SourceProfile => SequenceConfig]
-      ): EitherNel[MissingData, SequenceConfig] = {
-        val configs: EitherNel[MissingData, List[SequenceConfig]] =
+      ): EitherNel[Error, SequenceConfig] = {
+        val configs: EitherNel[Error, List[SequenceConfig]] =
           params.traverse { p =>
             for {
-              t <- p.targetId.toRightNel(MissingData.nameOnly("target"))
-              s <- p.sourceProfile.toRightNel(MissingData(t.some, "source profile"))
-              f <- config.toRightNel(MissingData.nameOnly("observing mode"))
+              t <- p.targetId.toRightNel(Error.missing("target"))
+              s <- p.sourceProfile.toRightNel(Error.MissingData(t.some, "source profile"))
+              f <- config.toRightNel(Error.missing("observing mode"))
             } yield f(s)
           }
 
@@ -127,8 +142,8 @@ object GeneratorParamsService {
         // different stars in the asterism.
         configs.flatMap { scs =>
           scs.distinct match {
-            case sc :: Nil => sc.rightNel[MissingData]
-            case _         => MissingData.nameOnly("multiple configs").leftNel[SequenceConfig]  // TODO: ConflictingData error
+            case sc :: Nil => sc.rightNel[Error]
+            case _         => Error.ConflictingData.leftNel[SequenceConfig]
           }
         }
       }
@@ -136,7 +151,7 @@ object GeneratorParamsService {
       private def toGeneratorParams(
         params: List[Params],
         config: Option[SourceProfile => SequenceConfig]
-      ): EitherNel[MissingData, GeneratorParams] =
+      ): EitherNel[Error, GeneratorParams] =
         sequenceConfig(params, config).flatMap {
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
@@ -157,7 +172,7 @@ object GeneratorParamsService {
         params:     Params,
         mode:       InstrumentMode,
         wavelength: Wavelength
-      ): ValidatedNel[MissingData, (Target.Id, SpectroscopyIntegrationTimeInput)] = {
+      ): ValidatedNel[Error, (Target.Id, SpectroscopyIntegrationTimeInput)] = {
 
         def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[Band] =
           bMap.minByOption { case (b, _) =>
@@ -178,13 +193,13 @@ object GeneratorParamsService {
               )
           }
 
-        (params.signalToNoise.toValidNel(MissingData.nameOnly("signal to noise")),
-         params.targetId.toValidNel(MissingData.nameOnly("target"))
+        (params.signalToNoise.toValidNel(Error.missing("signal to noise")),
+         params.targetId.toValidNel(Error.missing("target"))
         ).tupled.andThen { case (s2n, tid) =>
           // these are dependent on having a target in the first place
-          (band.toValidNel(MissingData(tid.some, "brightness measure")),
-           params.radialVelocity.toValidNel(MissingData(tid.some, "radial velocity")),
-           params.sourceProfile.toValidNel(MissingData(tid.some, "source profile"))
+          (band.toValidNel(Error.targetMissing(tid, "brightness measure")),
+           params.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity")),
+           params.sourceProfile.toValidNel(Error.targetMissing(tid, "source profile"))
           ).mapN { case (b, rv, sp) =>
             tid ->
             SpectroscopyIntegrationTimeInput(
