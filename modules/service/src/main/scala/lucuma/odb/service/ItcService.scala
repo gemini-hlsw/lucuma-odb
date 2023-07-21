@@ -74,14 +74,23 @@ object ItcService {
         s"Observation '$observationId' in program '$programId' not found."
     }
 
-    case class MissingParams(
-      missing: NonEmptyList[GeneratorParamsService.MissingData]
+    case class ObservationDefinitionError(
+      errors: NonEmptyList[GeneratorParamsService.Error]
     ) extends Error {
       def format: String = {
-        val params = missing.map { m =>
-          s"${m.targetId.fold("") { tid => s"(target $tid) " }}${m.paramName}"
-        }.intercalate(", ")
-        s"ITC cannot be queried until the following parameters are defined: $params"
+        val conflict = Option.when(errors.exists(_ === GeneratorParamsService.Error.ConflictingData))(
+          "Observation would require multiple instrument configurations to observe all the targets in the asterism."
+        )
+
+        val missing = errors.collect {
+          case GeneratorParamsService.Error.MissingData(tid, paramName) =>
+            s"${tid.fold("") { tid => s"(target $tid) " }}$paramName"
+        } match {
+          case Nil    => none[String]
+          case params => s"ITC cannot be queried until the following parameters are defined: $params".some
+        }
+
+        (conflict.toList ++ missing.toList).intercalate("\n")
       }
     }
 
@@ -215,7 +224,7 @@ object ItcService {
           .select(pid, oid)
           .map {
             case None                => ObservationNotFound(pid, oid).asLeft
-            case Some(Left(missing)) => MissingParams(missing).asLeft
+            case Some(Left(errors))  => ObservationDefinitionError(errors).asLeft
             case Some(Right(params)) => params.asRight
           }
 
