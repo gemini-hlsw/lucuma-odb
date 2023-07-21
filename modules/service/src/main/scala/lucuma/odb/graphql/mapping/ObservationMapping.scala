@@ -165,7 +165,7 @@ trait ObservationMapping[F[_]]
 
         services.use { s =>
           s.generator(commitHash, itcClient, plannedTimeCalculator)
-           .lookupAndGenerate(pid, oid, limit)
+           .generate(pid, oid, limit)
            .map(_.bimap(mapError, mapSuccess).merge)
         }
       }

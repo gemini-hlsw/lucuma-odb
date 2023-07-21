@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Eq
-import cats.data.EitherT
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
@@ -85,7 +84,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
       (pid, oid, limit) => {
         services.use { s =>
           s.generator(commitHash, itcClient, plannedTimeCalculator)
-           .lookupAndGenerate(pid, oid, limit)
+           .generate(pid, oid, limit)
            .map(_.bimap(_.toResult, _.config.asJson.success).merge)
         }
       }
@@ -97,21 +96,9 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, _) => {
         services.use { s =>
-          (for {
-            itc <- EitherT(
-                     s.itcService(itcClient)
-                      .lookup(pid, oid)
-                      .map(_.leftMap {
-                        case ItcService.Error.ObservationNotFound(_, _) => Result(Json.Null)
-                        case e                                          => Result.failure(e.format)
-                      })
-                   )
-            dig <- EitherT(
-                     s.generator(commitHash, itcClient, plannedTimeCalculator)
-                      .generate(oid, itc.params, itc.result, Generator.FutureLimit.Min)
-                      .map(_.bimap(_.toResult, _.config.executionDigest.asJson.success))
-                   )
-          } yield dig).merge
+          s.generator(commitHash, itcClient, plannedTimeCalculator)
+           .digest(pid, oid)
+           .map(_.bimap(_.toResult, _.asJson.success).merge)
         }
       }
 
