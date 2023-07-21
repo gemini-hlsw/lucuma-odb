@@ -87,7 +87,7 @@ object ItcService {
             s"${tid.fold("") { tid => s"(target $tid) " }}$paramName"
         } match {
           case Nil    => none[String]
-          case params => s"ITC cannot be queried until the following parameters are defined: $params".some
+          case params => s"ITC cannot be queried until the following parameters are defined: ${params.intercalate(", ")}".some
         }
 
         (conflict.toList ++ missing.toList).intercalate("\n")

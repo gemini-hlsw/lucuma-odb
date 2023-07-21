@@ -38,8 +38,6 @@ import spire.math.Rational
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
-import java.security.MessageDigest
-import java.util.HexFormat
 
 /**
  * Configuration for the GMOS Long Slit science mode.  Using these parameters, a
@@ -118,7 +116,7 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
 
   def explicitSpatialOffsets: Option[List[Q]]
 
-  def hash: String = {
+  def hashBytes: Array[Byte] = {
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
@@ -139,12 +137,7 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
     }
 
     out.close()
-
-    HexFormat.of.formatHex(
-      MessageDigest
-        .getInstance("MD5")
-        .digest(bao.toByteArray)
-    )
+    bao.toByteArray
   }
 
 }

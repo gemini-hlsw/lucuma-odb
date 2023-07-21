@@ -43,6 +43,8 @@ import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.UUID
 
 import Generator.FutureLimit
@@ -119,63 +121,113 @@ object Generator {
 
       private val exp = SmartGcalExpander.fromService(smartGcalService)
 
+      private case class Context(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        itcRes: ItcService.AsterismResult,
+        params: GeneratorParams
+      ) {
+
+        val integrationTime: ItcService.TargetResult =
+          itcRes.value.focus
+
+        val hash: String = {
+          val zero = 0.toByte
+          val md5  = MessageDigest.getInstance("MD5")
+
+          // Observing Mode
+          md5.update(params.observingMode.hashBytes)
+
+          // Integration Time
+          val ing = itcRes.value.focus.value
+          md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
+          md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
+
+          // Commit Hash
+          md5.update(commitHash.toByteArray)
+
+          HexFormat.of.formatHex(md5.digest())
+        }
+
+        def checkCache(using NoTransaction[F]): EitherT[F, Error, Option[ExecutionDigest]] =
+          EitherT.right(services.transactionally {
+            executionDigestService.select(pid, oid, hash)
+          })
+
+        def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, Error, Unit] =
+          EitherT.right(services.transactionally {
+            executionDigestService.insertOrUpdate(pid, oid, hash, digest)
+          })
+      }
+
+      private object Context {
+
+        def lookup(
+          pid: Program.Id,
+          oid: Observation.Id
+        )(using NoTransaction[F]): EitherT[F, Error, Context] =
+          EitherT(
+            itcService(itcClient)
+              .lookup(pid, oid)
+              .map(_.bimap(
+                error   => ItcError(error),
+                success => Context(pid, oid, success.result, success.params)
+              ))
+          )
+
+      }
+
       override def digest(
         pid: Program.Id,
         oid: Observation.Id
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
-        ???
+        (for {
+          c <- Context.lookup(pid, oid)
+          o <- c.checkCache
+          d <- o.fold(generateAndCache(c, FutureLimit.Min).map(_.config.executionDigest))(d => EitherT.pure(d))
+        } yield d).value
 
       override def generate(
-        pid:         Program.Id,
-        oid:         Observation.Id,
-        futureLimit: FutureLimit = FutureLimit.Default
+        pid: Program.Id,
+        oid: Observation.Id,
+        lim: FutureLimit = FutureLimit.Default
       )(using NoTransaction[F]): F[Either[Error, Success]] =
         (for {
-          r <- lookup(pid, oid)
-          s <- doGenerate(oid, r.params, r.result, futureLimit)
+          c <- Context.lookup(pid, oid)
+          s <- generateAndCache(c, lim)
         } yield s).value
 
-      private def lookup(
-        pid: Program.Id,
-        oid: Observation.Id
-      )(using NoTransaction[F]): EitherT[F, Error, ItcService.Success] =
-        EitherT(
-          itcService(itcClient)
-            .lookup(pid, oid)
-            .map(_.leftMap(error => ItcError(error)))
-        )
-
-//      private def hash(
-//        params:    GeneratorParams,
-//        resultSet: ItcService.AsterismResult
-//      ): String = {
-//
-//      }
+      private def generateAndCache(
+        ctx: Context,
+        lim: FutureLimit
+      )(using NoTransaction[F]): EitherT[F, Error, Success] =
+        for {
+          s <- doGenerate(ctx, lim)
+          _ <- ctx.cache(s.config.executionDigest)
+        } yield s
 
       // Generate a sequence for the observation, which will depend on the
       // observation's observing mode.
       private def doGenerate(
-        oid:         Observation.Id,
-        params:      GeneratorParams,
-        resultSet:   ItcService.AsterismResult,
-        futureLimit: FutureLimit
+        ctx: Context,
+        lim: FutureLimit
       )(using NoTransaction[F]): EitherT[F, Error, Success] = {
-        val namespace = SequenceIds.namespace(commitHash, oid, params)
+        val namespace = SequenceIds.namespace(commitHash, ctx.oid, ctx.params)
 
-        params match {
+        ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
-              p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosNorth)
+              p0  <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
               p1  <- expandAndEstimate(p0, exp.gmosNorth, calculator.gmosNorth)
-              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, futureLimit))
-            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosNorth(res))
+              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, lim))
+            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosNorth(res))
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
-              p0  <- gmosLongSlit(resultSet.value.focus, config, gmos.longslit.Generator.GmosSouth)
+              p0  <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
               p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
-              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, futureLimit))
-            } yield Success(oid, resultSet, InstrumentExecutionConfig.GmosSouth(res))
+              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, lim))
+            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosSouth(res))
         }
       }
 

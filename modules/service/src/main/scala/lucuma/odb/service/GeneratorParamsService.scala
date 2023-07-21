@@ -35,6 +35,7 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.sourceprofile.given
+import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -43,7 +44,6 @@ import skunk.implicits.*
 
 import scala.collection.immutable.SortedMap
 
-import ObservingModeServices.SequenceConfig
 import GeneratorParamsService.Error
 import Services.Syntax.*
 
@@ -105,7 +105,7 @@ object GeneratorParamsService {
         for {
           ps <- selectParams(programId, which)                  // F[List[Params]]
           oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
-          m  <- observingModeServices.selectSequenceConfig(oms) // F[Map[Observation.Id, SourceProfile => SequenceConfig]]
+          m  <- observingModeServices.selectObservingMode(oms) // F[Map[Observation.Id, SourceProfile => ObservingMode]]
         } yield
           ps.groupBy(_.observationId).map { case (oid, oParams) =>
             oid -> toGeneratorParams(oParams, m.get(oid))
@@ -124,11 +124,11 @@ object GeneratorParamsService {
               .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           }
 
-      private def sequenceConfig(
+      private def observingMode(
         params: List[Params],
-        config: Option[SourceProfile => SequenceConfig]
-      ): EitherNel[Error, SequenceConfig] = {
-        val configs: EitherNel[Error, List[SequenceConfig]] =
+        config: Option[SourceProfile => ObservingMode]
+      ): EitherNel[Error, ObservingMode] = {
+        val configs: EitherNel[Error, List[ObservingMode]] =
           params.traverse { p =>
             for {
               t <- p.targetId.toRightNel(Error.missing("target"))
@@ -137,22 +137,22 @@ object GeneratorParamsService {
             } yield f(s)
           }
 
-        // All of the SequenceConfigs that we compute have to be the same.
+        // All of the `ObservingMode`s that we compute have to be the same.
         // Otherwise we would need to configure the instrument differently for
         // different stars in the asterism.
         configs.flatMap { scs =>
           scs.distinct match {
             case sc :: Nil => sc.rightNel[Error]
-            case _         => Error.ConflictingData.leftNel[SequenceConfig]
+            case _         => Error.ConflictingData.leftNel[ObservingMode]
           }
         }
       }
 
       private def toGeneratorParams(
         params: List[Params],
-        config: Option[SourceProfile => SequenceConfig]
+        config: Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, GeneratorParams] =
-        sequenceConfig(params, config).flatMap {
+        observingMode(params, config).flatMap {
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
               spectroscopyParams(p, InstrumentMode.GmosNorthSpectroscopy(g, f, GmosFpu.North.builtin(u)), λ)
@@ -194,8 +194,9 @@ object GeneratorParamsService {
           }
 
         (params.signalToNoise.toValidNel(Error.missing("signal to noise")),
+         params.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
          params.targetId.toValidNel(Error.missing("target"))
-        ).tupled.andThen { case (s2n, tid) =>
+        ).tupled.andThen { case (s2n, s2nA, tid) =>
           // these are dependent on having a target in the first place
           (band.toValidNel(Error.targetMissing(tid, "brightness measure")),
            params.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity")),
@@ -205,7 +206,7 @@ object GeneratorParamsService {
             SpectroscopyIntegrationTimeInput(
               wavelength,
               s2n,
-              params.signalToNoiseAt,
+              s2nA.some,
               sp,
               b,
               rv,

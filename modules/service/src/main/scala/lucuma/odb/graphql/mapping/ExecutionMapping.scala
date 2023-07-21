@@ -72,7 +72,6 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
           Result(Json.Null)
         case e: Generator.Error                                                   =>
           Result.failure(e.format)
-
       }
   }
 
