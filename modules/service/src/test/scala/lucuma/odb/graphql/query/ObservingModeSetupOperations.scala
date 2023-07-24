@@ -85,6 +85,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
                    },
                    resolution: 100,
                    signalToNoise: 100.0,
+                   signalToNoiseAt: { nanometers: 500 },
                    wavelengthCoverage: {
                      nanometers: 20
                    },

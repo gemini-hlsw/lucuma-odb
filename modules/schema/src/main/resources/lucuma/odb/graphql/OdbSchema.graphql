@@ -1378,11 +1378,6 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   Instrument type
   """
   instrument: Instrument!
-
-  """
-  Setup time estimates
-  """
-  setup: SetupTime!
 }
 
 """
@@ -1411,12 +1406,6 @@ type GmosNorthExecutionSequence implements ExecutionSequence {
   any remaining atoms not included in 'possibleFuture'.
   """
   atomCount: PosInt!
-
-  """
-  Sequence digest (including all anticipated future values regardless of
-  whether they appear in 'possibleFuture').
-  """
-  digest: SequenceDigest!
 
 }
 
@@ -1918,11 +1907,6 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   Instrument type
   """
   instrument: Instrument!
-
-  """
-  Setup time estimates
-  """
-  setup: SetupTime!
 }
 
 """
@@ -1951,12 +1935,6 @@ type GmosSouthExecutionSequence implements ExecutionSequence {
   any remaining atoms not included in 'possibleFuture'.
   """
   atomCount: PosInt!
-
-  """
-  Sequence digest (including all anticipated future values regardless of
-  whether they appear in 'possibleFuture').
-  """
-  digest: SequenceDigest!
 
 }
 
@@ -5242,6 +5220,28 @@ type Exchange implements ProposalClass {
 }
 
 type Execution {
+
+  """
+  Calculations dependent on the sequence, such as planned time and offsets.
+  """
+  digest: ExecutionDigest!
+
+  """
+  Full execution config, including acquisition and science sequences.
+  """
+  config(
+
+    """
+    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
+    sequence has `hasMore` and `atomCount` fields that can be used to determine
+    whether and how many remaining atoms are yet to be executed.
+    """
+    futureLimit: PosInt = 25
+
+  ): ExecutionConfig!
+
   """
   Datasets associated with the observation
   """
@@ -5271,27 +5271,6 @@ type Execution {
     """
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
-
-  """
-  Calculations dependent on the sequence, such as planned time and offsets.
-  """
-  digest: ExecutionDigest!
-
-  """
-  Full execution config, including acquisition and science sequences.
-  """
-  config(
-
-    """
-    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
-    If the projected future is longer, the size will be capped at this value.
-    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
-    sequence has `hasMore` and `atomCount` fields that can be used to determine
-    whether and how many remaining atoms are yet to be executed.
-    """
-    futureLimit: PosInt = 25
-
-  ): ExecutionConfig!
 }
 
 """
@@ -5302,11 +5281,6 @@ interface ExecutionConfig {
   Instrument type
   """
   instrument: Instrument!
-
-  """
-  Setup time estimates
-  """
-  setup: SetupTime!
 }
 
 """
@@ -7235,30 +7209,7 @@ type Observation {
   The ITC result for this observation, assuming it has associated target(s)
   and a selected observing mode.
   """
-  itc(
-    "deprecated, will be removed"
-    useCache: Boolean = true
-  ): ItcResultSet
-
-  """
-  Produces the execution configuration with its acquisition and science
-  sequences for this observation.
-  """
-  sequence(
-
-    "deprecated, will be removed"
-    useCache: Boolean = true
-
-    """
-    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
-    If the projected future is longer, the size will be capped at this value.
-    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
-    sequence has `hasMore` and `atomCount` fields that can be used to determine
-    whether and how many remaining atoms are yet to be executed.
-    """
-    futureLimit: PosInt = 25
-
-  ): SequenceGenerationResult
+  itc: ItcResultSet
 
 }
 
@@ -8386,14 +8337,6 @@ type SequenceEvent { # implements ExecutionEvent {
   Time at which this event was received
   """
   received: Timestamp!
-}
-
-type SequenceGenerationResult {
-  programId:       ProgramId!
-  observationId:   ObservationId!
-  itcResult:       ItcResultSet!
-  executionConfig: ExecutionConfig!
-  scienceDigest:   SequenceDigest
 }
 
 """

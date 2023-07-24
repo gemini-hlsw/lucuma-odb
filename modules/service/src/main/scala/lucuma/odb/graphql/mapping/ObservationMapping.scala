@@ -7,9 +7,7 @@ package mapping
 
 import cats.Eq
 import cats.effect.Resource
-import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
-import cats.syntax.parallel.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
@@ -18,17 +16,12 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax.*
-import eu.timepit.refined.cats.*
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
-import lucuma.odb.json.all.query.given
-import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
@@ -45,8 +38,6 @@ trait ObservationMapping[F[_]]
      with TimingWindowView[F]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F] {
-
-  private val FutureLimitParam   = "futureLimit"
 
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
@@ -79,7 +70,6 @@ trait ObservationMapping[F[_]]
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
         EffectField("itc", itcQueryHandler, List("id", "programId")),
         SqlObject("execution"),
-        EffectField("sequence", sequenceQueryHandler, List("id", "programId"))
       )
     )
 
@@ -111,16 +101,6 @@ trait ObservationMapping[F[_]]
         case Select("itc", List(BooleanBinding.Option("useCache", rUseCache)), child) =>
           rUseCache.map { _ => Select("itc", Nil, child) }
 
-        case Select("sequence", List(
-          BooleanBinding.Option("useCache", rUseCache),
-          Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
-        ), child) =>
-          (rUseCache, rFutureLimit).parMapN { case (_, futureLimit) =>
-            Environment(
-              Env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)),
-              Select("sequence", Nil, child)
-            )
-          }
       }
     )
 
@@ -139,38 +119,6 @@ trait ObservationMapping[F[_]]
         }
 
     effectHandler("itc", readEnv, calculate)
-  }
-
-  def sequenceQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Generator.FutureLimit] =
-      _.getR[Generator.FutureLimit](FutureLimitParam)
-
-    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
-      (pid, oid, limit) => {
-        val mapError: Generator.Error => Result[Json] = {
-          case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
-            Result(Json.Null)
-          case e: Generator.Error                                                   =>
-            Result.failure(e.format)
-        }
-
-        def mapSuccess(s: Generator.Success): Result[Json] =
-          Json.obj(
-            "programId"       -> pid.asJson,
-            "observationId"   -> oid.asJson,
-            "itcResult"       -> s.itc.asJson,
-            "executionConfig" -> s.config.asJson,
-            "scienceDigest"   -> s.config.executionDigest.science.asJson
-          ).success
-
-        services.use { s =>
-          s.generator(commitHash, itcClient, plannedTimeCalculator)
-           .generate(pid, oid, limit)
-           .map(_.bimap(mapError, mapSuccess).merge)
-        }
-      }
-
-    effectHandler("sequence", readEnv, calculate)
   }
 
 }

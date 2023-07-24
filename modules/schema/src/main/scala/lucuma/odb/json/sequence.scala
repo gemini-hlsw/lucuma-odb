@@ -139,8 +139,7 @@ trait SequenceCodec {
         f <- c.downField("possibleFuture").as[List[Atom[D]]]
         m <- c.downField("hasMore").as[Boolean]
         u <- c.downField("atomCount").as[PosInt]
-        d <- c.downField("digest").as[SequenceDigest]
-      } yield ExecutionSequence(n, f, m, u, d)
+      } yield ExecutionSequence(n, f, m, u)
     }
 
   given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionSequence[D]] =
@@ -149,8 +148,7 @@ trait SequenceCodec {
         "nextAtom"       -> a.nextAtom.asJson,
         "possibleFuture" -> a.possibleFuture.asJson,
         "hasMore"        -> a.hasMore.asJson,
-        "atomCount"      -> a.atomCount.asJson,
-        "digest"         -> a.digest.asJson
+        "atomCount"      -> a.atomCount.asJson
       )
     }
 
@@ -160,8 +158,7 @@ trait SequenceCodec {
         t <- c.downField("static").as[S]
         a <- c.downField("acquisition").as[Option[ExecutionSequence[D]]]
         s <- c.downField("science").as[Option[ExecutionSequence[D]]]
-        u <- c.downField("setup").as[SetupTime]
-      } yield ExecutionConfig(t, a, s, u)
+      } yield ExecutionConfig(t, a, s)
     }
 
   given [S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionConfig[S, D]] =
@@ -169,8 +166,7 @@ trait SequenceCodec {
       Json.obj(
         "static"        -> a.static.asJson,
         "acquisition"   -> a.acquisition.asJson,
-        "science"       -> a.science.asJson,
-        "setup"         -> a.setup.asJson
+        "science"       -> a.science.asJson
       )
     }
 

@@ -107,7 +107,8 @@ object Generator {
   case class Success(
     observationId: Observation.Id,
     itc:           ItcService.AsterismResult,
-    config:        InstrumentExecutionConfig
+    config:        InstrumentExecutionConfig,
+    digest:        ExecutionDigest
   )
 
   def instantiate[F[_]: Concurrent](
@@ -184,7 +185,7 @@ object Generator {
         (for {
           c <- Context.lookup(pid, oid)
           o <- c.checkCache
-          d <- o.fold(generateAndCache(c, FutureLimit.Min).map(_.config.executionDigest))(d => EitherT.pure(d))
+          d <- o.fold(generateAndCache(c, FutureLimit.Min).map(_.digest))(d => EitherT.pure(d))
         } yield d).value
 
       override def generate(
@@ -203,7 +204,7 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, Success] =
         for {
           s <- doGenerate(ctx, lim)
-          _ <- ctx.cache(s.config.executionDigest)
+          _ <- ctx.cache(s.digest)
         } yield s
 
       // Generate a sequence for the observation, which will depend on the
@@ -220,14 +221,14 @@ object Generator {
               p0  <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
               p1  <- expandAndEstimate(p0, exp.gmosNorth, calculator.gmosNorth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, lim))
-            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosNorth(res))
+            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosNorth(res._1), res._2)
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p0  <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
               p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
               res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, lim))
-            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosSouth(res))
+            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosSouth(res._1), res._2)
         }
       }
 
@@ -310,7 +311,7 @@ object Generator {
         proto:       ProtoExecutionConfig[F, S, ProtoAtom[ProtoStep[(D, StepEstimate)]]],
         setupTime:   SetupTime,
         futureLimit: FutureLimit
-      ): F[ExecutionConfig[S, D]] = {
+      ): F[(ExecutionConfig[S, D], ExecutionDigest)] = {
 
         def toExecutionSequence(
           sequence:     SequenceSummary[D],
@@ -327,18 +328,17 @@ object Generator {
                 }
                 Atom(atomId, atom.description, steps)
               }
-        ).map(nel => ExecutionSequence(nel.head, nel.tail, sequence.hasMore, PosInt.unsafeFrom(sequence.atomCount), sequence.digest))
+          ).map(nel => ExecutionSequence(nel.head, nel.tail, sequence.hasMore, PosInt.unsafeFrom(sequence.atomCount)))
 
         for {
-          acq <- SequenceSummary.summarize(proto.acquisition, futureLimit)
-          sci <- SequenceSummary.summarize(proto.science, futureLimit)
-        } yield
-          ExecutionConfig(
-            proto.static,
-            toExecutionSequence(acq, SequenceType.Acquisition),
-            toExecutionSequence(sci, SequenceType.Science),
-            setupTime
-          )
+          acqSummary <- SequenceSummary.summarize(proto.acquisition, futureLimit)
+          acqSequence = toExecutionSequence(acqSummary, SequenceType.Acquisition)
+          sciSummary <- SequenceSummary.summarize(proto.science, futureLimit)
+          sciSequence = toExecutionSequence(sciSummary, SequenceType.Science)
+        } yield (
+          ExecutionConfig(proto.static, acqSequence, sciSequence),
+          ExecutionDigest(setupTime, acqSummary.digest, sciSummary.digest)
+        )
       }
     }
 }
