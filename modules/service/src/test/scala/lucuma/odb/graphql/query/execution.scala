@@ -284,9 +284,6 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                          }
                        }
                        acquisition {
-                         digest {
-                           observeClass
-                         }
                          nextAtom {
                            observeClass
                            steps {
@@ -352,9 +349,6 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                       "nodAndShuffle": null
                     },
                     "acquisition": {
-                      "digest": {
-                        "observeClass": "ACQUISITION"
-                      },
                       "nextAtom": {
                         "observeClass": "ACQUISITION",
                         "steps": [
@@ -619,14 +613,16 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
              query {
                observation(observationId: "$oid") {
                  execution {
+                   digest {
+                     science {
+                       offsets {
+                         q { arcseconds }
+                       }
+                     }
+                   }
                    config {
                      ... on GmosNorthExecutionConfig {
                        science {
-                         digest {
-                           offsets {
-                             q { arcseconds }
-                           }
-                         }
                          nextAtom {
                            description
                            steps {
@@ -665,22 +661,24 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             {
               "observation": {
                 "execution": {
+                  "digest": {
+                    "science": {
+                      "offsets": [
+                        {
+                          "q": {
+                            "arcseconds": -15.000000
+                          }
+                        },
+                        {
+                          "q": {
+                            "arcseconds": 15.000000
+                          }
+                        }
+                      ]
+                    }
+                  },
                   "config": {
                     "science": {
-                      "digest": {
-                        "offsets": [
-                          {
-                            "q": {
-                              "arcseconds": -15.000000
-                            }
-                          },
-                          {
-                            "q": {
-                              "arcseconds": 15.000000
-                            }
-                          }
-                        ]
-                      },
                       "nextAtom": {
                         "description": "q -15.0″, λ 500.0 nm",
                         "steps": [
@@ -1578,22 +1576,24 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
              query {
                observation(observationId: "$oid") {
                  execution {
+                   digest {
+                     setup {
+                       full {
+                         seconds
+                       }
+                       reacquisition {
+                         seconds
+                       }
+                     }
+                     science {
+                       plannedTime {
+                         ...plannedTimeFields
+                       }
+                     }
+                   }
                    config {
                      ... on GmosNorthExecutionConfig {
-                       setup {
-                         full {
-                           seconds
-                         }
-                         reacquisition {
-                           seconds
-                         }
-                       }
                        science {
-                         digest {
-                           plannedTime {
-                             ...plannedTimeFields
-                           }
-                         }
                          nextAtom {
                            ...gmosNorthAtomFields
                          }
@@ -1612,7 +1612,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             {
               "observation": {
                 "execution": {
-                  "config" : {
+                  "digest": {
                     "setup": {
                       "full": {
                         "seconds": 960.000000
@@ -1621,34 +1621,36 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                         "seconds": 300.000000
                       }
                     },
-                    "science" : {
-                      "digest": {
-                        "plannedTime" : {
-                          "total" : {
-                            "seconds" : 769.200000
-                          },
-                          "charges" : [
-                            {
-                              "chargeClass" : "NON_CHARGED",
-                              "time" : {
-                                "seconds" : 0.000000
-                              }
-                            },
-                            {
-                              "chargeClass" : "PARTNER",
-                              "time" : {
-                                "seconds" : 357.600000
-                              }
-                            },
-                            {
-                              "chargeClass" : "PROGRAM",
-                              "time" : {
-                                "seconds" : 411.600000
-                              }
+                    "science": {
+                      "plannedTime" : {
+                        "total" : {
+                          "seconds" : 769.200000
+                        },
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
                             }
-                          ]
-                        }
-                      },
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 357.600000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 411.600000
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "config" : {
+                    "science" : {
                       "nextAtom" : {
                         "steps" : [
                           {
