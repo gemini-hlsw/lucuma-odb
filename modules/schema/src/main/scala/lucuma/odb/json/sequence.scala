@@ -7,7 +7,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.eq.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -102,7 +102,8 @@ trait SequenceCodec {
         o <- c.downField("observeClass").as[ObserveClass]
         t <- c.downField("plannedTime").as[PlannedTime]
         f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
-      } yield SequenceDigest(o, t, f)
+        n <- c.downField("atomCount").as[NonNegInt]
+      } yield SequenceDigest(o, t, f, n)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
@@ -110,7 +111,8 @@ trait SequenceCodec {
       Json.obj(
         "observeClass" -> a.observeClass.asJson,
         "plannedTime"  -> a.plannedTime.asJson,
-        "offsets"      -> a.offsets.toList.asJson
+        "offsets"      -> a.offsets.toList.asJson,
+        "atomCount"    -> a.atomCount.asJson
       )
     }
 
@@ -138,8 +140,7 @@ trait SequenceCodec {
         n <- c.downField("nextAtom").as[Atom[D]]
         f <- c.downField("possibleFuture").as[List[Atom[D]]]
         m <- c.downField("hasMore").as[Boolean]
-        u <- c.downField("atomCount").as[PosInt]
-      } yield ExecutionSequence(n, f, m, u)
+      } yield ExecutionSequence(n, f, m)
     }
 
   given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionSequence[D]] =
@@ -147,8 +148,7 @@ trait SequenceCodec {
       Json.obj(
         "nextAtom"       -> a.nextAtom.asJson,
         "possibleFuture" -> a.possibleFuture.asJson,
-        "hasMore"        -> a.hasMore.asJson,
-        "atomCount"      -> a.atomCount.asJson
+        "hasMore"        -> a.hasMore.asJson
       )
     }
 

@@ -10,6 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
@@ -77,11 +78,13 @@ object ExecutionDigestService {
           digest.acquisition.plannedTime(ChargeClass.Partner),
           digest.acquisition.plannedTime(ChargeClass.Program),
           digest.acquisition.offsets.toList,
+          digest.acquisition.atomCount,
           digest.science.observeClass,
           digest.science.plannedTime(ChargeClass.NonCharged),
           digest.science.plannedTime(ChargeClass.Partner),
           digest.science.plannedTime(ChargeClass.Program),
           digest.science.offsets.toList,
+          digest.science.atomCount,
           hash,
           digest.setup.full,
           digest.setup.reacquisition,
@@ -90,11 +93,13 @@ object ExecutionDigestService {
           digest.acquisition.plannedTime(ChargeClass.Partner),
           digest.acquisition.plannedTime(ChargeClass.Program),
           digest.acquisition.offsets.toList,
+          digest.acquisition.atomCount,
           digest.science.observeClass,
           digest.science.plannedTime(ChargeClass.NonCharged),
           digest.science.plannedTime(ChargeClass.Partner),
           digest.science.plannedTime(ChargeClass.Program),
-          digest.science.offsets.toList
+          digest.science.offsets.toList,
+          digest.science.atomCount
         ).void
 
     }
@@ -138,12 +143,13 @@ object ExecutionDigestService {
       }
 
     private val sequence_digest: Codec[SequenceDigest] =
-      (obs_class *: planned_time *: offset_array).imap { case (oClass, pTime, offsets) =>
-        SequenceDigest(oClass, pTime, SortedSet.from(offsets))
+      (obs_class *: planned_time *: offset_array *: int4_nonneg).imap { case (oClass, pTime, offsets, aCount) =>
+        SequenceDigest(oClass, pTime, SortedSet.from(offsets), aCount)
       } { sd => (
         sd.observeClass,
         sd.plannedTime,
-        sd.offsets.toList
+        sd.offsets.toList,
+        sd.atomCount
       )}
 
     private val execution_digest: Codec[ExecutionDigest] =
@@ -160,11 +166,13 @@ object ExecutionDigestService {
           c_acq_partner_time,
           c_acq_program_time,
           c_acq_offsets,
+          c_acq_atom_count,
           c_sci_obs_class,
           c_sci_non_charged_time,
           c_sci_partner_time,
           c_sci_program_time,
-          c_sci_offsets
+          c_sci_offsets,
+          c_sci_atom_count
         FROM
           t_execution_digest
         WHERE
@@ -183,11 +191,13 @@ object ExecutionDigestService {
       TimeSpan,
       TimeSpan,
       List[Offset],
+      NonNegInt,
       ObserveClass,
       TimeSpan,
       TimeSpan,
       TimeSpan,
       List[Offset],
+      NonNegInt,
       String,
       TimeSpan,
       TimeSpan,
@@ -196,11 +206,13 @@ object ExecutionDigestService {
       TimeSpan,
       TimeSpan,
       List[Offset],
+      NonNegInt,
       ObserveClass,
       TimeSpan,
       TimeSpan,
       TimeSpan,
-      List[Offset]
+      List[Offset],
+      NonNegInt
     )] =
       sql"""
         INSERT INTO t_execution_digest (
@@ -214,11 +226,13 @@ object ExecutionDigestService {
           c_acq_partner_time,
           c_acq_program_time,
           c_acq_offsets,
+          c_acq_atom_count,
           c_sci_obs_class,
           c_sci_non_charged_time,
           c_sci_partner_time,
           c_sci_program_time,
-          c_sci_offsets
+          c_sci_offsets,
+          c_sci_atom_count
         ) SELECT
           $program_id,
           $observation_id,
@@ -230,11 +244,13 @@ object ExecutionDigestService {
           $time_span,
           $time_span,
           $offset_array,
+          $int4_nonneg,
           $obs_class,
           $time_span,
           $time_span,
           $time_span,
-          $offset_array
+          $offset_array,
+          $int4_nonneg
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
           SET c_hash                 = $text,
               c_full_setup_time      = $time_span,
@@ -244,11 +260,13 @@ object ExecutionDigestService {
               c_acq_partner_time     = $time_span,
               c_acq_program_time     = $time_span,
               c_acq_offsets          = $offset_array,
+              c_acq_atom_count       = $int4_nonneg,
               c_sci_obs_class        = $obs_class,
               c_sci_non_charged_time = $time_span,
               c_sci_partner_time     = $time_span,
               c_sci_program_time     = $time_span,
-              c_sci_offsets          = $offset_array
+              c_sci_offsets          = $offset_array,
+              c_sci_atom_count       = $int4_nonneg
       """.command
 
   }

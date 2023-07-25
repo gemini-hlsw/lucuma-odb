@@ -4,15 +4,15 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
-import eu.timepit.refined.types.numeric.PosInt
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.SequenceType
@@ -60,7 +60,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     futureLimit:   FutureLimit = FutureLimit.Default
-  )(using NoTransaction[F]): F[Either[Generator.Error, Generator.Success]]
+  )(using NoTransaction[F]): F[Either[Generator.Error, InstrumentExecutionConfig]]
 
 }
 
@@ -102,14 +102,10 @@ object Generator {
         s"Could not generate a sequence, missing Smart GCAL mapping: $key"
     }
 
+    def missingSmartGcalDef(key: String): Error =
+      MissingSmartGcalDef(key)
   }
 
-  case class Success(
-    observationId: Observation.Id,
-    itc:           ItcService.AsterismResult,
-    config:        InstrumentExecutionConfig,
-    digest:        ExecutionDigest
-  )
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
@@ -128,6 +124,9 @@ object Generator {
         itcRes: ItcService.AsterismResult,
         params: GeneratorParams
       ) {
+
+        def namespace: UUID =
+           SequenceIds.namespace(commitHash, oid, params)
 
         val integrationTime: ItcService.TargetResult =
           itcRes.value.focus
@@ -185,52 +184,54 @@ object Generator {
         (for {
           c <- Context.lookup(pid, oid)
           o <- c.checkCache
-          d <- o.fold(generateAndCache(c, FutureLimit.Min).map(_.digest))(d => EitherT.pure(d))
+          d <- o.fold(calcExecutionDigest(c).flatTap(c.cache))(d => EitherT.pure(d))
         } yield d).value
 
       override def generate(
         pid: Program.Id,
         oid: Observation.Id,
         lim: FutureLimit = FutureLimit.Default
-      )(using NoTransaction[F]): F[Either[Error, Success]] =
+      )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
-          s <- generateAndCache(c, lim)
-        } yield s).value
+          x <- calcExecutionConfig(c, lim)
+        } yield x).value
 
-      private def generateAndCache(
-        ctx: Context,
-        lim: FutureLimit
-      )(using NoTransaction[F]): EitherT[F, Error, Success] =
-        for {
-          s <- doGenerate(ctx, lim)
-          _ <- ctx.cache(s.digest)
-        } yield s
-
-      // Generate a sequence for the observation, which will depend on the
-      // observation's observing mode.
-      private def doGenerate(
-        ctx: Context,
-        lim: FutureLimit
-      )(using NoTransaction[F]): EitherT[F, Error, Success] = {
-        val namespace = SequenceIds.namespace(commitHash, ctx.oid, ctx.params)
-
+      private def calcExecutionDigest(
+        ctx: Context
+      )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
-              p0  <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
-              p1  <- expandAndEstimate(p0, exp.gmosNorth, calculator.gmosNorth)
-              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosNorth.estimateSetup, lim))
-            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosNorth(res._1), res._2)
+              p <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
+              r <- executionDigest(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth), calculator.gmosNorth.estimateSetup)
+            } yield r
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
-              p0  <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
-              p1  <- expandAndEstimate(p0, exp.gmosSouth, calculator.gmosSouth)
-              res <- EitherT.right(toExecutionConfig(namespace, p1, calculator.gmosSouth.estimateSetup, lim))
-            } yield Success(ctx.oid, ctx.itcRes, InstrumentExecutionConfig.GmosSouth(res._1), res._2)
+              p <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
+              r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth), calculator.gmosSouth.estimateSetup)
+            } yield r
         }
-      }
+
+      private def calcExecutionConfig(
+        ctx: Context,
+        lim: FutureLimit
+      )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
+        ctx.params match {
+          case GeneratorParams.GmosNorthLongSlit(_, config) =>
+            for {
+              p <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
+              r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth), ctx.namespace, lim)
+            } yield InstrumentExecutionConfig.GmosNorth(r)
+
+          case GeneratorParams.GmosSouthLongSlit(_, config) =>
+            for {
+              p <- gmosLongSlit(ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
+              r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth), ctx.namespace, lim)
+            } yield InstrumentExecutionConfig.GmosSouth(r)
+        }
+
 
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
       // or planned time calculation.
@@ -251,94 +252,84 @@ object Generator {
         proto:    ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]],
         expander: SmartGcalExpander[F, K, D],
         calc:     PlannedTimeCalculator[S, D]
-      ): EitherT[F, Error, ProtoExecutionConfig[F, S, ProtoAtom[ProtoStep[(D, StepEstimate)]]]] =
-        for {
-          _ <- EitherT(expander.validate(proto.acquisition).map(_.leftMap(MissingSmartGcalDef.apply)))
-          c <- EitherT(expander.validate(proto.science).map(_.leftMap(MissingSmartGcalDef.apply)))
-          s <- EitherT.rightT(
-                 proto.mapBothSequences[F, ProtoAtom[ProtoStep[(D, StepEstimate)]]](
-                   _.through(expander.expandWithCache(c))
-                    .through(calc.estimateSequence[F](proto.static))
-                 )
-               )
-        } yield s
+      ): ProtoExecutionConfig[F, S, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]] =
+        proto.mapBothSequences[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]](
+          _.through(expander.expand)
+           .through(calc.estimateSequence[F](proto.static))
+        )
+
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 
-      private case class SequenceSummary[D](
-        initialAtoms: Vector[ProtoAtom[ProtoStep[(D, StepEstimate)]]],
-        hasMore:      Boolean,
-        atomCount:    Int,
-        digest:       SequenceDigest
-      ) {
+      private def executionDigest[S, D](
+        proto:     ProtoExecutionConfig[F, S, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
+        setupTime: SetupTime
+      ): EitherT[F, Error, ExecutionDigest] = {
 
-        def addAtom(
-          a: ProtoAtom[ProtoStep[(D, StepEstimate)]],
-          futureLimit: FutureLimit
-        ): SequenceSummary[D] = {
-          val digestʹ    = a.steps.foldLeft(digest) { (d, s) =>
-            val dʹ = d.add(s.observeClass).add(PlannedTime.fromStep(s.observeClass, s.value._2))
-            offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
-          }
-          val appendAtom = initialAtoms.lengthIs < (futureLimit.value + 1 /* for nextAtom */)
-          copy(
-            initialAtoms = if (appendAtom) initialAtoms.appended(a) else initialAtoms,
-            hasMore      = !appendAtom,
-            atomCount    = atomCount + 1,
-            digest       = digestʹ
-          )
-        }
-      }
-
-      private object SequenceSummary {
-        def zero[D]: SequenceSummary[D] =
-          SequenceSummary(
-            Vector.empty,
-            false,
-            0,
-            SequenceDigest.Zero
-          )
-
-        def summarize[D](
-          s: Stream[F, ProtoAtom[ProtoStep[(D, StepEstimate)]]],
-          futureLimit: FutureLimit
-        ): F[SequenceSummary[D]] =
-          s.fold(zero[D]) { (sum, a) => sum.addAtom(a, futureLimit) }.compile.onlyOrError
-      }
-
-      private def toExecutionConfig[S, D](
-        namespace:   UUID,
-        proto:       ProtoExecutionConfig[F, S, ProtoAtom[ProtoStep[(D, StepEstimate)]]],
-        setupTime:   SetupTime,
-        futureLimit: FutureLimit
-      ): F[(ExecutionConfig[S, D], ExecutionDigest)] = {
-
-        def toExecutionSequence(
-          sequence:     SequenceSummary[D],
-          sequenceType: SequenceType
-        ): Option[ExecutionSequence[D]] =
-          NonEmptyList.fromFoldable(
-            sequence
-              .initialAtoms
-              .zipWithIndex
-              .map(_.map(SequenceIds.atomId(namespace, sequenceType, _)))
-              .map { case (atom, atomId) =>
-                val steps = atom.steps.zipWithIndex.map { case (ProtoStep((d, e), sc, oc, bp), j) =>
-                  Step(SequenceIds.stepId(namespace, sequenceType, atomId, j), d, sc, e, oc, bp)
+        def sequenceDigest(
+          s: Stream[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]]
+        ): F[Either[Error, SequenceDigest]] =
+          s.fold(SequenceDigest.Zero.asRight[Error]) { (eDigest, eAtom) =>
+            eDigest.flatMap { digest =>
+              eAtom.bimap(
+                missingSmartGcalDef,
+                _.steps.foldLeft(digest) { (d, s) =>
+                  val dʹ  = d.add(s.observeClass).add(PlannedTime.fromStep(s.observeClass, s.value._2))
+                  val dʹʹ = offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
+                  // TODO: handle step count increment (leftMap then flatMap?)
+                  // TODO: with "sequence too long error"
+                  dʹʹ
                 }
-                Atom(atomId, atom.description, steps)
-              }
-          ).map(nel => ExecutionSequence(nel.head, nel.tail, sequence.hasMore, PosInt.unsafeFrom(sequence.atomCount)))
+              )
+            }
+          }.compile.onlyOrError
 
         for {
-          acqSummary <- SequenceSummary.summarize(proto.acquisition, futureLimit)
-          acqSequence = toExecutionSequence(acqSummary, SequenceType.Acquisition)
-          sciSummary <- SequenceSummary.summarize(proto.science, futureLimit)
-          sciSequence = toExecutionSequence(sciSummary, SequenceType.Science)
-        } yield (
-          ExecutionConfig(proto.static, acqSequence, sciSequence),
-          ExecutionDigest(setupTime, acqSummary.digest, sciSummary.digest)
-        )
+          a <- EitherT(sequenceDigest(proto.acquisition))
+          s <- EitherT(sequenceDigest(proto.science))
+        } yield ExecutionDigest(setupTime, a, s)
+
+      }
+
+      private def executionConfig[S, D](
+        proto:       ProtoExecutionConfig[F, S, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
+        namespace:   UUID,
+        futureLimit: FutureLimit
+      ): EitherT[F, Error, ExecutionConfig[S, D]] = {
+
+        def executionSequence(
+          s: Stream[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
+          t: SequenceType
+        ): F[Either[Error, Option[ExecutionSequence[D]]]] =
+          s.take(futureLimit.value + 2)  // +1 for the nextAtom, +futureLimit for the possibleFuture, +1 to check for more
+           .zipWithIndex
+           .map(_.map(SequenceIds.atomId(namespace, t, _)))
+           .map { case (eAtom, atomId) =>
+             eAtom.bimap(
+               missingSmartGcalDef,
+               atom =>
+                 val steps = atom.steps.zipWithIndex.map { case (ProtoStep((d, e), sc, oc, bp), j) =>
+                   Step(SequenceIds.stepId(namespace, t, atomId, j), d, sc, e, oc, bp)
+                 }
+                 Atom(atomId, atom.description, steps)
+             )
+           }
+           .compile
+           .toVector
+           .map(_.sequence.map { atoms =>
+              atoms.headOption.map { head =>
+                val tail = atoms.tail
+                if (tail.size === futureLimit.value + 1)
+                  ExecutionSequence(head, tail.init.toList, true)
+                else
+                  ExecutionSequence(head, tail.toList, false)
+              }
+           })
+
+        for {
+          a <- EitherT(executionSequence(proto.acquisition, SequenceType.Acquisition))
+          s <- EitherT(executionSequence(proto.science, SequenceType.Science))
+        } yield ExecutionConfig(proto.static, a, s)
       }
     }
 }
