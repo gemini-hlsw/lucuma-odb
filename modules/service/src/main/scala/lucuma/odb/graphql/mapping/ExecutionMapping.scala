@@ -84,7 +84,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
         services.use { s =>
           s.generator(commitHash, itcClient, plannedTimeCalculator)
            .generate(pid, oid, limit)
-           .map(_.bimap(_.toResult, _.config.asJson.success).merge)
+           .map(_.bimap(_.toResult, _.asJson.success).merge)
         }
       }
 

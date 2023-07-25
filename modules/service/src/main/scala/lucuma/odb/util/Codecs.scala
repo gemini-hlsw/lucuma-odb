@@ -5,6 +5,7 @@ package lucuma.odb.util
 
 import cats.syntax.apply.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -276,6 +277,9 @@ trait Codecs {
 
   val int2_nonneg: Codec[NonNegShort] =
     int2.eimap(NonNegShort.from)(_.value)
+
+  val int4_nonneg: Codec[NonNegInt] =
+    int4.eimap(NonNegInt.from)(_.value)
 
   val program_id: Codec[Program.Id] =
     gid[Program.Id]

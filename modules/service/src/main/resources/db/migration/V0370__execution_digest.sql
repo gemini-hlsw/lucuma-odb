@@ -30,6 +30,7 @@ CREATE TABLE t_execution_digest (
   c_acq_partner_time     interval         NOT NULL,
   c_acq_program_time     interval         NOT NULL,
   c_acq_offsets          int8[][]         NOT NULL,
+  c_acq_atom_count       int4             NOT NULL CHECK (c_acq_atom_count >= 0),
 
   -- Science Digest
   c_sci_obs_class        e_obs_class      NOT NULL,
@@ -37,6 +38,7 @@ CREATE TABLE t_execution_digest (
   c_sci_partner_time     interval         NOT NULL,
   c_sci_program_time     interval         NOT NULL,
   c_sci_offsets          int8[][]         NOT NULL,
+  c_sci_atom_count       int4             NOT NULL CHECK (c_sci_atom_count >= 0),
 
   FOREIGN KEY (c_program_id, c_observation_id)
     REFERENCES t_observation(c_program_id, c_observation_id)

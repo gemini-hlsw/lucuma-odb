@@ -1383,7 +1383,7 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
 """
 Next atom to execute and potential future atoms.
 """
-type GmosNorthExecutionSequence implements ExecutionSequence {
+type GmosNorthExecutionSequence {
 
   """
   Next atom to execute.
@@ -1400,12 +1400,6 @@ type GmosNorthExecutionSequence implements ExecutionSequence {
   'possibleFuture'.
   """
   hasMore: Boolean!
-
-  """
-  Total count of anticipated atoms, including 'nextAtom', 'possibleFuture' and
-  any remaining atoms not included in 'possibleFuture'.
-  """
-  atomCount: PosInt!
 
 }
 
@@ -1912,7 +1906,7 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
 """
 Next atom to execute and potential future atoms.
 """
-type GmosSouthExecutionSequence implements ExecutionSequence {
+type GmosSouthExecutionSequence {
 
   """
   Next atom to execute.
@@ -1929,12 +1923,6 @@ type GmosSouthExecutionSequence implements ExecutionSequence {
   'possibleFuture'.
   """
   hasMore: Boolean!
-
-  """
-  Total count of anticipated atoms, including 'nextAtom', 'possibleFuture' and
-  any remaining atoms not included in 'possibleFuture'.
-  """
-  atomCount: PosInt!
 
 }
 
@@ -5357,19 +5345,6 @@ type ExecutionDigest {
 
 }
 
-"""
-Execution sequence -- type specific implementations will include access to
-atoms.
-"""
-interface ExecutionSequence {
-
-  """
-  Sequence digest (including all anticipated future values regardless of
-  whether they appear in possibleFuture)
-  """
-  digest: SequenceDigest!
-
-}
 
 """
 Exposure time mode, either signal to noise or fixed
@@ -8293,20 +8268,21 @@ enum SequenceCommand {
 }
 
 type SequenceDigest {
-  """
-  ObserveClass of the whole sequence
-  """
+
+  """ObserveClass of the whole sequence. """
   observeClass: ObserveClass!
 
-  """
-  PlannedTime for the whole sequence
-  """
+  """PlannedTime for the whole sequence. """
   plannedTime: PlannedTime!
 
-  """
-  Unique offsets that occur in the sequence
-  """
+  """Unique offsets that occur in the sequence."""
   offsets: [Offset!]!
+
+  """
+  Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'
+  and any remaining atoms not included in 'possibleFuture'.
+  """
+  atomCount: NonNegInt!
 }
 
 """
