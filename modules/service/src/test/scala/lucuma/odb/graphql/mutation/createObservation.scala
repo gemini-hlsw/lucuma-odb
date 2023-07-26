@@ -689,12 +689,6 @@ class createObservation extends OdbSuite {
     }
   }
 
-  private def siteName(site: Site): String =
-    site match {
-      case Site.GN => "North"
-      case Site.GS => "South"
-    }
-
   private def createObsWithObservingMode(
     pid:      Program.Id,
     site:     Site,
