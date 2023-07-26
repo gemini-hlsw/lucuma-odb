@@ -103,9 +103,9 @@ object GeneratorParamsService {
         which:     List[Observation.Id]
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
         for {
-          ps <- selectParams(programId, which)                  // F[List[Params]]
+          ps <- selectParams(programId, which)
           oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
-          m  <- observingModeServices.selectObservingMode(oms) // F[Map[Observation.Id, SourceProfile => ObservingMode]]
+          m  <- observingModeServices.selectObservingMode(oms)
         } yield
           ps.groupBy(_.observationId).map { case (oid, oParams) =>
             oid -> toGeneratorParams(oParams, m.get(oid))
@@ -142,8 +142,8 @@ object GeneratorParamsService {
         // different stars in the asterism.
         configs.flatMap { scs =>
           scs.distinct match {
-            case sc :: Nil => sc.rightNel[Error]
-            case _         => Error.ConflictingData.leftNel[ObservingMode]
+            case sc :: Nil => sc.rightNel
+            case _         => Error.ConflictingData.leftNel
           }
         }
       }
