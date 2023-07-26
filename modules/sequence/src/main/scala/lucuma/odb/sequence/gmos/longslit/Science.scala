@@ -70,7 +70,6 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
       case Nil => Stream(Offset.Q.Zero).repeat
       case os  => Stream.emits(os).repeat
     }
-    val xBin = mode.xBin
 
     def nextAtom(stepOrder: Science.StepOrder, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
       (for {
@@ -87,7 +86,7 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
         _ <- optics.filter      := mode.filter
         _ <- optics.fpu         := GmosFpuMask.builtin.reverseGet(mode.fpu).some
 
-        _ <- optics.xBin        := xBin
+        _ <- optics.xBin        := mode.xBin
         _ <- optics.yBin        := mode.yBin
         _ <- optics.ampReadMode := mode.ampReadMode
         _ <- optics.ampGain     := mode.ampGain

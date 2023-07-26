@@ -44,14 +44,14 @@ object PlannedTimeCalculator {
         _.mapAccumulate(EstimatorState.empty[D]) { (s, eAtom) =>
           eAtom.fold(
             error =>
-              (s, error.asLeft[ProtoAtom[ProtoStep[(D, StepEstimate)]]]),
+              (s, error.asLeft),
             atom  =>
              val sa = atom.mapAccumulate(s) { (sʹ, step) =>
                val c = configChange.estimate(sʹ, step)
                val d = detectorEstimator.estimate(static, step)
                (sʹ.next(step), step.tupleRight(StepEstimate.fromMax(c, d)))
              }
-             sa.map(_.asRight[String])
+             sa.map(_.asRight)
           )
         }.map(_._2)  // discard the state
     }

@@ -54,19 +54,17 @@ object SmartGcalExpander {
       _.evalMapAccumulate(emptyCache[K, D])(expandAtom).map(_._2)
 
     private def expandAtom(
-      cache: Cache[K, D],              // S
-      atom:  ProtoAtom[ProtoStep[D]]   // O  // O2 = Either[String, ProtoAtom[ProtoStep[D]]]
+      cache: Cache[K, D],
+      atom:  ProtoAtom[ProtoStep[D]]
     ): F[(Cache[K, D], Either[String, ProtoAtom[ProtoStep[D]]])] =
       atom
         .steps
         .mapAccumulateM(cache)(expandStep)
-        .map(_.map { (nel: NonEmptyList[Either[String, NonEmptyList[ProtoStep[D]]]]) =>
-          nel.flatSequence.map(steps => ProtoAtom(atom.description, steps))
-        })
+        .map(_.map(_.flatSequence.map(steps => ProtoAtom(atom.description, steps))))
 
     private def expandStep(
-      cache: Cache[K, D],   // S
-      step:  ProtoStep[D]   // A   // B = Either[String, NonEmptyList[ProtoStep[D]]]
+      cache: Cache[K, D],
+      step:  ProtoStep[D]
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
       step match {
         case ProtoStep(d, StepConfig.SmartGcal(sgt), o, b) =>
@@ -81,20 +79,17 @@ object SmartGcalExpander {
             select(key, sgt).map {
               case Nil    =>
                 val error = formatKey(key)
-                (
-                  cache.updated((key, sgt), error.asLeft[NonEmptyList[(D => D, Gcal)]]),
-                  error.asLeft[NonEmptyList[ProtoStep[D]]]
-                )
+                (cache.updated((key, sgt), error.asLeft), error.asLeft)
               case h :: t =>
                (
-                 cache.updated((key, sgt), NonEmptyList(h, t).asRight[String]),
-                 NonEmptyList(toStep(h), t.map(toStep)).asRight[String]
+                 cache.updated((key, sgt), NonEmptyList(h, t).asRight),
+                 NonEmptyList(toStep(h), t.map(toStep)).asRight
                )
             }
           ) { e => (cache, e.map(_.map(toStep))).pure[F] }
 
         case ps@ProtoStep(_, _, _, _) =>
-          (cache, NonEmptyList.one(ps).asRight[String]).pure[F]
+          (cache, NonEmptyList.one(ps).asRight).pure[F]
       }
 
   }
