@@ -12,9 +12,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ObservingModeInput
+import lucuma.odb.sequence.ObservingMode
 import skunk.Transaction
 
-import lucuma.odb.sequence.ObservingMode
 import Services.Syntax.*
 
 sealed trait ObservingModeServices[F[_]] {
