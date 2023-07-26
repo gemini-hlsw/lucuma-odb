@@ -101,6 +101,11 @@ object Generator {
         s"Could not generate a sequence, missing Smart GCAL mapping: $key"
     }
 
+    case object SequenceTooLong extends Error {
+      def format: String =
+        s"The generated sequence is too long (more than ${Int.MaxValue} atoms)"
+    }
+
     def missingSmartGcalDef(key: String): Error =
       MissingSmartGcalDef(key)
   }
@@ -265,21 +270,22 @@ object Generator {
         setupTime: SetupTime
       ): EitherT[F, Error, ExecutionDigest] = {
 
+        // Compute the sequence digest from the stream by folding over the steps
+        // if possible. Missing smart gcal definitions may prevent it.
         def sequenceDigest(
           s: Stream[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]]
         ): F[Either[Error, SequenceDigest]] =
           s.fold(SequenceDigest.Zero.asRight[Error]) { (eDigest, eAtom) =>
             eDigest.flatMap { digest =>
-              eAtom.bimap(
-                missingSmartGcalDef,
-                _.steps.foldLeft(digest) { (d, s) =>
-                  val dʹ  = d.add(s.observeClass).add(PlannedTime.fromStep(s.observeClass, s.value._2))
-                  val dʹʹ = offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
-                  // TODO: handle step count increment (leftMap then flatMap?)
-                  // TODO: with "sequence too long error"
-                  dʹʹ
-                }
-              )
+              digest.incrementAtomCount.toRight(SequenceTooLong).flatMap { incDigest =>
+                eAtom.bimap(
+                  missingSmartGcalDef,
+                  _.steps.foldLeft(incDigest) { (d, s) =>
+                    val dʹ = d.add(s.observeClass).add(PlannedTime.fromStep(s.observeClass, s.value._2))
+                    offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
+                  }
+                )
+              }
             }
           }.compile.onlyOrError
 

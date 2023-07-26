@@ -120,6 +120,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                          p { arcseconds }
                          q { arcseconds }
                        }
+                       atomCount
                      }
                      science {
                        observeClass
@@ -134,6 +135,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                          p { arcseconds }
                          q { arcseconds }
                        }
+                       atomCount
                      }
                    }
                  }
@@ -198,7 +200,8 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                             "arcseconds" : 0.000000
                           }
                         }
-                      ]
+                      ],
+                      "atomCount": 1
                     },
                     "science" : {
                       "observeClass" : "SCIENCE",
@@ -244,7 +247,8 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                             "arcseconds" : 15.000000
                           }
                         }
-                      ]
+                      ],
+                      "atomCount": 6
                     }
                   }
                 }
