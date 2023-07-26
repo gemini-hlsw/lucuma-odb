@@ -32,7 +32,12 @@ import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
+import lucuma.core.syntax.enumerated.*
+import lucuma.core.util.Enumerated
 import spire.math.Rational
+
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 
 /**
  * Configuration for the GMOS Long Slit science mode.  Using these parameters, a
@@ -41,7 +46,7 @@ import spire.math.Rational
  * @tparam F filter type
  * @tparam U FPU type
  */
-sealed trait Config[G, F, U] extends Product with Serializable {
+sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product with Serializable {
   def grating: G
 
   def filter: Option[F]
@@ -51,18 +56,10 @@ sealed trait Config[G, F, U] extends Product with Serializable {
   def centralWavelength: Wavelength
 
 
-  def xBin(
-    sourceProfile: SourceProfile,
-    imageQuality:  ImageQuality,
-    sampling:      PosDouble
-  ): GmosXBinning =
-    explicitXBin.getOrElse(defaultXBin(sourceProfile, imageQuality, sampling))
+  def xBin: GmosXBinning =
+    explicitXBin.getOrElse(defaultXBin)
 
-  def defaultXBin(
-    sourceProfile: SourceProfile,
-    imageQuality:  ImageQuality,
-    sampling:      PosDouble
-  ): GmosXBinning
+  def defaultXBin: GmosXBinning
 
   def explicitXBin: Option[GmosXBinning]
 
@@ -119,30 +116,48 @@ sealed trait Config[G, F, U] extends Product with Serializable {
 
   def explicitSpatialOffsets: Option[List[Q]]
 
+  def hashBytes: Array[Byte] = {
+    val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
+    val out: DataOutputStream      = new DataOutputStream(bao)
+
+    out.writeChars(grating.tag)
+    filter.foreach(f => out.writeChars(f.tag))
+    out.writeChars(fpu.tag)
+    out.writeInt(centralWavelength.toPicometers.value.value)
+    out.writeChars(xBin.tag)
+    out.writeChars(yBin.tag)
+    out.writeChars(ampGain.tag)
+    out.writeChars(ampReadMode.tag)
+    out.writeChars(roi.tag)
+    wavelengthDithers.foreach { d =>
+      out.writeInt(d.toPicometers.value)
+    }
+    spatialOffsets.foreach { o =>
+      out.writeLong(o.toAngle.toMicroarcseconds)
+    }
+
+    out.close()
+    bao.toByteArray
+  }
+
 }
 
 object Config {
 
   final case class GmosNorth(
-    grating:             GmosNorthGrating,
-    filter:              Option[GmosNorthFilter],
-    fpu:                 GmosNorthFpu,
-    centralWavelength:   Wavelength,
-    explicitXBin:        Option[GmosXBinning]    = None,
-    explicitYBin:        Option[GmosYBinning]    = None,
-    explicitAmpReadMode: Option[GmosAmpReadMode] = None,
-    explicitAmpGain:     Option[GmosAmpGain]     = None,
-    explicitRoi:         Option[GmosRoi]         = None,
-    explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
-    explicitSpatialOffsets:    Option[List[Q]]                = None
+    grating:                   GmosNorthGrating,
+    filter:                    Option[GmosNorthFilter],
+    fpu:                       GmosNorthFpu,
+    centralWavelength:         Wavelength,
+    defaultXBin:               GmosXBinning,
+    explicitXBin:              Option[GmosXBinning],
+    explicitYBin:              Option[GmosYBinning],
+    explicitAmpReadMode:       Option[GmosAmpReadMode],
+    explicitAmpGain:           Option[GmosAmpGain],
+    explicitRoi:               Option[GmosRoi],
+    explicitWavelengthDithers: Option[List[WavelengthDither]],
+    explicitSpatialOffsets:    Option[List[Q]]
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
-
-    override def defaultXBin(
-      sourceProfile: SourceProfile,
-      imageQuality:  ImageQuality,
-      sampling:      PosDouble
-    ): GmosXBinning =
-      xbinNorth(fpu, sourceProfile, imageQuality, sampling)
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersNorth(this.grating)
@@ -151,12 +166,44 @@ object Config {
 
   object GmosNorth {
 
+    def apply(
+      sourceProfile:             SourceProfile,
+      imageQuality:              ImageQuality,
+      sampling:                  PosDouble,
+      grating:                   GmosNorthGrating,
+      filter:                    Option[GmosNorthFilter],
+      fpu:                       GmosNorthFpu,
+      centralWavelength:         Wavelength,
+      explicitXBin:              Option[GmosXBinning]           = None,
+      explicitYBin:              Option[GmosYBinning]           = None,
+      explicitAmpReadMode:       Option[GmosAmpReadMode]        = None,
+      explicitAmpGain:           Option[GmosAmpGain]            = None,
+      explicitRoi:               Option[GmosRoi]                = None,
+      explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
+      explicitSpatialOffsets:    Option[List[Q]]                = None
+    ): GmosNorth =
+      GmosNorth(
+        grating,
+        filter,
+        fpu,
+        centralWavelength,
+        xbinNorth(fpu, sourceProfile, imageQuality, sampling),
+        explicitXBin,
+        explicitYBin,
+        explicitAmpReadMode,
+        explicitAmpGain,
+        explicitRoi,
+        explicitWavelengthDithers,
+        explicitSpatialOffsets
+      )
+
     given Eq[GmosNorth] =
       Eq.by { a => (
         a.grating,
         a.filter,
         a.fpu,
         a.centralWavelength,
+        a.defaultXBin,
         a.explicitXBin,
         a.explicitYBin,
         a.explicitAmpReadMode,
@@ -169,25 +216,19 @@ object Config {
   }
 
   final case class GmosSouth(
-    grating:             GmosSouthGrating,
-    filter:              Option[GmosSouthFilter],
-    fpu:                 GmosSouthFpu,
-    centralWavelength:   Wavelength,
-    explicitXBin:        Option[GmosXBinning]    = None,
-    explicitYBin:        Option[GmosYBinning]    = None,
-    explicitAmpReadMode: Option[GmosAmpReadMode] = None,
-    explicitAmpGain:     Option[GmosAmpGain]     = None,
-    explicitRoi:         Option[GmosRoi]         = None,
-    explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
-    explicitSpatialOffsets:    Option[List[Q]]                = None
+    grating:                   GmosSouthGrating,
+    filter:                    Option[GmosSouthFilter],
+    fpu:                       GmosSouthFpu,
+    centralWavelength:         Wavelength,
+    defaultXBin:               GmosXBinning,
+    explicitXBin:              Option[GmosXBinning],
+    explicitYBin:              Option[GmosYBinning],
+    explicitAmpReadMode:       Option[GmosAmpReadMode],
+    explicitAmpGain:           Option[GmosAmpGain],
+    explicitRoi:               Option[GmosRoi],
+    explicitWavelengthDithers: Option[List[WavelengthDither]],
+    explicitSpatialOffsets:    Option[List[Q]]
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
-
-    override def defaultXBin(
-      sourceProfile: SourceProfile,
-      imageQuality:  ImageQuality,
-      sampling:      PosDouble
-    ): GmosXBinning =
-      xbinSouth(fpu, sourceProfile, imageQuality, sampling)
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
@@ -196,12 +237,45 @@ object Config {
 
   object GmosSouth {
 
+    def apply(
+      sourceProfile:             SourceProfile,
+      imageQuality:              ImageQuality,
+      sampling:                  PosDouble,
+      grating:                   GmosSouthGrating,
+      filter:                    Option[GmosSouthFilter],
+      fpu:                       GmosSouthFpu,
+      centralWavelength:         Wavelength,
+      explicitXBin:              Option[GmosXBinning]           = None,
+      explicitYBin:              Option[GmosYBinning]           = None,
+      explicitAmpReadMode:       Option[GmosAmpReadMode]        = None,
+      explicitAmpGain:           Option[GmosAmpGain]            = None,
+      explicitRoi:               Option[GmosRoi]                = None,
+      explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
+      explicitSpatialOffsets:    Option[List[Q]]                = None
+    ): GmosSouth =
+      GmosSouth(
+        grating,
+        filter,
+        fpu,
+        centralWavelength,
+        xbinSouth(fpu, sourceProfile, imageQuality, sampling),
+        explicitXBin,
+        explicitYBin,
+        explicitAmpReadMode,
+        explicitAmpGain,
+        explicitRoi,
+        explicitWavelengthDithers,
+        explicitSpatialOffsets
+      )
+
+
     given Eq[GmosSouth] =
       Eq.by { a => (
         a.grating,
         a.filter,
         a.fpu,
         a.centralWavelength,
+        a.defaultXBin,
         a.explicitXBin,
         a.explicitYBin,
         a.explicitAmpReadMode,

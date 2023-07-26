@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -18,9 +19,13 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ImageQuality
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
+import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -33,11 +38,11 @@ trait GmosLongSlitService[F[_]] {
 
   def selectNorth(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, GmosLongSlitInput.Create.North]]
+  ): F[Map[Observation.Id, SourceProfile => GmosNorth]]
 
   def selectSouth(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, GmosLongSlitInput.Create.South]]
+  ): F[Map[Observation.Id, SourceProfile => GmosSouth]]
 
   def insertNorth(
     input: GmosLongSlitInput.Create.North
@@ -91,6 +96,8 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
+  val Sampling: PosDouble = PosDouble.unsafeFrom(2.0)
+
   def instantiate[F[_]: Concurrent](using Services[F]): GmosLongSlitService[F] =
 
     new GmosLongSlitService[F] {
@@ -129,25 +136,27 @@ object GmosLongSlitService {
         which:   List[Observation.Id],
         f:       NonEmptyList[Observation.Id] => AppliedFragment,
         decoder: Decoder[A]
-      ): F[Map[Observation.Id, A]] =
+      ): F[List[(Observation.Id, ImageQuality, A)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Applicative[F].pure(Map.empty)) { oids =>
+          .fold(Applicative[F].pure(List.empty)) { oids =>
             val af = f(oids)
-            session.prepareR(af.fragment.query(observation_id ~ decoder)).use { pq =>
-              pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.toMap)
+            session.prepareR(af.fragment.query(observation_id *: image_quality *: decoder)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
             }
           }
 
       override def selectNorth(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, GmosLongSlitInput.Create.North]] =
+      ): F[Map[Observation.Id, SourceProfile => GmosNorth]] =
         select(which, Statements.selectGmosNorthLongSlit, north)
+          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, Sampling)) }.toMap)
 
       override def selectSouth(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, GmosLongSlitInput.Create.South]] =
+      ): F[Map[Observation.Id, SourceProfile => GmosSouth]] =
         select(which, Statements.selectGmosSouthLongSlit, south)
+          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, Sampling)) }.toMap)
 
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>
@@ -220,24 +229,26 @@ object GmosLongSlitService {
     ): AppliedFragment =
       sql"""
         SELECT
-          c_observation_id,
-          c_grating,
-          c_filter,
-          c_fpu,
-          c_central_wavelength,
-          c_xbin,
-          c_ybin,
-          c_amp_read_mode,
-          c_amp_gain,
-          c_roi,
-          c_wavelength_dithers,
-          c_spatial_offsets
+          ls.c_observation_id,
+          ob.c_image_quality,
+          ls.c_grating,
+          ls.c_filter,
+          ls.c_fpu,
+          ls.c_central_wavelength,
+          ls.c_xbin,
+          ls.c_ybin,
+          ls.c_amp_read_mode,
+          ls.c_amp_gain,
+          ls.c_roi,
+          ls.c_wavelength_dithers,
+          ls.c_spatial_offsets
         FROM
-          #$table
+          #$table ls
+        INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
       """(Void) |+|
       void"""
         WHERE
-          c_observation_id IN ("""                                        |+|
+          ls.c_observation_id IN ("""                                     |+|
             observationIds.map(sql"$observation_id").intercalate(void",") |+|
           void")"
 

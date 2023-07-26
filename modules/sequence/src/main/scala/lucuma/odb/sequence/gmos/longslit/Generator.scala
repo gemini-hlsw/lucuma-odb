@@ -6,7 +6,6 @@ package longslit
 
 import cats.data.NonEmptyList
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosDouble
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GmosNorthDetector.{Hamamatsu => HamamatsuNorth}
@@ -15,9 +14,7 @@ import lucuma.core.enums.GmosNorthStageMode.FollowXy
 import lucuma.core.enums.GmosSouthDetector.{Hamamatsu => HamamatsuSouth}
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthStageMode.FollowXyz
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.MosPreImaging.IsNotMosPreImaging
-import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -45,10 +42,8 @@ sealed abstract class Generator[S, D, G, F, U](
 ) {
 
   def generate(
-    itc:           IntegrationTime,
-    sourceProfile: SourceProfile,
-    imageQuality:  ImageQuality,
-    config:        Config[G, F, U]
+    itc:    IntegrationTime,
+    config: Config[G, F, U]
   ): Either[String, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] = {
 
     val acq = acqSequence.compute(
@@ -58,13 +53,7 @@ sealed abstract class Generator[S, D, G, F, U](
       config.centralWavelength
     )
 
-    val sci = sciSequence.compute(
-      config,
-      SciExposureTime(itc.exposureTime),
-      sourceProfile,
-      imageQuality,
-      Generator.Sampling
-    )
+    val sci = sciSequence.compute(config, SciExposureTime(itc.exposureTime))
 
     Option
       .when(itc.exposures.value > 0)(
@@ -82,9 +71,6 @@ sealed abstract class Generator[S, D, G, F, U](
 
 
 object Generator {
-
-  val Sampling: PosDouble =
-    PosDouble.unsafeFrom(2.0)
 
   // Until we can get results from the ITC for acquisition
   val StandinAcquisitionTime: AcqExposureTime =

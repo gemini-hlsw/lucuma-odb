@@ -7,7 +7,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.eq.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -23,6 +23,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.PlannedTime
@@ -101,7 +102,8 @@ trait SequenceCodec {
         o <- c.downField("observeClass").as[ObserveClass]
         t <- c.downField("plannedTime").as[PlannedTime]
         f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
-      } yield SequenceDigest(o, t, f)
+        n <- c.downField("atomCount").as[NonNegInt]
+      } yield SequenceDigest(o, t, f, n)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
@@ -109,7 +111,26 @@ trait SequenceCodec {
       Json.obj(
         "observeClass" -> a.observeClass.asJson,
         "plannedTime"  -> a.plannedTime.asJson,
-        "offsets"      -> a.offsets.toList.asJson
+        "offsets"      -> a.offsets.toList.asJson,
+        "atomCount"    -> a.atomCount.asJson
+      )
+    }
+
+  given Decoder[ExecutionDigest] =
+    Decoder.instance { c =>
+      for {
+        t <- c.downField("setup").as[SetupTime]
+        a <- c.downField("acquisition").as[SequenceDigest]
+        s <- c.downField("science").as[SequenceDigest]
+      } yield ExecutionDigest(t, a, s)
+    }
+
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
+    Encoder.instance { (a: ExecutionDigest) =>
+      Json.obj(
+        "setup"       -> a.setup.asJson,
+        "acquisition" -> a.acquisition.asJson,
+        "science"     -> a.science.asJson
       )
     }
 
@@ -119,9 +140,7 @@ trait SequenceCodec {
         n <- c.downField("nextAtom").as[Atom[D]]
         f <- c.downField("possibleFuture").as[List[Atom[D]]]
         m <- c.downField("hasMore").as[Boolean]
-        u <- c.downField("atomCount").as[PosInt]
-        d <- c.downField("digest").as[SequenceDigest]
-      } yield ExecutionSequence(n, f, m, u, d)
+      } yield ExecutionSequence(n, f, m)
     }
 
   given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionSequence[D]] =
@@ -129,9 +148,7 @@ trait SequenceCodec {
       Json.obj(
         "nextAtom"       -> a.nextAtom.asJson,
         "possibleFuture" -> a.possibleFuture.asJson,
-        "hasMore"        -> a.hasMore.asJson,
-        "atomCount"      -> a.atomCount.asJson,
-        "digest"         -> a.digest.asJson
+        "hasMore"        -> a.hasMore.asJson
       )
     }
 
@@ -141,8 +158,7 @@ trait SequenceCodec {
         t <- c.downField("static").as[S]
         a <- c.downField("acquisition").as[Option[ExecutionSequence[D]]]
         s <- c.downField("science").as[Option[ExecutionSequence[D]]]
-        u <- c.downField("setup").as[SetupTime]
-      } yield ExecutionConfig(t, a, s, u)
+      } yield ExecutionConfig(t, a, s)
     }
 
   given [S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionConfig[S, D]] =
@@ -150,8 +166,7 @@ trait SequenceCodec {
       Json.obj(
         "static"        -> a.static.asJson,
         "acquisition"   -> a.acquisition.asJson,
-        "science"       -> a.science.asJson,
-        "setup"         -> a.setup.asJson
+        "science"       -> a.science.asJson
       )
     }
 
