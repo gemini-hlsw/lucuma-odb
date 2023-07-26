@@ -13,14 +13,20 @@ import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 enum GeneratorParams {
 
   case GmosNorthLongSlit(
-    itc:    NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
-    config: gmos.longslit.Config.GmosNorth
+    itc:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
+    mode: gmos.longslit.Config.GmosNorth
   )
 
   case GmosSouthLongSlit(
-    itc:    NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
-    config: gmos.longslit.Config.GmosSouth
+    itc:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
+    mode: gmos.longslit.Config.GmosSouth
   )
+
+  def observingMode: ObservingMode =
+    this match {
+      case GmosNorthLongSlit(_, m) => m
+      case GmosSouthLongSlit(_, m) => m
+    }
 
 }
 
@@ -29,13 +35,13 @@ object GeneratorParams {
   given Eq[GmosNorthLongSlit] =
     Eq.by { a => (
       a.itc,
-      a.config
+      a.mode
     )}
 
   given Eq[GmosSouthLongSlit] =
     Eq.by { a => (
       a.itc,
-      a.config
+      a.mode
     )}
 
   given Eq[GeneratorParams] =

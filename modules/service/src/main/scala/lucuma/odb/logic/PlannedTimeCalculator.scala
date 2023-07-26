@@ -4,6 +4,7 @@
 package lucuma.odb.logic
 
 import cats.MonadError
+import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import fs2.Pipe
@@ -19,7 +20,7 @@ import skunk.Session
 trait PlannedTimeCalculator[S, D] {
   def estimateSetup: SetupTime
 
-  def estimateSequence[F[_]](static: S): Pipe[F, ProtoAtom[ProtoStep[D]], ProtoAtom[ProtoStep[(D, StepEstimate)]]]
+  def estimateSequence[F[_]](static: S): Pipe[F, Either[String, ProtoAtom[ProtoStep[D]]], Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]]
 }
 
 object PlannedTimeCalculator {
@@ -27,10 +28,10 @@ object PlannedTimeCalculator {
   def fromSession[F[_]](s: Session[F], enums: Enums)(using MonadError[F, Throwable]): F[PlannedTimeCalculator.ForInstrumentMode] =
     PlannedTimeContext.select(s, enums).map(fromContext)
 
-  def fromContext(ctx: PlannedTimeContext): ForInstrumentMode =
+  private def fromContext(ctx: PlannedTimeContext): ForInstrumentMode =
     new ForInstrumentMode(ctx)
 
-  def fromEstimators[S, D](
+  private def fromEstimators[S, D](
     setup:             SetupTime,
     configChange:      ConfigChangeEstimator[D],
     detectorEstimator: DetectorEstimator[S, D]
@@ -39,14 +40,20 @@ object PlannedTimeCalculator {
       def estimateSetup: SetupTime =
         setup
 
-      def estimateSequence[F[_]](static: S): Pipe[F, ProtoAtom[ProtoStep[D]], ProtoAtom[ProtoStep[(D, StepEstimate)]]] =
-        _.mapAccumulate(EstimatorState.empty[D]) { (s, a) =>
-          a.mapAccumulate(s) { (sʹ, step) =>
-            val c = configChange.estimate(sʹ, step)
-            val d = detectorEstimator.estimate(static, step)
-            (sʹ.next(step), step.tupleRight(StepEstimate.fromMax(c, d)))
-          }
-        }.map(_._2)
+      def estimateSequence[F[_]](static: S): Pipe[F, Either[String, ProtoAtom[ProtoStep[D]]], Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]] =
+        _.mapAccumulate(EstimatorState.empty[D]) { (s, eAtom) =>
+          eAtom.fold(
+            error =>
+              (s, error.asLeft),
+            atom  =>
+             val sa = atom.mapAccumulate(s) { (sʹ, step) =>
+               val c = configChange.estimate(sʹ, step)
+               val d = detectorEstimator.estimate(static, step)
+               (sʹ.next(step), step.tupleRight(StepEstimate.fromMax(c, d)))
+             }
+             sa.map(_.asRight)
+          )
+        }.map(_._2)  // discard the state
     }
 
   class ForInstrumentMode private[PlannedTimeCalculator] (private val ctx: PlannedTimeContext) {

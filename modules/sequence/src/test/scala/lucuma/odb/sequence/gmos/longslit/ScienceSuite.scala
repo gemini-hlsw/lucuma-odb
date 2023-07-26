@@ -5,14 +5,10 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
-import eu.timepit.refined.types.numeric.PosDouble
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.ImageQuality
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.arb.ArbSourceProfile
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.util.arb.ArbEnumerated
@@ -29,17 +25,14 @@ class ScienceSuite extends ScalaCheckSuite {
 
   import ArbEnumerated.*
   import ArbGmosLongSlitConfig.given
-  import ArbSourceProfile.given
 
   val tenMin: SciExposureTime =
     SciExposureTime.fromDuration(Duration.ofMinutes(10)).get
 
   def northSequence(
     ls: Config.GmosNorth,
-    sp: SourceProfile,
-    iq: ImageQuality
   ): Stream[Pure, Science.Atom[GmosNorth]] =
-    Science.GmosNorth.compute(ls, tenMin, sp, iq, PosDouble.unsafeFrom(2.0))
+    Science.GmosNorth.compute(ls, tenMin)
 
   def sequencesEqual[A](
     obtained: Stream[Pure, A],
@@ -50,8 +43,8 @@ class ScienceSuite extends ScalaCheckSuite {
   }
 
   property("prefers explicitly set parameters") {
-    forAll { (ls: Config.GmosNorth, sp: SourceProfile, iq: ImageQuality) =>
-      val as = northSequence(ls, sp, iq)
+    forAll { (ls: Config.GmosNorth) =>
+      val as = northSequence(ls)
 
       sequencesEqual(
         as.map(a => DynamicOptics.North.yBin.get(a.science.value)),
@@ -61,8 +54,8 @@ class ScienceSuite extends ScalaCheckSuite {
   }
 
   property("cycles through wavelength dithers") {
-    forAll { (ls: Config.GmosNorth, sp: SourceProfile, iq: ImageQuality) =>
-      val as = northSequence(ls, sp, iq)
+    forAll { (ls: Config.GmosNorth) =>
+      val as = northSequence(ls)
 
       sequencesEqual(
         as.map(a => DynamicOptics.North.wavelength.getOption(a.science.value).get),
@@ -83,8 +76,8 @@ class ScienceSuite extends ScalaCheckSuite {
         .andThen(Offset.q)
         .andThen(Offset.Component.angle)
 
-    forAll { (ls: Config.GmosNorth, sp: SourceProfile, iq: ImageQuality) =>
-      val as = northSequence(ls, sp, iq)
+    forAll { (ls: Config.GmosNorth) =>
+      val as = northSequence(ls)
 
       sequencesEqual(
         as.map(_.science).flatMap(s => Stream.fromOption(offset.getOption(s))),

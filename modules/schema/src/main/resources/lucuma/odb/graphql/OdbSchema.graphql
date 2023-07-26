@@ -1378,17 +1378,12 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   Instrument type
   """
   instrument: Instrument!
-
-  """
-  Setup time estimates
-  """
-  setup: SetupTime!
 }
 
 """
 Next atom to execute and potential future atoms.
 """
-type GmosNorthExecutionSequence implements ExecutionSequence {
+type GmosNorthExecutionSequence {
 
   """
   Next atom to execute.
@@ -1405,18 +1400,6 @@ type GmosNorthExecutionSequence implements ExecutionSequence {
   'possibleFuture'.
   """
   hasMore: Boolean!
-
-  """
-  Total count of anticipated atoms, including 'nextAtom', 'possibleFuture' and
-  any remaining atoms not included in 'possibleFuture'.
-  """
-  atomCount: PosInt!
-
-  """
-  Sequence digest (including all anticipated future values regardless of
-  whether they appear in 'possibleFuture').
-  """
-  digest: SequenceDigest!
 
 }
 
@@ -1918,17 +1901,12 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   Instrument type
   """
   instrument: Instrument!
-
-  """
-  Setup time estimates
-  """
-  setup: SetupTime!
 }
 
 """
 Next atom to execute and potential future atoms.
 """
-type GmosSouthExecutionSequence implements ExecutionSequence {
+type GmosSouthExecutionSequence {
 
   """
   Next atom to execute.
@@ -1945,18 +1923,6 @@ type GmosSouthExecutionSequence implements ExecutionSequence {
   'possibleFuture'.
   """
   hasMore: Boolean!
-
-  """
-  Total count of anticipated atoms, including 'nextAtom', 'possibleFuture' and
-  any remaining atoms not included in 'possibleFuture'.
-  """
-  atomCount: PosInt!
-
-  """
-  Sequence digest (including all anticipated future values regardless of
-  whether they appear in 'possibleFuture').
-  """
-  digest: SequenceDigest!
 
 }
 
@@ -5242,6 +5208,28 @@ type Exchange implements ProposalClass {
 }
 
 type Execution {
+
+  """
+  Calculations dependent on the sequence, such as planned time and offsets.
+  """
+  digest: ExecutionDigest!
+
+  """
+  Full execution config, including acquisition and science sequences.
+  """
+  config(
+
+    """
+    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
+    sequence has `hasMore` and `atomCount` fields that can be used to determine
+    whether and how many remaining atoms are yet to be executed.
+    """
+    futureLimit: PosInt = 25
+
+  ): ExecutionConfig!
+
   """
   Datasets associated with the observation
   """
@@ -5271,11 +5259,6 @@ type Execution {
     """
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
-
-  """
-  Execution config
-  """
-  executionConfig: ExecutionConfig!
 }
 
 """
@@ -5286,11 +5269,6 @@ interface ExecutionConfig {
   Instrument type
   """
   instrument: Instrument!
-
-  """
-  Setup time estimates
-  """
-  setup: SetupTime!
 }
 
 """
@@ -5353,17 +5331,17 @@ enum Existence {
   DELETED
 }
 
-"""
-Execution sequence -- type specific implementations will include access to
-atoms.
-"""
-interface ExecutionSequence {
+"Summarizes the execution setup time and sequences."
+type ExecutionDigest {
 
-  """
-  Sequence digest (including all anticipated future values regardless of
-  whether they appear in possibleFuture)
-  """
-  digest: SequenceDigest!
+  "Setup time calculations."
+  setup:       SetupTime!
+
+  "Acquisition sequence summary."
+  acquisition: SequenceDigest
+
+  "Science sequence summary."
+  science:     SequenceDigest
 
 }
 
@@ -7206,30 +7184,7 @@ type Observation {
   The ITC result for this observation, assuming it has associated target(s)
   and a selected observing mode.
   """
-  itc(
-    "deprecated, will be removed"
-    useCache: Boolean = true
-  ): ItcResultSet
-
-  """
-  Produces the execution configuration with its acquisition and science
-  sequences for this observation.
-  """
-  sequence(
-
-    "deprecated, will be removed"
-    useCache: Boolean = true
-
-    """
-    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
-    If the projected future is longer, the size will be capped at this value.
-    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
-    sequence has `hasMore` and `atomCount` fields that can be used to determine
-    whether and how many remaining atoms are yet to be executed.
-    """
-    futureLimit: PosInt = 25
-
-  ): SequenceGenerationResult
+  itc: ItcResultSet
 
 }
 
@@ -7886,19 +7841,6 @@ type Query {
   filterTypeMeta: [FilterTypeMeta!]!
 
   """
-  ITC execution results.  DEPRECATED (use the `observation` query and select the
-  `itc` field instead).
-  """
-  itc(
-    programId:     ProgramId!
-
-    observationId: ObservationId!
-
-    "deprecated, will be removed"
-    useCache: Boolean! = true
-  ): ItcResultSet @deprecated(reason: "use observation(observationId: \"o-111\") { itc {...} } instead")
-
-  """
   Returns the observation with the given id, if any.
   """
   observation(
@@ -8010,30 +7952,6 @@ type Query {
   #   # Set to true to include deleted values
   #   includeDeleted: Boolean! = false
   # ): ScienceRequirementsGroupSelectResult!
-
-  """
-  Produces the execution configuration with its acquisition and science
-  sequences for this observation.  DEPRECATED (use the `observation` query and
-  select the `sequence` field instead.
-  """
-  sequence(
-    programId:     ProgramId!
-
-    observationId: ObservationId!
-
-    "deprecated, will be removed"
-    useCache: Boolean! = true
-
-    """
-    The maximum size (number of atoms) of the 'possibleFuture' in the sequences.
-    If the projected future is longer, the size will be capped at this value.
-    Use 0 if only interested in the 'nextAtom'.  The maximum is 100.  Each
-    sequence has 'hasMore' and 'atomCount' fields that can be used to determine
-    whether and how many remaining atoms are yet to be executed.
-    """
-    futureLimit: PosInt! = 25
-
-  ): SequenceGenerationResult @deprecated(reason: "use observation(observationId: \"o-111\") { sequence {...} } instead")
 
   """
   Retrieves the target with the given id, if it exists
@@ -8350,20 +8268,21 @@ enum SequenceCommand {
 }
 
 type SequenceDigest {
-  """
-  ObserveClass of the whole sequence
-  """
+
+  """ObserveClass of the whole sequence. """
   observeClass: ObserveClass!
 
-  """
-  PlannedTime for the whole sequence
-  """
+  """PlannedTime for the whole sequence. """
   plannedTime: PlannedTime!
 
-  """
-  Unique offsets that occur in the sequence
-  """
+  """Unique offsets that occur in the sequence."""
   offsets: [Offset!]!
+
+  """
+  Total count of anticipated atoms, including the 'nextAtom', 'possibleFuture'
+  and any remaining atoms not included in 'possibleFuture'.
+  """
+  atomCount: NonNegInt!
 }
 
 """
@@ -8394,14 +8313,6 @@ type SequenceEvent { # implements ExecutionEvent {
   Time at which this event was received
   """
   received: Timestamp!
-}
-
-type SequenceGenerationResult {
-  programId:       ProgramId!
-  observationId:   ObservationId!
-  itcResult:       ItcResultSet!
-  executionConfig: ExecutionConfig!
-  scienceDigest:   SequenceDigest
 }
 
 """

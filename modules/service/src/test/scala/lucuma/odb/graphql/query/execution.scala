@@ -40,7 +40,7 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import natchez.Trace.Implicits.noop
 import skunk.Session
 
-class sequence extends OdbSuite with ObservingModeSetupOperations {
+class execution extends OdbSuite with ObservingModeSetupOperations {
 
   val pi: User   = TestUsers.Standard.pi(1, 30)
   val user: User = TestUsers.service(3)
@@ -87,6 +87,180 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("digest") {
+    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      } yield (p, o, t)
+    setup.flatMap { case (_, oid, _) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   digest {
+                     setup {
+                       full { seconds }
+                       reacquisition { seconds }
+                     }
+                     acquisition {
+                       observeClass
+                       plannedTime {
+                         charges {
+                           chargeClass
+                           time { seconds }
+                         }
+                         total { seconds }
+                       }
+                       offsets {
+                         p { arcseconds }
+                         q { arcseconds }
+                       }
+                       atomCount
+                     }
+                     science {
+                       observeClass
+                       plannedTime {
+                         charges {
+                           chargeClass
+                           time { seconds }
+                         }
+                         total { seconds }
+                       }
+                       offsets {
+                         p { arcseconds }
+                         q { arcseconds }
+                       }
+                       atomCount
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "digest": {
+                    "setup" : {
+                      "full" : {
+                        "seconds" : 960.000000
+                      },
+                      "reacquisition" : {
+                        "seconds" : 300.000000
+                      }
+                    },
+                    "acquisition" : {
+                      "observeClass" : "ACQUISITION",
+                      "plannedTime" : {
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 185.162500
+                            }
+                          }
+                        ],
+                        "total" : {
+                          "seconds" : 185.162500
+                        }
+                      },
+                      "offsets" : [
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 0.000000
+                          }
+                        },
+                        {
+                          "p" : {
+                            "arcseconds" : 10.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 0.000000
+                          }
+                        }
+                      ],
+                      "atomCount": 1
+                    },
+                    "science" : {
+                      "observeClass" : "SCIENCE",
+                      "plannedTime" : {
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 357.600000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 411.600000
+                            }
+                          }
+                        ],
+                        "total" : {
+                          "seconds" : 769.200000
+                        }
+                      },
+                      "offsets" : [
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 0.000000
+                          }
+                        },
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : 15.000000
+                          }
+                        }
+                      ],
+                      "atomCount": 6
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
   test("simple generation") {
     val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
       for {
@@ -102,8 +276,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        static {
                          stageMode
@@ -114,9 +288,6 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                          }
                        }
                        acquisition {
-                         digest {
-                           observeClass
-                         }
                          nextAtom {
                            observeClass
                            steps {
@@ -173,8 +344,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "static": {
                       "stageMode": "FOLLOW_XY",
                       "detector": "HAMAMATSU",
@@ -182,9 +353,6 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                       "nodAndShuffle": null
                     },
                     "acquisition": {
-                      "digest": {
-                        "observeClass": "ACQUISITION"
-                      },
                       "nextAtom": {
                         "observeClass": "ACQUISITION",
                         "steps": [
@@ -303,8 +471,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence(futureLimit: 1) {
-                   executionConfig {
+                 execution {
+                   config(futureLimit: 1) {
                      ... on GmosNorthExecutionConfig {
                        science {
                          nextAtom {
@@ -336,8 +504,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "science": {
                       "nextAtom": {
                         "observeClass": "SCIENCE"
@@ -398,9 +566,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence(futureLimit: 101) {
-                   programId
-                   executionConfig {
+                 execution {
+                   config(futureLimit: 101) {
                      ... on GmosNorthExecutionConfig {
                        science {
                          possibleFuture {
@@ -449,15 +616,17 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   digest {
+                     science {
+                       offsets {
+                         q { arcseconds }
+                       }
+                     }
+                   }
+                   config {
                      ... on GmosNorthExecutionConfig {
                        science {
-                         digest {
-                           offsets {
-                             q { arcseconds }
-                           }
-                         }
                          nextAtom {
                            description
                            steps {
@@ -495,23 +664,25 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "digest": {
                     "science": {
-                      "digest": {
-                        "offsets": [
-                          {
-                            "q": {
-                              "arcseconds": -15.000000
-                            }
-                          },
-                          {
-                            "q": {
-                              "arcseconds": 15.000000
-                            }
+                      "offsets": [
+                        {
+                          "q": {
+                            "arcseconds": -15.000000
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "q": {
+                            "arcseconds": 15.000000
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "config": {
+                    "science": {
                       "nextAtom": {
                         "description": "q -15.0″, λ 500.0 nm",
                         "steps": [
@@ -676,8 +847,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        science {
                          nextAtom {
@@ -711,8 +882,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "science": {
                       "nextAtom": {
                         "description": "q 0.0″, λ 495.0 nm",
@@ -882,8 +1053,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      instrument
                    }
                  }
@@ -917,8 +1088,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosSouthExecutionConfig {
                        science {
                          nextAtom {
@@ -941,8 +1112,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                   }
                 }
               }
@@ -1072,8 +1243,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
+                 execution {
+                   config {
                      ... on GmosNorthExecutionConfig {
                        acquisition {
                          nextAtom {
@@ -1093,8 +1264,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig": {
+                "execution": {
+                  "config": {
                     "acquisition": {
                       "nextAtom": {
                          "steps": [
@@ -1408,23 +1579,25 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
 
              query {
                observation(observationId: "$oid") {
-                 sequence {
-                   executionConfig {
-                     ... on GmosNorthExecutionConfig {
-                       setup {
-                         full {
-                           seconds
-                         }
-                         reacquisition {
-                           seconds
-                         }
+                 execution {
+                   digest {
+                     setup {
+                       full {
+                         seconds
                        }
+                       reacquisition {
+                         seconds
+                       }
+                     }
+                     science {
+                       plannedTime {
+                         ...plannedTimeFields
+                       }
+                     }
+                   }
+                   config {
+                     ... on GmosNorthExecutionConfig {
                        science {
-                         digest {
-                           plannedTime {
-                             ...plannedTimeFields
-                           }
-                         }
                          nextAtom {
                            ...gmosNorthAtomFields
                          }
@@ -1442,8 +1615,8 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "observation": {
-                "sequence": {
-                  "executionConfig" : {
+                "execution": {
+                  "digest": {
                     "setup": {
                       "full": {
                         "seconds": 960.000000
@@ -1452,34 +1625,36 @@ class sequence extends OdbSuite with ObservingModeSetupOperations {
                         "seconds": 300.000000
                       }
                     },
-                    "science" : {
-                      "digest": {
-                        "plannedTime" : {
-                          "total" : {
-                            "seconds" : 769.200000
-                          },
-                          "charges" : [
-                            {
-                              "chargeClass" : "NON_CHARGED",
-                              "time" : {
-                                "seconds" : 0.000000
-                              }
-                            },
-                            {
-                              "chargeClass" : "PARTNER",
-                              "time" : {
-                                "seconds" : 357.600000
-                              }
-                            },
-                            {
-                              "chargeClass" : "PROGRAM",
-                              "time" : {
-                                "seconds" : 411.600000
-                              }
+                    "science": {
+                      "plannedTime" : {
+                        "total" : {
+                          "seconds" : 769.200000
+                        },
+                        "charges" : [
+                          {
+                            "chargeClass" : "NON_CHARGED",
+                            "time" : {
+                              "seconds" : 0.000000
                             }
-                          ]
-                        }
-                      },
+                          },
+                          {
+                            "chargeClass" : "PARTNER",
+                            "time" : {
+                              "seconds" : 357.600000
+                            }
+                          },
+                          {
+                            "chargeClass" : "PROGRAM",
+                            "time" : {
+                              "seconds" : 411.600000
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "config" : {
+                    "science" : {
                       "nextAtom" : {
                         "steps" : [
                           {
