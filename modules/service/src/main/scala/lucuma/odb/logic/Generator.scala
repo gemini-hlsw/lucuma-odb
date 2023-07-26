@@ -6,7 +6,6 @@ package lucuma.odb.logic
 import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
@@ -301,8 +300,7 @@ object Generator {
           s: Stream[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
           t: SequenceType
         ): F[Either[Error, Option[ExecutionSequence[D]]]] =
-          s.take(futureLimit.value + 2)  // +1 for the nextAtom, +futureLimit for the possibleFuture, +1 to check for more
-           .zipWithIndex
+          s.zipWithIndex
            .map(_.map(SequenceIds.atomId(namespace, t, _)))
            .map { case (eAtom, atomId) =>
              eAtom.bimap(
@@ -314,15 +312,16 @@ object Generator {
                  Atom(atomId, atom.description, steps)
              )
            }
+           .zipWithNext
+           .map { case (e, n) => e.tupleRight(n.isDefined) } // Either[Error, (atom, has more)]
+           .take(1 + futureLimit.value) // 1 (nextAtom) + futureLimit (possibleFuture)
            .compile
-           .toVector
+           .toList
            .map(_.sequence.map { atoms =>
-              atoms.headOption.map { head =>
-                val tail = atoms.tail
-                if (tail.size === futureLimit.value + 1)
-                  ExecutionSequence(head, tail.init.toList, true)
-                else
-                  ExecutionSequence(head, tail.toList, false)
+              atoms.headOption.map { case (head, _) =>
+                val future  = atoms.tail.map(_._1)
+                val hasMore = atoms.last._2
+                ExecutionSequence(head, future, hasMore)
               }
            })
 
