@@ -98,7 +98,7 @@ object GmosLongSlitInput {
         ObservingModeType.GmosNorthLongSlit
 
       /**
-       * Creates a GMOS Long Slit sequence config based on input parameters.
+       * Creates a GMOS long slit observing mode based on input parameters.
        */
       def toObservingMode(
         sourceProfile: SourceProfile,
@@ -173,7 +173,7 @@ object GmosLongSlitInput {
         ObservingModeType.GmosSouthLongSlit
 
       /**
-       * Creates a GMOS Long Slit sequence config based on input parameters.
+       * Creates a GMOS long slit observing mode based on input parameters.
        */
       def toObservingMode(
         sourceProfile: SourceProfile,
