@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.GroupTree
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.util.Codecs._
@@ -22,6 +23,7 @@ import Services.Syntax.*
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Group.Id]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[GroupService.UpdateGroupsResponse]
+  def selectGroups(programId: Program.Id): F[GroupTree]
 }
 
 object GroupService {
@@ -67,6 +69,28 @@ object GroupService {
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 
+      def selectGroups(programId: Program.Id): F[GroupTree] = {
+
+        def mkTree(m: Map[Option[Group.Id], List[GroupTree.Child]]): GroupTree = {
+
+          def mapChildren(children: List[GroupTree.Child]): List[GroupTree.Child] =
+            children.map {
+              case l@GroupTree.Leaf(_)                        => l
+              case b@GroupTree.Branch(_, _, _, _, _, _, _, _) => mapBranch(b)
+            }
+
+          def mapBranch(p: GroupTree.Branch): GroupTree.Branch =
+            p.copy(children = mapChildren(m.get(p.groupId.some).toList.flatten))
+
+          GroupTree.Root(programId, mapChildren(m.get(none[Group.Id]).toList.flatten))
+        }
+
+        for {
+          gs <- session.execute(Statements.SelectGroups)(programId)
+          os <- session.execute(Statements.SelectObservations)(programId)
+        } yield mkTree((gs ++ os).groupBy(_._1).view.mapValues(_.sortBy(_._2.value).map(_._3)).toMap)
+
+      }
     }
 
   object Statements {
@@ -139,6 +163,42 @@ object GroupService {
         WHERE c_group_id IN (
       """.apply(gid, index) |+| which |+| void")"
 
+    val branch: Decoder[GroupTree.Branch] =
+      (group_id *: int2_nonneg.opt *: bool *: text_nonempty.opt *: text_nonempty.opt *: time_span.opt *: time_span.opt).map {
+        case (gid, minRequired, ordered, name, description, minInterval, maxInterval) =>
+          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval)
+      }
+
+    val SelectGroups: Query[Program.Id, (Option[Group.Id], NonNegShort, GroupTree.Branch)] =
+      sql"""
+        SELECT
+          c_parent_id,
+          c_parent_index,
+          c_group_id,
+          c_name,
+          c_description,
+          c_min_required,
+          c_ordered,
+          c_min_interval,
+          c_max_interval
+        FROM
+          t_group
+        WHERE
+          c_program_id = $program_id
+      """.query(group_id.opt *: int2_nonneg *: branch)
+
+    val SelectObservations: Query[Program.Id, (Option[Group.Id], NonNegShort, GroupTree.Leaf)] =
+      sql"""
+        SELECT
+          c_group_id,
+          c_group_index,
+          c_observation_id
+        FROM
+          t_observation
+        WHERE
+          c_program_id = $program_id
+      """.query(group_id.opt *: int2_nonneg *: observation_id)
+         .map { case (gid, index, oid) => (gid, index, GroupTree.Leaf(oid)) }
   }
 
 }
