@@ -5223,10 +5223,11 @@ type Execution {
     The maximum size (number of atoms) of the `possibleFuture` in the sequences.
     If the projected future is longer, the size will be capped at this value.
     Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
-    sequence has `hasMore` and `atomCount` fields that can be used to determine
-    whether and how many remaining atoms are yet to be executed.
+    sequence has a `hasMore` field that can be used to determine whether there
+    additional atoms beyond those returned in `possibleFuture`.  The total
+    projected atom count is available in the execution digest.
     """
-    futureLimit: PosInt = 25
+    futureLimit: NonNegInt = 25
 
   ): ExecutionConfig!
 
