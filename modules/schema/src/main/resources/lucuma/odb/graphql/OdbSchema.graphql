@@ -7152,17 +7152,18 @@ enum PlanetaryNebulaSpectrum {
 }
 
 """
-A collection of PlannedTimeCharge
+An estimation of the remaining execution time, categorized by charge class.
 """
 type PlannedTime {
 
   """
-  Individual time charges
+  Individual time charges.
   """
   charges: [PlannedTimeCharge!]!
 
   """
-  The total of all charges
+  The total of all charges (i.e., the remaining execution time estimate ignoring
+  charge class).
   """
   total: TimeSpan!
 }
@@ -7182,6 +7183,20 @@ type PlannedTimeCharge {
   """
   time: TimeSpan!
 
+}
+
+"""
+The range of remaining time estimates from minimum to maximum.  The actual
+remaining time should vary between the two extremes, depending upon which
+observations and groups are actually completed.
+"""
+type PlannedTimeRange {
+
+   """Minimum remaining planned time estimate."""
+   minimum: PlannedTime!
+
+   """Maximum remaining planned time estimate."""
+   maximum: PlannedTime!
 }
 
 """
@@ -7316,6 +7331,9 @@ type Program {
 
   "All group elements (observations and sub-groups) in the program."
   allGroupElements: [GroupElement!]!
+
+  "Remaining execution time estimate range."
+  plannedTimeRange: PlannedTimeRange
 
 }
 
