@@ -164,8 +164,8 @@ object GroupService {
       """.apply(gid, index) |+| which |+| void")"
 
     val branch: Decoder[GroupTree.Branch] =
-      (group_id *: int2_nonneg.opt *: bool *: text_nonempty.opt *: text_nonempty.opt *: time_span.opt *: time_span.opt).map {
-        case (gid, minRequired, ordered, name, description, minInterval, maxInterval) =>
+      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt).map {
+        case (gid, name, description, minRequired, ordered, minInterval, maxInterval) =>
           GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval)
       }
 

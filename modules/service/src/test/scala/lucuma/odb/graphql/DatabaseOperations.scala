@@ -407,7 +407,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
     updateTargetExistencetAs(user, tid, Existence.Present)
 
-  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None): IO[Group.Id] =
+  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None, minRequired: Option[NonNegShort] = None): IO[Group.Id] =
     query(
       user = user,
       query = s"""
@@ -418,6 +418,7 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 parentGroup: ${parentGroupId.asJson.spaces2}
                 parentGroupIndex: ${parentIndex.map(_.value).asJson.spaces2}
+                minimumRequired: ${minRequired.map(_.value).asJson.spaces2}
               }
             }
           ) {
