@@ -6969,11 +6969,6 @@ type Observation {
   posAngleConstraint: PosAngleConstraint!
 
   """
-  Observation planned time calculation.
-  """
-  plannedTime: PlannedTimeSummary! @deprecated(reason: "the PlannedTimeSummary type will be replaced")
-
-  """
   The program that contains this observation
   """
   program: Program!
@@ -7190,26 +7185,6 @@ type PlannedTimeCharge {
 }
 
 """
-Deprecated, to be replaced.
-"""
-type PlannedTimeSummary {
-  """
-  The portion of planned time that will be charged
-  """
-  pi: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
-
-  """
-  The portion of planned time that will not be charged
-  """
-  uncharged: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
-
-  """
-  The total estimated execution time
-  """
-  execution: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
-}
-
-"""
 Poor Weather
 """
 type PoorWeather implements ProposalClass {
@@ -7335,11 +7310,6 @@ type Program {
   ProposalAttachments associated with the program
   """
   proposalAttachments: [ProposalAttachment!]!
-
-  """
-  Program planned time calculation.
-  """
-  plannedTime: PlannedTimeSummary! @deprecated(reason: "the PlannedTimeSummary type will be replaced")
 
   "Top-level group elements (observations and sub-groups) in the program."
   groupElements: [GroupElement!]!

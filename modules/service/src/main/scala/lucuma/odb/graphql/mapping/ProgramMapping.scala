@@ -49,7 +49,6 @@ trait ProgramMapping[F[_]]
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
         SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
-        SqlObject("plannedTime"),
         SqlObject("observations"),
         SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
         SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
