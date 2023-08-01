@@ -476,66 +476,6 @@ input DeclinationInput {
 }
 
 """
-Selects the observations for delete
-"""
-input DeleteObservationsInput {
-  """
-  Filters the observations for delete according to those that match the given constraints.
-  """
-  WHERE: WhereObservation
-
-  """
-  Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
-  """
-  LIMIT: NonNegInt
-}
-
-"""
-The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
-"""
-type DeleteObservationsResult {
-  """
-  The edited observations, up to the specified LIMIT or the default maximum of 1000.
-  """
-  observations: [Observation!]!
-
-  """
-  `true` when there were additional edits that were not returned.
-  """
-  hasMore: Boolean!
-}
-
-"""
-Selects the targets for delete
-"""
-input DeleteTargetsInput {
-  """
-  Filters the targets for delete according to those that match the given constraints.
-  """
-  WHERE: WhereTarget
-
-  """
-  Caps the number of results returned to the given value (if additional targets match the WHERE clause they will be updated but not returned).
-  """
-  LIMIT: NonNegInt
-}
-
-"""
-The result of updating the selected targets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional targets were modified and not included here.
-"""
-type DeleteTargetsResult {
-  """
-  The edited targets, up to the specified LIMIT or the default maximum of 1000.
-  """
-  targets: [Target!]!
-
-  """
-  `true` when there were additional edits that were not returned.
-  """
-  hasMore: Boolean!
-}
-
-"""
 Demo science
 """
 input DemoScienceInput {
@@ -2515,26 +2455,6 @@ type Mutation {
   ): CreateTargetResult!
 
   """
-  Deletes all the observations identified by the `WHERE` field
-  """
-  deleteObservations(
-    """
-    Parameters used to select observations for delete
-    """
-    input: DeleteObservationsInput!
-  ): DeleteObservationsResult!
-
-  """
-  Deletes all the targets identified by the `WHERE` field
-  """
-  deleteTargets(
-    """
-    Parameters used to select observations for delete
-    """
-    input: DeleteTargetsInput!
-  ): DeleteTargetsResult!
-
-  """
   Link a user to a program. Any existing link will be replaced.
   This operation is available only to Admin and Service users.
   """
@@ -2582,26 +2502,6 @@ type Mutation {
 
   "Set the allocation for a program from the specified partner."
   setAllocation(input: SetAllocationInput!): SetAllocationResult!
-
-  """
-  Undeletes all the observations identified by the `WHERE` field
-  """
-  undeleteObservations(
-    """
-    Parameters used to select observations for undelete
-    """
-    input: UndeleteObservationsInput!
-  ): UndeleteObservationsResult!
-
-  """
-  Undeletes all the targets identified by the `WHERE` field
-  """
-  undeleteTargets(
-    """
-    Parameters used to select observations for undelete
-    """
-    input: UndeleteTargetsInput!
-  ): UndeleteTargetsResult!
 
   """
   Unlink a user from a program.
@@ -3760,66 +3660,6 @@ input TimingWindowInput {
   Window end parameters. If omitted, the window will never end.
   """
   end: TimingWindowEndInput
-}
-
-"""
-Selects the observations for undelete
-"""
-input UndeleteObservationsInput {
-  """
-  Filters the observations for undelete according to those that match the given constraints.
-  """
-  WHERE: WhereObservation
-
-  """
-  Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
-  """
-  LIMIT: NonNegInt
-}
-
-"""
-The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
-"""
-type UndeleteObservationsResult {
-  """
-  The edited observations, up to the specified LIMIT or the default maximum of 1000.
-  """
-  observations: [Observation!]!
-
-  """
-  `true` when there were additional edits that were not returned.
-  """
-  hasMore: Boolean!
-}
-
-"""
-Selects the targets for undelete
-"""
-input UndeleteTargetsInput {
-  """
-  Filters the targets for undelete according to those that match the given constraints.
-  """
-  WHERE: WhereTarget
-
-  """
-  Caps the number of results returned to the given value (if additional targets match the WHERE clause they will be updated but not returned).
-  """
-  LIMIT: NonNegInt
-}
-
-"""
-The result of updating the selected targets, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional targets were modified and not included here.
-"""
-type UndeleteTargetsResult {
-  """
-  The edited targets, up to the specified LIMIT or the default maximum of 1000.
-  """
-  targets: [Target!]!
-
-  """
-  `true` when there were additional edits that were not returned.
-  """
-  hasMore: Boolean!
 }
 
 """
