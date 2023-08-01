@@ -7,10 +7,10 @@ val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.0.2"
-val fs2Version                 = "3.6.1"
+val fs2Version                 = "3.8.0"
 val grackleVersion             = "0.13.0"
 val http4sBlazeVersion         = "0.23.14"
-val http4sEmberVersion         = "0.23.18"
+val http4sEmberVersion         = "0.23.23"
 val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.8"
@@ -128,7 +128,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.507"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.519"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
