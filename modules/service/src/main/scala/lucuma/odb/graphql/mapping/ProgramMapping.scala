@@ -147,89 +147,39 @@ trait ProgramMapping[F[_]]
 
   lazy val plannedTimeHandler: EffectHandler[F] =
     new EffectHandler[F] {
+      val longestToShortest = catsKernelOrderingForOrder(Order.reverse(Order[PlannedTime]))
 
-      case class Acc(
-        valid:      List[PlannedTimeRange],
-        complete:   Set[Observation.Id],
-        incomplete: Set[Observation.Id]
-      ) {
-
-        def add(r: RangeResult): Acc =
-          Acc(
-            r.plannedTimeRange.fold(valid)(_ :: valid),
-            complete   ++ r.completeObservations,
-            incomplete ++ r.incompleteObservations
+      def combine(minRequired: Int, children: List[PlannedTimeRange]): Option[PlannedTimeRange] =
+        Option.when(children.size >= minRequired) {
+          PlannedTimeRange.from(
+            children.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero),
+            children.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero)
           )
-
-        def toRangeResult(minRequired: Int): RangeResult =
-          RangeResult(
-            if (valid.size < minRequired)
-              none[PlannedTimeRange]
-            else {
-              val longestToShortest = catsKernelOrderingForOrder(Order.reverse(Order[PlannedTime]))
-              PlannedTimeRange.from(
-                valid.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero),
-                valid.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero)
-              ).some
-            },
-            complete,
-            incomplete
-          )
-
-      }
-
-      object Acc {
-        val Empty: Acc = Acc(List.empty, Set.empty, Set.empty)
-
-        def fromChildResults(cs: List[RangeResult]): Acc =
-          cs.foldLeft(Empty)(_.add(_))
-
-      }
-
-      case class RangeResult(
-        plannedTimeRange:       Option[PlannedTimeRange],
-        completeObservations:   Set[Observation.Id],
-        incompleteObservations: Set[Observation.Id]
-      )
-
-      object RangeResult {
-
-        def combine(
-          minRequired:  Option[NonNegShort],
-          childResults: List[RangeResult]
-        ): RangeResult =
-          Acc.fromChildResults(childResults)
-             .toRangeResult(minRequired.fold(childResults.size)(_.value.intValue))
-      }
-
-      def plannedTimeRange(pid: Program.Id, root: GroupTree): F[RangeResult] =
-        root match {
-
-          case GroupTree.Leaf(oid) =>
-            services.useNonTransactionally {
-              generator(commitHash, itcClient, plannedTimeCalculator)
-                .digest(pid, oid)
-                .map(_.fold(
-                  _ => RangeResult(None, Set.empty, Set(oid)),
-                  d =>
-                   val pt = d.fullPlannedTime
-                   RangeResult(PlannedTimeRange.from(pt, pt).some, Set(oid), Set.empty)
-                ))
-            }
-
-          case GroupTree.Branch(_, min, _, children, _, _, _, _) =>
-            children.traverse(plannedTimeRange(pid, _)).map(RangeResult.combine(min, _))
-
-          case GroupTree.Root(_, children) =>
-            children.traverse(plannedTimeRange(pid, _)).map(RangeResult.combine(None, _))
-
         }
 
-      def calculate(pid: Program.Id): F[RangeResult] =
+      def leafRange(pid: Program.Id, oid: Observation.Id): F[Option[PlannedTimeRange]] =
+        services.useNonTransactionally {
+          generator(commitHash, itcClient, plannedTimeCalculator)
+            .digest(pid, oid)
+            .map(_.toOption.map(d => PlannedTimeRange.single(d.fullPlannedTime)))
+        }
+
+      def parentRange(pid: Program.Id, minRequired: Option[NonNegShort], children: List[GroupTree.Child]): F[Option[PlannedTimeRange]] =
+        children
+          .traverse(plannedTimeRange(pid, _))
+          .map(lst => combine(minRequired.fold(lst.size)(_.value.toInt), lst.flatMap(_.toList)))
+
+      def plannedTimeRange(pid: Program.Id, root: GroupTree): F[Option[PlannedTimeRange]] =
+        root match {
+          case GroupTree.Leaf(oid)                               => leafRange(pid, oid)
+          case GroupTree.Branch(_, min, _, children, _, _, _, _) => parentRange(pid, min, children)
+          case GroupTree.Root(_, children)                       => parentRange(pid, None, children)
+        }
+
+      def calculate(pid: Program.Id): F[Option[PlannedTimeRange]] =
         services
           .useTransactionally(groupService.selectGroups(pid))
           .flatMap(plannedTimeRange(pid, _))
-
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
         (for {
@@ -242,7 +192,7 @@ trait ProgramMapping[F[_]]
             .map { case (result, (child, parentCursor)) =>
               import lucuma.odb.json.plannedtime.given
               import lucuma.odb.json.time.query.given
-              val json: Json     = Json.fromFields(List("plannedTimeRange" -> result.plannedTimeRange.asJson))
+              val json: Json     = Json.fromFields(List("plannedTimeRange" -> result.asJson))
               val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
               (child, cursor)
             }
