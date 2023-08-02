@@ -196,7 +196,7 @@ object GroupService {
         FROM
           t_observation
         WHERE
-          c_program_id = $program_id
+          c_program_id = $program_id AND c_existence = 'present'
       """.query(group_id.opt *: int2_nonneg *: observation_id)
          .map { case (gid, index, oid) => (gid, index, GroupTree.Leaf(oid)) }
   }
