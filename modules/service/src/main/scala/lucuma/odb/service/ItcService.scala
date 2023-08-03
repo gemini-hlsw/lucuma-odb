@@ -221,7 +221,7 @@ object ItcService {
         oid: Observation.Id
       )(using Transaction[F]): F[Either[Error, GeneratorParams]] =
         generatorParamsService
-          .select(pid, oid)
+          .selectOne(pid, oid)
           .map {
             case None                => ObservationNotFound(pid, oid).asLeft
             case Some(Left(errors))  => ObservationDefinitionError(errors).asLeft
