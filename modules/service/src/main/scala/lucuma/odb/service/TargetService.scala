@@ -29,6 +29,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.SiderealInput
@@ -84,8 +85,8 @@ object TargetService {
       override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
         val insert: AppliedFragment =
           input.tracking match {
-            case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
-            case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
+            case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, TargetRole.Science)
+            case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson, TargetRole.Science)
           }
         val where = Statements.whereFragment(pid, user)
         val appl  = insert |+| void" " |+| where
@@ -104,7 +105,7 @@ object TargetService {
 
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
-          val update = Statements.updateTargets(input, which)
+          val update = Statements.updateTargets(input, which, TargetRole.Science)
           Stream.resource(session.prepareR(update.fragment.query(target_id))).flatMap { ps =>
             ps.stream(update.argument, 1024)
           }
@@ -188,10 +189,11 @@ object TargetService {
     import ProgramService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
 
     def insertSiderealFragment(
-      pid:  Program.Id,
-      name: NonEmptyString,
-      si:   SiderealInput.Create,
-      sourceProfile: Json
+      pid:           Program.Id,
+      name:          NonEmptyString,
+      si:            SiderealInput.Create,
+      sourceProfile: Json,
+      role:          TargetRole
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -208,7 +210,8 @@ object TargetService {
           c_sid_catalog_name,
           c_sid_catalog_id,
           c_sid_catalog_object_type,
-          c_source_profile
+          c_source_profile,
+          c_role
         )
         select
           $program_id,
@@ -224,7 +227,8 @@ object TargetService {
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
-          $json
+          $json,
+          $target_role
       """.apply(
         pid,
         name,
@@ -238,15 +242,17 @@ object TargetService {
         si.catalogInfo.flatMap(_.name),
         si.catalogInfo.flatMap(_.id),
         si.catalogInfo.flatMap(_.objectType),
-        sourceProfile
+        sourceProfile,
+        role
       )
     }
 
     def insertNonsiderealFragment(
-      pid:  Program.Id,
-      name: NonEmptyString,
-      ek:  EphemerisKey,
-      sourceProfile: Json
+      pid:           Program.Id,
+      name:          NonEmptyString,
+      ek:            EphemerisKey,
+      sourceProfile: Json,
+      role:          TargetRole
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -256,7 +262,8 @@ object TargetService {
           c_nsid_des,
           c_nsid_key_type,
           c_nsid_key,
-          c_source_profile
+          c_source_profile,
+          c_role
         )
         select
           $program_id,
@@ -265,14 +272,16 @@ object TargetService {
           ${text_nonempty},
           ${ephemeris_key_type},
           ${text_nonempty},
-          $json
+          $json,
+          $target_role
       """.apply(
         pid,
         name,
         NonEmptyString.from(ek.des).toOption.get, // we know this is never emptyek.des ~
         ek.keyType,
         NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
-        sourceProfile
+        sourceProfile,
+        role
       )
     }
 
@@ -378,11 +387,13 @@ object TargetService {
     def updateTargets(
       SET:   TargetPropertiesInput.Edit,
       which: AppliedFragment,
+      role:  TargetRole
     ): AppliedFragment =  {
       def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
         void"UPDATE t_target "                                         |+|
           void"SET " |+| us.intercalate(void", ") |+| void" "          |+|
           void"WHERE t_target.c_target_id IN (" |+| which |+| void") " |+|
+          sql"AND t_target.c_role = $target_role ".apply(role)          |+|
           void"RETURNING t_target.c_target_id"
       updates(SET).fold(which)(update)
     }
@@ -407,7 +418,8 @@ object TargetService {
           c_nsid_des,
           c_nsid_key_type,
           c_nsid_key,
-          c_source_profile
+          c_source_profile,
+          c_role
         )
         SELECT
           c_program_id,
@@ -426,10 +438,12 @@ object TargetService {
           c_nsid_des,
           c_nsid_key_type,
           c_nsid_key,
-          c_source_profile
+          c_source_profile,
+          c_role
         FROM t_target
         WHERE c_target_id = $target_id
-      """.apply(tid) |+|
+        AND   c_role      = $target_role
+      """.apply(tid, TargetRole.Science) |+|
       ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_target_id
