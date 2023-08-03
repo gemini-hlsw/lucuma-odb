@@ -7332,7 +7332,13 @@ type Program {
   "All group elements (observations and sub-groups) in the program."
   allGroupElements: [GroupElement!]!
 
-  "Remaining execution time estimate range."
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have a 'PlannedTime', it must be fully defined
+  such that a sequence can be generated for it.  If a program has observations
+  that are required and which are not fully defined, the planned time range
+  cannot be calculated.
+  """
   plannedTimeRange: PlannedTimeRange
 
 }
