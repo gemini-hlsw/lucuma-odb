@@ -85,7 +85,6 @@ class observations extends OdbSuite {
     }
   }
 
-  // N.B. contains a planned time summary which needs to be reworked
   test("simple observation selection") {
     createProgramAs(pi2).flatMap { pid =>
       createObservationAs(pi2, pid).flatMap { oid =>
@@ -97,17 +96,6 @@ class observations extends OdbSuite {
                 hasMore
                 matches {
                   id
-                  plannedTime {
-                    pi {
-                      seconds
-                    }
-                    uncharged {
-                      seconds
-                    }
-                    execution {
-                      seconds
-                    }
-                  }
                 }
               }
             }
@@ -120,18 +108,7 @@ class observations extends OdbSuite {
                   "hasMore" : false,
                   "matches" : [
                     {
-                      "id" : $oid,
-                      "plannedTime" : {
-                        "pi" : {
-                          "seconds" : 0.000000
-                        },
-                        "uncharged" : {
-                          "seconds" : 0.000000
-                        },
-                        "execution" : {
-                          "seconds" : 0.000000
-                        }
-                      }
+                      "id" : $oid
                     }
                   ]
                 }

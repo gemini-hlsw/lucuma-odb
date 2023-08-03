@@ -15,10 +15,10 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.8"
 val log4catsVersion            = "2.6.0"
-val lucumaItcVersion           = "0.17.0"
-val lucumaCoreVersion          = "0.82.0"
+val lucumaItcVersion           = "0.17.1"
+val lucumaCoreVersion          = "0.83.0"
 val lucumaGraphQLRoutesVersion = "0.6.6"
-val lucumaSsoVersion           = "0.6.1"
+val lucumaSsoVersion           = "0.6.2"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -29,7 +29,7 @@ val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.6.0"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
-ThisBuild / tlBaseVersion      := "0.4"
+ThisBuild / tlBaseVersion      := "0.5"
 ThisBuild / scalaVersion       := "3.3.0"
 ThisBuild / crossScalaVersions := Seq("3.3.0")
 
@@ -128,7 +128,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.519"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.521"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,

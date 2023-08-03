@@ -11,6 +11,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 
+import ObservingModeSetupOperations.*
+
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
   def createGmosNorthLongSlitObservationAs(
@@ -69,35 +71,44 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
            createObservation(input: {
              programId: ${pid.asJson},
              SET: {
-               constraintSet: {
-                 cloudExtinction: POINT_ONE,
-                 imageQuality: POINT_ONE,
-                 skyBackground: DARKEST
-               },
+               $ConstraintSet,
                targetEnvironment: {
                  asterism: ${tids.asJson}
                },
-               scienceRequirements: {
-                 mode: SPECTROSCOPY,
-                 spectroscopy: {
-                   wavelength: {
-                     nanometers: 500
-                   },
-                   resolution: 100,
-                   signalToNoise: 100.0,
-                   signalToNoiseAt: { nanometers: 500 },
-                   wavelengthCoverage: {
-                     nanometers: 20
-                   },
-                   focalPlane: SINGLE_SLIT,
-                   focalPlaneAngle: {
-                     microarcseconds: 0
-                   }
-                 }
-               },
+               $ScienceRequirements,
                observingMode: {
                  $mode
                }
+             }
+           }) {
+             observation {
+               id
+             }
+           }
+         }
+      """
+    ).map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def createObservationWithNoModeAs(
+    user: User,
+    pid:  Program.Id,
+    tid:  Target.Id
+  ): IO[Observation.Id] =
+    query(
+      user  = user,
+      query =
+      s"""
+         mutation {
+           createObservation(input: {
+             programId: ${pid.asJson},
+             SET: {
+               $ConstraintSet,
+               targetEnvironment: {
+                 asterism: ${List(tid).asJson}
+               },
+               $ScienceRequirements
              }
            }) {
              observation {
@@ -175,5 +186,40 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
     )
 
+
+}
+
+object ObservingModeSetupOperations {
+
+  val ConstraintSet: String =
+    """
+      constraintSet: {
+        cloudExtinction: POINT_ONE,
+        imageQuality: POINT_ONE,
+        skyBackground: DARKEST
+      }
+    """
+
+  val ScienceRequirements: String =
+    """
+      scienceRequirements: {
+        mode: SPECTROSCOPY,
+        spectroscopy: {
+          wavelength: {
+            nanometers: 500
+          },
+          resolution: 100,
+          signalToNoise: 100.0,
+          signalToNoiseAt: { nanometers: 500 },
+          wavelengthCoverage: {
+            nanometers: 20
+          },
+          focalPlane: SINGLE_SLIT,
+          focalPlaneAngle: {
+            microarcseconds: 0
+          }
+        }
+      }
+    """
 
 }
