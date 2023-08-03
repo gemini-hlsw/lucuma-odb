@@ -39,6 +39,10 @@ sealed trait ExecutionDigestService[F[_]] {
     hash:          String
   )(using Transaction[F]): F[Option[ExecutionDigest]]
 
+  def selectAll(
+    programId: Program.Id
+  )(using Transaction[F]): F[Map[Observation.Id, (String, ExecutionDigest)]]
+
   def insertOrUpdate(
     programId:      Program.Id,
     observationId:  Observation.Id,
@@ -58,8 +62,15 @@ object ExecutionDigestService {
         hash: String
       )(using Transaction[F]): F[Option[ExecutionDigest]] =
         session
-          .option(Statements.SelectExecutionDigest)(pid, oid)
+          .option(Statements.SelectOneExecutionDigest)(pid, oid)
           .map(_.collect { case (h, d) if h === hash => d })
+
+      override def selectAll(
+        pid: Program.Id
+      )(using Transaction[F]): F[Map[Observation.Id, (String, ExecutionDigest)]] =
+        session
+          .execute(Statements.SelectAllExecutionDigest)(pid)
+          .map(_.map { case (oid, hash, digest) => oid -> (hash, digest) }.toMap)
 
       override def insertOrUpdate(
         pid:    Program.Id,
@@ -155,30 +166,43 @@ object ExecutionDigestService {
     private val execution_digest: Codec[ExecutionDigest] =
       (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
-    def SelectExecutionDigest: Query[(Program.Id, Observation.Id), (String, ExecutionDigest)] =
+    private val DigestColumns: String =
+      """
+        c_full_setup_time,
+        c_reacq_setup_time,
+        c_acq_obs_class,
+        c_acq_non_charged_time,
+        c_acq_partner_time,
+        c_acq_program_time,
+        c_acq_offsets,
+        c_acq_atom_count,
+        c_sci_obs_class,
+        c_sci_non_charged_time,
+        c_sci_partner_time,
+        c_sci_program_time,
+        c_sci_offsets,
+        c_sci_atom_count
+      """
+
+    def SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (String, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
-          c_full_setup_time,
-          c_reacq_setup_time,
-          c_acq_obs_class,
-          c_acq_non_charged_time,
-          c_acq_partner_time,
-          c_acq_program_time,
-          c_acq_offsets,
-          c_acq_atom_count,
-          c_sci_obs_class,
-          c_sci_non_charged_time,
-          c_sci_partner_time,
-          c_sci_program_time,
-          c_sci_offsets,
-          c_sci_atom_count
-        FROM
-          t_execution_digest
+          #$DigestColumns
         WHERE
           c_program_id     = $program_id     AND
           c_observation_id = $observation_id
       """.query(text *: execution_digest)
+
+    def SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, String, ExecutionDigest)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_hash,
+          #$DigestColumns
+        WHERE
+          c_program_id = $program_id
+      """.query(observation_id *: text *: execution_digest)
 
     def InsertOrUpdateExecutionDigest: Command[(
       Program.Id,
