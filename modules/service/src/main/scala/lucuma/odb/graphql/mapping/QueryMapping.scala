@@ -16,6 +16,7 @@ import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
@@ -274,10 +275,11 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         Select("target", Nil,
           Unique(
             Filter(
-              And(
+              and(List(
                 Predicates.target.id.eql(pid),
                 Predicates.target.program.isVisibleTo(user),
-              ),
+                Predicates.target.hasRole(TargetRole.Science)
+              )),
               child
             )
           )
@@ -334,6 +336,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                   OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
                   Predicates.target.existence.includeDeleted(includeDeleted),
                   Predicates.target.program.isVisibleTo(user),
+                  Predicates.target.hasRole(TargetRole.Science),
                   WHERE.getOrElse(True)
                 )
               )),
