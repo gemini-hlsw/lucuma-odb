@@ -66,7 +66,6 @@ trait ObservationMapping[F[_]]
         SqlObject("scienceRequirements"),
         SqlObject("observingMode"),
         SqlField("instrument", ObservationView.Instrument),
-        SqlObject("plannedTime"),
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
         EffectField("itc", itcQueryHandler, List("id", "programId")),
         SqlObject("execution"),

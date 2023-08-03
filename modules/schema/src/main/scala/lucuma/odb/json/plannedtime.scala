@@ -15,6 +15,7 @@ import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
 import lucuma.core.model.sequence.PlannedTime
+import lucuma.core.model.sequence.PlannedTimeRange
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.util.TimeSpan
@@ -169,6 +170,22 @@ trait PlannedTimeCodec {
       Json.obj(
         "charges" -> a.charges.asJson,
         "total"   -> a.sum.asJson
+      )
+    }
+
+  given Decoder[PlannedTimeRange] =
+    Decoder.instance { c =>
+      for {
+        n <- c.downField("minimum").as[PlannedTime]
+        x <- c.downField("maximum").as[PlannedTime]
+      } yield PlannedTimeRange.from(n, x)
+    }
+
+  given (using Encoder[TimeSpan]): Encoder[PlannedTimeRange] =
+    Encoder.instance { (a: PlannedTimeRange) =>
+      Json.obj(
+        "minimum" -> a.min.asJson,
+        "maximum" -> a.max.asJson
       )
     }
 }

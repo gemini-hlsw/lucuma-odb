@@ -6969,11 +6969,6 @@ type Observation {
   posAngleConstraint: PosAngleConstraint!
 
   """
-  Observation planned time calculation.
-  """
-  plannedTime: PlannedTimeSummary! @deprecated(reason: "the PlannedTimeSummary type will be replaced")
-
-  """
   The program that contains this observation
   """
   program: Program!
@@ -7157,17 +7152,18 @@ enum PlanetaryNebulaSpectrum {
 }
 
 """
-A collection of PlannedTimeCharge
+An estimation of the remaining execution time, categorized by charge class.
 """
 type PlannedTime {
 
   """
-  Individual time charges
+  Individual time charges.
   """
   charges: [PlannedTimeCharge!]!
 
   """
-  The total of all charges
+  The total of all charges (i.e., the remaining execution time estimate ignoring
+  charge class).
   """
   total: TimeSpan!
 }
@@ -7190,23 +7186,17 @@ type PlannedTimeCharge {
 }
 
 """
-Deprecated, to be replaced.
+The range of remaining time estimates from minimum to maximum.  The actual
+remaining time should vary between the two extremes, depending upon which
+observations and groups are actually completed.
 """
-type PlannedTimeSummary {
-  """
-  The portion of planned time that will be charged
-  """
-  pi: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
+type PlannedTimeRange {
 
-  """
-  The portion of planned time that will not be charged
-  """
-  uncharged: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
+   """Minimum remaining planned time estimate."""
+   minimum: PlannedTime!
 
-  """
-  The total estimated execution time
-  """
-  execution: TimeSpan! @deprecated(reason: "the PlannedTimeSummary type will be removed")
+   """Maximum remaining planned time estimate."""
+   maximum: PlannedTime!
 }
 
 """
@@ -7336,16 +7326,20 @@ type Program {
   """
   proposalAttachments: [ProposalAttachment!]!
 
-  """
-  Program planned time calculation.
-  """
-  plannedTime: PlannedTimeSummary! @deprecated(reason: "the PlannedTimeSummary type will be replaced")
-
   "Top-level group elements (observations and sub-groups) in the program."
   groupElements: [GroupElement!]!
 
   "All group elements (observations and sub-groups) in the program."
   allGroupElements: [GroupElement!]!
+
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have a 'PlannedTime', it must be fully defined
+  such that a sequence can be generated for it.  If a program has observations
+  that are required and which are not fully defined, the planned time range
+  cannot be calculated.
+  """
+  plannedTimeRange: PlannedTimeRange
 
 }
 
