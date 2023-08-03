@@ -9,8 +9,8 @@ import cats.syntax.all._
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Group
 import lucuma.core.model.Program
-import lucuma.odb.data.Nullable
 import lucuma.odb.data.GroupTree
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.util.Codecs._
