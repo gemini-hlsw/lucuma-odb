@@ -51,10 +51,34 @@ import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
 
+  /**
+   * Obtains the ITC results for a single target, first checking the cache and
+   * then performing a query to the ITC service if necessary.
+   */
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[ItcService.Error, ItcService.Success]]
+
+  /**
+   * Selects the cached ITC results for a single observation, if available and
+   * still valid.  Does not perform a remote ITC service call if not available.
+   */
+  def selectOneCachedResult(
+    pid:    Program.Id,
+    oid:    Observation.Id,
+    params: GeneratorParams
+  )(using Transaction[F]): F[Option[ItcService.AsterismResult]]
+
+  /**
+   * Selects the cached ITC results for a program, for those observations where
+   * it is available and still valid.  Does not perform a remote ITC service
+   * call if not available.
+   */
+  def selectAllCachedResults(
+    pid:    Program.Id,
+    params: Map[Observation.Id, GeneratorParams]
+  )(using Transaction[F]): F[Map[Observation.Id, ItcService.AsterismResult]]
 
 }
 
@@ -212,7 +236,7 @@ object ItcService {
         services.transactionally {
           (for {
             p <- EitherT(selectParams(pid, oid))
-            r <- EitherT.liftF(selectResult(pid, oid, p))
+            r <- EitherT.liftF(selectOneCachedResult(pid, oid, p))
           } yield (p, r)).value
         }
 
@@ -228,10 +252,16 @@ object ItcService {
             case Some(Right(params)) => params.asRight
           }
 
+      private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)] = {
+        case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
+        case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
+      }
+
+
       // Selects the asterism result as a whole by selecting all the individual
       // target results.  If any individual result is not found then the asterism
       // as a whole is considered not found.
-      private def selectResult(
+      override def selectOneCachedResult(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
@@ -242,21 +272,55 @@ object ItcService {
           input: SpectroscopyIntegrationTimeInput
         ): F[Option[TargetResult]] =
           session
-            .option(Statements.SelectItcResult)(pid, oid, tid)
+            .option(Statements.SelectOneItcResult)(pid, oid, tid)
             .map(_.collect { case (h, time) if h === hash(input) =>
               TargetResult(tid, input, time)
             })
 
-        val specs = params match {
-          case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
-          case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
-        }
-
-        specs
+        itcInputs(params)
           .traverse { case (tid, input) => OptionT(selectSingleTarget(tid, input)) }
           .value
           .map(_.map(lst => AsterismResult(Zipper.fromNel(lst).focusMax)))
       }
+
+      override def selectAllCachedResults(
+        pid:    Program.Id,
+        params: Map[Observation.Id, GeneratorParams]
+      )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]] =
+        session
+          .execute(Statements.SelectAllItcResults)(pid)
+          .map(
+            _.groupBy(_._1)
+             .map { case (oid, lst) =>
+
+               // Get the cached result, if any, for each target in the
+               // observation's asterism.
+               val cachedResults: Map[Target.Id, (String, IntegrationTime)] =
+                 lst.map { case (_, tid, h, time) => tid -> (h, time) }.toMap
+
+               // Get the GeneratorParams for the observation, lookup the ITC
+               // inputs (there's one per target), then find the corresponding
+               // cached result.  Assuming the hash matches, it is still valid.
+               // If they are all still valid, we can create an AsterismResult.
+               val asterismResult: Option[AsterismResult] =
+                 params
+                   .get(oid)
+                   .map(itcInputs)
+                   .flatMap(
+                     _.traverse { case (tid, input) =>
+                       cachedResults.get(tid).collect { case (h, time) if hash(input) === h =>
+                         TargetResult(tid, input, time)
+                       }
+                     }
+                   )
+                   .map { lst => // NonEmptyList[TargetResult]
+                     AsterismResult(Zipper.fromNel(lst).focusMax)
+                   }
+
+               (oid, asterismResult)
+             }
+             .collect { case (oid, Some(a)) => (oid, a) }
+          )
 
       // Calls the remote ITC service and stores the results in a table for
       // future lookups.
@@ -334,7 +398,7 @@ object ItcService {
                c_data    = ${text.opt}
       """.command
 
-    val SelectItcResult: Query[(
+    val SelectOneItcResult: Query[(
       Program.Id,
       Observation.Id,
       Target.Id
@@ -350,6 +414,19 @@ object ItcService {
               c_observation_id = $observation_id AND
               c_target_id      = $target_id
       """.query(text *: integration_time)
+
+    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, String, IntegrationTime)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_target_id,
+          c_hash,
+          c_exposure_time,
+          c_exposure_count,
+          c_signal_to_noise
+        FROM t_itc_result
+        WHERE c_program_id = $program_id
+      """.query(observation_id *: target_id *: text *: integration_time)
 
     val InsertOrUpdateItcResult: Command[(
       Program.Id,
