@@ -23,14 +23,14 @@ object GmosCcdModeInput {
         GmosYBinningBinding.Option("yBin", rYBin),
         GmosAmpCountBinding.Option("ampCount", rAmpCount),
         GmosAmpGainBinding.Option("ampGain", rAmpGain),
-        GmosAmpReadModeBinding.Option("ampRead", rAmpRead)
-      ) => (rXBin, rYBin, rAmpCount, rAmpGain, rAmpRead).parMapN { (xBin, yBin, ampCount, ampGain, ampRead) =>
+        GmosAmpReadModeBinding.Option("ampReadMode", rAmpReadMode)
+      ) => (rXBin, rYBin, rAmpCount, rAmpGain, rAmpReadMode).parMapN { (xBin, yBin, ampCount, ampGain, ampReadMode) =>
         GmosCcdMode(
           xBin.getOrElse(GmosXBinning.One),
           yBin.getOrElse(GmosYBinning.One),
           ampCount.getOrElse(GmosAmpCount.Twelve),
           ampGain.getOrElse(GmosAmpGain.Low),
-          ampRead.getOrElse(GmosAmpReadMode.Slow)
+          ampReadMode.getOrElse(GmosAmpReadMode.Slow)
         )
       }
     }

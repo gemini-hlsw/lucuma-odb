@@ -934,7 +934,7 @@ input GmosCcdModeInput {
   """
   Amp Read Mode, defaults to 'SLOW'
   """
-  ampRead: GmosAmpReadMode
+  ampReadMode: GmosAmpReadMode
 
 }
 

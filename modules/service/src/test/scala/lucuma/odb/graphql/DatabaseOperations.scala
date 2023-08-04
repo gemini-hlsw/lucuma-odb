@@ -478,7 +478,7 @@ trait DatabaseOperations { this: OdbSuite =>
           yBin: ONE,
           ampCount: TWELVE,
           ampGain: LOW,
-          ampRead: SLOW
+          ampReadMode: SLOW
         },
         dtax: TWO,
         roi: FULL_FRAME,
