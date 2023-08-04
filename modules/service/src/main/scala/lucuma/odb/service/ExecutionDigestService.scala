@@ -33,7 +33,7 @@ import scala.collection.immutable.SortedSet
 
 sealed trait ExecutionDigestService[F[_]] {
 
-  def select(
+  def selectOne(
     programId:     Program.Id,
     observationId: Observation.Id,
     hash:          String
@@ -56,7 +56,7 @@ object ExecutionDigestService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionDigestService[F] =
     new ExecutionDigestService[F] {
-      override def select(
+      override def selectOne(
         pid:  Program.Id,
         oid:  Observation.Id,
         hash: String
@@ -189,6 +189,7 @@ object ExecutionDigestService {
         SELECT
           c_hash,
           #$DigestColumns
+        FROM t_execution_digest
         WHERE
           c_program_id     = $program_id     AND
           c_observation_id = $observation_id
@@ -200,6 +201,7 @@ object ExecutionDigestService {
           c_observation_id,
           c_hash,
           #$DigestColumns
+        FROM t_execution_digest
         WHERE
           c_program_id = $program_id
       """.query(observation_id *: text *: execution_digest)

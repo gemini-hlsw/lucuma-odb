@@ -51,14 +51,28 @@ import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
 
+  import ItcService.AsterismResult
+  import ItcService.Error
+  import ItcService.Success
+
   /**
    * Obtains the ITC results for a single target, first checking the cache and
-   * then performing a query to the ITC service if necessary.
+   * then performing a query to the remote ITC service if necessary.
    */
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[ItcService.Error, ItcService.Success]]
+  )(using NoTransaction[F]): F[Either[Error, Success]]
+
+  /**
+   * Using the provided generator parameters, calls the remote ITC service to
+   * obtain the AsterismResult, if possible, then caches it for future reference.
+   */
+  def callRemote(
+    pid:    Program.Id,
+    oid:    Observation.Id,
+    params: GeneratorParams
+  )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
 
   /**
    * Selects the cached ITC results for a single observation, if available and
@@ -68,7 +82,7 @@ sealed trait ItcService[F[_]] {
     pid:    Program.Id,
     oid:    Observation.Id,
     params: GeneratorParams
-  )(using Transaction[F]): F[Option[ItcService.AsterismResult]]
+  )(using Transaction[F]): F[Option[AsterismResult]]
 
   /**
    * Selects the cached ITC results for a program, for those observations where
@@ -78,7 +92,7 @@ sealed trait ItcService[F[_]] {
   def selectAllCachedResults(
     pid:    Program.Id,
     params: Map[Observation.Id, GeneratorParams]
-  )(using Transaction[F]): F[Map[Observation.Id, ItcService.AsterismResult]]
+  )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]]
 
 }
 
@@ -225,8 +239,18 @@ object ItcService {
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, storedResult) = pr
-          result <- storedResult.fold(EitherT(callAndInsert(pid, oid, params)))(r => EitherT.pure(r))
+          result <- storedResult.fold(EitherT(callRemote(pid, oid, params)))(r => EitherT.pure(r))
         } yield Success(params, result)).value
+
+      override def callRemote(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        params: GeneratorParams
+      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
+        (for {
+          r <- EitherT(callRemote(params))
+          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
+        } yield r).value
 
       // Selects the parameters then selects the previously stored result set, if any.
       private def attemptLookup(
@@ -321,18 +345,6 @@ object ItcService {
              }
              .collect { case (oid, Some(a)) => (oid, a) }
           )
-
-      // Calls the remote ITC service and stores the results in a table for
-      // future lookups.
-      private def callAndInsert(
-        pid:      Program.Id,
-        oid:      Observation.Id,
-        params:   GeneratorParams
-      ): F[Either[Error, AsterismResult]] =
-        (for {
-          r <- EitherT(callRemote(params))
-          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
-        } yield r).value
 
       private def callRemote(
         params:   GeneratorParams

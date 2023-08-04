@@ -5,8 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.Order
-import cats.Order.catsKernelOrderingForOrder
 import cats.effect.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
@@ -26,10 +24,8 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.PlannedTimeRange
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
@@ -147,44 +143,11 @@ trait ProgramMapping[F[_]]
   lazy val plannedTimeHandler: EffectHandler[F] =
     new EffectHandler[F] {
 
-      // PlannedTime Ordering that sorts longest to shortest.
-      val longestToShortest = catsKernelOrderingForOrder(Order.reverse(Order[PlannedTime]))
-
-      def combine(minRequired: Int, children: List[PlannedTimeRange]): Option[PlannedTimeRange] =
-        Option.when(children.size >= minRequired) {
-          PlannedTimeRange.from(
-            // Combines the first minRequired elements after sorting by ascending min PlannedTime
-            children.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero),
-            // Combines the first minRequired elements after sorting by descending max PlannedTime
-            children.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero)
-          )
-        }
-
-      def leafRange(pid: Program.Id, oid: Observation.Id): F[Option[PlannedTimeRange]] =
-        services.useNonTransactionally {
-          generator(commitHash, itcClient, plannedTimeCalculator)
-            .digest(pid, oid)
-            .map(_.toOption.map(d => PlannedTimeRange.single(d.fullPlannedTime)))
-        }
-
-      // If no minRequired, assume _all_ children are required.
-      def parentRange(pid: Program.Id, minRequired: Option[NonNegShort], children: List[GroupTree.Child]): F[Option[PlannedTimeRange]] =
-        children
-          .traverse(plannedTimeRange(pid, _))
-          // combine after skipping any elements for which we cannot compute the planned time
-          .map(lst => combine(minRequired.fold(lst.size)(_.value.toInt), lst.flatMap(_.toList)))
-
-      def plannedTimeRange(pid: Program.Id, root: GroupTree): F[Option[PlannedTimeRange]] =
-        root match {
-          case GroupTree.Leaf(oid)                               => leafRange(pid, oid)
-          case GroupTree.Branch(_, min, _, children, _, _, _, _) => parentRange(pid, min, children)
-          case GroupTree.Root(_, children)                       => parentRange(pid, None, children)
-        }
-
       def calculate(pid: Program.Id): F[Option[PlannedTimeRange]] =
-        services
-          .useTransactionally(groupService.selectGroups(pid))
-          .flatMap(plannedTimeRange(pid, _))
+        services.useNonTransactionally {
+          plannedTimeRangeService(commitHash, itcClient, plannedTimeCalculator)
+            .estimateProgram(pid)
+        }
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
         (for {

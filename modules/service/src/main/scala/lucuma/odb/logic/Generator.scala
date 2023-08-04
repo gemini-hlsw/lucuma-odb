@@ -55,6 +55,13 @@ sealed trait Generator[F[_]] {
     observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[Generator.Error, ExecutionDigest]]
 
+  def calculateDigest(
+    programId:      Program.Id,
+    observationId:  Observation.Id,
+    asterismResult: ItcService.AsterismResult,
+    params:         GeneratorParams
+  )(using NoTransaction[F]): F[Either[Generator.Error, ExecutionDigest]]
+
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
@@ -143,7 +150,7 @@ object Generator {
           md5.update(params.observingMode.hashBytes)
 
           // Integration Time
-          val ing = itcRes.value.focus.value
+          val ing = integrationTime.value
           md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
           md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
 
@@ -155,7 +162,7 @@ object Generator {
 
         def checkCache(using NoTransaction[F]): EitherT[F, Error, Option[ExecutionDigest]] =
           EitherT.right(services.transactionally {
-            executionDigestService.select(pid, oid, hash)
+            executionDigestService.selectOne(pid, oid, hash)
           })
 
         def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, Error, Unit] =
@@ -188,20 +195,41 @@ object Generator {
         (for {
           c <- Context.lookup(pid, oid)
           o <- c.checkCache
-          d <- o.fold(calcExecutionDigest(c).flatTap(c.cache))(d => EitherT.pure(d))
+          d <- o.fold(calcDigestThenCache(c))(EitherT.pure(_))
         } yield d).value
 
-      override def generate(
-        pid: Program.Id,
-        oid: Observation.Id,
-        lim: FutureLimit = FutureLimit.Default
-      )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
-        (for {
-          c <- Context.lookup(pid, oid)
-          x <- calcExecutionConfig(c, lim)
-        } yield x).value
+      // TODO: This is kind of a mess with all the calc methods.  Can it be
+      // TODO: fixed?  For Generator and ItcService there are a few external
+      // TODO: methods.
+      //
+      // * all in one -- lookup in cache, failing that do expensive thing and then cache
+      //   This one seems to not take GeneratorParams but mabybe it should?
+      //
+      // * just do the expensive bit and cache.  This one requires the Generator
+      //   params because otherwise you'd have to do a transaction to look them
+      //   up.
+      //
+      // * just lookup from the cache and do try to compute or do any remote
+      //   calls
+      //
+      // It'd be nice to come up with some kind of intuitive naming for these
+      // options.
+      //
 
-      private def calcExecutionDigest(
+      override def calculateDigest(
+        pid:            Program.Id,
+        oid:            Observation.Id,
+        asterismResult: ItcService.AsterismResult,
+        params:         GeneratorParams
+      )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
+        calcDigestThenCache(Context(pid, oid, asterismResult, params)).value
+
+      private def calcDigestThenCache(
+        ctx: Context
+      )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
+        calcDigestFromContext(ctx).flatTap(ctx.cache)
+
+      private def calcDigestFromContext(
         ctx: Context
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         ctx.params match {
@@ -218,7 +246,17 @@ object Generator {
             } yield r
         }
 
-      private def calcExecutionConfig(
+      override def generate(
+        pid: Program.Id,
+        oid: Observation.Id,
+        lim: FutureLimit = FutureLimit.Default
+      )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
+        (for {
+          c <- Context.lookup(pid, oid)
+          x <- calcExecutionConfigFromContext(c, lim)
+        } yield x).value
+
+      private def calcExecutionConfigFromContext(
         ctx: Context,
         lim: FutureLimit
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
