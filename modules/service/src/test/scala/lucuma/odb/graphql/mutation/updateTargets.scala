@@ -6,6 +6,7 @@ package mutation
 
 import io.circe.literal._
 import lucuma.core.model.User
+import lucuma.refined.*
 
 class updateTargets extends OdbSuite {
 
@@ -114,6 +115,43 @@ class updateTargets extends OdbSuite {
           }
         """,
         expected = Left(List("Argument 'input.SET.name' is invalid: cannot be null"))
+       )
+      }
+    }
+  }
+
+  test("update guide target (not updated)") {
+    createProgramAs(pi).flatMap { pid =>
+      createGuideTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+       expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateTargets(input: {
+              SET: {
+                name: "New Guía"
+              }
+              WHERE: {
+                id: { EQ: "$tid"}
+              }
+            }) {
+              targets {
+                id
+                name
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updateTargets" : {
+                "targets" : [
+                ]
+              }
+            }
+          """
+        )
        )
       }
     }
