@@ -162,7 +162,7 @@ object GeneratorParamsService {
                   f,
                   GmosFpu.North.builtin(u),
                   gn.ccdMode.some,
-                  gn.explicitRoi.getOrElse(gn.roi).some),
+                  gn.roi.some),
                 λ)
             }.map { itcParams =>
               GeneratorParams.GmosNorthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gn)
@@ -177,7 +177,7 @@ object GeneratorParamsService {
                   f,
                   GmosFpu.South.builtin(u),
                   gs.ccdMode.some,
-                  gs.explicitRoi.getOrElse(gs.roi).some),
+                  gs.roi.some),
                 λ)
             }.map { itcParams =>
               GeneratorParams.GmosSouthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gs)
