@@ -155,14 +155,30 @@ object GeneratorParamsService {
         observingMode(params, config).flatMap {
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
-              spectroscopyParams(p, InstrumentMode.GmosNorthSpectroscopy(g, f, GmosFpu.North.builtin(u)), λ)
+              spectroscopyParams(
+                p,
+                InstrumentMode.GmosNorthSpectroscopy(
+                  g,
+                  f,
+                  GmosFpu.North.builtin(u),
+                  gn.ccdMode.some,
+                  gn.roi.some),
+                λ)
             }.map { itcParams =>
               GeneratorParams.GmosNorthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gn)
             }.toEither
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
-              spectroscopyParams(p, InstrumentMode.GmosSouthSpectroscopy(g, f, GmosFpu.South.builtin(u)), λ)
+              spectroscopyParams(
+                p,
+                InstrumentMode.GmosSouthSpectroscopy(
+                  g,
+                  f,
+                  GmosFpu.South.builtin(u),
+                  gs.ccdMode.some,
+                  gs.roi.some),
+                λ)
             }.map { itcParams =>
               GeneratorParams.GmosSouthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gs)
             }.toEither

@@ -9,6 +9,7 @@ import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
@@ -32,6 +33,7 @@ import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
 import spire.math.Rational
@@ -116,6 +118,15 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
 
   def explicitSpatialOffsets: Option[List[Q]]
 
+  def ccdMode: GmosCcdMode =
+    GmosCcdMode(
+      xBin,
+      yBin,
+      GmosAmpCount.Twelve,
+      ampGain,
+      ampReadMode
+    )
+
   def hashBytes: Array[Byte] = {
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -144,7 +155,7 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
 
 object Config {
 
-  final case class GmosNorth(
+  final case class GmosNorth private[longslit] (
     grating:                   GmosNorthGrating,
     filter:                    Option[GmosNorthFilter],
     fpu:                       GmosNorthFpu,
@@ -215,7 +226,7 @@ object Config {
 
   }
 
-  final case class GmosSouth(
+  final case class GmosSouth private[longslit] (
     grating:                   GmosSouthGrating,
     filter:                    Option[GmosSouthFilter],
     fpu:                       GmosSouthFpu,
