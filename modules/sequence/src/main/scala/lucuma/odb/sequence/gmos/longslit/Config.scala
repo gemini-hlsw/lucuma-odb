@@ -9,6 +9,7 @@ import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
@@ -32,6 +33,7 @@ import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
 import spire.math.Rational
@@ -144,7 +146,7 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
 
 object Config {
 
-  final case class GmosNorth(
+  final case class GmosNorth private[longslit] (
     grating:                   GmosNorthGrating,
     filter:                    Option[GmosNorthFilter],
     fpu:                       GmosNorthFpu,
@@ -161,6 +163,15 @@ object Config {
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersNorth(this.grating)
+
+    val ccdMode: GmosCcdMode =
+      GmosCcdMode(
+        explicitXBin.getOrElse(defaultXBin),
+        explicitYBin.getOrElse(defaultYBin),
+        GmosAmpCount.Twelve,
+        explicitAmpGain.getOrElse(defaultAmpGain),
+        explicitAmpReadMode.getOrElse(defaultAmpReadMode)
+      )
 
   }
 
@@ -215,7 +226,7 @@ object Config {
 
   }
 
-  final case class GmosSouth(
+  final case class GmosSouth private[longslit] (
     grating:                   GmosSouthGrating,
     filter:                    Option[GmosSouthFilter],
     fpu:                       GmosSouthFpu,
@@ -232,6 +243,15 @@ object Config {
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
+
+    val ccdMode: GmosCcdMode =
+      GmosCcdMode(
+        explicitXBin.getOrElse(defaultXBin),
+        explicitYBin.getOrElse(defaultYBin),
+        GmosAmpCount.Twelve,
+        explicitAmpGain.getOrElse(defaultAmpGain),
+        explicitAmpReadMode.getOrElse(defaultAmpReadMode)
+      )
 
   }
 
