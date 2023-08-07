@@ -30,6 +30,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
@@ -43,7 +44,6 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
 import java.security.MessageDigest
-import java.util.HexFormat
 import java.util.UUID
 
 import Generator.FutureLimit
@@ -142,7 +142,7 @@ object Generator {
         val integrationTime: ItcService.TargetResult =
           itcRes.value.focus
 
-        val hash: String = {
+        val hash: Md5Hash = {
           val zero = 0.toByte
           val md5  = MessageDigest.getInstance("MD5")
 
@@ -157,7 +157,7 @@ object Generator {
           // Commit Hash
           md5.update(commitHash.toByteArray)
 
-          HexFormat.of.formatHex(md5.digest())
+          Md5Hash.unsafeFromByteArray(md5.digest())
         }
 
         def checkCache(using NoTransaction[F]): EitherT[F, Error, Option[ExecutionDigest]] =

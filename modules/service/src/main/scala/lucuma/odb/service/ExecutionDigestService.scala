@@ -21,11 +21,11 @@ import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.numeric._int8
-import skunk.codec.text.text
 import skunk.data.Arr
 import skunk.implicits.*
 
@@ -36,17 +36,17 @@ sealed trait ExecutionDigestService[F[_]] {
   def selectOne(
     programId:     Program.Id,
     observationId: Observation.Id,
-    hash:          String
+    hash:          Md5Hash
   )(using Transaction[F]): F[Option[ExecutionDigest]]
 
   def selectAll(
     programId: Program.Id
-  )(using Transaction[F]): F[Map[Observation.Id, (String, ExecutionDigest)]]
+  )(using Transaction[F]): F[Map[Observation.Id, (Md5Hash, ExecutionDigest)]]
 
   def insertOrUpdate(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    hash:           String,
+    hash:           Md5Hash,
     digest:         ExecutionDigest
   )(using Transaction[F]): F[Unit]
 
@@ -59,7 +59,7 @@ object ExecutionDigestService {
       override def selectOne(
         pid:  Program.Id,
         oid:  Observation.Id,
-        hash: String
+        hash: Md5Hash
       )(using Transaction[F]): F[Option[ExecutionDigest]] =
         session
           .option(Statements.SelectOneExecutionDigest)(pid, oid)
@@ -67,7 +67,7 @@ object ExecutionDigestService {
 
       override def selectAll(
         pid: Program.Id
-      )(using Transaction[F]): F[Map[Observation.Id, (String, ExecutionDigest)]] =
+      )(using Transaction[F]): F[Map[Observation.Id, (Md5Hash, ExecutionDigest)]] =
         session
           .execute(Statements.SelectAllExecutionDigest)(pid)
           .map(_.map { case (oid, hash, digest) => oid -> (hash, digest) }.toMap)
@@ -75,7 +75,7 @@ object ExecutionDigestService {
       override def insertOrUpdate(
         pid:    Program.Id,
         oid:    Observation.Id,
-        hash:   String,
+        hash:   Md5Hash,
         digest: ExecutionDigest
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertOrUpdateExecutionDigest)(
@@ -184,7 +184,7 @@ object ExecutionDigestService {
         c_sci_atom_count
       """
 
-    def SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (String, ExecutionDigest)] =
+    def SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
@@ -193,9 +193,9 @@ object ExecutionDigestService {
         WHERE
           c_program_id     = $program_id     AND
           c_observation_id = $observation_id
-      """.query(text *: execution_digest)
+      """.query(md5_hash *: execution_digest)
 
-    def SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, String, ExecutionDigest)] =
+    def SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_observation_id,
@@ -204,12 +204,12 @@ object ExecutionDigestService {
         FROM t_execution_digest
         WHERE
           c_program_id = $program_id
-      """.query(observation_id *: text *: execution_digest)
+      """.query(observation_id *: md5_hash *: execution_digest)
 
     def InsertOrUpdateExecutionDigest: Command[(
       Program.Id,
       Observation.Id,
-      String,
+      Md5Hash,
       TimeSpan,
       TimeSpan,
       ObserveClass,
@@ -224,7 +224,7 @@ object ExecutionDigestService {
       TimeSpan,
       List[Offset],
       NonNegInt,
-      String,
+      Md5Hash,
       TimeSpan,
       TimeSpan,
       ObserveClass,
@@ -262,7 +262,7 @@ object ExecutionDigestService {
         ) SELECT
           $program_id,
           $observation_id,
-          $text,
+          $md5_hash,
           $time_span,
           $time_span,
           $obs_class,
@@ -278,7 +278,7 @@ object ExecutionDigestService {
           $offset_array,
           $int4_nonneg
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
-          SET c_hash                 = $text,
+          SET c_hash                 = $md5_hash,
               c_full_setup_time      = $time_span,
               c_reacq_setup_time     = $time_span,
               c_acq_obs_class        = $obs_class,
