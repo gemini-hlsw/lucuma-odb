@@ -1,5 +1,5 @@
 create type e_target_role as enum('science', 'guide');
-comment on type e_existence is 'The role of the target.';
+comment on type e_target_role is 'The role of the target.';
 
 alter table t_target
 add column c_role e_target_role;
