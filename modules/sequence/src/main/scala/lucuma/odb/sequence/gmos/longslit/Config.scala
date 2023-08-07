@@ -118,6 +118,15 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
 
   def explicitSpatialOffsets: Option[List[Q]]
 
+  def ccdMode: GmosCcdMode =
+    GmosCcdMode(
+      xBin,
+      yBin,
+      GmosAmpCount.Twelve,
+      ampGain,
+      ampReadMode
+    )
+
   def hashBytes: Array[Byte] = {
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -163,15 +172,6 @@ object Config {
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersNorth(this.grating)
-
-    val ccdMode: GmosCcdMode =
-      GmosCcdMode(
-        explicitXBin.getOrElse(defaultXBin),
-        explicitYBin.getOrElse(defaultYBin),
-        GmosAmpCount.Twelve,
-        explicitAmpGain.getOrElse(defaultAmpGain),
-        explicitAmpReadMode.getOrElse(defaultAmpReadMode)
-      )
 
   }
 
@@ -243,15 +243,6 @@ object Config {
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
-
-    val ccdMode: GmosCcdMode =
-      GmosCcdMode(
-        explicitXBin.getOrElse(defaultXBin),
-        explicitYBin.getOrElse(defaultYBin),
-        GmosAmpCount.Twelve,
-        explicitAmpGain.getOrElse(defaultAmpGain),
-        explicitAmpReadMode.getOrElse(defaultAmpReadMode)
-      )
 
   }
 
