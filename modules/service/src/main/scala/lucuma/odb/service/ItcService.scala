@@ -36,6 +36,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.Syntax.*
@@ -46,7 +47,6 @@ import skunk.codec.text.text
 import skunk.implicits.*
 
 import java.security.MessageDigest
-import java.util.HexFormat
 import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
@@ -192,14 +192,12 @@ object ItcService {
     result: AsterismResult
   )
 
-  private val hex = HexFormat.of
-
-  private def hash(input: SpectroscopyIntegrationTimeInput): String =
-    hex.formatHex(
+  private def hash(input: SpectroscopyIntegrationTimeInput): Md5Hash =
+    Md5Hash.unsafeFromByteArray {
       MessageDigest
         .getInstance("MD5")
         .digest(input.asJson.noSpaces.getBytes("UTF-8"))
-    )
+    }
 
   def pollVersionsForever[F[_]: Async: Temporal: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -319,7 +317,7 @@ object ItcService {
 
                // Get the cached result, if any, for each target in the
                // observation's asterism.
-               val cachedResults: Map[Target.Id, (String, IntegrationTime)] =
+               val cachedResults: Map[Target.Id, (Md5Hash, IntegrationTime)] =
                  lst.map { case (_, tid, h, time) => tid -> (h, time) }.toMap
 
                // Get the GeneratorParams for the observation, lookup the ITC
@@ -414,7 +412,7 @@ object ItcService {
       Program.Id,
       Observation.Id,
       Target.Id
-    ), (String, IntegrationTime)] =
+    ), (Md5Hash, IntegrationTime)] =
       sql"""
         SELECT
           c_hash,
@@ -425,9 +423,9 @@ object ItcService {
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id AND
               c_target_id      = $target_id
-      """.query(text *: integration_time)
+      """.query(md5_hash *: integration_time)
 
-    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, String, IntegrationTime)] =
+    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, Md5Hash, IntegrationTime)] =
       sql"""
         SELECT
           c_observation_id,
@@ -438,17 +436,17 @@ object ItcService {
           c_signal_to_noise
         FROM t_itc_result
         WHERE c_program_id = $program_id
-      """.query(observation_id *: target_id *: text *: integration_time)
+      """.query(observation_id *: target_id *: md5_hash *: integration_time)
 
     val InsertOrUpdateItcResult: Command[(
       Program.Id,
       Observation.Id,
       Target.Id,
-      String,
+      Md5Hash,
       TimeSpan,
       PosInt,
       SignalToNoise,
-      String,
+      Md5Hash,
       TimeSpan,
       PosInt,
       SignalToNoise
@@ -466,12 +464,12 @@ object ItcService {
           $program_id,
           $observation_id,
           $target_id,
-          $text,
+          $md5_hash,
           $time_span,
           $pos_int,
           $signal_to_noise
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
-          SET c_hash            = $text,
+          SET c_hash            = $md5_hash,
               c_exposure_time   = $time_span,
               c_exposure_count  = $pos_int,
               c_signal_to_noise = $signal_to_noise

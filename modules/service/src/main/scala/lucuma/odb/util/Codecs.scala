@@ -37,6 +37,7 @@ import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -223,6 +224,9 @@ trait Codecs {
 
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
+
+  val md5_hash: Codec[Md5Hash] =
+    bytea.eimap(b => Md5Hash.fromByteArray(b).toRight(s"Expected an MD5 hash value but found ${b.size} bytes"))(_.toByteArray)
 
   val mos_pre_imaging: Codec[MosPreImaging] =
     bool.imap(
