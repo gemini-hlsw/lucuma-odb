@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.Order
-import cats.data.EitherNel
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.OptionT
@@ -36,6 +35,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.Syntax.*
@@ -46,15 +46,51 @@ import skunk.codec.text.text
 import skunk.implicits.*
 
 import java.security.MessageDigest
-import java.util.HexFormat
 import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
 
+  import ItcService.AsterismResult
+  import ItcService.Error
+
+  /**
+   * Obtains the ITC results for a single target, first checking the cache and
+   * then performing a query to the remote ITC service if necessary.
+   */
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[ItcService.Error, ItcService.Success]]
+  )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
+
+  /**
+   * Using the provided generator parameters, calls the remote ITC service to
+   * obtain the AsterismResult, if possible, then caches it for future reference.
+   */
+  def callRemote(
+    programId:     Program.Id,
+    observationId: Observation.Id,
+    params:        GeneratorParams
+  )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
+
+  /**
+   * Selects the cached ITC results for a single observation, if available and
+   * still valid.  Does not perform a remote ITC service call if not available.
+   */
+  def selectOne(
+    programId:    Program.Id,
+    observatinId: Observation.Id,
+    params:       GeneratorParams
+  )(using Transaction[F]): F[Option[AsterismResult]]
+
+  /**
+   * Selects the cached ITC results for a program, for those observations where
+   * it is available and still valid.  Does not perform a remote ITC service
+   * call if not available.
+   */
+  def selectAll(
+    programId: Program.Id,
+    params:    Map[Observation.Id, GeneratorParams]
+  )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]]
 
 }
 
@@ -66,31 +102,25 @@ object ItcService {
 
   object Error {
 
-    case class ObservationNotFound(
-      programId:     Program.Id,
-      observationId: Observation.Id
-    ) extends Error {
-      def format: String =
-        s"Observation '$observationId' in program '$programId' not found."
-    }
-
     case class ObservationDefinitionError(
       errors: NonEmptyList[GeneratorParamsService.Error]
     ) extends Error {
       def format: String = {
-        val conflict = Option.when(errors.exists(_ === GeneratorParamsService.Error.ConflictingData))(
-          "Observation would require multiple instrument configurations to observe all the targets in the asterism."
-        )
 
-        val missing = errors.collect {
-          case GeneratorParamsService.Error.MissingData(tid, paramName) =>
-            s"${tid.fold("") { tid => s"(target $tid) " }}$paramName"
-        } match {
-          case Nil    => none[String]
-          case params => s"ITC cannot be queried until the following parameters are defined: ${params.intercalate(", ")}".some
-        }
+        val (missingParams, others) =
+          errors.foldLeft((List.empty[String], List.empty[String])) { case ((missingParams, others), e) =>
+            e match {
+              case GeneratorParamsService.Error.MissingData(_, _) =>
+                (e.format :: missingParams, others)
+              case _ =>
+                (missingParams, e.format :: others)
+            }
+          }
 
-        (conflict.toList ++ missing.toList).intercalate("\n")
+        ((missingParams match {
+          case Nil    => ""
+          case params => s"ITC cannot be queried until the following parameters are defined: ${params.sorted.intercalate(", ")}."
+        }) :: others).intercalate("\n")
       }
     }
 
@@ -149,19 +179,12 @@ object ItcService {
 
   }
 
-  case class Success(
-    params: GeneratorParams,
-    result: AsterismResult
-  )
-
-  private val hex = HexFormat.of
-
-  private def hash(input: SpectroscopyIntegrationTimeInput): String =
-    hex.formatHex(
+  private def hash(input: SpectroscopyIntegrationTimeInput): Md5Hash =
+    Md5Hash.unsafeFromByteArray {
       MessageDigest
         .getInstance("MD5")
         .digest(input.asJson.noSpaces.getBytes("UTF-8"))
-    )
+    }
 
   def pollVersionsForever[F[_]: Async: Temporal: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -197,12 +220,22 @@ object ItcService {
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, Success]] =
+      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
-          (params, storedResult) = pr
-          result <- storedResult.fold(EitherT(callAndInsert(pid, oid, params)))(r => EitherT.pure(r))
-        } yield Success(params, result)).value
+          (params, oa) = pr
+          result <- oa.fold(EitherT(callRemote(pid, oid, params)))(EitherT.pure(_))
+        } yield result).value
+
+      override def callRemote(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        params: GeneratorParams
+      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
+        (for {
+          r <- EitherT(callRemote(params))
+          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
+        } yield r).value
 
       // Selects the parameters then selects the previously stored result set, if any.
       private def attemptLookup(
@@ -211,27 +244,20 @@ object ItcService {
       )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResult])]] =
         services.transactionally {
           (for {
-            p <- EitherT(selectParams(pid, oid))
-            r <- EitherT.liftF(selectResult(pid, oid, p))
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
+            r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
 
-      private def selectParams(
-        pid: Program.Id,
-        oid: Observation.Id
-      )(using Transaction[F]): F[Either[Error, GeneratorParams]] =
-        generatorParamsService
-          .select(pid, oid)
-          .map {
-            case None                => ObservationNotFound(pid, oid).asLeft
-            case Some(Left(errors))  => ObservationDefinitionError(errors).asLeft
-            case Some(Right(params)) => params.asRight
-          }
+      private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)] = {
+        case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
+        case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
+      }
 
       // Selects the asterism result as a whole by selecting all the individual
       // target results.  If any individual result is not found then the asterism
       // as a whole is considered not found.
-      private def selectResult(
+      override def selectOne(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
@@ -242,33 +268,55 @@ object ItcService {
           input: SpectroscopyIntegrationTimeInput
         ): F[Option[TargetResult]] =
           session
-            .option(Statements.SelectItcResult)(pid, oid, tid)
+            .option(Statements.SelectOneItcResult)(pid, oid, tid)
             .map(_.collect { case (h, time) if h === hash(input) =>
               TargetResult(tid, input, time)
             })
 
-        val specs = params match {
-          case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
-          case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
-        }
-
-        specs
+        itcInputs(params)
           .traverse { case (tid, input) => OptionT(selectSingleTarget(tid, input)) }
           .value
           .map(_.map(lst => AsterismResult(Zipper.fromNel(lst).focusMax)))
       }
 
-      // Calls the remote ITC service and stores the results in a table for
-      // future lookups.
-      private def callAndInsert(
-        pid:      Program.Id,
-        oid:      Observation.Id,
-        params:   GeneratorParams
-      ): F[Either[Error, AsterismResult]] =
-        (for {
-          r <- EitherT(callRemote(params))
-          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
-        } yield r).value
+      override def selectAll(
+        pid:    Program.Id,
+        params: Map[Observation.Id, GeneratorParams]
+      )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]] =
+        session
+          .execute(Statements.SelectAllItcResults)(pid)
+          .map(
+            _.groupBy(_._1)
+             .map { case (oid, lst) =>
+
+               // Get the cached result, if any, for each target in the
+               // observation's asterism.
+               val cachedResults: Map[Target.Id, (Md5Hash, IntegrationTime)] =
+                 lst.map { case (_, tid, h, time) => tid -> (h, time) }.toMap
+
+               // Get the GeneratorParams for the observation, lookup the ITC
+               // inputs (there's one per target), then find the corresponding
+               // cached result.  Assuming the hash matches, it is still valid.
+               // If they are all still valid, we can create an AsterismResult.
+               val asterismResult: Option[AsterismResult] =
+                 params
+                   .get(oid)
+                   .map(itcInputs)
+                   .flatMap(
+                     _.traverse { case (tid, input) =>
+                       cachedResults.get(tid).collect { case (h, time) if hash(input) === h =>
+                         TargetResult(tid, input, time)
+                       }
+                     }
+                   )
+                   .map { lst => // NonEmptyList[TargetResult]
+                     AsterismResult(Zipper.fromNel(lst).focusMax)
+                   }
+
+               (oid, asterismResult)
+             }
+             .collect { case (oid, Some(a)) => (oid, a) }
+          )
 
       private def callRemote(
         params:   GeneratorParams
@@ -334,11 +382,11 @@ object ItcService {
                c_data    = ${text.opt}
       """.command
 
-    val SelectItcResult: Query[(
+    val SelectOneItcResult: Query[(
       Program.Id,
       Observation.Id,
       Target.Id
-    ), (String, IntegrationTime)] =
+    ), (Md5Hash, IntegrationTime)] =
       sql"""
         SELECT
           c_hash,
@@ -349,17 +397,30 @@ object ItcService {
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id AND
               c_target_id      = $target_id
-      """.query(text *: integration_time)
+      """.query(md5_hash *: integration_time)
+
+    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, Md5Hash, IntegrationTime)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_target_id,
+          c_hash,
+          c_exposure_time,
+          c_exposure_count,
+          c_signal_to_noise
+        FROM t_itc_result
+        WHERE c_program_id = $program_id
+      """.query(observation_id *: target_id *: md5_hash *: integration_time)
 
     val InsertOrUpdateItcResult: Command[(
       Program.Id,
       Observation.Id,
       Target.Id,
-      String,
+      Md5Hash,
       TimeSpan,
       PosInt,
       SignalToNoise,
-      String,
+      Md5Hash,
       TimeSpan,
       PosInt,
       SignalToNoise
@@ -377,12 +438,12 @@ object ItcService {
           $program_id,
           $observation_id,
           $target_id,
-          $text,
+          $md5_hash,
           $time_span,
           $pos_int,
           $signal_to_noise
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
-          SET c_hash            = $text,
+          SET c_hash            = $md5_hash,
               c_exposure_time   = $time_span,
               c_exposure_count  = $pos_int,
               c_signal_to_noise = $signal_to_noise

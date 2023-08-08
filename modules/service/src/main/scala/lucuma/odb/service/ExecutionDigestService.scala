@@ -21,11 +21,11 @@ import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.numeric._int8
-import skunk.codec.text.text
 import skunk.data.Arr
 import skunk.implicits.*
 
@@ -33,16 +33,20 @@ import scala.collection.immutable.SortedSet
 
 sealed trait ExecutionDigestService[F[_]] {
 
-  def select(
+  def selectOne(
     programId:     Program.Id,
     observationId: Observation.Id,
-    hash:          String
+    hash:          Md5Hash
   )(using Transaction[F]): F[Option[ExecutionDigest]]
+
+  def selectAll(
+    programId: Program.Id
+  )(using Transaction[F]): F[Map[Observation.Id, (Md5Hash, ExecutionDigest)]]
 
   def insertOrUpdate(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    hash:           String,
+    hash:           Md5Hash,
     digest:         ExecutionDigest
   )(using Transaction[F]): F[Unit]
 
@@ -52,19 +56,26 @@ object ExecutionDigestService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionDigestService[F] =
     new ExecutionDigestService[F] {
-      override def select(
+      override def selectOne(
         pid:  Program.Id,
         oid:  Observation.Id,
-        hash: String
+        hash: Md5Hash
       )(using Transaction[F]): F[Option[ExecutionDigest]] =
         session
-          .option(Statements.SelectExecutionDigest)(pid, oid)
+          .option(Statements.SelectOneExecutionDigest)(pid, oid)
           .map(_.collect { case (h, d) if h === hash => d })
+
+      override def selectAll(
+        pid: Program.Id
+      )(using Transaction[F]): F[Map[Observation.Id, (Md5Hash, ExecutionDigest)]] =
+        session
+          .execute(Statements.SelectAllExecutionDigest)(pid)
+          .map(_.map { case (oid, hash, digest) => oid -> (hash, digest) }.toMap)
 
       override def insertOrUpdate(
         pid:    Program.Id,
         oid:    Observation.Id,
-        hash:   String,
+        hash:   Md5Hash,
         digest: ExecutionDigest
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertOrUpdateExecutionDigest)(
@@ -155,35 +166,50 @@ object ExecutionDigestService {
     private val execution_digest: Codec[ExecutionDigest] =
       (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
-    def SelectExecutionDigest: Query[(Program.Id, Observation.Id), (String, ExecutionDigest)] =
+    private val DigestColumns: String =
+      """
+        c_full_setup_time,
+        c_reacq_setup_time,
+        c_acq_obs_class,
+        c_acq_non_charged_time,
+        c_acq_partner_time,
+        c_acq_program_time,
+        c_acq_offsets,
+        c_acq_atom_count,
+        c_sci_obs_class,
+        c_sci_non_charged_time,
+        c_sci_partner_time,
+        c_sci_program_time,
+        c_sci_offsets,
+        c_sci_atom_count
+      """
+
+    def SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
-          c_full_setup_time,
-          c_reacq_setup_time,
-          c_acq_obs_class,
-          c_acq_non_charged_time,
-          c_acq_partner_time,
-          c_acq_program_time,
-          c_acq_offsets,
-          c_acq_atom_count,
-          c_sci_obs_class,
-          c_sci_non_charged_time,
-          c_sci_partner_time,
-          c_sci_program_time,
-          c_sci_offsets,
-          c_sci_atom_count
-        FROM
-          t_execution_digest
+          #$DigestColumns
+        FROM t_execution_digest
         WHERE
           c_program_id     = $program_id     AND
           c_observation_id = $observation_id
-      """.query(text *: execution_digest)
+      """.query(md5_hash *: execution_digest)
+
+    def SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_hash,
+          #$DigestColumns
+        FROM t_execution_digest
+        WHERE
+          c_program_id = $program_id
+      """.query(observation_id *: md5_hash *: execution_digest)
 
     def InsertOrUpdateExecutionDigest: Command[(
       Program.Id,
       Observation.Id,
-      String,
+      Md5Hash,
       TimeSpan,
       TimeSpan,
       ObserveClass,
@@ -198,7 +224,7 @@ object ExecutionDigestService {
       TimeSpan,
       List[Offset],
       NonNegInt,
-      String,
+      Md5Hash,
       TimeSpan,
       TimeSpan,
       ObserveClass,
@@ -236,7 +262,7 @@ object ExecutionDigestService {
         ) SELECT
           $program_id,
           $observation_id,
-          $text,
+          $md5_hash,
           $time_span,
           $time_span,
           $obs_class,
@@ -252,7 +278,7 @@ object ExecutionDigestService {
           $offset_array,
           $int4_nonneg
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
-          SET c_hash                 = $text,
+          SET c_hash                 = $md5_hash,
               c_full_setup_time      = $time_span,
               c_reacq_setup_time     = $time_span,
               c_acq_obs_class        = $obs_class,

@@ -27,7 +27,6 @@ import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
@@ -67,12 +66,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =
-      e match {
-        case Generator.Error.ItcError(ItcService.Error.ObservationNotFound(_, _)) =>
-          Result(Json.Null)
-        case e: Generator.Error                                                   =>
-          Result.failure(e.format)
-      }
+      Result.failure(e.format)
   }
 
   private lazy val configHandler: EffectHandler[F] = {

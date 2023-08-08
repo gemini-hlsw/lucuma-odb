@@ -13,6 +13,7 @@ import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.PlannedTimeRangeService
 import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import skunk.Session
@@ -138,6 +139,8 @@ trait Services[F[_]]:
   /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
   def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): Generator[F]
 
+  /** Construct a `PlannedTimeRangeService`, given a `CommitHash` and an `ItcClient`.*/
+  def plannedTimeRangeService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): PlannedTimeRangeService[F]
 
 
 object Services:
@@ -196,6 +199,7 @@ object Services:
       def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
       def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
+      def plannedTimeRangeService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = PlannedTimeRangeService.instantiate(commitHash, itcClient, ptc)
 
 
   /**
@@ -233,6 +237,7 @@ object Services:
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
+    def plannedTimeRangeService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): PlannedTimeRangeService[F] = summon[Services[F]].plannedTimeRangeService(commitHash, itcClient, ptc)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 
