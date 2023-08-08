@@ -28,7 +28,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     for {
       p  <- createProgram
       ts <- (1 to targetCount).toList.traverse(_ => createTargetWithProfileAs(user, p))
-      o  <- createGmosNorthLongSlitObservationAs(user, p, ts*)
+      o  <- createGmosNorthLongSlitObservationAs(user, p, ts)
     } yield (p, o, ts)
 
   def setup1: IO[(Program.Id, Observation.Id, Target.Id)] =
@@ -345,7 +345,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     for {
       p <- createProgram
       t <- createTarget(p)
-      o <- createGmosNorthLongSlitObservationAs(user, p, t)
+      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       r <- expect(
         user = user,
         query =

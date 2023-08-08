@@ -13,6 +13,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
@@ -63,7 +64,7 @@ object PlannedTimeRangeService {
       itcClient: ItcClient[F]
     )(using Services[F], Transaction[F]): F[Map[Observation.Id, ObservationData]] =
       for {
-        p <- generatorParamsService.selectAll(pid)
+        p <- generatorParamsService.selectAll(pid, ObsStatus.Approved)
         pʹ = p.collect { case (oid, Right(gp)) => (oid, gp) }
         i <- itcService(itcClient).selectAll(pid, pʹ)
         d <- executionDigestService.selectAll(pid)

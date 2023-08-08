@@ -31,7 +31,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.util.Enumerated
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
@@ -63,7 +62,7 @@ trait GeneratorParamsService[F[_]] {
 
   def selectAll(
     programId: Program.Id,
-    minStatus: Option[ObsStatus] = None
+    minStatus: ObsStatus = ObsStatus.New
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
@@ -125,10 +124,10 @@ object GeneratorParamsService {
         doSelect(selectManyParams(pid, oids))
 
       override def selectAll(
-        pid: Program.Id,
-        minStatus: Option[ObsStatus] = None
+        pid:       Program.Id,
+        minStatus: ObsStatus
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
-        doSelect(selectAllParams(pid, minStatus.getOrElse(Enumerated[ObsStatus].all.head)))
+        doSelect(selectAllParams(pid, minStatus))
 
       private def doSelect(
         params: F[List[Params]]
