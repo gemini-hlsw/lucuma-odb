@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.Order
-import cats.data.EitherNel
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.OptionT
@@ -13,6 +12,7 @@ import cats.effect.Concurrent
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.effect.syntax.spawn.*
+import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -53,7 +53,6 @@ sealed trait ItcService[F[_]] {
 
   import ItcService.AsterismResult
   import ItcService.Error
-  import ItcService.Success
 
   /**
    * Obtains the ITC results for a single target, first checking the cache and
@@ -62,26 +61,26 @@ sealed trait ItcService[F[_]] {
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[Error, Success]]
+  )(using NoTransaction[F]): F[Either[Error, Option[AsterismResult]]]
 
   /**
    * Using the provided generator parameters, calls the remote ITC service to
    * obtain the AsterismResult, if possible, then caches it for future reference.
    */
   def callRemote(
-    pid:    Program.Id,
-    oid:    Observation.Id,
-    params: GeneratorParams
+    programId:     Program.Id,
+    observationId: Observation.Id,
+    params:        GeneratorParams
   )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
 
   /**
    * Selects the cached ITC results for a single observation, if available and
    * still valid.  Does not perform a remote ITC service call if not available.
    */
-  def selectOneCachedResult(
-    pid:    Program.Id,
-    oid:    Observation.Id,
-    params: GeneratorParams
+  def selectOne(
+    programId:    Program.Id,
+    observatinId: Observation.Id,
+    params:       GeneratorParams
   )(using Transaction[F]): F[Option[AsterismResult]]
 
   /**
@@ -89,9 +88,9 @@ sealed trait ItcService[F[_]] {
    * it is available and still valid.  Does not perform a remote ITC service
    * call if not available.
    */
-  def selectAllCachedResults(
-    pid:    Program.Id,
-    params: Map[Observation.Id, GeneratorParams]
+  def selectAll(
+    programId: Program.Id,
+    params:    Map[Observation.Id, GeneratorParams]
   )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]]
 
 }
@@ -103,14 +102,6 @@ object ItcService {
   }
 
   object Error {
-
-    case class ObservationNotFound(
-      programId:     Program.Id,
-      observationId: Observation.Id
-    ) extends Error {
-      def format: String =
-        s"Observation '$observationId' in program '$programId' not found."
-    }
 
     case class ObservationDefinitionError(
       errors: NonEmptyList[GeneratorParamsService.Error]
@@ -187,11 +178,6 @@ object ItcService {
 
   }
 
-  case class Success(
-    params: GeneratorParams,
-    result: AsterismResult
-  )
-
   private def hash(input: SpectroscopyIntegrationTimeInput): Md5Hash =
     Md5Hash.unsafeFromByteArray {
       MessageDigest
@@ -233,12 +219,11 @@ object ItcService {
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, Success]] =
+      )(using NoTransaction[F]): F[Either[Error, Option[AsterismResult]]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
-          (params, storedResult) = pr
-          result <- storedResult.fold(EitherT(callRemote(pid, oid, params)))(r => EitherT.pure(r))
-        } yield Success(params, result)).value
+          result <- pr.traverse { case (params, oa) => oa.fold(EitherT(callRemote(pid, oid, params)))(r => EitherT.pure(r)) }
+        } yield result).value
 
       override def callRemote(
         pid:    Program.Id,
@@ -254,36 +239,23 @@ object ItcService {
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResult])]] =
+      )(using NoTransaction[F]): F[Either[Error, Option[(GeneratorParams, Option[AsterismResult])]]] =
         services.transactionally {
           (for {
-            p <- EitherT(selectParams(pid, oid))
-            r <- EitherT.liftF(selectOneCachedResult(pid, oid, p))
-          } yield (p, r)).value
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
+            r <- EitherT.liftF(p.fold(none[AsterismResult].pure[F])(selectOne(pid, oid, _)))
+          } yield p.tupleRight(r)).value
         }
-
-      private def selectParams(
-        pid: Program.Id,
-        oid: Observation.Id
-      )(using Transaction[F]): F[Either[Error, GeneratorParams]] =
-        generatorParamsService
-          .selectOne(pid, oid)
-          .map {
-            case None                => ObservationNotFound(pid, oid).asLeft
-            case Some(Left(errors))  => ObservationDefinitionError(errors).asLeft
-            case Some(Right(params)) => params.asRight
-          }
 
       private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)] = {
         case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
         case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
       }
 
-
       // Selects the asterism result as a whole by selecting all the individual
       // target results.  If any individual result is not found then the asterism
       // as a whole is considered not found.
-      override def selectOneCachedResult(
+      override def selectOne(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
@@ -305,7 +277,7 @@ object ItcService {
           .map(_.map(lst => AsterismResult(Zipper.fromNel(lst).focusMax)))
       }
 
-      override def selectAllCachedResults(
+      override def selectAll(
         pid:    Program.Id,
         params: Map[Observation.Id, GeneratorParams]
       )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]] =
