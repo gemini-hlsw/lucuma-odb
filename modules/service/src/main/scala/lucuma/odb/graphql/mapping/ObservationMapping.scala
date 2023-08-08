@@ -113,7 +113,7 @@ trait ObservationMapping[F[_]]
            .lookup(pid, oid)
            .map {
              case Left(e)  => Result.failure(e.format)
-             case Right(s) => s.result.success
+             case Right(s) => s.success
            }
         }
 

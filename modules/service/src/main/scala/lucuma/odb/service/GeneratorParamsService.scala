@@ -49,27 +49,44 @@ import Services.Syntax.*
 
 trait GeneratorParamsService[F[_]] {
 
-  def select(
-    programId: Program.Id,
-    which:     Observation.Id
-  )(using Transaction[F]): F[Option[EitherNel[Error, GeneratorParams]]]
+  def selectOne(
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using Transaction[F]): F[EitherNel[Error, GeneratorParams]]
+
+  def selectMany(
+    programId:      Program.Id,
+    observationIds: List[Observation.Id]
+  )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
   def selectAll(
     programId: Program.Id,
-    which:     List[Observation.Id]
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
 
 object GeneratorParamsService {
 
-//  sealed trait Error extends Product with Serializable
-  enum Error {
-    case MissingData(targetId: Option[Target.Id], paramName: String)
-    case ConflictingData
+  sealed trait Error extends Product with Serializable {
+    def format: String
   }
 
   object Error {
+    case class MissingObservation(programId: Program.Id, observationId: Observation.Id) extends Error {
+      def format: String =
+        s"Observation '$observationId' in program '$programId' not found."
+    }
+
+    case class MissingData(targetId: Option[Target.Id], paramName: String) extends Error {
+      def format: String =
+        s"${targetId.map(tid => s"(target $tid) ").orEmpty}$paramName"
+    }
+
+    case object ConflictingData extends Error {
+      def format: String =
+        "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
+    }
+
     def missing(paramName: String): Error =
       MissingData(none, paramName)
 
@@ -92,18 +109,28 @@ object GeneratorParamsService {
 
       import lucuma.odb.sequence.gmos
 
-      override def select(
-        programId: Program.Id,
-        which:     Observation.Id
-      )(using Transaction[F]): F[Option[EitherNel[Error, GeneratorParams]]] =
-        selectAll(programId, List(which)).map(_.get(which))
+      override def selectOne(
+        pid: Program.Id,
+        oid: Observation.Id
+      )(using Transaction[F]): F[EitherNel[Error, GeneratorParams]] =
+        selectMany(pid, List(oid)).map(_.getOrElse(oid, Error.MissingObservation(pid, oid).leftNel))
+
+      override def selectMany(
+        pid:  Program.Id,
+        oids: List[Observation.Id]
+      )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
+        doSelect(selectManyParams(pid, oids))
 
       override def selectAll(
-        programId: Program.Id,
-        which:     List[Observation.Id]
+        pid: Program.Id,
+      )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
+        doSelect(selectAllParams(pid))
+
+      private def doSelect(
+        params: F[List[Params]]
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
         for {
-          ps <- selectParams(programId, which)
+          ps <- params
           oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
           m  <- observingModeServices.selectObservingMode(oms)
         } yield
@@ -111,18 +138,25 @@ object GeneratorParamsService {
             oid -> toGeneratorParams(oParams, m.get(oid))
           }
 
-      private def selectParams(
-        programId: Program.Id,
-        which:     List[Observation.Id]
+      private def selectManyParams(
+        pid:  Program.Id,
+        oids: List[Observation.Id]
       ): F[List[Params]] =
         NonEmptyList
-          .fromList(which)
+          .fromList(oids)
           .fold(List.empty[Params].pure[F]) { oids =>
-            val (af, decoder) = Statements.selectParams(user, programId, oids)
-            session
-              .prepareR(af.fragment.query(decoder))
-              .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
+            executeSelect(Statements.selectManyParams(user, pid, oids))
           }
+
+      private def selectAllParams(
+        pid: Program.Id
+      ): F[List[Params]] =
+        executeSelect(Statements.selectAllParams(user, pid))
+
+      private def executeSelect(af: AppliedFragment): F[List[Params]] =
+        session
+          .prepareR(af.fragment.query(Statements.params))
+          .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
 
       private def observingMode(
         params: List[Params],
@@ -257,7 +291,7 @@ object GeneratorParamsService {
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
-    private val params: Decoder[Params] =
+    val params: Decoder[Params] =
       (observation_id          *:
        constraint_set          *:
        signal_to_noise.opt     *:
@@ -268,38 +302,55 @@ object GeneratorParamsService {
        source_profile.opt
       ).to[Params]
 
-    def selectParams(
+    private def ParamColumns(tab: String): String =
+      s"""
+        $tab.c_observation_id,
+        $tab.c_image_quality,
+        $tab.c_cloud_extinction,
+        $tab.c_sky_background,
+        $tab.c_water_vapor,
+        $tab.c_air_mass_min,
+        $tab.c_air_mass_max,
+        $tab.c_hour_angle_min,
+        $tab.c_hour_angle_max,
+        $tab.c_spec_signal_to_noise,
+        $tab.c_spec_signal_to_noise_at,
+        $tab.c_observing_mode_type,
+        $tab.c_target_id,
+        $tab.c_sid_rv,
+        $tab.c_source_profile
+      """
+
+    def selectManyParams(
       user:      User,
       programId: Program.Id,
       which:     NonEmptyList[Observation.Id]
-    ): (AppliedFragment, Decoder[Params]) =
-      (void"""
+    ): AppliedFragment =
+      sql"""
         SELECT
-          c_observation_id,
-          c_image_quality,
-          c_cloud_extinction,
-          c_sky_background,
-          c_water_vapor,
-          c_air_mass_min,
-          c_air_mass_max,
-          c_hour_angle_min,
-          c_hour_angle_max,
-          c_spec_signal_to_noise,
-          c_spec_signal_to_noise_at,
-          c_observing_mode_type,
-          c_target_id,
-          c_sid_rv,
-          c_source_profile
-        FROM v_generator_params
+          #${ParamColumns("gp")}
+        FROM v_generator_params gp
         WHERE
-        """ |+|
-          sql"""c_program_id = $program_id""".apply(programId) |+|
-          void""" AND c_observation_id IN (""" |+|
-            which.map(sql"$observation_id").intercalate(void", ") |+|
-          void")" |+|
-          existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af },
-        params
-      )
+      """(Void) |+|
+        sql"""gp.c_program_id = $program_id""".apply(programId) |+|
+        void""" AND gp.c_observation_id IN (""" |+|
+          which.map(sql"$observation_id").intercalate(void", ") |+|
+        void")" |+|
+        existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
 
+    def selectAllParams(
+      user:      User,
+      programId: Program.Id
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          #${ParamColumns("gp")}
+        FROM v_generator_params gp
+        INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
+        WHERE
+      """(Void) |+|
+        sql"""gp.c_program_id = $program_id""".apply(programId) |+|
+        void""" AND ob.c_existence = 'present' """ |+|
+        existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
   }
 }
