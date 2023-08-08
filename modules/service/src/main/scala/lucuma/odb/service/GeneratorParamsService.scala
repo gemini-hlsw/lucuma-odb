@@ -18,6 +18,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.Band
+import lucuma.core.enums.ObsStatus
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessUnits.Surface
@@ -30,6 +31,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
@@ -61,6 +63,7 @@ trait GeneratorParamsService[F[_]] {
 
   def selectAll(
     programId: Program.Id,
+    minStatus: Option[ObsStatus] = None
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
@@ -123,8 +126,9 @@ object GeneratorParamsService {
 
       override def selectAll(
         pid: Program.Id,
+        minStatus: Option[ObsStatus] = None
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
-        doSelect(selectAllParams(pid))
+        doSelect(selectAllParams(pid, minStatus.getOrElse(Enumerated[ObsStatus].all.head)))
 
       private def doSelect(
         params: F[List[Params]]
@@ -149,9 +153,10 @@ object GeneratorParamsService {
           }
 
       private def selectAllParams(
-        pid: Program.Id
+        pid:       Program.Id,
+        minStatus: ObsStatus
       ): F[List[Params]] =
-        executeSelect(Statements.selectAllParams(user, pid))
+        executeSelect(Statements.selectAllParams(user, pid, minStatus))
 
       private def executeSelect(af: AppliedFragment): F[List[Params]] =
         session
@@ -340,7 +345,8 @@ object GeneratorParamsService {
 
     def selectAllParams(
       user:      User,
-      programId: Program.Id
+      programId: Program.Id,
+      minStatus: ObsStatus
     ): AppliedFragment =
       sql"""
         SELECT
@@ -349,8 +355,10 @@ object GeneratorParamsService {
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
         WHERE
       """(Void) |+|
-        sql"""gp.c_program_id = $program_id""".apply(programId) |+|
-        void""" AND ob.c_existence = 'present' """ |+|
+        sql"""gp.c_program_id = $program_id""".apply(programId)    |+|
+        void""" AND ob.c_existence = 'present' """                 |+|
+        sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
+        void""" AND ob.c_active_status = 'active' """              |+|
         existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
   }
 }
