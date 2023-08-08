@@ -12,7 +12,6 @@ import cats.effect.Concurrent
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.effect.syntax.spawn.*
-import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -61,7 +60,7 @@ sealed trait ItcService[F[_]] {
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[Error, Option[AsterismResult]]]
+  )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
 
   /**
    * Using the provided generator parameters, calls the remote ITC service to
@@ -107,19 +106,21 @@ object ItcService {
       errors: NonEmptyList[GeneratorParamsService.Error]
     ) extends Error {
       def format: String = {
-        val conflict = Option.when(errors.exists(_ === GeneratorParamsService.Error.ConflictingData))(
-          "Observation would require multiple instrument configurations to observe all the targets in the asterism."
-        )
 
-        val missing = errors.collect {
-          case GeneratorParamsService.Error.MissingData(tid, paramName) =>
-            s"${tid.fold("") { tid => s"(target $tid) " }}$paramName"
-        } match {
-          case Nil    => none[String]
-          case params => s"ITC cannot be queried until the following parameters are defined: ${params.intercalate(", ")}".some
-        }
+        val (missingParams, others) =
+          errors.foldLeft((List.empty[String], List.empty[String])) { case ((missingParams, others), e) =>
+            e match {
+              case GeneratorParamsService.Error.MissingData(_, _) =>
+                (e.format :: missingParams, others)
+              case _ =>
+                (missingParams, e.format :: others)
+            }
+          }
 
-        (conflict.toList ++ missing.toList).intercalate("\n")
+        ((missingParams match {
+          case Nil    => ""
+          case params => s"ITC cannot be queried until the following parameters are defined: ${params.sorted.intercalate(", ")}."
+        }) :: others).intercalate("\n")
       }
     }
 
@@ -219,10 +220,11 @@ object ItcService {
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, Option[AsterismResult]]] =
+      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
-          result <- pr.traverse { case (params, oa) => oa.fold(EitherT(callRemote(pid, oid, params)))(r => EitherT.pure(r)) }
+          (params, oa) = pr
+          result <- oa.fold(EitherT(callRemote(pid, oid, params)))(EitherT.pure(_))
         } yield result).value
 
       override def callRemote(
@@ -239,12 +241,12 @@ object ItcService {
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, Option[(GeneratorParams, Option[AsterismResult])]]] =
+      )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResult])]] =
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
-            r <- EitherT.liftF(p.fold(none[AsterismResult].pure[F])(selectOne(pid, oid, _)))
-          } yield p.tupleRight(r)).value
+            r <- EitherT.liftF(selectOne(pid, oid, p))
+          } yield (p, r)).value
         }
 
       private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)] = {
