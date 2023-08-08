@@ -16,7 +16,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.show.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
@@ -51,13 +50,13 @@ import Services.Syntax.*
 trait GeneratorParamsService[F[_]] {
 
   def selectOne(
-    programId: Program.Id,
-    which:     Observation.Id
-  )(using Transaction[F]): F[EitherNel[Error, Option[GeneratorParams]]]
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using Transaction[F]): F[EitherNel[Error, GeneratorParams]]
 
   def selectMany(
-    programId: Program.Id,
-    which:     List[Observation.Id]
+    programId:      Program.Id,
+    observationIds: List[Observation.Id]
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
   def selectAll(
@@ -73,10 +72,16 @@ object GeneratorParamsService {
   }
 
   object Error {
+    case class MissingObservation(programId: Program.Id, observationId: Observation.Id) extends Error {
+      def format: String =
+        s"Observation '$observationId' in program '$programId' not found."
+    }
+
     case class MissingData(targetId: Option[Target.Id], paramName: String) extends Error {
       def format: String =
-        s"${targetId.map(_.show + ": ").orEmpty}Missing param '$paramName'"
+        s"${targetId.map(tid => s"(target $tid) ").orEmpty}$paramName"
     }
+
     case object ConflictingData extends Error {
       def format: String =
         "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
@@ -105,21 +110,21 @@ object GeneratorParamsService {
       import lucuma.odb.sequence.gmos
 
       override def selectOne(
-        programId: Program.Id,
-        which:     Observation.Id
-      )(using Transaction[F]): F[EitherNel[Error, Option[GeneratorParams]]] =
-        selectMany(programId, List(which)).map(_.get(which).sequence)
+        pid: Program.Id,
+        oid: Observation.Id
+      )(using Transaction[F]): F[EitherNel[Error, GeneratorParams]] =
+        selectMany(pid, List(oid)).map(_.getOrElse(oid, Error.MissingObservation(pid, oid).leftNel))
 
       override def selectMany(
-        programId: Program.Id,
-        which:     List[Observation.Id]
+        pid:  Program.Id,
+        oids: List[Observation.Id]
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
-        doSelect(selectManyParams(programId, which))
+        doSelect(selectManyParams(pid, oids))
 
       override def selectAll(
-        programId: Program.Id,
+        pid: Program.Id,
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
-        doSelect(selectAllParams(programId))
+        doSelect(selectAllParams(pid))
 
       private def doSelect(
         params: F[List[Params]]
@@ -134,19 +139,19 @@ object GeneratorParamsService {
           }
 
       private def selectManyParams(
-        programId: Program.Id,
-        which:     List[Observation.Id]
+        pid:  Program.Id,
+        oids: List[Observation.Id]
       ): F[List[Params]] =
         NonEmptyList
-          .fromList(which)
+          .fromList(oids)
           .fold(List.empty[Params].pure[F]) { oids =>
-            executeSelect(Statements.selectManyParams(user, programId, oids))
+            executeSelect(Statements.selectManyParams(user, pid, oids))
           }
 
       private def selectAllParams(
-        programId: Program.Id
+        pid: Program.Id
       ): F[List[Params]] =
-        executeSelect(Statements.selectAllParams(user, programId))
+        executeSelect(Statements.selectAllParams(user, pid))
 
       private def executeSelect(af: AppliedFragment): F[List[Params]] =
         session

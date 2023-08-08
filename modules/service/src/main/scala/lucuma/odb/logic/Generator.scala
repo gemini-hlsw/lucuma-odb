@@ -4,7 +4,6 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
-import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
@@ -55,14 +54,13 @@ sealed trait Generator[F[_]] {
 
   /**
    * Looks up the parameters required to calculate the ExecutionDigest, performs
-   * the calculation, and caches the results if the observation was found.  If
-   * the observation is not completely defined (e.g., if missing the observing
-    * mode), an Error is produced.
+   * the calculation, and caches the results. If the observation is not
+   * completely defined (e.g., if missing the observing mode), an Error is produced.
    */
   def digest(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[Error, Option[ExecutionDigest]]]
+  )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
   /**
    * Calculates the ExecutionDigest given the AsterismResults from the ITC
@@ -85,7 +83,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     futureLimit:   FutureLimit = FutureLimit.Default
-  )(using NoTransaction[F]): F[Either[Error, Option[InstrumentExecutionConfig]]]
+  )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
 
 }
 
@@ -151,16 +149,6 @@ object Generator {
 
       private val exp = SmartGcalExpander.fromService(smartGcalService)
 
-      type OptionEitherT[F[_], Error, A] = OptionT[EitherT[F, Error, *], A]
-
-      object OptionEitherT {
-        def apply[A](value: F[Either[Error, Option[A]]]): OptionEitherT[F, Error, A] =
-          OptionT(EitherT(value))
-
-        def useOrCalc[A](a: Option[A], calc: => EitherT[F, Error, A]): OptionEitherT[F, Error, A] =
-          OptionT.liftF(a.fold(calc)(EitherT.pure(_)))
-      }
-
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
@@ -208,24 +196,24 @@ object Generator {
         def lookup(
           pid: Program.Id,
           oid: Observation.Id
-        )(using NoTransaction[F]): OptionEitherT[F, Error, Context] = {
+        )(using NoTransaction[F]): EitherT[F, Error, Context] = {
           val itc = itcService(itcClient)
 
-          val opc: OptionEitherT[F, Error, (GeneratorParams, Option[ItcService.AsterismResult])] =
-            OptionEitherT(services.transactionally {
-              for {
-                p <- generatorParamsService.selectOne(pid, oid).map(_.leftMap(es => InvalidData(oid, es.map(_.format).intercalate(", "))))
-                c <- p.toOption.flatten.flatTraverse(itc.selectOne(pid, oid, _))
-              } yield p.map(_.tupleRight(c))
-            })
+          val opc: F[Either[Error, (GeneratorParams, Option[ItcService.AsterismResult])]] =
+            services.transactionally {
+              (for {
+                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(es => InvalidData(oid, es.map(_.format).intercalate(", ")))))
+                c <- EitherT.liftF(itc.selectOne(pid, oid, p))
+              } yield (p, c)).value
+            }
 
           def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResult] =
             EitherT(itc.callRemote(pid, oid, p)).leftMap(ItcError(_): Error)
 
           for {
-            pc <- opc
+            pc <- EitherT(opc)
             (params, cached) = pc
-            as <- OptionEitherT.useOrCalc(cached, callItc(params))
+            as <- cached.fold(callItc(params))(EitherT.pure(_))
           } yield Context(pid, oid, as, params)
 
         }
@@ -234,11 +222,11 @@ object Generator {
       override def digest(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, Option[ExecutionDigest]]] =
+      )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
         (for {
           c <- Context.lookup(pid, oid)
-          d <- OptionT.liftF(c.checkCache.flatMap(_.fold(calcDigestThenCache(c))(EitherT.pure(_))))
-        } yield d).value.value
+          d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c))(EitherT.pure(_)))
+        } yield d).value
 
       override def calculateDigest(
         pid:            Program.Id,
@@ -274,11 +262,11 @@ object Generator {
         pid: Program.Id,
         oid: Observation.Id,
         lim: FutureLimit = FutureLimit.Default
-      )(using NoTransaction[F]): F[Either[Error, Option[InstrumentExecutionConfig]]] =
+      )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
-          x <- OptionT.liftF(calcExecutionConfigFromContext(c, lim))
-        } yield x).value.value
+          x <- calcExecutionConfigFromContext(c, lim)
+        } yield x).value
 
       private def calcExecutionConfigFromContext(
         ctx: Context,
