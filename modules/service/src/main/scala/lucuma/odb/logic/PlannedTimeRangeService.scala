@@ -29,9 +29,14 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
-
+/**
+ * A service that can estimate the PlannedTimeRange for a program.
+ */
 sealed trait PlannedTimeRangeService[F[_]] {
 
+  /**
+   * Estimates the program planned time for observations that are well defined.
+   */
   def estimateProgram(
     programId: Program.Id
   )(using NoTransaction[F]): F[Option[PlannedTimeRange]]
