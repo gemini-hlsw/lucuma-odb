@@ -16,6 +16,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.show.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.Band
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
@@ -52,7 +53,7 @@ trait GeneratorParamsService[F[_]] {
   def selectOne(
     programId: Program.Id,
     which:     Observation.Id
-  )(using Transaction[F]): F[Option[EitherNel[Error, GeneratorParams]]]
+  )(using Transaction[F]): F[EitherNel[Error, Option[GeneratorParams]]]
 
   def selectMany(
     programId: Program.Id,
@@ -67,13 +68,20 @@ trait GeneratorParamsService[F[_]] {
 
 object GeneratorParamsService {
 
-//  sealed trait Error extends Product with Serializable
-  enum Error {
-    case MissingData(targetId: Option[Target.Id], paramName: String)
-    case ConflictingData
+  sealed trait Error extends Product with Serializable {
+    def format: String
   }
 
   object Error {
+    case class MissingData(targetId: Option[Target.Id], paramName: String) extends Error {
+      def format: String =
+        s"${targetId.map(_.show + ": ").orEmpty}Missing param '$paramName'"
+    }
+    case object ConflictingData extends Error {
+      def format: String =
+        "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
+    }
+
     def missing(paramName: String): Error =
       MissingData(none, paramName)
 
@@ -99,8 +107,8 @@ object GeneratorParamsService {
       override def selectOne(
         programId: Program.Id,
         which:     Observation.Id
-      )(using Transaction[F]): F[Option[EitherNel[Error, GeneratorParams]]] =
-        selectMany(programId, List(which)).map(_.get(which))
+      )(using Transaction[F]): F[EitherNel[Error, Option[GeneratorParams]]] =
+        selectMany(programId, List(which)).map(_.get(which).sequence)
 
       override def selectMany(
         programId: Program.Id,

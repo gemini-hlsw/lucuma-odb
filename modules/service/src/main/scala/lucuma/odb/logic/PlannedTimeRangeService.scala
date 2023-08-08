@@ -60,7 +60,7 @@ object PlannedTimeRangeService {
       for {
         p <- generatorParamsService.selectAll(pid)
         pʹ = p.collect { case (oid, Right(gp)) => (oid, gp) }
-        i <- itcService(itcClient).selectAllCachedResults(pid, pʹ)
+        i <- itcService(itcClient).selectAll(pid, pʹ)
         d <- executionDigestService.selectAll(pid)
         dʹ = d.map { case (oid, (_, digest)) => (oid, digest) }
       } yield pʹ.map { case (oid, gp) => (oid, ObservationData(gp, i.get(oid), dʹ.get(oid))) }
