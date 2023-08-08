@@ -9,7 +9,9 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.Site
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
@@ -575,6 +577,56 @@ trait DatabaseOperations { this: OdbSuite =>
     }
 
   }
+
+  /** "North" or "South" */
+  def siteName(site: Site): String =
+    site match {
+      case Site.GN => "North"
+      case Site.GS => "South"
+    }
+
+  def createObsWithGmosLongSlitObservingModeAs(
+    user:     User,
+    pid:      Program.Id,
+    site:     Site,
+    grating:  String,
+    fpu:      String = "LONG_SLIT_0_25",
+    iq:       ImageQuality = ImageQuality.TwoPointZero,
+    asterism: List[Target.Id] = Nil
+  ): IO[Observation.Id] =
+    query(user, 
+      s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              constraintSet: {
+                imageQuality: ${iq.tag.toUpperCase}
+              }
+              observingMode: {
+                gmos${siteName(site)}LongSlit: {
+                  grating: $grating
+                  filter: G_PRIME
+                  fpu: $fpu
+                  centralWavelength: {
+                    nanometers: 234.56
+                  }
+                }
+              }
+              targetEnvironment: {
+                asterism: [ ${asterism.map(_.asJson).mkString(", ")} ]
+              }
+            }
+          }) {
+            observation {
+              id
+            }
+          }
+        }
+      """
+    ).map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
 
 
 }
