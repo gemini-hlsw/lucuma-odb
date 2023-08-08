@@ -88,13 +88,13 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("digest") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
-    setup.flatMap { case (_, oid, _) =>
+      } yield o
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
@@ -262,14 +262,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("simple generation") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (_, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
@@ -457,14 +457,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("simple generation - limited future") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (_, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
@@ -552,14 +552,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("simple generation - too many future atoms") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[(Program.Id, Observation.Id)] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield (p, o)
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { case (pid, oid) =>
       expect(
         user  = user,
         query =
@@ -587,7 +587,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   test("explicit offsets") {
 
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
@@ -607,9 +607,9 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             }
           """
         )
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (_, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
@@ -819,7 +819,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   test("explicit wavelength dithers") {
 
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
@@ -838,9 +838,9 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             }
           """
         )
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (_, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
@@ -1039,14 +1039,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("user cannot access program") {
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (pid, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = pi,
         query =
@@ -1128,14 +1128,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   test("planned time: config and detector estimates") {
 
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (_, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =
@@ -1539,14 +1539,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   test("planned time: observation level") {
 
-    val setup: IO[(Program.Id, Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, t)
-      } yield (p, o, t)
+      } yield o
 
-    setup.flatMap { case (_, oid, _) =>
+    setup.flatMap { oid =>
       expect(
         user  = user,
         query =

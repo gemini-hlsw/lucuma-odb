@@ -53,11 +53,23 @@ import Generator.FutureLimit
 
 sealed trait Generator[F[_]] {
 
+  /**
+   * Looks up the parameters required to calculate the ExecutionDigest, performs
+   * the calculation, and caches the results if the observation was found.  If
+   * the observation is not completely defined (e.g., if missing the observing
+    * mode), an Error is produced.
+   */
   def digest(
     programId:     Program.Id,
     observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[Error, Option[ExecutionDigest]]]
 
+  /**
+   * Calculates the ExecutionDigest given the AsterismResults from the ITC
+   * along with the GeneratorParams. This method always performs the calculation
+   * and does not attempt to use cached results nor call the ITC.  It will
+   * cache the calculation once performed.
+   */
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
@@ -65,6 +77,10 @@ sealed trait Generator[F[_]] {
     params:         GeneratorParams
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
+  /**
+   * Generates the execution config if the observation is found and defined
+   * well enough to perform the calculation.
+   */
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
