@@ -11,6 +11,7 @@ import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.ObsStatus
@@ -133,7 +134,10 @@ object PlannedTimeRangeService {
         children
           .traverse(plannedTimeRange(pid, _, m))
           // combine after skipping any elements for which we cannot compute the planned time
-          .map(lst => combine(minRequired.fold(lst.size)(_.value.toInt), lst.flatMap(_.toList)))
+          .map { lst =>
+            val valid = lst.flattenOption
+            combine(minRequired.fold(valid.size)(_.value.toInt), valid)
+          }
 
       def plannedTimeRange(
         pid:  Program.Id,

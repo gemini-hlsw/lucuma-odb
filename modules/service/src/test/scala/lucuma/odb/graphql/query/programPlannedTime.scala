@@ -204,7 +204,18 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": null
+                "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
               }
             }
           """
@@ -240,7 +251,18 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": null
+                "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
               }
             }
           """
@@ -324,7 +346,18 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": null
+                 "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : $ShortTime
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : $ShortTime
+                    }
+                  }
+                }
               }
             }
           """
