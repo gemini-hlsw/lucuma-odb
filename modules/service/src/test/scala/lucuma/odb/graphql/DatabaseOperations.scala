@@ -6,24 +6,45 @@ package lucuma.odb.graphql
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric.NonNegShort
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.math.Declination
+import lucuma.core.math.Epoch
+import lucuma.core.math.RightAscension
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition.*
 import lucuma.core.model.Target
+import lucuma.core.model.UnnormalizedSED.*
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimeSpan
+import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TargetRole
+import lucuma.odb.json.angle.query.given
+import lucuma.odb.json.sourceprofile.given
+import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
+import natchez.Trace.Implicits.noop
+import skunk.*
+import skunk.circe.codec.json.{json => jsonCodec}
+import skunk.syntax.all.*
+
+import scala.collection.immutable.SortedMap
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -576,5 +597,54 @@ trait DatabaseOperations { this: OdbSuite =>
 
   }
 
+  def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {
+    val query = sql"select c_role from t_target where c_target_id = $target_id".query(target_role)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.unique(tid)))
+  }
 
+  def createGuideTargetIn(
+    pid:  Program.Id,
+    name: NonEmptyString = "Unnamed Guide".refined,
+    sourceProfile: SourceProfile =
+      SourceProfile.Point(
+        BandNormalized(
+          StellarLibrary(StellarLibrarySpectrum.B5III).some,
+          SortedMap.empty
+        )
+      )
+  ): IO[Target.Id] = {
+    val af = sql"""
+      insert into t_target (
+        c_program_id,
+        c_name,
+        c_type,
+        c_sid_ra,
+        c_sid_dec,
+        c_sid_epoch,
+        c_source_profile,
+        c_role
+      )
+      select
+        $program_id,
+        $text_nonempty,
+        'sidereal',
+        ${right_ascension},
+        ${declination},
+        ${epoch},
+        $jsonCodec,
+        $target_role
+      returning c_target_id
+    """.apply(
+      pid,
+      name,
+      RightAscension.Zero,
+      Declination.Zero,
+      Epoch.J2000,
+      sourceProfile.asJson,
+      TargetRole.Guide
+    )
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
+  }
 }

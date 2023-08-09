@@ -16,6 +16,7 @@ trait TargetView[F[_]] extends BaseMapping[F] {
     val Name          = col("c_name", text_nonempty)
     val Existence     = col("c_existence", existence)
     val SourceProfile = col("c_source_profile", jsonb)
+    val Role          = col("c_role", target_role)
     object Sidereal {
       val SyntheticId    = col("c_sidereal_id", target_id.embedded)
       val Ra             = col("c_sid_ra", right_ascension.embedded)

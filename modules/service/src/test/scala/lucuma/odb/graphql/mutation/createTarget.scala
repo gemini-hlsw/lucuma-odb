@@ -4,12 +4,14 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Partner
+import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.TargetRole
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -77,81 +79,84 @@ class createTarget extends OdbSuite {
               }
             ) {
               target $FullTargetGraph
+              targetId: target { id }
             }
           }
         """).flatMap { js =>
           val expected = json"""
             {
-              "createTarget": {
-                "target": {
-                  "existence": "PRESENT",
-                  "name": "Crunchy Target",
-                  "program": {
-                    "id": ${pid}
-                  },
-                  "sourceProfile": {
-                    "point" : {
-                      "bandNormalized" : {
-                        "sed" : {
-                          "stellarLibrary" : "B5_III",
-                          "coolStar" : null,
-                          "galaxy" : null,
-                          "planet" : null,
-                          "quasar" : null,
-                          "hiiRegion" : null,
-                          "planetaryNebula" : null,
-                          "powerLaw" : null,
-                          "blackBodyTempK" : null,
-                          "fluxDensities" : null
-                        }
-                      },
-                      "emissionLines" : null
+              "existence": "PRESENT",
+              "name": "Crunchy Target",
+              "program": {
+                "id": ${pid}
+              },
+              "sourceProfile": {
+                "point" : {
+                  "bandNormalized" : {
+                    "sed" : {
+                      "stellarLibrary" : "B5_III",
+                      "coolStar" : null,
+                      "galaxy" : null,
+                      "planet" : null,
+                      "quasar" : null,
+                      "hiiRegion" : null,
+                      "planetaryNebula" : null,
+                      "powerLaw" : null,
+                      "blackBodyTempK" : null,
+                      "fluxDensities" : null
                     }
                   },
-                  "sidereal": {
-                    "ra": {
-                      "hms": "00:49:22.800000",
-                      "hours": 0.823,
-                      "degrees": 12.345,
-                      "microarcseconds": 44442000000
-                    },
-                    "dec": {
-                      "dms": "+45:40:40.800000",
-                      "degrees": 45.678,
-                      "microarcseconds": 164440800000
-                    },
-                    "epoch": "J2000.000",
-                    "properMotion": {
-                      "ra": {
-                        "microarcsecondsPerYear": 12345,
-                        "milliarcsecondsPerYear": 12.345
-                      },
-                      "dec": {
-                        "microarcsecondsPerYear": -7000,
-                        "milliarcsecondsPerYear": -7.000
-                      }
-                    },
-                    "radialVelocity": {
-                      "centimetersPerSecond" : 78,
-                      "metersPerSecond" : 0.78,
-                      "kilometersPerSecond" : 0.00078
-                    },
-                    "parallax": {
-                      "microarcseconds": 123456,
-                      "milliarcseconds": 123.456
-                    },
-                    "catalogInfo": {
-                      "name" : "SIMBAD",
-                      "id" : "arbitrary",
-                      "objectType" : "also arbitrary"
-                    }
-                  },
-                  "nonsidereal": null
+                  "emissionLines" : null
                 }
-              }
+              },
+              "sidereal": {
+                "ra": {
+                  "hms": "00:49:22.800000",
+                  "hours": 0.823,
+                  "degrees": 12.345,
+                  "microarcseconds": 44442000000
+                },
+                "dec": {
+                  "dms": "+45:40:40.800000",
+                  "degrees": 45.678,
+                  "microarcseconds": 164440800000
+                },
+                "epoch": "J2000.000",
+                "properMotion": {
+                  "ra": {
+                    "microarcsecondsPerYear": 12345,
+                    "milliarcsecondsPerYear": 12.345
+                  },
+                  "dec": {
+                    "microarcsecondsPerYear": -7000,
+                    "milliarcsecondsPerYear": -7.000
+                  }
+                },
+                "radialVelocity": {
+                  "centimetersPerSecond" : 78,
+                  "metersPerSecond" : 0.78,
+                  "kilometersPerSecond" : 0.00078
+                },
+                "parallax": {
+                  "microarcseconds": 123456,
+                  "milliarcseconds": 123.456
+                },
+                "catalogInfo": {
+                  "name" : "SIMBAD",
+                  "id" : "arbitrary",
+                  "objectType" : "also arbitrary"
+                }
+              },
+              "nonsidereal": null
             }
           """
-          IO(assertEquals(js, expected))
+
+          val data = js.hcursor.downFields("createTarget", "target").as[Json].toOption.get
+          assertEquals(data, expected)
+
+          // The create target mutation only creates science targets.
+          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
         }
     }
   }
@@ -184,48 +189,51 @@ class createTarget extends OdbSuite {
               }
             ) {
               target $FullTargetGraph
+              targetId: target { id }
             }
           }
         """).flatMap { js =>
           val expected = json"""
             {
-              "createTarget" : {
-                "target" : {
-                  "existence" : "PRESENT",
-                  "name" : "Crunchy Planet",
-                  "program" : {
-                    "id" : $pid
-                  },
-                  "sourceProfile" : {
-                    "point" : {
-                      "bandNormalized" : {
-                        "sed" : {
-                          "stellarLibrary" : "B5_III",
-                          "coolStar" : null,
-                          "galaxy" : null,
-                          "planet" : null,
-                          "quasar" : null,
-                          "hiiRegion" : null,
-                          "planetaryNebula" : null,
-                          "powerLaw" : null,
-                          "blackBodyTempK" : null,
-                          "fluxDensities" : null
-                        }
-                      },
-                      "emissionLines" : null
+              "existence" : "PRESENT",
+              "name" : "Crunchy Planet",
+              "program" : {
+                "id" : $pid
+              },
+              "sourceProfile" : {
+                "point" : {
+                  "bandNormalized" : {
+                    "sed" : {
+                      "stellarLibrary" : "B5_III",
+                      "coolStar" : null,
+                      "galaxy" : null,
+                      "planet" : null,
+                      "quasar" : null,
+                      "hiiRegion" : null,
+                      "planetaryNebula" : null,
+                      "powerLaw" : null,
+                      "blackBodyTempK" : null,
+                      "fluxDensities" : null
                     }
                   },
-                  "sidereal" : null,
-                  "nonsidereal" : {
-                    "des" : "foo",
-                    "keyType" : "COMET",
-                    "key" : "Comet_foo"
-                  }
+                  "emissionLines" : null
                 }
+              },
+              "sidereal" : null,
+              "nonsidereal" : {
+                "des" : "foo",
+                "keyType" : "COMET",
+                "key" : "Comet_foo"
               }
             }
           """
-          IO(assertEquals(js, expected))
+          
+          val data = js.hcursor.downFields("createTarget", "target").as[Json].toOption.get
+          assertEquals(data, expected)
+
+          // The create target mutation only creates science targets.
+          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
         }
     }
   }
