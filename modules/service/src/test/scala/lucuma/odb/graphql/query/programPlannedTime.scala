@@ -24,6 +24,9 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ObsActiveStatus.Inactive
+import lucuma.core.enums.ObsStatus.Approved
+import lucuma.core.enums.ObsStatus.New
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
@@ -133,7 +136,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield p
 
     setup.flatMap { pid =>
@@ -175,13 +178,107 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
+  test("single complete, but 'New' observation") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = New)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 plannedTimeRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
+  test("single complete, but 'Inactive' observation") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = Approved, activeStatus = Inactive)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 plannedTimeRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
+  }
+
   test("two complete observations") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, t)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield p
 
     setup.flatMap { pid =>
@@ -227,7 +324,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- createObservationWithNoModeAs(user, p, t)
       } yield p
 
@@ -249,7 +346,18 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": null
+                 "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : $ShortTime
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : $ShortTime
+                    }
+                  }
+                }
               }
             }
           """
@@ -286,7 +394,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g <- createGroupAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- moveObsToGroup(p, g, o)
       } yield p
 
@@ -333,9 +441,9 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         g <- createGroupAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- moveObsToGroup(p, g, o)
       } yield p
 
@@ -383,7 +491,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
-        oShort <- createGmosNorthLongSlitObservationAs(user, p, t)
+        oShort <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(p, g, oShort, oLong)
       } yield p
@@ -426,17 +534,66 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("a group with explicit minRequired, missing required children") {
+    val setup: IO[Program.Id] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        g  <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(2).some)
+        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o2 <- createObservationWithNoModeAs(user, p, t)
+        _  <- moveObsToGroup(p, g, o1, o2)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 plannedTimeRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
   test("two groups") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g0 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
-        oShort0 <- createGmosNorthLongSlitObservationAs(user, p, t)
+        oShort0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong0  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(p, g0, oShort0, oLong0)
         g1 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
-        oShort1 <- createGmosNorthLongSlitObservationAs(user, p, t)
+        oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(p, g1, oShort1, oLong1)
       } yield p

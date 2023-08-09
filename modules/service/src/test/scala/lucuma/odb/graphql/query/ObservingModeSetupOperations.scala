@@ -6,19 +6,24 @@ package query
 
 import cats.effect.IO
 import io.circe.syntax.*
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 
 import ObservingModeSetupOperations.*
 
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
   def createGmosNorthLongSlitObservationAs(
-    user: User,
-    pid:  Program.Id,
-    tids: Target.Id*
+    user:         User,
+    pid:          Program.Id,
+    tids:         List[Target.Id],
+    status:       ObsStatus       = ObsStatus.Approved,
+    activeStatus: ObsActiveStatus = ObsActiveStatus.Active
   ): IO[Observation.Id] =
     createObservationWithModeAs(
       user,
@@ -33,13 +38,17 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
             nanometers: 500
           }
         }
-      """
+      """,
+      status,
+      activeStatus
     )
 
   def createGmosSouthLongSlitObservationAs(
-    user: User,
-    pid:  Program.Id,
-    tids: Target.Id*
+    user:         User,
+    pid:          Program.Id,
+    tids:         List[Target.Id],
+    status:       ObsStatus       = ObsStatus.Approved,
+    activeStatus: ObsActiveStatus = ObsActiveStatus.Active
   ): IO[Observation.Id] =
     createObservationWithModeAs(
       user,
@@ -54,14 +63,18 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
             nanometers: 500
           }
         }
-      """
+      """,
+      status,
+      activeStatus
     )
 
   def createObservationWithModeAs(
-    user: User,
-    pid:  Program.Id,
-    tids: List[Target.Id],
-    mode: String
+    user:         User,
+    pid:          Program.Id,
+    tids:         List[Target.Id],
+    mode:         String,
+    status:       ObsStatus       = ObsStatus.Approved,
+    activeStatus: ObsActiveStatus = ObsActiveStatus.Active
   ): IO[Observation.Id] =
     query(
       user  = user,
@@ -78,7 +91,9 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
                $ScienceRequirements,
                observingMode: {
                  $mode
-               }
+               },
+               status: ${status.tag.toScreamingSnakeCase},
+               activeStatus: ${activeStatus.tag.toScreamingSnakeCase}
              }
            }) {
              observation {
@@ -92,9 +107,11 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     }
 
   def createObservationWithNoModeAs(
-    user: User,
-    pid:  Program.Id,
-    tid:  Target.Id
+    user:         User,
+    pid:          Program.Id,
+    tid:          Target.Id,
+    status:       ObsStatus       = ObsStatus.Approved,
+    activeStatus: ObsActiveStatus = ObsActiveStatus.Active
   ): IO[Observation.Id] =
     query(
       user  = user,
@@ -108,7 +125,9 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
                targetEnvironment: {
                  asterism: ${List(tid).asJson}
                },
-               $ScienceRequirements
+               $ScienceRequirements,
+               status: ${status.tag.toScreamingSnakeCase},
+               activeStatus: ${activeStatus.tag.toScreamingSnakeCase}
              }
            }) {
              observation {
