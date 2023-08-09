@@ -91,7 +91,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -265,7 +265,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
@@ -460,7 +460,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
@@ -555,7 +555,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield (p, o)
 
     setup.flatMap { case (pid, oid) =>
@@ -1042,7 +1042,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
@@ -1077,7 +1077,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield (p, o)
 
     setup.flatMap { case (pid, oid) =>
@@ -1131,7 +1131,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
@@ -1542,7 +1542,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     setup.flatMap { oid =>

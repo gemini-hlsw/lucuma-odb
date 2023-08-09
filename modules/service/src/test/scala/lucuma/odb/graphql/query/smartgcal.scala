@@ -190,7 +190,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, t)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     // Should pick definition 2, with the 2 second exposure time based on the
@@ -420,7 +420,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        o <- createGmosSouthLongSlitObservationAs(user, p, t)
+        o <- createGmosSouthLongSlitObservationAs(user, p, List(t))
       } yield o
 
     // Should pick definition 2, with the 2 second exposure time based on the
