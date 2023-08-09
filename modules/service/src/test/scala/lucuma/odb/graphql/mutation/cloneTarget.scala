@@ -5,11 +5,13 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
+import lucuma.refined.*
 
 class cloneTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -36,7 +38,7 @@ class cloneTarget extends OdbSuite {
               }
             }
           """
-        ).map { json =>
+        ).flatMap { json =>
 
           // The data fields (i.e., everything but ID) should be the same
           assertEquals(
@@ -44,12 +46,17 @@ class cloneTarget extends OdbSuite {
             json.hcursor.downFields("cloneTarget", "newTarget").as[Json]
           )
 
+          // The ids should exist, so we'll just 'get' them
+          val origId = json.hcursor.downFields("cloneTarget", "originalTargetId", "id").as[Target.Id].toOption.get
+          val newId =  json.hcursor.downFields("cloneTarget", "newTargetId", "id").as[Target.Id].toOption.get
+
           // The ids should be different
-          assertNotEquals(
-            json.hcursor.downFields("cloneTarget", "originalTargetId", "Id").as[Target.Id],
-            json.hcursor.downFields("cloneTarget", "newTargetId", "Id").as[Target.Id]
+          assertNotEquals(origId, newId)
+
+          // The target roles should match
+          (getTargetRoleFromDb(origId), getTargetRoleFromDb(newId)).parMapN((oldRole, newRole) => 
+            assertEquals(oldRole, newRole)
           )
-        
         }
       }
     }
@@ -147,6 +154,28 @@ class cloneTarget extends OdbSuite {
       createTargetAs(pi, pid, "My Target").flatMap { tid =>
         expect(
           user = pi2, // different user!
+          query = s"""
+            mutation {
+              cloneTarget(input: {
+                targetId: "$tid"
+              }) {
+                newTarget {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Left(List(s"No such target: $tid"))
+        )
+      }
+    }
+  }
+
+  test("clone a guide target") {
+    createProgramAs(pi).flatMap { pid =>
+      createGuideTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+        expect(
+          user = pi,
           query = s"""
             mutation {
               cloneTarget(input: {
