@@ -124,7 +124,6 @@ object PlannedTimeRangeService {
         }.value
 
 
-      // If no minRequired, assume _all_ children are required.
       def parentRange(
         pid:         Program.Id,
         minRequired: Option[NonNegShort],
@@ -133,9 +132,12 @@ object PlannedTimeRangeService {
       ): F[Option[PlannedTimeRange]] =
         children
           .traverse(plannedTimeRange(pid, _, m))
-          // combine after skipping any elements for which we cannot compute the planned time
+          // combine after skipping any elements for which we cannot compute the
+          // planned time
           .map { lst =>
             val valid = lst.flattenOption
+            // If no expicit `minRequired` is set, only count the complete and
+            // Approved (i.e., valid) observations.
             combine(minRequired.fold(valid.size)(_.value.toInt), valid)
           }
 

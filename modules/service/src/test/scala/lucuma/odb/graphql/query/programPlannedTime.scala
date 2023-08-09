@@ -534,6 +534,55 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("a group with explicit minRequired, missing required children") {
+    val setup: IO[Program.Id] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        g  <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(2).some)
+        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o2 <- createObservationWithNoModeAs(user, p, t)
+        _  <- moveObsToGroup(p, g, o1, o2)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 plannedTimeRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "plannedTimeRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
   test("two groups") {
     val setup: IO[Program.Id] =
       for {
