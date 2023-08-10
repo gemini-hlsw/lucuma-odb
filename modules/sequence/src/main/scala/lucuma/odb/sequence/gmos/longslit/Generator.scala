@@ -16,7 +16,6 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthStageMode.FollowXyz
 import lucuma.core.enums.MosPreImaging.IsNotMosPreImaging
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoAtom
@@ -42,21 +41,22 @@ sealed abstract class Generator[S, D, G, F, U](
 ) {
 
   def generate(
-    itc:    IntegrationTime,
-    config: Config[G, F, U]
+    acquisitionItc: IntegrationTime,
+    scienceItc:     IntegrationTime,
+    config:         Config[G, F, U]
   ): Either[String, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] = {
 
     val acq = acqSequence.compute(
       acqFilters,
       config.fpu,
-      Generator.StandinAcquisitionTime,
+      AcqExposureTime(acquisitionItc.exposureTime),
       config.centralWavelength
     )
 
-    val sci = sciSequence.compute(config, SciExposureTime(itc.exposureTime))
+    val sci = sciSequence.compute(config, SciExposureTime(scienceItc.exposureTime))
 
     Option
-      .when(itc.exposures.value > 0)(
+      .when(scienceItc.exposures.value > 0 && acquisitionItc.exposures.value > 0)(
         ProtoExecutionConfig(
           static,
           Stream(ProtoAtom.of("Acquisition - Initial", acq.ccd2, acq.p10, acq.slit)) ++
@@ -71,10 +71,6 @@ sealed abstract class Generator[S, D, G, F, U](
 
 
 object Generator {
-
-  // Until we can get results from the ITC for acquisition
-  val StandinAcquisitionTime: AcqExposureTime =
-    AcqExposureTime(10.secTimeSpan)
 
   object GmosNorth extends Generator(
     StaticConfig.GmosNorth(

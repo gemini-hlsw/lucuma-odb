@@ -13,13 +13,15 @@ import cats.effect.Resource
 import cats.effect.Temporal
 import cats.effect.syntax.spawn.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.order.*
 import cats.syntax.traverse.*
+import clue.ResponseException
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import io.circe.Encoder
@@ -32,11 +34,13 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -134,11 +138,10 @@ object ItcService {
     }
   }
 
-  case class TargetResult(
-    targetId: Target.Id,
-    input:    SpectroscopyIntegrationTimeInput,
-    value:    IntegrationTime
-  ) {
+  sealed trait TargetResult {
+    val targetId: Target.Id
+    val value:    IntegrationTime
+
     def totalTime: Option[TimeSpan] = {
       val total = BigInt(value.exposureTime.toMicroseconds) * value.exposures.value
       Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
@@ -146,7 +149,6 @@ object ItcService {
   }
 
   object TargetResult {
-
     given Order[TargetResult] =
       Order.by { s => (s.totalTime, s.targetId) }
 
@@ -163,8 +165,21 @@ object ItcService {
       }
   }
 
+  case class TargetSpectroscopyResult(
+    targetId: Target.Id,
+    input:    SpectroscopyIntegrationTimeInput,
+    value:    IntegrationTime
+  ) extends TargetResult
+
+  case class TargetImagingResult(
+    targetId: Target.Id,
+    input:    ImagingIntegrationTimeInput,
+    value:    IntegrationTime
+  ) extends TargetResult
+
   case class AsterismResult(
-    value: Zipper[TargetResult]
+    acquisitionResult: Zipper[TargetResult],
+    scienceResult: Zipper[TargetResult]
   )
 
   object AsterismResult {
@@ -172,19 +187,20 @@ object ItcService {
     given Encoder[AsterismResult] =
       Encoder.instance { rs =>
         Json.obj(
-          "result" -> rs.value.focus.asJson,
-          "all"    -> rs.value.toList.asJson
+          "result" -> rs.scienceResult.focus.asJson,
+          "all"    -> rs.scienceResult.toList.asJson
         )
       }
 
   }
 
-  private def hash(input: SpectroscopyIntegrationTimeInput): Md5Hash =
+  private def hash[A: Encoder](input: A): Md5Hash = {
     Md5Hash.unsafeFromByteArray {
       MessageDigest
         .getInstance("MD5")
         .digest(input.asJson.noSpaces.getBytes("UTF-8"))
     }
+  }
 
   def pollVersionsForever[F[_]: Async: Temporal: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -249,7 +265,7 @@ object ItcService {
           } yield (p, r)).value
         }
 
-      private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)] = {
+      private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
         case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
         case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
       }
@@ -265,18 +281,25 @@ object ItcService {
 
         def selectSingleTarget(
           tid:   Target.Id,
-          input: SpectroscopyIntegrationTimeInput
-        ): F[Option[TargetResult]] =
+          input: (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)
+        ): F[Option[(TargetImagingResult, TargetSpectroscopyResult)]] =
           session
             .option(Statements.SelectOneItcResult)(pid, oid, tid)
             .map(_.collect { case (h, time) if h === hash(input) =>
-              TargetResult(tid, input, time)
+              (
+                TargetImagingResult(tid, input._1, time),
+                TargetSpectroscopyResult(tid, input._2, time)
+              )
             })
 
         itcInputs(params)
           .traverse { case (tid, input) => OptionT(selectSingleTarget(tid, input)) }
           .value
-          .map(_.map(lst => AsterismResult(Zipper.fromNel(lst).focusMax)))
+          .map(_.map{ lst =>
+            val it: NonEmptyList[TargetResult] = lst.map(_._1)
+            val st = lst.map(_._2)
+            AsterismResult(Zipper.fromNel(it).focusMax, Zipper.fromNel(st).focusMax)
+          })
       }
 
       override def selectAll(
@@ -305,12 +328,17 @@ object ItcService {
                    .flatMap(
                      _.traverse { case (tid, input) =>
                        cachedResults.get(tid).collect { case (h, time) if hash(input) === h =>
-                         TargetResult(tid, input, time)
+                        (
+                          TargetImagingResult(tid, input._1, time),
+                          TargetSpectroscopyResult(tid, input._2, time)
+                        )
                        }
                      }
                    )
                    .map { lst => // NonEmptyList[TargetResult]
-                     AsterismResult(Zipper.fromNel(lst).focusMax)
+                     val it = lst.map(_._1)
+                     val st = lst.map(_._2)
+                     AsterismResult(Zipper.fromNel(it).focusMax, Zipper.fromNel(st).focusMax)
                    }
 
                (oid, asterismResult)
@@ -322,22 +350,37 @@ object ItcService {
         params:   GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         params match {
-          case GeneratorParams.GmosNorthLongSlit(itc, _) => callRemoteSpectroscopy(itc)
-          case GeneratorParams.GmosSouthLongSlit(itc, _) => callRemoteSpectroscopy(itc)
+          case GeneratorParams.GmosNorthLongSlit(itc, _) => callRemoteItc(itc)
+          case GeneratorParams.GmosSouthLongSlit(itc, _) => callRemoteItc(itc)
         }
 
-      private def callRemoteSpectroscopy(
-        targets:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)]
+      // According to the spec we default if the target is too bright
+      // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
+      private def safeAcquisitionCall(ii: ImagingIntegrationTimeInput): F[NonEmptyList[IntegrationTime]] =
+        client.imaging(ii, useCache = false)
+          .map(_.result)
+          .recover {
+            case ResponseException(errors, _) if errors.exists(_.message.contains("target is too bright")) =>
+              // Use default if target is too bright
+              Acquisition.DefaultIntegrationTime
+          }.map {
+            case r if r.head.exposureTime > Acquisition.MaxExposureTime => r.map(_.copy(exposureTime = Acquisition.MaxExposureTime))
+            case r if r.head.exposureTime < Acquisition.MinExposureTime => r.map(_.copy(exposureTime = Acquisition.MinExposureTime))
+            case r => r
+          }
+
+      private def callRemoteItc(
+        targets:  NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))]
       )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
-        targets.traverse { case (tid, si) =>
-          client.spectroscopy(si, useCache = false).map {
-            case IntegrationTimeResult(_, results) =>
-              TargetResult(tid, si, results.head).rightNel
+        targets.traverse { case (tid, (ii, si)) =>
+          (safeAcquisitionCall(ii), client.spectroscopy(si, useCache = false)).mapN {
+            case (img, IntegrationTimeResult(_, spec)) =>
+              (TargetImagingResult(tid, ii, img.head), TargetSpectroscopyResult(tid, si, spec.head)).rightNel
           }
           .handleError { t => (tid, t.getMessage).leftNel }
         }.map(_.sequence.bimap(
           errors  => RemoteServiceErrors(errors),
-          targets => AsterismResult(Zipper.fromNel(targets).focusMax)
+          targets => AsterismResult(Zipper.fromNel(targets.map(_._1)).focusMax, Zipper.fromNel(targets.map(_._2)).focusMax)
         ))
 
       private def insertOrUpdate(
@@ -347,7 +390,7 @@ object ItcService {
       )(using Transaction[F]): F[Unit] = {
 
         def insertOrUpdateSingleTarget(success: TargetResult): F[Unit] = {
-          val h = hash(success.input)
+          val h = hash(success)
           session.execute(Statements.InsertOrUpdateItcResult)(
             pid,
             oid,
@@ -363,7 +406,7 @@ object ItcService {
           ).void
         }
 
-        resultSet.value.traverse(insertOrUpdateSingleTarget).void
+        resultSet.scienceResult.traverse(insertOrUpdateSingleTarget).void
       }
 
     }

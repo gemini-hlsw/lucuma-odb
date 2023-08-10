@@ -8,17 +8,18 @@ import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.eq.*
 import lucuma.core.model.Target
+import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 
 enum GeneratorParams {
 
   case GmosNorthLongSlit(
-    itc:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
+    itc:  NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))],
     mode: gmos.longslit.Config.GmosNorth
   )
 
   case GmosSouthLongSlit(
-    itc:  NonEmptyList[(Target.Id, SpectroscopyIntegrationTimeInput)],
+    itc:  NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))],
     mode: gmos.longslit.Config.GmosSouth
   )
 
