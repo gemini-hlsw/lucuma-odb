@@ -19,6 +19,8 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.Band
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessUnits.Surface
@@ -32,12 +34,16 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.GmosFpu
+import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.InstrumentMode
+import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
+import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -105,6 +111,16 @@ object GeneratorParamsService {
     }
 
   }
+
+  extension (mode: InstrumentMode)
+    def asImaging(λ: Wavelength): InstrumentMode =
+      mode match {
+        case GmosNorthSpectroscopy(_, _, _, _, _) =>
+          InstrumentMode.GmosNorthImaging(Acquisition.filter(GmosNorthFilter.acquisition, λ, _.wavelength))
+        case GmosSouthSpectroscopy(_, _, _, _, _) =>
+          InstrumentMode.GmosSouthImaging(Acquisition.filter(GmosSouthFilter.acquisition, λ, _.wavelength))
+        case x => x
+      }
 
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
@@ -193,7 +209,7 @@ object GeneratorParamsService {
         observingMode(params, config).flatMap {
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
-              spectroscopyParams(
+              itcParams(
                 p,
                 InstrumentMode.GmosNorthSpectroscopy(
                   g,
@@ -208,7 +224,7 @@ object GeneratorParamsService {
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
-              spectroscopyParams(
+              itcParams(
                 p,
                 InstrumentMode.GmosSouthSpectroscopy(
                   g,
@@ -222,11 +238,11 @@ object GeneratorParamsService {
             }.toEither
         }
 
-      private def spectroscopyParams(
+      private def itcParams(
         params:     Params,
         mode:       InstrumentMode,
         wavelength: Wavelength
-      ): ValidatedNel[Error, (Target.Id, SpectroscopyIntegrationTimeInput)] = {
+      ): ValidatedNel[Error, (Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
 
         def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[Band] =
           bMap.minByOption { case (b, _) =>
@@ -257,15 +273,26 @@ object GeneratorParamsService {
            params.sourceProfile.toValidNel(Error.targetMissing(tid, "source profile"))
           ).mapN { case (b, rv, sp) =>
             tid ->
-            SpectroscopyIntegrationTimeInput(
-              wavelength,
-              s2n,
-              s2nA.some,
-              sp,
-              b,
-              rv,
-              params.constraints,
-              mode
+            (
+              ImagingIntegrationTimeInput(
+                wavelength,
+                Acquisition.AcquisitionSN,
+                sp,
+                b,
+                rv,
+                params.constraints,
+                mode.asImaging(wavelength)
+              ),
+              SpectroscopyIntegrationTimeInput(
+                wavelength,
+                s2n,
+                s2nA.some,
+                sp,
+                b,
+                rv,
+                params.constraints,
+                mode
+              )
             )
           }
         }

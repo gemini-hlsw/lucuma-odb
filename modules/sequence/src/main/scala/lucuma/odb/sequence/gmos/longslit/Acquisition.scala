@@ -21,6 +21,7 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -29,8 +30,10 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.refined.*
 
 sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
 
@@ -45,7 +48,7 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
     λ:            Wavelength
   ): Acquisition.Steps[D] = {
 
-    def filter: F = acqFilters.toList.minBy { f => λ.diff(wavelength(f)).abs }
+    def filter: F = Acquisition.filter(acqFilters, λ, wavelength)
 
     eval {
       for {
@@ -65,7 +68,7 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
         _  <- optics.roi           := GmosRoi.CentralStamp
         s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
-        _  <- optics.exposure      := (exposureTime * NonNegInt.unsafeFrom(4)).timeSpan
+        _  <- optics.exposure      := (exposureTime * NonNegInt.unsafeFrom(3)).timeSpan
         s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
       } yield Acquisition.Steps(s0, s1, s2)
@@ -75,6 +78,14 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
 }
 
 object Acquisition {
+  val AcquisitionSN: SignalToNoise = SignalToNoise.FromBigDecimalExact.getOption(10).get
+  val DefaultIntegrationTime: NonEmptyList[IntegrationTime] =
+    NonEmptyList.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined, AcquisitionSN))
+  val MinExposureTime = TimeSpan.fromSeconds(1).get
+  val MaxExposureTime = TimeSpan.fromSeconds(180).get
+
+  def filter[F](acqFilters: NonEmptyList[F], λ: Wavelength, wavelength: F => Wavelength): F =
+    acqFilters.toList.minBy { f => λ.diff(wavelength(f)).abs }
 
   /**
    * Unique step configurations used to form an acquisition sequence.
