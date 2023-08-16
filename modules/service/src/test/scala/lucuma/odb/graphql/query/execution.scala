@@ -174,12 +174,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                           {
                             "chargeClass" : "PROGRAM",
                             "time" : {
-                              "seconds" : 185.162500
+                              "seconds" : 175.162500
                             }
                           }
                         ],
                         "total" : {
-                          "seconds" : 185.162500
+                          "seconds" : 175.162500
                         }
                       },
                       "offsets" : [
@@ -415,7 +415,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                             "observeClass": "ACQUISITION",
                             "instrumentConfig": {
                               "exposure": {
-                                "seconds": 40.000000
+                                "seconds": 30.000000
                               },
                               "readout": {
                                 "xBin": "ONE",
@@ -454,7 +454,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
 
   }
-
+//
   test("simple generation - limited future") {
     val setup: IO[Observation.Id] =
       for {
@@ -1124,7 +1124,6 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
-
   test("planned time: config and detector estimates") {
 
     val setup: IO[Observation.Id] =
@@ -1472,10 +1471,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                 "description" : "GMOS North Hamamatsu Detector Array",
                                 "dataset" : {
                                   "estimate" : {
-                                    "seconds" : 54.200000
+                                    "seconds" : 44.200000
                                   },
                                   "exposure" : {
-                                    "seconds" : 40.000000
+                                    "seconds" : 30.000000
                                   },
                                   "readout" : {
                                     "seconds" : 4.200000
@@ -1486,7 +1485,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                 },
                                 "count" : 1,
                                 "estimate" : {
-                                  "seconds" : 54.200000
+                                  "seconds" : 44.200000
                                 }
                               },
                               "all" : [
@@ -1495,10 +1494,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                   "description" : "GMOS North Hamamatsu Detector Array",
                                   "dataset" : {
                                     "estimate" : {
-                                      "seconds" : 54.200000
+                                      "seconds" : 44.200000
                                     },
                                     "exposure" : {
-                                      "seconds" : 40.000000
+                                      "seconds" : 30.000000
                                     },
                                     "readout" : {
                                       "seconds" : 4.200000
@@ -1509,16 +1508,16 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                   },
                                   "count" : 1,
                                   "estimate" : {
-                                    "seconds" : 54.200000
+                                    "seconds" : 44.200000
                                   }
                                 }
                               ],
                               "estimate" : {
-                                "seconds" : 54.200000
+                                "seconds" : 44.200000
                               }
                             },
                             "total" : {
-                              "seconds" : 61.262500
+                              "seconds" : 51.262500
                             }
                           }
                          }
