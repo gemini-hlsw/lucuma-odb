@@ -184,6 +184,7 @@ object ItcService {
 
   object AsterismResult {
 
+    // Clients only care about science results
     given Encoder[AsterismResult] =
       Encoder.instance { rs =>
         Json.obj(
@@ -194,13 +195,12 @@ object ItcService {
 
   }
 
-  private def hash[A: Encoder](input: A): Md5Hash = {
+  private def hash[A: Encoder](input: A): Md5Hash =
     Md5Hash.unsafeFromByteArray {
       MessageDigest
         .getInstance("MD5")
         .digest(input.asJson.noSpaces.getBytes("UTF-8"))
     }
-  }
 
   def pollVersionsForever[F[_]: Async: Temporal: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -335,7 +335,7 @@ object ItcService {
                        }
                      }
                    )
-                   .map { lst => // NonEmptyList[TargetResult]
+                   .map { lst => // NonEmptyList[(TargetResult, TargetResult)]
                      val it = lst.map(_._1)
                      val st = lst.map(_._2)
                      AsterismResult(Zipper.fromNel(it).focusMax, Zipper.fromNel(st).focusMax)
@@ -389,24 +389,26 @@ object ItcService {
         resultSet: AsterismResult
       )(using Transaction[F]): F[Unit] = {
 
-        def insertOrUpdateSingleTarget(success: TargetResult): F[Unit] = {
-          val h = hash(success)
+        def insertOrUpdateSingleTarget(acquisition: TargetResult)(science: TargetResult): F[Unit] = {
+          val h = hash((acquisition, science))
           session.execute(Statements.InsertOrUpdateItcResult)(
             pid,
             oid,
-            success.targetId,
+            science.targetId,
             h,
-            success.value.exposureTime,
-            success.value.exposures,
-            success.value.signalToNoise,
+            science.value.exposureTime,
+            science.value.exposures,
+            science.value.signalToNoise,
+            acquisition.value.exposureTime,
             h,
-            success.value.exposureTime,
-            success.value.exposures,
-            success.value.signalToNoise,
+            science.value.exposureTime,
+            science.value.exposures,
+            science.value.signalToNoise,
+            acquisition.value.exposureTime,
           ).void
         }
 
-        resultSet.scienceResult.traverse(insertOrUpdateSingleTarget).void
+         resultSet.scienceResult.traverse(insertOrUpdateSingleTarget(resultSet.acquisitionResult.focus)).void
       }
 
     }
@@ -463,10 +465,12 @@ object ItcService {
       TimeSpan,
       PosInt,
       SignalToNoise,
+      TimeSpan,
       Md5Hash,
       TimeSpan,
       PosInt,
-      SignalToNoise
+      SignalToNoise,
+      TimeSpan
     )] =
       sql"""
         INSERT INTO t_itc_result (
@@ -476,7 +480,8 @@ object ItcService {
           c_hash,
           c_exposure_time,
           c_exposure_count,
-          c_signal_to_noise
+          c_signal_to_noise,
+          c_acquisition_time
         ) SELECT
           $program_id,
           $observation_id,
@@ -484,12 +489,14 @@ object ItcService {
           $md5_hash,
           $time_span,
           $pos_int,
-          $signal_to_noise
+          $signal_to_noise,
+          $time_span
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
-          SET c_hash            = $md5_hash,
-              c_exposure_time   = $time_span,
-              c_exposure_count  = $pos_int,
-              c_signal_to_noise = $signal_to_noise
+          SET c_hash             = $md5_hash,
+              c_exposure_time    = $time_span,
+              c_exposure_count   = $pos_int,
+              c_signal_to_noise  = $signal_to_noise,
+              c_acquisition_time = $time_span
       """.command
 
 

@@ -39,7 +39,8 @@ trait ArbGeneratorParams {
     Arbitrary {
       for {
         s   <- Gen.choose(1, 4)
-        itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))]).map(NonEmptyList.fromListUnsafe)
+        itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))])
+          .map(NonEmptyList.fromListUnsafe)
         cfg <- arbitrary[Config.GmosNorth]
       } yield GmosNorthLongSlit(itc, cfg)
     }
@@ -58,7 +59,8 @@ trait ArbGeneratorParams {
     Arbitrary {
       for {
         s   <- Gen.choose(1, 4)
-        itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))]).map(NonEmptyList.fromListUnsafe)
+        itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))])
+          .map(NonEmptyList.fromListUnsafe)
         cfg <- arbitrary[Config.GmosSouth]
       } yield GmosSouthLongSlit(itc, cfg)
     }
