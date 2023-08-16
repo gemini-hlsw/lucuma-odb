@@ -18,9 +18,9 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.Band
-import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.ObsStatus
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessUnits.Surface
