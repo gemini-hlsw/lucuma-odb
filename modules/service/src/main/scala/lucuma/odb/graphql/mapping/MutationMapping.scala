@@ -17,6 +17,7 @@ import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -211,7 +212,18 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
       services.useTransactionally {
-        observationService.cloneObservation(input).map { r =>
+
+        val clone: ResultT[F, (Program.Id, Observation.Id)] = 
+          ResultT(observationService.cloneObservation(input))
+
+        // this will do nothing if input.asterism is Absent
+        def setAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
+          ResultT(asterismService.setAsterism(pid, NonEmptyList.of(oid), input.asterism))
+
+        val doTheThing: F[Result[Observation.Id]] =
+          clone.flatMap { (pid, oid) => setAsterism(pid, oid).as(oid) } .value
+
+        doTheThing.map { r =>
           r.map { oid =>
             Filter(And(
               Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
@@ -219,6 +231,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             ), child)
           }
         }
+        
       }
     }
 

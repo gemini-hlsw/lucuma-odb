@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package issue.github
 
 import cats.syntax.all.*
-import io.circe.syntax.*
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.Target
 
 // https://github.com/gemini-hlsw/lucuma-odb/issues/634
