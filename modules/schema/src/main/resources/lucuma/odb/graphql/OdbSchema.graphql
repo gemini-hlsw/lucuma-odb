@@ -7341,6 +7341,11 @@ type Program {
   """
   plannedTimeRange: PlannedTimeRange
 
+  """
+  Allocated time.
+  """
+  allocations: [Allocation!]!
+
 }
 
 """
