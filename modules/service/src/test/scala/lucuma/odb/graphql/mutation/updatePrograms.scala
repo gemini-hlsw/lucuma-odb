@@ -10,9 +10,9 @@ import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Tag
-import lucuma.core.syntax.timespan.*
 
 class updatePrograms extends OdbSuite(debug = true) {
 

@@ -6,15 +6,15 @@ package lucuma.odb.graphql.predicate
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
-import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.core.model.GuestUser
+import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
-import lucuma.core.model.StandardUser
-import lucuma.core.model.StandardRole.Pi
-import lucuma.core.model.StandardRole.Ngo
-import lucuma.core.model.StandardRole.Staff
 import lucuma.core.model.StandardRole.Admin
+import lucuma.core.model.StandardRole.Ngo
+import lucuma.core.model.StandardRole.Pi
+import lucuma.core.model.StandardRole.Staff
+import lucuma.core.model.StandardUser
+import lucuma.core.model.User
 import lucuma.odb.data.Tag
 
 class ProgramPredicates(path: Path) {
