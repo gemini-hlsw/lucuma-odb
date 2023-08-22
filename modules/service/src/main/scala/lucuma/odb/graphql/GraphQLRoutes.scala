@@ -12,6 +12,7 @@ import io.circe.Json
 import lucuma.core.model.User
 import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.graphql.routes.GraphQLService
+import lucuma.graphql.routes.HttpRouteHandler
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
@@ -21,7 +22,11 @@ import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
-import org.http4s._
+import org.http4s.Header
+import org.http4s.HttpRoutes
+import org.http4s.Request
+import org.http4s.Response
+import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
@@ -107,6 +112,56 @@ object GraphQLRoutes {
         )
       }
     }
+
+  /** 
+   * `HttpRoutes` for a static GraphQL query, served on an HTTP `GET` endpoint. The intent here is
+   * to permit unauthenticated metadata queries for client applications like Explore.
+   */
+  def staticQuery[F[_]: Temporal](
+    service: GraphQLService[F],
+    path:    String,
+    query:   String
+  ): HttpRoutes[F] = {
+    val dsl = new Http4sDsl[F]{}; import dsl._
+    val h = new HttpRouteHandler(service)
+    HttpRoutes.of[F] {
+      case req @ GET -> Root / `path` =>
+        h.oneOffGet(query, None, None)
+    }
+  }
+
+  /** A static, unauthenticated HTTP `GET` query at `/enum-metadata` returning all enum metadata. */
+  def enumMetadata[F[_]: Temporal](
+    service: GraphQLService[F]
+  ): HttpRoutes[F] =
+    staticQuery(service, "enum-metadata", """
+      query {
+        partnerMeta {
+          tag
+          shortName
+          longName
+          active
+        }
+        filterTypeMeta {
+          tag
+          shortName
+          longName
+        }
+        obsAttachmentTypeMeta {
+          tag
+          shortName
+          longName
+          fileExtensions {
+            fileExtension
+          }
+        }
+        proposalAttachmentTypeMeta {
+          tag
+          shortName
+          longName
+        }
+      }
+    """)
 
 }
 
