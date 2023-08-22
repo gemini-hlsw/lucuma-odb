@@ -15,9 +15,11 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import fs2.io.net.Network
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
+import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.ObsAttachmentRoutes
+import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.PlannedTimeCalculator
@@ -44,8 +46,6 @@ import skunk.{Command => _, _}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration._
-import lucuma.odb.graphql.OdbMapping
-import lucuma.graphql.routes.GrackleGraphQLService
 
 object MainArgs {
   opaque type ResetDatabase = Boolean
