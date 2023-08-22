@@ -26,14 +26,7 @@ import lucuma.odb.instances.given
 import lucuma.odb.service.Services
 
 trait QueryMapping[F[_]] extends Predicates[F] {
-  this: SkunkMapping[F]
-   with TargetMapping[F]
-   with ObsAttachmentTypeMetaMapping[F]
-   with FilterTypeMetaMapping[F]
-   with PartnerMetaMapping[F]
-   with ProgramMapping[F]
-   with ProposalAttachmentTypeMetaMapping[F]
-   with ObservationMapping[F] =>
+  this: SkunkMapping[F] =>
 
   // Resources defined in the final cake.
   def user: model.User

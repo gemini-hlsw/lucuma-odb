@@ -44,6 +44,8 @@ import skunk.{Command => _, _}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration._
+import lucuma.odb.graphql.OdbMapping
+import lucuma.graphql.routes.GrackleGraphQLService
 
 object MainArgs {
   opaque type ResetDatabase = Boolean
@@ -232,10 +234,12 @@ object FMain extends MainParams {
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
+      metadataService    = GrackleGraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
     } yield { wsb =>
       val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
       val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
-      middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes)
+      val metadataRoutes = GraphQLRoutes.enumMetadata(metadataService)
+      middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes <+> metadataRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */
