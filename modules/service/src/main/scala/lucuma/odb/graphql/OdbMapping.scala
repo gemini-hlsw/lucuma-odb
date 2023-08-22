@@ -369,4 +369,45 @@ object OdbMapping {
 
         }
 
+  /** 
+   * A minimal read-only mapping that only knows how to return enum metadata. Other queries will
+   * fail with errors.
+   */
+  def forMetadata[F[_]: Async: Trace: Logger](
+    database: Resource[F, Session[F]],
+    monitor:  SkunkMonitor[F],
+    enums:    Enums,
+  ): Mapping[F] =
+    new SkunkMapping[F](database, monitor)
+      with BaseMapping[F]
+      with FilterTypeMetaMapping[F]
+      with LeafMappings[F]
+      with ObsAttachmentTypeMetaMapping[F]
+      with ObsAttachmentFileExtMapping[F]
+      with PartnerMetaMapping[F]
+      with ProposalAttachmentTypeMetaMapping[F]
+      with QueryMapping[F]
+    {
+
+      // These are unused for enum metadata queries.
+      def user = sys.error("OdbMapping.forMetadata: no user available")
+      def services = sys.error("OdbMapping.forMetadata: no services available")
+
+      // Our schema
+      val schema: Schema =
+        unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
+
+      // Our combined type mappings
+      override val typeMappings: List[TypeMapping] =
+        List(
+          FilterTypeMetaMapping,
+          ObsAttachmentTypeMetaMapping,
+          ObsAttachmentFileExtMapping,
+          PartnerMetaMapping,
+          ProposalAttachmentTypeMetaMapping,
+          QueryMapping,
+        ) ++ LeafMappings
+    
+    }
+        
 }

@@ -12,6 +12,7 @@ import io.circe.Json
 import lucuma.core.model.User
 import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.graphql.routes.GraphQLService
+import lucuma.graphql.routes.HttpRouteHandler
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
@@ -21,8 +22,14 @@ import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
-import org.http4s._
+import org.http4s.Header
+import org.http4s.HttpRoutes
+import org.http4s.MediaType
+import org.http4s.Request
+import org.http4s.Response
+import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
+import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import skunk.Session
@@ -107,6 +114,64 @@ object GraphQLRoutes {
         )
       }
     }
+
+  /** 
+   * An endpoint that listens on `/export/<name>` and returns an application/javascript response
+   * of the form `export const <name> = '<query result>'`.
+   */
+  def exportConst[F[_]: Temporal](
+    service: GraphQLService[F],
+    name:    String,
+    query:   String,
+  ): HttpRoutes[F] = {
+    val dsl = new Http4sDsl[F]{}; import dsl._
+    // borrow HttpRouteHandler from lucuma-graphql-routes but hack it to return js
+    val h = new HttpRouteHandler(service) {
+      override def toResponse(result: Either[Throwable, Json]): F[Response[F]] =
+        result match {
+          case Left(err)   => super.toResponse(result)
+          case Right(json) => 
+            Ok(s"export const $name ='${json.noSpaces}'")
+            .map(_.withContentType(`Content-Type`(MediaType.application.javascript)))
+        }
+    }
+    HttpRoutes.of[F] {
+      case req @ GET -> Root / "export" / `name` =>
+        h.oneOffGet(query, None, None)
+    }
+  }
+
+  def enumMetadata[F[_]: Temporal](
+    service: GraphQLService[F]
+  ): HttpRoutes[F] =
+    exportConst(service, "enumMetadata", """
+      query {
+        partnerMeta {
+          tag
+          shortName
+          longName
+          active
+        }
+        filterTypeMeta {
+          tag
+          shortName
+          longName
+        }
+        obsAttachmentTypeMeta {
+          tag
+          shortName
+          longName
+          fileExtensions {
+            fileExtension
+          }
+        }
+        proposalAttachmentTypeMeta {
+          tag
+          shortName
+          longName
+        }
+      }
+    """)
 
 }
 
