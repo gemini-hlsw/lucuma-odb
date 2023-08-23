@@ -405,10 +405,14 @@ object ItcService {
             science.value.exposures,
             science.value.signalToNoise,
             acquisition.value.exposureTime,
-          ).void
+          ).ensuring(acquisition.targetId === science.targetId).void
         }
 
-         resultSet.scienceResult.traverse(insertOrUpdateSingleTarget(resultSet.acquisitionResult.focus)).void
+
+        resultSet.scienceResult.traverse { r =>
+          val acqResult = resultSet.acquisitionResult.find(_.targetId === r.targetId)
+          acqResult.traverse(insertOrUpdateSingleTarget(_)(r))
+        }.void
       }
 
     }
