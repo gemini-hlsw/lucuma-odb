@@ -15,8 +15,12 @@ import io.circe.Encoder
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.circe.CirceMappingLike
+import io.circe.Json
 
-trait MappingExtras[F[_]] extends Mapping[F] {
+trait MappingExtras[F[_]] extends CirceMappingLike[F] {
 
   given Order[NonNegShort] = Order.by(_.value) // y u not exist already
 
@@ -67,5 +71,22 @@ trait MappingExtras[F[_]] extends Mapping[F] {
         }
       }
     }
+
+  // If the parent is a CirceCursor we just walk down and don't look to see if a defined mapping
+  // for the type we're sitting on. This lets us treat json results as opaque, terminal results.
+  override def mkCursorForField(parent: Cursor, fieldName: String, resultName: Option[String]): Result[Cursor] = {
+    val context = parent.context
+    val fieldContext = context.forFieldOrAttribute(fieldName, resultName)
+    parent match {
+      case CirceCursor(_, json, _, env) =>
+        val f = json.asObject.flatMap(_(fieldName))
+        f match {
+          case None if fieldContext.tpe.isNullable => Result(CirceCursor(fieldContext, Json.Null, Some(parent), env))
+          case Some(json) => Result(CirceCursor(fieldContext, json, Some(parent), env))
+          case _ => Result.failure(s"Json blob doesn't contain field '$fieldName' for type ${context.tpe}")
+        }
+      case _ => super.mkCursorForField(parent, fieldName, resultName)
+    }
+  }
 
 }
