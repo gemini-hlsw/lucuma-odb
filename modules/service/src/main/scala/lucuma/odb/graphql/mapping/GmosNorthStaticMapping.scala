@@ -8,7 +8,7 @@
 
  trait GmosNorthStaticMapping[F[_]] extends GmosStaticTables[F] {
 
-   private lazy val mapping: ObjectMapping =
+   lazy val GmosNorthStaticMapping: ObjectMapping =
      ObjectMapping(
        tpe = GmosNorthStaticType,
        fieldMappings = List(
@@ -19,14 +19,4 @@
        )
      )
 
-   // The GmosNorthStatic type appears in the middle of a computed JSON result.
-   // In order to avoid finding this mapping in that case, we need to be
-   // explicit about when to use this mapping.
-   lazy val GmosNorthStaticMapping: TypeMapping =
-     SwitchMapping(
-       GmosNorthStaticType,
-       List(
-         GmosNorthVisitType / "static" -> mapping
-       )
-     )
  }
