@@ -30,6 +30,7 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
@@ -159,8 +160,11 @@ object Generator {
         def namespace: UUID =
            SequenceIds.namespace(commitHash, oid, params)
 
-        val integrationTime: ItcService.TargetResult =
-          itcRes.value.focus
+        val acquisitionIntegrationTime: IntegrationTime =
+          itcRes.acquisitionResult.focus.value
+
+        val scienceIntegrationTime: IntegrationTime =
+          itcRes.scienceResult.focus.value
 
         val hash: Md5Hash = {
           val zero = 0.toByte
@@ -170,7 +174,7 @@ object Generator {
           md5.update(params.observingMode.hashBytes)
 
           // Integration Time
-          val ing = integrationTime.value
+          val ing = scienceIntegrationTime
           md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
           md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
 
@@ -247,13 +251,13 @@ object Generator {
         ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
-              p <- gmosLongSlit(ctx.oid, ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
+              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
               r <- executionDigest(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth), calculator.gmosNorth.estimateSetup)
             } yield r
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
-              p <- gmosLongSlit(ctx.oid, ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
+              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
               r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth), calculator.gmosSouth.estimateSetup)
             } yield r
         }
@@ -275,13 +279,13 @@ object Generator {
         ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
-              p <- gmosLongSlit(ctx.oid, ctx.integrationTime, config, gmos.longslit.Generator.GmosNorth)
+              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
               r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth), ctx.namespace, lim)
             } yield InstrumentExecutionConfig.GmosNorth(r)
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
-              p <- gmosLongSlit(ctx.oid, ctx.integrationTime, config, gmos.longslit.Generator.GmosSouth)
+              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
               r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth), ctx.namespace, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }
@@ -290,15 +294,16 @@ object Generator {
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
       // or planned time calculation.
       private def gmosLongSlit[S, D, G, L, U](
-        oid:       Observation.Id,
-        itcResult: ItcService.TargetResult,
-        config:    gmos.longslit.Config[G, L, U],
-        generator: gmos.longslit.Generator[S, D, G, L, U]
+        oid:            Observation.Id,
+        acquisitionItc: IntegrationTime,
+        scienceItc:     IntegrationTime,
+        config:         gmos.longslit.Config[G, L, U],
+        generator:      gmos.longslit.Generator[S, D, G, L, U]
       ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
         EitherT.fromEither[F](
-          generator.generate(itcResult.value, config) match {
+          generator.generate(acquisitionItc, scienceItc, config) match {
             case Left(msg)    => InvalidData(oid, msg).asLeft
-            case Right(proto) => proto.mapSequences(_.take(1), _.take(itcResult.value.exposures.value)).asRight[Error]
+            case Right(proto) => proto.mapSequences(_.take(1), _.take(scienceItc.exposures.value)).asRight[Error]
           }
         )
 

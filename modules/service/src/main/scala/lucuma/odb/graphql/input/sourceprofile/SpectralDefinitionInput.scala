@@ -15,10 +15,16 @@ import lucuma.odb.graphql.binding._
 
 object SpectralDefinitionInput {
 
-  implicit class SpectralDefinitionProjections[A](self: SpectralDefinition[A]) {
-    def bandNormalized = self match { case a: BandNormalized[A] => Result(a); case _ => Result.failure("Not a band normalized spectral definition.") }
-    def emissionLines  = self match { case a: EmissionLines[A]  => Result(a); case _ => Result.failure("Not a emission lines spectral definition.") }
-  }
+  extension [A](self: SpectralDefinition[A])
+    def bandNormalized = self match {
+      case a: BandNormalized[A] => Result(a)
+      case _ => Result.failure("Not a band normalized spectral definition.")
+    }
+
+    def emissionLines  = self match {
+      case a: EmissionLines[A]  => Result(a)
+      case u => Result.failure(s"Not a emission lines spectral definition ${u}.")
+    }
 
   object Integrated {
 

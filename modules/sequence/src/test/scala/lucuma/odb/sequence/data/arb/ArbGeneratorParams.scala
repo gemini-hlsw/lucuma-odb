@@ -8,6 +8,7 @@ package arb
 import cats.data.NonEmptyList
 import lucuma.core.model.Target
 import lucuma.core.util.arb.ArbGid
+import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.itc.client.arb.ArbInstrumentMode
@@ -26,36 +27,40 @@ trait ArbGeneratorParams {
   import GeneratorParams.GmosSouthLongSlit
 
   given Arbitrary[GmosNorthLongSlit] = {
-    given Arbitrary[SpectroscopyIntegrationTimeInput] =
+    given Arbitrary[(ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)] =
       Arbitrary {
         for {
-          im <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
-          sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(im)
-        } yield sm
+          mo <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
+          sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(mo)
+          im <- ArbIntegrationTimeInput.genImagingIntegrationTimeInput(mo)
+        } yield (im, sm)
       }
 
     Arbitrary {
       for {
         s   <- Gen.choose(1, 4)
-        itc <- Gen.listOfN(s, arbitrary[(Target.Id, SpectroscopyIntegrationTimeInput)]).map(NonEmptyList.fromListUnsafe)
+        itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))])
+          .map(NonEmptyList.fromListUnsafe)
         cfg <- arbitrary[Config.GmosNorth]
       } yield GmosNorthLongSlit(itc, cfg)
     }
   }
 
   given Arbitrary[GmosSouthLongSlit] = {
-    given Arbitrary[SpectroscopyIntegrationTimeInput] =
+    given Arbitrary[(ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)] =
       Arbitrary {
         for {
-          im <- arbitrary[InstrumentMode.GmosSouthSpectroscopy]
-          sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(im)
-        } yield sm
+          mo <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
+          sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(mo)
+          im <- ArbIntegrationTimeInput.genImagingIntegrationTimeInput(mo)
+        } yield (im, sm)
       }
 
     Arbitrary {
       for {
         s   <- Gen.choose(1, 4)
-        itc <- Gen.listOfN(s, arbitrary[(Target.Id, SpectroscopyIntegrationTimeInput)]).map(NonEmptyList.fromListUnsafe)
+        itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))])
+          .map(NonEmptyList.fromListUnsafe)
         cfg <- arbitrary[Config.GmosSouth]
       } yield GmosSouthLongSlit(itc, cfg)
     }
