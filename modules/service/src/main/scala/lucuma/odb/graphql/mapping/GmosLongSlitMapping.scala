@@ -26,6 +26,7 @@ import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.gmos.longslit.Config
@@ -59,19 +60,19 @@ trait GmosLongSlitMapping[F[_]]
     val explicitXBin: FieldMapping        = SqlField("explicitXBin", cc.XBin)
 
     val yBin: FieldMapping                = explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin")
-    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(Config.DefaultYBinning))
+    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(DefaultYBinning))
     val explicitYBin: FieldMapping        = SqlField("explicitYBin", cc.YBin)
 
     val ampReadMode: FieldMapping         = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
-    val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(Config.DefaultAmpReadMode))
+    val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode))
     val explicitAmpReadMode: FieldMapping = SqlField("explicitAmpReadMode", cc.AmpReadMode)
 
     val ampGain: FieldMapping             = explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain")
-    val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(Config.DefaultAmpGain))
+    val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(DefaultAmpGain))
     val explicitAmpGain: FieldMapping     = SqlField("explicitAmpGain", cc.AmpGain)
 
     val roi: FieldMapping                 = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
-    val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(Config.DefaultRoi))
+    val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
     val explicitRoi: FieldMapping         = SqlField("explicitRoi", cc.Roi)
 
     val wavelengthDithersString: FieldMapping   =
@@ -152,7 +153,7 @@ trait GmosLongSlitMapping[F[_]]
               sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
             } yield
               sp.fold(GmosXBinning.Two) { sourceProfile =>  // TODO: What should the real default be if there is no target
-                Config.xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+                xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
               },
           List("fpu", "imageQuality", "sourceProfile")
         ),
@@ -263,7 +264,7 @@ trait GmosLongSlitMapping[F[_]]
               sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
             } yield
               sp.fold(GmosXBinning.Two) { sourceProfile =>
-                Config.xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
+                xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
               },
           List("fpu", "imageQuality", "sourceProfile")
         ),
