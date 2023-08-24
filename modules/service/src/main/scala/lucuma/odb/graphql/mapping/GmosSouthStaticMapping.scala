@@ -8,7 +8,7 @@
 
  trait GmosSouthStaticMapping[F[_]] extends GmosStaticTables[F] {
 
-   private lazy val mapping: ObjectMapping =
+  lazy val GmosSouthStaticMapping: ObjectMapping =
      ObjectMapping(
        tpe = GmosSouthStaticType,
        fieldMappings = List(
@@ -19,14 +19,4 @@
        )
      )
 
-   // The GmosSouthStatic type appears in the middle of a computed JSON result.
-   // In order to avoid finding this mapping in that case, we need to be
-   // explicit about when to use this mapping.
-   lazy val GmosSouthStaticMapping: TypeMapping =
-     SwitchMapping(
-       GmosSouthStaticType,
-       List(
-         GmosSouthVisitType / "static" -> mapping
-       )
-     )
  }
