@@ -19,6 +19,10 @@ import io.circe.Json
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
+import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Result
+import edu.gemini.grackle.circe.CirceMappingLike
+import io.circe.Json
 
 trait MappingExtras[F[_]] extends CirceMappingLike[F] {
 
