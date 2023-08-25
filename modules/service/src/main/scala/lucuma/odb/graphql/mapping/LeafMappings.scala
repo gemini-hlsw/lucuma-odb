@@ -14,6 +14,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
+import lucuma.ags.GuideProbe
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
@@ -88,6 +89,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosXBinning](GmosXBinningType),
       LeafMapping[GmosYBinning](GmosYBinningType),
       LeafMapping[Group.Id](GroupIdType),
+      LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[GuideState](GuideStateType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),

@@ -17,6 +17,13 @@ object all {
        with offset.QueryCodec
        with time.QueryCodec
        with wavelength.QueryCodec
+       with rightascension.QueryEncoder
+       with declination.QueryEncoder
+       with propermotion.QueryEncoder
+       with radialvelocity.QueryEncoder
+       with parallax.QueryEncoder
+       with cataloginfo.QueryEncoder
+       with sidereal.QueryEncoder
        with UniversalCodecs
 
   object transport
