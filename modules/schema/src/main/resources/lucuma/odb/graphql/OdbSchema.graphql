@@ -6518,6 +6518,57 @@ type CreateGroupResult {
   group: Group!
 }
 
+  """
+  The guide star(s) and related information
+  """
+type GuideEnvironment {
+  """
+  The position angle
+  """
+  posAngle: Angle!
+
+  """
+  A list of GuideProbeTargets, which essentially provides a mapping from guide probes to targets.
+  """
+  guideTargets: [GuideTarget!]!
+}
+
+"""
+Enumeration for Guide Probes
+"""
+enum GuideProbe {
+  GMOS_OIWFS
+}
+
+"""
+Type that contains a guide probe and guide target information for use in the GuideEnvironment
+"""
+type GuideTarget {
+  """
+  The guide probe
+  """
+  probe: GuideProbe!
+
+  """
+  Target name.
+  """
+  name: NonEmptyString!
+
+  """
+  source profile
+  """
+  sourceProfile: SourceProfile!
+
+  """
+  Sidereal tracking information, if this is a sidereal target
+  """
+  sidereal: Sidereal
+
+  """
+  Nonsidereal tracking information, if this is a nonsidereal target
+  """
+  nonsidereal: Nonsidereal
+}
 
 """
 HII Region spectrum
@@ -7085,6 +7136,7 @@ type Observation {
   """
   itc: ItcResultSet!
 
+  # Temporary!!!`
 }
 
 """
@@ -9072,6 +9124,11 @@ type TargetEnvironment {
     """
     includeDeleted: Boolean! = false
   ): Target
+
+  """
+  The guide star(s) and related information
+  """
+  guideEnvironment: GuideEnvironment
 
   """
   When set, overrides the default base position of the target group

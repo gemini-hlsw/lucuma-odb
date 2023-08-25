@@ -22,8 +22,6 @@ import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
-import lucuma.odb.logic.PlannedTimeCalculator
-import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
@@ -41,8 +39,6 @@ trait ObservationMapping[F[_]]
 
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
-  def commitHash: CommitHash
-  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(

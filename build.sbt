@@ -110,6 +110,8 @@ lazy val service = project
       "com.monovore"   %% "decline"                            % declineVersion,
       "io.laserdisc"   %% "fs2-aws-s3"                         % fs2AwsVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"                  % grackleVersion,
+      "edu.gemini"     %% "lucuma-catalog"                     % lucumaCatalogVersion,
+      "edu.gemini"     %% "lucuma-ags"                         % lucumaCatalogVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"      % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"          % lucumaSsoVersion,
       "is.cir"         %% "ciris"                              % cirisVersion,
