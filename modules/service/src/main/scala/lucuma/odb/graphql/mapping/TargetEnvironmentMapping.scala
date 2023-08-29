@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
+import cats.effect.Temporal
 import cats.syntax.all.*
 import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
@@ -29,7 +30,7 @@ import org.http4s.client.Client
 import binding._
 import table._
 
-trait TargetEnvironmentMapping[F[_]]
+trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F] 
      with AsterismTargetTable[F]
      with ObservationView[F]
@@ -97,12 +98,14 @@ trait TargetEnvironmentMapping[F[_]]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[GuideEnvironmentService.GuideEnvironment]] =
       (pid, oid, _) =>
         services.use { s =>
-          s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-           .get(pid, oid)
-           .map {
-             case Left(e)  => Result.failure(e.format)
-             case Right(s) => s.success
-           }
+          Temporal[F].realTimeInstant.flatMap(obsTime =>
+            s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+              .get(pid, oid, obsTime)
+              .map {
+                case Left(e)  => Result.failure(e.format)
+                case Right(s) => s.success
+              }
+          )
         }
 
     effectHandler("guideEnvironment", readEnv, calculate)

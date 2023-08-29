@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.effect.Temporal
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.text.utf8
@@ -85,7 +84,8 @@ import Services.Syntax.*
 trait GuideEnvironmentService[F[_]] {
   import GuideEnvironmentService.Error
   import GuideEnvironmentService.GuideEnvironment
-  def get(pid: Program.Id, oid: Observation.Id)(using
+
+  def get(pid: Program.Id, oid: Observation.Id, obsTime: Instant)(using
     NoTransaction[F]
   ): F[Either[Error, GuideEnvironment]]
 }
@@ -147,7 +147,7 @@ object GuideEnvironmentService {
       optWavelength.toRight(Error.GeneralError(s"No wavelength defined for observation $id."))
   }
 
-  def instantiate[F[_]: Concurrent: Temporal](
+  def instantiate[F[_]: Concurrent](
     httpClient:            Client[F],
     itcClient:             ItcClient[F],
     commitHash:            CommitHash,
@@ -336,7 +336,7 @@ object GuideEnvironmentService {
             .toRight(Error.GeneralError(s"No usable guide targets were found for observation ${obsInfo.id}"))
         }
 
-      override def get(pid: Program.Id, oid: Observation.Id)(using
+      override def get(pid: Program.Id, oid: Observation.Id, obsTime: Instant)(using
         NoTransaction[F]
       ): F[Either[Error, GuideEnvironment]] =
         (for {
@@ -345,8 +345,6 @@ object GuideEnvironmentService {
           tracking        = ObjectTracking.fromAsterism(asterism)
           so             <- EitherT(getOffsets(pid, oid))
           (site, offsets) = so
-          // TODO: Figure out how to deal with the time bit, for now use `now`.
-          obsTime        <- EitherT.liftF(Temporal[F].realTimeInstant)
           candidates     <- EitherT(getCandidates(oid, obsTime, tracking))
           baseCoords     <- EitherT.fromEither(
                               obsInfo.explicitBase
