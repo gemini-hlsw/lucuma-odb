@@ -5,15 +5,17 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import lucuma.core.model.Visit
+import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.odb.graphql.binding.*
 
 case class RecordGmosNorthStepInput(
-  visitId: Visit.Id,
+  atomId:     Atom.Id,
   instrument: GmosNorth,
-  step: StepConfig
+  step:       StepConfig,
+  stepIndex:  NonNegShort
 )
 
 object RecordGmosNorthStepInput {
@@ -21,11 +23,12 @@ object RecordGmosNorthStepInput {
   val Binding: Matcher[RecordGmosNorthStepInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        VisitIdBinding("visitId", rVisitId),
+        AtomIdBinding("atomId", rAtomId),
         GmosNorthDynamicInput.Binding("instrument", rInstrument),
-        StepConfigInput.Binding("stepConfig", rStepConfig)
-      ) => (rVisitId, rInstrument, rStepConfig).parMapN { (visitId, instrument, step) =>
-        RecordGmosNorthStepInput(visitId, instrument, step)
+        StepConfigInput.Binding("stepConfig", rStepConfig),
+        NonNegShortBinding("stepIndex", rStepIndex)
+      ) => (rAtomId, rInstrument, rStepConfig, rStepIndex).parMapN { (atomId, instrument, step, stepIndex) =>
+        RecordGmosNorthStepInput(atomId, instrument, step, stepIndex)
       }
     }
 

@@ -143,7 +143,6 @@ object ExecutionEventService {
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Option[Dataset.Filename], Step.Id), ExecutionEvent.Id] =
       sql"""
         INSERT INTO t_dataset_event (
-          c_visit_id,
           c_step_id,
           c_index,
           c_dataset_stage,
@@ -152,7 +151,6 @@ object ExecutionEventService {
           c_file_index
         )
         SELECT
-          c_visit_id,
           $dataset_id,
           $dataset_stage,
           ${dataset_filename.opt}
@@ -180,13 +178,11 @@ object ExecutionEventService {
     val InsertStepEvent: Query[(Step.Id, SequenceType, StepStage, Step.Id), ExecutionEvent.Id] =
       sql"""
         INSERT INTO t_step_event (
-          c_visit_id,
           c_step_id,
           c_sequence_type,
           c_step_stage
         )
         SELECT
-          c_visit_id,
           $step_id,
           $sequence_type,
           $step_stage

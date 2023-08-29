@@ -21,6 +21,7 @@ import edu.gemini.grackle.Term
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.enums.Instrument
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -29,6 +30,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
@@ -44,6 +46,7 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.RecordAtomInput
 import lucuma.odb.graphql.input.RecordGmosNorthStepInput
 import lucuma.odb.graphql.input.RecordGmosNorthVisitInput
 import lucuma.odb.graphql.input.RecordGmosSouthStepInput
@@ -65,9 +68,9 @@ import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProposalService
+import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.service.StepService
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
@@ -94,8 +97,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProgram,
       CreateTarget,
       LinkUser,
+      RecordGmosNorthAtom,
       RecordGmosNorthStep,
       RecordGmosNorthVisit,
+      RecordGmosSouthAtom,
       RecordGmosSouthStep,
       RecordGmosSouthVisit,
       SetAllocation,
@@ -368,18 +373,56 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private def recordAtom(
+    response:  F[SequenceService.InsertAtomResponse],
+    predicate: LeafPredicates[Atom.Id],
+    child:     Query
+  ): F[Result[Query]] = {
+    import SequenceService.InsertAtomResponse.*
+    response.map[Result[Query]] {
+      case NotAuthorized(user)           =>
+        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+      case VisitNotFound(id, instrument) =>
+        Result.failure(s"Visit '$id' not found or is not a ${instrument.longName} visit")
+      case Success(aid)                  =>
+        Result(Unique(Filter(predicate.eql(aid), child)))
+    }
+  }
+
+  private lazy val RecordGmosNorthAtom: MutationField =
+    MutationField("recordGmosNorthAtom", RecordAtomInput.bindingFor(Instrument.GmosNorth)) { (input, child) =>
+      services.useTransactionally {
+        recordAtom(
+          sequenceService.insertAtomRecord(input.instrument, input.visitId, input.stepCount, input.sequenceType),
+          Predicates.gmosNorthAtomRecord.id,  // TODO: atom record or just atom ???
+          child
+        )
+      }
+    }
+
+  private lazy val RecordGmosSouthAtom: MutationField =
+    MutationField("recordGmosSouthAtom", RecordAtomInput.bindingFor(Instrument.GmosSouth)) { (input, child) =>
+      services.useTransactionally {
+        recordAtom(
+          sequenceService.insertAtomRecord(input.instrument, input.visitId, input.stepCount, input.sequenceType),
+          Predicates.gmosSouthAtomRecord.id,  // TODO: atom record or just atom ???
+          child
+        )
+      }
+    }
+
   private def recordStep(
-    response:  F[StepService.InsertStepResponse],
+    response:  F[SequenceService.InsertStepResponse],
     predicate: LeafPredicates[Step.Id],
     child:     Query
   ): F[Result[Query]] = {
-    import StepService.InsertStepResponse.*
+    import SequenceService.InsertStepResponse.*
     response.map[Result[Query]] {
-      case NotAuthorized(user)                 =>
+      case NotAuthorized(user)           =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
-      case VisitNotFound(id, instrument)       =>
-        Result.failure(s"Visit '$id' not found or is not a ${instrument.longName} visit")
-      case Success(sid)                        =>
+      case AtomNotFound(id, instrument)  =>
+        Result.failure(s"Atom '$id' not found or is not a ${instrument.longName} atom")
+      case Success(sid)                  =>
         Result(Unique(Filter(predicate.eql(sid), child)))
     }
   }
@@ -388,7 +431,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosNorthStep", RecordGmosNorthStepInput.Binding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          stepService.insertGmosNorth(input.visitId, input.instrument, input.step),
+          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.stepIndex),
           Predicates.gmosNorthStep.id,
           child
         )
@@ -399,7 +442,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosSouthStep", RecordGmosSouthStepInput.Binding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          stepService.insertGmosSouth(input.visitId, input.instrument, input.step),
+          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.stepIndex),
           Predicates.gmosSouthStep.id,
           child
         )
