@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
@@ -25,6 +26,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED.*
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimeSpan
 import lucuma.odb.FMain
@@ -561,15 +563,40 @@ trait DatabaseOperations { this: OdbSuite =>
     }
   }
 
-  def recordStepAs(user: User, instrument: Instrument, vid: Visit.Id): IO[Step.Id] =
-    recordStepAs(user, vid, instrument, dynamicConfig(instrument), stepConfigScience)
+  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] = {
+    val name = s"record${instrument.tag}Atom"
+
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            $name(input: {
+              visitId: ${vid.asJson},
+              sequenceType: ${sequenceType.tag.toUpperCase},
+              stepCount: ${stepCount.asJson}
+            }) {
+              atomRecord {
+                id
+              }
+            }
+          }
+        """
+    ).map { json =>
+      json.hcursor.downFields(name, "atomRecord", "id").require[Atom.Id]
+    }
+  }
+
+  def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
+    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigScience)
 
   def recordStepAs(
-    user:       User,
-    vid:        Visit.Id,
-    instrument: Instrument,
+    user:            User,
+    aid:             Atom.Id,
+    instrument:      Instrument,
     instrumentInput: String,
-    stepConfigInput: String
+    stepConfigInput: String,
+    stepIndex:       Int = 0
   ): IO[Step.Id] = {
 
     val name = s"record${instrument.tag}Step"
@@ -577,9 +604,10 @@ trait DatabaseOperations { this: OdbSuite =>
     val q = s"""
       mutation {
         $name(input: {
-          visitId: ${vid.asJson},
+          atomId: ${aid.asJson},
           $instrumentInput,
-          $stepConfigInput
+          $stepConfigInput,
+          stepIndex: $stepIndex
         }) {
           stepRecord {
             id

@@ -26,6 +26,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
@@ -46,6 +47,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
     List(
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[Long](ChronicleIdType),
+      LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[Tag](ConditionsExpectationTypeType),

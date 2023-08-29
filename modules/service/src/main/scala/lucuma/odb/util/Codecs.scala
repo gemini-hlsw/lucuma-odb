@@ -26,6 +26,7 @@ import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.Group
 import lucuma.core.model.*
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
@@ -139,6 +140,9 @@ trait Codecs {
 
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
+
+  val atom_id: Codec[Atom.Id] =
+    uid[Atom.Id]
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))

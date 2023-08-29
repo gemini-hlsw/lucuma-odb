@@ -15,6 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.odb.data.ObservingModeType
 
 class recordStep extends OdbSuite {
@@ -23,38 +24,40 @@ class recordStep extends OdbSuite {
 
   override lazy val validUsers: List[User] = List(staff)
 
-  private def recordVisit(
+  private def recordVisitAndAtom(
     mode: ObservingModeType,
     user: User
-  ): IO[(Program.Id, Observation.Id, Visit.Id)] =
+  ): IO[(Program.Id, Observation.Id, Visit.Id, Atom.Id)] =
     for {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
       vid <- recordVisitAs(user, mode.instrument, oid)
-    } yield (pid, oid, vid)
+      aid <- recordAtomAs(user, mode.instrument, vid)
+    } yield (pid, oid, vid, aid)
 
   private def recordStepTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Visit.Id => String,
-    expected: Either[Visit.Id => String, Json]
+    query:    Atom.Id => String,
+    expected: Atom.Id => Either[String, Json]
   ): IO[Unit] =
     for {
-      ids <- recordVisit(mode, user)
-      (_, _, vid) = ids
-      _   <- expect(user, query(vid), expected.leftMap(f => List(f(vid))))
+      ids <- recordVisitAndAtom(mode, user)
+      (_, _, _, aid) = ids
+      _   <- expect(user, query(aid), expected(aid).leftMap(msg => List(msg)))
     } yield ()
 
   test("recordStep - GmosNorth") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 0
           }) {
             stepRecord {
               instrumentConfig {
@@ -86,11 +89,12 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
+              stepIndex
             }
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -119,7 +123,8 @@ class recordStep extends OdbSuite {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
                 }
-              }
+              },
+              "stepIndex": 0
             }
           }
         }
@@ -131,12 +136,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosSouthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosSouthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 1
           }) {
             stepRecord {
               instrumentConfig {
@@ -168,11 +174,12 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
+              stepIndex
             }
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosSouthStep": {
             "stepRecord": {
@@ -201,7 +208,8 @@ class recordStep extends OdbSuite {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
                 }
-              }
+              },
+              "stepIndex": 1
             }
           }
         }
@@ -213,12 +221,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosSouthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 0
           }) {
             stepRecord {
               instrumentConfig {
@@ -230,7 +239,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      ((vid: Visit.Id) => s"Visit '$vid' not found or is not a GMOS South visit").asLeft
+      aid => s"Atom '$aid' not found or is not a GMOS South atom".asLeft
     )
   }
 
@@ -259,12 +268,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 0
           }) {
             stepRecord {
               instrumentConfig {
@@ -283,7 +293,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -322,12 +332,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 0
           }) {
             stepRecord {
               instrumentConfig {
@@ -342,7 +353,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -387,12 +398,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 0
           }) {
             stepRecord {
               instrumentConfig {
@@ -411,7 +423,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -445,12 +457,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigBias
+            $stepConfigBias,
+            stepIndex: 0
           }) {
             stepRecord {
               stepConfig {
@@ -460,7 +473,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -485,12 +498,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigDark
+            $stepConfigDark,
+            stepIndex: 0
           }) {
             stepRecord {
               stepConfig {
@@ -500,7 +514,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -530,12 +544,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigGcal
+            $stepConfigGcal,
+            stepIndex: 0
           }) {
             stepRecord {
               stepConfig {
@@ -551,7 +566,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -573,12 +588,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience
+            $stepConfigScience,
+            stepIndex: 0
           }) {
             stepRecord {
               stepConfig {
@@ -599,7 +615,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {
@@ -635,12 +651,13 @@ class recordStep extends OdbSuite {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      vid => s"""
+      aid => s"""
         mutation {
           recordGmosNorthStep(input: {
-            visitId: ${vid.asJson},
+            atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigSmartGcal
+            $stepConfigSmartGcal,
+            stepIndex: 0
           }) {
             stepRecord {
               stepConfig {
@@ -653,7 +670,7 @@ class recordStep extends OdbSuite {
           }
         }
       """,
-      json"""
+      _ => json"""
         {
           "recordGmosNorthStep": {
             "stepRecord": {

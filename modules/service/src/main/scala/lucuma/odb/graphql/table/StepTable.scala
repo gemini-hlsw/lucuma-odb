@@ -5,6 +5,7 @@
 
 import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.angle_µas
+import lucuma.odb.util.Codecs.atom_id
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.gcal_continuum
 import lucuma.odb.util.Codecs.gcal_diffuser
@@ -12,11 +13,11 @@ import lucuma.odb.util.Codecs.gcal_filter
 import lucuma.odb.util.Codecs.gcal_shutter
 import lucuma.odb.util.Codecs.guide_state
 import lucuma.odb.util.Codecs.instrument
+import lucuma.odb.util.Codecs.int2_nonneg
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.smart_gcal_type
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type
-import lucuma.odb.util.Codecs.visit_id
 import skunk.codec.boolean.bool
 
 trait StepTable[F[_]] extends BaseMapping[F] {
@@ -25,7 +26,8 @@ trait StepTable[F[_]] extends BaseMapping[F] {
     val Id: ColumnRef            = col("c_step_id",        step_id)
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
     val Instrument: ColumnRef    = col("c_instrument",     instrument)
-    val VisitId: ColumnRef       = col("c_visit_id",       visit_id)
+    val AtomId: ColumnRef        = col("c_atom_id",        atom_id)
+    val StepIndex: ColumnRef     = col("c_step_index",     int2_nonneg)
     val StepType: ColumnRef      = col("c_step_type",      step_type)
     val Created: ColumnRef       = col("c_created",        core_timestamp)
 

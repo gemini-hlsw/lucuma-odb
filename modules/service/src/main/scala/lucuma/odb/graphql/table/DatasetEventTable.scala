@@ -11,14 +11,12 @@ import lucuma.odb.util.Codecs.int2_nonneg
 import lucuma.odb.util.Codecs.pos_int
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
-import lucuma.odb.util.Codecs.visit_id
 import skunk.codec.temporal.date
 
 trait DatasetEventTable[F[_]] extends BaseMapping[F] {
 
   object DatasetEventTable extends TableDef("t_dataset_event") {
     val Id: ColumnRef           = col("c_execution_event_id", execution_event_id)
-    val VisitId: ColumnRef      = col("c_visit_id",           visit_id)
 
     object DatasetId {
       val StepId: ColumnRef     = col("c_step_id",            step_id)

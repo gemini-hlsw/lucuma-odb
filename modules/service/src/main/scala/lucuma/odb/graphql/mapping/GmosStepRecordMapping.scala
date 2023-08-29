@@ -19,7 +19,8 @@ trait GmosStepRecordMapping[F[_]] extends StepTable[F] with GmosDynamicTables[F]
       tpe = typeRef,
       fieldMappings = List(
         SqlField("id", StepTable.Id, key = true),
-        SqlField("visitId", StepTable.VisitId),
+        SqlField("atomId", StepTable.AtomId),
+        SqlField("stepIndex", StepTable.StepIndex),
 
         SqlObject("instrumentConfig", Join(StepTable.Id, table.Id)),
         SqlObject("stepConfig")
