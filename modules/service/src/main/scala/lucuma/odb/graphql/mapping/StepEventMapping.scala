@@ -7,13 +7,13 @@ package mapping
 import table.AtomRecordTable
 import table.ObservationView
 import table.StepEventTable
-import table.StepTable
+import table.StepRecordTable
 import table.VisitTable
 
 trait StepEventMapping[F[_]] extends StepEventTable[F]
                                 with ObservationView[F]
                                 with AtomRecordTable[F]
-                                with StepTable[F]
+                                with StepRecordTable[F]
                                 with VisitTable[F] {
 
   lazy val StepEventMapping: ObjectMapping =
@@ -24,7 +24,7 @@ trait StepEventMapping[F[_]] extends StepEventTable[F]
         SqlField("stepId",       StepEventTable.StepId),
         SqlField("sequenceType", StepEventTable.SequenceType),
         SqlField("stepStage",    StepEventTable.StepStage),
-        SqlObject("observation", Join(StepEventTable.StepId, StepTable.Id), Join(StepTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
+        SqlObject("observation", Join(StepEventTable.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
         SqlField("received",     StepEventTable.Received)
       )
     )

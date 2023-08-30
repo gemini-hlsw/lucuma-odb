@@ -15,12 +15,12 @@ import java.time.LocalDate
 import table.AtomRecordTable
 import table.DatasetEventTable
 import table.ObservationView
-import table.StepTable
+import table.StepRecordTable
 
 trait DatasetEventMapping[F[_]] extends DatasetEventTable[F]
                                    with ObservationView[F]
                                    with AtomRecordTable[F]
-                                   with StepTable[F] {
+                                   with StepRecordTable[F] {
 
   lazy val DatasetEventMapping: ObjectMapping =
     ObjectMapping(
@@ -46,7 +46,7 @@ trait DatasetEventMapping[F[_]] extends DatasetEventTable[F]
           List("fileSite", "fileDate", "fileIndex")
         ),
 
-        SqlObject("observation", Join(DatasetEventTable.DatasetId.StepId, StepTable.Id), Join(StepTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
+        SqlObject("observation", Join(DatasetEventTable.DatasetId.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
         SqlField("received",     DatasetEventTable.Received)
       )
     )

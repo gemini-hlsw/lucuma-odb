@@ -6,9 +6,9 @@ package mapping
 
 import edu.gemini.grackle.TypeRef
 
-import table.StepTable
+import table.StepRecordTable
 
-trait RecordGmosStepResultMapping[F[_]] extends StepTable[F] {
+trait RecordGmosStepResultMapping[F[_]] extends StepRecordTable[F] {
 
   private def recordStepResultMapping(
     typeRef: TypeRef
@@ -16,7 +16,7 @@ trait RecordGmosStepResultMapping[F[_]] extends StepTable[F] {
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true),
+        SqlField("id", StepRecordTable.Id, key = true),
         SqlObject("stepRecord")
       )
     )

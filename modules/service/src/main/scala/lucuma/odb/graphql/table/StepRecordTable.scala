@@ -20,9 +20,9 @@ import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type
 import skunk.codec.boolean.bool
 
-trait StepTable[F[_]] extends BaseMapping[F] {
+trait StepRecordTable[F[_]] extends BaseMapping[F] {
 
-  object StepTable extends TableDef("v_step") {
+  object StepRecordTable extends TableDef("v_step_record") {
     val Id: ColumnRef            = col("c_step_id",        step_id)
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
     val Instrument: ColumnRef    = col("c_instrument",     instrument)

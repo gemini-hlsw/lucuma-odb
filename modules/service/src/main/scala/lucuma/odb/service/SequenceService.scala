@@ -248,7 +248,7 @@ object SequenceService {
       NonNegShort
     )] =
       sql"""
-        INSERT INTO t_step (
+        INSERT INTO t_step_record (
           c_step_id,
           c_instrument,
           c_atom_id,
