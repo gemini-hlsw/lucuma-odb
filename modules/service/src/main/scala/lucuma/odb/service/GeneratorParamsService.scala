@@ -24,6 +24,7 @@ import lucuma.core.enums.ObsStatus
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessUnits.Surface
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -72,6 +73,33 @@ trait GeneratorParamsService[F[_]] {
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
+
+// TODO: move to lucuma-core
+/**
+ * Returns the band and brightness value for the band closest to the given wavelength.
+ */
+def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[(Band, BrightnessValue)] =
+  bMap.minByOption { case (b, _) =>
+    (w.toPicometers.value.value - b.center.toPicometers.value.value).abs
+  }.map(x => (x._1, x._2.value))
+
+/**
+ * Returns the band and brightness of a source profile for the band closest to the given wavelength.
+ */
+def nearestBand(wavelength: Wavelength, sourceProfile: Option[SourceProfile]): Option[(Band, BrightnessValue)] =
+  sourceProfile.flatMap { sp =>
+    SourceProfile
+      .integratedBrightnesses
+      .getOption(sp)
+      .flatMap(bMap => extractBand[Integrated](wavelength, bMap))
+      .orElse(
+        SourceProfile
+          .surfaceBrightnesses
+          .getOption(sp)
+          .flatMap(bMap => extractBand[Surface](wavelength, bMap))
+      )
+  }
+
 
 object GeneratorParamsService {
 
@@ -243,32 +271,14 @@ object GeneratorParamsService {
         mode:       InstrumentMode,
         wavelength: Wavelength
       ): ValidatedNel[Error, (Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
-
-        def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[Band] =
-          bMap.minByOption { case (b, _) =>
-            (w.toPicometers.value.value - b.center.toPicometers.value.value).abs
-          }.map(_._1)
-
-        def band: Option[Band] =
-          params.sourceProfile.flatMap { sp =>
-            SourceProfile
-              .integratedBrightnesses
-              .getOption(sp)
-              .flatMap(bMap => extractBand[Integrated](wavelength, bMap))
-              .orElse(
-                SourceProfile
-                  .surfaceBrightnesses
-                  .getOption(sp)
-                  .flatMap(bMap => extractBand[Surface](wavelength, bMap))
-              )
-          }
+        val targetBand = nearestBand(wavelength, params.sourceProfile).map(_._1)
 
         (params.signalToNoise.toValidNel(Error.missing("signal to noise")),
          params.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
          params.targetId.toValidNel(Error.missing("target"))
         ).tupled.andThen { case (s2n, s2nA, tid) =>
           // these are dependent on having a target in the first place
-          (band.toValidNel(Error.targetMissing(tid, "brightness measure")),
+          (targetBand.toValidNel(Error.targetMissing(tid, "brightness measure")),
            params.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity")),
            params.sourceProfile.toValidNel(Error.targetMissing(tid, "source profile"))
           ).mapN { case (b, rv, sp) =>
