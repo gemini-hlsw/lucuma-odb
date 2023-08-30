@@ -16,9 +16,7 @@ CREATE TABLE t_atom (
   -- atom instrument matches the observation instrument.
   UNIQUE (c_atom_id, c_instrument),
 
-  -- Link to the corresponding visit (if any).  If none, this is a manual step.
-  -- All executed atoms are tied to a particular visit.
-  c_visit_id       d_visit_id       NULL REFERENCES t_visit (c_visit_id) ON DELETE CASCADE,
+  c_visit_id       d_visit_id       NOT NULL REFERENCES t_visit (c_visit_id) ON DELETE CASCADE,
 
   -- How many steps are in this atom
   c_step_count     int2             NOT NULL CHECK (c_step_count >= 0),
@@ -48,6 +46,9 @@ ALTER TABLE t_step
     REFERENCES  t_atom (c_atom_id, c_instrument) ON DELETE CASCADE;
 
 COMMENT ON COLUMN t_step.c_step_index IS 'index of step within its atom';
+
+--ALTER TABLE t_step
+--  RENAME TO t_step_record;
 
 -- A view that ties together all the step config tables, primarily to simplify
 -- mapping logic.

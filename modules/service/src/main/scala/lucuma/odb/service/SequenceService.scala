@@ -9,7 +9,6 @@ import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
 import cats.syntax.eq.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
@@ -64,7 +63,7 @@ object SequenceService {
     atomId:        Atom.Id,
     observationId: Observation.Id,
     instrument:    Instrument,
-    visitId:       Option[Visit.Id],
+    visitId:       Visit.Id,
     stepCount:     NonNegShort,
     sequenceType:  SequenceType,
     created:       Timestamp
@@ -126,7 +125,7 @@ object SequenceService {
           v    = visitService.select(visitId).map(_.filter(_.instrument === instrument))
           inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, instrument, visitId.some, stepCount, sequenceType))
+          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, instrument, visitId, stepCount, sequenceType))
         } yield InsertAtomResponse.Success(aid)).merge
 
       import InsertStepResponse.*
@@ -196,7 +195,7 @@ object SequenceService {
         atom_id        *:
         observation_id *:
         instrument     *:
-        visit_id.opt   *:
+        visit_id       *:
         int2_nonneg    *:
         sequence_type  *:
         core_timestamp
@@ -220,7 +219,7 @@ object SequenceService {
       Atom.Id,
       Observation.Id,
       Instrument,
-      Option[Visit.Id],
+      Visit.Id,
       NonNegShort,
       SequenceType
     )] =
@@ -236,7 +235,7 @@ object SequenceService {
           $atom_id,
           $observation_id,
           $instrument,
-          ${visit_id.opt},
+          $visit_id,
           $int2_nonneg,
           $sequence_type
       """.command
