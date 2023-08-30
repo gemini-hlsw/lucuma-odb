@@ -211,7 +211,7 @@ object SequenceService {
           c_step_count,
           c_sequence_type,
           c_created
-        FROM t_atom
+        FROM t_atom_record
         WHERE c_atom_id = $atom_id
       """.query(atom_record)
 
@@ -224,7 +224,7 @@ object SequenceService {
       SequenceType
     )] =
       sql"""
-        INSERT INTO t_atom (
+        INSERT INTO t_atom_record (
           c_atom_id,
           c_observation_id,
           c_instrument,

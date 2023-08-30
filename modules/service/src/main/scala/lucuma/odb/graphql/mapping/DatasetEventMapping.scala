@@ -12,14 +12,14 @@ import lucuma.core.model.sequence.Dataset
 
 import java.time.LocalDate
 
-import table.AtomTable
+import table.AtomRecordTable
 import table.DatasetEventTable
 import table.ObservationView
 import table.StepTable
 
 trait DatasetEventMapping[F[_]] extends DatasetEventTable[F]
                                    with ObservationView[F]
-                                   with AtomTable[F]
+                                   with AtomRecordTable[F]
                                    with StepTable[F] {
 
   lazy val DatasetEventMapping: ObjectMapping =
@@ -46,7 +46,7 @@ trait DatasetEventMapping[F[_]] extends DatasetEventTable[F]
           List("fileSite", "fileDate", "fileIndex")
         ),
 
-        SqlObject("observation", Join(DatasetEventTable.DatasetId.StepId, StepTable.Id), Join(StepTable.AtomId, AtomTable.Id), Join(AtomTable.ObservationId, ObservationView.Id)),
+        SqlObject("observation", Join(DatasetEventTable.DatasetId.StepId, StepTable.Id), Join(StepTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
         SqlField("received",     DatasetEventTable.Received)
       )
     )

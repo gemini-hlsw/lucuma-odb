@@ -6,9 +6,9 @@ package mapping
 
 import edu.gemini.grackle.TypeRef
 
-import table.AtomTable
+import table.AtomRecordTable
 
-trait RecordGmosAtomResultMapping[F[_]] extends AtomTable[F] {
+trait RecordGmosAtomResultMapping[F[_]] extends AtomRecordTable[F] {
 
   private def recordAtomResultMapping(
     typeRef: TypeRef
@@ -16,7 +16,7 @@ trait RecordGmosAtomResultMapping[F[_]] extends AtomTable[F] {
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id", AtomTable.Id, key = true),
+        SqlField("id", AtomRecordTable.Id, key = true),
         SqlObject("atomRecord")
       )
     )

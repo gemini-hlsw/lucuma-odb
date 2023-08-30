@@ -11,9 +11,9 @@ import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.sequence_type
 import lucuma.odb.util.Codecs.visit_id
 
-trait AtomTable[F[_]] extends BaseMapping[F] {
+trait AtomRecordTable[F[_]] extends BaseMapping[F] {
 
-  object AtomTable extends TableDef("t_atom") {
+  object AtomRecordTable extends TableDef("t_atom_record") {
     val Id: ColumnRef            = col("c_atom_id",        atom_id)
     val VisitId: ColumnRef       = col("c_visit_id",       visit_id)
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
