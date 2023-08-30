@@ -3,7 +3,7 @@ CREATE DOMAIN d_atom_id AS varchar
 
 COMMENT ON DOMAIN d_atom_id IS 'UUID for atoms';
 
-CREATE TABLE t_atom (
+CREATE TABLE t_atom_record (
   c_atom_id        d_atom_id        PRIMARY KEY,
 
   -- Link back to the observation table.
@@ -27,7 +27,7 @@ CREATE TABLE t_atom (
   c_created        timestamp        NOT NULL DEFAULT now()
 );
 
-COMMENT ON COLUMN t_atom.c_step_count IS 'number of steps in the atom';
+COMMENT ON COLUMN t_atom_record.c_step_count IS 'number of steps in the atom';
 
 DROP VIEW v_step;
 
@@ -41,9 +41,9 @@ ALTER TABLE t_step
   DROP COLUMN c_visit_id,
   ADD  COLUMN c_atom_id    d_atom_id NOT NULL,
   ADD  COLUMN c_step_index int2      NOT NULL CHECK (c_step_index >= 0),
-  ADD  CONSTRAINT t_atom_c_atom_id_c_instrument_fkey
+  ADD  CONSTRAINT t_atom_record_c_atom_id_c_instrument_fkey
     FOREIGN KEY (c_atom_id, c_instrument)
-    REFERENCES  t_atom (c_atom_id, c_instrument) ON DELETE CASCADE;
+    REFERENCES  t_atom_record (c_atom_id, c_instrument) ON DELETE CASCADE;
 
 COMMENT ON COLUMN t_step.c_step_index IS 'index of step within its atom';
 

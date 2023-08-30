@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.AtomTable
+import table.AtomRecordTable
 import table.ObservationView
 import table.StepEventTable
 import table.StepTable
@@ -12,7 +12,7 @@ import table.VisitTable
 
 trait StepEventMapping[F[_]] extends StepEventTable[F]
                                 with ObservationView[F]
-                                with AtomTable[F]
+                                with AtomRecordTable[F]
                                 with StepTable[F]
                                 with VisitTable[F] {
 
@@ -24,7 +24,7 @@ trait StepEventMapping[F[_]] extends StepEventTable[F]
         SqlField("stepId",       StepEventTable.StepId),
         SqlField("sequenceType", StepEventTable.SequenceType),
         SqlField("stepStage",    StepEventTable.StepStage),
-        SqlObject("observation", Join(StepEventTable.StepId, StepTable.Id), Join(StepTable.AtomId, AtomTable.Id), Join(AtomTable.ObservationId, ObservationView.Id)),
+        SqlObject("observation", Join(StepEventTable.StepId, StepTable.Id), Join(StepTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
         SqlField("received",     StepEventTable.Received)
       )
     )

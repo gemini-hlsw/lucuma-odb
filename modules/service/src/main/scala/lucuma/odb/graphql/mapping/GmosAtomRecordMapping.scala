@@ -6,21 +6,21 @@ package mapping
 
 import edu.gemini.grackle.TypeRef
 
-import table.AtomTable
+import table.AtomRecordTable
 import table.StepTable
 
-trait GmosAtomRecordMapping[F[_]] extends AtomTable[F] with StepTable[F] {
+trait GmosAtomRecordMapping[F[_]] extends AtomRecordTable[F] with StepTable[F] {
 
   private def stepRecordMapping(typeRef: TypeRef): ObjectMapping =
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id", AtomTable.Id, key = true),
-        SqlField("visitId", AtomTable.VisitId),
-        SqlField("sequenceType", AtomTable.SequenceType),
-        SqlField("stepCount", AtomTable.StepCount),
+        SqlField("id", AtomRecordTable.Id, key = true),
+        SqlField("visitId", AtomRecordTable.VisitId),
+        SqlField("sequenceType", AtomRecordTable.SequenceType),
+        SqlField("stepCount", AtomRecordTable.StepCount),
 
-        SqlObject("steps", Join(AtomTable.Id, StepTable.AtomId))
+        SqlObject("steps", Join(AtomRecordTable.Id, StepTable.AtomId))
 
         // TBD - more fields!
       )
