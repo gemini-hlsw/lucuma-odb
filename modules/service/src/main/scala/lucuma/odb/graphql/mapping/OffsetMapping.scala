@@ -7,9 +7,9 @@ package mapping
 import edu.gemini.grackle.TypeRef
 import lucuma.core.math.Angle
 
-import table.StepTable
+import table.StepRecordTable
 
-trait OffsetMapping[F[_]] extends StepTable[F] {
+trait OffsetMapping[F[_]] extends StepRecordTable[F] {
 
   private def offsetComponentMapping(
     typeRef:     TypeRef,
@@ -42,10 +42,10 @@ trait OffsetMapping[F[_]] extends StepTable[F] {
     )
 
   lazy val OffsetPMapping: TypeMapping =
-    offsetComponentSwitchMapping("p", OffsetPType, StepTable.Id, StepTable.Science.OffsetP)
+    offsetComponentSwitchMapping("p", OffsetPType, StepRecordTable.Id, StepRecordTable.Science.OffsetP)
 
   lazy val OffsetQMapping: TypeMapping =
-    offsetComponentSwitchMapping("q", OffsetQType, StepTable.Id, StepTable.Science.OffsetQ)
+    offsetComponentSwitchMapping("q", OffsetQType, StepRecordTable.Id, StepRecordTable.Science.OffsetQ)
 
   private def offsetMapping(
     idColumn: ColumnRef
@@ -63,8 +63,8 @@ trait OffsetMapping[F[_]] extends StepTable[F] {
     SwitchMapping(
       OffsetType,
       List(
-        GmosNorthStepRecordType / "stepConfig" / "offset" -> offsetMapping(StepTable.Id),
-        GmosSouthStepRecordType / "stepConfig" / "offset" -> offsetMapping(StepTable.Id)
+        GmosNorthStepRecordType / "stepConfig" / "offset" -> offsetMapping(StepRecordTable.Id),
+        GmosSouthStepRecordType / "stepConfig" / "offset" -> offsetMapping(StepRecordTable.Id)
       )
     )
 }

@@ -47,12 +47,12 @@ ALTER TABLE t_step
 
 COMMENT ON COLUMN t_step.c_step_index IS 'index of step within its atom';
 
---ALTER TABLE t_step
---  RENAME TO t_step_record;
+ALTER TABLE t_step
+  RENAME TO t_step_record;
 
 -- A view that ties together all the step config tables, primarily to simplify
 -- mapping logic.
-CREATE VIEW v_step AS
+CREATE VIEW v_step_record AS
 SELECT
   s.c_step_id,
   s.c_atom_id,
@@ -73,7 +73,7 @@ SELECT
   n.c_guide_state,
   m.c_smart_gcal_type
 FROM
-  t_step s
+  t_step_record s
 LEFT JOIN t_step_config_gcal g
   ON g.c_step_id = s.c_step_id
 LEFT JOIN t_step_config_science n

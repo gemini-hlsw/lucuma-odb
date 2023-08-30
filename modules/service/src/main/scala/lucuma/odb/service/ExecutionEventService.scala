@@ -155,9 +155,9 @@ object ExecutionEventService {
           $dataset_stage,
           ${dataset_filename.opt}
         FROM
-          t_step
+          t_step_record
         WHERE
-          t_step.c_step_id = $step_id
+          t_step_record.c_step_id = $step_id
         RETURNING
           c_execution_event_id
       """.query(execution_event_id)
@@ -187,9 +187,9 @@ object ExecutionEventService {
           $sequence_type,
           $step_stage
         FROM
-          t_step
+          t_step_record
         WHERE
-          t_step.c_step_id = $step_id
+          t_step_record.c_step_id = $step_id
         RETURNING
           c_execution_event_id
       """.query(execution_event_id)

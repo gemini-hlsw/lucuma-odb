@@ -16,9 +16,9 @@ import edu.gemini.grackle.TypeRef
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.StepType
 
-import table.StepTable
+import table.StepRecordTable
 
-trait StepConfigMapping[F[_]] extends StepTable[F] {
+trait StepConfigMapping[F[_]] extends StepRecordTable[F] {
 
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
@@ -39,8 +39,8 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
       tpe           = StepConfigType,
       discriminator = stepTypeDiscriminator,
       fieldMappings = List(
-        SqlField("id",       StepTable.Id,       key = true, hidden = true),
-        SqlField("stepType", StepTable.StepType, discriminator = true)
+        SqlField("id",       StepRecordTable.Id,       key = true, hidden = true),
+        SqlField("stepType", StepRecordTable.StepType, discriminator = true)
       )
     )
 
@@ -73,7 +73,7 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
     ObjectMapping(
       tpe           = BiasType,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true, hidden = true)
+        SqlField("id", StepRecordTable.Id, key = true, hidden = true)
       )
     )
 
@@ -81,7 +81,7 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
     ObjectMapping(
       tpe           = DarkType,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true, hidden = true)
+        SqlField("id", StepRecordTable.Id, key = true, hidden = true)
       )
     )
 
@@ -92,12 +92,12 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
     ObjectMapping(
       tpe           = GcalType,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true, hidden = true),
-        SqlField("continuum", StepTable.Gcal.Continuum),
-        SqlField("arArc",     StepTable.Gcal.ArArc,   hidden = true),
-        SqlField("cuarArc",   StepTable.Gcal.CuarArc, hidden = true),
-        SqlField("tharArc",   StepTable.Gcal.TharArc, hidden = true),
-        SqlField("xeArc",     StepTable.Gcal.XeArc,   hidden = true),
+        SqlField("id", StepRecordTable.Id, key = true, hidden = true),
+        SqlField("continuum", StepRecordTable.Gcal.Continuum),
+        SqlField("arArc",     StepRecordTable.Gcal.ArArc,   hidden = true),
+        SqlField("cuarArc",   StepRecordTable.Gcal.CuarArc, hidden = true),
+        SqlField("tharArc",   StepRecordTable.Gcal.TharArc, hidden = true),
+        SqlField("xeArc",     StepRecordTable.Gcal.XeArc,   hidden = true),
         CursorField(
           "arcs",
           cursor =>
@@ -109,9 +109,9 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
             } yield List(ar, cuar, thar, xe).flattenOption,
           List("arArc", "cuarArc", "tharArc", "xeArc")
         ),
-        SqlField("filter",    StepTable.Gcal.Filter),
-        SqlField("diffuser",  StepTable.Gcal.Diffuser),
-        SqlField("shutter",   StepTable.Gcal.Shutter)
+        SqlField("filter",    StepRecordTable.Gcal.Filter),
+        SqlField("diffuser",  StepRecordTable.Gcal.Diffuser),
+        SqlField("shutter",   StepRecordTable.Gcal.Shutter)
       )
     )
   }
@@ -120,9 +120,9 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
     ObjectMapping(
       tpe           = ScienceType,
       fieldMappings = List(
-        SqlField("synthetic_id", StepTable.Id, key = true, hidden = true),
+        SqlField("synthetic_id", StepRecordTable.Id, key = true, hidden = true),
         SqlObject("offset"),
-        SqlField("guiding", StepTable.Science.GuideState)
+        SqlField("guiding", StepRecordTable.Science.GuideState)
       )
     )
 
@@ -130,8 +130,8 @@ trait StepConfigMapping[F[_]] extends StepTable[F] {
     ObjectMapping(
       tpe           = SmartGcalType,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true, hidden = true),
-        SqlField("smartGcalType", StepTable.SmartGcal.Type)
+        SqlField("id", StepRecordTable.Id, key = true, hidden = true),
+        SqlField("smartGcalType", StepRecordTable.SmartGcal.Type)
       )
     )
 
