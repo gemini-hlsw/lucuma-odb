@@ -22,6 +22,7 @@ import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.traverse.*
 import clue.ResponseException
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import io.circe.Encoder
@@ -136,6 +137,11 @@ object ItcService {
         s"ITC returned errors: ${ps.intercalate(", ")}"
       }
     }
+
+    case object TargetMissmatch extends Error {
+      def format: String =
+        s"ITC provide conflicting results"
+    }
   }
 
   sealed trait TargetResult {
@@ -146,6 +152,7 @@ object ItcService {
       val total = BigInt(value.exposureTime.toMicroseconds) * value.exposures.value
       Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
     }
+
   }
 
   object TargetResult {
@@ -177,12 +184,33 @@ object ItcService {
     value:    IntegrationTime
   ) extends TargetResult
 
-  case class AsterismResult(
+  case class AsterismResult private (
     acquisitionResult: Zipper[TargetResult],
     scienceResult: Zipper[TargetResult]
-  )
+  ) {
+    assert(acquisitionResult.focus.targetId === scienceResult.focus.targetId)
+  }
 
   object AsterismResult {
+
+    def fromResults(acquisition: NonEmptyList[TargetImagingResult], science: NonEmptyList[TargetSpectroscopyResult]): Option[AsterismResult] = {
+      // results for acquisition and sciencce should contain the same set of targets
+      if (acquisition.map(_.targetId).sortBy(_.value) === science.map(_.targetId).sortBy(_.value)) {
+        // Find the target with the brightest magnitude for the relevant wavelength
+        val brightestTarget = science.minimumByOption { t =>
+          val profile = t.input.sourceProfile
+          // Sort by value
+          nearestBand(t.input.wavelength, profile.some).map(_._2)
+        }.head // This is safe because we know the list is not empty
+
+        val selectedTarget = brightestTarget.targetId
+
+        // Focus each zipper on the selected science target
+        val a = Zipper.fromNel[TargetResult](acquisition).findFocus(_.targetId === selectedTarget)
+        val s = Zipper.fromNel[TargetResult](science).findFocus(_.targetId === selectedTarget)
+        (a, s).mapN(AsterismResult(_, _))
+      } else None
+    }
 
     // Clients only care about science results
     given Encoder[AsterismResult] =
@@ -295,10 +323,10 @@ object ItcService {
         itcInputs(params)
           .traverse { case (tid, input) => OptionT(selectSingleTarget(tid, input)) }
           .value
-          .map(_.map{ lst =>
-            val it: NonEmptyList[TargetResult] = lst.map(_._1)
+          .map(_.flatMap{ lst =>
+            val it  = lst.map(_._1)
             val st = lst.map(_._2)
-            AsterismResult(Zipper.fromNel(it).focusMax, Zipper.fromNel(st).focusMax)
+            AsterismResult.fromResults(it, st)
           })
       }
 
@@ -335,10 +363,10 @@ object ItcService {
                        }
                      }
                    )
-                   .map { lst => // NonEmptyList[(TargetResult, TargetResult)]
+                   .flatMap { lst => // NonEmptyList[(TargetResult, TargetResult)]
                      val it = lst.map(_._1)
                      val st = lst.map(_._2)
-                     AsterismResult(Zipper.fromNel(it).focusMax, Zipper.fromNel(st).focusMax)
+                     AsterismResult.fromResults(it, st)
                    }
 
                (oid, asterismResult)
@@ -379,9 +407,10 @@ object ItcService {
           }
           .handleError { t => (tid, t.getMessage).leftNel }
         }.map(_.sequence.bimap(
-          errors  => RemoteServiceErrors(errors),
-          targets => AsterismResult(Zipper.fromNel(targets.map(_._1)).focusMax, Zipper.fromNel(targets.map(_._2)).focusMax)
-        ))
+          errors  => (RemoteServiceErrors(errors): Error).asLeft[AsterismResult],
+          targets =>
+            AsterismResult.fromResults(targets.map(_._1), targets.map(_._2)).toRight[Error](Error.TargetMissmatch)
+        ).merge)
 
       private def insertOrUpdate(
         pid:       Program.Id,
