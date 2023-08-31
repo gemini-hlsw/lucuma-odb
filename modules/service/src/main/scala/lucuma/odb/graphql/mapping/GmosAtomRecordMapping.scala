@@ -11,7 +11,7 @@ import table.StepRecordTable
 
 trait GmosAtomRecordMapping[F[_]] extends AtomRecordTable[F] with StepRecordTable[F] {
 
-  private def stepRecordMapping(typeRef: TypeRef): ObjectMapping =
+  private def atomRecordMapping(typeRef: TypeRef): ObjectMapping =
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
@@ -27,9 +27,9 @@ trait GmosAtomRecordMapping[F[_]] extends AtomRecordTable[F] with StepRecordTabl
     )
 
   lazy val GmosNorthAtomRecordMapping: ObjectMapping =
-    stepRecordMapping(GmosNorthAtomRecordType)
+    atomRecordMapping(GmosNorthAtomRecordType)
 
   lazy val GmosSouthAtomRecordMapping: ObjectMapping =
-    stepRecordMapping(GmosSouthAtomRecordType)
+    atomRecordMapping(GmosSouthAtomRecordType)
 
 }
