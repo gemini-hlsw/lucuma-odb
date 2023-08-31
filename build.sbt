@@ -1,24 +1,24 @@
 val catsParseVersion           = "0.3.10"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.5"
+val circeVersion               = "0.14.6"
 val cirisVersion               = "3.1.0"
 val clueVersion                = "0.31.1"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
-val fs2AwsVersion              = "6.0.2"
-val fs2Version                 = "3.8.0"
+val fs2AwsVersion              = "6.0.3"
+val fs2Version                 = "3.9.1"
 val grackleVersion             = "0.13.0"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.23"
 val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.4.8"
+val logbackVersion             = "1.4.11"
 val log4catsVersion            = "2.6.0"
 val lucumaItcVersion           = "0.18.2"
 val lucumaCoreVersion          = "0.84.1"
 val lucumaGraphQLRoutesVersion = "0.6.6"
-val lucumaSsoVersion           = "0.6.3"
+val lucumaSsoVersion           = "0.6.4"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -130,7 +130,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.521"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.541"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
