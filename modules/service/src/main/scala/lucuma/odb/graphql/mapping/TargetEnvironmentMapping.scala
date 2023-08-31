@@ -18,6 +18,7 @@ import edu.gemini.grackle.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
@@ -42,6 +43,8 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
   def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
+
+  private val ObsTimeParam = "observationTime"
 
   private def asterismObject(name: String): SqlObject =
     SqlObject(
@@ -89,23 +92,31 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
           rIncludeDeleted.map { includeDeleted =>
             Select("firstScienceTarget", Nil, Unique(asterismQuery(includeDeleted, firstOnly = true, child)))
           }
+
+        case Select("guideEnvironment", List(
+          TimestampBinding(ObsTimeParam, rObsTime)
+        ), child) => 
+          rObsTime.map { obsTime =>
+            Environment(
+              Env(ObsTimeParam -> obsTime),
+              Select("guideEnvironment", Nil, child)
+            )
+          }
       }
     )
 
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Unit] = _ => ().success
+    val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[GuideEnvironmentService.GuideEnvironment]] =
-      (pid, oid, _) =>
+    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[GuideEnvironmentService.GuideEnvironment]] =
+      (pid, oid, obsTime) =>
         services.use { s =>
-          Temporal[F].realTimeInstant.flatMap(obsTime =>
-            s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-              .get(pid, oid, obsTime)
-              .map {
-                case Left(e)  => Result.failure(e.format)
-                case Right(s) => s.success
-              }
-          )
+          s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+            .get(pid, oid, obsTime.toInstant)
+            .map {
+              case Left(e)  => Result.failure(e.format)
+              case Right(s) => s.success
+            }
         }
 
     effectHandler("guideEnvironment", readEnv, calculate)
