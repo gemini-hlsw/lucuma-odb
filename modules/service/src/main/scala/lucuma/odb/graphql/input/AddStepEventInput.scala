@@ -5,14 +5,12 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding.*
 
 case class AddStepEventInput(
   stepId:       Step.Id,
-  sequenceType: SequenceType,
   stepStage:    StepStage
 )
 
@@ -22,11 +20,10 @@ object AddStepEventInput {
     ObjectFieldsBinding.rmap {
       case List(
         StepIdBinding("stepId", rStepId),
-        SequenceTypeBinding("sequenceType", rSequenceType),
         StepStageBinding("stepStage", rStepStage)
       ) =>
-        (rStepId, rSequenceType, rStepStage).parMapN { (sid, stype, stage) =>
-          AddStepEventInput(sid, stype, stage)
+        (rStepId, rStepStage).parMapN { (sid, stage) =>
+          AddStepEventInput(sid, stage)
         }
     }
 

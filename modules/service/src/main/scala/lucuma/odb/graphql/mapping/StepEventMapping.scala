@@ -4,12 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
+import table.AtomRecordTable
 import table.ObservationView
 import table.StepEventTable
+import table.StepRecordTable
 import table.VisitTable
 
 trait StepEventMapping[F[_]] extends StepEventTable[F]
                                 with ObservationView[F]
+                                with AtomRecordTable[F]
+                                with StepRecordTable[F]
                                 with VisitTable[F] {
 
   lazy val StepEventMapping: ObjectMapping =
@@ -18,10 +22,9 @@ trait StepEventMapping[F[_]] extends StepEventTable[F]
       fieldMappings = List(
         SqlField("id",           StepEventTable.Id, key = true),
         SqlField("stepId",       StepEventTable.StepId),
-        SqlField("visitId",      StepEventTable.VisitId),
         SqlField("sequenceType", StepEventTable.SequenceType),
         SqlField("stepStage",    StepEventTable.StepStage),
-        SqlObject("observation", Join(StepEventTable.VisitId, VisitTable.Id), Join(VisitTable.ObservationId, ObservationView.Id)),
+        SqlObject("observation", Join(StepEventTable.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
         SqlField("received",     StepEventTable.Received)
       )
     )

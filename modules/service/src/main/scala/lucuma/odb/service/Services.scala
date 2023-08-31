@@ -121,12 +121,12 @@ trait Services[F[_]]:
   /** The `SmartGcalService`. */
   def smartGcalService: SmartGcalService[F]
 
-  /** The `StepService`. */
-  def stepService: StepService[F]
-  
+  /** The `Sequence`. */
+  def sequenceService: SequenceService[F]
+
   /** The `TargetService`. */
   def targetService: TargetService[F]
-  
+
   /** The `TimingWindowService`. */
   def timingWindowService: TimingWindowService[F]
 
@@ -145,10 +145,10 @@ trait Services[F[_]]:
 
 object Services:
 
-  /** 
+  /**
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
-   */  
+   */
   def forUser[F[_]: Concurrent: Trace: UUIDGen](u: User)(s: Session[F]): Services[F[_]] =
     new Services[F]:
       val user = u
@@ -187,7 +187,7 @@ object Services:
       lazy val proposalAttachmentMetadataService = ProposalAttachmentMetadataService.instantiate
       lazy val proposalService = ProposalService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
-      lazy val stepService = StepService.instantiate
+      lazy val sequenceService = SequenceService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val visitService = VisitService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
@@ -231,7 +231,7 @@ object Services:
     def proposalAttachmentMetadataService[F[_]](using Services[F]): ProposalAttachmentMetadataService[F] = summon[Services[F]].proposalAttachmentMetadataService
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
-    def stepService[F[_]](using Services[F]): StepService[F] = summon[Services[F]].stepService
+    def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
