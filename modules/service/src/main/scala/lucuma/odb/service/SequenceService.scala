@@ -44,15 +44,13 @@ trait SequenceService[F[_]] {
   def insertGmosNorthStepRecord(
     atomId:     Atom.Id,
     instrument: GmosNorth,
-    step:       StepConfig,
-    stepIndex:  NonNegShort
+    step:       StepConfig
   )(using Transaction[F]): F[SequenceService.InsertStepResponse]
 
   def insertGmosSouthStepRecord(
     atomId:     Atom.Id,
     instrument: GmosSouth,
-    step:       StepConfig,
-    stepIndex:  NonNegShort
+    step:       StepConfig
   )(using Transaction[F]): F[SequenceService.InsertStepResponse]
 
 }
@@ -145,7 +143,6 @@ object SequenceService {
         atomId:              Atom.Id,
         instrument:          Instrument,
         stepConfig:          StepConfig,
-        stepIndex:           NonNegShort,
         insertDynamicConfig: Step.Id => F[Unit]
       )(using Transaction[F]): F[InsertStepResponse] =
         (for {
@@ -153,7 +150,7 @@ object SequenceService {
           a    = selectAtomRecord(atomId).map(_.filter(_.instrument === instrument))
           inv <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
           sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
-          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType, stepIndex)).void
+          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType)).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
         } yield Success(sid)).merge
@@ -161,28 +158,24 @@ object SequenceService {
       override def insertGmosNorthStepRecord(
         atomId:        Atom.Id,
         dynamicConfig: GmosNorth,
-        stepConfig:    StepConfig,
-        stepIndex:     NonNegShort
+        stepConfig:    StepConfig
       )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
           stepConfig,
-          stepIndex,
           sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
         )
 
       override def insertGmosSouthStepRecord(
         atomId:        Atom.Id,
         dynamicConfig: GmosSouth,
-        stepConfig:    StepConfig,
-        stepIndex:     NonNegShort
+        stepConfig:    StepConfig
       )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,
           stepConfig,
-          stepIndex,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
         )
 
@@ -244,22 +237,19 @@ object SequenceService {
       Step.Id,
       Atom.Id,
       Instrument,
-      StepType,
-      NonNegShort
+      StepType
     )] =
       sql"""
         INSERT INTO t_step_record (
           c_step_id,
           c_atom_id,
           c_instrument,
-          c_step_type,
-          c_step_index
+          c_step_type
         ) SELECT
           $step_id,
           $atom_id,
           $instrument,
-          $step_type,
-          $int2_nonneg
+          $step_type
       """.command
 
     val InsertStepConfigGcal: Command[(Step.Id, StepConfig.Gcal)] =

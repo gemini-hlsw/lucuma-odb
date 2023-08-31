@@ -595,8 +595,7 @@ trait DatabaseOperations { this: OdbSuite =>
     aid:             Atom.Id,
     instrument:      Instrument,
     instrumentInput: String,
-    stepConfigInput: String,
-    stepIndex:       Int = 0
+    stepConfigInput: String
   ): IO[Step.Id] = {
 
     val name = s"record${instrument.tag}Step"
@@ -606,8 +605,7 @@ trait DatabaseOperations { this: OdbSuite =>
         $name(input: {
           atomId: ${aid.asJson},
           $instrumentInput,
-          $stepConfigInput,
-          stepIndex: $stepIndex
+          $stepConfigInput
         }) {
           stepRecord {
             id
