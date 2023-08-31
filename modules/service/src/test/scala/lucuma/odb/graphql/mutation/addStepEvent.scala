@@ -51,13 +51,11 @@ class addStepEvent extends OdbSuite {
       s"""
         mutation {
           addStepEvent(input: {
-            stepId:       "$sid",
-            sequenceType: SCIENCE,
-            stepStage:    START_STEP
+            stepId:    "$sid",
+            stepStage: START_STEP
           }) {
             event {
               stepId
-              sequenceType
               stepStage
               observation {
                 id
@@ -76,7 +74,6 @@ class addStepEvent extends OdbSuite {
         "addStepEvent": {
           "event": {
             "stepId": $sid,
-            "sequenceType": "SCIENCE",
             "stepStage": "START_STEP",
             "observation": {
               "id": $oid
@@ -94,9 +91,8 @@ class addStepEvent extends OdbSuite {
       s"""
         mutation {
           addStepEvent(input: {
-            stepId:       "s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7",
-            sequenceType: SCIENCE,
-            stepStage:    START_STEP
+            stepId:    "s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7",
+            stepStage: START_STEP
           }) {
             event {
               stepId

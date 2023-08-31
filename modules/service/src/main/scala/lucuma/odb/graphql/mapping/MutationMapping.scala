@@ -368,7 +368,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("addStepEvent", AddStepEventInput.Binding) { (input, child) =>
       services.useTransactionally {
         executionEventService
-          .insertStepEvent(input.stepId, input.sequenceType, input.stepStage)
+          .insertStepEvent(input.stepId, input.stepStage)
           .map(executionEventResponseToResult(child, Predicates.stepEvent))
       }
     }
