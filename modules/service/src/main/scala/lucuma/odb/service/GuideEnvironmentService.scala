@@ -75,6 +75,7 @@ import skunk.implicits.*
 
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.Month
 import java.time.ZoneOffset
 import java.time.temporal.ChronoField
 import java.time.temporal.ChronoUnit
@@ -192,9 +193,15 @@ object GuideEnvironmentService {
         tracking:        ObjectTracking,
         shapeConstraint: ShapeExpression
       ): Either[Error, ADQLQuery] = {
+        // We want the query dates to be in discreet units to make them more cachable, but
+        // we always want at least six months in the future for the scheduler. So, we'll use one year 
+        // starting at either January or July 1st.
         val ldt   = LocalDateTime.ofInstant(obsTime, ZoneOffset.UTC)
-        // We consider the query valid from the fist moment of the year to the end for cachability
-        val start = ldt.`with`(ChronoField.DAY_OF_YEAR, 1L).`with`(ChronoField.NANO_OF_DAY, 0)
+        val firstOfYear = ldt.`with`(ChronoField.DAY_OF_YEAR, 1L).`with`(ChronoField.NANO_OF_DAY, 0)
+        val start =
+          if (ldt.getMonthValue() < Month.JULY.getValue())
+            firstOfYear
+          else firstOfYear.`with`(ChronoField.MONTH_OF_YEAR, Month.JULY.getValue())
         val end   = start.plus(1, ChronoUnit.YEARS)
 
         (tracking.at(start.toInstant(ZoneOffset.UTC)), tracking.at(end.toInstant(ZoneOffset.UTC)))
