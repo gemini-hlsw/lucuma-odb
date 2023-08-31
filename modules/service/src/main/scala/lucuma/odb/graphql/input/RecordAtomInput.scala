@@ -11,8 +11,8 @@ import lucuma.core.model.Visit
 import lucuma.odb.graphql.binding.*
 
 case class RecordAtomInput(
-  instrument:   Instrument,
   visitId:      Visit.Id,
+  instrument:   Instrument,
   sequenceType: SequenceType,
   stepCount:    NonNegShort
 )
@@ -26,7 +26,7 @@ object RecordAtomInput {
         SequenceTypeBinding("sequenceType", rSequenceType),
         NonNegShortBinding("stepCount", rStepCount)
       ) => (rVisitId, rSequenceType, rStepCount).parMapN { (visitId, sequenceType, stepCount) =>
-        RecordAtomInput(instrument, visitId, sequenceType, stepCount)
+        RecordAtomInput(visitId, instrument, sequenceType, stepCount)
       }
     }
 
