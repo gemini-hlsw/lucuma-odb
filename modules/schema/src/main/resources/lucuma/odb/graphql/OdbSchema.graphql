@@ -36,10 +36,7 @@ type AddSequenceEventResult {
 
 "StepEvent creation parameters."
 input AddStepEventInput {
-  stepId:  StepId!
-
-  sequenceType: SequenceType!
-
+  stepId: StepId!
   stepStage: StepStage!
 }
 
@@ -1198,6 +1195,28 @@ type GmosNorthAtom implements Atom {
 
 }
 
+"GMOS North atom as recorded by Observe."
+type GmosNorthAtomRecord {
+
+  "Atom ID"
+  id: AtomId!
+
+  "Visit ID"
+  visitId: VisitId!
+
+  "Created by Observe at this time."
+  created: Timestamp!
+
+  "Sequence type."
+  sequenceType: SequenceType!
+
+  "Number of valid steps required to complete this atom."
+  stepCount: NonNegShort!
+
+  "Recorded steps"
+  steps: [GmosNorthStepRecord!]!
+}
+
 """
 GmosNorth Detector type
 """
@@ -1586,9 +1605,7 @@ type GmosNorthStep implements Step {
 
 }
 
-"""
-A GmosNorth step configuration as recorded by Observe
-"""
+"GMOS North step configuration as recorded by Observe."
 type GmosNorthStepRecord {
   """
   Step id
@@ -1596,14 +1613,17 @@ type GmosNorthStepRecord {
   id: StepId!
 
   """
-  Visit id
+  Atom id
   """
-  visitId: VisitId!
+  atomId: AtomId!
 
   """
   Created by Observe at time
   """
   created: Timestamp!
+
+  "Step index relative to the referenced atom."
+  stepIndex: NonNegShort!
 
   """
   Started at time
@@ -1686,9 +1706,9 @@ type GmosNorthVisit {
   static: GmosNorthStatic!
 
   """
-  GmosNorth recorded steps
+  GmosNorth recorded atoms
   """
-  steps: [GmosNorthStepRecord!]!
+  atoms: [GmosNorthAtomRecord!]!
 
   """
   Sequence events associated with this visit
@@ -1720,6 +1740,28 @@ type GmosSouthAtom implements Atom {
   Individual steps that comprise the atom
   """
   steps: [GmosSouthStep!]!
+}
+
+"GMOS South atom as recorded by Observe."
+type GmosSouthAtomRecord {
+
+  "Atom ID"
+  id: AtomId!
+
+  "Visit ID"
+  visitId: VisitId!
+
+  "Created by Observe at this time."
+  created: Timestamp!
+
+  "Sequence type."
+  sequenceType: SequenceType!
+
+  "Number of valid steps required to complete this atom."
+  stepCount: NonNegShort!
+
+  "Recorded steps"
+  steps: [GmosSouthStepRecord!]!
 }
 
 """
@@ -2122,9 +2164,12 @@ type GmosSouthStepRecord {
   id: StepId!
 
   """
-  Visit id
+  Atom id
   """
-  visitId: VisitId!
+  atomId: AtomId!
+
+  "Step index relative to the referenced atom."
+  stepIndex: NonNegShort!
 
   """
   Created by Observe at time
@@ -2460,13 +2505,15 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
-  """
-  Record a new GMOS North step
-  """
+  "Record a new GMOS North atom"
+  recordGmosNorthAtom(
+    "Atom configuration parameters"
+    input: RecordAtomInput!
+  ): RecordGmosNorthAtomResult!
+
+  "Record a new GMOS North step"
   recordGmosNorthStep(
-    """
-    GmosNorth step configuration parameters
-    """
+    "GMOS North step configuration parameters"
     input: RecordGmosNorthStepInput!
   ): RecordGmosNorthStepResult!
 
@@ -2480,13 +2527,15 @@ type Mutation {
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
 
-  """
-  Record a new GMOS South step
-  """
+  "Record a new GMOS South atom"
+  recordGmosSouthAtom(
+    "GMOS South atom configuration parameters"
+    input: RecordAtomInput!
+  ): RecordGmosSouthAtomResult!
+
+  "Record a new GMOS South step"
   recordGmosSouthStep(
-    """
-    GmosSouth step configuration parameters
-    """
+    "GmosSouth step configuration parameters"
     input: RecordGmosSouthStepInput!
   ): RecordGmosSouthStepResult!
 
@@ -2996,11 +3045,22 @@ input RadialVelocityInput {
   kilometersPerSecond: BigDecimal
 }
 
-"""
-Input parameters for creating a new GmosNorth StepRecord
-"""
-input RecordGmosNorthStepInput {
+"Input parameters for creating a new atom record"
+input RecordAtomInput {
   visitId: VisitId!
+  sequenceType: SequenceType!
+  stepCount: NonNegShort!
+}
+
+"The result of recording a GMOS North atom."
+type RecordGmosNorthAtomResult {
+  "The newly added atom record itself."
+  atomRecord: GmosNorthAtomRecord!
+}
+
+"Input parameters for creating a new GmosNorth StepRecord"
+input RecordGmosNorthStepInput {
+  atomId: AtomId!
   instrument: GmosNorthDynamicInput!
   stepConfig: StepConfigInput!
 }
@@ -3033,11 +3093,17 @@ type RecordGmosNorthVisitResult {
   visit: GmosNorthVisit!
 }
 
+"The result of recording a GMOS South atom."
+type RecordGmosSouthAtomResult {
+  "The newly added atom record itself."
+  atomRecord: GmosSouthAtomRecord!
+}
+
 """
 Input parameters for creating a new GmosSouth StepRecord
 """
 input RecordGmosSouthStepInput {
-  visitId: VisitId!
+  atomId: AtomId!
   instrument: GmosSouthDynamicInput!
   stepConfig: StepConfigInput!
 }
@@ -4757,9 +4823,6 @@ type DatasetEvent {
 
   "Identifies the associated dataset."
   datasetId: DatasetId!
-
-  "Associated visit."
-  visitId: VisitId!
 
   "Dataset filename, when known."
   filename: DatasetFilename
@@ -8616,9 +8679,6 @@ type StepEvent {
 
   "Identifies the step to which the event refers."
   stepId: StepId!
-
-  "Associated visit."
-  visitId: VisitId!
 
   "Whether this is an acquisition or science sequence step."
   sequenceType: SequenceType!

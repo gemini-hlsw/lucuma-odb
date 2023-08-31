@@ -7,9 +7,9 @@ package mapping
 import edu.gemini.grackle.TypeRef
 
 import table.GmosDynamicTables
-import table.StepTable
+import table.StepRecordTable
 
-trait GmosStepRecordMapping[F[_]] extends StepTable[F] with GmosDynamicTables[F] {
+trait GmosStepRecordMapping[F[_]] extends StepRecordTable[F] with GmosDynamicTables[F] {
 
   private def stepRecordMapping[G, L, U](
     typeRef: TypeRef,
@@ -18,10 +18,10 @@ trait GmosStepRecordMapping[F[_]] extends StepTable[F] with GmosDynamicTables[F]
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id", StepTable.Id, key = true),
-        SqlField("visitId", StepTable.VisitId),
+        SqlField("id", StepRecordTable.Id, key = true),
+        SqlField("atomId", StepRecordTable.AtomId),
 
-        SqlObject("instrumentConfig", Join(StepTable.Id, table.Id)),
+        SqlObject("instrumentConfig", Join(StepRecordTable.Id, table.Id)),
         SqlObject("stepConfig")
 
         // TBD - more fields!

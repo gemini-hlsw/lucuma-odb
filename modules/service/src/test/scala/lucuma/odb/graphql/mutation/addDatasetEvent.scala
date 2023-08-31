@@ -11,7 +11,6 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.ObservingModeType
 
@@ -25,24 +24,25 @@ class addDatasetEvent extends OdbSuite {
   private def recordStep(
     mode: ObservingModeType,
     user: User
-  ):IO[(Observation.Id, Visit.Id, Step.Id)] =
+  ):IO[(Observation.Id, Step.Id)] =
     for {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
       vid <- recordVisitAs(user, mode.instrument, oid)
-      sid <- recordStepAs(user, mode.instrument, vid)
-    } yield (oid, vid, sid)
+      aid <- recordAtomAs(user, mode.instrument, vid)
+      sid <- recordStepAs(user, mode.instrument, aid)
+    } yield (oid, sid)
 
   private def addDatasetEventTest(
     mode:     ObservingModeType,
     user:     User,
     query:    Step.Id => String,
-    expected: (Observation.Id, Visit.Id, Step.Id) => Either[String, Json]
+    expected: (Observation.Id, Step.Id) => Either[String, Json]
   ): IO[Unit] = {
     for {
       ids <- recordStep(mode, user)
-      (oid, vid, sid) = ids
-      _   <- expect(user, query(sid), expected(oid, vid, sid).leftMap(s => List(s)))
+      (oid, sid) = ids
+      _   <- expect(user, query(sid), expected(oid, sid).leftMap(s => List(s)))
     } yield ()
 }
 
@@ -58,7 +58,6 @@ class addDatasetEvent extends OdbSuite {
             datasetStage: START_WRITE
           }) {
             event {
-              visitId
               datasetId {
                 stepId
                 index
@@ -77,11 +76,10 @@ class addDatasetEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       staff,
       sid => query(sid),
-      (oid, vid, sid) => json"""
+      (oid, sid) => json"""
       {
         "addDatasetEvent": {
           "event": {
-            "visitId": $vid,
             "datasetId": {
               "stepId": $sid,
               "index": 2
@@ -112,7 +110,6 @@ class addDatasetEvent extends OdbSuite {
             filename: "N20230627S0001.fits"
           }) {
             event {
-              visitId
               datasetId {
                 stepId
                 index
@@ -131,11 +128,10 @@ class addDatasetEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       staff,
       sid => query(sid),
-      (oid, vid, sid) => json"""
+      (oid, sid) => json"""
       {
         "addDatasetEvent": {
           "event": {
-            "visitId": $vid,
             "datasetId": {
               "stepId": $sid,
               "index": 2
@@ -177,7 +173,7 @@ class addDatasetEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       staff,
       _ => query,
-      (_, _, _) => s"Step id 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
+      (_, _) => s"Step id 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
     )
 
   }

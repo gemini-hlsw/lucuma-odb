@@ -5,15 +5,15 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
 
 case class RecordGmosSouthStepInput(
-  visitId: Visit.Id,
+  atomId:     Atom.Id,
   instrument: GmosSouth,
-  step: StepConfig
+  step:       StepConfig
 )
 
 object RecordGmosSouthStepInput {
@@ -21,11 +21,11 @@ object RecordGmosSouthStepInput {
   val Binding: Matcher[RecordGmosSouthStepInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        VisitIdBinding("visitId", rVisitId),
+        AtomIdBinding("atomId", rAtomId),
         GmosSouthDynamicInput.Binding("instrument", rInstrument),
         StepConfigInput.Binding("stepConfig", rStepConfig)
-      ) => (rVisitId, rInstrument, rStepConfig).parMapN { (visitId, instrument, step) =>
-        RecordGmosSouthStepInput(visitId, instrument, step)
+      ) => (rAtomId, rInstrument, rStepConfig).parMapN { (atomId, instrument, step) =>
+        RecordGmosSouthStepInput(atomId, instrument, step)
       }
     }
 
