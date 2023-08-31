@@ -175,7 +175,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  private def httpClient: Client[IO] = Client.apply(_ => Resource.eval(IO.pure(Response.notFound[IO])))
+  // override in tests that need an http client
+  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
+  
+  private def httpClient: Client[IO] = Client.apply(httpRequestHandler)
 
   protected def databaseConfig: Config.Database =
     Config.Database(
