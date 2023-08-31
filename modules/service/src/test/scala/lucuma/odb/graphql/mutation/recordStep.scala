@@ -56,8 +56,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience,
-            stepIndex: 0
+            $stepConfigScience
           }) {
             stepRecord {
               instrumentConfig {
@@ -89,7 +88,6 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
-              stepIndex
             }
           }
         }
@@ -123,8 +121,7 @@ class recordStep extends OdbSuite {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
                 }
-              },
-              "stepIndex": 0
+              }
             }
           }
         }
@@ -141,8 +138,7 @@ class recordStep extends OdbSuite {
           recordGmosSouthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience,
-            stepIndex: 1
+            $stepConfigScience
           }) {
             stepRecord {
               instrumentConfig {
@@ -174,7 +170,6 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
-              stepIndex
             }
           }
         }
@@ -208,8 +203,7 @@ class recordStep extends OdbSuite {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
                 }
-              },
-              "stepIndex": 1
+              }
             }
           }
         }
@@ -226,8 +220,7 @@ class recordStep extends OdbSuite {
           recordGmosSouthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience,
-            stepIndex: 0
+            $stepConfigScience
           }) {
             stepRecord {
               instrumentConfig {
@@ -273,8 +266,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience,
-            stepIndex: 0
+            $stepConfigScience
           }) {
             stepRecord {
               instrumentConfig {
@@ -337,8 +329,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience,
-            stepIndex: 0
+            $stepConfigScience
           }) {
             stepRecord {
               instrumentConfig {
@@ -403,8 +394,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience,
-            stepIndex: 0
+            $stepConfigScience
           }) {
             stepRecord {
               instrumentConfig {
@@ -462,8 +452,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigBias,
-            stepIndex: 0
+            $stepConfigBias
           }) {
             stepRecord {
               stepConfig {
@@ -503,8 +492,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigDark,
-            stepIndex: 0
+            $stepConfigDark
           }) {
             stepRecord {
               stepConfig {
@@ -549,8 +537,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigGcal,
-            stepIndex: 0
+            $stepConfigGcal
           }) {
             stepRecord {
               stepConfig {
@@ -593,8 +580,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience,
-            stepIndex: 0
+            $stepConfigScience
           }) {
             stepRecord {
               stepConfig {
@@ -656,8 +642,7 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigSmartGcal,
-            stepIndex: 0
+            $stepConfigSmartGcal
           }) {
             stepRecord {
               stepConfig {

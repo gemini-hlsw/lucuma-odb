@@ -3063,7 +3063,6 @@ input RecordGmosNorthStepInput {
   atomId: AtomId!
   instrument: GmosNorthDynamicInput!
   stepConfig: StepConfigInput!
-  stepIndex: NonNegShort!
 }
 
 """
@@ -3107,7 +3106,6 @@ input RecordGmosSouthStepInput {
   atomId: AtomId!
   instrument: GmosSouthDynamicInput!
   stepConfig: StepConfigInput!
-  stepIndex: NonNegShort!
 }
 
 """

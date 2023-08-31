@@ -40,12 +40,9 @@ ALTER TABLE t_step
   DROP COLUMN c_observation_id,
   DROP COLUMN c_visit_id,
   ADD  COLUMN c_atom_id    d_atom_id NOT NULL,
-  ADD  COLUMN c_step_index int2      NOT NULL CHECK (c_step_index >= 0),
   ADD  CONSTRAINT t_atom_record_c_atom_id_c_instrument_fkey
     FOREIGN KEY (c_atom_id, c_instrument)
     REFERENCES  t_atom_record (c_atom_id, c_instrument) ON DELETE CASCADE;
-
-COMMENT ON COLUMN t_step.c_step_index IS 'index of step within its atom';
 
 ALTER TABLE t_step
   RENAME TO t_step_record;
@@ -58,7 +55,6 @@ SELECT
   s.c_atom_id,
   s.c_instrument,
   s.c_step_type,
-  s.c_step_index,
   s.c_created,
   g.c_gcal_continuum,
   g.c_gcal_ar_arc,

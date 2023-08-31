@@ -431,7 +431,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosNorthStep", RecordGmosNorthStepInput.Binding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.stepIndex),
+          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step),
           Predicates.gmosNorthStep.id,
           child
         )
@@ -442,7 +442,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosSouthStep", RecordGmosSouthStepInput.Binding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.stepIndex),
+          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step),
           Predicates.gmosSouthStep.id,
           child
         )

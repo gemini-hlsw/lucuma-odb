@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -14,8 +13,7 @@ import lucuma.odb.graphql.binding.*
 case class RecordGmosSouthStepInput(
   atomId:     Atom.Id,
   instrument: GmosSouth,
-  step:       StepConfig,
-  stepIndex:  NonNegShort
+  step:       StepConfig
 )
 
 object RecordGmosSouthStepInput {
@@ -25,10 +23,9 @@ object RecordGmosSouthStepInput {
       case List(
         AtomIdBinding("atomId", rAtomId),
         GmosSouthDynamicInput.Binding("instrument", rInstrument),
-        StepConfigInput.Binding("stepConfig", rStepConfig),
-        NonNegShortBinding("stepIndex", rStepIndex)
-      ) => (rAtomId, rInstrument, rStepConfig, rStepIndex).parMapN { (atomId, instrument, step, stepIndex) =>
-        RecordGmosSouthStepInput(atomId, instrument, step, stepIndex)
+        StepConfigInput.Binding("stepConfig", rStepConfig)
+      ) => (rAtomId, rInstrument, rStepConfig).parMapN { (atomId, instrument, step) =>
+        RecordGmosSouthStepInput(atomId, instrument, step)
       }
     }
 
