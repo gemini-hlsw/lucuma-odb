@@ -393,8 +393,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosNorthAtom", RecordAtomInput.bindingFor(Instrument.GmosNorth)) { (input, child) =>
       services.useTransactionally {
         recordAtom(
-          sequenceService.insertAtomRecord(input.instrument, input.visitId, input.stepCount, input.sequenceType),
-          Predicates.gmosNorthAtomRecord.id,  // TODO: atom record or just atom ???
+          sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
+          Predicates.gmosNorthAtomRecord.id,
           child
         )
       }
@@ -404,8 +404,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosSouthAtom", RecordAtomInput.bindingFor(Instrument.GmosSouth)) { (input, child) =>
       services.useTransactionally {
         recordAtom(
-          sequenceService.insertAtomRecord(input.instrument, input.visitId, input.stepCount, input.sequenceType),
-          Predicates.gmosSouthAtomRecord.id,  // TODO: atom record or just atom ???
+          sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
+          Predicates.gmosSouthAtomRecord.id,
           child
         )
       }

@@ -35,8 +35,8 @@ trait SequenceService[F[_]] {
   )(using Transaction[F]): F[Option[SequenceService.AtomRecord]]
 
   def insertAtomRecord(
-    instrument:   Instrument,
     visitId:      Visit.Id,
+    instrument:   Instrument,
     stepCount:    NonNegShort,
     sequenceType: SequenceType
   )(using Transaction[F]): F[SequenceService.InsertAtomResponse]
@@ -62,8 +62,8 @@ object SequenceService {
   case class AtomRecord(
     atomId:        Atom.Id,
     observationId: Observation.Id,
-    instrument:    Instrument,
     visitId:       Visit.Id,
+    instrument:    Instrument,
     stepCount:     NonNegShort,
     sequenceType:  SequenceType,
     created:       Timestamp
@@ -115,8 +115,8 @@ object SequenceService {
         session.option(Statements.SelectAtom)(atomId)
 
       override def insertAtomRecord(
-        instrument:   Instrument,
         visitId:      Visit.Id,
+        instrument:   Instrument,
         stepCount:    NonNegShort,
         sequenceType: SequenceType
       )(using Transaction[F]): F[InsertAtomResponse] =
@@ -125,7 +125,7 @@ object SequenceService {
           v    = visitService.select(visitId).map(_.filter(_.instrument === instrument))
           inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, instrument, visitId, stepCount, sequenceType))
+          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType))
         } yield InsertAtomResponse.Success(aid)).merge
 
       import InsertStepResponse.*
@@ -153,7 +153,7 @@ object SequenceService {
           a    = selectAtomRecord(atomId).map(_.filter(_.instrument === instrument))
           inv <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
           sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
-          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, instrument, atomId, stepConfig.stepType, stepIndex)).void
+          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType, stepIndex)).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
         } yield Success(sid)).merge
@@ -194,8 +194,8 @@ object SequenceService {
       (
         atom_id        *:
         observation_id *:
-        instrument     *:
         visit_id       *:
+        instrument     *:
         int2_nonneg    *:
         sequence_type  *:
         core_timestamp
@@ -206,8 +206,8 @@ object SequenceService {
         SELECT
           c_atom_id,
           c_observation_id,
-          c_instrument,
           c_visit_id,
+          c_instrument,
           c_step_count,
           c_sequence_type,
           c_created
@@ -218,8 +218,8 @@ object SequenceService {
     val InsertAtom: Command[(
       Atom.Id,
       Observation.Id,
-      Instrument,
       Visit.Id,
+      Instrument,
       NonNegShort,
       SequenceType
     )] =
@@ -227,37 +227,37 @@ object SequenceService {
         INSERT INTO t_atom_record (
           c_atom_id,
           c_observation_id,
-          c_instrument,
           c_visit_id,
+          c_instrument,
           c_step_count,
           c_sequence_type
         ) SELECT
           $atom_id,
           $observation_id,
-          $instrument,
           $visit_id,
+          $instrument,
           $int2_nonneg,
           $sequence_type
       """.command
 
     val InsertStep: Command[(
       Step.Id,
-      Instrument,
       Atom.Id,
+      Instrument,
       StepType,
       NonNegShort
     )] =
       sql"""
         INSERT INTO t_step_record (
           c_step_id,
-          c_instrument,
           c_atom_id,
+          c_instrument,
           c_step_type,
           c_step_index
         ) SELECT
           $step_id,
-          $instrument,
           $atom_id,
+          $instrument,
           $step_type,
           $int2_nonneg
       """.command
