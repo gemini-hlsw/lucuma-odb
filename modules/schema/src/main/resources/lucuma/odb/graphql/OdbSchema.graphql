@@ -36,10 +36,7 @@ type AddSequenceEventResult {
 
 "StepEvent creation parameters."
 input AddStepEventInput {
-  stepId:  StepId!
-
-  sequenceType: SequenceType!
-
+  stepId: StepId!
   stepStage: StepStage!
 }
 

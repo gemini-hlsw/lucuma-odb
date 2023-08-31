@@ -11,7 +11,6 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
@@ -40,7 +39,6 @@ trait ExecutionEventService[F[_]] {
 
   def insertStepEvent(
     stepId:       Step.Id,
-    sequenceType: SequenceType,
     stepStage:    StepStage
   )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse]
 
@@ -117,7 +115,6 @@ object ExecutionEventService {
 
       override def insertStepEvent(
         stepId:       Step.Id,
-        sequenceType: SequenceType,
         stepStage:    StepStage
       )(using Transaction[F]): F[InsertEventResponse] = {
 
@@ -125,7 +122,7 @@ object ExecutionEventService {
 
         val insert: F[Either[StepNotFound, ExecutionEvent.Id]] =
           session
-            .option(Statements.InsertStepEvent)(stepId, sequenceType, stepStage, stepId)
+            .option(Statements.InsertStepEvent)(stepId, stepStage, stepId)
             .map(_.toRight(StepNotFound(stepId)))
             .recover {
               case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
@@ -175,16 +172,14 @@ object ExecutionEventService {
           c_execution_event_id
       """.query(execution_event_id)
 
-    val InsertStepEvent: Query[(Step.Id, SequenceType, StepStage, Step.Id), ExecutionEvent.Id] =
+    val InsertStepEvent: Query[(Step.Id, StepStage, Step.Id), ExecutionEvent.Id] =
       sql"""
         INSERT INTO t_step_event (
           c_step_id,
-          c_sequence_type,
           c_step_stage
         )
         SELECT
           $step_id,
-          $sequence_type,
           $step_stage
         FROM
           t_step_record

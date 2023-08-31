@@ -86,7 +86,8 @@ ORDER BY
 TRUNCATE TABLE t_step_event;
 
 ALTER TABLE t_step_event
-  DROP COLUMN c_visit_id;
+  DROP COLUMN c_visit_id,
+  DROP COLUMN c_sequence_type;
 
 TRUNCATE TABLE t_dataset_event;
 
