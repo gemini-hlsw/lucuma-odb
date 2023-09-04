@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.text.utf8
 import io.circe.Encoder
 import io.circe.Json
@@ -30,31 +29,23 @@ import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
-import lucuma.core.math.ProperMotion
 import lucuma.core.math.Wavelength
-import lucuma.core.model.CatalogInfo
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
-import lucuma.core.model.EphemerisKey
 import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
-import lucuma.core.model.SiderealTracking
-import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionConfig
-import lucuma.core.model.sequence.InstrumentExecutionConfig.GmosNorth
-import lucuma.core.model.sequence.InstrumentExecutionConfig.GmosSouth
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.TargetRole
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
@@ -68,8 +59,6 @@ import org.http4s.Request
 import org.http4s.client.Client
 import skunk.AppliedFragment
 import skunk.Decoder
-import skunk.circe.codec.all.*
-import skunk.codec.all.*
 import skunk.implicits.*
 
 import java.time.Instant
@@ -159,18 +148,11 @@ object GuideEnvironmentService {
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Either[Error, NonEmptyList[Target]]] = {
-        val af = Statements.getAsterism(user, pid, oid)
-        session
-          .prepareR(
-            af.fragment.query(Decoders.targetDecoder)
-          )
-          .use(
-            _.stream(af.argument, chunkSize = 1024).compile.toList
-              .map(
-                NonEmptyList
-                  .fromList(_)
-                  .toRight(Error.GeneralError(s"No targets have been defined for observation $oid."))
-              )
+        asterismService.getAsterism(pid, oid)
+          .map(l => 
+            NonEmptyList.fromList(
+              l.map(_._2)
+            ).toRight(Error.GeneralError(s"No targets have been defined for observation $oid."))
           )
       }
 
@@ -386,32 +368,6 @@ object GuideEnvironmentService {
   object Statements {
     import ProgramService.Statements.andWhereUserAccess
 
-    def getAsterism(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
-      sql"""
-        select
-          c_name,
-          c_sid_ra,
-          c_sid_dec,
-          c_sid_epoch,
-          c_sid_pm_ra,
-          c_sid_pm_dec,
-          c_sid_rv,
-          c_sid_parallax,
-          c_sid_catalog_name,
-          c_sid_catalog_id,
-          c_sid_catalog_object_type,
-          c_nsid_des,
-          c_nsid_key_type,
-          c_source_profile
-        from t_target t
-        inner join t_asterism_target a
-        on t.c_target_id = a.c_target_id
-          and a.c_program_id = $program_id
-          and a.c_observation_id = $observation_id
-        where t.c_existence = 'present'
-          and t.c_role = $target_role
-      """.apply(pid, oid, TargetRole.Science) |+| andWhereUserAccess(user, pid)
-
     def getObservationInfo(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
         select
@@ -442,63 +398,6 @@ object GuideEnvironmentService {
   }
 
   private object Decoders {
-    def toNonEmpty(s: String): Option[NonEmptyString] = NonEmptyString.from(s).toOption
-
-    val targetDecoder: Decoder[Target] =
-      (text_nonempty *:           // name
-        right_ascension.opt *:
-        declination.opt *:
-        epoch.opt *:
-        int8.opt *:               // proper motion ra
-        int8.opt *:               // proper motion dec
-        radial_velocity.opt *:
-        parallax.opt *:
-        catalog_name.opt *:
-        varchar.opt *:            // catalog id
-        varchar.opt *:            // catalog object type
-        varchar.opt *:            // ns des
-        ephemeris_key_type.opt *: // ns ephemeris key type
-        jsonb                     // source profile
-      ).emap {
-        case (name,
-              oRa,
-              oDec,
-              oEpoch,
-              oPmRa,
-              oPmDec,
-              oRv,
-              oParallax,
-              oCatName,
-              oCatId,
-              oCatType,
-              oDes,
-              oEphemKeyType,
-              profile
-            ) =>
-          val oSourceProfile = profile.as[SourceProfile].toOption
-          (oRa, oDec, oEpoch, oSourceProfile)
-            .mapN { (ra, dec, epoch, sourceProfile) =>
-              val baseCoords   = Coordinates(ra, dec)
-              val properMotion = (oPmRa, oPmDec).mapN((pmRa, pmDec) =>
-                ProperMotion(ProperMotion.μasyRA(pmRa), ProperMotion.μasyDec(pmDec))
-              )
-              val catalogInfo  = (oCatName, oCatId.flatMap(toNonEmpty)).mapN { (name, id) =>
-                CatalogInfo(name, id, oCatType.flatMap(toNonEmpty))
-              }
-              val tracking     = SiderealTracking(baseCoords, epoch, properMotion, oRv, oParallax)
-              Target.Sidereal(name, tracking, sourceProfile, catalogInfo)
-            }
-            .orElse(
-              (oDes, oEphemKeyType, oSourceProfile)
-                .mapN((des, keyType, sourceProfile) =>
-                  EphemerisKey.fromTypeAndDes
-                    .getOption((keyType, des))
-                    .map(key => Target.Nonsidereal(name, key, sourceProfile))
-                )
-                .flatten
-            )
-            .toRight("Invalid target.")
-      }
 
     val obsInfoDecoder: Decoder[ObservationInfo] =
       (observation_id *:
