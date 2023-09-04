@@ -28,6 +28,7 @@ import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
@@ -37,7 +38,9 @@ import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.json.angle.query.given
+import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.sourceprofile.given
+import lucuma.odb.json.stepconfig.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
@@ -621,6 +624,51 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
     }
 
+  }
+
+  def recordStepAs[D: io.circe.Encoder](
+    user:            User,
+    aid:             Atom.Id,
+    instrument:      Instrument,
+    instrumentInput: D,
+    stepConfig:      StepConfig
+  ): IO[Step.Id] = {
+
+    val name = s"record${instrument.tag}Step"
+
+    def step = stepConfig.asJson.mapObject(_.remove("stepType"))
+
+    val vars = Json.obj(
+      "input" -> Json.obj(
+        "atomId" -> aid.asJson,
+        "instrument" -> instrumentInput.asJson,
+        "stepConfig" -> (stepConfig match {
+          case StepConfig.Bias          => Json.obj("bias" -> "true".asJson)
+          case StepConfig.Dark          => Json.obj("dark" -> "true".asJson)
+          case StepConfig.Gcal(_,_,_,_) => Json.obj("gcal" -> step)
+          case StepConfig.Science(_,_)  => Json.obj("science" -> step)
+          case StepConfig.SmartGcal(_)  => Json.obj("smartGcal" -> step)
+        })
+      )
+    )
+
+    val q = s"""
+      mutation RecordStep($$input: ${name.capitalize}Input!) {
+        $name(input: $$input) {
+          stepRecord {
+            id
+          }
+        }
+      }
+    """
+
+    query(
+      user      = user,
+      query     = q,
+      variables = vars.asObject
+    ).map { json =>
+      json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
+    }
   }
 
   def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {

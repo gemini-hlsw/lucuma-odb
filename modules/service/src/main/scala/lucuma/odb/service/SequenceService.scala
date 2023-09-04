@@ -8,8 +8,13 @@ import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
 import cats.syntax.eq.*
+import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import eu.timepit.refined.types.numeric.PosInt
+import fs2.Stream
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
@@ -33,6 +38,22 @@ trait SequenceService[F[_]] {
   def selectAtomRecord(
     atomId: Atom.Id
   )(using Transaction[F]): F[Option[SequenceService.AtomRecord]]
+
+  def selectGmosNorthAtomCounts(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Map[List[(GmosNorth, StepConfig)], PosInt]]
+
+  def selectGmosNorthSteps(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]]
+
+  def selectGmosSouthAtomCounts(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Map[List[(GmosSouth, StepConfig)], PosInt]]
+
+  def selectGmosSouthSteps(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]]
 
   def insertAtomRecord(
     visitId:      Visit.Id,
@@ -111,6 +132,176 @@ object SequenceService {
         atomId: Atom.Id
       )(using Transaction[F]): F[Option[AtomRecord]] =
         session.option(Statements.SelectAtom)(atomId)
+
+      override def selectGmosNorthAtomCounts(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Map[List[(GmosNorth, StepConfig)], PosInt]] =
+        selectAtomCounts(
+          observationId,
+          gmosSequenceService.selectGmosNorthDynamic(observationId)
+        )
+
+      override def selectGmosSouthAtomCounts(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Map[List[(GmosSouth, StepConfig)], PosInt]] =
+        selectAtomCounts(
+          observationId,
+          gmosSequenceService.selectGmosSouthDynamic(observationId)
+        )
+
+      private def selectAtomCounts[D](
+        observationId:  Observation.Id,
+        dynamicConfigs: Stream[F, (Step.Id, D)]
+      )(using Transaction[F]): F[Map[List[(D, StepConfig)], PosInt]] =
+        stepRecordMap(observationId, dynamicConfigs)
+          .flatMap(completedAtomCountMap(observationId))
+
+      def selectGmosNorthSteps(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]] =
+        stepRecordMap(observationId, gmosSequenceService.selectGmosNorthDynamic(observationId))
+
+      def selectGmosSouthSteps(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]] =
+        stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamic(observationId))
+
+      private def stepRecordMap[D](
+        observationId:  Observation.Id,
+        dynamicConfigs: Stream[F, (Step.Id, D)]
+      )(using Transaction[F]): F[Map[Step.Id, (D, StepConfig)]] = {
+
+        // `configs` is a grouping of a configuration C and the set of steps
+        // that share that same configuration value.  It's grouped this way to
+        // minimize the amount of memory that is needed to hold the entire
+        // executed part of the sequence.
+        //
+        // Here we want to flip this map around (Step.Id -> C), but also map C
+        // to A if possible.  The mapping function is intended to lookup the
+        // instrument configuration associated with a science, gcal, etc.
+        // configuration.  E.g. (Step.Id, Science) => (GmosNorth, Science).
+        def foldConfigs[A, C](
+          configs: Iterable[(C, Set[Step.Id])],
+          z:       Map[Step.Id, A]
+        )(op: (Step.Id, C) => Option[A]): Map[Step.Id, A] =
+          configs.foldLeft(z) { case (zʹ, (c, sids)) =>
+            sids.foldLeft(zʹ) { case (zʹʹ, sid) =>
+              op(sid, c).fold(zʹʹ)(a => zʹʹ + (sid -> a))
+            }
+          }
+
+        def foldStream[A, C](
+          stream: Stream[F, (Step.Id, C)],
+          z:      Map[Step.Id, A]
+        )(op: (Step.Id, C) => Option[A]): F[Map[Step.Id, A]] =
+          stream.fold(Map.empty[C, Set[Step.Id]]) { case (m, (s, c)) =>
+            m.updatedWith(c) { _.map(_ + s).orElse(Set(s).some)}
+          }.compile.onlyOrError.map(foldConfigs(_, z)(op))
+
+        def foldQuery[A, C](
+          query: Query[Observation.Id, (Step.Id, C)],
+          z:     Map[Step.Id, A]
+        )(op: (Step.Id, C) => Option[A]): F[Map[Step.Id, A]] =
+          foldStream(session.stream(query)(observationId, 1024), z)(op)
+
+        for {
+          ds <- foldStream(dynamicConfigs, Map.empty[Step.Id, D])((_, d) => d.some)
+          e   = Map.empty[Step.Id, (D, StepConfig)]
+          op  = (sid: Step.Id, sc: StepConfig) => ds.get(sid).tupleRight(sc)
+          g  <- foldQuery(Statements.SelectStepConfigGcalForObs,      e)(op)
+          s  <- foldQuery(Statements.SelectStepConfigScienceForObs,   g)(op)
+          m  <- foldQuery(Statements.SelectStepConfigSmartGcalForObs, s)(op)
+          bd <- biasAndDark(observationId)
+        } yield foldConfigs(bd, m)(op)
+
+      }
+
+      // Bias and Dark have no real configuration other than the instrument
+      // itself.  There's not a separate table for these like there is for gcal,
+      // science, and smart gcal.
+      private def biasAndDark(observationId: Observation.Id): F[List[(StepConfig, Set[Step.Id])]] =
+        session
+          .stream(Statements.SelectStepConfigBiasOrDarkForObs)(observationId, 1024)
+          .fold((Set.empty[Step.Id], Set.empty[Step.Id])) { case ((bias, dark), (s, stype)) =>
+            stype match {
+              case StepType.Bias => (bias + s, dark)
+              case StepType.Dark => (bias, dark + s)
+              case _             => (bias, dark)
+            }
+          }
+          .compile
+          .onlyOrError
+          .map { case (bias, dark) => List(StepConfig.Bias -> bias, StepConfig.Dark -> dark) }
+
+      // Want a map from atom configuration to completed count that can be
+      // matched against the generated atoms.
+      private def completedAtomCountMap[D](
+        observationId: Observation.Id
+      )(
+        stepMap: Map[Step.Id, (D, StepConfig)]
+      )(using Transaction[F]): F[Map[List[(D, StepConfig)], PosInt]] = {
+
+        type StepMatch[D]     = (D, StepConfig)
+        type AtomMatch[D]     = List[StepMatch[D]]
+        type CompletionMap[D] = Map[AtomMatch[D], PosInt]
+
+        trait State[D] {
+          def reset: State[D]
+          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): State[D]
+          def finalized: CompletionMap[D]
+        }
+
+        case class Reset[D](completed: CompletionMap[D]) extends State[D] {
+          def reset: State[D] = this
+
+          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): State[D] =
+            InProgress(aid, count, List(step), completed)
+
+          def finalized: CompletionMap[D] = completed
+        }
+
+        object Reset {
+          def init[D]: State[D] = Reset[D](Map.empty)
+        }
+
+        case class InProgress[D](
+          inProgressAtomId: Atom.Id,
+          inProgressCount:  NonNegShort,
+          inProgressSteps:  AtomMatch[D],
+          completed:        CompletionMap[D]
+        ) extends State[D] {
+
+          def reset: State[D] = Reset(completed)
+
+          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): State[D] =
+            if ((aid === inProgressAtomId))
+              copy(inProgressSteps = step :: inProgressSteps) // continue existing atom
+            else
+              InProgress(aid, count, List(step), finalized)   // start a new atom
+
+          def finalized: CompletionMap[D] =
+            if (inProgressSteps.sizeIs != inProgressCount.value)
+              completed
+            else
+              completed.updatedWith(inProgressSteps.reverse)(
+                _.flatMap(posInt => PosInt.from(posInt.value + 1).toOption)
+                 .orElse(PosInt.from(1).toOption)
+              )
+        }
+
+        // Fold over the stream of completed steps in completion order.  If an
+        // atom is broken up by anything else it shouldn't count as complete.
+        session
+          .stream(Statements.SelectStepRecordForObs)(observationId, 1024)
+          .fold(Reset.init[D]) { case (state, (aid, cnt, sid)) =>
+            stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, _))
+          }
+          .compile
+          .onlyOrError
+          .map(_.finalized)
+
+      }
+
 
       override def insertAtomRecord(
         visitId:      Visit.Id,
@@ -252,44 +443,133 @@ object SequenceService {
           $step_type
       """.command
 
-    val InsertStepConfigGcal: Command[(Step.Id, StepConfig.Gcal)] =
+    val SelectStepRecordForObs: Query[Observation.Id, (Atom.Id, NonNegShort, Step.Id)] =
+      (sql"""
+        SELECT
+          a.c_atom_id,
+          a.c_step_count,
+          s.c_step_id
+        FROM t_step_record s
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id ORDER BY s.c_created"""
+      ).query(atom_id *: int2_nonneg *: step_id)     // ORDER BY not quite correct, add a completion time set from events
+
+    val SelectStepConfigBiasOrDarkForObs: Query[Observation.Id, (Step.Id, StepType)] =
+      (sql"""
+        SELECT
+          s.c_step_id,
+          s.c_step_type
+        FROM t_step_record s
+        INNER JOIN t_atom_record a on a.c_atom_id = s.c_atom_id
+        WHERE
+      """ ~> sql"""
+          a.c_observation_id = $observation_id AND
+          (s.c_step_type = 'bias' OR s.c_step_type = 'dark')
+      """).query(step_id *: step_type)
+
+    def encodeColumns(prefix: Option[String], columns: List[String]): String =
+      columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
+
+    def selectStepConfigForObs[A](table: String, columns: List[String], decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
+      (sql"""
+        SELECT
+          s.c_step_id,
+          #${encodeColumns("c".some, columns)}
+        FROM #$table c
+        INNER JOIN t_step_record s ON s.c_step_id = c.c_step_id
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
+      ).query(step_id *: decoderA)
+
+// TODO: I would like to write the insert step config logic once, parameterized
+// by the table name, columns, and the encoder.  I think I'm being thwarted by
+// scala.quoted / macro issues?
+//
+//[error] /Users/swalker/dev/lucuma-odb/modules/core/shared/src/main/scala-3/syntax/StringContextOps.scala: Found:    skunk.Encoder[A]
+//[error] Required: skunk.Encoder[Nothing *: Nothing]
+//[error] one error found
+//[error] (service / Compile / compileIncremental) Compilation failed
+//
+// is there a way to get this method the context information that the macro is expecting?
+//
+//    def insertStepConfig[A: Type](table: String, columns: List[String], encoderA: Encoder[A]): Command[(Step.Id, A)] = {
+//      val f: Fragment[Void] = sql"""
+//        INSERT INTO #$table (
+//          c_step_id,
+//          #${encodeColumns(None, columns)}
+//        )"""
+//
+//      sql"""
+//        $f
+//        SELECT
+//          $step_id,
+//          $encoderA
+//      """.command
+//    }
+
+    def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""
-        INSERT INTO t_step_config_gcal (
+        INSERT INTO #$table (
           c_step_id,
-          c_gcal_continuum,
-          c_gcal_ar_arc,
-          c_gcal_cuar_arc,
-          c_gcal_thar_arc,
-          c_gcal_xe_arc,
-          c_gcal_filter,
-          c_gcal_diffuser,
-          c_gcal_shutter
-        ) SELECT
+          #${encodeColumns(none, columns)}
+        )
+      """
+
+    val StepConfigGcalColumns: List[String] =
+      List(
+        "c_gcal_continuum",
+        "c_gcal_ar_arc",
+        "c_gcal_cuar_arc",
+        "c_gcal_thar_arc",
+        "c_gcal_xe_arc",
+        "c_gcal_filter",
+        "c_gcal_diffuser",
+        "c_gcal_shutter"
+      )
+
+    val InsertStepConfigGcal: Command[(Step.Id, StepConfig.Gcal)] =
+//      insertStepConfig[StepConfig.Gcal]("t_step_config_gcal", StepConfigGcalColumns, step_config_gcal)
+      sql"""
+        ${insertStepConfigFragment("t_step_config_gcal", StepConfigGcalColumns)} SELECT
           $step_id,
           $step_config_gcal
       """.command
 
+    val SelectStepConfigGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.Gcal)] =
+      selectStepConfigForObs("t_step_config_gcal", StepConfigGcalColumns, step_config_gcal)
+
+    val StepConfigScienceColumns: List[String] =
+      List(
+        "c_offset_p",
+        "c_offset_q",
+        "c_guide_state"
+      )
+
     val InsertStepConfigScience: Command[(Step.Id, StepConfig.Science)] =
+//      insertStepConfig[StepConfig.Science]("t_step_config_science", StepConfigGcalColumns, step_config_science)
       sql"""
-        INSERT INTO t_step_config_science (
-          c_step_id,
-          c_offset_p,
-          c_offset_q,
-          c_guide_state
-        ) SELECT
+        ${insertStepConfigFragment("t_step_config_science", StepConfigScienceColumns)} SELECT
           $step_id,
           $step_config_science
       """.command
 
+    val SelectStepConfigScienceForObs: Query[Observation.Id, (Step.Id, StepConfig.Science)] =
+      selectStepConfigForObs("t_step_config_science", StepConfigScienceColumns, step_config_science)
+
+    val StepConfigSmartGcalColumns: List[String] =
+      List(
+        "c_smart_gcal_type"
+      )
+
     val InsertStepConfigSmartGcal: Command[(Step.Id, StepConfig.SmartGcal)] =
       sql"""
-        INSERT INTO t_step_config_smart_gcal (
-          c_step_id,
-          c_smart_gcal_type
-        ) SELECT
+        ${insertStepConfigFragment("t_step_config_smart_gcal", StepConfigSmartGcalColumns)} SELECT
           $step_id,
           $step_config_smart_gcal
       """.command
+
+    val SelectStepConfigSmartGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.SmartGcal)] =
+      selectStepConfigForObs("t_step_config_smart_gcal", StepConfigSmartGcalColumns, step_config_smart_gcal)
 
   }
 }
