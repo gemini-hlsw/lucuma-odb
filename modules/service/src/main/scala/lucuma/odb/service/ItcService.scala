@@ -33,6 +33,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.brightestProfileAt
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingIntegrationTimeInput
@@ -194,21 +195,20 @@ object ItcService {
   object AsterismResult {
 
     def fromResults(acquisition: NonEmptyList[TargetImagingResult], science: NonEmptyList[TargetSpectroscopyResult]): Option[AsterismResult] = {
+      val wv = science.head.input.wavelength
       // results for acquisition and sciencce should contain the same set of targets
       if (acquisition.map(_.targetId).sortBy(_.value) === science.map(_.targetId).sortBy(_.value)) {
         // Find the target with the brightest magnitude for the relevant wavelength
-        val brightestTarget = science.minimumByOption { t =>
-          val profile = t.input.sourceProfile
-          // Sort by value
-          nearestBand(t.input.wavelength, profile.some).map(_._2)
-        }.head // This is safe because we know the list is not empty
+        val brightestTarget = science.brightestProfileAt(_.input.sourceProfile)(wv)
 
-        val selectedTarget = brightestTarget.targetId
+        brightestTarget.flatMap { t =>
+          val selectedTarget = t.targetId
 
-        // Focus each zipper on the selected science target
-        val a = Zipper.fromNel[TargetResult](acquisition).findFocus(_.targetId === selectedTarget)
-        val s = Zipper.fromNel[TargetResult](science).findFocus(_.targetId === selectedTarget)
-        (a, s).mapN(AsterismResult(_, _))
+          // Focus each zipper on the selected science target
+          val a = Zipper.fromNel[TargetResult](acquisition).findFocus(_.targetId === selectedTarget)
+          val s = Zipper.fromNel[TargetResult](science).findFocus(_.targetId === selectedTarget)
+          (a, s).mapN(AsterismResult(_, _))
+        }
       } else None
     }
 
