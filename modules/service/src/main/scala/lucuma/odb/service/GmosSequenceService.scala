@@ -7,7 +7,10 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
+import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
@@ -28,6 +31,10 @@ trait GmosSequenceService[F[_]] {
     dynamic: DynamicConfig.GmosNorth
   )(using Transaction[F]): F[Unit]
 
+  def selectGmosNorthDynamic(
+    observationId: Observation.Id
+  )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)]
+
   def insertGmosNorthStatic(
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
@@ -38,6 +45,10 @@ trait GmosSequenceService[F[_]] {
     stepId:  Step.Id,
     dynamic: DynamicConfig.GmosSouth
   )(using Transaction[F]): F[Unit]
+
+  def selectGmosSouthDynamic(
+    observationId: Observation.Id
+  )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)]
 
   def insertGmosSouthStatic(
     observationId: Observation.Id,
@@ -59,6 +70,11 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertGmosNorthDynamic)(stepId, dynamic).void
 
+      override def selectGmosNorthDynamic(
+        observationId: Observation.Id
+      )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)] =
+        session.stream(Statements.SelectGmosNorthDynamicForObs)(observationId, 1024)
+
       override def insertGmosNorthStatic(
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
@@ -76,6 +92,11 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertGmosSouthDynamic)(stepId, dynamic).void
 
+      override def selectGmosSouthDynamic(
+        observationId: Observation.Id
+      )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)] =
+        session.stream(Statements.SelectGmosSouthDynamicForObs)(observationId, 1024)
+
       override def insertGmosSouthStatic(
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
@@ -90,25 +111,33 @@ object GmosSequenceService {
 
   object Statements {
 
+    def encodeColumns(prefix: Option[String], columns: List[String]): String =
+      columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
+
+    val GmosDynamicColumns: List[String] =
+      List(
+        "c_exposure_time",
+        "c_xbin",
+        "c_ybin",
+        "c_amp_count",
+        "c_amp_gain",
+        "c_amp_read_mode",
+        "c_dtax",
+        "c_roi",
+        "c_grating_disperser",
+        "c_grating_order",
+        "c_grating_wavelength",
+        "c_filter",
+        "c_fpu_custom_mask_filename",
+        "c_fpu_custom_mask_slit_width",
+        "c_fpu_builtin"
+      )
+
     def insertGmosDynamic(site: String): Fragment[Void]  =
       sql"""
         INSERT INTO t_gmos_#${site}_dynamic (
           c_step_id,
-          c_exposure_time,
-          c_xbin,
-          c_ybin,
-          c_amp_count,
-          c_amp_gain,
-          c_amp_read_mode,
-          c_dtax,
-          c_roi,
-          c_grating_disperser,
-          c_grating_order,
-          c_grating_wavelength,
-          c_filter,
-          c_fpu_custom_mask_filename,
-          c_fpu_custom_mask_slit_width,
-          c_fpu_builtin
+          #${encodeColumns(none, GmosDynamicColumns)}
         )
       """
 
@@ -117,6 +146,23 @@ object GmosSequenceService {
 
     val InsertGmosSouthDynamic: Command[(Step.Id, DynamicConfig.GmosSouth)] =
       (insertGmosDynamic("south") ~> sql"SELECT $step_id, $gmos_south_dynamic").command
+
+    def selectGmosDynamic[A](site: String, decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
+      (sql"""
+        SELECT
+          s.c_step_id,
+          #${encodeColumns("c".some, GmosDynamicColumns)}
+        FROM t_gmos_#${site}_dynamic c
+        INNER JOIN t_step_record s ON s.c_step_id = c.c_step_id
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
+      ).query(step_id *: decoderA)
+
+    val SelectGmosNorthDynamicForObs: Query[Observation.Id, (Step.Id, DynamicConfig.GmosNorth)] =
+      selectGmosDynamic("north", gmos_north_dynamic)
+
+    val SelectGmosSouthDynamicForObs: Query[Observation.Id, (Step.Id, DynamicConfig.GmosSouth)] =
+      selectGmosDynamic("south", gmos_south_dynamic)
 
     val InsertGmosNorthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosNorth), Long] =
       sql"""

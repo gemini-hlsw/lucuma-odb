@@ -16,19 +16,32 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GuideState
+import lucuma.core.enums.Instrument
 import lucuma.core.math.BoundedInterval
+import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
@@ -1775,4 +1788,177 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
+  val SetupZeroStepsGmosNorth: IO[Observation.Id] =
+    for {
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+    } yield o
+
+  test("zero gmos north dynamic steps - GmosSequenceService") {
+    SetupZeroStepsGmosNorth.flatMap { oid =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .gmosSequenceService
+            .selectGmosNorthDynamic(oid)(using xa)
+            .compile
+            .toList
+        }
+      }
+    }.map(lst => assert(lst.isEmpty))
+  }
+
+  test("zero gmos north dynamic steps - SequenceService steps") {
+    SetupZeroStepsGmosNorth.flatMap { oid =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .sequenceService
+            .selectGmosNorthSteps(oid)(using xa)
+        }
+      }
+    }.map(m => assert(m.isEmpty))
+  }
+
+  test("zero gmos north dynamic steps - SequenceService atom counts") {
+    SetupZeroStepsGmosNorth.flatMap { oid =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .sequenceService
+            .selectGmosNorthAtomCounts(oid)(using xa)
+        }
+      }
+    }.map(m => assert(m.isEmpty))
+  }
+
+  val NorthDynamicScience = GmosNorth(
+    TimeSpan.unsafeFromMicroseconds(20_000_000L),
+    GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
+    GmosDtax.Zero,
+    GmosRoi.FullFrame,
+    GmosGratingConfig.North(GmosNorthGrating.R831_G5302, GmosGratingOrder.One, Wavelength.decimalNanometers.unsafeGet(BigDecimal("500.0"))).some,
+    GmosNorthFilter.RPrime.some,
+    GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
+  )
+
+  val NorthDynamicFlat = NorthDynamicScience.copy(exposure = TimeSpan.unsafeFromMicroseconds(1_000_000L))
+
+  val Science = StepConfig.Science(Offset.Zero, GuideState.Enabled)
+  val Flat    = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
+
+  val SetupOneStepGmosNorth: IO[(Observation.Id, Step.Id)] = {
+    import lucuma.odb.json.all.transport.given
+
+    for {
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      v <- recordVisitAs(user, Instrument.GmosNorth, o)
+      a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 1)
+      s <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+    } yield (o, s)
+}
+
+  test("one gmos north dynamic step - GmosSequenceService") {
+    SetupOneStepGmosNorth.flatMap { case (o, s) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .gmosSequenceService
+            .selectGmosNorthDynamic(o)(using xa)
+            .compile
+            .toList
+        }
+      }.map(lst => assertEquals(lst, List(s -> NorthDynamicScience)))
+    }
+  }
+
+  test("one gmos north dynamic step - SequenceService steps") {
+    SetupOneStepGmosNorth.flatMap { case (o, s) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .sequenceService
+            .selectGmosNorthSteps(o)(using xa)
+        }
+      }.map { m =>
+        assertEquals(m, Map(s -> (NorthDynamicScience, Science)))
+      }
+    }
+  }
+
+  test("one gmos north dynamic step - SequenceService atom counts") {
+    SetupOneStepGmosNorth.flatMap { case (o, _) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .sequenceService
+            .selectGmosNorthAtomCounts(o)(using xa)
+        }
+      }.map { m =>
+        assertEquals(m, Map(List((NorthDynamicScience, Science)) -> PosInt.unsafeFrom(1)))
+      }
+    }
+  }
+
+  val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
+    import lucuma.odb.json.all.transport.given
+
+    for {
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      v <- recordVisitAs(user, Instrument.GmosNorth, o)
+      a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
+      sSci  <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+      sFlat <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicFlat,    Flat)
+    } yield (o, sSci, sFlat)
+  }
+
+  test("two gmos north dynamic steps - GmosSequenceService") {
+    SetupTwoStepsGmosNorth.flatMap { case (o, sSci, sFlat) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .gmosSequenceService
+            .selectGmosNorthDynamic(o)(using xa)
+            .compile
+            .toList
+            .map(_.toMap)
+        }
+      }.map { m =>
+        assertEquals(m, Map(sSci -> NorthDynamicScience, sFlat -> NorthDynamicFlat))
+      }
+    }
+  }
+
+  test("two gmos north dynamic steps - SequenceService steps") {
+    SetupTwoStepsGmosNorth.flatMap { case (o, sSci, sFlat) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .sequenceService
+            .selectGmosNorthSteps(o)(using xa)
+        }
+      }.map { m =>
+        assertEquals(m, Map(sSci -> (NorthDynamicScience, Science), sFlat -> (NorthDynamicFlat, Flat)))
+      }
+    }
+  }
+
+  test("two gmos north dynamic steps - SequenceService atom counts") {
+    SetupTwoStepsGmosNorth.flatMap { case (o, _, _) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          services
+            .sequenceService
+            .selectGmosNorthAtomCounts(o)(using xa)
+        }
+      }.map { m =>
+        assertEquals(m, Map(List((NorthDynamicScience, Science), (NorthDynamicFlat, Flat)) -> PosInt.unsafeFrom(1)))
+      }
+    }
+  }
 }

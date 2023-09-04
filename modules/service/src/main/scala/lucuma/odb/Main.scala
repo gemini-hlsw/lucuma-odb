@@ -271,7 +271,8 @@ object FMain extends MainParams {
       user     = config.user,
       database = database.getOrElse(config.database),
       password = config.password.some,
-      ssl      = SSL.Trusted.withFallback(true)
+      ssl      = SSL.Trusted.withFallback(true),
+      strategy = Strategy.SearchPath
     )
   }
 
