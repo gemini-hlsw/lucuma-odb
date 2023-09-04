@@ -7136,7 +7136,6 @@ type Observation {
   """
   itc: ItcResultSet!
 
-  # Temporary!!!`
 }
 
 """

@@ -57,7 +57,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.TargetRole
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.Generator.FutureLimit
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.util.Codecs.*
@@ -140,12 +139,13 @@ object GuideEnvironmentService {
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
     optWavelength:      Option[Wavelength],
-    fpu:                Option[Either[GmosNorthFpu, GmosSouthFpu]],
+    fpu:                Either[GmosNorthFpu, GmosSouthFpu],
     explicitBase:       Option[Coordinates]
   ) {
-    def agsParams: AgsParams                  = AgsParams.GmosAgsParams(fpu, PortDisposition.Side)
+    def agsParams: AgsParams                  = AgsParams.GmosAgsParams(fpu.some, PortDisposition.Side)
     def wavelength: Either[Error, Wavelength] =
       optWavelength.toRight(Error.GeneralError(s"No wavelength defined for observation $id."))
+    def site: Site = fpu.fold(_ => Site.GN, _ => Site.GS)
   }
 
   def instantiate[F[_]: Concurrent](
@@ -283,17 +283,12 @@ object GuideEnvironmentService {
       def getOffsets(
         pid: Program.Id,
         oid: Observation.Id
-      ): F[Either[Error, (Site, Option[NonEmptyList[Offset]])]] =
+      ): F[Either[Error, Option[NonEmptyList[Offset]]]] =
         generator(commitHash, itcClient, plannedTimeCalculator)
-          .generate(pid, oid, FutureLimit.Default)
+          .digest(pid, oid)
           .map {
             _.leftMap(Error.GeneratorError(_))
-              .map {
-                case GmosNorth(executionConfig) =>
-                  (Site.GN, offsetsFromExecConfig(oid, executionConfig))
-                case GmosSouth(executionConfig) =>
-                  (Site.GS, offsetsFromExecConfig(oid, executionConfig))
-              }
+              .map { d => NonEmptyList.fromFoldable(d.science.offsets) }
           }
 
       def getPositions(
@@ -350,8 +345,7 @@ object GuideEnvironmentService {
           obsInfo        <- EitherT(getObservationInfo(pid, oid))
           asterism       <- EitherT(getAsterism(pid, oid))
           tracking        = ObjectTracking.fromAsterism(asterism)
-          so             <- EitherT(getOffsets(pid, oid))
-          (site, offsets) = so
+          offsets        <- EitherT(getOffsets(pid, oid))
           candidates     <- EitherT(getCandidates(oid, obsTime, tracking))
           baseCoords     <- EitherT.fromEither(
                               obsInfo.explicitBase
@@ -376,7 +370,7 @@ object GuideEnvironmentService {
                                 )
                             )
           positions      <- EitherT.fromEither(
-                              getPositions(oid, site, obsInfo.posAngleConstraint, offsets, tracking, obsTime)
+                              getPositions(oid, obsInfo.site, obsInfo.posAngleConstraint, offsets, tracking, obsTime)
                             )
           usable         <- EitherT.fromEither(
                               processCandidates(obsInfo, baseCoords, scienceCoords, positions, candidates)
@@ -549,24 +543,24 @@ object GuideEnvironmentService {
                   ha   <- HourAngle.fromOrderedDecimalHours.getOption((hMin, hMax))
                 } yield ha
               )
-              .toRight("Invalid elevation range in observation.")
+              .toRight(s"Invalid elevation range in observation $id.")
 
-          val fpu: Option[Either[GmosNorthFpu, GmosSouthFpu]] =
+          val fpu: Either[String, Either[GmosNorthFpu, GmosSouthFpu]] =
             (nFpu, sFpu) match {
-              case (Some(north), None) => north.asLeft.some
-              case (None, Some(south)) => south.asRight.some
-              case _                   => None
+              case (Some(north), None) => north.asLeft.asRight
+              case (None, Some(south)) => south.asRight.asRight
+              case _                   => s"No configuration for observation $id.".asLeft
             }
 
           val explicitBase: Option[Coordinates] =
             (ra, dec).mapN(Coordinates(_, _))
 
-          elevRange.map(elev =>
+          (elevRange, fpu).mapN((elev, f) =>
             ObservationInfo(id,
                             ConstraintSet(image, cloud, sky, water, elev),
                             paConstraint,
                             wavelength,
-                            fpu,
+                            f,
                             explicitBase
             )
           )
