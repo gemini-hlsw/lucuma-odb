@@ -96,7 +96,7 @@ sealed trait ObservationService[F[_]] {
 
   def cloneObservation(
     input: CloneObservationInput
-  )(using Transaction[F]): F[Result[Observation.Id]]
+  )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]]
 
 }
 
@@ -319,7 +319,7 @@ object ObservationService {
 
       def cloneObservation(
         input: CloneObservationInput
-      )(using Transaction[F]): F[Result[Observation.Id]] = {
+      )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
         // First we need the pid, observing mode, and grouping information
         val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
@@ -361,13 +361,13 @@ object ObservationService {
 
                 val doUpdate =
                   input.SET match
-                    case None    => Result(oid2).pure[F] // nothing to do
+                    case None    => Result((pid, oid2)).pure[F] // nothing to do
                     case Some(s) =>
                       updateObservations(pid, s, sql"select $observation_id".apply(oid2))
                         .map { r =>
                           // We probably don't need to check this return value, but I feel bad not doing it.
                           r.flatMap {
-                            case List(`oid2`) => Result(oid2)
+                            case List(`oid2`) => Result((pid, oid2))
                             case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
                           }
                         }
