@@ -5,14 +5,22 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.all.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 
 final case class CloneObservationInput(
   observationId: Observation.Id,
   SET:           Option[ObservationPropertiesInput.Edit],
-)
+) {
+
+  def asterism: Nullable[NonEmptyList[Target.Id]] =
+    SET.fold(Nullable.Absent)(_.asterism)
+    
+}
 
 object CloneObservationInput {
 
