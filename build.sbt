@@ -8,7 +8,7 @@ val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.0.3"
 val fs2Version                 = "3.9.1"
-val grackleVersion             = "0.13.0"
+val grackleVersion             = "0.14-74b6b5d-SNAPSHOT"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.23"
 val http4sJdkHttpClientVersion = "0.9.0"
@@ -18,7 +18,7 @@ val log4catsVersion            = "2.6.0"
 val lucumaCatalogVersion       = "0.43.3"
 val lucumaItcVersion           = "0.20.0"
 val lucumaCoreVersion          = "0.85.0"
-val lucumaGraphQLRoutesVersion = "0.6.6"
+val lucumaGraphQLRoutesVersion = "0.6.6-24-411de6b-20230905T181828Z-SNAPSHOT"
 val lucumaSsoVersion           = "0.6.5"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -114,7 +114,7 @@ lazy val service = project
       "edu.gemini"     %% "gsp-graphql-skunk"                  % grackleVersion,
       "edu.gemini"     %% "lucuma-catalog"                     % lucumaCatalogVersion,
       "edu.gemini"     %% "lucuma-ags"                         % lucumaCatalogVersion,
-      "edu.gemini"     %% "lucuma-graphql-routes-grackle"      % lucumaGraphQLRoutesVersion,
+      "edu.gemini"     %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"          % lucumaSsoVersion,
       "is.cir"         %% "ciris"                              % cirisVersion,
       "is.cir"         %% "ciris-refined"                      % cirisVersion,

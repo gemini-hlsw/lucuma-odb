@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.util
 
-import edu.gemini.grackle.Directive
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.Field
 import edu.gemini.grackle.InputObjectType
@@ -19,6 +18,7 @@ import edu.gemini.grackle.Type
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.UnionType
 import org.tpolecat.sourcepos.SourcePos
+import edu.gemini.grackle.DirectiveDef
 
 object Remapper {
 
@@ -27,7 +27,7 @@ object Remapper {
     new Schema {
       val pos: SourcePos = s.pos
       val types: List[NamedType] = s.types.map(new Remapper(this).remapNamedType)
-      val directives: List[Directive] = s.directives
+      val directives: List[DirectiveDef] = s.directives
     }
 
 }
@@ -35,23 +35,23 @@ object Remapper {
 private class Remapper(s: Schema) {
 
   def remapInputValue: InputValue => InputValue = {
-    case InputValue(name, desc, tpe, defaultValue) =>
-      InputValue(name, desc, remapType(tpe), defaultValue)
+    case InputValue(name, desc, tpe, defaultValue, dirs) =>
+      InputValue(name, desc, remapType(tpe), defaultValue, dirs)
   }
 
   def remapField: Field => Field = {
-    case Field(name, desc, args, tpe, isDeprecated, deprecationReason) =>
-      Field(name, desc, args.map(remapInputValue), remapType(tpe), isDeprecated, deprecationReason)
+    case Field(name, desc, args, tpe, dirs) =>
+      Field(name, desc, args.map(remapInputValue), remapType(tpe), dirs)
   }
 
   def remapNamedType: NamedType => NamedType = {
-    case TypeRef(_, name)                              => TypeRef(s, name)
-    case ScalarType(name, desc)                        => ScalarType(name, desc)
-    case UnionType(name, desc, members)                => UnionType(name, desc, members.map(remapNamedType))
-    case EnumType(name, desc, enumValues)              => EnumType(name, desc, enumValues)
-    case InputObjectType(name, desc, inputFields)      => InputObjectType(name, desc, inputFields.map(remapInputValue))
-    case InterfaceType(name, desc, fields, interfaces) => InterfaceType(name, desc, fields.map(remapField), interfaces.map(remapNamedType))
-    case ObjectType(name, desc, fields, interfaces)    => ObjectType(name, desc, fields.map(remapField), interfaces.map(remapNamedType))
+    case TypeRef(_, name)                                    => TypeRef(s, name)
+    case ScalarType(name, desc, dirs)                        => ScalarType(name, desc, dirs)
+    case UnionType(name, desc, members, dirs)                => UnionType(name, desc, members.map(remapNamedType), dirs)
+    case EnumType(name, desc, enumValues, dirs)              => EnumType(name, desc, enumValues, dirs)
+    case InputObjectType(name, desc, inputFields, dirs)      => InputObjectType(name, desc, inputFields.map(remapInputValue), dirs)
+    case InterfaceType(name, desc, fields, interfaces, dirs) => InterfaceType(name, desc, fields.map(remapField), interfaces.map(remapNamedType), dirs)
+    case ObjectType(name, desc, fields, interfaces, dirs)    => ObjectType(name, desc, fields.map(remapField), interfaces.map(remapNamedType), dirs)
   }
 
   def remapType: Type => Type = {

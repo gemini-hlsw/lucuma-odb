@@ -7,7 +7,6 @@ import cats.Eq
 import cats.kernel.Order
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Result
@@ -19,6 +18,7 @@ import io.circe.Json
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
+import edu.gemini.grackle.Context
 
 trait MappingExtras[F[_]] extends CirceMappingLike[F] {
 

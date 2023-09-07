@@ -5,11 +5,11 @@ package lucuma.odb.graphql.enums
 
 import cats.Functor
 import cats.syntax.all._
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.EnumValue
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
+import edu.gemini.grackle.EnumType
+import edu.gemini.grackle.EnumValueDefinition
 
 object PartnerEnumType {
 
@@ -18,7 +18,8 @@ object PartnerEnumType {
       EnumType(
         "Partner",
         Some("Enumerated type of partners."),
-        elems.map { case tag ~ desc ~ active => EnumValue(tag.toUpperCase(), Some(desc), !active) }
+        elems.map { case tag ~ desc ~ _ => EnumValueDefinition(tag.toUpperCase(), Some(desc), Nil) }, // TODO: deprecated directive
+        Nil
       )
     }
 

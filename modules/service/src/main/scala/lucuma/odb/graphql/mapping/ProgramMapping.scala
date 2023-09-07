@@ -11,6 +11,7 @@ import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
@@ -75,70 +76,67 @@ trait ProgramMapping[F[_]]
       )
     )
 
-  lazy val ProgramElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      ProgramType -> {
-        case Select("observations", List(
-          BooleanBinding("includeDeleted", rIncludeDeleted),
-          ObservationIdBinding.Option("OFFSET", rOFFSET),
-          NonNegIntBinding.Option("LIMIT", rLIMIT),
-        ), child) =>
-          (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
-            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
-            ResultMapping.selectResult("observations", child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  Predicates.observation.existence.includeDeleted(includeDeleted),
-                  OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
-                ))),
-                oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
-                offset = None,
-                limit = Some(limit + 1),
-                q
-              )
-            }
+  lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (ProgramType, "observations", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted),
+      ObservationIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+    )) =>
+      Elab.transformChild { child =>
+        (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
+          val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+              ))),
+              oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
+              offset = None,
+              limit = Some(limit + 1),
+              q
+            )
           }
-        case Select("groupElements", Nil, child) =>
-          Result(
-            Select("groupElements", Nil,
-              FilterOrderByOffsetLimit(
-                pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
-                oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
-                offset = None,
-                limit = None,
-                child
-              )
-            )
-          )
-        case Select("allGroupElements", Nil, child) =>
-          Result(
-            Select("allGroupElements", Nil,
-              FilterOrderByOffsetLimit(
-                pred = None,
-                oss = Some(List(
-                  OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
-                  OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
-                )),
-                offset = None,
-                limit = None,
-                child
-              )
-            )
-          )
-        case Select("obsAttachments", Nil, child) =>
-          Result(
-            Select("obsAttachments", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
-            )
-          )
-        case Select("proposalAttachments", Nil, child) =>
-          Result(
-            Select("proposalAttachments", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
-            )
-          )
+        }
       }
-    )
+
+    case (ProgramType, "groupElements", Nil) =>
+      Elab.transformChild { child => 
+        FilterOrderByOffsetLimit(
+          pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
+          oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
+          offset = None,
+          limit = None,
+          child
+        )
+      }
+
+    case (ProgramType, "allGroupElements", Nil) =>
+      Elab.transformChild { child => 
+        FilterOrderByOffsetLimit(
+          pred = None,
+          oss = Some(List(
+            OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
+            OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
+          )),
+          offset = None,
+          limit = None,
+          child
+        )
+      }
+
+    case (ProgramType, "obsAttachments", Nil) =>
+      Elab.transformChild { child => 
+        OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
+      }
+
+    case (ProgramType, "proposalAttachments", Nil) =>
+      Elab.transformChild { child => 
+        OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
+      }
+
+  }
 
   lazy val plannedTimeHandler: EffectHandler[F] =
     new EffectHandler[F] {
