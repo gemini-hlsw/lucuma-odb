@@ -21,3 +21,17 @@ abstract class TimeSuite(using Encoder[TimeSpan]) extends DisciplineSuite with A
 class TimeQuerySuite extends TimeSuite(using time.query.Encoder_TimeSpan)
 
 class TimeTransportSuite extends TimeSuite(using time.transport.Encoder_TimeSpan)
+
+class TimeSpec extends munit.ScalaCheckSuite {
+  import org.scalacheck.Prop.forAll
+  property("includes value in error") {
+    forAll { (str: String) =>
+      import io.circe.syntax.*
+      time.query.given_Decoder_TimeSpan.decodeJson(str.asJson) match {
+        case Left(e) =>
+          assert(e.getMessage.contains(s"Could not parse duration value ${str.asJson}"), e)
+        case _       => fail("Expected error")
+      }
+    }
+  }
+}
