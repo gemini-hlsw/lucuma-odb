@@ -8,8 +8,10 @@ package longslit
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.option.*
+import cats.syntax.order.*
 import eu.timepit.refined._
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.data.Zipper
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -50,6 +52,15 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
 
     def filter: F = Acquisition.filter(acqFilters, λ, wavelength)
 
+    // Last step, max 360s
+    // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images#activity-2516
+    def lastExpTime(exposureTime: AcqExposureTime): TimeSpan = {
+      val base = (exposureTime * NonNegInt.unsafeFrom(3)).timeSpan
+      if (base > Acquisition.MaxExpTimeLastStep)
+        Acquisition.MaxExpTimeLastStep
+      else base
+    }
+
     eval {
       for {
         _  <- optics.exposure      := exposureTime.timeSpan
@@ -68,7 +79,7 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
         _  <- optics.roi           := GmosRoi.CentralStamp
         s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
-        _  <- optics.exposure      := (exposureTime * NonNegInt.unsafeFrom(3)).timeSpan
+        _  <- optics.exposure      := lastExpTime(exposureTime)
         s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
       } yield Acquisition.Steps(s0, s1, s2)
@@ -78,11 +89,15 @@ sealed trait Acquisition[D, G, F, U] extends SequenceState[D] {
 }
 
 object Acquisition {
-  val AcquisitionSN: SignalToNoise = SignalToNoise.FromBigDecimalExact.getOption(10).get
-  val DefaultIntegrationTime: NonEmptyList[IntegrationTime] =
-    NonEmptyList.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined, AcquisitionSN))
-  val MinExposureTime = TimeSpan.fromSeconds(1).get
-  val MaxExposureTime = TimeSpan.fromSeconds(180).get
+  val AcquisitionSN: SignalToNoise =
+    SignalToNoise.FromBigDecimalExact.getOption(10).get
+
+  val DefaultIntegrationTime: Zipper[IntegrationTime] =
+    Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined, AcquisitionSN))
+
+  val MinExposureTime    = TimeSpan.fromSeconds(1).get
+  val MaxExposureTime    = TimeSpan.fromSeconds(180).get
+  val MaxExpTimeLastStep = TimeSpan.fromSeconds(360).get
 
   def filter[F](acqFilters: NonEmptyList[F], λ: Wavelength, wavelength: F => Wavelength): F =
     acqFilters.toList.minBy { f => λ.diff(wavelength(f)).abs }
