@@ -47,6 +47,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.json.all.query.given
+import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
@@ -83,7 +84,7 @@ object GuideEnvironmentService {
   // There is only one now, will eventually need to get this from somewhere.
   val guideProbe: GuideProbe = GuideProbe.GmosOiwfs
 
-  case class GuideTarget(probe: GuideProbe, target: Sidereal)
+  case class GuideTarget(probe: GuideProbe, target: Target)
 
   object GuideTarget {
     given Encoder[GuideTarget] =
@@ -92,7 +93,7 @@ object GuideEnvironmentService {
           "probe"         -> gt.probe.asJson,
           "name"          -> gt.target.name.asJson,
           "sourceProfile" -> gt.target.sourceProfile.asJson,
-          "sidereal"      -> gt.target.asJson
+          target.query.siderealOrNonJson(gt.target)
         )
       }
   }
