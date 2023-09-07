@@ -384,7 +384,7 @@ object ItcService {
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(ii: ImagingIntegrationTimeInput): F[NonEmptyList[IntegrationTime]] =
+      private def safeAcquisitionCall(ii: ImagingIntegrationTimeInput): F[Zipper[IntegrationTime]] =
         client.imaging(ii, useCache = false)
           .map(_.result)
           .recover {
@@ -392,9 +392,10 @@ object ItcService {
               // Use default if target is too bright
               Acquisition.DefaultIntegrationTime
           }.map {
-            case r if r.head.exposureTime > Acquisition.MaxExposureTime => r.map(_.copy(exposureTime = Acquisition.MaxExposureTime))
-            case r if r.head.exposureTime < Acquisition.MinExposureTime => r.map(_.copy(exposureTime = Acquisition.MinExposureTime))
+            case r if r.focus.exposureTime > Acquisition.MaxExposureTime => r.map(_.copy(exposureTime = Acquisition.MaxExposureTime))
+            case r if r.focus.exposureTime < Acquisition.MinExposureTime => r.map(_.copy(Acquisition.MaxExposureTime))
             case r => r
+
           }
 
       private def callRemoteItc(
@@ -403,7 +404,7 @@ object ItcService {
         targets.traverse { case (tid, (ii, si)) =>
           (safeAcquisitionCall(ii), client.spectroscopy(si, useCache = false)).mapN {
             case (img, IntegrationTimeResult(_, spec)) =>
-              (TargetImagingResult(tid, ii, img.head), TargetSpectroscopyResult(tid, si, spec.head)).rightNel
+              (TargetImagingResult(tid, ii, img.focus), TargetSpectroscopyResult(tid, si, spec.focus)).rightNel
           }
           .handleError { t => (tid, t.getMessage).leftNel }
         }.map(_.sequence.bimap(

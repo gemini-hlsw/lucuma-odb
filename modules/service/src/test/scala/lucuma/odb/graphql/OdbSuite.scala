@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql
 
-import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.effect.unsafe.IORuntime
@@ -28,6 +27,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.JsonObject
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
@@ -148,13 +148,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          NonEmptyList.one(FakeItcResult)
+          Zipper.one(FakeItcResult)
         ).pure[IO]
 
       override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          NonEmptyList.one(FakeItcResult)
+          Zipper.one(FakeItcResult)
         ).pure[IO]
 
       def optimizedSpectroscopyGraph(
