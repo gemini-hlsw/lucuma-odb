@@ -393,7 +393,7 @@ object ItcService {
               Acquisition.DefaultIntegrationTime
           }.map {
             case r if r.focus.exposureTime > Acquisition.MaxExposureTime => r.map(_.copy(exposureTime = Acquisition.MaxExposureTime))
-            case r if r.focus.exposureTime < Acquisition.MinExposureTime => r.map(_.copy(Acquisition.MaxExposureTime))
+            case r if r.focus.exposureTime < Acquisition.MinExposureTime => r.map(_.copy(exposureTime = Acquisition.MinExposureTime))
             case r => r
 
           }
