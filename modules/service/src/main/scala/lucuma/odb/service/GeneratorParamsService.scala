@@ -17,14 +17,9 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import lucuma.core.enums.Band
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObsStatus
-import lucuma.core.math.BrightnessUnits.BrightnessMeasure
-import lucuma.core.math.BrightnessUnits.Integrated
-import lucuma.core.math.BrightnessUnits.Surface
-import lucuma.core.math.BrightnessValue
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -50,8 +45,6 @@ import skunk.*
 import skunk.circe.codec.json.*
 import skunk.implicits.*
 
-import scala.collection.immutable.SortedMap
-
 import GeneratorParamsService.Error
 import Services.Syntax.*
 
@@ -73,33 +66,6 @@ trait GeneratorParamsService[F[_]] {
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
-
-// TODO: move to lucuma-core
-/**
- * Returns the band and brightness value for the band closest to the given wavelength.
- */
-def extractBand[T](w: Wavelength, bMap: SortedMap[Band, BrightnessMeasure[T]]): Option[(Band, BrightnessValue)] =
-  bMap.minByOption { case (b, _) =>
-    (w.toPicometers.value.value - b.center.toPicometers.value.value).abs
-  }.map(x => (x._1, x._2.value))
-
-/**
- * Returns the band and brightness of a source profile for the band closest to the given wavelength.
- */
-def nearestBand(wavelength: Wavelength, sourceProfile: Option[SourceProfile]): Option[(Band, BrightnessValue)] =
-  sourceProfile.flatMap { sp =>
-    SourceProfile
-      .integratedBrightnesses
-      .getOption(sp)
-      .flatMap(bMap => extractBand[Integrated](wavelength, bMap))
-      .orElse(
-        SourceProfile
-          .surfaceBrightnesses
-          .getOption(sp)
-          .flatMap(bMap => extractBand[Surface](wavelength, bMap))
-      )
-  }
-
 
 object GeneratorParamsService {
 
@@ -271,7 +237,7 @@ object GeneratorParamsService {
         mode:       InstrumentMode,
         wavelength: Wavelength
       ): ValidatedNel[Error, (Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
-        val targetBand = nearestBand(wavelength, params.sourceProfile).map(_._1)
+        val targetBand = params.sourceProfile.flatMap(_.nearestBand(wavelength)).map(_._1)
 
         (params.signalToNoise.toValidNel(Error.missing("signal to noise")),
          params.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
