@@ -36,7 +36,7 @@ object time {
           from("minutes",      TimeSpan.FromMinutes     ) orElse
           from("hours",        TimeSpan.FromHours       ) orElse
           from("iso",          TimeSpan.FromString      ) orElse
-          DecodingFailure(s"Could not parse duration value", c.history).asLeft
+          DecodingFailure(s"Could not parse duration value ${c.value.spaces2}", c.history).asLeft
       }
 
   }
@@ -71,5 +71,3 @@ object time {
   object transport extends TransportCodec
 
 }
-
-
