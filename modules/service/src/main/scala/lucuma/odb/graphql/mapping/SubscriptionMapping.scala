@@ -59,11 +59,11 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => Stream[F, Result[Query]]) =
       new SubscriptionField {
         val FieldMapping =
-          RootStream.computeChild(fieldName) { (child, tpe, env) =>
+          RootStream.computeChild(fieldName) { (child, _, _) =>
             child match
-              case Environment(a, child2) =>
+              case Environment(env, child2) =>
                 Nested(env.getR[I]("input").flatTraverse(f(_, child2)))
-                  .map(child3 => Environment(a, child3))
+                  .map(child3 => Environment(env, child3))
                   .value
               case _ =>
                 Result.failure(s"Unexpected: $child").pure[Stream[F, *]]
