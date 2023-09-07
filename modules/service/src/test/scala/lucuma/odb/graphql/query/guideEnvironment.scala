@@ -433,7 +433,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
                   "ra": {
                     "microseconds": 20782434012,
                     "hms": "05:46:22.434012",
-                    "hours": 5.772898336666667,
+                    "hours": 5.772898336666666666666666666666667,
                     "degrees": 86.59347505
                   },
                   "dec": {
