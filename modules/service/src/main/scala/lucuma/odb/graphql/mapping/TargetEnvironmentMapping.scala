@@ -8,10 +8,11 @@ package mapping
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.syntax.all.*
-import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
 import edu.gemini.grackle.Result
+import edu.gemini.grackle.Env
+import edu.gemini.grackle.Query
+import edu.gemini.grackle.QueryCompiler.Elab
+import edu.gemini.grackle.Query._
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax.*
@@ -75,35 +76,31 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       child  = child
     )
 
-  lazy val TargetEnvironmentElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      TargetEnvironmentType -> {
-        case Select("asterism", List(
-          BooleanBinding("includeDeleted", rIncludeDeleted)
-        ), child) =>
-          rIncludeDeleted.map { includeDeleted =>
-            Select("asterism", Nil, asterismQuery(includeDeleted, firstOnly = false, child))
-          }
-
-        // TODO: not yet working
-        case Select("firstScienceTarget", List(
-          BooleanBinding("includeDeleted", rIncludeDeleted)
-        ), child) =>
-          rIncludeDeleted.map { includeDeleted =>
-            Select("firstScienceTarget", Nil, Unique(asterismQuery(includeDeleted, firstOnly = true, child)))
-          }
-
-        case Select("guideEnvironment", List(
-          TimestampBinding(ObsTimeParam, rObsTime)
-        ), child) => 
-          rObsTime.map { obsTime =>
-            Environment(
-              Env(ObsTimeParam -> obsTime),
-              Select("guideEnvironment", Nil, child)
-            )
-          }
+  lazy val TargetEnvironmentElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (TargetEnvironmentType, "asterism", List(BooleanBinding("includeDeleted", rIncludeDeleted))) =>
+      Elab.transformChild { child =>
+        rIncludeDeleted.map { includeDeleted =>
+          asterismQuery(includeDeleted, firstOnly = false, child)
+        }
       }
-    )
+
+    // TODO: not yet working
+    case (TargetEnvironmentType, "firstScienceTarget", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    )) =>
+      Elab.transformChild { child =>
+        rIncludeDeleted.map { includeDeleted =>
+          Unique(asterismQuery(includeDeleted, firstOnly = true, child))
+        }
+      }
+
+    case (TargetEnvironmentType, "guideEnvironment", List(
+      TimestampBinding(ObsTimeParam, rObsTime)
+    )) => 
+      Elab.liftR(rObsTime).flatMap { obsTime =>
+        Elab.env(ObsTimeParam -> obsTime)
+      }
+  }
 
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)

@@ -5,11 +5,11 @@ package lucuma.odb.graphql.enums
 
 import cats.Functor
 import cats.syntax.all._
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.EnumValue
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
+import edu.gemini.grackle.EnumType
+import edu.gemini.grackle.EnumValueDefinition
 
 object FilterTypeEnumType {
 
@@ -18,7 +18,8 @@ object FilterTypeEnumType {
       EnumType(
         "FilterType",
         Some("Enumerated type of filters."),
-        elems.map { case (tag, desc) => EnumValue(tag, Some(desc)) }
+        elems.map { case (tag, desc) => EnumValueDefinition(tag, Some(desc), Nil) },
+        Nil
       )
     }
 

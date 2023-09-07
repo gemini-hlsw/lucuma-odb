@@ -9,8 +9,8 @@ import cats.syntax.all._
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Query._
-import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import lucuma.core.model.Observation
@@ -36,30 +36,29 @@ trait ConstraintSetGroupMapping[F[_]]
       )
     )
 
-  lazy val ConstraintSetGroupElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      ConstraintSetGroupType -> {
-        case Select("observations", List(
-          BooleanBinding("includeDeleted", rIncludeDeleted),
-          ObservationIdBinding.Option("OFFSET", rOFFSET),
-          NonNegIntBinding.Option("LIMIT", rLIMIT),
-        ), child) =>
-          (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
-            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
-            ResultMapping.selectResult("observations", child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  Predicates.observation.existence.includeDeleted(includeDeleted),
-                  OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
-                ))),
-                oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
-                offset = None,
-                limit = Some(limit + 1),
-                q
-              )
-            }
+  lazy val ConstraintSetGroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (ConstraintSetGroupType, "observations", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted),
+      ObservationIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+    )) =>
+      Elab.transformChild { child =>
+        (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
+          val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+              ))),
+              oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
+              offset = None,
+              limit = Some(limit + 1),
+              q
+            )
           }
+        }
       }
-    )
+
 }
 

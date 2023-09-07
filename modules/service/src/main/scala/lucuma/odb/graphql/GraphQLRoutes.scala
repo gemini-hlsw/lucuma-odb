@@ -37,6 +37,7 @@ import skunk.Session
 import skunk.SqlState
 
 import scala.concurrent.duration._
+import edu.gemini.grackle.Operation
 
 object GraphQLRoutes {
 
@@ -99,7 +100,7 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(info(user, s"New service instance."))
                       map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
                       svc   = new GrackleGraphQLService(map) {
-                        override def query(request: ParsedGraphQLRequest): F[Either[Throwable, Json]] =
+                        override def query(request: Operation): F[Either[Throwable, Json]] =
                           super.query(request).retryOnInvalidCursorName.flatTap {
                             case Left(t)  => warn(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}")
                             case Right(j) => debug(user, s"Query (success).")

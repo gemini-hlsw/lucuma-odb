@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.util
 
-import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Cursor.Env.EmptyEnv
-import edu.gemini.grackle.Cursor.Env.NonEmptyEnv
+import edu.gemini.grackle.Env
+import edu.gemini.grackle.Env.EmptyEnv
+import edu.gemini.grackle.Env.NonEmptyEnv
 import edu.gemini.grackle.PathTerm
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Query
@@ -50,11 +50,11 @@ object PrettyPrinter {
   def query(q: Query): Doc =
     q match
 
-      case Select(name, args, child) =>
-        var props = List("name" -> quoted(name))
-        if args.nonEmpty then props :+= "args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close)
-        if child != Query.Empty then props :+= "child" -> query(child)
-        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
+      // case Select(name, args, child) =>
+      //   var props = List("name" -> quoted(name))
+      //   if args.nonEmpty then props = props +: ("args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close))
+      //   if child != Query.Empty then props :+= "child" -> query(child)
+      //   if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
 
       case Group(queries)                  => obj("Group", queries.map(query):_*)
       case Unique(child)                   => obj("Unique", query(child))
@@ -63,17 +63,17 @@ object PrettyPrinter {
       case Introspect(schema, child)       => obj("Introspect", "schema" -> str("<schema>"), "child" -> query(child))
       case Effect(handler, child)          => obj("Effect", "handler" -> str("<handler>"), "child" -> query(child))
       case Environment(e, child)           => obj("Environment", "env" -> env(e), "child" -> query(child))
-      case Wrap(name, child)               => obj("Wrap", "name" -> quoted(name), "child" -> query(child))
-      case Rename(name, child)             => obj("Rename", "name" -> quoted(name), "child" -> query(child))
-      case UntypedNarrow(tpnme, child)     => obj("UntypedNarrow", "tpname" -> quoted(tpnme), "child" -> query(child))
+      // case Wrap(name, child)               => obj("Wrap", "name" -> quoted(name), "child" -> query(child))
+      // case Rename(name, child)             => obj("Rename", "name" -> quoted(name), "child" -> query(child))
+      // case UntypedNarrow(tpnme, child)     => obj("UntypedNarrow", "tpname" -> quoted(tpnme), "child" -> query(child))
       case Narrow(subtpe, child)           => obj("Narrow", "subtpe" -> str(subtpe), "child" -> query(child))
-      case Skip(sense, cond, child)        => obj("Skip", "sense" -> str(sense), "cond" -> str(cond), "child" -> query(child))
+      // case Skip(sense, cond, child)        => obj("Skip", "sense" -> str(sense), "cond" -> str(cond), "child" -> query(child))
       case Limit(num, child)               => obj("Limit", "num" -> str(num), "child" -> query(child))
       case Offset(num, child)              => obj("Offset", "num" -> str(num), "child" -> query(child))
       case OrderBy(selections, child)      => obj("OrderBy", "selections" -> orderSelections(selections), "child" -> query(child))
-      case Count(name, child)              => obj("Limit", "name" -> quoted(name), "child" -> query(child))
+      // case Count(name, child)              => obj("Limit", "name" -> quoted(name), "child" -> query(child))
       case TransformCursor(f, child)       => obj("TransformCursor", "f" -> text("<function>"), "child" -> query(child))
-      case Skipped                         => text("Skipped")
+      // case Skipped                         => text("Skipped")
       case Empty                           => text("Empty")
 
   def binding(b: Binding): Doc =

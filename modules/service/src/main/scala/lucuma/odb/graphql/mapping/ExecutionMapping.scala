@@ -8,12 +8,9 @@ import cats.Eq
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Query.Environment
-import edu.gemini.grackle.Query.Select
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.syntax.*
@@ -28,6 +25,9 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+import edu.gemini.grackle.QueryCompiler.Elab
+import edu.gemini.grackle.Query.Binding
+import edu.gemini.grackle.Env
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
 
@@ -49,20 +49,16 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
       )
     )
 
-  lazy val ExecutionElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      ExecutionType -> {
-        case Select("config", List(
-          Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
-        ), child) =>
-          rFutureLimit.map { futureLimit =>
-            Environment(
-              Env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)),
-              Select("config", Nil, child)
-            )
-          }
+  lazy val ExecutionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (ExecutionType, "config", List(Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit))) =>
+      Elab.transformChild { child =>
+        rFutureLimit.map { futureLimit =>
+          Environment(
+            Env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)),
+            child
+          )
+        }
       }
-    )
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =

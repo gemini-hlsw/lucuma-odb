@@ -5,7 +5,7 @@ package lucuma.odb.graphql.mapping
 
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Cursor.ListTransformCursor
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
@@ -43,18 +43,22 @@ object ResultMapping {
   }
 
   extension (self: Query.type)
-    def mapSomeFields(query: Query)(f: PartialFunction[Query, Result[Query]]): Result[Query] =
-      self.mapFields(query)(f.applyOrElse(_, Result.apply))
+    def mapSomeFields(query: Query)(f: PartialFunction[Query, Query]): Query =
+      self.mapFields(query) { q =>
+        f.lift(q) match
+          case None => q
+          case Some(qq) => qq
+      } 
 
-  private def result(field: Option[String], child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] = {
+  private def result(child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] = {
 
     // Find the "matches" node under the main "targets" query and add all our filtering
     // and whatnot down in there, wrapping with a transform that removes the last row from the
     // final results. See an `SelectResultMapping` to see how `hasMore` works.
-    def transformMatches(q: Query): Result[Query] =
+    def transformMatches(q: Query): Query =
       Query.mapSomeFields(q) {
-        case Select(`collectionField`, Nil, child) =>
-          Result(Select(collectionField, Nil, TransformCursor(Take(limit), transform(child))))
+        case Select(`collectionField`, alias, child) =>
+          Select(collectionField, alias, TransformCursor(Take(limit), transform(child)))
       }
 
     // If we're selecting collectionField then continue by transforming the child query, otherwise
@@ -62,24 +66,23 @@ object ResultMapping {
     if !Query.hasField(child, collectionField)
     then Result.failure(s"Field `$collectionField` must be selected.") // meh
     else
-      transformMatches(child).map { child =>
-        val env = Environment(
-            Env(
-              ResultMapping.LimitKey -> limit,
-              ResultMapping.AliasKey -> Query.fieldAlias(child, collectionField),
-            ),
-            child
-          )
-        field.fold(env)(Select(_, Nil, env))
+      Result {
+        Environment(
+          Env(
+            ResultMapping.LimitKey -> limit,
+            ResultMapping.AliasKey -> Query.fieldAlias(child, collectionField),
+          ),
+          transformMatches(child)
+        )
       }
 
   }
 
-  def selectResult(field: String, child: Query, limit: Int)(transform: Query => Query): Result[Query] =
-    result(Some(field), child, limit, "matches")(transform)
+  def selectResult(child: Query, limit: Int)(transform: Query => Query): Result[Query] =
+    result(child, limit, "matches")(transform)
 
   def mutationResult(child: Query, limit: Int, collectionField: String)(transform: Query => Query): Result[Query] =
-    result(None, child, limit, collectionField)(transform)
+    result(child, limit, collectionField)(transform)
 
 }
 

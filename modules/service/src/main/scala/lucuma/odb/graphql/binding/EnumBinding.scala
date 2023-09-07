@@ -3,7 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value.UntypedVariableValue
+import edu.gemini.grackle.Ast.Value.EnumValue
+import edu.gemini.grackle.Ast.Name
 
-val UntypedVariableBinding: Matcher[String] =
-  primitiveBinding("UntypedVariable") { case UntypedVariableValue(name) => name }
+val EnumBinding: Matcher[Name] =
+  primitiveBinding("Enum") { case EnumValue(name) => name }
