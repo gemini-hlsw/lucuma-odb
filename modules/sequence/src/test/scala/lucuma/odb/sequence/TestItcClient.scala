@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.*
+import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
@@ -53,13 +54,16 @@ object TestItcClient {
         input:    SpectroscopyIntegrationTimeInput,
         useCache: Boolean
       ): F[IntegrationTimeResult] =
-        IntegrationTimeResult(Version, NonEmptyList.one(result)).pure[F]
+        IntegrationTimeResult(Version, Zipper.fromNel(NonEmptyList.one(result))).pure[F]
 
       override def imaging(
         input:    ImagingIntegrationTimeInput,
         useCache: Boolean
       ): F[IntegrationTimeResult] =
-        IntegrationTimeResult(Version, NonEmptyList.one(result)).pure[F]
+        IntegrationTimeResult(
+          Version,
+          Zipper.of(result, result)
+        ).pure[F]
 
       override def optimizedSpectroscopyGraph(
         input:    OptimizedSpectroscopyGraphInput,
