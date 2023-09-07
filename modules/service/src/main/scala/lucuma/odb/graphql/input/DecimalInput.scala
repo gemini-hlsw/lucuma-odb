@@ -27,7 +27,7 @@ import lucuma.odb.graphql.binding._
         BigDecimalBinding("value", rValue),
         EnumBinding("units", rEnum)
       ) =>
-        (rValue, rEnum.map(_.value)).parTupled.flatMap {
+        (rValue, rEnum).parTupled.flatMap {
           case (value, label) =>
             handler.lift((value, label)) match {
               case Some(r) => r

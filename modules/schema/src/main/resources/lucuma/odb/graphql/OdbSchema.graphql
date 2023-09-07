@@ -1,3 +1,16 @@
+
+
+enum Partner { DUMMY }
+enum ConditionsMeasurementSource { DUMMY }
+enum SeeingTrend { DUMMY }
+enum ConditionsExpectationType { DUMMY }
+enum ObsAttachmentType { DUMMY }
+enum FilterType { DUMMY }
+enum ProposalAttachmentType { DUMMY }
+
+
+
+
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
 
@@ -3140,7 +3153,7 @@ type RecordGmosSouthVisitResult {
 Right Ascension, choose one of the available units
 """
 input RightAscensionInput {
-  microarcseconds: Long @deprecated
+  microarcseconds: Long # @deprecated
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal

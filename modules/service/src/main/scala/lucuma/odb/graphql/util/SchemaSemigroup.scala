@@ -12,6 +12,7 @@ import edu.gemini.grackle.Schema
 import edu.gemini.grackle.Type
 import org.tpolecat.sourcepos.SourcePos
 import edu.gemini.grackle.DirectiveDef
+import edu.gemini.grackle.EnumType
 
 /** A mixin that provides Semigroup[Schema]. */
 trait SchemaSemigroup[F[_]] extends Mapping[F] {
@@ -34,6 +35,13 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
         (a.fields ++ b.fields).distinctBy(_.name),
         (a.interfaces ++ b.interfaces).distinctBy(_.name),
         (a.directives ++ b.directives).distinctBy(_.name),
+      )
+    case ((a: EnumType, b: EnumType)) if sameName(a, b) =>
+      EnumType(
+        a.name, 
+        a.description, 
+        (a.enumValues ++ b.enumValues).distinctBy(_.name).filterNot(_.name == "DUMMY"), 
+        (a.directives ++ b.directives).distinctBy(_.name)
       )
     // todo: other named types
     case (a, _) => a

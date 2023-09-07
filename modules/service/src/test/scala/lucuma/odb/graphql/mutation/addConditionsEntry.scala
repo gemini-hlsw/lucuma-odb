@@ -58,7 +58,7 @@ class addConditionsEntry extends OdbSuite {
         }
       """,
       expected = Left(List(
-        "Value of type ConditionsMeasurementSource required for 'source'"
+        "Value of type ConditionsMeasurementSource required for 'source' in field 'addConditionsEntry' of type 'Mutation'"
       ))
     )
   }

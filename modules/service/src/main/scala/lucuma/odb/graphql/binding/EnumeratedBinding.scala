@@ -8,6 +8,6 @@ import io.circe.Json
 import lucuma.core.util.Enumerated
 
 def enumeratedBinding[A](implicit ev: Enumerated[A]): Matcher[A] =
-  EnumBinding.map(n => Json.fromString(n.value)).emap { j =>
+  EnumBinding.map(n => Json.fromString(n)).emap { j =>
     ev.decodeJson(j).leftMap(_.message)
   }

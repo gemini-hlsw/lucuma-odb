@@ -134,11 +134,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
       new MutationField {
         val FieldMapping =
-          RootEffect.computeChild(fieldName) { (child, tpe, env) =>
+          RootEffect.computeChild(fieldName) { (child, _, _) =>
             child match {
-              case Environment(x, child2) =>
+              case Environment(env, child2) =>
                 Nested(env.getR[I]("input").flatTraverse(i => f(i, child2)))
-                  .map(child3 => Environment(x, child3))
+                  .map(child3 => Environment(env, child3))
                   .value
               case _ =>
                 Result.failure(s"Unexpected: $child").pure[F]

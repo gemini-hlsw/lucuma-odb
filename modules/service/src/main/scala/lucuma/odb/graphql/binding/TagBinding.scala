@@ -6,4 +6,4 @@ package lucuma.odb.graphql.binding
 import lucuma.odb.data.Tag
 
 val TagBinding =
-  EnumBinding.map(n => Tag(n.value.toLowerCase))
+  EnumBinding.map(n => Tag(n.toLowerCase))
