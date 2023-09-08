@@ -35,6 +35,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.brightestProfileAt
 import lucuma.core.util.TimeSpan
+import lucuma.itc.ErrorCode
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.IntegrationTimeResult
@@ -388,7 +389,7 @@ object ItcService {
         client.imaging(ii, useCache = false)
           .map(_.result)
           .recover {
-            case ResponseException(errors, _) if errors.exists(_.message.contains("target is too bright")) =>
+            case ResponseException(errors, _) if errors.exists(_.extensions.exists(_.exists(_ === ("errorCode" -> ErrorCode.SourceTooBright.asJson)))) =>
               // Use default if target is too bright
               Acquisition.DefaultIntegrationTime
           }.map {
