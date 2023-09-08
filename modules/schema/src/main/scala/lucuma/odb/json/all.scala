@@ -6,7 +6,9 @@ package lucuma.odb.json
 object all {
 
   trait UniversalCodecs
-    extends GmosCodec
+    extends CatalogInfoCodec
+       with EpochCodec
+       with GmosCodec
        with NumericCodec
        with SequenceCodec
        with SourceProfileCodec
@@ -17,6 +19,12 @@ object all {
        with offset.QueryCodec
        with time.QueryCodec
        with wavelength.QueryCodec
+       with rightascension.QueryCodec
+       with declination.QueryCodec
+       with propermotion.QueryCodec
+       with radialvelocity.QueryCodec
+       with parallax.QueryCodec
+       with target.QueryCodec
        with UniversalCodecs
 
   object transport
@@ -24,6 +32,12 @@ object all {
        with offset.TransportCodec
        with time.TransportCodec
        with wavelength.TransportCodec
+       with rightascension.TransportCodec
+       with declination.TransportCodec
+       with propermotion.TransportCodec
+       with radialvelocity.TransportCodec
+       with parallax.TransportCodec
+       with target.TransportCodec
        with UniversalCodecs
 
 }

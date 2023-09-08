@@ -27,6 +27,7 @@ import org.http4s.HttpRoutes
 import org.http4s.MediaType
 import org.http4s.Request
 import org.http4s.Response
+import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.headers.`Content-Type`
@@ -56,6 +57,7 @@ object GraphQLRoutes {
     userSvc:    UserService[F],
     enums:      Enums,
     ptc:        PlannedTimeCalculator.ForInstrumentMode,
+    httpClient: Client[F]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -95,7 +97,7 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(userSvc.canonicalizeUser(user).retryOnInvalidCursorName)
 
                       _    <- OptionT.liftF(info(user, s"New service instance."))
-                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc)
+                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
                       svc   = new GrackleGraphQLService(map) {
                         override def query(request: ParsedGraphQLRequest): F[Either[Throwable, Json]] =
                           super.query(request).retryOnInvalidCursorName.flatTap {

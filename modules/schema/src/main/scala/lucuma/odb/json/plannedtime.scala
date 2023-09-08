@@ -10,6 +10,7 @@ import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
+import lucuma.core.data.ZipperCodec
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.DatasetEstimate
@@ -23,7 +24,7 @@ import lucuma.core.util.TimeSpan
 trait PlannedTimeCodec {
 
   import time.decoder.given
-  import zipper.given
+  import ZipperCodec.given
 
   given Decoder[SetupTime] =
     Decoder.instance { c =>

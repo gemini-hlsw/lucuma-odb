@@ -50,7 +50,9 @@ import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
+import org.http4s.Response
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -173,6 +175,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
+  // override in tests that need an http client
+  protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
+  
+  private def httpClient: Client[IO] = Client.apply(httpRequestHandler)
+
   protected def databaseConfig: Config.Database =
     Config.Database(
       host     = container.containerIpAddress,
@@ -208,7 +215,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       ssoClient.pure[Resource[IO, *]],
       "unused",
       s3ClientOpsResource,
-      s3PresignerResource
+      s3PresignerResource,
+      httpClient.pure[Resource[IO, *]]
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -221,7 +229,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(PlannedTimeCalculator.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc)
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient)
     } yield map
 
   protected def server: Resource[IO, Server] =

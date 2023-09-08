@@ -13,7 +13,7 @@ import org.scalacheck.Prop
 import org.scalacheck.Prop.*
 
 def conversionTest[A: Arbitrary : Decoder : Encoder](keys: Set[String] = Set.empty): Prop =
-  forAll { (a: A, i: Int) =>
+  forAll { (a: A) =>
     Encoder[A].apply(a).asObject.exists { o =>
 
       // Leave only the keys referring to equivalent values in distinct units
