@@ -120,6 +120,7 @@ trait BaseMapping[F[_]]
   lazy val GroupIdType                         = schema.ref("GroupId")
   lazy val GroupEditType                       = schema.ref("GroupEdit")
   lazy val GroupElementType                    = schema.ref("GroupElement")
+  lazy val GuideProbeType                      = schema.ref("GuideProbe")
   lazy val GuideStateType                      = schema.ref("GuideState")
   lazy val HmsStringType                       = schema.ref("HmsString")
   lazy val HourAngleRangeType                  = schema.ref("HourAngleRange")

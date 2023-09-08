@@ -15,6 +15,7 @@ val http4sJdkHttpClientVersion = "0.9.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.11"
 val log4catsVersion            = "2.6.0"
+val lucumaCatalogVersion       = "0.43.2"
 val lucumaItcVersion           = "0.19.0"
 val lucumaCoreVersion          = "0.85.0"
 val lucumaGraphQLRoutesVersion = "0.6.6"
@@ -30,7 +31,7 @@ val skunkVersion               = "0.6.0"
 val pprintVersion              = "0.8.1"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
-ThisBuild / tlBaseVersion      := "0.5"
+ThisBuild / tlBaseVersion      := "0.6"
 ThisBuild / scalaVersion       := "3.3.0"
 ThisBuild / crossScalaVersions := Seq("3.3.0")
 
@@ -110,6 +111,8 @@ lazy val service = project
       "com.monovore"   %% "decline"                            % declineVersion,
       "io.laserdisc"   %% "fs2-aws-s3"                         % fs2AwsVersion,
       "edu.gemini"     %% "gsp-graphql-skunk"                  % grackleVersion,
+      "edu.gemini"     %% "lucuma-catalog"                     % lucumaCatalogVersion,
+      "edu.gemini"     %% "lucuma-ags"                         % lucumaCatalogVersion,
       "edu.gemini"     %% "lucuma-graphql-routes-grackle"      % lucumaGraphQLRoutesVersion,
       "edu.gemini"     %% "lucuma-sso-backend-client"          % lucumaSsoVersion,
       "is.cir"         %% "ciris"                              % cirisVersion,

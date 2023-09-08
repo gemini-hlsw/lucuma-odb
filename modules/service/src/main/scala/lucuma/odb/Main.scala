@@ -36,6 +36,7 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s._
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.client.Client
 import org.http4s.implicits._
 import org.http4s.server._
 import org.http4s.server.websocket.WebSocketBuilder2
@@ -208,7 +209,8 @@ object FMain extends MainParams {
       config.ssoClient,
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
-      S3FileService.s3PresignerResource(config.aws)
+      S3FileService.s3PresignerResource(config.aws),
+      config.httpClientResource
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
@@ -220,17 +222,19 @@ object FMain extends MainParams {
     ssoClientResource:   Resource[F, SsoClient[F, User]],
     domain:              String,
     s3OpsResource:       Resource[F, S3AsyncClientOp[F]],
-    s3PresignerResource: Resource[F, S3Presigner]
+    s3PresignerResource: Resource[F, S3Presigner],
+    httpClientResource:  Resource[F, Client[F]]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
       itcClient         <- itcClientResource
       ssoClient         <- ssoClientResource
+      httpClient        <- httpClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(PlannedTimeCalculator.fromSession(_, enums)))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc)
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)

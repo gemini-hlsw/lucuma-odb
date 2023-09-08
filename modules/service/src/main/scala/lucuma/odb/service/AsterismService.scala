@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
+import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -12,15 +13,24 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.show.*
 import edu.gemini.grackle.Result
+import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.math.Coordinates
+import lucuma.core.math.ProperMotion
+import lucuma.core.model.CatalogInfo
+import lucuma.core.model.EphemerisKey
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.SiderealTracking
+import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
-import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.program_id
-import lucuma.odb.util.Codecs.target_id
+import lucuma.odb.data.TargetRole
+import lucuma.odb.json.all.query.given
+import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.circe.codec.all.*
+import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -74,6 +84,10 @@ trait AsterismService[F[_]] {
     newId: Observation.Id,
   )(using Transaction[F]): F[Unit]
 
+  def getAsterism(
+    programId: Program.Id,
+    observationId: Observation.Id
+  )(using NoTransaction[F]): F[List[(Target.Id, Target)]]
 }
 
 object AsterismService {
@@ -84,7 +98,7 @@ object AsterismService {
   ): String =
     s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
 
-  def instantiate[F[_]: MonadCancelThrow](using Services[F]): AsterismService[F] =
+  def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
 
@@ -153,11 +167,19 @@ object AsterismService {
           ps.execute(clone.argument).void
         }
 
+      override def getAsterism(
+        programId: Program.Id,
+        observationId: Observation.Id
+      )(using NoTransaction[F]): F[List[(Target.Id, Target)]] =
+        val af = Statements.getAsterism(user, programId, observationId)
+        session.prepareR(af.fragment.query(Decoders.targetDecoder)).use { ps =>
+          ps.stream(af.argument, chunkSize = 1024).compile.toList
+        }
     }
 
   object Statements {
 
-    import ProgramService.Statements.{existsUserAccess, whereUserAccess}
+    import ProgramService.Statements.{andWhereUserAccess, whereUserAccess}
 
     def insertLinksAs(
       user:           User,
@@ -210,14 +232,6 @@ object AsterismService {
         targetIds.map(sql"$target_id").intercalate(void", ") |+|
       void")"
 
-    private def andExistsUserAccess(
-      user:      User,
-      programId: Program.Id
-    ): AppliedFragment =
-      existsUserAccess(user, programId).fold(AppliedFragment.empty) { af =>
-        void" AND " |+| af
-      }
-
     def deleteLinksAs(
       user:           User,
       programId:      Program.Id,
@@ -228,7 +242,7 @@ object AsterismService {
          void"WHERE " |+| programIdEqual(programId)     |+|
          void" AND " |+| observationIdIn(observationIds) |+|
          void" AND " |+| targetIdIn(targetIds)           |+|
-         andExistsUserAccess(user, programId)
+         andWhereUserAccess(user, programId)
 
     def deleteAllLinksAs(
       user:           User,
@@ -238,7 +252,7 @@ object AsterismService {
       void"DELETE FROM ONLY t_asterism_target "         |+|
         void"WHERE " |+| programIdEqual(programId)      |+|
         void" AND "  |+| observationIdIn(observationIds) |+|
-        andExistsUserAccess(user, programId)
+        andWhereUserAccess(user, programId)
 
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
       sql"""
@@ -257,6 +271,94 @@ object AsterismService {
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid, originalOid)
 
+    def getAsterism(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
+      sql"""
+        select
+          t.c_target_id,
+          c_name,
+          c_sid_ra,
+          c_sid_dec,
+          c_sid_epoch,
+          c_sid_pm_ra,
+          c_sid_pm_dec,
+          c_sid_rv,
+          c_sid_parallax,
+          c_sid_catalog_name,
+          c_sid_catalog_id,
+          c_sid_catalog_object_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_source_profile
+        from t_target t
+        inner join t_asterism_target a
+        on t.c_target_id = a.c_target_id
+          and a.c_program_id = $program_id
+          and a.c_observation_id = $observation_id
+        where t.c_existence = 'present'
+          and t.c_role = $target_role
+      """.apply(pid, oid, TargetRole.Science) |+| andWhereUserAccess(user, pid)
   }
 
+  object Decoders {
+    def toNonEmpty(s: String): Option[NonEmptyString] = NonEmptyString.from(s).toOption
+
+    val targetDecoder: Decoder[(Target.Id, Target)] =
+      (target_id *:
+        text_nonempty *:           // name
+        right_ascension.opt *:
+        declination.opt *:
+        epoch.opt *:
+        int8.opt *:               // proper motion ra
+        int8.opt *:               // proper motion dec
+        radial_velocity.opt *:
+        parallax.opt *:
+        catalog_name.opt *:
+        varchar.opt *:            // catalog id
+        varchar.opt *:            // catalog object type
+        varchar.opt *:            // ns des
+        ephemeris_key_type.opt *: // ns ephemeris key type
+        jsonb                     // source profile
+      ).emap {
+        case (id,
+              name,
+              oRa,
+              oDec,
+              oEpoch,
+              oPmRa,
+              oPmDec,
+              oRv,
+              oParallax,
+              oCatName,
+              oCatId,
+              oCatType,
+              oDes,
+              oEphemKeyType,
+              profile
+            ) =>
+          val oSourceProfile = profile.as[SourceProfile].toOption
+          (oRa, oDec, oEpoch, oSourceProfile)
+            .mapN { (ra, dec, epoch, sourceProfile) =>
+              val baseCoords   = Coordinates(ra, dec)
+              val properMotion = (oPmRa, oPmDec).mapN((pmRa, pmDec) =>
+                ProperMotion(ProperMotion.μasyRA(pmRa), ProperMotion.μasyDec(pmDec))
+              )
+              val catalogInfo  = (oCatName, oCatId.flatMap(toNonEmpty)).mapN { (name, id) =>
+                CatalogInfo(name, id, oCatType.flatMap(toNonEmpty))
+              }
+              val tracking     = SiderealTracking(baseCoords, epoch, properMotion, oRv, oParallax)
+              (id, Target.Sidereal(name, tracking, sourceProfile, catalogInfo))
+            }
+            .orElse(
+              (oDes, oEphemKeyType, oSourceProfile)
+                .mapN((des, keyType, sourceProfile) =>
+                  EphemerisKey.fromTypeAndDes
+                    .getOption((keyType, des))
+                    .map(key => (id, Target.Nonsidereal(name, key, sourceProfile)))
+                )
+                .flatten
+            )
+            .toRight(s"Invalid target $id.")
+      }
+
+  }
 }
