@@ -6,17 +6,21 @@ package lucuma.odb.graphql.util
 import cats.Eq
 import cats.kernel.Order
 import cats.syntax.all._
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
+import edu.gemini.grackle.Result
 import edu.gemini.grackle.Type
+import edu.gemini.grackle.circe.CirceMappingLike
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Encoder
+import io.circe.Json
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
 
-trait MappingExtras[F[_]] extends Mapping[F] {
+trait MappingExtras[F[_]] extends CirceMappingLike[F] {
 
   given Order[NonNegShort] = Order.by(_.value) // y u not exist already
 
@@ -33,7 +37,7 @@ trait MappingExtras[F[_]] extends Mapping[F] {
         CursorField(field, _.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
     }
   }
-      
+
   /**
     * A dispatching `TypeMapping` that selects a different underlying mapping based on the GraphQL
     * `Type` and field name.
@@ -50,7 +54,7 @@ trait MappingExtras[F[_]] extends Mapping[F] {
             .map(_.underlying)                         // with List/Nullable removed
             .zip(cx.path.reverse.tails)                // zipped with the (remaining) path to where we are now
             .map { (t, p) => Path.from(t).prepend(p) } // turned into Path objects.
-        
+
         lookup.collectFirst { case (p, m) if allPaths.exists(_ === p) => m }
 
       }
@@ -67,5 +71,22 @@ trait MappingExtras[F[_]] extends Mapping[F] {
         }
       }
     }
+
+  // If the parent is a CirceCursor we just walk down and don't look to see if a defined mapping
+  // for the type we're sitting on. This lets us treat json results as opaque, terminal results.
+  override def mkCursorForField(parent: Cursor, fieldName: String, resultName: Option[String]): Result[Cursor] = {
+    val context = parent.context
+    val fieldContext = context.forFieldOrAttribute(fieldName, resultName)
+    parent match {
+      case CirceCursor(_, json, _, env) =>
+        val f = json.asObject.flatMap(_(fieldName))
+        f match {
+          case None if fieldContext.tpe.isNullable => Result(CirceCursor(fieldContext, Json.Null, Some(parent), env))
+          case Some(json) => Result(CirceCursor(fieldContext, json, Some(parent), env))
+          case _ => Result.failure(s"Json blob doesn't contain field '$fieldName' for type ${context.tpe}")
+        }
+      case _ => super.mkCursorForField(parent, fieldName, resultName)
+    }
+  }
 
 }

@@ -31,6 +31,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
 import natchez.Trace
+import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 
@@ -78,6 +79,7 @@ object OdbMapping {
     commitHash0: CommitHash,
     enums:       Enums,
     ptc:         PlannedTimeCalculator.ForInstrumentMode,
+    httpClient0:  Client[F]
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
@@ -200,6 +202,7 @@ object OdbMapping {
           override val topics: Topics[F] = topics0
           override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
           override val plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode = ptc
+          override val httpClient: Client[F] = httpClient0
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =

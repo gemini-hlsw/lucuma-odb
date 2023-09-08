@@ -5,15 +5,13 @@ package lucuma.odb.json
 
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
-import lucuma.core.data.Zipper
-import lucuma.core.data.arb.ArbZipper
+import lucuma.core.model.CatalogInfo
+import lucuma.core.model.arb.ArbCatalogInfo
 import munit.DisciplineSuite
 
-class ZipperSuite extends DisciplineSuite with ArbitraryInstances {
+class CatalogInfoSuite extends DisciplineSuite with ArbitraryInstances {
+  import ArbCatalogInfo.*
+  import cataloginfo.given
 
-  import ArbZipper.given
-  import zipper.given
-
-  checkAll("Zipper", CodecTests[Zipper[Int]].codec)
-
+  checkAll("CatalogInfoCodec", CodecTests[CatalogInfo].codec)
 }
