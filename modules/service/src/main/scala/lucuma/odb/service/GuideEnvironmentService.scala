@@ -41,7 +41,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
-import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.itc.client.ItcClient
@@ -252,17 +251,6 @@ object GuideEnvironmentService {
           offset
         }
 
-      def offsetsFromExecConfig[S, D](
-        oid:        Observation.Id,
-        execConfig: ExecutionConfig[S, D]
-      ): Option[NonEmptyList[Offset]] =
-        execConfig.science
-          .map { s =>
-            s.nextAtom.steps.offsets ++
-              s.possibleFuture.flatMap(_.steps.offsets)
-          }
-          .flatMap(NonEmptyList.fromList)
-
       def getOffsets(
         pid: Program.Id,
         oid: Observation.Id
@@ -271,7 +259,7 @@ object GuideEnvironmentService {
           .digest(pid, oid)
           .map {
             _.leftMap(Error.GeneratorError(_))
-              .map { d => NonEmptyList.fromFoldable(d.science.offsets) }
+              .map { d => NonEmptyList.fromFoldable(d.science.offsets.union(d.acquisition.offsets)) }
           }
 
       def getPositions(
@@ -284,9 +272,7 @@ object GuideEnvironmentService {
       ): Either[Error, NonEmptyList[AgsPosition]] = {
         val angles     =
           posAngleConstraint.anglesToTestAt(site, tracking, obsTime).map(_.sorted(Angle.AngleOrder))
-        val newOffsets = offsets match
-          case None          => NonEmptyList.of(Offset.Zero)
-          case Some(offsets) => offsets.prepend(Offset.Zero).distinct
+        val newOffsets = offsets.getOrElse(NonEmptyList.of(Offset.Zero))
 
         angles
           .map(toTest =>
