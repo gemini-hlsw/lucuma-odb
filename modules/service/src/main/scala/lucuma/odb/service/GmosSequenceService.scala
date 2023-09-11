@@ -114,7 +114,7 @@ object GmosSequenceService {
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
-    val GmosDynamicColumns: List[String] =
+    private val GmosDynamicColumns: List[String] =
       List(
         "c_exposure_time",
         "c_xbin",
@@ -133,7 +133,7 @@ object GmosSequenceService {
         "c_fpu_builtin"
       )
 
-    def insertGmosDynamic(site: String): Fragment[Void]  =
+    private def insertGmosDynamic(site: String): Fragment[Void]  =
       sql"""
         INSERT INTO t_gmos_#${site}_dynamic (
           c_step_id,
@@ -147,7 +147,7 @@ object GmosSequenceService {
     val InsertGmosSouthDynamic: Command[(Step.Id, DynamicConfig.GmosSouth)] =
       (insertGmosDynamic("south") ~> sql"SELECT $step_id, $gmos_south_dynamic").command
 
-    def selectGmosDynamic[A](site: String, decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
+    private def selectGmosDynamic[A](site: String, decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
       (sql"""
         SELECT
           s.c_step_id,

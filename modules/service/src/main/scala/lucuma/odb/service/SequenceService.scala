@@ -241,45 +241,45 @@ object SequenceService {
         stepMap: Map[Step.Id, (D, StepConfig)]
       )(using Transaction[F]): F[Map[List[(D, StepConfig)], PosInt]] = {
 
-        type StepMatch[D]     = (D, StepConfig)
-        type AtomMatch[D]     = List[StepMatch[D]]
-        type CompletionMap[D] = Map[AtomMatch[D], PosInt]
+        type StepMatch     = (D, StepConfig)
+        type AtomMatch     = List[StepMatch]
+        type CompletionMap = Map[AtomMatch, PosInt]
 
-        trait State[D] {
-          def reset: State[D]
-          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): State[D]
-          def finalized: CompletionMap[D]
+        trait State {
+          def reset: State
+          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch): State
+          def finalized: CompletionMap
         }
 
-        case class Reset[D](completed: CompletionMap[D]) extends State[D] {
-          def reset: State[D] = this
+        case class Reset(completed: CompletionMap) extends State {
+          def reset: State = this
 
-          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): State[D] =
+          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch): State =
             InProgress(aid, count, List(step), completed)
 
-          def finalized: CompletionMap[D] = completed
+          def finalized: CompletionMap = completed
         }
 
         object Reset {
-          def init[D]: State[D] = Reset[D](Map.empty)
+          lazy val init: State = Reset(Map.empty)
         }
 
-        case class InProgress[D](
+        case class InProgress(
           inProgressAtomId: Atom.Id,
           inProgressCount:  NonNegShort,
-          inProgressSteps:  AtomMatch[D],
-          completed:        CompletionMap[D]
-        ) extends State[D] {
+          inProgressSteps:  AtomMatch,
+          completed:        CompletionMap
+        ) extends State {
 
-          def reset: State[D] = Reset(completed)
+          def reset: State = Reset(completed)
 
-          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): State[D] =
-            if ((aid === inProgressAtomId))
+          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch): State =
+            if (aid === inProgressAtomId)
               copy(inProgressSteps = step :: inProgressSteps) // continue existing atom
             else
               InProgress(aid, count, List(step), finalized)   // start a new atom
 
-          def finalized: CompletionMap[D] =
+          def finalized: CompletionMap =
             if (inProgressSteps.sizeIs != inProgressCount.value)
               completed
             else
@@ -293,7 +293,7 @@ object SequenceService {
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectStepRecordForObs)(observationId, 1024)
-          .fold(Reset.init[D]) { case (state, (aid, cnt, sid)) =>
+          .fold(Reset.init) { case (state, (aid, cnt, sid)) =>
             stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, _))
           }
           .compile
@@ -339,7 +339,7 @@ object SequenceService {
         (for {
           _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           a    = selectAtomRecord(atomId).map(_.filter(_.instrument === instrument))
-          inv <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
+          _   <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
           sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
           _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType)).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
@@ -470,7 +470,7 @@ object SequenceService {
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
-    def selectStepConfigForObs[A](table: String, columns: List[String], decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
+    private def selectStepConfigForObs[A](table: String, columns: List[String], decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
       (sql"""
         SELECT
           s.c_step_id,
@@ -507,7 +507,7 @@ object SequenceService {
 //      """.command
 //    }
 
-    def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
+    private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""
         INSERT INTO #$table (
           c_step_id,
@@ -515,7 +515,7 @@ object SequenceService {
         )
       """
 
-    val StepConfigGcalColumns: List[String] =
+    private val StepConfigGcalColumns: List[String] =
       List(
         "c_gcal_continuum",
         "c_gcal_ar_arc",
@@ -538,7 +538,7 @@ object SequenceService {
     val SelectStepConfigGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.Gcal)] =
       selectStepConfigForObs("t_step_config_gcal", StepConfigGcalColumns, step_config_gcal)
 
-    val StepConfigScienceColumns: List[String] =
+    private val StepConfigScienceColumns: List[String] =
       List(
         "c_offset_p",
         "c_offset_q",
@@ -556,7 +556,7 @@ object SequenceService {
     val SelectStepConfigScienceForObs: Query[Observation.Id, (Step.Id, StepConfig.Science)] =
       selectStepConfigForObs("t_step_config_science", StepConfigScienceColumns, step_config_science)
 
-    val StepConfigSmartGcalColumns: List[String] =
+    private val StepConfigSmartGcalColumns: List[String] =
       List(
         "c_smart_gcal_type"
       )
