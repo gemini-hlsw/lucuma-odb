@@ -571,7 +571,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield (p, o)
 
-    setup.flatMap { case (pid, oid) =>
+    setup.flatMap { case (_, oid) =>
       expect(
         user  = user,
         query =
@@ -1093,7 +1093,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield (p, o)
 
-    setup.flatMap { case (pid, oid) =>
+    setup.flatMap { case (_, oid) =>
       expect(
         user  = user,
         query =
@@ -1788,7 +1788,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
-  val SetupZeroStepsGmosNorth: IO[Observation.Id] =
+  private val SetupZeroStepsGmosNorth: IO[Observation.Id] =
     for {
       p <- createProgram
       t <- createTargetWithProfileAs(user, p)
@@ -1833,7 +1833,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }.map(m => assert(m.isEmpty))
   }
 
-  val NorthDynamicScience = GmosNorth(
+  private val NorthDynamicScience = GmosNorth(
     TimeSpan.unsafeFromMicroseconds(20_000_000L),
     GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
     GmosDtax.Zero,
@@ -1843,12 +1843,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
   )
 
-  val NorthDynamicFlat = NorthDynamicScience.copy(exposure = TimeSpan.unsafeFromMicroseconds(1_000_000L))
+  private val NorthDynamicFlat = NorthDynamicScience.copy(exposure = TimeSpan.unsafeFromMicroseconds(1_000_000L))
 
-  val Science = StepConfig.Science(Offset.Zero, GuideState.Enabled)
-  val Flat    = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
+  private val Science = StepConfig.Science(Offset.Zero, GuideState.Enabled)
+  private val Flat    = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
 
-  val SetupOneStepGmosNorth: IO[(Observation.Id, Step.Id)] = {
+  private val SetupOneStepGmosNorth: IO[(Observation.Id, Step.Id)] = {
     import lucuma.odb.json.all.transport.given
 
     for {
@@ -1856,7 +1856,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       t <- createTargetWithProfileAs(user, p)
       o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
-      a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 1)
+      a <- recordAtomAs(user, Instrument.GmosNorth, v)
       s <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
     } yield (o, s)
 }
@@ -1903,7 +1903,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
+  private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
     import lucuma.odb.json.all.transport.given
 
     for {
