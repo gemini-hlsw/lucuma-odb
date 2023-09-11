@@ -10,7 +10,6 @@ import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
-import edu.gemini.grackle.Query.Environment
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.syntax.*
@@ -51,13 +50,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
 
   lazy val ExecutionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (ExecutionType, "config", List(Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit))) =>
-      Elab.transformChild { child =>
-        rFutureLimit.map { futureLimit =>
-          Environment(
-            Env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)),
-            child
-          )
-        }
+      Elab.liftR(rFutureLimit).flatMap { futureLimit =>
+        Elab.env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default))
       }
 
   extension (e: Generator.Error) {

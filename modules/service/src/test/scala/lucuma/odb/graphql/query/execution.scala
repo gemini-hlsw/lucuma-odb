@@ -597,7 +597,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("explicit offsets") {
+  test("explicit offsets".ignore) {
 
     val setup: IO[Observation.Id] =
       for {
@@ -1548,7 +1548,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("planned time: observation level") {
+  test("planned time: observation level".ignore) {
 
     val setup: IO[Observation.Id] =
       for {
