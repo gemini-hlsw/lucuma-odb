@@ -6787,8 +6787,9 @@ successes, the overall "result" will be a failure. The "all" field contains
 results for all targets regardless.
 """
 type ItcResultSet {
-  result: ItcResult!
-  all:    [ItcResult!]
+  selected: ItcResult!
+  all:      [ItcResult!]
+  index:    NonNegInt!
 }
 
 """

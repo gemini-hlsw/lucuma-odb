@@ -53,7 +53,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
               observation(observationId: "$oid") {
                 id
                 itc {
-                  result {
+                  selected {
                     targetId
                     exposureTime {
                       seconds
@@ -74,7 +74,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                "observation": {
                  "id": $oid,
                  "itc": {
-                   "result": {
+                   "selected": {
                      "targetId": $tid,
                      "exposureTime": {
                        "seconds": 10.000000
@@ -105,7 +105,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$oid") {
                 itc {
-                  result {
+                  selected {
                     targetId
                   }
                   all {
@@ -120,7 +120,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             {
                "observation": {
                  "itc": {
-                   "result": {
+                   "selected": {
                      "targetId": $tid1
                    },
                    "all": [
@@ -199,7 +199,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$o") {
                 itc {
-                  result {
+                  selected {
                     targetId
                   }
                 }
@@ -277,7 +277,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$o") {
                 itc {
-                  result {
+                  selected {
                     targetId
                   }
                 }
@@ -353,7 +353,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$o") {
                 itc {
-                  result {
+                  selected {
                     targetId
                   }
                 }
