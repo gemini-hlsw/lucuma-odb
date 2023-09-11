@@ -100,7 +100,6 @@ sealed trait ObservationService[F[_]] {
 
 }
 
-
 object ObservationService {
 
   final case class ItcParams(
