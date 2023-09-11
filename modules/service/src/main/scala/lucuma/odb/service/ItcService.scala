@@ -496,7 +496,7 @@ object ItcService {
           c_hash,
           c_sci_exposure_time,
           c_sci_exposure_count,
-          c_sci_signal_to_noise
+          c_sci_signal_to_noise,
           c_acq_exposure_time,
           c_acq_exposure_count,
           c_acq_signal_to_noise
