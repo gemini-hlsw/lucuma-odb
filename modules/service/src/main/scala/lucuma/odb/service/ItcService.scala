@@ -216,7 +216,10 @@ object ItcService {
 
     given Encoder[AsterismResult] =
       Encoder.instance { rs =>
-        rs.scienceResult.asJson
+        Json.obj(
+          "science" -> rs.scienceResult.asJson,
+          "acquisition" -> rs.acquisitionResult.asJson
+        )
       }
 
   }
