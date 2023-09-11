@@ -29,6 +29,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
+import lucuma.core.data.ZipperCodec.given
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -147,8 +148,8 @@ object ItcService {
   }
 
   sealed trait TargetResult {
-    val targetId: Target.Id
-    val value:    IntegrationTime
+    val targetId:      Target.Id
+    val value:         IntegrationTime
 
     def totalTime: Option[TimeSpan] = {
       val total = BigInt(value.exposureTime.toMicroseconds) * value.exposures.value
@@ -213,13 +214,9 @@ object ItcService {
       } else None
     }
 
-    // Clients only care about science results
     given Encoder[AsterismResult] =
       Encoder.instance { rs =>
-        Json.obj(
-          "result" -> rs.scienceResult.focus.asJson,
-          "all"    -> rs.scienceResult.toList.asJson
-        )
+        rs.scienceResult.asJson
       }
 
   }
