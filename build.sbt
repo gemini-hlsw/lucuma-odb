@@ -38,6 +38,7 @@ ThisBuild / crossScalaVersions := Seq("3.3.0")
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
 
+ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
 ThisBuild / githubWorkflowBuild +=
   WorkflowStep.Use(
