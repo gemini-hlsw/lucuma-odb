@@ -29,6 +29,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
+import lucuma.core.data.ZipperCodec.given
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -213,12 +214,11 @@ object ItcService {
       } else None
     }
 
-    // Clients only care about science results
     given Encoder[AsterismResult] =
       Encoder.instance { rs =>
         Json.obj(
-          "result" -> rs.scienceResult.focus.asJson,
-          "all"    -> rs.scienceResult.toList.asJson
+          "science" -> rs.scienceResult.asJson,
+          "acquisition" -> rs.acquisitionResult.asJson
         )
       }
 
@@ -314,10 +314,10 @@ object ItcService {
         ): F[Option[(TargetImagingResult, TargetSpectroscopyResult)]] =
           session
             .option(Statements.SelectOneItcResult)(pid, oid, tid)
-            .map(_.collect { case (h, time) if h === hash(input) =>
+            .map(_.collect { case (h, sciTime, acqTime) if h === hash(input) =>
               (
-                TargetImagingResult(tid, input._1, time),
-                TargetSpectroscopyResult(tid, input._2, time)
+                TargetImagingResult(tid, input._1, acqTime),
+                TargetSpectroscopyResult(tid, input._2, sciTime)
               )
             })
 
@@ -343,8 +343,10 @@ object ItcService {
 
                // Get the cached result, if any, for each target in the
                // observation's asterism.
-               val cachedResults: Map[Target.Id, (Md5Hash, IntegrationTime)] =
-                 lst.map { case (_, tid, h, time) => tid -> (h, time) }.toMap
+               val cachedResults: Map[Target.Id, (Md5Hash, IntegrationTime, IntegrationTime)] =
+                 lst.map { case (_, tid, h, sciTime, acqTime) =>
+                  tid -> (h, sciTime, acqTime)
+                 }.toMap
 
                // Get the GeneratorParams for the observation, lookup the ITC
                // inputs (there's one per target), then find the corresponding
@@ -356,10 +358,10 @@ object ItcService {
                    .map(itcInputs)
                    .flatMap(
                      _.traverse { case (tid, input) =>
-                       cachedResults.get(tid).collect { case (h, time) if hash(input) === h =>
+                       cachedResults.get(tid).collect { case (h, sciTime, acqTime) if hash(input) === h =>
                         (
-                          TargetImagingResult(tid, input._1, time),
-                          TargetSpectroscopyResult(tid, input._2, time)
+                          TargetImagingResult(tid, input._1, acqTime),
+                          TargetSpectroscopyResult(tid, input._2, sciTime)
                         )
                        }
                      }
@@ -431,11 +433,15 @@ object ItcService {
             science.value.exposures,
             science.value.signalToNoise,
             acquisition.value.exposureTime,
+            acquisition.value.exposures,
+            acquisition.value.signalToNoise,
             h,
             science.value.exposureTime,
             science.value.exposures,
             science.value.signalToNoise,
             acquisition.value.exposureTime,
+            acquisition.value.exposures,
+            acquisition.value.signalToNoise,
           ).ensuring(acquisition.targetId === science.targetId).void
         }
 
@@ -466,31 +472,37 @@ object ItcService {
       Program.Id,
       Observation.Id,
       Target.Id
-    ), (Md5Hash, IntegrationTime)] =
+    ), (Md5Hash, IntegrationTime, IntegrationTime)] =
       sql"""
         SELECT
           c_hash,
-          c_exposure_time,
-          c_exposure_count,
-          c_signal_to_noise
+          c_sci_exposure_time,
+          c_sci_exposure_count,
+          c_sci_signal_to_noise,
+          c_acq_exposure_time,
+          c_acq_exposure_count,
+          c_acq_signal_to_noise
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id AND
               c_target_id      = $target_id
-      """.query(md5_hash *: integration_time)
+      """.query(md5_hash *: integration_time *: integration_time)
 
-    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, Md5Hash, IntegrationTime)] =
+    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, Md5Hash, IntegrationTime, IntegrationTime)] =
       sql"""
         SELECT
           c_observation_id,
           c_target_id,
           c_hash,
-          c_exposure_time,
-          c_exposure_count,
-          c_signal_to_noise
+          c_sci_exposure_time,
+          c_sci_exposure_count,
+          c_sci_signal_to_noise,
+          c_acq_exposure_time,
+          c_acq_exposure_count,
+          c_acq_signal_to_noise
         FROM t_itc_result
         WHERE c_program_id = $program_id
-      """.query(observation_id *: target_id *: md5_hash *: integration_time)
+      """.query(observation_id *: target_id *: md5_hash *: integration_time *: integration_time)
 
     val InsertOrUpdateItcResult: Command[(
       Program.Id,
@@ -501,11 +513,15 @@ object ItcService {
       PosInt,
       SignalToNoise,
       TimeSpan,
+      PosInt,
+      SignalToNoise,
       Md5Hash,
       TimeSpan,
       PosInt,
       SignalToNoise,
-      TimeSpan
+      TimeSpan,
+      PosInt,
+      SignalToNoise,
     )] =
       sql"""
         INSERT INTO t_itc_result (
@@ -513,10 +529,12 @@ object ItcService {
           c_observation_id,
           c_target_id,
           c_hash,
-          c_exposure_time,
-          c_exposure_count,
-          c_signal_to_noise,
-          c_acquisition_time
+          c_sci_exposure_time,
+          c_sci_exposure_count,
+          c_sci_signal_to_noise,
+          c_acq_exposure_time,
+          c_acq_exposure_count,
+          c_acq_signal_to_noise
         ) SELECT
           $program_id,
           $observation_id,
@@ -525,13 +543,17 @@ object ItcService {
           $time_span,
           $pos_int,
           $signal_to_noise,
-          $time_span
+          $time_span,
+          $pos_int,
+          $signal_to_noise
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
-          SET c_hash             = $md5_hash,
-              c_exposure_time    = $time_span,
-              c_exposure_count   = $pos_int,
-              c_signal_to_noise  = $signal_to_noise,
-              c_acquisition_time = $time_span
+          SET c_hash                 = $md5_hash,
+              c_sci_exposure_time    = $time_span,
+              c_sci_exposure_count   = $pos_int,
+              c_sci_signal_to_noise  = $signal_to_noise,
+              c_acq_exposure_time    = $time_span,
+              c_acq_exposure_count   = $pos_int,
+              c_acq_signal_to_noise  = $signal_to_noise
       """.command
 
 

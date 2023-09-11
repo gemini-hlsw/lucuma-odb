@@ -6787,8 +6787,9 @@ successes, the overall "result" will be a failure. The "all" field contains
 results for all targets regardless.
 """
 type ItcResultSet {
-  result: ItcResult!
-  all:    [ItcResult!]
+  selected: ItcResult!
+  all:      [ItcResult!]
+  index:    NonNegInt!
 }
 
 """
@@ -7134,8 +7135,20 @@ type Observation {
   The ITC result for this observation, assuming it has associated target(s)
   and a selected observing mode.
   """
-  itc: ItcResultSet!
+  itc: Itc!
 
+}
+
+type Itc {
+  """
+  The ITC result for the science part of the sequence
+  """
+  science: ItcResultSet!
+
+  """
+  The ITC result for the acquisition part of the sequence
+  """
+  acquisition: ItcResultSet!
 }
 
 """

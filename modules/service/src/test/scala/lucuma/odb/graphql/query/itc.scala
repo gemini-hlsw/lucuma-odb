@@ -53,16 +53,31 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
               observation(observationId: "$oid") {
                 id
                 itc {
-                  result {
-                    targetId
-                    exposureTime {
-                      seconds
+                  science {
+                    selected {
+                      targetId
+                      exposureTime {
+                        seconds
+                      }
+                      exposures
+                      signalToNoise
                     }
-                    exposures
-                    signalToNoise
+                    all {
+                      targetId
+                    }
                   }
-                  all {
-                    targetId
+                  acquisition {
+                    selected {
+                      targetId
+                      exposureTime {
+                        seconds
+                      }
+                      exposures
+                      signalToNoise
+                    }
+                    all {
+                      targetId
+                    }
                   }
                 }
               }
@@ -71,24 +86,41 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-               "observation": {
-                 "id": $oid,
-                 "itc": {
-                   "result": {
-                     "targetId": $tid,
-                     "exposureTime": {
-                       "seconds": 10.000000
+              "observation": {
+                "id": $oid,
+                "itc": {
+                  "science": {
+                    "selected": {
+                      "targetId": $tid,
+                       "exposureTime": {
+                         "seconds": 10.000000
+                       },
+                       "exposures": ${FakeItcResult.exposures.value},
+                       "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
                      },
-                     "exposures": ${FakeItcResult.exposures.value},
-                     "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
-                   },
-                   "all": [
-                     {
-                       "targetId": $tid
-                     }
-                   ]
-                 }
-               }
+                     "all": [
+                       {
+                         "targetId": $tid
+                       }
+                    ]
+                  },
+                  "acquisition": {
+                    "selected": {
+                      "targetId": $tid,
+                       "exposureTime": {
+                         "seconds": 10.000000
+                       },
+                       "exposures": ${FakeItcResult.exposures.value},
+                       "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+                     },
+                     "all": [
+                       {
+                         "targetId": $tid
+                       }
+                    ]
+                  }
+                }
+              }
             }
           """
         )
@@ -105,11 +137,13 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$oid") {
                 itc {
-                  result {
-                    targetId
-                  }
-                  all {
-                    targetId
+                  science {
+                    selected {
+                      targetId
+                    }
+                    all {
+                      targetId
+                    }
                   }
                 }
               }
@@ -118,21 +152,23 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         expected = Right(
           json"""
             {
-               "observation": {
-                 "itc": {
-                   "result": {
-                     "targetId": $tid1
-                   },
-                   "all": [
-                     {
-                       "targetId": $tid0
-                     },
-                     {
-                       "targetId": $tid1
-                     }
-                   ]
-                 }
-               }
+              "observation": {
+                "itc": {
+                  "science": {
+                    "selected": {
+                      "targetId": $tid1
+                    },
+                    "all": [
+                      {
+                        "targetId": $tid0
+                      },
+                      {
+                        "targetId": $tid1
+                      }
+                    ]
+                  }
+                }
+              }
             }
           """
         )
@@ -199,8 +235,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$o") {
                 itc {
-                  result {
-                    targetId
+                  science {
+                    selected {
+                      targetId
+                    }
                   }
                 }
               }
@@ -277,8 +315,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$o") {
                 itc {
-                  result {
-                    targetId
+                  science {
+                    selected {
+                      targetId
+                    }
                   }
                 }
               }
@@ -353,8 +393,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             query {
               observation(observationId: "$o") {
                 itc {
-                  result {
-                    targetId
+                  science {
+                    selected {
+                      targetId
+                    }
                   }
                 }
               }
