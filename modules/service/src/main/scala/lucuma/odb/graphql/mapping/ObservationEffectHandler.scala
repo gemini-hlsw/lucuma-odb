@@ -13,6 +13,7 @@ import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
+import edu.gemini.grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -43,18 +44,22 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
         (for {
           ctx <- ResultT(queryContext(queries).pure[F])
-          res <- ctx.distinct.traverse { case (pid, oid, env) =>
+          obs <- ctx.distinct.traverse { case (pid, oid, env) =>
                    ResultT(calculate(pid, oid, env)).map((oid, env, _))
                  }
-        } yield
-          ctx
-            .flatMap { case (_, oid, env) => res.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
-            .zip(queries)
-            .map { case (result, (child, parentCursor)) =>
-              val json: Json     = Json.fromFields(List(fieldName -> result.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
-              (child, cursor)
-            }
+          res <- ResultT(ctx
+                   .flatMap { case (_, oid, env) => obs.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
+                   .zip(queries)
+                   .traverse { case (result, (child, childCursor)) =>
+                     childCursor.context.parent.toResultOrError("No parent context").map { parentContext =>
+                       val parentField    = childCursor.path.head
+                       val json: Json     = Json.fromFields(List(parentField -> Json.fromFields(List(fieldName -> result.asJson))))
+                       val cursor: Cursor = CirceCursor(parentContext, json, Some(childCursor), childCursor.fullEnv)
+                       (Query.Select(parentField, None, child), cursor)
+                     }
+                   }.pure[F]
+                 )
+          } yield res
         ).value
 
     }
