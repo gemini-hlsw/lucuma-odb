@@ -11,6 +11,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.text.utf8
 import lucuma.core.model.ObsAttachment
+import lucuma.core.model.User
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.client.JavaNetClientBuilder
@@ -64,16 +65,16 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
         } yield nes
       }
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 30)
-  val service = TestUsers.service(3)
+  val pi: User      = TestUsers.Standard.pi(1, 30)
+  val pi2: User     = TestUsers.Standard.pi(2, 30)
+  val service: User = TestUsers.service(3)
 
-  val validUsers = List(pi, pi2, service)
+  val validUsers: List[User] = List(pi, pi2, service)
 
   def getViaPresignedUrl(url: NonEmptyString): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      var uri = Uri.unsafeFromString(url.value)
-      var request = Request[IO](
+    server.flatMap { _ =>
+      val uri = Uri.unsafeFromString(url.value)
+      val request = Request[IO](
         method = Method.GET,
         uri = uri,
       )

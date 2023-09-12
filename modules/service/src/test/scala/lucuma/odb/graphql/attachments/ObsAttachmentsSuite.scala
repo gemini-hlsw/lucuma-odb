@@ -64,8 +64,8 @@ abstract class ObsAttachmentsSuite extends AttachmentsSuite {
     attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
-      var request = Request[IO](
+      val uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
+      val request = Request[IO](
         method = Method.GET,
         uri = uri,
         headers = Headers(authHeader(user))
@@ -80,8 +80,8 @@ abstract class ObsAttachmentsSuite extends AttachmentsSuite {
     attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "obs" / "url" / programId.toString / attachmentId.toString
-      var request = Request[IO](
+      val uri     = svr.baseUri / "attachment" / "obs" / "url" / programId.toString / attachmentId.toString
+      val request = Request[IO](
         method = Method.GET,
         uri = uri,
         headers = Headers(authHeader(user))
@@ -96,8 +96,8 @@ abstract class ObsAttachmentsSuite extends AttachmentsSuite {
     attachmentId: ObsAttachment.Id
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
-      var request = Request[IO](
+      val uri     = svr.baseUri / "attachment" / "obs" / programId.toString / attachmentId.toString
+      val request = Request[IO](
         method = Method.DELETE,
         uri = uri,
         headers = Headers(authHeader(user))
