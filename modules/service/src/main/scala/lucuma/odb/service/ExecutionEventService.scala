@@ -139,7 +139,7 @@ object ExecutionEventService {
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time) = e
           _ <- EitherT.liftF(
-            Applicative[F].whenA(stepStage === StepStage.EndStep)(
+            Applicative[F].whenA(stepStage === StepStage.EndStep)(  // Simplistic we'll need to examine datasets as well
               services.sequenceService.setStepCompleted(stepId, time)
             )
           )
