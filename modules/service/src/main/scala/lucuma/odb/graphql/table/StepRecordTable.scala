@@ -28,6 +28,7 @@ trait StepRecordTable[F[_]] extends BaseMapping[F] {
     val AtomId: ColumnRef        = col("c_atom_id",        atom_id)
     val StepType: ColumnRef      = col("c_step_type",      step_type)
     val Created: ColumnRef       = col("c_created",        core_timestamp)
+    val Completed: ColumnRef     = col("c_completed",      core_timestamp.opt)
 
     object Gcal {
       val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum)
