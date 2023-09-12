@@ -3,11 +3,13 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.functor.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
@@ -136,7 +138,11 @@ object ExecutionEventService {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time) = e
-          _ <- EitherT.liftF(services.sequenceService.setStepCompleted(stepId, time))
+          _ <- EitherT.liftF(
+            Applicative[F].whenA(stepStage === StepStage.EndStep)(
+              services.sequenceService.setStepCompleted(stepId, time)
+            )
+          )
         } yield Success(eid, time)).merge
       }
     }
