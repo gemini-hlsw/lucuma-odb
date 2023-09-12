@@ -146,8 +146,8 @@ class proposalAttachments extends AttachmentsSuite {
     ta:        TestAttachment
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "proposal" / programId.toString / ta.attachmentType
-      var request = Request[IO](
+      val uri     = svr.baseUri / "attachment" / "proposal" / programId.toString / ta.attachmentType
+      val request = Request[IO](
         method = Method.GET,
         uri = uri,
         headers = Headers(authHeader(user))
@@ -162,8 +162,8 @@ class proposalAttachments extends AttachmentsSuite {
     ta:        TestAttachment
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "proposal" / "url" / programId.toString / ta.attachmentType
-      var request = Request[IO](
+      val uri     = svr.baseUri / "attachment" / "proposal" / "url" / programId.toString / ta.attachmentType
+      val request = Request[IO](
         method = Method.GET,
         uri = uri,
         headers = Headers(authHeader(user))
@@ -178,8 +178,8 @@ class proposalAttachments extends AttachmentsSuite {
     ta:        TestAttachment
   ): Resource[IO, Response[IO]] =
     server.flatMap { svr =>
-      var uri     = svr.baseUri / "attachment" / "proposal" / programId.toString / ta.attachmentType
-      var request = Request[IO](
+      val uri     = svr.baseUri / "attachment" / "proposal" / programId.toString / ta.attachmentType
+      val request = Request[IO](
         method = Method.DELETE,
         uri = uri,
         headers = Headers(authHeader(user))
@@ -199,19 +199,19 @@ class proposalAttachments extends AttachmentsSuite {
     )
   }
 
-  val file1A           = TestAttachment("file1.pdf", "science", "A description".some, "Hopeful")
-  val file1B           = TestAttachment("file1.pdf", "science", none, "New contents")
-  val file1C           = TestAttachment("file1.pdf", "team", none, "Same name, different type")
-  val file1Empty       = TestAttachment("file1.pdf", "science", "Thing".some, "")
-  val file1InvalidType = TestAttachment("file1.pdf", "NotAType", none, "It'll never make it")
-  val file2            = TestAttachment("file2.pdf", "team", "Masked".some, "Zorro")
-  val fileWithPath     = TestAttachment("this/file.pdf", "science", none, "Doesn't matter")
-  val missingFileName  = TestAttachment("", "science", none, "Doesn't matter")
+  private val file1A           = TestAttachment("file1.pdf", "science", "A description".some, "Hopeful")
+  private val file1B           = TestAttachment("file1.pdf", "science", none, "New contents")
+  private val file1C           = TestAttachment("file1.pdf", "team", none, "Same name, different type")
+  private val file1Empty       = TestAttachment("file1.pdf", "science", "Thing".some, "")
+  private val file1InvalidType = TestAttachment("file1.pdf", "NotAType", none, "It'll never make it")
+  private val file2            = TestAttachment("file2.pdf", "team", "Masked".some, "Zorro")
+  private val fileWithPath     = TestAttachment("this/file.pdf", "science", none, "Doesn't matter")
+  private val missingFileName  = TestAttachment("", "science", none, "Doesn't matter")
   // same attachment type as file1A, but different name, etc.
-  val file3            = TestAttachment("different.pdf", "science", "Unmatching file name".some, "Something different")
-  val missingExtension = TestAttachment("file1", "science", "Missing extension".some, "Doesn't matter")
-  val emptyExtension =   TestAttachment("file1.", "team", "Empty extension".some, "Doesn't matter")
-  val invalidExtension =   TestAttachment("file1.pif", "science", "Invalid extension".some, "Doesn't matter")
+  private val file3            = TestAttachment("different.pdf", "science", "Unmatching file name".some, "Something different")
+  private val missingExtension = TestAttachment("file1", "science", "Missing extension".some, "Doesn't matter")
+  private val emptyExtension   = TestAttachment("file1.", "team", "Empty extension".some, "Doesn't matter")
+  private val invalidExtension = TestAttachment("file1.pif", "science", "Invalid extension".some, "Doesn't matter")
 
   val invalidExtensionMsg = "Invalid file. Must be a PDF file."
 
@@ -341,17 +341,15 @@ class proposalAttachments extends AttachmentsSuite {
 
   test("update with duplicate name is a BadRequest") {
     for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(pi, pid, file1A).expectOk
-      path   <- getRemotePathFromDb(pid, file1A)
-      fileKey = awsConfig.fileKey(path)
-      _      <- insertAttachment(pi, pid, file2).expectOk
-      path2  <- getRemotePathFromDb(pid, file2)
-      fk2     = awsConfig.fileKey(path2)
-      _      <- assertAttachmentsGql(pi, pid, file2, file1A)
-      _      <- updateAttachment(pi, pid, file1C).withExpectation(Status.BadRequest, "Duplicate file name")
-      _      <- assertAttachmentsGql(pi, pid, file2, file1A)
-      _      <- getAttachment(pi, pid, file2).expectBody(file2.content)
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, file1A).expectOk
+      _   <- getRemotePathFromDb(pid, file1A)
+      _   <- insertAttachment(pi, pid, file2).expectOk
+      _   <- getRemotePathFromDb(pid, file2)
+      _   <- assertAttachmentsGql(pi, pid, file2, file1A)
+      _   <- updateAttachment(pi, pid, file1C).withExpectation(Status.BadRequest, "Duplicate file name")
+      _   <- assertAttachmentsGql(pi, pid, file2, file1A)
+      _   <- getAttachment(pi, pid, file2).expectBody(file2.content)
     } yield ()
   }
 
@@ -573,7 +571,6 @@ class proposalAttachments extends AttachmentsSuite {
     for {
       pid    <- createProgramAs(pi)
       _      <- insertAttachment(service, pid, file1A).expectOk
-      newDesc = "New description"
       newTa   = file1A.copy(description = none)
       _      <- updateAttachmentsGql(pi,
                                      pid,
