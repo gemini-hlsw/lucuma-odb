@@ -33,6 +33,7 @@ import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+import edu.gemini.grackle.syntax.*
 
 import Services.Syntax.*
 import binding._
@@ -150,20 +151,24 @@ trait ProgramMapping[F[_]]
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
         (for {
           ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Program.Id]("id") }.pure[F])
-          res <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
-        } yield
-          ctx
-            .flatMap(pid => res.find(r => r._1 === pid).map(_._2).toList)
-            .zip(queries)
-            .map { case (result, (child, parentCursor)) =>
-              import lucuma.odb.json.plannedtime.given
-              import lucuma.odb.json.time.query.given
-              val json: Json     = Json.fromFields(List("plannedTimeRange" -> result.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
-              (child, cursor)
-            }
+          ps  <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
+          res <- ResultT(ctx
+                    .flatMap(pid => ps.find(r => r._1 === pid).map(_._2).toList)
+                    .zip(queries)
+                    .traverse { case (result, (child, childCursor)) =>
+                      import lucuma.odb.json.plannedtime.given
+                      import lucuma.odb.json.time.query.given
+                      childCursor.context.parent.toResultOrError("No parent context").map { parentContext =>
+                        val parentField    = childCursor.path.head
+                        val json: Json     = Json.fromFields(List(parentField -> Json.fromFields(List("plannedTimeRange" -> result.asJson))))
+                        val cursor: Cursor = CirceCursor(parentContext, json, Some(childCursor), childCursor.fullEnv)
+                        (Query.Select(parentField, None, child), cursor)
+                      }
+                    }.pure[F]
+                  )
+          } yield res
         ).value
-    }
-
+        
+  }
 }
 
