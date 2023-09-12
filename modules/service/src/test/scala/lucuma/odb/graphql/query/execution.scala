@@ -29,12 +29,14 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.GuideState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.StepStage
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -43,6 +45,7 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -1908,17 +1911,17 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("one gmos north dynamic step - SequenceService atom counts") {
-    SetupOneStepGmosNorth.flatMap { case (o, _) =>
+    val m = SetupOneStepGmosNorth.flatMap { case (o, _) =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
             .selectGmosNorthAtomCounts(o)(using xa)
         }
-      }.map { m =>
-        assertEquals(m, Map(List((NorthDynamicScience, Science)) -> PosInt.unsafeFrom(1)))
       }
     }
+
+    assertIO(m, Map(List((NorthDynamicScience, Science)) -> PosInt.unsafeFrom(1)))
   }
 
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
@@ -1972,16 +1975,49 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("two gmos north dynamic steps - SequenceService atom counts") {
-    SetupTwoStepsGmosNorth.flatMap { case (o, _, _) =>
+    val m = SetupTwoStepsGmosNorth.flatMap { case (o, _, _) =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
             .selectGmosNorthAtomCounts(o)(using xa)
         }
-      }.map { m =>
-        assertEquals(m, Map(List((NorthDynamicScience, Science), (NorthDynamicFlat, Flat)) -> PosInt.unsafeFrom(1)))
       }
     }
+
+    assertIO(m, Map(List((NorthDynamicScience, Science), (NorthDynamicFlat, Flat)) -> PosInt.unsafeFrom(1)))
   }
+
+  test("clear execution digest") {
+
+    val setup: IO[(Program.Id, Observation.Id, Step.Id)] = {
+      import lucuma.odb.json.all.transport.given
+
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        v <- recordVisitAs(user, Instrument.GmosNorth, o)
+        a <- recordAtomAs(user, Instrument.GmosNorth, v)
+        s <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+      } yield (p, o, s)
+    }
+
+    val md5 = Md5Hash.unsafeFromByteArray(Array.fill(16)(0.toByte))
+
+    val isEmpty = setup.flatMap { case (p, o, s) =>
+      withServices(user) { services =>
+        services.session.transaction.use { xa =>
+          for {
+            _ <- services.executionDigestService.insertOrUpdate(p, o, md5, ExecutionDigest.Zero)(using xa)
+            _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa)
+            d <- services.executionDigestService.selectOne(p, o, md5)(using xa)
+          } yield d.isEmpty
+        }
+      }
+    }
+
+    assertIOBoolean(isEmpty, "The execution digest should be removed")
+  }
+
 }
