@@ -20,6 +20,7 @@ import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
@@ -32,6 +33,14 @@ import skunk.implicits.*
 import scala.collection.immutable.SortedSet
 
 sealed trait ExecutionDigestService[F[_]] {
+
+  /**
+   * Delete the execution digest (if any) associated with the observation which
+   * is in turn associated with the given step.
+   */
+  def deleteOne(
+    sid: Step.Id
+  )(using Transaction[F]): F[Unit]
 
   def selectOne(
     programId:     Program.Id,
@@ -56,6 +65,12 @@ object ExecutionDigestService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionDigestService[F] =
     new ExecutionDigestService[F] {
+
+      override def deleteOne(
+        sid: Step.Id
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.DeleteOneExecutionDigest)(sid).void
+
       override def selectOne(
         pid:  Program.Id,
         oid:  Observation.Id,
@@ -116,6 +131,19 @@ object ExecutionDigestService {
     }
 
   object Statements {
+
+    val DeleteOneExecutionDigest: Command[Step.Id] =
+      sql"""
+        DELETE FROM t_execution_digest
+          WHERE (c_program_id, c_observation_id) IN (
+            SELECT o.c_program_id,
+                   o.c_observation_id
+              FROM t_observation o
+              JOIN t_atom_record a ON a.c_observation_id = o.c_observation_id
+              JOIN t_step_record s ON s.c_atom_id = a.c_atom_id
+             WHERE s.c_step_id = $step_id
+          )
+      """.command
 
     private val setup_time: Codec[SetupTime] =
       (time_span *: time_span).to[SetupTime]
@@ -184,7 +212,7 @@ object ExecutionDigestService {
         c_sci_atom_count
       """
 
-    def SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
+    val SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
@@ -195,7 +223,7 @@ object ExecutionDigestService {
           c_observation_id = $observation_id
       """.query(md5_hash *: execution_digest)
 
-    def SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
+    val SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_observation_id,
@@ -206,7 +234,7 @@ object ExecutionDigestService {
           c_program_id = $program_id
       """.query(observation_id *: md5_hash *: execution_digest)
 
-    def InsertOrUpdateExecutionDigest: Command[(
+    val InsertOrUpdateExecutionDigest: Command[(
       Program.Id,
       Observation.Id,
       Md5Hash,
