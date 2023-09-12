@@ -1833,6 +1833,23 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }.map(m => assert(m.isEmpty))
   }
 
+  private def addEndStepEvent(sid: Step.Id): IO[Unit] = {
+    val q = s"""
+      mutation {
+        addStepEvent(input: {
+          stepId: "$sid",
+          stepStage: END_STEP
+        }) {
+          event {
+            stepId
+          }
+        }
+      }
+    """
+
+    query(user, q).void
+  }
+
   private val NorthDynamicScience = GmosNorth(
     TimeSpan.unsafeFromMicroseconds(20_000_000L),
     GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
@@ -1858,6 +1875,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v)
       s <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+      _ <- addEndStepEvent(s)
     } yield (o, s)
 }
 
@@ -1912,8 +1930,13 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
+
       sSci  <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+      _     <- addEndStepEvent(sSci)
+
       sFlat <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicFlat,    Flat)
+      _     <- addEndStepEvent(sFlat)
+
     } yield (o, sSci, sFlat)
   }
 

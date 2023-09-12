@@ -461,8 +461,8 @@ object SequenceService {
           s.c_step_id
         FROM t_step_record s
         INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
-        WHERE """ ~> sql"""a.c_observation_id = $observation_id ORDER BY s.c_created"""
-      ).query(atom_id *: int2_nonneg *: step_id)     // ORDER BY not quite correct, add a completion time set from events
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL ORDER BY s.c_completed"""
+      ).query(atom_id *: int2_nonneg *: step_id)
 
     val SelectStepConfigBiasOrDarkForObs: Query[Observation.Id, (Step.Id, StepType)] =
       (sql"""
