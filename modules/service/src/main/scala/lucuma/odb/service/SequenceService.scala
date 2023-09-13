@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -211,32 +212,12 @@ object SequenceService {
 
         for {
           ds <- foldStream(dynamicConfigs, Map.empty[Step.Id, D])((_, d) => d.some)
-          e   = Map.empty[Step.Id, (D, StepConfig)]
-          op  = (sid: Step.Id, sc: StepConfig) => ds.get(sid).tupleRight(sc)
-          g  <- foldQuery(Statements.SelectStepConfigGcalForObs,      e)(op)
-          s  <- foldQuery(Statements.SelectStepConfigScienceForObs,   g)(op)
-          m  <- foldQuery(Statements.SelectStepConfigSmartGcalForObs, s)(op)
-          bd <- biasAndDark(observationId)
-        } yield foldConfigs(bd, m)(op)
+          r  <- foldQuery(Statements.SelectStepConfigForObs, Map.empty[Step.Id, (D, StepConfig)]) { (sid, sc) =>
+            ds.get(sid).tupleRight(sc)
+          }
+        } yield r
 
       }
-
-      // Bias and Dark have no real configuration other than the instrument
-      // itself.  There's not a separate table for these like there is for gcal,
-      // science, and smart gcal.
-      private def biasAndDark(observationId: Observation.Id): F[List[(StepConfig, Set[Step.Id])]] =
-        session
-          .stream(Statements.SelectStepConfigBiasOrDarkForObs)(observationId, 1024)
-          .fold((Set.empty[Step.Id], Set.empty[Step.Id])) { case ((bias, dark), (s, stype)) =>
-            stype match {
-              case StepType.Bias => (bias + s, dark)
-              case StepType.Dark => (bias, dark + s)
-              case _             => (bias, dark)
-            }
-          }
-          .compile
-          .onlyOrError
-          .map { case (bias, dark) => List(StepConfig.Bias -> bias, StepConfig.Dark -> dark) }
 
       // Want a map from atom configuration to completed count that can be
       // matched against the generated atoms.
@@ -464,32 +445,8 @@ object SequenceService {
         WHERE """ ~> sql"""a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL ORDER BY s.c_completed"""
       ).query(atom_id *: int2_nonneg *: step_id)
 
-    val SelectStepConfigBiasOrDarkForObs: Query[Observation.Id, (Step.Id, StepType)] =
-      (sql"""
-        SELECT
-          s.c_step_id,
-          s.c_step_type
-        FROM t_step_record s
-        INNER JOIN t_atom_record a on a.c_atom_id = s.c_atom_id
-        WHERE
-      """ ~> sql"""
-          a.c_observation_id = $observation_id AND
-          (s.c_step_type = 'bias' OR s.c_step_type = 'dark')
-      """).query(step_id *: step_type)
-
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
-
-    private def selectStepConfigForObs[A](table: String, columns: List[String], decoderA: Decoder[A]): Query[Observation.Id, (Step.Id, A)] =
-      (sql"""
-        SELECT
-          s.c_step_id,
-          #${encodeColumns("c".some, columns)}
-        FROM #$table c
-        INNER JOIN t_step_record s ON s.c_step_id = c.c_step_id
-        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
-        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
-      ).query(step_id *: decoderA)
 
 // TODO: I would like to write the insert step config logic once, parameterized
 // by the table name, columns, and the encoder.  I think I'm being thwarted by
@@ -545,9 +502,6 @@ object SequenceService {
           $step_config_gcal
       """.command
 
-    val SelectStepConfigGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.Gcal)] =
-      selectStepConfigForObs("t_step_config_gcal", StepConfigGcalColumns, step_config_gcal)
-
     private val StepConfigScienceColumns: List[String] =
       List(
         "c_offset_p",
@@ -563,9 +517,6 @@ object SequenceService {
           $step_config_science
       """.command
 
-    val SelectStepConfigScienceForObs: Query[Observation.Id, (Step.Id, StepConfig.Science)] =
-      selectStepConfigForObs("t_step_config_science", StepConfigScienceColumns, step_config_science)
-
     private val StepConfigSmartGcalColumns: List[String] =
       List(
         "c_smart_gcal_type"
@@ -578,8 +529,40 @@ object SequenceService {
           $step_config_smart_gcal
       """.command
 
-    val SelectStepConfigSmartGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.SmartGcal)] =
-      selectStepConfigForObs("t_step_config_smart_gcal", StepConfigSmartGcalColumns, step_config_smart_gcal)
+    private val step_config: Codec[StepConfig] =
+      (
+        step_type               *:
+        step_config_gcal.opt    *:
+        step_config_science.opt *:
+        step_config_smart_gcal.opt
+      ).eimap { case stepType *: oGcal *: oScience *: oSmart *: EmptyTuple =>
+        stepType match {
+          case StepType.Bias      => StepConfig.Bias.asRight
+          case StepType.Dark      => StepConfig.Dark.asRight
+          case StepType.Gcal      => oGcal.toRight("Missing gcal step config definition")
+          case StepType.Science   => oScience.toRight("Missing science step config definition")
+          case StepType.SmartGcal => oSmart.toRight("Missing smart gcal step config definition")
+        }
+      } { stepConfig =>
+        stepConfig.stepType                        *:
+        StepConfig.gcal.getOption(stepConfig)      *:
+        StepConfig.science.getOption(stepConfig)   *:
+        StepConfig.smartGcal.getOption(stepConfig) *:
+        EmptyTuple
+      }
+
+    val SelectStepConfigForObs: Query[Observation.Id, (Step.Id, StepConfig)] =
+      (sql"""
+        SELECT
+          v.c_step_id,
+          v.c_step_type,
+          #${encodeColumns("v".some, StepConfigGcalColumns)},
+          #${encodeColumns("v".some, StepConfigScienceColumns)},
+          #${encodeColumns("v".some, StepConfigSmartGcalColumns)}
+        FROM v_step_record v
+        INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
+      ).query(step_id *: step_config)
 
     val SetStepCompleted: Command[(Option[Timestamp], Step.Id)] =
       sql"""
