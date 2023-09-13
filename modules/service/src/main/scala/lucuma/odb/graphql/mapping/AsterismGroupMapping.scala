@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.Filter
-import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.Query.Binding
+import edu.gemini.grackle.Query.Filter
 import edu.gemini.grackle.QueryCompiler.Elab
+import edu.gemini.grackle.TypeRef
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table._

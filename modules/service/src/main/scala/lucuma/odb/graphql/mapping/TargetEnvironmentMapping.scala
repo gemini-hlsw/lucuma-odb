@@ -8,11 +8,11 @@ package mapping
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
 import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.QueryCompiler.Elab
+import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import edu.gemini.grackle.syntax.*

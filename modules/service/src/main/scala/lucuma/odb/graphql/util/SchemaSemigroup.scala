@@ -5,14 +5,14 @@ package lucuma.odb.graphql.util
 
 import cats.Semigroup
 import cats.syntax.all._
+import edu.gemini.grackle.DirectiveDef
+import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.ObjectType
 import edu.gemini.grackle.Schema
 import edu.gemini.grackle.Type
 import org.tpolecat.sourcepos.SourcePos
-import edu.gemini.grackle.DirectiveDef
-import edu.gemini.grackle.EnumType
 
 /** A mixin that provides Semigroup[Schema]. */
 trait SchemaSemigroup[F[_]] extends Mapping[F] {

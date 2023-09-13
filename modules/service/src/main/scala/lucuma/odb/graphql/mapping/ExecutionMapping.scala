@@ -8,8 +8,11 @@ import cats.Eq
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.Binding
 import edu.gemini.grackle.Query.EffectHandler
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.syntax.*
@@ -24,9 +27,6 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
-import edu.gemini.grackle.QueryCompiler.Elab
-import edu.gemini.grackle.Query.Binding
-import edu.gemini.grackle.Env
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] {
 

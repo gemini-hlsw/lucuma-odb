@@ -7,6 +7,7 @@ import cats.data.OptionT
 import cats.effect._
 import cats.implicits._
 import cats.kernel.Order
+import edu.gemini.grackle.Operation
 import edu.gemini.grackle.skunk.SkunkMonitor
 import io.circe.Json
 import lucuma.core.model.User
@@ -37,7 +38,6 @@ import skunk.Session
 import skunk.SqlState
 
 import scala.concurrent.duration._
-import edu.gemini.grackle.Operation
 
 object GraphQLRoutes {
 

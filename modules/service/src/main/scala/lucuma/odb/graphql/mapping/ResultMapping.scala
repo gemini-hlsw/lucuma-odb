@@ -5,8 +5,8 @@ package lucuma.odb.graphql.mapping
 
 import cats.syntax.all._
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Env
 import edu.gemini.grackle.Cursor.ListTransformCursor
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
 import edu.gemini.grackle.Result
