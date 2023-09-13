@@ -37,3 +37,28 @@ LEFT JOIN t_step_config_smart_gcal m
   ON m.c_step_id = s.c_step_id
 ORDER BY
   s.c_step_id;
+
+-- Deletes the observation's execution digest when one of its step is marked
+-- complete.
+CREATE OR REPLACE FUNCTION delete_execution_digest()
+  RETURNS TRIGGER AS $$
+BEGIN
+   DELETE FROM t_execution_digest
+     WHERE (c_program_id, c_observation_id) IN (
+       SELECT DISTINCT
+         o.c_program_id, o.c_observation_id
+       FROM t_observation o
+         JOIN t_atom_record a ON a.c_observation_id = o.c_observation_id
+         WHERE a.c_atom_id = OLD.c_atom_id
+     );
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers the deletion of an observation's execution digest when a step is
+-- marked complete (or marked incomplete having previously been marked complete).
+CREATE TRIGGER delete_execution_digest_trigger
+  AFTER UPDATE ON t_step_record
+  FOR EACH ROW
+  WHEN (num_nulls(NEW.c_completed, OLD.c_completed) = 1)
+    EXECUTE PROCEDURE delete_execution_digest();

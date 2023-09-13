@@ -3,14 +3,13 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
@@ -136,19 +135,18 @@ object ExecutionEventService {
             }
 
         def stepCompleteActions(time: Timestamp): F[Unit] =
-          for {
-            _ <- services.sequenceService.setStepCompleted(stepId, time)
-            _ <- services.executionDigestService.deleteOne(stepId)
-          } yield ()
+          services.sequenceService.setStepCompleted(stepId, time)
 
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time) = e
           _ <- EitherT.liftF(
-              // N.B. This is too simplistic. We'll need to examine datasets as
-              // well I believe.
-              Applicative[F].whenA(stepStage === StepStage.EndStep)(stepCompleteActions(time))
+              // N.B. This is probably too simplistic. We'll need to examine
+              // datasets as well I believe.
+//              Applicative[F].whenA(stepStage === StepStage.EndStep)(stepCompleteActions(time))
+              stepCompleteActions(time).whenA(stepStage === StepStage.EndStep)
+//              Applicative[F].whenA(stepStage === StepStage.EndStep)(stepCompleteActions(time))
           )
         } yield Success(eid, time)).merge
       }
