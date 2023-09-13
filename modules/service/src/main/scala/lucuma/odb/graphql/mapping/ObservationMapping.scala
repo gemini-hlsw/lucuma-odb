@@ -8,8 +8,10 @@ package mapping
 import cats.Eq
 import cats.effect.Resource
 import cats.syntax.functor.*
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -26,8 +28,6 @@ import lucuma.odb.service.Services
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
 import table.ProgramTable
-import edu.gemini.grackle.Env
-import edu.gemini.grackle.QueryCompiler.Elab
 
 
 trait ObservationMapping[F[_]]

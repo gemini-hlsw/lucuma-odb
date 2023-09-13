@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
+import edu.gemini.grackle.DirectiveDef
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.Schema
@@ -17,7 +18,6 @@ import lucuma.core.util.TimeSpan
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import skunk.Session
-import edu.gemini.grackle.DirectiveDef
 
 /**
  * Enums loaded from the database on startup.  These fall into two categories:

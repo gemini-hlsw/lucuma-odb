@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.util
 
+import edu.gemini.grackle.DirectiveDef
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.Field
 import edu.gemini.grackle.InputObjectType
@@ -18,7 +19,6 @@ import edu.gemini.grackle.Type
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.UnionType
 import org.tpolecat.sourcepos.SourcePos
-import edu.gemini.grackle.DirectiveDef
 
 object Remapper {
 

@@ -11,12 +11,13 @@ import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
+import edu.gemini.grackle.syntax.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.syntax.*
@@ -33,7 +34,6 @@ import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
-import edu.gemini.grackle.syntax.*
 
 import Services.Syntax.*
 import binding._

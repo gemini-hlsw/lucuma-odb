@@ -15,8 +15,8 @@ import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
-import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Query.*
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.Term

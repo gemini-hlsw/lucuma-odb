@@ -9,6 +9,7 @@ import cats.syntax.applicative.*
 import cats.syntax.eq.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Result
@@ -20,7 +21,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 
 import table.ObservationView
-import edu.gemini.grackle.Env
 
 trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
 
