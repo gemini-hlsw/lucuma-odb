@@ -535,7 +535,7 @@ object SequenceService {
         step_config_gcal.opt    *:
         step_config_science.opt *:
         step_config_smart_gcal.opt
-      ).eimap { case stepType *: oGcal *: oScience *: oSmart *: EmptyTuple =>
+      ).eimap { case (stepType, oGcal, oScience, oSmart) =>
         stepType match {
           case StepType.Bias      => StepConfig.Bias.asRight
           case StepType.Dark      => StepConfig.Dark.asRight
@@ -544,11 +544,11 @@ object SequenceService {
           case StepType.SmartGcal => oSmart.toRight("Missing smart gcal step config definition")
         }
       } { stepConfig =>
-        stepConfig.stepType                        *:
-        StepConfig.gcal.getOption(stepConfig)      *:
-        StepConfig.science.getOption(stepConfig)   *:
-        StepConfig.smartGcal.getOption(stepConfig) *:
-        EmptyTuple
+        (stepConfig.stepType,
+         StepConfig.gcal.getOption(stepConfig),
+         StepConfig.science.getOption(stepConfig),
+         StepConfig.smartGcal.getOption(stepConfig)
+        )
       }
 
     val SelectStepConfigForObs: Query[Observation.Id, (Step.Id, StepConfig)] =
