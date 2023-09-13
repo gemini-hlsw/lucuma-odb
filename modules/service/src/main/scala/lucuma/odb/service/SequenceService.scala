@@ -297,7 +297,7 @@ object SequenceService {
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
-          .stream(Statements.SelectStepRecordForObs)(observationId, 1024)
+          .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
           .fold(Reset.init) { case (state, (aid, cnt, sid)) =>
             stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, _))
           }
@@ -311,7 +311,7 @@ object SequenceService {
         stepId: Step.Id,
         time:   Option[Timestamp]
       )(using Transaction[F]): F[Unit] =
-        session.execute(Statements.SetStepComplete)(time, stepId).void
+        session.execute(Statements.SetStepCompleted)(time, stepId).void
 
       override def insertAtomRecord(
         visitId:      Visit.Id,
@@ -453,7 +453,7 @@ object SequenceService {
           $step_type
       """.command
 
-    val SelectStepRecordForObs: Query[Observation.Id, (Atom.Id, NonNegShort, Step.Id)] =
+    val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Atom.Id, NonNegShort, Step.Id)] =
       (sql"""
         SELECT
           a.c_atom_id,
@@ -581,7 +581,7 @@ object SequenceService {
     val SelectStepConfigSmartGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.SmartGcal)] =
       selectStepConfigForObs("t_step_config_smart_gcal", StepConfigSmartGcalColumns, step_config_smart_gcal)
 
-    val SetStepComplete: Command[(Option[Timestamp], Step.Id)] =
+    val SetStepCompleted: Command[(Option[Timestamp], Step.Id)] =
       sql"""
         UPDATE t_step_record
            SET c_completed = ${core_timestamp.opt}

@@ -2003,15 +2003,13 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       } yield (p, o, s)
     }
 
-    val md5 = Md5Hash.unsafeFromByteArray(Array.fill(16)(0.toByte))
-
     val isEmpty = setup.flatMap { case (p, o, s) =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           for {
-            _ <- services.executionDigestService.insertOrUpdate(p, o, md5, ExecutionDigest.Zero)(using xa)
+            _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
             _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa)
-            d <- services.executionDigestService.selectOne(p, o, md5)(using xa)
+            d <- services.executionDigestService.selectOne(p, o, Md5Hash.Zero)(using xa)
           } yield d.isEmpty
         }
       }
