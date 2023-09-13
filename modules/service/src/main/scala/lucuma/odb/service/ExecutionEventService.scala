@@ -5,7 +5,6 @@ package lucuma.odb.service
 
 import cats.data.EitherT
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
@@ -134,9 +133,6 @@ object ExecutionEventService {
               case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
             }
 
-        def stepCompleteActions(time: Timestamp): F[Unit] =
-          services.sequenceService.setStepCompleted(stepId, time)
-
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insert).leftWiden[InsertEventResponse]
@@ -144,7 +140,9 @@ object ExecutionEventService {
           _ <- EitherT.liftF(
               // N.B. This is probably too simplistic. We'll need to examine
               // datasets as well I believe.
-              stepCompleteActions(time).whenA(stepStage === StepStage.EndStep)
+              services
+                .sequenceService
+                .setStepCompleted(stepId, Option.when(stepStage === StepStage.EndStep)(time))
           )
         } yield Success(eid, time)).merge
       }

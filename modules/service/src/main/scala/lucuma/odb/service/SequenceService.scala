@@ -57,7 +57,7 @@ trait SequenceService[F[_]] {
 
   def setStepCompleted(
     stepId: Step.Id,
-    time:   Timestamp
+    time:   Option[Timestamp]
   )(using Transaction[F]): F[Unit]
 
   def insertAtomRecord(
@@ -309,7 +309,7 @@ object SequenceService {
 
       override def setStepCompleted(
         stepId: Step.Id,
-        time:   Timestamp
+        time:   Option[Timestamp]
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.SetStepComplete)(time, stepId).void
 
@@ -581,10 +581,10 @@ object SequenceService {
     val SelectStepConfigSmartGcalForObs: Query[Observation.Id, (Step.Id, StepConfig.SmartGcal)] =
       selectStepConfigForObs("t_step_config_smart_gcal", StepConfigSmartGcalColumns, step_config_smart_gcal)
 
-    val SetStepComplete: Command[(Timestamp, Step.Id)] =
+    val SetStepComplete: Command[(Option[Timestamp], Step.Id)] =
       sql"""
         UPDATE t_step_record
-           SET c_completed = $core_timestamp
+           SET c_completed = ${core_timestamp.opt}
          WHERE c_step_id = $step_id
       """.command
 
