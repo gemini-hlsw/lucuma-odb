@@ -158,7 +158,7 @@ object Generator {
       ) {
 
         def namespace: UUID =
-           SequenceIds.namespace(commitHash, oid, params)
+          SequenceIds.namespace(commitHash, oid, params)
 
         val acquisitionIntegrationTime: IntegrationTime =
           itcRes.acquisitionResult.focus.value
