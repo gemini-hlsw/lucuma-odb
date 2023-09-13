@@ -30,15 +30,12 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.Timestamp
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
 
 trait SequenceService[F[_]] {
-
-  def selectAtomRecord(
-    atomId: Atom.Id
-  )(using Transaction[F]): F[Option[SequenceService.AtomRecord]]
 
   def selectGmosNorthAtomCounts(
     observationId: Observation.Id
@@ -133,11 +130,6 @@ object SequenceService {
 
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] with ExecutionUserCheck {
-
-      override def selectAtomRecord(
-        atomId: Atom.Id
-      )(using Transaction[F]): F[Option[AtomRecord]] =
-        session.option(Statements.SelectAtom)(atomId)
 
       override def selectGmosNorthAtomCounts(
         observationId: Observation.Id
@@ -329,7 +321,7 @@ object SequenceService {
       )(using Transaction[F]): F[InsertStepResponse] =
         (for {
           _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
-          a    = selectAtomRecord(atomId).map(_.filter(_.instrument === instrument))
+          a    = session.unique(Statements.AtomExists)((atomId, instrument)).map(Option.when(_)(()))
           _   <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
           sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
           _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType)).void
@@ -365,30 +357,14 @@ object SequenceService {
 
   object Statements {
 
-    private val atom_record: Codec[AtomRecord] =
-      (
-        atom_id        *:
-        observation_id *:
-        visit_id       *:
-        instrument     *:
-        int2_nonneg    *:
-        sequence_type  *:
-        core_timestamp
-      ).to[AtomRecord]
-
-    val SelectAtom: Query[Atom.Id, AtomRecord] =
+    val AtomExists: Query[(Atom.Id, Instrument), Boolean] =
       sql"""
-        SELECT
-          c_atom_id,
-          c_observation_id,
-          c_visit_id,
-          c_instrument,
-          c_step_count,
-          c_sequence_type,
-          c_created
-        FROM t_atom_record
-        WHERE c_atom_id = $atom_id
-      """.query(atom_record)
+        SELECT EXISTS (
+          SELECT 1
+            FROM t_atom_record
+           WHERE c_atom_id = $atom_id AND c_instrument = $instrument
+        )
+      """.query(bool)
 
     val InsertAtom: Command[(
       Atom.Id,
