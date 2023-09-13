@@ -38,7 +38,7 @@ LEFT JOIN t_step_config_smart_gcal m
 ORDER BY
   s.c_step_id;
 
--- Deletes the observation's execution digest when one of its step is marked
+-- Deletes the observation's execution digest when one of its steps is marked
 -- complete.
 CREATE OR REPLACE FUNCTION delete_execution_digest()
   RETURNS TRIGGER AS $$
