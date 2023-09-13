@@ -448,32 +448,6 @@ object SequenceService {
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
-// TODO: I would like to write the insert step config logic once, parameterized
-// by the table name, columns, and the encoder.  I think I'm being thwarted by
-// scala.quoted / macro issues?
-//
-//[error] /Users/swalker/dev/lucuma-odb/modules/core/shared/src/main/scala-3/syntax/StringContextOps.scala: Found:    skunk.Encoder[A]
-//[error] Required: skunk.Encoder[Nothing *: Nothing]
-//[error] one error found
-//[error] (service / Compile / compileIncremental) Compilation failed
-//
-// is there a way to get this method the context information that the macro is expecting?
-//
-//    def insertStepConfig[A: Type](table: String, columns: List[String], encoderA: Encoder[A]): Command[(Step.Id, A)] = {
-//      val f: Fragment[Void] = sql"""
-//        INSERT INTO #$table (
-//          c_step_id,
-//          #${encodeColumns(None, columns)}
-//        )"""
-//
-//      sql"""
-//        $f
-//        SELECT
-//          $step_id,
-//          $encoderA
-//      """.command
-//    }
-
     private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""
         INSERT INTO #$table (
@@ -495,7 +469,6 @@ object SequenceService {
       )
 
     val InsertStepConfigGcal: Command[(Step.Id, StepConfig.Gcal)] =
-//      insertStepConfig[StepConfig.Gcal]("t_step_config_gcal", StepConfigGcalColumns, step_config_gcal)
       sql"""
         ${insertStepConfigFragment("t_step_config_gcal", StepConfigGcalColumns)} SELECT
           $step_id,
@@ -510,7 +483,6 @@ object SequenceService {
       )
 
     val InsertStepConfigScience: Command[(Step.Id, StepConfig.Science)] =
-//      insertStepConfig[StepConfig.Science]("t_step_config_science", StepConfigGcalColumns, step_config_science)
       sql"""
         ${insertStepConfigFragment("t_step_config_science", StepConfigScienceColumns)} SELECT
           $step_id,
