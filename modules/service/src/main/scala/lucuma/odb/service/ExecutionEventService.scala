@@ -144,9 +144,7 @@ object ExecutionEventService {
           _ <- EitherT.liftF(
               // N.B. This is probably too simplistic. We'll need to examine
               // datasets as well I believe.
-//              Applicative[F].whenA(stepStage === StepStage.EndStep)(stepCompleteActions(time))
               stepCompleteActions(time).whenA(stepStage === StepStage.EndStep)
-//              Applicative[F].whenA(stepStage === StepStage.EndStep)(stepCompleteActions(time))
           )
         } yield Success(eid, time)).merge
       }
