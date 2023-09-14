@@ -139,6 +139,8 @@ object Generator {
       MissingSmartGcalDef(key)
   }
 
+  private type SimpleAtom[D]    = ProtoAtom[ProtoStep[D]]
+  private type EstimatedAtom[D] = ProtoAtom[ProtoStep[(D, StepEstimate)]]
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
@@ -305,7 +307,7 @@ object Generator {
         scienceItc:     IntegrationTime,
         config:         gmos.longslit.Config[G, L, U],
         generator:      gmos.longslit.Generator[S, D, G, L, U]
-      ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
+      ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, SimpleAtom[D]]] =
         EitherT.fromEither[F](
           generator.generate(acquisitionItc, scienceItc, config) match {
             case Left(msg)    => InvalidData(oid, msg).asLeft
@@ -315,30 +317,48 @@ object Generator {
 
       // Performs smart-gcal expansion and planned time calculation.
       private def expandAndEstimate[S, K, D](
-        proto:    ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]],
+        proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
         expander: SmartGcalExpander[F, K, D],
         calc:     PlannedTimeCalculator[S, D],
         compMap:  CompletedAtomMap[D]
-      ): ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]] =
-        proto.mapBothSequences(  //[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]](
+      ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] = {
 
-            // Do smart-gcal expansion
-          _.through(expander.expand)
 
-            // Number the atoms, because executed atoms will be filtered but we
-            // need the index to always calculate the same Atom.id.
-            .zipWithIndex
-            .map { case (e, index) => e.tupleRight(index) }
+        val f: SequenceType => Stream[F, SimpleAtom[D]] => Stream[F, Either[String, (EstimatedAtom[D], Long)]] =
+          sequenceType =>
+              // Do smart-gcal expansion
+            _.through(expander.expand)
 
-            // Add step estimates
-           .through(calc.estimateSequence[F](proto.static))
-        )
+              // Number the atoms, because executed atoms will be filtered out but
+              // we need the correct index to always calculate the same Atom.Id.
+              .zipWithIndex
+              .map { case (e, index) => e.tupleRight(index) }
+
+              // Strip executed atoms
+              .mapAccumulate(compMap) { case (state, eAtom) =>
+                eAtom.fold(s => (state, s.asLeft), atomIndex => {
+                  // Add executed flag and return updated map.
+                  val (atom, index)      = atomIndex
+                  val (stateʹ, executed) = state.matchAtom(sequenceType, atom)
+                  (stateʹ, (atom, index, executed).asRight)
+                })
+              }
+              .collect {
+                case (_, Left(msg))                 => Left(msg)
+                case (_, Right(atom, index, false)) => Right((atom, index)) // keep only un-executed atoms
+              }
+
+              // Add step estimates
+             .through(calc.estimateSequence[F](proto.static))
+
+        proto.mapSequences(f(SequenceType.Acquisition), f(SequenceType.Science))
+      }
 
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 
       private def executionDigest[S, D](
-        proto:     ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]],
+        proto:     ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
         setupTime: SetupTime
       ): EitherT[F, Error, ExecutionDigest] = {
 
@@ -369,13 +389,13 @@ object Generator {
       }
 
       private def executionConfig[S, D](
-        proto:       ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]],
+        proto:       ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
         namespace:   UUID,
         futureLimit: FutureLimit
       ): EitherT[F, Error, ExecutionConfig[S, D]] = {
 
         def executionSequence(
-          s: Stream[F, Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]],
+          s: Stream[F, Either[String, (EstimatedAtom[D], Long)]],
           t: SequenceType
         ): F[Either[Error, Option[ExecutionSequence[D]]]] =
           s.map(_.map(_.map(SequenceIds.atomId(namespace, t, _)))) // turn the Long into an AtomId

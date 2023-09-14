@@ -28,6 +28,12 @@ object CompletedAtomMap {
 
     def science[D](steps: StepMatch[D]*): Key[D] =
       Key(SequenceType.Science, steps.toList)
+      
+    def fromProtoAtom[D](
+      sequenceType: SequenceType,
+      atom:         ProtoAtom[ProtoStep[D]]
+    ): Key[D] =
+      Key(sequenceType, atom.steps.map(s => (s.value, s.stepConfig)).toList)
 
   }
 
@@ -44,6 +50,14 @@ object CompletedAtomMap {
         case None    => PosInt.unsafeFrom(1).some
         case Some(p) => PosInt.from(p.value + 1).toOption
       }
+      
+    def matchAtom(
+      s: SequenceType,
+      a: ProtoAtom[ProtoStep[D]]
+    ): (CompletedAtomMap[D], Boolean) = {
+      val k = Key.fromProtoAtom(s, a)
+      if (contains(k)) (decrement(k), true) else (m, false)
+    }
 
     def decrement(k: Key[D]): CompletedAtomMap[D] =
       m.updatedWith(k)(_.flatMap(p => PosInt.from(p.value - 1).toOption))
