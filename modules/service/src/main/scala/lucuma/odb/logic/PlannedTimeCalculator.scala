@@ -20,7 +20,7 @@ import skunk.Session
 trait PlannedTimeCalculator[S, D] {
   def estimateSetup: SetupTime
 
-  def estimateSequence[F[_]](static: S): Pipe[F, Either[String, ProtoAtom[ProtoStep[D]]], Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]]
+  def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]]
 }
 
 object PlannedTimeCalculator {
@@ -40,18 +40,20 @@ object PlannedTimeCalculator {
       def estimateSetup: SetupTime =
         setup
 
-      def estimateSequence[F[_]](static: S): Pipe[F, Either[String, ProtoAtom[ProtoStep[D]]], Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]] =
+      def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]] =
         _.mapAccumulate(EstimatorState.empty[D]) { (s, eAtom) =>
           eAtom.fold(
             error =>
               (s, error.asLeft),
-            atom  =>
+            atomI =>
+             val (atom, index) = atomI
              val sa = atom.mapAccumulate(s) { (sʹ, step) =>
                val c = configChange.estimate(sʹ, step)
                val d = detectorEstimator.estimate(static, step)
                (sʹ.next(step), step.tupleRight(StepEstimate.fromMax(c, d)))
              }
-             sa.map(_.asRight)
+             // Restore the atom index and convert to Either
+             sa.tupleRight(index).map(_.asRight)
           )
         }.map(_._2)  // discard the state
     }
