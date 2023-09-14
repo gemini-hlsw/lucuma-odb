@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.sequence.data.CompletedAtomMap
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -1830,7 +1831,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthAtomCounts(oid)(using xa)
+            .selectGmosNorthCompletedAtomMap(oid)(using xa)
         }
       }
     }.map(m => assert(m.isEmpty))
@@ -1853,7 +1854,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     query(user, q).void
   }
 
-  private val NorthDynamicScience = GmosNorth(
+  private val GmosNorthScience = GmosNorth(
     TimeSpan.unsafeFromMicroseconds(20_000_000L),
     GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
     GmosDtax.Zero,
@@ -1863,7 +1864,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
   )
 
-  private val NorthDynamicFlat = NorthDynamicScience.copy(exposure = TimeSpan.unsafeFromMicroseconds(1_000_000L))
+  private val GmosNorthFlat = GmosNorthScience.copy(exposure = TimeSpan.unsafeFromMicroseconds(1_000_000L))
 
   private val Science = StepConfig.Science(Offset.Zero, GuideState.Enabled)
   private val Flat    = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
@@ -1877,10 +1878,15 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v)
-      s <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+      s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience, Science)
       _ <- addEndStepEvent(s)
     } yield (o, s)
-}
+  }
+
+  private def scienceSingleAtom[D](steps: CompletedAtomMap.StepMatch[D]*): CompletedAtomMap[D] =
+    CompletedAtomMap.from(
+      CompletedAtomMap.Key.science(steps*) -> PosInt.unsafeFrom(1)
+    )
 
   test("one gmos north dynamic step - GmosSequenceService") {
     SetupOneStepGmosNorth.flatMap { case (o, s) =>
@@ -1892,7 +1898,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             .compile
             .toList
         }
-      }.map(lst => assertEquals(lst, List(s -> NorthDynamicScience)))
+      }.map(lst => assertEquals(lst, List(s -> GmosNorthScience)))
     }
   }
 
@@ -1905,7 +1911,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             .selectGmosNorthSteps(o)(using xa)
         }
       }.map { m =>
-        assertEquals(m, Map(s -> (NorthDynamicScience, Science)))
+        assertEquals(m, Map(s -> (GmosNorthScience, Science)))
       }
     }
   }
@@ -1916,12 +1922,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthAtomCounts(o)(using xa)
+            .selectGmosNorthCompletedAtomMap(o)(using xa)
         }
       }
     }
 
-    assertIO(m, Map(List((NorthDynamicScience, Science)) -> PosInt.unsafeFrom(1)))
+    assertIO(m, scienceSingleAtom((GmosNorthScience, Science)))
   }
 
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
@@ -1934,10 +1940,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
 
-      sSci  <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+      sSci  <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience, Science)
       _     <- addEndStepEvent(sSci)
 
-      sFlat <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicFlat,    Flat)
+      sFlat <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthFlat,    Flat)
       _     <- addEndStepEvent(sFlat)
 
     } yield (o, sSci, sFlat)
@@ -1955,7 +1961,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             .map(_.toMap)
         }
       }.map { m =>
-        assertEquals(m, Map(sSci -> NorthDynamicScience, sFlat -> NorthDynamicFlat))
+        assertEquals(m, Map(sSci -> GmosNorthScience, sFlat -> GmosNorthFlat))
       }
     }
   }
@@ -1969,7 +1975,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             .selectGmosNorthSteps(o)(using xa)
         }
       }.map { m =>
-        assertEquals(m, Map(sSci -> (NorthDynamicScience, Science), sFlat -> (NorthDynamicFlat, Flat)))
+        assertEquals(m, Map(sSci -> (GmosNorthScience, Science), sFlat -> (GmosNorthFlat, Flat)))
       }
     }
   }
@@ -1980,12 +1986,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthAtomCounts(o)(using xa)
+            .selectGmosNorthCompletedAtomMap(o)(using xa)
         }
       }
     }
 
-    assertIO(m, Map(List((NorthDynamicScience, Science), (NorthDynamicFlat, Flat)) -> PosInt.unsafeFrom(1)))
+    assertIO(m, scienceSingleAtom((GmosNorthScience, Science), (GmosNorthFlat, Flat)))
   }
 
   test("clear execution digest") {
@@ -1999,7 +2005,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         v <- recordVisitAs(user, Instrument.GmosNorth, o)
         a <- recordAtomAs(user, Instrument.GmosNorth, v)
-        s <- recordStepAs(user, a, Instrument.GmosNorth, NorthDynamicScience, Science)
+        s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience, Science)
       } yield (p, o, s)
     }
 
