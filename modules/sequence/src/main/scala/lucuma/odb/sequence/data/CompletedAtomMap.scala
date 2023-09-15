@@ -8,7 +8,13 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.sequence.StepConfig
 
-
+/**
+ * CompletedAtomMap associates atom configurations with a count of executed
+ * instances of the atom.  This is used to filter executed atoms when producing
+ * the sequence.
+ *
+ * @tparam D dynamic instrument configuration type
+ */
 opaque type CompletedAtomMap[D] = Map[CompletedAtomMap.Key[D], PosInt]
 
 object CompletedAtomMap {
@@ -51,14 +57,6 @@ object CompletedAtomMap {
         case Some(p) => PosInt.from(p.value + 1).toOption
       }
       
-    def matchAtom(
-      s: SequenceType,
-      a: ProtoAtom[ProtoStep[D]]
-    ): (CompletedAtomMap[D], Boolean) = {
-      val k = Key.fromProtoAtom(s, a)
-      if (contains(k)) (decrement(k), true) else (m, false)
-    }
-
     def decrement(k: Key[D]): CompletedAtomMap[D] =
       m.updatedWith(k)(_.flatMap(p => PosInt.from(p.value - 1).toOption))
 
@@ -71,7 +69,20 @@ object CompletedAtomMap {
     def toMap: Map[Key[D], PosInt] =
       m
 
+    /**
+     * Match the given `ProtoAtom[ProtoStep[D]]` against the completed atoms.
+     * If there is at least one matching completed atom, `true` is returned and
+     * a copy of the completed atom map with one fewer instance.  Otherwise
+     * `false` is returned along with this completed atom map.
+     */
+    def matchAtom(
+      s: SequenceType,
+      a: ProtoAtom[ProtoStep[D]]
+    ): (CompletedAtomMap[D], Boolean) = {
+      val k = Key.fromProtoAtom(s, a)
+      if (contains(k)) (decrement(k), true) else (m, false)
+    }
+
   }
 
 }
-

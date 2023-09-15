@@ -13,6 +13,7 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
+import fs2.Pipe
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.SequenceType
@@ -323,35 +324,36 @@ object Generator {
         compMap:  CompletedAtomMap[D]
       ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] = {
 
+        // Given a SequenceType produces a Pipe from a SimpleAtom to a smart-gcal
+        // expanded, estimated, indexed atom with executed steps filtered out.
+        def pipe(sequenceType: SequenceType): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
+            // Do smart-gcal expansion
+          _.through(expander.expand)
 
-        val f: SequenceType => Stream[F, SimpleAtom[D]] => Stream[F, Either[String, (EstimatedAtom[D], Long)]] =
-          sequenceType =>
-              // Do smart-gcal expansion
-            _.through(expander.expand)
+            // Number the atoms, because executed atoms will be filtered out but
+            // we need the correct index to always calculate the same Atom.Id.
+            .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
 
-              // Number the atoms, because executed atoms will be filtered out but
-              // we need the correct index to always calculate the same Atom.Id.
-              .zipWithIndex
-              .map { case (e, index) => e.tupleRight(index) }
-
-              // Strip executed atoms
-              .mapAccumulate(compMap) { case (state, eAtom) =>
-                eAtom.fold(s => (state, s.asLeft), atomIndex => {
+            // Strip executed atoms
+            .mapAccumulate(compMap) { case (state, eAtom) =>
+              eAtom.fold(
+                error => (state, error.asLeft),
+                { case (atom, index) =>
                   // Add executed flag and return updated map.
-                  val (atom, index)      = atomIndex
                   val (stateʹ, executed) = state.matchAtom(sequenceType, atom)
                   (stateʹ, (atom, index, executed).asRight)
-                })
-              }
-              .collect {
-                case (_, Left(msg))                 => Left(msg)
-                case (_, Right(atom, index, false)) => Right((atom, index)) // keep only un-executed atoms
-              }
+                }
+              )
+            }
+            .collect {
+              case (_, Left(error))               => Left(error)
+              case (_, Right(atom, index, false)) => Right((atom, index)) // keep only un-executed atoms
+            }
 
-              // Add step estimates
-             .through(calc.estimateSequence[F](proto.static))
+            // Add step estimates
+           .through(calc.estimateSequence[F](proto.static))
 
-        proto.mapSequences(f(SequenceType.Acquisition), f(SequenceType.Science))
+        proto.mapSequences(pipe(SequenceType.Acquisition), pipe(SequenceType.Science))
       }
 
 

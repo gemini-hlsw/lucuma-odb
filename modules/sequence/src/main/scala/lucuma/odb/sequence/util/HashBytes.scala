@@ -11,6 +11,9 @@ import lucuma.core.util.Gid
 import java.nio.charset.StandardCharsets.UTF_8
 import java.security.MessageDigest
 
+/**
+ * Typeclass for producing an `Array[Byte]` that represents an object.
+ */
 trait HashBytes[A] {
 
   def hashBytes(a: A): Array[Byte]
