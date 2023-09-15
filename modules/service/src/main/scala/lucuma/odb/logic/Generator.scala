@@ -174,9 +174,10 @@ object Generator {
           md5.update(params.observingMode.hashBytes)
 
           // Integration Time
-          val ing = scienceIntegrationTime
-          md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
-          md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
+          List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ing =>
+            md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
+            md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
+          }
 
           // Commit Hash
           md5.update(commitHash.toByteArray)
