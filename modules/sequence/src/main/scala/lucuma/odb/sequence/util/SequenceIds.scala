@@ -9,7 +9,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Uid
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.sequence.syntax.hash.*
 
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
@@ -24,11 +24,9 @@ object SequenceIds {
     observationId: Observation.Id,
     params:        GeneratorParams
   ): UUID =
-    toUuid { s =>
-      s.write(commitHash.toByteArray)
-      s.writeObject(observationId)
-      s.writeObject(params)
-    }
+    UUID.nameUUIDFromBytes(
+      Array.concat(commitHash.hashBytes, observationId.hashBytes, params.hashBytes)
+    )
 
   def atomId(
     namespace:    UUID,
@@ -80,4 +78,5 @@ object SequenceIds {
       }
     )
   }
+
 }

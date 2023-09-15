@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
@@ -36,6 +37,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
@@ -471,7 +473,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
 
   }
-//
+
   test("simple generation - limited future") {
     val setup: IO[Observation.Id] =
       for {
@@ -1855,7 +1857,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   private val GmosNorthScience = GmosNorth(
-    TimeSpan.unsafeFromMicroseconds(20_000_000L),
+    TimeSpan.unsafeFromMicroseconds(10_000_000L),
     GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
     GmosDtax.Zero,
     GmosRoi.FullFrame,
@@ -1928,6 +1930,62 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
 
     assertIO(m, scienceSingleAtom((GmosNorthScience, Science)))
+  }
+
+  def genGmosNorthSequence(oid: Observation.Id, futureLimit: Int): IO[List[Atom.Id]] =
+    query(
+      user = user,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              config(futureLimit: $futureLimit) {
+                ... on GmosNorthExecutionConfig {
+                  science {
+                    nextAtom {
+                      id
+                    }
+                    possibleFuture {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map { json =>
+      val sci = json.hcursor.downFields("observation", "execution", "config", "science")
+      val n   = sci.downFields("nextAtom", "id").require[Atom.Id]
+      val fs  = sci.downFields("possibleFuture").values.toList.flatMap(_.toList.map(_.hcursor.downField("id").require[Atom.Id]))
+      n :: fs
+    }
+
+  test("one gmos north dynamic step - Generator") {
+
+    import lucuma.odb.json.all.transport.given
+
+    // Atom.Id list before and after recording the steps for the first atom.
+    val beforeAndAfter =
+      for {
+        p      <- createProgram
+        t      <- createTargetWithProfileAs(user, p)
+        o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        before <- genGmosNorthSequence(o, 3)
+        v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
+        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience, Science)
+        _      <- addEndStepEvent(s0)
+        s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat, Flat)
+        _      <- addEndStepEvent(s1)
+        after  <- genGmosNorthSequence(o, 2)
+      } yield (before, after)
+
+    // THe tail of before should equal after since the first atom has been executed.
+    val result = beforeAndAfter.map { case (before, after) => before.tail === after }
+
+    assertIOBoolean(result)
   }
 
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
