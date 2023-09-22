@@ -28,7 +28,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     createObservationWithModeAs(
       user,
       pid,
-      tids.toList,
+      tids,
       """
         gmosNorthLongSlit: {
           grating: R831_G5302,
@@ -53,7 +53,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     createObservationWithModeAs(
       user,
       pid,
-      tids.toList,
+      tids,
       """
         gmosSouthLongSlit: {
           grating: R600_G5324,
