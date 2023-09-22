@@ -7,12 +7,14 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
 import lucuma.core.util.Gid
+import lucuma.core.util.TimeSpan
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.security.MessageDigest
 
 /**
- * Typeclass for producing an `Array[Byte]` that represents an object.
+ * Typeclass for producing an `Array[Byte]` that represents an object.  This is
+ * precursor to producing, say, an MD5 hash.
  */
 trait HashBytes[A] {
 
@@ -61,6 +63,11 @@ object HashBytes {
         HashBytes[Char].hashBytes(Gid[A].tag.value),
         HashBytes[PosLong].hashBytes(Gid[A].isoPosLong.get(a))
       )
+  }
+
+  given HashBytes[TimeSpan] with {
+    def hashBytes(a: TimeSpan): Array[Byte] =
+      HashBytes[Long].hashBytes(a.toMicroseconds)
   }
 
   given given_HashBytes_Json[A: Encoder]: HashBytes[A] with {
