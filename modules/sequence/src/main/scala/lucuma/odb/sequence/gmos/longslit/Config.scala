@@ -1,7 +1,8 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos.longslit
+package lucuma.odb.sequence
+package gmos.longslit
 
 import cats.Eq
 import cats.syntax.option.*
@@ -209,12 +210,24 @@ object Config {
       )
 
     def reconcile(a: GmosNorth, modes: List[ObservingMode]): Option[GmosNorth] =
-      modes match {
-        case Nil                                                             =>
+      modes.headOption match {
+        case None                                                  =>
           a.some
-        case b @ GmosNorth(_, _, _, _, _, _, _, _, _, _, _, _, _, _) :: rest =>
-          a.xBin min b.
+
+        case Some(b@GmosNorth(_, _, _, _, _, _, _, _, _, _, _, _)) =>
+          if (a === b)
+            reconcile(a, modes.tail)
+          else {
+            val x  = a.xBin min b.xBin
+            val aʹ = a.copy(explicitXBin = none, defaultXBin = x)
+            val bʹ = b.copy(explicitXBin = none, defaultXBin = x)
+            if (aʹ === bʹ) reconcile(aʹ, modes.tail) else none
+          }
+
+        case _                                                     =>
+          none
       }
+
 
     given Eq[GmosNorth] =
       Eq.by { a => (
@@ -287,6 +300,24 @@ object Config {
         explicitSpatialOffsets
       )
 
+    def reconcile(a: GmosSouth, modes: List[ObservingMode]): Option[GmosSouth] =
+      modes.headOption match {
+        case None                                                  =>
+          a.some
+
+        case Some(b@GmosSouth(_, _, _, _, _, _, _, _, _, _, _, _)) =>
+          if (a === b)
+            reconcile(a, modes.tail)
+          else {
+            val x  = a.xBin min b.xBin
+            val aʹ = a.copy(explicitXBin = none, defaultXBin = x)
+            val bʹ = b.copy(explicitXBin = none, defaultXBin = x)
+            if (aʹ === bʹ) reconcile(aʹ, modes.tail) else none
+          }
+
+        case _                                                     =>
+          none
+      }
 
     given Eq[GmosSouth] =
       Eq.by { a => (

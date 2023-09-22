@@ -31,6 +31,7 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.GuideState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepStage
+import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -70,7 +71,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(user, "Sequence Testing")
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRow: TableRow.North =
+    val tableRow1: TableRow.North =
       TableRow(
         PosLong.unsafeFrom(1),
         TableKey(
@@ -99,9 +100,39 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           )
         )
       )
+    val tableRow2: TableRow.North =
+      TableRow(
+        PosLong.unsafeFrom(1),
+        TableKey(
+          GratingConfigKey(
+            GmosNorthGrating.R831_G5302,
+            GmosGratingOrder.One,
+            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+          ).some,
+          GmosNorthFilter.RPrime.some,
+          GmosNorthFpu.LongSlit_5_00.some,
+          GmosXBinning.One,
+          GmosYBinning.Two,
+          GmosAmpGain.Low
+        ),
+        SmartGcalValue(
+          Gcal(
+            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+            GcalFilter.Gmos,
+            GcalDiffuser.Ir,
+            GcalShutter.Open
+          ),
+          GcalBaselineType.Night,
+          PosInt.unsafeFrom(1),
+          LegacyInstrumentConfig(
+            TimeSpan.unsafeFromMicroseconds(1_000_000L)
+          )
+        )
+      )
     val services = Services.forUser(pi /* doesn't matter*/)(s)
     services.transactionally {
-      services.smartGcalService.insertGmosNorth(1, tableRow)
+      services.smartGcalService.insertGmosNorth(1, tableRow1) *>
+      services.smartGcalService.insertGmosNorth(2, tableRow2)
     }
   }
 
@@ -2175,4 +2206,90 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     assertIOBoolean(beforeAndAfter.map { case (before, after) => before === after })
   }
 
+  test("select min x-binning") {
+    val setup: IO[Observation.Id] =
+      for {
+        p  <- createProgram
+        t0 <- createTargetWithGaussianAs(user, p, Angle.fromMicroarcseconds(647_200L))  // X-binning of 4
+        t1 <- createTargetWithProfileAs(user, p)  // X-binning of 1
+        o  <- createObservationWithModeAs(user, p, List(t0, t1),
+               // use a 5" slit so that won't be a factor
+               """
+                 gmosNorthLongSlit: {
+                   grating: R831_G5302,
+                   filter: R_PRIME,
+                   fpu: LONG_SLIT_5_00,
+                   centralWavelength: {
+                     nanometers: 500
+                   }
+                 }
+               """
+             )
+      } yield o
+
+    setup.flatMap { oid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosNorthExecutionConfig {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               readout {
+                                 xBin
+                                 yBin
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "config": {
+                    "science": {
+                      "nextAtom": {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "readout": {
+                                "xBin": "ONE",
+                                "yBin": "TWO"
+                              }
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "readout": {
+                                "xBin": "ONE",
+                                "yBin": "TWO"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
 }
