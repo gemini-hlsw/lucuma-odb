@@ -40,6 +40,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.ItcService
@@ -171,20 +172,19 @@ object Generator {
           itcRes.scienceResult.focus.value
 
         val hash: Md5Hash = {
-          val zero = 0.toByte
-          val md5  = MessageDigest.getInstance("MD5")
+          val md5 = MessageDigest.getInstance("MD5")
 
           // Observing Mode
           md5.update(params.observingMode.hashBytes)
 
           // Integration Time
           List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ing =>
-            md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
-            md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
+            md5.update(ing.exposureTime.hashBytes)
+            md5.update(ing.exposures.hashBytes)
           }
 
           // Commit Hash
-          md5.update(commitHash.toByteArray)
+          md5.update(commitHash.hashBytes)
 
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
