@@ -4,6 +4,8 @@
 package lucuma.odb.sequence.gmos.longslit
 
 import cats.Eq
+import cats.syntax.option.*
+import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
@@ -205,6 +207,14 @@ object Config {
         explicitWavelengthDithers,
         explicitSpatialOffsets
       )
+
+    def reconcile(a: GmosNorth, modes: List[ObservingMode]): Option[GmosNorth] =
+      modes match {
+        case Nil                                                             =>
+          a.some
+        case b @ GmosNorth(_, _, _, _, _, _, _, _, _, _, _, _, _, _) :: rest =>
+          a.xBin min b.
+      }
 
     given Eq[GmosNorth] =
       Eq.by { a => (

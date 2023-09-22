@@ -3,6 +3,8 @@
 
 package lucuma.odb.sequence
 
+import cats.data.NonEmptyList
+import cats.syntax.option.*
 import lucuma.odb.sequence.util.HashBytes
 
 /**
@@ -12,11 +14,22 @@ type ObservingMode =
   gmos.longslit.Config.GmosNorth |
   gmos.longslit.Config.GmosSouth
 
-given HashBytes[ObservingMode] with {
-  def hashBytes(a: ObservingMode): Array[Byte] =
-    a match {
-      case gn: gmos.longslit.Config.GmosNorth => gn.hashBytes
-      case gs: gmos.longslit.Config.GmosSouth => gs.hashBytes
-    }
-}
+object ObservingMode {
 
+  def reconcile(modes: NonEmptyList[ObservingMode]): Option[ObservingMode] = {
+    modes.toList match {
+      case m :: Nil => m.some
+      case
+    }
+
+  }
+
+  given HashBytes[ObservingMode] with {
+    def hashBytes(a: ObservingMode): Array[Byte] =
+      a match {
+        case gn: gmos.longslit.Config.GmosNorth => gn.hashBytes
+        case gs: gmos.longslit.Config.GmosSouth => gs.hashBytes
+      }
+  }
+
+}
