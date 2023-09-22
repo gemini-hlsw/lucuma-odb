@@ -59,6 +59,9 @@ object GeneratorParams {
   ): Array[Byte] = {
     val bld = scala.collection.mutable.ArrayBuilder.make[Byte]
 
+    given HashBytes[ImagingIntegrationTimeInput] = HashBytes.forJsonEncoder
+    given HashBytes[SpectroscopyIntegrationTimeInput] = HashBytes.forJsonEncoder
+
     itc.toList.foreach { case (tid, (imaging, spectroscopy)) =>
       bld.addAll(tid.hashBytes)
       bld.addAll(imaging.hashBytes)
