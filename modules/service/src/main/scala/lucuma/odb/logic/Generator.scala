@@ -13,6 +13,7 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
+import fs2.Pipe
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.SequenceType
@@ -33,11 +34,13 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.sequence.data.CompletedAtomMap
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.ItcService
@@ -138,6 +141,8 @@ object Generator {
       MissingSmartGcalDef(key)
   }
 
+  private type SimpleAtom[D]    = ProtoAtom[ProtoStep[D]]
+  private type EstimatedAtom[D] = ProtoAtom[ProtoStep[(D, StepEstimate)]]
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
@@ -158,7 +163,7 @@ object Generator {
       ) {
 
         def namespace: UUID =
-           SequenceIds.namespace(commitHash, oid, params)
+          SequenceIds.namespace(commitHash, oid, params)
 
         val acquisitionIntegrationTime: IntegrationTime =
           itcRes.acquisitionResult.focus.value
@@ -167,20 +172,19 @@ object Generator {
           itcRes.scienceResult.focus.value
 
         val hash: Md5Hash = {
-          val zero = 0.toByte
-          val md5  = MessageDigest.getInstance("MD5")
+          val md5 = MessageDigest.getInstance("MD5")
 
           // Observing Mode
           md5.update(params.observingMode.hashBytes)
 
           // Integration Time
           List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ing =>
-            md5.update(BigInt(ing.exposureTime.toMicroseconds).toByteArray.reverse.padTo(8, zero))
-            md5.update(BigInt(ing.exposures.value).toByteArray.reverse.padTo(4, zero))
+            md5.update(ing.exposureTime.hashBytes)
+            md5.update(ing.exposures.hashBytes)
           }
 
           // Commit Hash
-          md5.update(commitHash.toByteArray)
+          md5.update(commitHash.hashBytes)
 
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
@@ -253,13 +257,15 @@ object Generator {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
-              r <- executionDigest(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth), calculator.gmosNorth.estimateSetup)
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletedAtomMap(ctx.oid) })
+              r <- executionDigest(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), calculator.gmosNorth.estimateSetup)
             } yield r
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
-              r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth), calculator.gmosSouth.estimateSetup)
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletedAtomMap(ctx.oid) })
+              r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), calculator.gmosSouth.estimateSetup)
             } yield r
         }
 
@@ -281,13 +287,15 @@ object Generator {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
-              r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth), ctx.namespace, lim)
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletedAtomMap(ctx.oid) })
+              r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), ctx.namespace, lim)
             } yield InstrumentExecutionConfig.GmosNorth(r)
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
-              r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth), ctx.namespace, lim)
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletedAtomMap(ctx.oid) })
+              r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), ctx.namespace, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }
 
@@ -300,7 +308,7 @@ object Generator {
         scienceItc:     IntegrationTime,
         config:         gmos.longslit.Config[G, L, U],
         generator:      gmos.longslit.Generator[S, D, G, L, U]
-      ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] =
+      ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, SimpleAtom[D]]] =
         EitherT.fromEither[F](
           generator.generate(acquisitionItc, scienceItc, config) match {
             case Left(msg)    => InvalidData(oid, msg).asLeft
@@ -310,20 +318,49 @@ object Generator {
 
       // Performs smart-gcal expansion and planned time calculation.
       private def expandAndEstimate[S, K, D](
-        proto:    ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]],
+        proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
         expander: SmartGcalExpander[F, K, D],
-        calc:     PlannedTimeCalculator[S, D]
-      ): ProtoExecutionConfig[F, S, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]] =
-        proto.mapBothSequences[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]](
+        calc:     PlannedTimeCalculator[S, D],
+        compMap:  CompletedAtomMap[D]
+      ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] = {
+
+        // Given a SequenceType produces a Pipe from a SimpleAtom to a smart-gcal
+        // expanded, estimated, indexed atom with executed steps filtered out.
+        def pipe(sequenceType: SequenceType): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
+            // Do smart-gcal expansion
           _.through(expander.expand)
+
+            // Number the atoms, because executed atoms will be filtered out but
+            // we need the correct index to always calculate the same Atom.Id.
+            .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
+
+            // Strip executed atoms
+            .mapAccumulate(compMap) { case (state, eAtom) =>
+              eAtom.fold(
+                error => (state, error.asLeft),
+                { case (atom, index) =>
+                  // Add executed flag and return updated map.
+                  val (stateʹ, executed) = state.matchAtom(sequenceType, atom)
+                  (stateʹ, (atom, index, executed).asRight)
+                }
+              )
+            }
+            .collect {
+              case (_, Left(error))               => Left(error)
+              case (_, Right(atom, index, false)) => Right((atom, index)) // keep only un-executed atoms
+            }
+
+            // Add step estimates
            .through(calc.estimateSequence[F](proto.static))
-        )
+
+        proto.mapSequences(pipe(SequenceType.Acquisition), pipe(SequenceType.Science))
+      }
 
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 
       private def executionDigest[S, D](
-        proto:     ProtoExecutionConfig[F, S, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
+        proto:     ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
         setupTime: SetupTime
       ): EitherT[F, Error, ExecutionDigest] = {
 
@@ -347,28 +384,28 @@ object Generator {
           }.compile.onlyOrError
 
         for {
-          a <- EitherT(sequenceDigest(proto.acquisition))
-          s <- EitherT(sequenceDigest(proto.science))
+          a <- EitherT(sequenceDigest(proto.acquisition.map(_.map(_._1)))) // strip the atom index and compute seq digest
+          s <- EitherT(sequenceDigest(proto.science.map(_.map(_._1))))
         } yield ExecutionDigest(setupTime, a, s)
 
       }
 
       private def executionConfig[S, D](
-        proto:       ProtoExecutionConfig[F, S, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
+        proto:       ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
         namespace:   UUID,
         futureLimit: FutureLimit
       ): EitherT[F, Error, ExecutionConfig[S, D]] = {
 
         def executionSequence(
-          s: Stream[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]],
+          s: Stream[F, Either[String, (EstimatedAtom[D], Long)]],
           t: SequenceType
         ): F[Either[Error, Option[ExecutionSequence[D]]]] =
-          s.zipWithIndex
-           .map(_.map(SequenceIds.atomId(namespace, t, _)))
-           .map { case (eAtom, atomId) =>
-             eAtom.bimap(
+          s.map(_.map(_.map(SequenceIds.atomId(namespace, t, _)))) // turn the Long into an AtomId
+           .map {
+             _.bimap(
                missingSmartGcalDef,
-               atom =>
+               atomI =>
+                 val (atom, atomId) = atomI
                  val steps = atom.steps.zipWithIndex.map { case (ProtoStep((d, e), sc, oc, bp), j) =>
                    Step(SequenceIds.stepId(namespace, t, atomId, j), d, sc, e, oc, bp)
                  }

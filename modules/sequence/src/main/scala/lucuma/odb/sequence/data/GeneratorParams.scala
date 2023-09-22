@@ -10,6 +10,8 @@ import cats.syntax.eq.*
 import lucuma.core.model.Target
 import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.odb.sequence.syntax.all.*
+import lucuma.odb.sequence.util.HashBytes
 
 enum GeneratorParams {
 
@@ -51,5 +53,30 @@ object GeneratorParams {
       case (s0@GmosSouthLongSlit(_, _), s1@GmosSouthLongSlit(_, _)) => s0 === s1
       case _                                                        => false
     }
+
+  private def itcBytes(
+    itc: NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))]
+  ): Array[Byte] = {
+    val bld = scala.collection.mutable.ArrayBuilder.make[Byte]
+
+    given HashBytes[ImagingIntegrationTimeInput] = HashBytes.forJsonEncoder
+    given HashBytes[SpectroscopyIntegrationTimeInput] = HashBytes.forJsonEncoder
+
+    itc.toList.foreach { case (tid, (imaging, spectroscopy)) =>
+      bld.addAll(tid.hashBytes)
+      bld.addAll(imaging.hashBytes)
+      bld.addAll(spectroscopy.hashBytes)
+    }
+
+    bld.result()
+  }
+
+  given HashBytes[GeneratorParams] with {
+    def hashBytes(a: GeneratorParams): Array[Byte] =
+      a match {
+        case GmosNorthLongSlit(itc, mode) => Array.concat(itcBytes(itc), mode.hashBytes)
+        case GmosSouthLongSlit(itc, mode) => Array.concat(itcBytes(itc), mode.hashBytes)
+      }
+  }
 
 }
