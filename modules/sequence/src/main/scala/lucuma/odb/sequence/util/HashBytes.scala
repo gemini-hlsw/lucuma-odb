@@ -29,6 +29,12 @@ object HashBytes {
 
   def apply[A](using ev: HashBytes[A]): ev.type = ev
 
+  def forJsonEncoder[A: Encoder]: HashBytes[A] =
+    new HashBytes[A] {
+      def hashBytes(a: A): Array[Byte] =
+        Encoder[A].apply(a).spaces2.getBytes(UTF_8)
+    }
+
   private def toByteArray(b: BigInt, pad: Int): Array[Byte] =
     b.toByteArray.reverse.padTo(pad, 0.toByte)
 
@@ -70,8 +76,4 @@ object HashBytes {
       HashBytes[Long].hashBytes(a.toMicroseconds)
   }
 
-  given given_HashBytes_Json[A: Encoder]: HashBytes[A] with {
-    def hashBytes(a: A): Array[Byte] =
-      Encoder[A].apply(a).spaces2.getBytes(UTF_8)
-  }
 }
