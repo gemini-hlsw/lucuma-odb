@@ -4,31 +4,28 @@
 package lucuma.odb.sequence
 
 import cats.data.NonEmptyList
-import cats.syntax.option.*
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 import lucuma.odb.sequence.util.HashBytes
 
 /**
  * All observing mode options.
  */
-type ObservingMode =
-  gmos.longslit.Config.GmosNorth |
-  gmos.longslit.Config.GmosSouth
+type ObservingMode = GmosNorth | GmosSouth
 
 object ObservingMode {
 
-  def reconcile(modes: NonEmptyList[ObservingMode]): Option[ObservingMode] = {
-    modes.toList match {
-      case m :: Nil => m.some
-      case
+  def reconcile(modes: NonEmptyList[ObservingMode]): Option[ObservingMode] =
+    modes.head match {
+        case gn: GmosNorth => GmosNorth.reconcile(gn, modes.tail)
+        case gs: GmosSouth => GmosSouth.reconcile(gs, modes.tail)
     }
-
-  }
 
   given HashBytes[ObservingMode] with {
     def hashBytes(a: ObservingMode): Array[Byte] =
       a match {
-        case gn: gmos.longslit.Config.GmosNorth => gn.hashBytes
-        case gs: gmos.longslit.Config.GmosSouth => gs.hashBytes
+        case gn: GmosNorth => gn.hashBytes
+        case gs: GmosSouth => gs.hashBytes
       }
   }
 
