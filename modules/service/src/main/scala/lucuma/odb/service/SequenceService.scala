@@ -14,7 +14,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
-import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
@@ -28,29 +27,27 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.Timestamp
+import lucuma.odb.sequence.data.CompletedAtomMap
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
 
 trait SequenceService[F[_]] {
 
-  def selectAtomRecord(
-    atomId: Atom.Id
-  )(using Transaction[F]): F[Option[SequenceService.AtomRecord]]
-
-  def selectGmosNorthAtomCounts(
+  def selectGmosNorthCompletedAtomMap(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Map[List[(GmosNorth, StepConfig)], PosInt]]
+  )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]]
 
   def selectGmosNorthSteps(
     observationId: Observation.Id
   )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]]
 
-  def selectGmosSouthAtomCounts(
+  def selectGmosSouthCompletedAtomMap(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Map[List[(GmosSouth, StepConfig)], PosInt]]
+  )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]]
 
   def selectGmosSouthSteps(
     observationId: Observation.Id
@@ -83,16 +80,6 @@ trait SequenceService[F[_]] {
 }
 
 object SequenceService {
-
-  case class AtomRecord(
-    atomId:        Atom.Id,
-    observationId: Observation.Id,
-    visitId:       Visit.Id,
-    instrument:    Instrument,
-    stepCount:     NonNegShort,
-    sequenceType:  SequenceType,
-    created:       Timestamp
-  )
 
   sealed trait InsertAtomResponse extends Product with Serializable
 
@@ -134,33 +121,28 @@ object SequenceService {
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] with ExecutionUserCheck {
 
-      override def selectAtomRecord(
-        atomId: Atom.Id
-      )(using Transaction[F]): F[Option[AtomRecord]] =
-        session.option(Statements.SelectAtom)(atomId)
-
-      override def selectGmosNorthAtomCounts(
+      override def selectGmosNorthCompletedAtomMap(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Map[List[(GmosNorth, StepConfig)], PosInt]] =
-        selectAtomCounts(
+      )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]] =
+        selectCompletedAtomMap(
           observationId,
           gmosSequenceService.selectGmosNorthDynamic(observationId)
         )
 
-      override def selectGmosSouthAtomCounts(
+      override def selectGmosSouthCompletedAtomMap(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Map[List[(GmosSouth, StepConfig)], PosInt]] =
-        selectAtomCounts(
+      )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]] =
+        selectCompletedAtomMap(
           observationId,
           gmosSequenceService.selectGmosSouthDynamic(observationId)
         )
 
-      private def selectAtomCounts[D](
+      private def selectCompletedAtomMap[D](
         observationId:  Observation.Id,
         dynamicConfigs: Stream[F, (Step.Id, D)]
-      )(using Transaction[F]): F[Map[List[(D, StepConfig)], PosInt]] =
+      )(using Transaction[F]): F[CompletedAtomMap[D]] =
         stepRecordMap(observationId, dynamicConfigs)
-          .flatMap(completedAtomCountMap(observationId))
+          .flatMap(completedAtomMap(observationId))
 
       def selectGmosNorthSteps(
         observationId: Observation.Id
@@ -221,66 +203,66 @@ object SequenceService {
 
       // Want a map from atom configuration to completed count that can be
       // matched against the generated atoms.
-      private def completedAtomCountMap[D](
+      private def completedAtomMap[D](
         observationId: Observation.Id
       )(
         stepMap: Map[Step.Id, (D, StepConfig)]
-      )(using Transaction[F]): F[Map[List[(D, StepConfig)], PosInt]] = {
+      )(using Transaction[F]): F[CompletedAtomMap[D]] = {
 
-        type StepMatch     = (D, StepConfig)
-        type AtomMatch     = List[StepMatch]
-        type CompletionMap = Map[AtomMatch, PosInt]
+        import CompletedAtomMap.AtomMatch
+        import CompletedAtomMap.StepMatch
 
         trait State {
           def reset: State
-          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch): State
-          def finalized: CompletionMap
+          def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: StepMatch[D]): State
+          def finalized: CompletedAtomMap[D]
         }
 
-        case class Reset(completed: CompletionMap) extends State {
-          def reset: State = this
+        case class Reset(completed: CompletedAtomMap[D]) extends State {
+          override def reset: State = this
 
-          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch): State =
-            InProgress(aid, count, List(step), completed)
+          override def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: StepMatch[D]): State =
+            InProgress(aid, count, sequenceType, List(step), completed)
 
-          def finalized: CompletionMap = completed
+          override def finalized: CompletedAtomMap[D] = completed
         }
 
         object Reset {
-          lazy val init: State = Reset(Map.empty)
+          lazy val init: State = Reset(CompletedAtomMap.Empty)
         }
 
         case class InProgress(
-          inProgressAtomId: Atom.Id,
-          inProgressCount:  NonNegShort,
-          inProgressSteps:  AtomMatch,
-          completed:        CompletionMap
+          inProgressAtomId:       Atom.Id,
+          inProgressCount:        NonNegShort,
+          inProgressSequenceType: SequenceType,
+          inProgressSteps:        AtomMatch[D],
+          completed:              CompletedAtomMap[D]
         ) extends State {
 
-          def reset: State = Reset(completed)
+          override def reset: State = Reset(completed)
 
-          def next(aid: Atom.Id, count: NonNegShort, step: StepMatch): State =
-            if (aid === inProgressAtomId)
-              copy(inProgressSteps = step :: inProgressSteps) // continue existing atom
-            else
-              InProgress(aid, count, List(step), finalized)   // start a new atom
+          private def addStep(step: StepMatch[D]): InProgress =
+            copy(inProgressSteps = step :: inProgressSteps)
 
-          def finalized: CompletionMap =
-            if (inProgressSteps.sizeIs != inProgressCount.value)
-              completed
-            else
-              completed.updatedWith(inProgressSteps.reverse)(
-                _.flatMap(posInt => PosInt.from(posInt.value + 1).toOption)
-                 .orElse(PosInt.from(1).toOption)
-              )
+          override def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: StepMatch[D]): State =
+            if (aid === inProgressAtomId) addStep(step) // continue existing atom
+            else InProgress(aid, count, sequenceType, List(step), finalized) // start a new atom
+
+          private def inProgressKey: CompletedAtomMap.Key[D] =
+            CompletedAtomMap.Key(inProgressSequenceType, inProgressSteps.reverse)
+
+          override def finalized: CompletedAtomMap[D] =
+            if (inProgressSteps.sizeIs != inProgressCount.value) completed
+            else completed.increment(inProgressKey)
+
         }
 
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
-          .fold(Reset.init) { case (state, (aid, cnt, sid)) =>
-            stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, _))
+          .fold(Reset.init) { case (state, (aid, cnt, seqType, sid)) =>
+            stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, seqType, _))
           }
           .compile
           .onlyOrError
@@ -329,7 +311,7 @@ object SequenceService {
       )(using Transaction[F]): F[InsertStepResponse] =
         (for {
           _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
-          a    = selectAtomRecord(atomId).map(_.filter(_.instrument === instrument))
+          a    = session.unique(Statements.AtomExists)((atomId, instrument)).map(Option.when(_)(()))
           _   <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
           sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
           _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType)).void
@@ -365,30 +347,14 @@ object SequenceService {
 
   object Statements {
 
-    private val atom_record: Codec[AtomRecord] =
-      (
-        atom_id        *:
-        observation_id *:
-        visit_id       *:
-        instrument     *:
-        int2_nonneg    *:
-        sequence_type  *:
-        core_timestamp
-      ).to[AtomRecord]
-
-    val SelectAtom: Query[Atom.Id, AtomRecord] =
+    val AtomExists: Query[(Atom.Id, Instrument), Boolean] =
       sql"""
-        SELECT
-          c_atom_id,
-          c_observation_id,
-          c_visit_id,
-          c_instrument,
-          c_step_count,
-          c_sequence_type,
-          c_created
-        FROM t_atom_record
-        WHERE c_atom_id = $atom_id
-      """.query(atom_record)
+        SELECT EXISTS (
+          SELECT 1
+            FROM t_atom_record
+           WHERE c_atom_id = $atom_id AND c_instrument = $instrument
+        )
+      """.query(bool)
 
     val InsertAtom: Command[(
       Atom.Id,
@@ -434,45 +400,20 @@ object SequenceService {
           $step_type
       """.command
 
-    val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Atom.Id, NonNegShort, Step.Id)] =
+    val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Atom.Id, NonNegShort, SequenceType, Step.Id)] =
       (sql"""
         SELECT
           a.c_atom_id,
           a.c_step_count,
+          a.c_sequence_type,
           s.c_step_id
         FROM t_step_record s
         INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
         WHERE """ ~> sql"""a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL ORDER BY s.c_completed"""
-      ).query(atom_id *: int2_nonneg *: step_id)
+      ).query(atom_id *: int2_nonneg *: sequence_type *: step_id)
 
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
-
-// TODO: I would like to write the insert step config logic once, parameterized
-// by the table name, columns, and the encoder.  I think I'm being thwarted by
-// scala.quoted / macro issues?
-//
-//[error] /Users/swalker/dev/lucuma-odb/modules/core/shared/src/main/scala-3/syntax/StringContextOps.scala: Found:    skunk.Encoder[A]
-//[error] Required: skunk.Encoder[Nothing *: Nothing]
-//[error] one error found
-//[error] (service / Compile / compileIncremental) Compilation failed
-//
-// is there a way to get this method the context information that the macro is expecting?
-//
-//    def insertStepConfig[A: Type](table: String, columns: List[String], encoderA: Encoder[A]): Command[(Step.Id, A)] = {
-//      val f: Fragment[Void] = sql"""
-//        INSERT INTO #$table (
-//          c_step_id,
-//          #${encodeColumns(None, columns)}
-//        )"""
-//
-//      sql"""
-//        $f
-//        SELECT
-//          $step_id,
-//          $encoderA
-//      """.command
-//    }
 
     private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""
@@ -495,7 +436,6 @@ object SequenceService {
       )
 
     val InsertStepConfigGcal: Command[(Step.Id, StepConfig.Gcal)] =
-//      insertStepConfig[StepConfig.Gcal]("t_step_config_gcal", StepConfigGcalColumns, step_config_gcal)
       sql"""
         ${insertStepConfigFragment("t_step_config_gcal", StepConfigGcalColumns)} SELECT
           $step_id,
@@ -510,7 +450,6 @@ object SequenceService {
       )
 
     val InsertStepConfigScience: Command[(Step.Id, StepConfig.Science)] =
-//      insertStepConfig[StepConfig.Science]("t_step_config_science", StepConfigGcalColumns, step_config_science)
       sql"""
         ${insertStepConfigFragment("t_step_config_science", StepConfigScienceColumns)} SELECT
           $step_id,

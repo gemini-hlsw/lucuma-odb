@@ -60,6 +60,11 @@ object CommitHash {
       }.getOrElse(0)
     }
 
+  given HashBytes[CommitHash] with {
+    def hashBytes(a: CommitHash): Array[Byte] =
+      a.toByteArray
+  }
+
   val FromString: Format[String, CommitHash] =
     Format(parse, _.format)
 
