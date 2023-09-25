@@ -214,7 +214,7 @@ object Config {
         case None                                                  =>
           a.some
 
-        case Some(b@GmosNorth(_, _, _, _, _, _, _, _, _, _, _, _)) =>
+        case Some(b: GmosNorth) =>
           if (a === b)
             reconcile(a, modes.tail)
           else {
@@ -305,7 +305,7 @@ object Config {
         case None                                                  =>
           a.some
 
-        case Some(b@GmosSouth(_, _, _, _, _, _, _, _, _, _, _, _)) =>
+        case Some(b: GmosSouth) =>
           if (a === b)
             reconcile(a, modes.tail)
           else {
