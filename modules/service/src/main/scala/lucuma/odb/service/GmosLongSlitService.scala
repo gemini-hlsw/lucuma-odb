@@ -96,7 +96,7 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
-  val Sampling: PosDouble = PosDouble.unsafeFrom(2.0)
+  val Sampling: PosDouble = PosDouble.unsafeFrom(2.5)
 
   def instantiate[F[_]: Concurrent](using Services[F]): GmosLongSlitService[F] =
 
