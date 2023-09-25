@@ -159,6 +159,9 @@ trait Codecs {
       _.toLocalDateTime
     )
 
+  val dataset_qa_state: Codec[DatasetQaState] =
+    enumerated(Type("e_dataset_qa_state"))
+
   val dataset_stage: Codec[DatasetStage] =
     enumerated(Type("e_dataset_stage"))
 
