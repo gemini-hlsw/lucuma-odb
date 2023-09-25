@@ -16,7 +16,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObsStatus
@@ -148,7 +147,7 @@ object GeneratorParamsService {
           m  <- observingModeServices.selectObservingMode(oms)
         } yield
           ps.groupBy(_.observationId).map { case (oid, oParams) =>
-            oid -> toGeneratorParams(oParams, m.get(oid))
+            oid -> toGeneratorParams(NonEmptyList.fromListUnsafe(oParams), m.get(oid))
           }
 
       private def selectManyParams(
@@ -173,10 +172,10 @@ object GeneratorParamsService {
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
 
       private def observingMode(
-        params: List[Params],
+        params: NonEmptyList[Params],
         config: Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, ObservingMode] = {
-        val configs: EitherNel[Error, List[ObservingMode]] =
+        val configs: EitherNel[Error, NonEmptyList[ObservingMode]] =
           params.traverse { p =>
             for {
               t <- p.targetId.toRightNel(Error.missing("target"))
@@ -188,16 +187,13 @@ object GeneratorParamsService {
         // All of the `ObservingMode`s that we compute have to be the same.
         // Otherwise we would need to configure the instrument differently for
         // different stars in the asterism.
-        configs.flatMap { scs =>
-          scs.distinct match {
-            case sc :: Nil => sc.rightNel
-            case _         => Error.ConflictingData.leftNel
-          }
+        configs.flatMap { modes =>
+          ObservingMode.reconcile(modes).fold(Error.ConflictingData.leftNel)(_.rightNel)
         }
       }
 
       private def toGeneratorParams(
-        params: List[Params],
+        params: NonEmptyList[Params],
         config: Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, GeneratorParams] =
         observingMode(params, config).flatMap {
@@ -212,9 +208,9 @@ object GeneratorParamsService {
                   gn.ccdMode.some,
                   gn.roi.some),
                 λ)
-            }.map { itcParams =>
-              GeneratorParams.GmosNorthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gn)
-            }.toEither
+            }
+            .map(GeneratorParams.GmosNorthLongSlit(_, gn))
+            .toEither
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
@@ -227,9 +223,9 @@ object GeneratorParamsService {
                   gs.ccdMode.some,
                   gs.roi.some),
                 λ)
-            }.map { itcParams =>
-              GeneratorParams.GmosSouthLongSlit(NonEmptyList.fromListUnsafe(itcParams), gs)
-            }.toEither
+            }
+            .map(GeneratorParams.GmosSouthLongSlit(_, gs))
+            .toEither
         }
 
       private def itcParams(
