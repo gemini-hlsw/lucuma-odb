@@ -17,8 +17,8 @@ object ObservingMode {
 
   def reconcile(modes: NonEmptyList[ObservingMode]): Option[ObservingMode] =
     modes.head match {
-        case gn: GmosNorth => GmosNorth.reconcile(gn, modes.tail)
-        case gs: GmosSouth => GmosSouth.reconcile(gs, modes.tail)
+      case gn: GmosNorth => GmosNorth.reconcile(gn, modes.tail)
+      case gs: GmosSouth => GmosSouth.reconcile(gs, modes.tail)
     }
 
   given HashBytes[ObservingMode] with {
