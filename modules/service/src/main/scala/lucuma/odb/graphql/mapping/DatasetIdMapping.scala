@@ -4,17 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.DatasetEventTable
+import table.DatasetTable
 
-trait DatasetIdMapping[F[_]] extends DatasetEventTable[F] {
+trait DatasetIdMapping[F[_]] extends DatasetTable[F] {
 
   lazy val DatasetIdMapping: ObjectMapping =
     ObjectMapping(
       tpe = DatasetIdType,
       fieldMappings = List(
-        SqlField("id", DatasetEventTable.Id, hidden = true, key = true),
-        SqlField("stepId", DatasetEventTable.DatasetId.StepId),
-        SqlField("index",  DatasetEventTable.DatasetId.Index)
+        SqlField("stepId", DatasetTable.DatasetId.StepId, key = true),
+        SqlField("index",  DatasetTable.DatasetId.Index, key = true)
       )
     )
 

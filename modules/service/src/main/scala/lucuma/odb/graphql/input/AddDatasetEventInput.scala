@@ -11,8 +11,7 @@ import lucuma.odb.graphql.binding.*
 
 case class AddDatasetEventInput(
   datasetId:    Dataset.Id,
-  datasetStage: DatasetStage,
-  filename:     Option[Dataset.Filename]
+  datasetStage: DatasetStage
 )
 
 object AddDatasetEventInput {
@@ -21,11 +20,10 @@ object AddDatasetEventInput {
     ObjectFieldsBinding.rmap {
       case List(
         DatasetIdInput.Binding("datasetId", rDatasetId),
-        DatasetStageBinding("datasetStage", rDatasetStage),
-        DatasetFilenameBinding.Option("filename", rFilename)
+        DatasetStageBinding("datasetStage", rDatasetStage)
       ) =>
-        (rDatasetId, rDatasetStage, rFilename).parMapN { (did, stage, filename) =>
-          AddDatasetEventInput(did, stage, filename)
+        (rDatasetId, rDatasetStage).parMapN { (did, stage) =>
+          AddDatasetEventInput(did, stage)
         }
     }
 

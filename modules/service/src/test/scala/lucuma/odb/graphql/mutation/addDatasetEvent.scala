@@ -66,7 +66,6 @@ class addDatasetEvent extends OdbSuite {
               observation {
                 id
               }
-              filename
             }
           }
         }
@@ -87,8 +86,7 @@ class addDatasetEvent extends OdbSuite {
             "datasetStage": "START_WRITE",
             "observation": {
               "id": $oid
-            },
-            "filename": null
+            }
           }
         }
       }
@@ -118,7 +116,6 @@ class addDatasetEvent extends OdbSuite {
               observation {
                 id
               }
-              filename
             }
           }
         }
@@ -139,8 +136,7 @@ class addDatasetEvent extends OdbSuite {
             "datasetStage": "START_WRITE",
             "observation": {
               "id": $oid
-            },
-            "filename": "N20230627S0001.fits"
+            }
           }
         }
       }

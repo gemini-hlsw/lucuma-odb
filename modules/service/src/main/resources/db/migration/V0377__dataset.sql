@@ -9,7 +9,7 @@ CREATE TYPE e_dataset_qa_state As ENUM ('pass', 'usable', 'fail');
 COMMENT ON TYPE e_dataset_qa_state is 'Dataset QA States.';
 
 -- Function used to generate a dataset filename from the site, date, and index.
-CREATE OR REPLACE FUNCTION generate_dataset_filename(site e_site, ldate date, idx int2)
+CREATE OR REPLACE FUNCTION generate_dataset_filename(site e_site, ldate date, idx int4)
 RETURNS varchar AS $$
 DECLARE
   site_prefix    varchar;
@@ -58,7 +58,20 @@ CREATE TABLE t_dataset (
   -- Dataset QA State
   c_qa_state   e_dataset_qa_state NULL,
 
-  -- Dataset Timestamp
-  c_timestamp  timestamp  NOT NULL
+  -- Dataset Timestamps
+  c_start_time timestamp  NULL,
+  c_end_time   timestamp  NULL
 );
 COMMENT ON TABLE t_dataset IS 'Datasets.';
+
+CREATE OR REPLACE FUNCTION set_dataset_index()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.c_index := COALESCE((SELECT MAX(c_index) FROM t_dataset WHERE c_step_id = NEW.c_step_id), 0) + 1;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_dataset_index_trigger
+BEFORE INSERT ON t_dataset
+FOR EACH ROW EXECUTE FUNCTION set_dataset_index();
