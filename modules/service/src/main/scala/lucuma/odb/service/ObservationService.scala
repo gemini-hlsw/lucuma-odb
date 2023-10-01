@@ -572,7 +572,7 @@ object ObservationService {
           ${hour_angle_range_value.opt},
           $science_mode,
           ${wavelength_pm.opt},
-          ${pos_int.opt},
+          ${int4_pos.opt},
           ${signal_to_noise.opt},
           ${wavelength_pm.opt},
           ${wavelength_pm.opt},
@@ -664,7 +664,7 @@ object ObservationService {
     def spectroscopyRequirementsUpdates(in: SpectroscopyScienceRequirementsInput): List[AppliedFragment] = {
 
       val upWavelength         = sql"c_spec_wavelength = ${wavelength_pm.opt}"
-      val upResolution         = sql"c_spec_resolution = ${pos_int.opt}"
+      val upResolution         = sql"c_spec_resolution = ${int4_pos.opt}"
       val upSignalToNoise      = sql"c_spec_signal_to_noise = ${signal_to_noise.opt}"
       val upSignalToNoiseAt    = sql"c_spec_signal_to_noise_at = ${wavelength_pm.opt}"
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"

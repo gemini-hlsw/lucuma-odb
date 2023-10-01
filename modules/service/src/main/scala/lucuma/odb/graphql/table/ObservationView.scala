@@ -88,7 +88,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
             val Value: ColumnRef       = col("c_spec_focal_plane_angle",    angle_µas.embedded)
           }
 
-          val Resolution: ColumnRef         = col("c_spec_resolution",          pos_int.opt)          
+          val Resolution: ColumnRef         = col("c_spec_resolution",          int4_pos.opt)
           val SignalToNoise: ColumnRef      = col("c_spec_signal_to_noise",     signal_to_noise.opt)        
           val FocalPlane: ColumnRef         = col("c_spec_focal_plane",         focal_plane.opt)
           val Capability: ColumnRef         = col("c_spec_capability",          spectroscopy_capabilities.opt)
