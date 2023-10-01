@@ -10,6 +10,7 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
+import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -30,8 +31,7 @@ trait ExecutionEventService[F[_]] {
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
-    datasetStage: DatasetStage,
-    filename:     Option[Dataset.Filename]
+    datasetStage: DatasetStage
   )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse]
 
   def insertSequenceEvent(
@@ -59,6 +59,10 @@ object ExecutionEventService {
       id: Step.Id
     ) extends InsertEventResponse
 
+    case class DatasetNotFound(
+      id: Dataset.Id
+    ) extends InsertEventResponse
+
     case class VisitNotFound(
       id: Visit.Id
     ) extends InsertEventResponse
@@ -74,18 +78,20 @@ object ExecutionEventService {
 
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
-        datasetStage: DatasetStage,
-        filename:     Option[Dataset.Filename]
+        datasetStage: DatasetStage
       )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
 
         import InsertEventResponse.*
 
-        val insert: F[Either[StepNotFound, (ExecutionEvent.Id, Timestamp)]] =
+        val sid = datasetId.stepId
+        val idx = PosShort.unsafeFrom(datasetId.index.value) // nonneg => pos (need to fix this in core)
+
+        val insert: F[Either[DatasetNotFound, (ExecutionEvent.Id, Timestamp)]] =
           session
-            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, filename, datasetId.stepId)
-            .map(_.toRight(StepNotFound(datasetId.stepId)))
+            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, sid, idx)
+            .map(_.toRight(DatasetNotFound(datasetId)))
             .recover {
-              case SqlState.ForeignKeyViolation(_) => StepNotFound(datasetId.stepId).asLeft
+              case SqlState.ForeignKeyViolation(_) => DatasetNotFound(datasetId).asLeft
             }
 
         (for {
@@ -150,24 +156,21 @@ object ExecutionEventService {
 
   object Statements {
 
-    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Option[Dataset.Filename], Step.Id), (ExecutionEvent.Id, Timestamp)] =
+    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Step.Id, PosShort), (ExecutionEvent.Id, Timestamp)] =
       sql"""
         INSERT INTO t_dataset_event (
           c_step_id,
           c_index,
-          c_dataset_stage,
-          c_file_site,
-          c_file_date,
-          c_file_index
+          c_dataset_stage
         )
         SELECT
           $dataset_id,
-          $dataset_stage,
-          ${dataset_filename.opt}
+          $dataset_stage
         FROM
-          t_step_record
+          t_dataset
         WHERE
-          t_step_record.c_step_id = $step_id
+          t_dataset.c_step_id = $step_id AND
+          t_dataset.c_index   = $int2_pos
         RETURNING
           c_execution_event_id,
           c_received

@@ -71,6 +71,9 @@ trait Services[F[_]]:
   /** The `ChronicleService`. */
   def chronicleService: ChronicleService[F]
 
+  /** The `DatasetService`. */
+  def datasetService: DatasetService[F]
+
   /** The `ExecutionDigestService`. */
   def executionDigestService: ExecutionDigestService[F]
 
@@ -176,6 +179,7 @@ object Services:
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
+      lazy val datasetService = DatasetService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
@@ -219,6 +223,7 @@ object Services:
     def allocationService[F[_]](using Services[F]): AllocationService[F] = summon[Services[F]].allocationService
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
+    def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
     def executionDigestService[F[_]](using Services[F]): ExecutionDigestService[F] = summon[Services[F]].executionDigestService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
