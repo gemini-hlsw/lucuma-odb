@@ -8,7 +8,7 @@ import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.dataset_stage
 import lucuma.odb.util.Codecs.execution_event_id
 import lucuma.odb.util.Codecs.int2_nonneg
-import lucuma.odb.util.Codecs.pos_int
+import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
 import skunk.codec.temporal.date
@@ -29,7 +29,7 @@ trait DatasetEventTable[F[_]] extends BaseMapping[F] {
     object DatasetFilename {
       val FileSite: ColumnRef   = col("c_file_site",          site.opt)
       val FileDate: ColumnRef   = col("c_file_date",          date.opt)
-      val FileIndex: ColumnRef  = col("c_file_index",         pos_int.opt)
+      val FileIndex: ColumnRef  = col("c_file_index",         int4_pos.opt)
     }
   }
 

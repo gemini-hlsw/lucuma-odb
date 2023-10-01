@@ -114,7 +114,7 @@ object SmartGcalService {
         f: TimeSpan => D => D
       ): F[List[(D => D, Gcal)]] =
         session
-          .prepareR(af.fragment.query(step_config_gcal ~ pos_int ~ time_span))
+          .prepareR(af.fragment.query(step_config_gcal ~ int4_pos ~ time_span))
           .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
           .map {
             _.flatMap { case ((gcal, count), exposureTime) =>
@@ -285,7 +285,7 @@ object SmartGcalService {
           $instrument,
           $int4,
           $step_config_gcal,
-          $pos_int,
+          $int4_pos,
           $gcal_baseline
       """
 
@@ -320,7 +320,7 @@ object SmartGcalService {
         ) SELECT
           $instrument,
           $int4,
-          $pos_long,
+          $int8_pos,
           ${gmos_north_grating.opt},
           ${gmos_north_filter.opt},
           ${gmos_north_fpu.opt},
@@ -363,7 +363,7 @@ object SmartGcalService {
         ) SELECT
           $instrument,
           $int4,
-          $pos_long,
+          $int8_pos,
           ${gmos_south_grating.opt},
           ${gmos_south_filter.opt},
           ${gmos_south_fpu.opt},
