@@ -91,7 +91,7 @@ object SmartGcalTable {
   def valueEncoder[A](using e: Encoder[A]): Encoder[SmartGcalValue[A]] =
     (
       step_config_gcal *:
-      int4_pos          *:
+      int4_pos         *:
       gcal_baseline    *:
       e
     ).contramap[SmartGcalValue[A]] { v => (
