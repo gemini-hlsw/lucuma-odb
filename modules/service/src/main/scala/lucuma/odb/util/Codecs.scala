@@ -449,7 +449,7 @@ trait Codecs {
     ).to[ConstraintSet]
 
   val dataset_id: Codec[Dataset.Id] =
-    (step_id *: int2_nonneg).to[Dataset.Id]
+    (step_id *: int2_pos).to[Dataset.Id]
 
   val dataset_filename: Codec[Dataset.Filename] =
     (site *: date *: int4_pos).eimap { case (s, d, p) =>

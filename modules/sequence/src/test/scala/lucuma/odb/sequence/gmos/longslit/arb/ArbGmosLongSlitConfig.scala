@@ -42,6 +42,7 @@ object ArbGmosLongSlitConfig {
         w <- arbitrary[Wavelength]
         dx <- arbitrary[GmosXBinning]
         x <- arbitrary[Option[GmosXBinning]]
+        dy <- arbitrary[GmosYBinning]
         y <- arbitrary[Option[GmosYBinning]]
         m <- arbitrary[Option[GmosAmpReadMode]]
         n <- arbitrary[Option[GmosAmpGain]]
@@ -55,6 +56,7 @@ object ArbGmosLongSlitConfig {
         w,
         dx,
         x,
+        dy,
         y,
         m,
         n,
@@ -73,6 +75,7 @@ object ArbGmosLongSlitConfig {
         w <- arbitrary[Wavelength]
         dx <- arbitrary[GmosXBinning]
         x <- arbitrary[Option[GmosXBinning]]
+        dy <- arbitrary[GmosYBinning]
         y <- arbitrary[Option[GmosYBinning]]
         m <- arbitrary[Option[GmosAmpReadMode]]
         n <- arbitrary[Option[GmosAmpGain]]
@@ -86,6 +89,7 @@ object ArbGmosLongSlitConfig {
         w,
         dx,
         x,
+        dy,
         y,
         m,
         n,

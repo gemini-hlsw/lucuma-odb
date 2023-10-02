@@ -6,9 +6,9 @@ package mapping
 
 import cats.syntax.all.*
 import coulomb.*
+import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.skunk.SkunkMapping
-import eu.timepit.refined.types.numeric.PosDouble
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -26,6 +26,7 @@ import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.sourceprofile.given
@@ -60,7 +61,6 @@ trait GmosLongSlitMapping[F[_]]
     val explicitXBin: FieldMapping        = SqlField("explicitXBin", cc.XBin)
 
     val yBin: FieldMapping                = explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin")
-    val defaultYBin: FieldMapping         = CursorField[GmosYBinning]("defaultYBin", _ => Result(DefaultYBinning))
     val explicitYBin: FieldMapping        = SqlField("explicitYBin", cc.YBin)
 
     val ampReadMode: FieldMapping         = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
@@ -145,23 +145,20 @@ trait GmosLongSlitMapping[F[_]]
 
         CursorField[GmosXBinning](
           "defaultXBin",
-          cursor =>
-            for {
-              fpu <- cursor.fieldAs[GmosNorthFpu]("fpu")
-              iq  <- cursor.fieldAs[ImageQuality]("imageQuality")
-              j   <- cursor.fieldAs[Option[Json]]("sourceProfile")
-              sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
-            } yield
-              sp.fold(GmosXBinning.Two) { sourceProfile =>  // TODO: What should the real default be if there is no target
-                xbinNorth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
-              },
-          List("fpu", "imageQuality", "sourceProfile")
+          defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
+          List("fpu", "grating", "imageQuality", "sourceProfile")
         ),
 
         common.explicitXBin,
 
         common.yBin,
-        common.defaultYBin,
+
+        CursorField[GmosYBinning](
+          "defaultYBin",
+          defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
+          List("fpu", "grating", "imageQuality", "sourceProfile")
+        ),
+
         common.explicitYBin,
 
         common.ampReadMode,
@@ -256,23 +253,20 @@ trait GmosLongSlitMapping[F[_]]
 
         CursorField[GmosXBinning](
           "defaultXBin",
-          cursor =>
-            for {
-              fpu <- cursor.fieldAs[GmosSouthFpu]("fpu")
-              iq  <- cursor.fieldAs[ImageQuality]("imageQuality")
-              j   <- cursor.fieldAs[Option[Json]]("sourceProfile")
-              sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
-            } yield
-              sp.fold(GmosXBinning.Two) { sourceProfile =>
-                xbinSouth(fpu, sourceProfile, iq, PosDouble.unsafeFrom(2.0))
-              },
-          List("fpu", "imageQuality", "sourceProfile")
+          defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
+          List("fpu", "grating", "imageQuality", "sourceProfile")
         ),
 
         common.explicitXBin,
 
         common.yBin,
-        common.defaultYBin,
+
+        CursorField[GmosYBinning](
+          "defaultYBin",
+          defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
+          List("fpu", "grating", "imageQuality", "sourceProfile")
+        ),
+
         common.explicitYBin,
 
         common.ampReadMode,
@@ -345,6 +339,20 @@ trait GmosLongSlitMapping[F[_]]
 }
 
 object GmosLongSlitMapping {
+
+  private def defaultBinning[U: ClassTag, G: ClassTag](
+    f: (U, SourceProfile, ImageQuality, G) => (GmosXBinning, GmosYBinning)
+  ): Cursor => Result[(GmosXBinning, GmosYBinning)] = cursor =>
+    for {
+      fpu <- cursor.fieldAs[U]("fpu")
+      iq  <- cursor.fieldAs[ImageQuality]("imageQuality")
+      j   <- cursor.fieldAs[Option[Json]]("sourceProfile")
+      g   <- cursor.fieldAs[G]("grating")
+      sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
+    } yield
+      sp.fold((GmosXBinning.One, GmosYBinning.One)) { sourceProfile =>
+        f(fpu, sourceProfile, iq, g)
+      }
 
   private def parseCsvBigDecimals(s: String): List[BigDecimal] =
     s.split(',').toList.map(n => BigDecimal(n.trim))
