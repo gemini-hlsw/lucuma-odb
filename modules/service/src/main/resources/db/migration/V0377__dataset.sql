@@ -66,8 +66,8 @@ CREATE TABLE t_dataset (
 
   -- If end is defined, then start must be defined.  Start must come before end.
   CONSTRAINT t_dataset_check_times CHECK (
-    ((c_end_time IS NULL) OR (c_start_time IS NOT NULL)) AND
-    (c_start_time <= c_end_time)
+    (c_end_time IS NULL) OR
+    (c_start_time IS NOT NULL AND (c_start_time <= c_end_time))
   )
 );
 COMMENT ON TABLE t_dataset IS 'Datasets.';
