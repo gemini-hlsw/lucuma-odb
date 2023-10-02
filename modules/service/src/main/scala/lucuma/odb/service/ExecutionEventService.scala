@@ -84,7 +84,7 @@ object ExecutionEventService {
         import InsertEventResponse.*
 
         val sid = datasetId.stepId
-        val idx = PosShort.unsafeFrom(datasetId.index.value) // nonneg => pos (need to fix this in core)
+        val idx = datasetId.index
 
         val insert: F[Either[DatasetNotFound, (ExecutionEvent.Id, Timestamp)]] =
           session
