@@ -37,7 +37,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
           fpu: LONG_SLIT_0_50,
           centralWavelength: {
             nanometers: 500
-          }
+          },
+          explicitYBin: TWO
         }
       """,
       status,
@@ -62,7 +63,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
           fpu: LONG_SLIT_0_50,
           centralWavelength: {
             nanometers: 500
-          }
+          },
+          explicitYBin: TWO
         }
       """,
       status,

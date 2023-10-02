@@ -647,6 +647,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO,
               explicitSpatialOffsets: [
                 { arcseconds: -15.0 },
                 { arcseconds:  15.0 },
@@ -879,6 +880,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO,
               explicitWavelengthDithers: [
                 { nanometers: -5.0 },
                 { nanometers:  0.0 },
@@ -2221,7 +2223,8 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                    fpu: LONG_SLIT_5_00,
                    centralWavelength: {
                      nanometers: 500
-                   }
+                   },
+                   explicitYBin: TWO
                  }
                """
              )
