@@ -27,6 +27,7 @@ import lucuma.core.model.UnnormalizedSED.*
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
@@ -39,6 +40,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
+import lucuma.odb.json.sequence.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.json.wavelength.query.given
@@ -668,6 +670,32 @@ trait DatabaseOperations { this: OdbSuite =>
       variables = vars.asObject
     ).map { json =>
       json.hcursor.downFields(name, "stepRecord", "id").require[Step.Id]
+    }
+  }
+
+  def recordDatasetAs(
+    user:     User,
+    sid:      Step.Id,
+    filename: String
+  ): IO[Dataset.Id] = {
+    val q = s"""
+      mutation {
+        recordDataset(input: {
+          stepId: ${sid.asJson},
+          filename: "$filename"
+        }) {
+          dataset {
+            id {
+              stepId
+              index
+            }
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).map { json =>
+      json.hcursor.downFields("recordDataset", "dataset", "id").require[Dataset.Id]
     }
   }
 

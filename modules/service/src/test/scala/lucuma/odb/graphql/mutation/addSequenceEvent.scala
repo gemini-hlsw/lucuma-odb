@@ -103,7 +103,7 @@ class addSequenceEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       staff,
       _ => query,
-      (_, _) => s"Visit id 'v-42' not found".asLeft
+      (_, _) => s"Visit 'v-42' not found".asLeft
     )
 
   }
