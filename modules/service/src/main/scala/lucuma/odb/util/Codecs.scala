@@ -5,11 +5,14 @@ package lucuma.odb.util
 
 import cats.syntax.apply.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
+import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
@@ -275,20 +278,29 @@ trait Codecs {
   val partner: Codec[Partner] =
     enumerated(Type.varchar)
 
-  val pos_big_decimal: Codec[PosBigDecimal] =
+  val numeric_nonneg: Codec[NonNegBigDecimal] =
+    numeric.eimap(NonNegBigDecimal.from)(_.value)
+
+  val numeric_pos: Codec[PosBigDecimal] =
     numeric.eimap(PosBigDecimal.from)(_.value)
-
-  val pos_int: Codec[PosInt] =
-    int4.eimap(PosInt.from)(_.value)
-
-  val pos_long: Codec[PosLong] =
-    int8.eimap(PosLong.from)(_.value)
 
   val int2_nonneg: Codec[NonNegShort] =
     int2.eimap(NonNegShort.from)(_.value)
 
+  val int2_pos: Codec[PosShort] =
+    int2.eimap(PosShort.from)(_.value)
+
   val int4_nonneg: Codec[NonNegInt] =
     int4.eimap(NonNegInt.from)(_.value)
+
+  val int4_pos: Codec[PosInt] =
+    int4.eimap(PosInt.from)(_.value)
+
+  val int8_nonneg: Codec[NonNegLong] =
+    int8.eimap(NonNegLong.from)(_.value)
+
+  val int8_pos: Codec[PosLong] =
+    int8.eimap(PosLong.from)(_.value)
 
   val program_id: Codec[Program.Id] =
     gid[Program.Id]
@@ -440,7 +452,7 @@ trait Codecs {
     (step_id *: int2_nonneg).to[Dataset.Id]
 
   val dataset_filename: Codec[Dataset.Filename] =
-    (site *: date *: pos_int).eimap { case (s, d, p) =>
+    (site *: date *: int4_pos).eimap { case (s, d, p) =>
       Dataset.Filename.from(s, d, p).toRight(s"Unsupported date: $d")
     } { f =>
       (f.site, f.localDate, f.index)
