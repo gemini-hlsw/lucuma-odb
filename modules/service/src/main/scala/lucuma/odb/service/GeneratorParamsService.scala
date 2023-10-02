@@ -197,7 +197,7 @@ object GeneratorParamsService {
         config: Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, GeneratorParams] =
         observingMode(params, config).flatMap {
-          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
+          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
               itcParams(
                 p,
@@ -212,7 +212,7 @@ object GeneratorParamsService {
             .map(GeneratorParams.GmosNorthLongSlit(_, gn))
             .toEither
 
-          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _) =>
+          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
             params.traverse { p =>
               itcParams(
                 p,

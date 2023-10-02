@@ -7,7 +7,6 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosDouble
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -23,6 +22,7 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
@@ -96,8 +96,6 @@ trait GmosLongSlitService[F[_]] {
 
 object GmosLongSlitService {
 
-  val Sampling: PosDouble = PosDouble.unsafeFrom(2.5)
-
   def instantiate[F[_]: Concurrent](using Services[F]): GmosLongSlitService[F] =
 
     new GmosLongSlitService[F] {
@@ -150,13 +148,13 @@ object GmosLongSlitService {
         which: List[Observation.Id]
       ): F[Map[Observation.Id, SourceProfile => GmosNorth]] =
         select(which, Statements.selectGmosNorthLongSlit, north)
-          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, Sampling)) }.toMap)
+          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
 
       override def selectSouth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, SourceProfile => GmosSouth]] =
         select(which, Statements.selectGmosSouthLongSlit, south)
-          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, Sampling)) }.toMap)
+          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
 
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>

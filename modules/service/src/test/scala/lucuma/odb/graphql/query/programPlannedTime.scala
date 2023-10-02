@@ -107,6 +107,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           grating: R831_G5302,
           filter: R_PRIME,
           fpu: LONG_SLIT_0_50,
+          explicitYBin: TWO,
           centralWavelength: {
             nanometers: 500
           }

@@ -514,7 +514,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               grating: B600_G5303,
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
-              centralWavelength: { nanometers: 500 }
+              centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO
             }
           """
         )
@@ -621,7 +622,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               grating: B600_G5307,
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
-              centralWavelength: { nanometers: 500 }
+              centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO
             }
           """
         )
@@ -728,6 +730,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 }
+              explicitYBin: TWO
             }
           """
         )
