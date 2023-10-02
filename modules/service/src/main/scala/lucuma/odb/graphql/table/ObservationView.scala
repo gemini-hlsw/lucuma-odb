@@ -23,7 +23,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val VisualizationTime: ColumnRef = col("c_visualization_time", core_timestamp.opt)
       val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
       val GroupId: ColumnRef           = col("c_group_id",           group_id.opt)
-      val GroupIndex: ColumnRef        = col("c_group_index",        int2_nonneg.opt)
+      val GroupIndex: ColumnRef        = col("c_group_index",        int2_nonneg)
 
       object PlannedTime {
         val Pi        = col("c_pts_pi", time_span)

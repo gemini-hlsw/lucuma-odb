@@ -7145,7 +7145,7 @@ type Observation {
   """
   Index in enclosing group or at the top level if ungrouped. If left unspecified on creation, observation will be added last in its enclosing group or at the top level. Cannot be set to null.
   """
-  groupIndex: NonNegShort
+  groupIndex: NonNegShort!
 
 }
 
