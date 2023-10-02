@@ -48,6 +48,7 @@ trait BaseMapping[F[_]]
   lazy val CreateProgramResultType             = schema.ref("CreateProgramResult")
   lazy val CreateTargetResultType              = schema.ref("CreateTargetResult")
   lazy val DarkType                            = schema.ref("Dark")
+  lazy val DatasetQaStateType                  = schema.ref("DatasetQaState")
   lazy val DatasetType                         = schema.ref("Dataset")
   lazy val DatasetEventType                    = schema.ref("DatasetEvent")
   lazy val DatasetIdType                       = schema.ref("DatasetId")

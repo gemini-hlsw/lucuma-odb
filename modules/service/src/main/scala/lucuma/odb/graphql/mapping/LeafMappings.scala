@@ -52,6 +52,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
       LeafMapping[Tag](ConditionsMeasurementSourceType),
       LeafMapping[Tag](ConditionsSourceType),

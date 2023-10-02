@@ -3067,6 +3067,10 @@ input RecordDatasetInput {
 
   "Dataset filename."
   filename: DatasetFilename!
+
+  "Dataset QA State."
+  qaState: DatasetQaState
+
 }
 
 "The result of recording a new dataset."

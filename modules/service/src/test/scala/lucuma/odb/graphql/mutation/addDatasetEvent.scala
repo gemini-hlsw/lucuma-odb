@@ -9,8 +9,10 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.refined.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.ObservingModeType
 
@@ -21,39 +23,42 @@ class addDatasetEvent extends OdbSuite {
 
   override lazy val validUsers: List[User] = List(staff)
 
-  private def recordStep(
+  private def recordDataset(
     mode: ObservingModeType,
-    user: User
-  ):IO[(Observation.Id, Step.Id)] =
+    user: User,
+    file: String
+  ):IO[(Observation.Id, Dataset.Id)] =
     for {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
       vid <- recordVisitAs(user, mode.instrument, oid)
       aid <- recordAtomAs(user, mode.instrument, vid)
       sid <- recordStepAs(user, mode.instrument, aid)
-    } yield (oid, sid)
+      did <- recordDatasetAs(user, sid, file)
+    } yield (oid, did)
 
   private def addDatasetEventTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Step.Id => String,
-    expected: (Observation.Id, Step.Id) => Either[String, Json]
+    file:     String,
+    query:    Dataset.Id => String,
+    expected: (Observation.Id, Dataset.Id) => Either[String, Json]
   ): IO[Unit] = {
     for {
-      ids <- recordStep(mode, user)
-      (oid, sid) = ids
-      _   <- expect(user, query(sid), expected(oid, sid).leftMap(s => List(s)))
+      ids <- recordDataset(mode, user, file)
+      (oid, did) = ids
+      _   <- expect(user, query(did), expected(oid, did).leftMap(s => List(s)))
     } yield ()
 }
 
   test("addDatasetEvent") {
-    def query(sid: Step.Id): String =
+    def query(did: Dataset.Id): String =
       s"""
         mutation {
           addDatasetEvent(input: {
             datasetId: {
-              stepId: "$sid",
-              index:  2
+              stepId: "${did.stepId}",
+              index:  ${did.index}
             },
             datasetStage: START_WRITE
           }) {
@@ -74,14 +79,15 @@ class addDatasetEvent extends OdbSuite {
     addDatasetEventTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      sid => query(sid),
-      (oid, sid) => json"""
+      "N18630101S0001.fits",
+      did => query(did),
+      (oid, did) => json"""
       {
         "addDatasetEvent": {
           "event": {
             "datasetId": {
-              "stepId": $sid,
-              "index": 2
+              "stepId": ${did.stepId},
+              "index": ${did.index}
             },
             "datasetStage": "START_WRITE",
             "observation": {
@@ -96,16 +102,15 @@ class addDatasetEvent extends OdbSuite {
   }
 
   test("addDatasetEvent - with filename") {
-    def query(sid: Step.Id): String =
+    def query(did: Dataset.Id): String =
       s"""
         mutation {
           addDatasetEvent(input: {
             datasetId: {
-              stepId: "$sid",
-              index:  2
+              stepId: "${did.stepId}",
+              index:  ${did.index}
             },
-            datasetStage: START_WRITE,
-            filename: "N20230627S0001.fits"
+            datasetStage: START_WRITE
           }) {
             event {
               datasetId {
@@ -124,14 +129,15 @@ class addDatasetEvent extends OdbSuite {
     addDatasetEventTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
-      sid => query(sid),
-      (oid, sid) => json"""
+      "N18630101S0002.fits",
+      did => query(did),
+      (oid, did) => json"""
       {
         "addDatasetEvent": {
           "event": {
             "datasetId": {
-              "stepId": $sid,
-              "index": 2
+              "stepId": ${did.stepId},
+              "index": ${did.index}
             },
             "datasetStage": "START_WRITE",
             "observation": {
@@ -145,7 +151,7 @@ class addDatasetEvent extends OdbSuite {
 
   }
 
-  test("addDatasetEvent - unknown step") {
+  test("addDatasetEvent - unknown dataset") {
     def query: String =
       s"""
         mutation {
@@ -168,8 +174,9 @@ class addDatasetEvent extends OdbSuite {
     addDatasetEventTest(
       ObservingModeType.GmosNorthLongSlit,
       staff,
+      "N18630101S0003.fits",
       _ => query,
-      (_, _) => s"Step id 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
+      (_, _) => s"Dataset '(s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7, 3)' not found".asLeft
     )
 
   }
