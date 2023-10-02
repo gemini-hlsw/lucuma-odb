@@ -48,6 +48,7 @@ import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.RecordAtomInput
+import lucuma.odb.graphql.input.RecordDatasetInput
 import lucuma.odb.graphql.input.RecordGmosNorthStepInput
 import lucuma.odb.graphql.input.RecordGmosNorthVisitInput
 import lucuma.odb.graphql.input.RecordGmosSouthStepInput
@@ -60,11 +61,13 @@ import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateProposalAttachmentsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
+import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.AllocationService
+import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
 import lucuma.odb.service.ProgramService
@@ -98,6 +101,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProgram,
       CreateTarget,
       LinkUser,
+      RecordDataset,
       RecordGmosNorthAtom,
       RecordGmosNorthStep,
       RecordGmosNorthVisit,
@@ -342,6 +346,32 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private def recordDatasetResponseToResult(
+    child:        Query,
+    predicates:   DatasetPredicates
+  ): DatasetService.InsertDatasetResponse => Result[Query] = {
+    import DatasetService.InsertDatasetResponse.*
+    (response: DatasetService.InsertDatasetResponse) => response match {
+      case NotAuthorized(user) =>
+        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+      case ReusedFilename(filename) =>
+        Result.failure(s"The filename '${filename.format}' is already assigned")
+      case StepNotFound(id)    =>
+        Result.failure(s"Step id '$id' not found")
+      case Success(did)     =>
+        Result(Unique(Filter(predicates.id.eql(did), child)))
+    }
+  }
+
+  private lazy val RecordDataset: MutationField =
+    MutationField("recordDataset", RecordDatasetInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        datasetService
+          .insertDataset(input.stepId, input.filename, input.qaState)
+          .map(recordDatasetResponseToResult(child, Predicates.recordDatasetResult.dataset))
+      }
+    }
+
   private def executionEventResponseToResult(
     child:        Query,
     predicates:   ExecutionEventPredicates
@@ -350,10 +380,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     (response: ExecutionEventService.InsertEventResponse) => response match {
       case NotAuthorized(user) =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
+      case DatasetNotFound(id)    =>
+        Result.failure(s"Dataset '${id.show}' not found")
       case StepNotFound(id)    =>
-        Result.failure(s"Step id '$id' not found")
+        Result.failure(s"Step '$id' not found")
       case VisitNotFound(id)   =>
-        Result.failure(s"Visit id '$id' not found")
+        Result.failure(s"Visit '$id' not found")
       case Success(eid, _)     =>
         Result(Unique(Filter(predicates.id.eql(eid), child)))
     }
@@ -363,7 +395,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("addDatasetEvent", AddDatasetEventInput.Binding) { (input, child) =>
       services.useTransactionally {
         executionEventService
-          .insertDatasetEvent(input.datasetId, input.datasetStage, input.filename)
+          .insertDatasetEvent(input.datasetId, input.datasetStage)
           .map(executionEventResponseToResult(child, Predicates.datasetEvent))
       }
     }

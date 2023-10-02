@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -51,6 +52,22 @@ trait SequenceCodec {
 
   given Encoder[Dataset.Filename] =
     Encoder[String].contramap[Dataset.Filename](_.format)
+
+  given Decoder[Dataset.Id] =
+    Decoder.instance { c =>
+      for {
+        sid <- c.downField("stepId").as[Step.Id]
+        idx <- c.downField("index").as[PosShort]
+      } yield Dataset.Id(sid, idx)
+    }
+
+  given Encoder[Dataset.Id] =
+    Encoder.instance { (a: Dataset.Id) =>
+      Json.obj(
+        "stepId" -> a.stepId.asJson,
+        "index"  -> a.index.asJson
+      )
+    }
 
   given [D: Decoder]: Decoder[Step[D]] =
     Decoder.instance { c =>

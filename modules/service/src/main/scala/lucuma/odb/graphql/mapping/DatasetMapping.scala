@@ -1,0 +1,35 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package mapping
+
+import table.AtomRecordTable
+import table.DatasetTable
+import table.ObservationView
+import table.StepRecordTable
+
+trait DatasetMapping[F[_]] extends DatasetTable[F]
+                              with ObservationView[F]
+                              with AtomRecordTable[F]
+                              with StepRecordTable[F] {
+
+  lazy val DatasetMapping: ObjectMapping =
+    ObjectMapping(
+      tpe = DatasetType,
+      fieldMappings = List(
+        SqlField("stepId", DatasetTable.DatasetId.StepId, hidden = true, key = true),
+        SqlField("index",  DatasetTable.DatasetId.Index, hidden = true, key = true),
+        SqlObject("id"),
+
+        SqlObject("observation", Join(DatasetTable.DatasetId.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
+        SqlField("filename", DatasetTable.File.Name),
+        SqlField("qaState",  DatasetTable.QaState),
+
+        SqlField("start", DatasetTable.Time.Start),
+        SqlField("end", DatasetTable.Time.End)
+      )
+    )
+
+
+}

@@ -108,6 +108,7 @@ object OdbMapping {
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
           with DeclinationMapping[F]
+          with DatasetMapping[F]
           with DatasetIdMapping[F]
           with DatasetEventMapping[F]
           with ElevationRangeMapping[F]
@@ -159,6 +160,7 @@ object OdbMapping {
           with ProposalAttachmentTypeMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
+          with RecordDatasetResultMapping[F]
           with RecordGmosAtomResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
@@ -232,6 +234,7 @@ object OdbMapping {
               CreateProgramResultMapping,
               CreateTargetResultMapping,
               DatasetIdMapping,
+              DatasetMapping,
               DatasetEventMapping,
               DeclinationMapping,
               ElevationRangeMapping,
@@ -289,6 +292,7 @@ object OdbMapping {
               ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
+              RecordDatasetResultMapping,
               RecordGmosNorthAtomResultMapping,
               RecordGmosNorthStepResultMapping,
               RecordGmosNorthVisitResultMapping,

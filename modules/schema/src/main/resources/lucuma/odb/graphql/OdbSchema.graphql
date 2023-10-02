@@ -7,9 +7,6 @@ input AddDatasetEventInput {
   "Dataset execution stage."
   datasetStage: DatasetStage!
 
-  "Dataset filename, if known."
-  filename: DatasetFilename
-
 }
 
 "The result of adding a dataset event."
@@ -2505,6 +2502,17 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
+  """
+  Records a new dataset.  This dataset may be subsequently referenced by dataset events.
+  """
+  recordDataset(
+    """
+    Describes the dataset to add.
+    """
+    input: RecordDatasetInput!
+  ): RecordDatasetResult!
+
+
   "Record a new GMOS North atom"
   recordGmosNorthAtom(
     "Atom configuration parameters"
@@ -3050,6 +3058,27 @@ input RecordAtomInput {
   visitId: VisitId!
   sequenceType: SequenceType!
   stepCount: NonNegShort!
+}
+
+"Dataset creation parameters."
+input RecordDatasetInput {
+  "Corresponding Step id."
+  stepId: StepId!
+
+  "Dataset filename."
+  filename: DatasetFilename!
+
+  "Dataset QA State."
+  qaState: DatasetQaState
+
+}
+
+"The result of recording a new dataset."
+type RecordDatasetResult {
+
+  "The new dataset that was added."
+  dataset: Dataset!
+
 }
 
 "The result of recording a GMOS North atom."
@@ -4792,14 +4821,14 @@ type Coordinates {
 
 type Dataset {
   """
-  Observation associated with this dataset
-  """
-  observation: Observation!
-
-  """
   Dataset id
   """
   id: DatasetId!
+
+  """
+  Observation associated with this dataset
+  """
+  observation: Observation!
 
   """
   Dataset filename
@@ -4807,9 +4836,20 @@ type Dataset {
   filename: DatasetFilename!
 
   """
-  Dataset QA state
+  Dataset QA state, if any has been set.
   """
   qaState: DatasetQaState
+
+  """
+  Start time, if the dataset collection has started.
+  """
+  start: Timestamp
+
+  """
+  End time, if the dataset collection has finished.
+  """
+  end: Timestamp
+
 }
 
 """
@@ -4823,9 +4863,6 @@ type DatasetEvent {
 
   "Identifies the associated dataset."
   datasetId: DatasetId!
-
-  "Dataset filename, when known."
-  filename: DatasetFilename
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
@@ -4845,7 +4882,7 @@ type DatasetId {
   stepId: StepId!
 
   "Dataset index."
-  index: NonNegShort!
+  index: PosShort!
 }
 
 input DatasetIdInput {
@@ -7395,6 +7432,11 @@ scalar PosBigDecimal
 An `Int` in the range from 1 to 2147483647
 """
 scalar PosInt
+
+"""
+A `Short` in the range from 1 to 32767
+"""
+scalar PosShort
 
 type Program {
   """
