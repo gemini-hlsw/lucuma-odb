@@ -354,6 +354,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     (response: DatasetService.InsertDatasetResponse) => response match {
       case NotAuthorized(user) =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
+      case ReusedFilename(filename) =>
+        Result.failure(s"The filename '${filename.format}' is already assigned")
       case StepNotFound(id)    =>
         Result.failure(s"Step id '$id' not found")
       case Success(did)     =>
@@ -365,7 +367,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordDataset", RecordDatasetInput.Binding) { (input, child) =>
       services.useTransactionally {
         datasetService
-          .insertDataset(input.stepId, input.filename, none)
+          .insertDataset(input.stepId, input.filename, input.qaState)
           .map(recordDatasetResponseToResult(child, Predicates.recordDatasetResult.dataset))
       }
     }
@@ -379,7 +381,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       case NotAuthorized(user) =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
       case DatasetNotFound(id)    =>
-        Result.failure(s"Dataset '$id' not found")
+        Result.failure(s"Dataset '${id.show}' not found")
       case StepNotFound(id)    =>
         Result.failure(s"Step '$id' not found")
       case VisitNotFound(id)   =>

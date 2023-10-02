@@ -85,7 +85,7 @@ class recordDataset extends OdbSuite {
               "observation": {
                 "id": $oid
               },
-              "filename": "N18630101S0001",
+              "filename": "N18630101S0001.fits",
               "qaState": null,
               "start": null,
               "end": null
@@ -96,4 +96,93 @@ class recordDataset extends OdbSuite {
     )
   }
 
+  test("recordDataset - init QA state") {
+    recordDatasetTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      sid => s"""
+        mutation {
+          recordDataset(input: {
+            stepId: ${sid.asJson},
+            filename: "N18630101S0002.fits",
+            qaState: USABLE
+          }) {
+            dataset {
+              id {
+                stepId
+                index
+              }
+              observation {
+                id
+              }
+              filename
+              qaState
+              start
+              end
+            }
+          }
+        }
+      """,
+      (oid, sid) => json"""
+        {
+          "recordDataset": {
+            "dataset": {
+              "id": {
+                "stepId": $sid,
+                "index": 1
+              },
+              "observation": {
+                "id": $oid
+              },
+              "filename": "N18630101S0002.fits",
+              "qaState": "USABLE",
+              "start": null,
+              "end": null
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordDataset - reused filename") {
+    recordDatasetTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      sid => s"""
+        mutation {
+          recordDataset(input: {
+            stepId: ${sid.asJson},
+            filename: "N18630101S0002.fits",
+            qaState: USABLE
+          }) {
+            dataset {
+              filename
+            }
+          }
+        }
+      """,
+      (oid, sid) => "The filename 'N18630101S0002.fits' is already assigned".asLeft
+    )
+  }
+
+  test("recordDataset - unkown step id") {
+    recordDatasetTest(
+      ObservingModeType.GmosNorthLongSlit,
+      staff,
+      sid => s"""
+        mutation {
+          recordDataset(input: {
+            stepId: "s-d506e5d9-e5d1-4fcc-964c-90afedabc9e8",
+            filename: "N18630101S0003.fits"
+          }) {
+            dataset {
+              filename
+            }
+          }
+        }
+      """,
+      (oid, sid) => "Step id 's-d506e5d9-e5d1-4fcc-964c-90afedabc9e8' not found".asLeft
+    )
+  }
 }

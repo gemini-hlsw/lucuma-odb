@@ -33,15 +33,21 @@ object DatasetService {
 
   sealed trait InsertDatasetResponse extends Product with Serializable
 
+  sealed trait InsertDatasetFailure extends InsertDatasetResponse
+
   object InsertDatasetResponse {
 
     case class NotAuthorized(
       user: User
-    ) extends InsertDatasetResponse
+    ) extends InsertDatasetFailure
 
     case class StepNotFound(
       id: Step.Id
-    ) extends InsertDatasetResponse
+    ) extends InsertDatasetFailure
+
+    case class ReusedFilename(
+      filename: Dataset.Filename
+    ) extends InsertDatasetFailure
 
     case class Success(
       datasetId: Dataset.Id
@@ -60,11 +66,12 @@ object DatasetService {
 
         import InsertDatasetResponse.*
 
-        val insert: F[Either[StepNotFound, Dataset.Id]] =
+        val insert: F[Either[InsertDatasetFailure, Dataset.Id]] =
           session
             .unique(Statements.InsertDataset)(stepId, filename, qaState)
-            .map(_.asRight[StepNotFound])
+            .map(_.asRight[InsertDatasetFailure])
             .recover {
+              case SqlState.UniqueViolation(_)     => ReusedFilename(filename).asLeft
               case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
             }
 
