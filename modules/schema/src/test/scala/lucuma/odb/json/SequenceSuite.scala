@@ -6,12 +6,14 @@ package lucuma.odb.json
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.arb.ArbAtom
+import lucuma.core.model.sequence.arb.ArbDataset
 import lucuma.core.model.sequence.arb.ArbExecutionConfig
 import lucuma.core.model.sequence.arb.ArbExecutionSequence
 import lucuma.core.model.sequence.arb.ArbInstrumentExecutionConfig
@@ -26,6 +28,7 @@ import munit.DisciplineSuite
 class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
 
   import ArbAtom.given
+  import ArbDataset.given
   import ArbDynamicConfig._
   import ArbInstrumentExecutionConfig.given
   import ArbExecutionConfig.given
@@ -40,6 +43,8 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   import wavelength.query.given
   import gmos.given
 
+  checkAll("Dataset.Filename",             CodecTests[Dataset.Filename].codec)
+  checkAll("Dataset.Id",                   CodecTests[Dataset.Id].codec)
   checkAll("SequenceDigest",               CodecTests[SequenceDigest].codec)
   checkAll("Step[GmosNorth]",              CodecTests[Step[DynamicConfig.GmosNorth]].codec)
   checkAll("Atom[GmosNorth]",              CodecTests[Atom[DynamicConfig.GmosNorth]].codec)
