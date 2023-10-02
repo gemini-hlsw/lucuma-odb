@@ -64,6 +64,7 @@ CREATE TABLE t_dataset (
 );
 COMMENT ON TABLE t_dataset IS 'Datasets.';
 
+-- Sets the dataset id index from the max index associated with the step id + 1
 CREATE OR REPLACE FUNCTION set_dataset_index()
 RETURNS TRIGGER AS $$
 BEGIN
