@@ -259,4 +259,74 @@ class observations extends OdbSuite {
     }
   }
 
+  test("select group info on observation without a group") {
+    for {
+      pid <- createProgramAs(pi2)
+      oid <- createObservationAs(pi2, pid)
+      _   <- expect(
+               user = pi2,
+               query = s"""
+              query {
+                observations(WHERE: { id: { EQ: "$oid" }}) {
+                  hasMore
+                  matches {
+                    id
+                    groupId
+                    groupIndex
+                  }
+                }
+              }""",
+               expected = Right(json"""
+                        {
+                          "observations" : {
+                            "hasMore" : false,
+                            "matches" : [
+                              {
+                                "id" : $oid,
+                                "groupId" : null,
+                                "groupIndex" : 0
+                              }
+                            ]
+                          }
+                        }""")
+             )
+    } yield ()
+  }
+
+  test("select group info on observation with a group") {
+    for {
+      pid <- createProgramAs(pi2)
+      gid <- createGroupAs(pi2, pid)
+      oid <- createObservationInGroupAs(pi2, pid, gid.some)
+      _   <- expect(
+               user = pi2,
+               query = s"""
+              query {
+                observations(WHERE: { id: { EQ: "$oid" }}) {
+                  hasMore
+                  matches {
+                    id
+                    groupId
+                    groupIndex
+                  }
+                }
+              }""",
+               expected = Right(json"""
+                        {
+                          "observations" : {
+                            "hasMore" : false,
+                            "matches" : [
+                              {
+                                "id" : $oid,
+                                "groupId" : $gid,
+                                "groupIndex" : 0
+                              }
+                            ]
+                          }
+                        }
+                      """)
+             )
+
+    } yield ()
+  }
 }
