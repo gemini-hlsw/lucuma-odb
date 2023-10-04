@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.effect.IO
+import cats.effect.kernel.Deferred
 import cats.syntax.show.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -99,6 +101,8 @@ class groupEdit extends OdbSuite {
           editType
           value {
             name
+            parentId
+            parentIndex
           }
         }
       }
@@ -113,7 +117,9 @@ class groupEdit extends OdbSuite {
       "groupEdit" -> Json.obj(
         "editType" -> Json.fromString(editType.tag.toUpperCase),
         "value"    -> Json.obj(
-          "name" -> Json.fromString(name)
+          "name"        -> Json.fromString(name),
+          "parentId"    -> Json.Null,
+          "parentIndex" -> Json.fromInt(0),
         )
       )
     )
@@ -218,4 +224,84 @@ class groupEdit extends OdbSuite {
        expected = List.fill(2)(json"""{"groupEdit":{"editType":"CREATED", "id":0}}""")
      )
    }
+
+  test("include correct parent information") {
+    Deferred[IO, (Group.Id, Group.Id, Group.Id)].flatMap { gids =>
+      subscriptionExpectF(
+        user      = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              editType
+              value {
+                id
+                parentId
+                parentIndex
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid <- createProgramAs(pi)
+              g1  <- createGroupAs(pi, pid)
+              g2  <- createGroupAs(pi, pid, Some(g1))
+              g3  <- createGroupAs(pi, pid, Some(g1), Some(NonNegShort.unsafeFrom(0)))
+              _   <- gids.complete((g1, g2, g3))
+            } yield ()
+          ),
+        expectedF =
+          gids.get.map { (g1, g2, g3) =>
+            List(
+              // first group created
+              json"""{
+                "groupEdit" : {
+                 "editType" : "CREATED",
+                  "value" : {
+                    "id" : $g1,
+                    "parentId" : null,
+                    "parentIndex" : 0
+                  }
+                }
+              }""",
+              // second group created
+              json"""{
+                "groupEdit" : {
+                  "editType" : "CREATED",
+                  "value" : {
+                    "id" : $g2,
+                    "parentId" : $g1,
+                    "parentIndex" : 0
+                  }
+                }
+              }""",
+              // second group moved out of the way
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED",
+                  "value" : {
+                    "id" : $g2,
+                    "parentId" : $g1,
+                    "parentIndex" : 1
+                  }
+                }
+              }""",
+              // third group created
+              json"""{
+                "groupEdit" : {
+                  "editType" : "CREATED",
+                  "value" : {
+                    "id" : $g3,
+                    "parentId" : $g1,
+                    "parentIndex" : 0
+                  }
+                }
+              }"""        
+            )
+          }
+      )
+    }
+  }
+
 }
