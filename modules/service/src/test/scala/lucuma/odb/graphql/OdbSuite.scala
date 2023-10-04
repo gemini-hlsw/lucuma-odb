@@ -392,6 +392,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
     }
 
+  def subscriptionExpectF(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None) =
+    subscription(user, query, mutations, variables).flatMap { obt =>
+      expectedF.map { expected =>
+        assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
+      }
+    }
+
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 
