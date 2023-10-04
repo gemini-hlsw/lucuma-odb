@@ -165,8 +165,10 @@ object TargetService {
 
         def replaceIn(tid: Target.Id): F[Unit] =
           input.REPLACE_IN.traverse_ { which =>
-            val stmt = Statements.replaceTargetIn(which, input.targetId, tid)
-            session.prepareR(stmt.fragment.command).use(_.execute(stmt.argument))
+            val s1 = Statements.dropItcCache(which)
+            val s2 = Statements.replaceTargetIn(which, input.targetId, tid)
+            session.prepareR(s1.fragment.command).use(_.execute(s1.argument)) >>
+            session.prepareR(s2.fragment.command).use(_.execute(s2.argument))
           }
 
         pid.flatMap {
@@ -448,6 +450,12 @@ object TargetService {
       void"""
         RETURNING c_target_id
       """
+
+    def dropItcCache(which: NonEmptyList[Observation.Id]): AppliedFragment =
+      sql"""
+      DELETE FROM t_itc_result
+      WHERE  c_observation_id IN (${observation_id.list(which.length)})
+      """.apply(which.toList)
 
     def replaceTargetIn(which: NonEmptyList[Observation.Id], from: Target.Id, to: Target.Id): AppliedFragment =
       sql"""
