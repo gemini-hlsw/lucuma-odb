@@ -6485,6 +6485,12 @@ type Group {
 
   id: GroupId!
 
+  "Id of this group's parent, or null if this group is at the top level."
+  parentId: GroupId
+
+  "Position of this group in its parent group (or at the top level)."
+  parentIndex: NonNegShort!
+
   "Optionally, a name"
   name: String
 
