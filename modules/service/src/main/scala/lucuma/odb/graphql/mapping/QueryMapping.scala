@@ -124,10 +124,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         Select("dataset", Nil,
           Unique(
             Filter(
-//              And(
+              And(
                 Predicates.dataset.id.eql(did),
-//                Predicates.dataset.observation.program.isVisibleTo(user)
-//              ),
+                Predicates.dataset.observation.program.isVisibleTo(user)
+              ),
               child
             )
           )
