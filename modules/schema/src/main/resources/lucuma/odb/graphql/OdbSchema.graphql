@@ -4891,7 +4891,7 @@ input DatasetIdInput {
   stepId: StepId!
 
   "Dataset index."
-  index: NonNegShort!
+  index: PosShort!
 }
 
 """
@@ -7795,24 +7795,10 @@ type Query {
     includeDeleted: Boolean! = false
   ): ConstraintSetGroupSelectResult!
 
-  """
-  Select the dataset associated with the given observation, step, and index
-  """
+  "Select the dataset associated with the given id."
   dataset(
-    """
-    Observation ID
-    """
-    observationId: ObservationId!
-
-    """
-    Step ID
-    """
-    stepId: StepId!
-
-    """
-    Dataset index
-    """
-    index: PosInt!
+    "Dataset ID"
+    datasetId: DatasetIdInput!
   ): Dataset
 
   """
@@ -9597,33 +9583,35 @@ input WhereOrderObsAttachmentId {
   LTE: ObsAttachmentId
 }
 
-"""
-Dataset filter options.  All specified items must match.
-"""
+"Dataset filter options.  All specified items must match."
 input WhereDataset {
+
   """
-  Matches the dataset observation id.
+  A list of nested dataset filters that all must match in order for the AND group as a whole to match.
   """
+  AND: [WhereDataset!]
+
+  """
+  A list of nested dataset filters where any one match causes the entire OR group as a whole to match.
+  """
+  OR: [WhereDataset!]
+
+  "A nested dataset filter that must not match in order for the NOT itself to match."
+  NOT: WhereDataset
+
+  "Matches all datasets associated with the observation."
   observationId: WhereOrderObservationId
 
-  """
-  Matches the dataset step id.
-  """
+  "Matches all datasets associated with the step."
   stepId: WhereEqStepId
 
-  """
-  Matches the dataset index within the step.
-  """
-  index: WhereOrderDatasetIndex
+  "Matches the particula dataset index within the step."
+  index: WhereOrderPosShort
 
-  """
-  Matches the dataset file name.
-  """
+  "Matches the dataset file name."
   filename: WhereString
 
-  """
-  Matches the dataset QA state.
-  """
+  "Matches the dataset QA state."
   qaState: WhereOptionEqQaState
 }
 
@@ -9639,7 +9627,7 @@ input WhereDatasetEvent {
   """
   Matches on the dataset index within the step.
   """
-  index: WhereOrderDatasetIndex
+  index: WhereOrderPosShort
 
   """
   Matches on the dataset stage.
@@ -9962,7 +9950,6 @@ Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".  Defining, `EQ`,
 `NEQ` etc. implies `IS_NULL` is `false`.
-
 """
 input WhereOptionEqQaState {
   """
@@ -10058,48 +10045,31 @@ input WhereOptionString {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
-input WhereOrderDatasetIndex {
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: PosInt
+input WhereOrderPosShort {
+  "Matches if the property value is exactly the supplied value."
+  EQ: PosShort
 
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: PosInt
+  "Matches if the property value is not the supplied value."
+  NEQ: PosShort
 
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [PosInt!]
+  "Matches if the property value is any of the supplied options."
+  IN: [PosShort!]
 
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [PosInt!]
+  "Matches if the property value is none of the supplied values."
+  NIN: [PosShort!]
 
-  """
-  Matches if the property is ordered after (>) the supplied value.
-  """
-  GT: PosInt
+  "Matches if the property is ordered after (>) the supplied value."
+  GT: PosShort
 
-  """
-  Matches if the property is ordered before (<) the supplied value.
-  """
-  LT: PosInt
+  "Matches if the property is ordered before (<) the supplied value."
+  LT: PosShort
 
-  """
-  Matches if the property is ordered after or equal (>=) the supplied value.
-  """
-  GTE: PosInt
+  "Matches if the property is ordered after or equal (>=) the supplied value."
+  GTE: PosShort
 
-  """
-  Matches if the property is ordered before or equal (<=) the supplied value.
-  """
-  LTE: PosInt
+  "Matches if the property is ordered before or equal (<=) the supplied value."
+  LTE: PosShort
 }
 
 """

@@ -18,6 +18,7 @@ import lucuma.core.model
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.input.DatasetIdInput
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
@@ -38,6 +39,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       fieldMappings = List(
         SqlObject("asterismGroup"),
         SqlObject("constraintSetGroup"),
+        SqlObject("dataset"),
         SqlObject("filterTypeMeta"),
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
@@ -56,6 +58,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     List(
       AsterismGroup,
       ConstraintSetGroup,
+      Dataset,
       FilterTypeMeta,
       ObsAttachmentTypeMeta,
       Observation,
@@ -112,6 +115,24 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Result(Select("proposalAttachmentTypeMeta", Nil,
         OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentTypeMetaType / "tag"))), child)
       ))
+
+  private lazy val Dataset: PartialFunction[Select, Result[Query]] =
+    case Select("dataset", List(
+      DatasetIdInput.Binding("datasetId", rDid)
+    ), child) =>
+      rDid.map { did =>
+        Select("dataset", Nil,
+          Unique(
+            Filter(
+//              And(
+                Predicates.dataset.id.eql(did),
+//                Predicates.dataset.observation.program.isVisibleTo(user)
+//              ),
+              child
+            )
+          )
+        )
+      }
 
   private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] =
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")

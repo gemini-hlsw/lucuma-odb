@@ -9,6 +9,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
+import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
@@ -26,6 +27,11 @@ sealed trait DatasetService[F[_]] {
     filename: Dataset.Filename,
     qaState:  Option[DatasetQaState]
   )(using Transaction[F]): F[DatasetService.InsertDatasetResponse]
+
+  def setQaState(
+    datasetId: Dataset.Id,
+    qaState:   Option[DatasetQaState]
+  )(using Transaction[F]): F[Unit]
 
 }
 
@@ -81,6 +87,14 @@ object DatasetService {
         } yield Success(d)).merge
       }
 
+      override def setQaState(
+        datasetId: Dataset.Id,
+        qaState:   Option[DatasetQaState]
+      )(using Transaction[F]): F[Unit] =
+        session
+          .execute(Statements.SetQaState)(qaState, datasetId.stepId, datasetId.index)
+          .void
+
     }
 
   object Statements {
@@ -103,5 +117,12 @@ object DatasetService {
           c_index
       """.query(dataset_id)
 
+    val SetQaState: Command[(Option[DatasetQaState], Step.Id, PosShort)] =
+      sql"""
+        UPDATE t_dataset
+           SET c_qa_state = ${dataset_qa_state.opt}
+         WHERE c_step_id  = $step_id
+           AND c_index    = $int2_pos
+      """.command
   }
 }

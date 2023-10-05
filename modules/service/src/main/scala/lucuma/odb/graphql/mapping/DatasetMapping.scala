@@ -19,7 +19,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       tpe = DatasetType,
       fieldMappings = List(
         SqlField("stepId", DatasetTable.DatasetId.StepId, hidden = true, key = true),
-        SqlField("index",  DatasetTable.DatasetId.Index, hidden = true, key = true),
+        SqlField("index",  DatasetTable.DatasetId.Index,  hidden = true, key = true),
         SqlObject("id"),
 
         SqlObject("observation", Join(DatasetTable.DatasetId.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),

@@ -55,6 +55,7 @@ import lucuma.odb.graphql.input.RecordGmosSouthStepInput
 import lucuma.odb.graphql.input.RecordGmosSouthVisitInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+//import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
@@ -605,26 +606,33 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+//  private lazy val UpdateDatasets =
+//    MuationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
+//      services.useTransactionally {
+//
+//      }
+//    }
+
   private lazy val UpdateObsAttachments =
-      MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
-        services.useTransactionally {
-          val filterPredicate = and(List(
-            Predicates.obsAttachment.program.id.eql(input.programId),
-            Predicates.obsAttachment.program.isWritableBy(user),
-            input.WHERE.getOrElse(True)
-          ))
+    MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
+      services.useTransactionally {
+        val filterPredicate = and(List(
+          Predicates.obsAttachment.program.id.eql(input.programId),
+          Predicates.obsAttachment.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
 
-          val idSelect: Result[AppliedFragment] =
-            MappedQuery(
-              Filter(filterPredicate, Select("id", Nil, Empty)),
-              Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
-            ).flatMap(_.fragment)
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(
+            Filter(filterPredicate, Select("id", Nil, Empty)),
+            Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
+          ).flatMap(_.fragment)
 
-          idSelect.flatTraverse { which =>
-            obsAttachmentMetadataService.updateObsAttachments(input.SET, which).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
-          }
+        idSelect.flatTraverse { which =>
+          obsAttachmentMetadataService.updateObsAttachments(input.SET, which).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
         }
       }
+    }
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
