@@ -79,6 +79,8 @@ object DatasetService {
             .recover {
               case SqlState.UniqueViolation(_)     => ReusedFilename(filename).asLeft
               case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
+              case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") =>
+                StepNotFound(stepId).asLeft
             }
 
         (for {

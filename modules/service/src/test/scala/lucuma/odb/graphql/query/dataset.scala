@@ -27,6 +27,7 @@ class dataset extends OdbSuite {
   private def setup(
     mode: ObservingModeType,
     user: User,
+    offset: Int = 0,
     stepCount: Int = 3,
     datasetsPerStep: Int = 2
   ):IO[(Observation.Id, List[(Step.Id, List[Dataset.Id])])] =
@@ -38,7 +39,7 @@ class dataset extends OdbSuite {
       ids <- (0 until stepCount).toList.traverse { x =>
         recordStepAs(user, mode.instrument, aid).flatMap { sid =>
           (0 until datasetsPerStep).toList.traverse { y =>
-            recordDatasetAs(user, sid, f"N18630101S${x * datasetsPerStep + y + 1}%04d.fits")
+            recordDatasetAs(user, sid, f"N18630101S${offset + x * datasetsPerStep + y + 1}%04d.fits")
           }.tupleLeft(sid)
         }
       }
@@ -46,7 +47,7 @@ class dataset extends OdbSuite {
 
 
   test("pi can select thier own dataset") {
-    setup(ObservingModeType.GmosNorthLongSlit, pi, 1, 1).flatMap {
+    setup(ObservingModeType.GmosNorthLongSlit, pi, 0, 1, 1).flatMap {
       case (oid, List((sid, List(did)))) =>
         val q = s"""
           query {
@@ -68,6 +69,33 @@ class dataset extends OdbSuite {
         """.asRight
 
         expect(pi, q, e)
+
+      case _ =>
+        fail("expected a single step and single dataset")
+    }
+  }
+
+  test("pi cannot select someone else's dataset") {
+    setup(ObservingModeType.GmosNorthLongSlit, pi, 1, 1, 1).flatMap {
+      case (oid, List((sid, List(did)))) =>
+        val q = s"""
+          query {
+            dataset(datasetId: {
+              stepId: "$sid",
+              index: 2
+            }) {
+              filename
+            }
+          }
+        """
+
+        val e = json"""
+        {
+          "dataset": null
+        }
+        """.asRight
+
+        expect(pi2, q, e)
 
       case _ =>
         fail("expected a single step and single dataset")
