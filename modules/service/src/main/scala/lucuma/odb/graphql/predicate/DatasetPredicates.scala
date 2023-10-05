@@ -7,5 +7,6 @@ package predicate
 import edu.gemini.grackle.Path
 
 class DatasetPredicates(path: Path) {
-  lazy val id = new DatasetIdPredicates(path / "id")
+  lazy val id          = new DatasetIdPredicates(path / "id")
+  lazy val observation = new ObservationPredicates(path / "observation")
 }
