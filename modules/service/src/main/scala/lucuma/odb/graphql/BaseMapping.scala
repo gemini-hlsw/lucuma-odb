@@ -53,6 +53,7 @@ trait BaseMapping[F[_]]
   lazy val DatasetEventType                    = schema.ref("DatasetEvent")
   lazy val DatasetIdType                       = schema.ref("DatasetId")
   lazy val DatasetFilenameType                 = schema.ref("DatasetFilename")
+  lazy val DatasetSelectResultType             = schema.ref("DatasetSelectResult")
   lazy val DatasetStageType                    = schema.ref("DatasetStage")
   lazy val DeclinationType                     = schema.ref("Declination")
   lazy val DemoScienceType                     = schema.ref("DemoScience")

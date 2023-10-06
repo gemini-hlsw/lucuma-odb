@@ -19,6 +19,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.DatasetIdInput
+import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
@@ -40,6 +41,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("asterismGroup"),
         SqlObject("constraintSetGroup"),
         SqlObject("dataset"),
+        SqlObject("datasets"),
         SqlObject("filterTypeMeta"),
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
@@ -59,6 +61,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       AsterismGroup,
       ConstraintSetGroup,
       Dataset,
+      Datasets,
       FilterTypeMeta,
       ObsAttachmentTypeMeta,
       Observation,
@@ -133,6 +136,35 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           )
         )
       }
+
+  private lazy val Datasets: PartialFunction[Select, Result[Query]] = {
+    val WhereDatasetBinding = WhereDataset.binding(Path.from(DatasetType))
+    {
+      case Select("datasets", List(
+        WhereDatasetBinding.Option("WHERE", rWHERE),
+        DatasetIdInput.Binding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      ), child) =>
+        (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult("datasets", child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
+                Predicates.dataset.observation.program.isVisibleTo(user),
+                WHERE.getOrElse(True)
+              ))),
+              oss = Some(List(
+                OrderSelection[lucuma.core.model.sequence.Dataset.Id](DatasetType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
+        }
+      }
+  }
 
   private lazy val ConstraintSetGroup: PartialFunction[Select, Result[Query]] =
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
