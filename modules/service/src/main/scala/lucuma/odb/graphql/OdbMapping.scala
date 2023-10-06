@@ -111,6 +111,7 @@ object OdbMapping {
           with DatasetMapping[F]
           with DatasetIdMapping[F]
           with DatasetEventMapping[F]
+          with DatasetSelectResultMapping[F]
           with ElevationRangeMapping[F]
           with ExecutionMapping[F]
           with FilterTypeMetaMapping[F]
@@ -236,6 +237,7 @@ object OdbMapping {
               DatasetIdMapping,
               DatasetMapping,
               DatasetEventMapping,
+              DatasetSelectResultMapping,
               DeclinationMapping,
               ElevationRangeMapping,
               ExecutionMapping,

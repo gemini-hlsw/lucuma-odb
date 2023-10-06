@@ -16,7 +16,15 @@ class DatasetIdPredicates(path: Path) {
   lazy val index  = LeafPredicates[PosShort](path / "index")
 
   def eql(a: Dataset.Id): Predicate =
-    And(stepId.eql(a.stepId), index.eql(PosShort.unsafeFrom(a.index.value)))
+    And(stepId.eql(a.stepId), index.eql(a.index))
 
+  def gtEql(a: Dataset.Id): Predicate =
+    And(stepId.gtEql(a.stepId), index.gtEql(a.index))
+
+  def in(as: List[Dataset.Id]): Predicate =
+    In(path, as)
+
+  def isNull(b: Boolean): Predicate =
+    IsNull(path, b)
 
 }
