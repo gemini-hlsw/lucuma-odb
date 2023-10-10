@@ -40,7 +40,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
-import lucuma.odb.json.sequence.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.json.wavelength.query.given
@@ -685,10 +684,7 @@ trait DatabaseOperations { this: OdbSuite =>
           filename: "$filename"
         }) {
           dataset {
-            id {
-              stepId
-              index
-            }
+            id
           }
         }
       }

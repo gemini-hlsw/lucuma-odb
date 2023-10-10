@@ -109,7 +109,6 @@ object OdbMapping {
           with CreateTargetResultMapping[F]
           with DeclinationMapping[F]
           with DatasetMapping[F]
-          with DatasetIdMapping[F]
           with DatasetEventMapping[F]
           with DatasetSelectResultMapping[F]
           with ElevationRangeMapping[F]
@@ -234,7 +233,6 @@ object OdbMapping {
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
-              DatasetIdMapping,
               DatasetMapping,
               DatasetEventMapping,
               DatasetSelectResultMapping,

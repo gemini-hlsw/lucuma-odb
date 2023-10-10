@@ -18,7 +18,6 @@ import lucuma.core.model
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
-import lucuma.odb.graphql.input.DatasetIdInput
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
@@ -121,7 +120,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   private lazy val Dataset: PartialFunction[Select, Result[Query]] =
     case Select("dataset", List(
-      DatasetIdInput.Binding("datasetId", rDid)
+      DatasetIdBinding("datasetId", rDid)
     ), child) =>
       rDid.map { did =>
         Select("dataset", Nil,
@@ -142,7 +141,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     {
       case Select("datasets", List(
         WhereDatasetBinding.Option("WHERE", rWHERE),
-        DatasetIdInput.Binding.Option("OFFSET", rOFFSET),
+        DatasetIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       ), child) =>
         (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>

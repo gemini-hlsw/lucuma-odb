@@ -55,7 +55,6 @@ import lucuma.odb.graphql.input.RecordGmosSouthStepInput
 import lucuma.odb.graphql.input.RecordGmosSouthVisitInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
-//import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
@@ -353,13 +352,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   ): DatasetService.InsertDatasetResponse => Result[Query] = {
     import DatasetService.InsertDatasetResponse.*
     (response: DatasetService.InsertDatasetResponse) => response match {
-      case NotAuthorized(user) =>
+      case NotAuthorized(user)      =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
       case ReusedFilename(filename) =>
         Result.failure(s"The filename '${filename.format}' is already assigned")
-      case StepNotFound(id)    =>
+      case StepNotFound(id)         =>
         Result.failure(s"Step id '$id' not found")
-      case Success(did)     =>
+      case Success(did, _, _)       =>
         Result(Unique(Filter(predicates.id.eql(did), child)))
     }
   }

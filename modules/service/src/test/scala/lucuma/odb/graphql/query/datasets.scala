@@ -37,13 +37,13 @@ class datasets extends OdbSuite with DatasetSetupOperations {
           "datasets" -> Json.obj(
             "hasMore" -> Json.False,
             "matches" -> Json.fromValues(List(
-              "N18630101S0001.fits".asJson,
-              "N18630101S0002.fits".asJson,
-              "N18630101S0003.fits".asJson,
-              "N18630101S0004.fits".asJson,
-              "N18630101S0005.fits".asJson,
-              "N18630101S0006.fits".asJson
-            ))
+              "N18630101S0001.fits",
+              "N18630101S0002.fits",
+              "N18630101S0003.fits",
+              "N18630101S0004.fits",
+              "N18630101S0005.fits",
+              "N18630101S0006.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
           )
         ).asRight
 

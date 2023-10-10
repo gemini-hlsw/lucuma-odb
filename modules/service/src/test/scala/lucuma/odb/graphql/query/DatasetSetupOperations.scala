@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import cats.effect.IO
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset

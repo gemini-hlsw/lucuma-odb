@@ -159,6 +159,9 @@ trait Codecs {
       _.toLocalDateTime
     )
 
+  val dataset_id: Codec[Dataset.Id] =
+    gid[Dataset.Id]
+
   val dataset_qa_state: Codec[DatasetQaState] =
     enumerated(Type("e_dataset_qa_state"))
 
@@ -450,9 +453,6 @@ trait Codecs {
      water_vapor      *:
      elevation_range
     ).to[ConstraintSet]
-
-  val dataset_id: Codec[Dataset.Id] =
-    (step_id *: int2_pos).to[Dataset.Id]
 
   val dataset_filename: Codec[Dataset.Filename] =
     (site *: date *: int4_pos).eimap { case (s, d, p) =>
