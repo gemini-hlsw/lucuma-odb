@@ -605,13 +605,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
-//  private lazy val UpdateDatasets =
-//    MuationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
-//      services.useTransactionally {
-//
-//      }
-//    }
-
   private lazy val UpdateObsAttachments =
     MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
       services.useTransactionally {
