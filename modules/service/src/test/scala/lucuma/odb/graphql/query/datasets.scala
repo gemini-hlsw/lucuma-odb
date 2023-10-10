@@ -51,4 +51,203 @@ class datasets extends OdbSuite with DatasetSetupOperations {
     }
   }
 
+  test("OFFSET, LIMIT, hasMore") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 6, 2, 3).flatMap {
+      case (_, steps) =>
+        val q = s"""
+          query {
+            datasets(
+              OFFSET: "${steps.head._2.tail.head}",
+              LIMIT: 4
+            ) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.True,
+            "matches" -> Json.fromValues(List(
+              // "N18630101S0007.fits",  skipped
+              "N18630101S0008.fits", // offset points to here
+              "N18630101S0009.fits",
+              "N18630101S0010.fits",
+              "N18630101S0011.fits"
+              // "N18630101S0012.fits" // after LIMIT
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+    }
+  }
+
+  test("dataset selection") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 12, 1, 3).flatMap {
+      case (oid, List((_, List(_, did, _)))) =>
+        val q = s"""
+          query {
+            datasets(WHERE: { id: { NEQ: "$did" }, observationId: { EQ: "$oid" } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              "N18630101S0013.fits",
+              // "N18630101S0014.fits", NEQ to this one
+              "N18630101S0015.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+
+      case (_, lst) =>
+        fail(s"Unexpected result: $lst")
+    }
+  }
+
+  test("observation selection") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 15, 1, 3).flatMap {
+      case (oid, _) =>
+        val q = s"""
+          query {
+            datasets(WHERE: { observationId: { EQ: "$oid" } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              "N18630101S0016.fits",
+              "N18630101S0017.fits",
+              "N18630101S0018.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+    }
+  }
+
+  test("step selection") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 18, 1, 3).flatMap {
+      case (oid, List((sid, _))) =>
+        val q = s"""
+          query {
+            datasets(WHERE: { stepId: { EQ: "$sid" } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              "N18630101S0019.fits",
+              "N18630101S0020.fits",
+              "N18630101S0021.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+
+      case (_, lst) =>
+        fail(s"Unexpected result: $lst")
+
+    }
+  }
+
+  test("step and index selection") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 21, 1, 3).flatMap {
+      case (oid, List((sid, _))) =>
+        val q = s"""
+          query {
+            datasets(WHERE: { stepId: { EQ: "$sid" }, index: { GT: 1 } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              // "N18630101S0022.fits", 1'st index skipped
+              "N18630101S0023.fits",
+              "N18630101S0024.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+
+      case (_, lst) =>
+        fail(s"Unexpected result: $lst")
+
+    }
+  }
+
+  test("filename") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 24, 1, 3).flatMap {
+      case (oid, List((sid, _))) =>
+        val q = s"""
+          query {
+            datasets(WHERE: { filename: { LIKE: "N18630101S002%.fits" } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              "N18630101S0020.fits",
+              "N18630101S0021.fits",
+              "N18630101S0022.fits",
+              "N18630101S0023.fits",
+              "N18630101S0024.fits",
+              "N18630101S0025.fits",
+              "N18630101S0026.fits",
+              "N18630101S0027.fits",
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+
+      case (_, lst) =>
+        fail(s"Unexpected result: $lst")
+
+    }
+  }
 }
