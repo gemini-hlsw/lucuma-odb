@@ -4819,7 +4819,7 @@ type Coordinates {
   dec: Declination!
 }
 
-"DatasetId id formatted as `o-[1-9a-f][0-9a-f]*`"
+"DatasetId id formatted as `d-[1-9a-f][0-9a-f]*`"
 scalar DatasetId
 
 type Dataset {

@@ -252,8 +252,43 @@ class datasets extends OdbSuite with DatasetSetupOperations {
     }
   }
 
+  test("qaState") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 27, 1, 3).flatMap {
+      case (oid, List((sid, _))) =>
+        val q = s"""
+          query {
+            datasets(WHERE: { qaState: { IS_NULL: true } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(
+              (1 to 30).map { i =>
+                f"N18630101S00$i%02d.fits"
+              }
+              .toList
+              .map(f => Json.obj("filename" -> f.asJson))
+            )
+          )
+        ).asRight
+
+        expect(pi, q, e)
+
+      case (_, lst) =>
+        fail(s"Unexpected result: $lst")
+
+    }
+  }
+
   test("pi cannot select someone else's dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 27, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 30, 1, 1).flatMap {
       case _ =>
         val q = s"""
           query {
