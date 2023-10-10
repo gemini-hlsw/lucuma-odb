@@ -4,15 +4,11 @@
 package lucuma.odb.graphql
 package mapping
 
-//import table.AtomRecordTablep
 import table.DatasetTable
 import table.ObservationView
-//import table.StepRecordTable
 
 trait DatasetMapping[F[_]] extends DatasetTable[F]
                               with ObservationView[F] {
-//                              with AtomRecordTable[F]
-//                              with StepRecordTable[F] {
 
   lazy val DatasetMapping: ObjectMapping =
     ObjectMapping(
