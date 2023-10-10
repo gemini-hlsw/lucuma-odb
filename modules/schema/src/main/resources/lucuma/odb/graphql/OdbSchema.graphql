@@ -3153,7 +3153,7 @@ type RecordGmosSouthVisitResult {
 Right Ascension, choose one of the available units
 """
 input RightAscensionInput {
-  microarcseconds: Long # @deprecated
+  microarcseconds: Long
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
