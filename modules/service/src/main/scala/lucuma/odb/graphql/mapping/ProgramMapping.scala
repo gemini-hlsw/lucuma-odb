@@ -17,9 +17,7 @@ import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
-import edu.gemini.grackle.syntax.*
 import eu.timepit.refined.types.numeric.NonNegShort
-import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -148,24 +146,21 @@ trait ProgramMapping[F[_]]
             .estimateProgram(pid)
         }
 
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
           ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Program.Id]("id") }.pure[F])
-          ps  <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
+          prg <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
           res <- ResultT(ctx
-                    .flatMap(pid => ps.find(r => r._1 === pid).map(_._2).toList)
-                    .zip(queries)
-                    .traverse { case (result, (child, childCursor)) =>
-                      import lucuma.odb.json.plannedtime.given
-                      import lucuma.odb.json.time.query.given
-                      childCursor.context.parent.toResultOrError("No parent context").map { parentContext =>
-                        val parentField    = childCursor.path.head
-                        val json: Json     = Json.fromFields(List(parentField -> Json.fromFields(List("plannedTimeRange" -> result.asJson))))
-                        val cursor: Cursor = CirceCursor(parentContext, json, Some(childCursor), childCursor.fullEnv)
-                        (Query.Select(parentField, None, child), cursor)
-                      }
-                    }.pure[F]
-                  )
+                   .flatMap(pid => prg.find(r => r._1 === pid).map(_._2).toList)
+                   .zip(queries)
+                   .traverse { case (result, (query, parentCursor)) =>
+                     import lucuma.odb.json.plannedtime.given
+                     import lucuma.odb.json.time.query.given
+                     Query.childContext(parentCursor.context, query).map { childContext =>
+                       CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
+                     }
+                   }.pure[F]
+                 )
           } yield res
         ).value
         

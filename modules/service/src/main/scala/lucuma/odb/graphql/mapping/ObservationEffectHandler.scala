@@ -14,8 +14,6 @@ import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
-import edu.gemini.grackle.syntax.*
-import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -41,7 +39,7 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
           } yield (p, o, e)
         }
 
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
           ctx <- ResultT(queryContext(queries).pure[F])
           obs <- ctx.distinct.traverse { case (pid, oid, env) =>
@@ -50,12 +48,9 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
           res <- ResultT(ctx
                    .flatMap { case (_, oid, env) => obs.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
                    .zip(queries)
-                   .traverse { case (result, (child, childCursor)) =>
-                     childCursor.context.parent.toResultOrError("No parent context").map { parentContext =>
-                       val parentField    = childCursor.path.head
-                       val json: Json     = Json.fromFields(List(parentField -> Json.fromFields(List(fieldName -> result.asJson))))
-                       val cursor: Cursor = CirceCursor(parentContext, json, Some(childCursor), childCursor.fullEnv)
-                       (Query.Select(parentField, None, child), cursor)
+                   .traverse { case (result, (query, parentCursor)) =>
+                     Query.childContext(parentCursor.context, query).map { childContext =>
+                       CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
                      }
                    }.pure[F]
                  )

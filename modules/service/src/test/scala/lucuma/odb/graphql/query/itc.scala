@@ -43,8 +43,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       case _                            => sys.error("Expected two targets")
     }
 
-  // RCN: succeeds if we don't select `id`
-  test("success, one target".ignore) {
+  test("success, one target") {
     setup1.flatMap { case (_, oid, tid) =>
       expect(
         user = user,
