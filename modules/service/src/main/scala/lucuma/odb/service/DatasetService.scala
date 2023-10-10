@@ -28,11 +28,6 @@ sealed trait DatasetService[F[_]] {
     qaState:  Option[DatasetQaState]
   )(using Transaction[F]): F[DatasetService.InsertDatasetResponse]
 
-  def setQaState(
-    datasetId: Dataset.Id,
-    qaState:   Option[DatasetQaState]
-  )(using Transaction[F]): F[Unit]
-
 }
 
 object DatasetService {
@@ -91,14 +86,6 @@ object DatasetService {
         } yield Success.apply.tupled(d)).merge
       }
 
-      override def setQaState(
-        datasetId: Dataset.Id,
-        qaState:   Option[DatasetQaState]
-      )(using Transaction[F]): F[Unit] =
-        session
-          .execute(Statements.SetQaState)(qaState, datasetId)
-          .void
-
     }
 
   object Statements {
@@ -122,11 +109,5 @@ object DatasetService {
           c_index
       """.query(dataset_id *: step_id *: int2_pos)
 
-    val SetQaState: Command[(Option[DatasetQaState], Dataset.Id)] =
-      sql"""
-        UPDATE t_dataset
-           SET c_qa_state   = ${dataset_qa_state.opt}
-         WHERE c_dataset_id = $dataset_id
-      """.command
   }
 }
