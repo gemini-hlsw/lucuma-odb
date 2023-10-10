@@ -6,6 +6,7 @@ package query
 
 import cats.syntax.either.*
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -250,4 +251,31 @@ class datasets extends OdbSuite with DatasetSetupOperations {
 
     }
   }
+
+  test("pi cannot select someone else's dataset") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 27, 1, 1).flatMap {
+      case _ =>
+        val q = s"""
+          query {
+            datasets() {
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = json"""
+        {
+          "datasets": {
+            "matches": [
+            ]
+          }
+        }
+        """.asRight
+
+        expect(pi2, q, e)
+    }
+  }
+
 }
