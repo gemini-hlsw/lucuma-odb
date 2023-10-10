@@ -10,7 +10,6 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
-import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -83,12 +82,9 @@ object ExecutionEventService {
 
         import InsertEventResponse.*
 
-        val sid = datasetId.stepId
-        val idx = datasetId.index
-
         val insert: F[Either[DatasetNotFound, (ExecutionEvent.Id, Timestamp)]] =
           session
-            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, sid, idx)
+            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, datasetId)
             .map(_.toRight(DatasetNotFound(datasetId)))
             .recover {
               case SqlState.ForeignKeyViolation(_) => DatasetNotFound(datasetId).asLeft
@@ -156,11 +152,10 @@ object ExecutionEventService {
 
   object Statements {
 
-    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Step.Id, PosShort), (ExecutionEvent.Id, Timestamp)] =
+    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (ExecutionEvent.Id, Timestamp)] =
       sql"""
         INSERT INTO t_dataset_event (
-          c_step_id,
-          c_index,
+          c_dataset_id,
           c_dataset_stage
         )
         SELECT
@@ -169,8 +164,7 @@ object ExecutionEventService {
         FROM
           t_dataset
         WHERE
-          t_dataset.c_step_id = $step_id AND
-          t_dataset.c_index   = $int2_pos
+          t_dataset.c_dataset_id = $dataset_id
         RETURNING
           c_execution_event_id,
           c_received

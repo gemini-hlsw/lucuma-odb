@@ -22,13 +22,10 @@ class dataset extends OdbSuite with DatasetSetupOperations {
 
   test("pi can select thier own dataset") {
     recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 0, 1, 1).flatMap {
-      case (oid, List((sid, List(did)))) =>
+      case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
-            dataset(datasetId: {
-              stepId: "$sid",
-              index: 1
-            }) {
+            dataset(datasetId: "$did") {
               filename
             }
           }
@@ -51,13 +48,10 @@ class dataset extends OdbSuite with DatasetSetupOperations {
 
   test("pi cannot select someone else's dataset") {
     recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 1, 1, 1).flatMap {
-      case (oid, List((sid, List(did)))) =>
+      case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
-            dataset(datasetId: {
-              stepId: "$sid",
-              index: 2
-            }) {
+            dataset(datasetId: "$did") {
               filename
             }
           }

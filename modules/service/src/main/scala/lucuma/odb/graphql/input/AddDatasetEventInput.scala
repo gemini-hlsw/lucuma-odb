@@ -19,7 +19,7 @@ object AddDatasetEventInput {
   val Binding: Matcher[AddDatasetEventInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        DatasetIdInput.Binding("datasetId", rDatasetId),
+        DatasetIdBinding("datasetId", rDatasetId),
         DatasetStageBinding("datasetStage", rDatasetStage)
       ) =>
         (rDatasetId, rDatasetStage).parMapN { (did, stage) =>

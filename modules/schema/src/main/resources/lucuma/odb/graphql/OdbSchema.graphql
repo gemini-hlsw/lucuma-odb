@@ -2,7 +2,7 @@
 input AddDatasetEventInput {
 
   "Dataset id"
-  datasetId: DatasetIdInput!
+  datasetId: DatasetId!
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
@@ -4819,11 +4819,19 @@ type Coordinates {
   dec: Declination!
 }
 
+"DatasetId id formatted as `o-[1-9a-f][0-9a-f]*`"
+scalar DatasetId
+
 type Dataset {
-  """
-  Dataset id
-  """
+
+  "Dataset id."
   id: DatasetId!
+
+  "The corresponding step's id."
+  stepId: StepId!
+
+  "Dataset index within the step."
+  index: PosShort!
 
   """
   Observation associated with this dataset
@@ -4861,11 +4869,11 @@ type DatasetEvent {
   "Event id."
   id: ExecutionEventId!
 
-  "Identifies the associated dataset."
-  datasetId: DatasetId!
-
   "Dataset execution stage."
   datasetStage: DatasetStage!
+
+  "Identifies the associated dataset."
+  dataset: Dataset!
 
   "Observation whose execution produced this event."
   observation: Observation!
@@ -4876,23 +4884,6 @@ type DatasetEvent {
 
 "Dataset filename in standard format."
 scalar DatasetFilename
-
-type DatasetId {
-  "Step ID."
-  stepId: StepId!
-
-  "Dataset index."
-  index: PosShort!
-}
-
-input DatasetIdInput {
-
-  "Step ID."
-  stepId: StepId!
-
-  "Dataset index."
-  index: PosShort!
-}
 
 """
 Dataset QA State
@@ -5178,7 +5169,7 @@ type Execution {
     """
     Starts the result set at (or after if not existent) the given dataset id.
     """
-    OFFSET: DatasetIdInput
+    OFFSET: DatasetId
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -7798,7 +7789,7 @@ type Query {
   "Select the dataset associated with the given id."
   dataset(
     "Dataset ID"
-    datasetId: DatasetIdInput!
+    datasetId: DatasetId!
   ): Dataset
 
   """
@@ -7813,7 +7804,7 @@ type Query {
     """
     Starts the result set at (or after if not existent) the given dataset id.
     """
-    OFFSET: DatasetIdInput
+    OFFSET: DatasetId
 
     """
     Limits the result to at most this number of matches (but never more than 1000).

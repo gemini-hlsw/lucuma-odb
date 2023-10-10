@@ -56,7 +56,9 @@ object DatasetService {
     ) extends InsertDatasetFailure
 
     case class Success(
-      datasetId: Dataset.Id
+      datasetId: Dataset.Id,
+      stepId:    Step.Id,
+      index:     PosShort
     ) extends InsertDatasetResponse
 
   }
@@ -72,7 +74,7 @@ object DatasetService {
 
         import InsertDatasetResponse.*
 
-        val insert: F[Either[InsertDatasetFailure, Dataset.Id]] =
+        val insert: F[Either[InsertDatasetFailure, (Dataset.Id, Step.Id, PosShort)]] =
           session
             .unique(Statements.InsertDataset)(stepId, filename, qaState)
             .map(_.asRight[InsertDatasetFailure])
@@ -86,7 +88,7 @@ object DatasetService {
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           d <- EitherT(insert).leftWiden[InsertDatasetResponse]
-        } yield Success(d)).merge
+        } yield Success.apply.tupled(d)).merge
       }
 
       override def setQaState(
@@ -94,14 +96,14 @@ object DatasetService {
         qaState:   Option[DatasetQaState]
       )(using Transaction[F]): F[Unit] =
         session
-          .execute(Statements.SetQaState)(qaState, datasetId.stepId, datasetId.index)
+          .execute(Statements.SetQaState)(qaState, datasetId)
           .void
 
     }
 
   object Statements {
 
-    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), Dataset.Id] =
+    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), (Dataset.Id, Step.Id, PosShort)] =
       sql"""
         INSERT INTO t_dataset (
           c_step_id,
@@ -115,16 +117,16 @@ object DatasetService {
           $dataset_filename,
           ${dataset_qa_state.opt}
         RETURNING
+          c_dataset_id,
           c_step_id,
           c_index
-      """.query(dataset_id)
+      """.query(dataset_id *: step_id *: int2_pos)
 
-    val SetQaState: Command[(Option[DatasetQaState], Step.Id, PosShort)] =
+    val SetQaState: Command[(Option[DatasetQaState], Dataset.Id)] =
       sql"""
         UPDATE t_dataset
-           SET c_qa_state = ${dataset_qa_state.opt}
-         WHERE c_step_id  = $step_id
-           AND c_index    = $int2_pos
+           SET c_qa_state   = ${dataset_qa_state.opt}
+         WHERE c_dataset_id = $dataset_id
       """.command
   }
 }

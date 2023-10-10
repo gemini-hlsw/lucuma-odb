@@ -12,8 +12,7 @@ trait RecordDatasetResultMapping[F[_]] extends DatasetTable[F] {
     ObjectMapping(
       tpe = RecordDatasetResultType,
       fieldMappings = List(
-        SqlField("stepId", DatasetTable.DatasetId.StepId, key = true, hidden = true),
-        SqlField("index",  DatasetTable.DatasetId.Index,  key = true, hidden = true),
+        SqlField("id", DatasetTable.Id, key = true),
         SqlObject("dataset")
       )
     )
