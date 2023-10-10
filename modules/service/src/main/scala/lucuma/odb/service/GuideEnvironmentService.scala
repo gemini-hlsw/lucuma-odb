@@ -43,6 +43,7 @@ import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.util.TimeSpan
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.json.all.query.given
@@ -251,15 +252,18 @@ object GuideEnvironmentService {
           offset
         }
 
-      def getOffsets(
+      def getTimeAndOffsets(
         pid: Program.Id,
         oid: Observation.Id
-      ): F[Either[Error, Option[NonEmptyList[Offset]]]] =
+      ): F[Either[Error, (TimeSpan, Option[NonEmptyList[Offset]])]] =
         generator(commitHash, itcClient, plannedTimeCalculator)
           .digest(pid, oid)
           .map {
             _.leftMap(Error.GeneratorError(_))
-              .map { d => NonEmptyList.fromFoldable(d.science.offsets.union(d.acquisition.offsets)) }
+              .map { d => 
+                (d.fullPlannedTime.sum, 
+                NonEmptyList.fromFoldable(d.science.offsets.union(d.acquisition.offsets)))
+              }
           }
 
       def getPositions(
@@ -268,10 +272,11 @@ object GuideEnvironmentService {
         posAngleConstraint: PosAngleConstraint,
         offsets:            Option[NonEmptyList[Offset]],
         tracking:           ObjectTracking,
-        obsTime:            Instant
+        obsTime:            Instant,
+        obsDuration:        TimeSpan,
       ): Either[Error, NonEmptyList[AgsPosition]] = {
         val angles     =
-          posAngleConstraint.anglesToTestAt(site, tracking, obsTime).map(_.sorted(Angle.AngleOrder))
+          posAngleConstraint.anglesToTestAt(site, tracking, obsTime, obsDuration.toDuration).map(_.sorted(Angle.AngleOrder))
         val newOffsets = offsets.getOrElse(NonEmptyList.of(Offset.Zero))
 
         angles
@@ -314,7 +319,8 @@ object GuideEnvironmentService {
           obsInfo        <- EitherT(getObservationInfo(pid, oid))
           asterism       <- EitherT(getAsterism(pid, oid))
           tracking        = ObjectTracking.fromAsterism(asterism)
-          offsets        <- EitherT(getOffsets(pid, oid))
+          tAndO          <- EitherT(getTimeAndOffsets(pid, oid))
+          (obsDuration, offsets) = tAndO
           candidates     <- EitherT(getCandidates(oid, obsTime, tracking))
           baseCoords     <- EitherT.fromEither(
                               obsInfo.explicitBase
@@ -339,7 +345,7 @@ object GuideEnvironmentService {
                                 )
                             )
           positions      <- EitherT.fromEither(
-                              getPositions(oid, obsInfo.site, obsInfo.posAngleConstraint, offsets, tracking, obsTime)
+                              getPositions(oid, obsInfo.site, obsInfo.posAngleConstraint, offsets, tracking, obsTime, obsDuration)
                             )
           usable         <- EitherT.fromEither(
                               processCandidates(obsInfo, baseCoords, scienceCoords, positions, candidates)
