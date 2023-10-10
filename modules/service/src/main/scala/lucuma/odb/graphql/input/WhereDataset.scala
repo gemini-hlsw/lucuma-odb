@@ -10,16 +10,20 @@ import edu.gemini.grackle.Predicate._
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetQaState
+import lucuma.core.model.Observation
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding._
 
 object WhereDataset {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereObservationBinding  = WhereObservation.binding(path / "observation")
-    val WhereEqStepIdBinding     = WhereEq.binding[Step.Id](path / "id" / "stepId", StepIdBinding)
-    val WhereOrderIndexBinding   = WhereOrder.binding[PosShort](path / "id" / "index", PosShortBinding)
-    val QaStateBinding           = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
+    val WhereOrderDatasetIdBinding     = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
+    val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "observation" / "id", ObservationIdBinding)
+    val WhereEqStepIdBinding           = WhereEq.binding[Step.Id](path / "stepId", StepIdBinding)
+    val WhereOrderIndexBinding         = WhereOrder.binding[PosShort](path / "index", PosShortBinding)
+    val WhereFilenameBinding           = WhereString.binding(path / "filename")
+    val QaStateBinding                 = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
 
     lazy val WhereDatasetBinding = binding(path)
 
@@ -29,19 +33,23 @@ object WhereDataset {
         WhereDatasetBinding.List.Option("OR", rOR),
         WhereDatasetBinding.Option("NOT", rNOT),
 
-        WhereObservationBinding.Option("observation", rObs),
+        WhereOrderDatasetIdBinding.Option("id", rId),
+        WhereOrderObservationIdBinding.Option("observationId", rObs),
         WhereEqStepIdBinding.Option("stepId", rStepId),
         WhereOrderIndexBinding.Option("index", rIndex),
+        WhereFilenameBinding.Option("filename", rFile),
         QaStateBinding.Option("qaState", rQa)
       ) =>
-        (rAND, rOR, rNOT, rObs, rStepId, rIndex, rQa).parMapN { (AND, OR, NOT, obs, sid, index, qa) =>
+        (rAND, rOR, rNOT, rId, rObs, rStepId, rIndex, rFile, rQa).parMapN { (AND, OR, NOT, id, obs, sid, index, file, qa) =>
           and(List(
             AND.map(and),
             OR.map(or),
             NOT.map(Not(_)),
+            id,
             obs,
             sid,
             index,
+            file,
             qa
           ).flatten)
         }
