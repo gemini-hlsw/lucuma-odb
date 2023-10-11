@@ -11,8 +11,8 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import edu.gemini.grackle.Cursor
 import edu.gemini.grackle.Cursor.Env
-import edu.gemini.grackle.Predicate.and
 import edu.gemini.grackle.Predicate.True
+import edu.gemini.grackle.Predicate.and
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Query.Environment
@@ -30,10 +30,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.itc.client.ItcClient
-import lucuma.odb.json.all.query.given
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
