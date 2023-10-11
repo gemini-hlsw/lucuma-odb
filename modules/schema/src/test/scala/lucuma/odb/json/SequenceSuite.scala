@@ -23,6 +23,7 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
+import lucuma.core.util.arb.ArbGid
 import munit.DisciplineSuite
 
 class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
@@ -30,6 +31,7 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   import ArbAtom.given
   import ArbDataset.given
   import ArbDynamicConfig._
+  import ArbGid.*
   import ArbInstrumentExecutionConfig.given
   import ArbExecutionConfig.given
   import ArbExecutionSequence.given

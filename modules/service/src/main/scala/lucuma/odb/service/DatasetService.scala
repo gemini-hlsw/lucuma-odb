@@ -9,6 +9,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
+import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
@@ -50,7 +51,9 @@ object DatasetService {
     ) extends InsertDatasetFailure
 
     case class Success(
-      datasetId: Dataset.Id
+      datasetId: Dataset.Id,
+      stepId:    Step.Id,
+      index:     PosShort
     ) extends InsertDatasetResponse
 
   }
@@ -66,26 +69,28 @@ object DatasetService {
 
         import InsertDatasetResponse.*
 
-        val insert: F[Either[InsertDatasetFailure, Dataset.Id]] =
+        val insert: F[Either[InsertDatasetFailure, (Dataset.Id, Step.Id, PosShort)]] =
           session
             .unique(Statements.InsertDataset)(stepId, filename, qaState)
             .map(_.asRight[InsertDatasetFailure])
             .recover {
               case SqlState.UniqueViolation(_)     => ReusedFilename(filename).asLeft
               case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
+              case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") =>
+                StepNotFound(stepId).asLeft
             }
 
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           d <- EitherT(insert).leftWiden[InsertDatasetResponse]
-        } yield Success(d)).merge
+        } yield Success.apply.tupled(d)).merge
       }
 
     }
 
   object Statements {
 
-    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), Dataset.Id] =
+    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), (Dataset.Id, Step.Id, PosShort)] =
       sql"""
         INSERT INTO t_dataset (
           c_step_id,
@@ -99,9 +104,10 @@ object DatasetService {
           $dataset_filename,
           ${dataset_qa_state.opt}
         RETURNING
+          c_dataset_id,
           c_step_id,
           c_index
-      """.query(dataset_id)
+      """.query(dataset_id *: step_id *: int2_pos)
 
   }
 }
