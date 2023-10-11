@@ -7,13 +7,15 @@ import lucuma.odb.graphql.table.*
 
 trait DatasetSelectResultMapping[F[_]]
   extends DatasetTable[F]
+     with ObservationView[F]
      with ResultMapping[F] {
 
   lazy val DatasetSelectResultMapping: TypeMapping =
     SwitchMapping(
       DatasetSelectResultType,
       List(
-        QueryType / "datasets" -> topLevelSelectResultMapping(DatasetSelectResultType)
+        QueryType / "datasets"     -> topLevelSelectResultMapping(DatasetSelectResultType),
+        ExecutionType / "datasets" -> nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
       )
     )
 
