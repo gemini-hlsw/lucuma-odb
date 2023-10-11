@@ -18,10 +18,12 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   val pi2     = TestUsers.Standard.pi(2, 32)
   val service = TestUsers.service(3)
 
+  val mode    = ObservingModeType.GmosNorthLongSlit
+
   val validUsers = List(pi, pi2, service).toList
 
   test("simple datasets selection") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 0, 2, 3).flatMap {
+    recordDatasets(mode, pi, 0, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           query {
@@ -53,7 +55,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("OFFSET, LIMIT, hasMore") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 6, 2, 3).flatMap {
+    recordDatasets(mode, pi, 6, 2, 3).flatMap {
       case (_, steps) =>
         val q = s"""
           query {
@@ -88,7 +90,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("dataset selection") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 12, 1, 3).flatMap {
+    recordDatasets(mode, pi, 12, 1, 3).flatMap {
       case (oid, List((_, List(_, did, _)))) =>
         val q = s"""
           query {
@@ -120,7 +122,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("observation selection") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 15, 1, 3).flatMap {
+    recordDatasets(mode, pi, 15, 1, 3).flatMap {
       case (oid, _) =>
         val q = s"""
           query {
@@ -149,7 +151,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("step selection") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 18, 1, 3).flatMap {
+    recordDatasets(mode, pi, 18, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -182,7 +184,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("step and index selection") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 21, 1, 3).flatMap {
+    recordDatasets(mode, pi, 21, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -215,7 +217,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("filename") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 24, 1, 3).flatMap {
+    recordDatasets(mode, pi, 24, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -253,7 +255,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("qaState") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 27, 1, 3).flatMap {
+    recordDatasets(mode, pi, 27, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -288,7 +290,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("pi cannot select someone else's dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 30, 1, 1).flatMap {
+    recordDatasets(mode, pi, 30, 1, 1).flatMap {
       case _ =>
         val q = s"""
           query {
@@ -310,6 +312,49 @@ class datasets extends OdbSuite with DatasetSetupOperations {
         """.asRight
 
         expect(pi2, q, e)
+    }
+  }
+
+  test("query via `observation` -> `execution` -> `datasets`") {
+    recordDatasets(mode, pi, 31, 1, 3).flatMap {
+      case (oid, _) =>
+        val q = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                datasets() {
+                  matches {
+                    filename
+                  }
+                }
+              }
+            }
+          }
+        """
+
+        val e = json"""
+        {
+          "observation": {
+            "execution": {
+              "datasets": {
+                "matches": [
+                  {
+                    "filename": "N18630101S0032.fits"
+                  },
+                  {
+                    "filename": "N18630101S0033.fits"
+                  },
+                  {
+                    "filename": "N18630101S0034.fits"
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """.asRight
+
+        expect(pi, q, e)
     }
   }
 

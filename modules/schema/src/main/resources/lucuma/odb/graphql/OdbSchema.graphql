@@ -5162,18 +5162,12 @@ type Execution {
 
   ): ExecutionConfig!
 
-  """
-  Datasets associated with the observation
-  """
+  "Datasets associated with the observation."
   datasets(
-    """
-    Starts the result set at (or after if not existent) the given dataset id.
-    """
+    "Starts the result set at (or after if not existent) the given dataset id."
     OFFSET: DatasetId
 
-    """
-    Limits the result to at most this number of matches (but never more than 1000).
-    """
+    "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): DatasetSelectResult!
 
