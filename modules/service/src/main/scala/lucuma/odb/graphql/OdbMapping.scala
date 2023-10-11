@@ -183,6 +183,7 @@ object OdbMapping {
           with TimeSpanMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
+          with UpdateDatasetsResultMapping[F]
           with UpdateGroupsResultMapping[F]
           with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
@@ -326,6 +327,7 @@ object OdbMapping {
               TimingWindowRepeatMapping,
               TimeSpanMapping,
               UpdateAsterismsResultMapping,
+              UpdateDatasetsResultMapping,
               UpdateGroupsResultMapping,
               UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,

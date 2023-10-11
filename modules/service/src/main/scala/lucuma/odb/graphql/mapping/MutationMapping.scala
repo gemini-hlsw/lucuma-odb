@@ -32,6 +32,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
@@ -55,6 +56,7 @@ import lucuma.odb.graphql.input.RecordGmosSouthStepInput
 import lucuma.odb.graphql.input.RecordGmosSouthVisitInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
@@ -110,6 +112,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RecordGmosSouthVisit,
       SetAllocation,
       UpdateAsterisms,
+      UpdateDatasets,
       UpdateGroups,
       UpdateObsAttachments,
       UpdateObservations,
@@ -164,6 +167,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         child = q
       )
     }
+
+  def datasetResultSubquery(dids: List[Dataset.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
+    mutationResultSubquery(
+      predicate       = Predicates.dataset.id.in(dids),
+      order           = OrderSelection[Dataset.Id](DatasetType / "id"),
+      limit           = limit,
+      collectionField = "datasets",
+      child
+    )
 
   def obsAttachmentResultSubquery(aids: List[ObsAttachment.Id], limit: Option[NonNegInt], child: Query) =
     mutationResultSubquery(
@@ -602,6 +614,26 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           _     <- transaction.rollback.unlessA(query.hasValue)
         } yield query
 
+      }
+    }
+
+  private lazy val UpdateDatasets: MutationField =
+    MutationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
+      services.useTransactionally {
+        // Our predicate for selecting datasets to update
+        val filterPredicate = and(List(
+          Predicates.dataset.observation.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("datasets"), List("datasets"), List(DatasetType))).flatMap(_.fragment)
+
+        idSelect.flatTraverse { which =>
+          datasetService
+            .updateDatasets(input.SET, which)
+            .map(datasetResultSubquery(_, input.LIMIT, child))
+        }
       }
     }
 
