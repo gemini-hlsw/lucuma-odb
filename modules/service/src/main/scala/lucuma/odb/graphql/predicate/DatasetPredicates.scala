@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 package predicate
 
 import edu.gemini.grackle.Path
+import lucuma.core.model.sequence.Dataset
 
 class DatasetPredicates(path: Path) {
-  lazy val id = new DatasetIdPredicates(path / "id")
+  lazy val id          = LeafPredicates[Dataset.Id](path / "id")
+  lazy val observation = new ObservationPredicates(path / "observation")
 }

@@ -18,6 +18,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val cloneObservationResult  = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult       = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
     val constraintSetGroup      = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
+    val dataset                 = DatasetPredicates(Path.from(DatasetType))
     val datasetEvent            = ExecutionEventPredicates(Path.from(DatasetEventType))
     val gmosNorthAtomRecord     = AtomPredicates(Path.from(GmosNorthAtomRecordType))
     val gmosNorthStep           = StepPredicates(Path.from(GmosNorthStepType))

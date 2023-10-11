@@ -9,11 +9,9 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.refined.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.model.sequence.Step
 import lucuma.odb.data.ObservingModeType
 
 
@@ -56,18 +54,14 @@ class addDatasetEvent extends OdbSuite {
       s"""
         mutation {
           addDatasetEvent(input: {
-            datasetId: {
-              stepId: "${did.stepId}",
-              index:  ${did.index}
-            },
+            datasetId: "$did",
             datasetStage: START_WRITE
           }) {
             event {
-              datasetId {
-                stepId
-                index
-              }
               datasetStage
+              dataset {
+                id
+              }
               observation {
                 id
               }
@@ -85,11 +79,10 @@ class addDatasetEvent extends OdbSuite {
       {
         "addDatasetEvent": {
           "event": {
-            "datasetId": {
-              "stepId": ${did.stepId},
-              "index": ${did.index}
-            },
             "datasetStage": "START_WRITE",
+            "dataset": {
+              "id": $did
+            },
             "observation": {
               "id": $oid
             }
@@ -106,18 +99,14 @@ class addDatasetEvent extends OdbSuite {
       s"""
         mutation {
           addDatasetEvent(input: {
-            datasetId: {
-              stepId: "${did.stepId}",
-              index:  ${did.index}
-            },
+            datasetId: "$did",
             datasetStage: START_WRITE
           }) {
             event {
-              datasetId {
-                stepId
-                index
-              }
               datasetStage
+              dataset {
+                id
+              }
               observation {
                 id
               }
@@ -135,11 +124,10 @@ class addDatasetEvent extends OdbSuite {
       {
         "addDatasetEvent": {
           "event": {
-            "datasetId": {
-              "stepId": ${did.stepId},
-              "index": ${did.index}
-            },
             "datasetStage": "START_WRITE",
+            "dataset": {
+              "id": $did
+            },
             "observation": {
               "id": $oid
             }
@@ -156,15 +144,12 @@ class addDatasetEvent extends OdbSuite {
       s"""
         mutation {
           addDatasetEvent(input: {
-            datasetId: {
-              stepId: "s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7",
-              index:  3
-            },
+            datasetId: "d-1863",
             datasetStage: START_WRITE
           }) {
             event {
-              datasetId {
-                stepId
+              dataset {
+                id
               }
             }
           }
@@ -176,7 +161,7 @@ class addDatasetEvent extends OdbSuite {
       staff,
       "N18630101S0003.fits",
       _ => query,
-      (_, _) => s"Dataset '(s-cfebc981-db7e-4c35-964d-6b19aa5ed2d7, 3)' not found".asLeft
+      (_, _) => s"Dataset 'd-1863' not found".asLeft
     )
 
   }

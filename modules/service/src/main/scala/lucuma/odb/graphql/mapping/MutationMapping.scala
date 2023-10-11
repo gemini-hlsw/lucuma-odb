@@ -352,13 +352,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   ): DatasetService.InsertDatasetResponse => Result[Query] = {
     import DatasetService.InsertDatasetResponse.*
     (response: DatasetService.InsertDatasetResponse) => response match {
-      case NotAuthorized(user) =>
+      case NotAuthorized(user)      =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
       case ReusedFilename(filename) =>
         Result.failure(s"The filename '${filename.format}' is already assigned")
-      case StepNotFound(id)    =>
+      case StepNotFound(id)         =>
         Result.failure(s"Step id '$id' not found")
-      case Success(did)     =>
+      case Success(did, _, _)       =>
         Result(Unique(Filter(predicates.id.eql(did), child)))
     }
   }
@@ -606,25 +606,25 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val UpdateObsAttachments =
-      MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
-        services.useTransactionally {
-          val filterPredicate = and(List(
-            Predicates.obsAttachment.program.id.eql(input.programId),
-            Predicates.obsAttachment.program.isWritableBy(user),
-            input.WHERE.getOrElse(True)
-          ))
+    MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
+      services.useTransactionally {
+        val filterPredicate = and(List(
+          Predicates.obsAttachment.program.id.eql(input.programId),
+          Predicates.obsAttachment.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
 
-          val idSelect: Result[AppliedFragment] =
-            MappedQuery(
-              Filter(filterPredicate, Select("id", Nil, Empty)),
-              Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
-            ).flatMap(_.fragment)
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(
+            Filter(filterPredicate, Select("id", Nil, Empty)),
+            Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
+          ).flatMap(_.fragment)
 
-          idSelect.flatTraverse { which =>
-            obsAttachmentMetadataService.updateObsAttachments(input.SET, which).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
-          }
+        idSelect.flatTraverse { which =>
+          obsAttachmentMetadataService.updateObsAttachments(input.SET, which).map(obsAttachmentResultSubquery(_, input.LIMIT, child))
         }
       }
+    }
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>

@@ -4,25 +4,21 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.AtomRecordTable
 import table.DatasetTable
 import table.ObservationView
-import table.StepRecordTable
 
 trait DatasetMapping[F[_]] extends DatasetTable[F]
-                              with ObservationView[F]
-                              with AtomRecordTable[F]
-                              with StepRecordTable[F] {
+                              with ObservationView[F] {
 
   lazy val DatasetMapping: ObjectMapping =
     ObjectMapping(
       tpe = DatasetType,
       fieldMappings = List(
-        SqlField("stepId", DatasetTable.DatasetId.StepId, hidden = true, key = true),
-        SqlField("index",  DatasetTable.DatasetId.Index, hidden = true, key = true),
-        SqlObject("id"),
+        SqlField("id",     DatasetTable.Id,   key = true),
+        SqlField("stepId", DatasetTable.StepId),
+        SqlField("index",  DatasetTable.Index),
 
-        SqlObject("observation", Join(DatasetTable.DatasetId.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.ObservationId, ObservationView.Id)),
+        SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
         SqlField("filename", DatasetTable.File.Name),
         SqlField("qaState",  DatasetTable.QaState),
 

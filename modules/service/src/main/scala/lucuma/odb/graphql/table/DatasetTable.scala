@@ -5,9 +5,11 @@ package lucuma.odb.graphql.table
 
 import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.dataset_qa_state
 import lucuma.odb.util.Codecs.int2_pos
 import lucuma.odb.util.Codecs.int4_pos
+import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
 import skunk.codec.temporal.date
@@ -18,10 +20,10 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
 
   object DatasetTable extends TableDef("t_dataset") {
 
-    object DatasetId {
-      val StepId: ColumnRef    = col("c_step_id", step_id)
-      val Index: ColumnRef     = col("c_index",   int2_pos)
-    }
+    val Id: ColumnRef            = col("c_dataset_id", dataset_id)
+    val StepId: ColumnRef        = col("c_step_id", step_id)
+    val Index: ColumnRef         = col("c_index",   int2_pos)
+    val ObservationId: ColumnRef = col("c_observation_id", observation_id)
 
     object File {
       val Site: ColumnRef  = col("c_file_site",  site)
