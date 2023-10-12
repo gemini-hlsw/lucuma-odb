@@ -6,17 +6,22 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.DatasetStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.ObservingModeType
 
 
 class addDatasetEvent extends OdbSuite {
 
+  val mode: ObservingModeType = ObservingModeType.GmosNorthLongSlit
   val staff: User = TestUsers.Standard.staff(nextId, nextId)
 
   override lazy val validUsers: List[User] = List(staff)
@@ -71,7 +76,7 @@ class addDatasetEvent extends OdbSuite {
       """
 
     addDatasetEventTest(
-      ObservingModeType.GmosNorthLongSlit,
+      mode,
       staff,
       "N18630101S0001.fits",
       did => query(did),
@@ -116,7 +121,7 @@ class addDatasetEvent extends OdbSuite {
       """
 
     addDatasetEventTest(
-      ObservingModeType.GmosNorthLongSlit,
+      mode,
       staff,
       "N18630101S0002.fits",
       did => query(did),
@@ -140,7 +145,7 @@ class addDatasetEvent extends OdbSuite {
   }
 
   test("addDatasetEvent - unknown dataset") {
-    def query: String =
+    val query: String =
       s"""
         mutation {
           addDatasetEvent(input: {
@@ -157,13 +162,87 @@ class addDatasetEvent extends OdbSuite {
       """
 
     addDatasetEventTest(
-      ObservingModeType.GmosNorthLongSlit,
+      mode,
       staff,
       "N18630101S0003.fits",
       _ => query,
       (_, _) => s"Dataset 'd-1863' not found".asLeft
     )
 
+  }
+
+  private def addEvent(did: Dataset.Id, stage: DatasetStage): IO[Timestamp] =
+    query(
+      staff,
+      s"""
+        mutation {
+          addDatasetEvent(input: {
+            datasetId:    "$did",
+            datasetStage: ${stage.tag.toUpperCase}
+          }) {
+            event {
+              received
+            }
+          }
+        }
+      """
+    ).map { json =>
+      json.hcursor.downFields("addDatasetEvent", "event", "received").require[Timestamp]
+    }
+
+  private def timestamps(did: Dataset.Id): IO[(Option[Timestamp], Option[Timestamp])] =
+    query(
+      staff,
+      s"""
+        query {
+          dataset(datasetId: "$did") {
+            start
+            end
+          }
+        }
+      """
+    ).map { json =>
+      val d = json.hcursor.downField("dataset")
+      val s = d.downField("start").require[Option[Timestamp]]
+      val e = d.downField("end").require[Option[Timestamp]]
+      (s, e)
+    }
+
+  private def timeTest(file: String, stages: DatasetStage*): IO[Unit] = {
+    def expected(times: List[Timestamp]): (Option[Timestamp], Option[Timestamp]) =
+      times.zip(stages).foldLeft((Option.empty[Timestamp], Option.empty[Timestamp])) { case ((start, end), (time, stage)) =>
+        if (stage === DatasetStage.StartObserve) (time.some, none)
+        else if ((stage === DatasetStage.EndWrite) && start.isDefined) (start, time.some)
+        else (start, end)
+      }
+
+    for {
+      ids <- recordDataset(mode, staff, file)
+      (oid, did) = ids
+      es  <- stages.toList.traverse(addEvent(did, _))
+      ex   = expected(es)
+      ts  <- timestamps(did)
+    } yield assertEquals(ts, ex)
+  }
+
+  test("addDatasetEvent - no start time") {
+    timeTest("N18630101S0004.fits", DatasetStage.StartWrite)
+  }
+
+  test("addDatasetEvent - start") {
+    timeTest("N18630101S0005.fits", DatasetStage.StartObserve)
+  }
+
+  test("addDatasetEvent - start, end") {
+    timeTest("N18630101S0006.fits", DatasetStage.StartObserve, DatasetStage.EndWrite)
+  }
+
+  test("addDatasetEvent - end, no start") {
+    timeTest("N18630101S0007.fits", DatasetStage.EndWrite)
+  }
+
+  test("addDatasetEvent - start, end, start") {
+    timeTest("N18630101S0008.fits", DatasetStage.StartObserve, DatasetStage.EndWrite, DatasetStage.StartObserve)
   }
 
 }
