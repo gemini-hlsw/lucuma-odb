@@ -9,11 +9,14 @@ import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.odb.data.Nullable
+import lucuma.odb.graphql.input.DatasetPropertiesInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -28,6 +31,10 @@ sealed trait DatasetService[F[_]] {
     qaState:  Option[DatasetQaState]
   )(using Transaction[F]): F[DatasetService.InsertDatasetResponse]
 
+  def updateDatasets(
+    SET:   DatasetPropertiesInput,
+    which: AppliedFragment
+  )(using Transaction[F]): F[List[Dataset.Id]]
 }
 
 object DatasetService {
@@ -86,6 +93,16 @@ object DatasetService {
         } yield Success.apply.tupled(d)).merge
       }
 
+      override def updateDatasets(
+        SET:   DatasetPropertiesInput,
+        which: AppliedFragment
+      )(using Transaction[F]): F[List[Dataset.Id]] =
+        Statements.UpdateDatasets(SET, which).toList.flatTraverse { af =>
+          session.prepareR(af.fragment.query(dataset_id)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList
+          }
+        }
+
     }
 
   object Statements {
@@ -109,5 +126,23 @@ object DatasetService {
           c_index
       """.query(dataset_id *: step_id *: int2_pos)
 
+    def UpdateDatasets(
+      SET:   DatasetPropertiesInput,
+      which: AppliedFragment
+    ): Option[AppliedFragment] = {
+      val upQaState = sql"c_qa_state = ${dataset_qa_state.opt}"
+
+      val update = SET.qaState match {
+        case Nullable.Absent      => None
+        case Nullable.Null        => Some(upQaState(None))
+        case Nullable.NonNull(qa) => Some(upQaState(Some(qa)))
+      }
+
+      update.map { up =>
+        void"UPDATE t_dataset SET " |+| up |+|
+          void" WHERE c_dataset_id IN (" |+| which |+| void")" |+|
+          void" RETURNING c_dataset_id"
+      }
+    }
   }
 }
