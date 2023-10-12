@@ -5,11 +5,14 @@ package lucuma.odb.service
 
 import cats.data.EitherT
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -78,7 +81,7 @@ object ExecutionEventService {
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
         datasetStage: DatasetStage
-      )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
+      )(using xa: Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
 
         import InsertEventResponse.*
 
@@ -90,10 +93,31 @@ object ExecutionEventService {
               case SqlState.ForeignKeyViolation(_) => DatasetNotFound(datasetId).asLeft
             }
 
+        // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
+        // unchanged) if there is an end event but no start.
+        def setDatasetTime(t: Timestamp): F[Unit] = {
+          // StartObserve signals the start of the dataset, EndWrite the end.
+          val up = datasetStage match {
+            case DatasetStage.StartObserve => services.datasetService.setStartTime.some
+            case DatasetStage.EndWrite     => services.datasetService.setEndTime.some
+            case _                         => none
+          }
+
+          up.fold(().pure) { f =>
+            for {
+              s <- xa.savepoint
+              _ <- f(datasetId, t).recoverWith {
+                case SqlState.CheckViolation(_) => xa.rollback(s).void
+              }
+            } yield ()
+          }
+        }
+
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time) = e
+          _ <- EitherT.liftF(setDatasetTime(time))
         } yield Success(eid, time)).merge
 
       }
