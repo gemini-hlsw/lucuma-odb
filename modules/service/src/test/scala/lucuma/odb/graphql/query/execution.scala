@@ -12,6 +12,8 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
@@ -39,6 +41,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
@@ -1889,6 +1892,44 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     query(user, q).void
   }
 
+  private def addDatasetEvent(did: Dataset.Id, stage: DatasetStage): IO[Unit] = {
+    val q = s"""
+      mutation {
+        addDatasetEvent(input: {
+          datasetId:    "$did",
+          datasetStage: ${stage.tag.toUpperCase}
+        }) {
+          event {
+            id
+          }
+        }
+      }
+    """
+
+    query(user, q).void
+  }
+
+  private def setQaState(did: Dataset.Id, qa: DatasetQaState): IO[Unit] = {
+    val q = s"""
+        mutation {
+          updateDatasets(input: {
+            SET: {
+              qaState: ${qa.tag.toUpperCase}
+            },
+            WHERE: {
+              id: { EQ: "$did" }
+            }
+          }) {
+            datasets {
+              id
+            }
+          }
+        }
+    """
+
+    query(user, q).void
+  }
+
   private val OneSecond      = TimeSpan.unsafeFromMicroseconds( 1_000_000L)
   private val TenSeconds     = TimeSpan.unsafeFromMicroseconds(10_000_000L)
 
@@ -1917,7 +1958,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   private val Science15 = StepConfig.Science(Offset.microarcseconds.reverseGet((0, 15_000_000L)), GuideState.Enabled)
   private val Flat      = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
 
-  private val SetupOneStepGmosNorth: IO[(Observation.Id, Step.Id)] = {
+  private def setupOneStepGmosNorth(count: Int): IO[(Observation.Id, Step.Id, Dataset.Id)] = {
     import lucuma.odb.json.all.transport.given
 
     for {
@@ -1927,8 +1968,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v)
       s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, Science00)
+      d <- recordDatasetAs(user, s, f"N18630101S$count%04d.fits")
+      _ <- addDatasetEvent(d, DatasetStage.StartObserve)
+      _ <- addDatasetEvent(d, DatasetStage.EndObserve)
+      _ <- addDatasetEvent(d, DatasetStage.StartReadout)
+      _ <- addDatasetEvent(d, DatasetStage.EndReadout)
+      _ <- addDatasetEvent(d, DatasetStage.StartWrite)
       _ <- addEndStepEvent(s)
-    } yield (o, s)
+    } yield (o, s, d)
   }
 
   private def scienceSingleAtom[D](steps: CompletedAtomMap.StepMatch[D]*): CompletedAtomMap[D] =
@@ -1937,7 +1984,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     )
 
   test("one gmos north dynamic step - GmosSequenceService") {
-    SetupOneStepGmosNorth.flatMap { case (o, s) =>
+    setupOneStepGmosNorth(1).flatMap { case (o, s, _) =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           services
@@ -1951,7 +1998,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("one gmos north dynamic step - SequenceService steps") {
-    SetupOneStepGmosNorth.flatMap { case (o, s) =>
+    setupOneStepGmosNorth(2).flatMap { case (o, s, _) =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           services
@@ -1964,8 +2011,8 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("one gmos north dynamic step - SequenceService atom counts") {
-    val m = SetupOneStepGmosNorth.flatMap { case (o, _) =>
+  test("one gmos north dynamic step - SequenceService atom counts - incomplete dataset") {
+    val m = setupOneStepGmosNorth(3).flatMap { case (o, _, _) =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           services
@@ -1974,6 +2021,62 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         }
       }
     }
+
+    assertIO(m, CompletedAtomMap.Empty)
+  }
+
+  test("one gmos north dynamic step - SequenceService atom counts - FAIL") {
+    val m =
+      for {
+        osd <- setupOneStepGmosNorth(4)
+        (o, s, d) = osd
+        _   <- addDatasetEvent(d, DatasetStage.EndWrite)
+        _   <- setQaState(d, DatasetQaState.Fail)
+        m   <- withServices(user) { services =>
+          services.session.transaction.use { xa =>
+            services
+              .sequenceService
+              .selectGmosNorthCompletedAtomMap(o)(using xa)
+          }
+        }
+      } yield m
+
+    assertIO(m, CompletedAtomMap.Empty)
+  }
+
+  test("one gmos north dynamic step - SequenceService atom counts - NULL QA") {
+    val m =
+      for {
+        osd <- setupOneStepGmosNorth(5)
+        (o, s, d) = osd
+        _   <- addDatasetEvent(d, DatasetStage.EndWrite)
+        m   <- withServices(user) { services =>
+          services.session.transaction.use { xa =>
+            services
+              .sequenceService
+              .selectGmosNorthCompletedAtomMap(o)(using xa)
+          }
+        }
+      } yield m
+
+    assertIO(m, scienceSingleAtom((GmosNorthScience0, Science00)))
+  }
+
+  test("one gmos north dynamic step - SequenceService atom counts - Pass") {
+    val m =
+      for {
+        osd <- setupOneStepGmosNorth(6)
+        (o, s, d) = osd
+        _   <- addDatasetEvent(d, DatasetStage.EndWrite)
+        _   <- setQaState(d, DatasetQaState.Pass)
+        m   <- withServices(user) { services =>
+          services.session.transaction.use { xa =>
+            services
+              .sequenceService
+              .selectGmosNorthCompletedAtomMap(o)(using xa)
+          }
+        }
+      } yield m
 
     assertIO(m, scienceSingleAtom((GmosNorthScience0, Science00)))
   }
