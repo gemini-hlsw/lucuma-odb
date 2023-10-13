@@ -18,6 +18,7 @@ import lucuma.core.model
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
@@ -38,6 +39,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       fieldMappings = List(
         SqlObject("asterismGroup"),
         SqlObject("constraintSetGroup"),
+        SqlObject("dataset"),
+        SqlObject("datasets"),
         SqlObject("filterTypeMeta"),
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
@@ -56,6 +59,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     List(
       AsterismGroup,
       ConstraintSetGroup,
+      Dataset,
+      Datasets,
       FilterTypeMeta,
       ObsAttachmentTypeMeta,
       Observation,
@@ -114,6 +119,55 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentTypeMetaType / "tag"))), child)
       }
+
+  private lazy val Dataset: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "dataset", List(
+      DatasetIdBinding("datasetId", rDid)
+    )) =>
+      Elab.transformChild { child =>
+        rDid.map { did =>
+          Unique(
+            Filter(
+              And(
+                Predicates.dataset.id.eql(did),
+                Predicates.dataset.observation.program.isVisibleTo(user)
+              ),
+              child
+            )
+          )
+        }
+      }
+
+  private lazy val Datasets: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereDatasetBinding = WhereDataset.binding(Path.from(DatasetType))
+    {
+      case (QueryType, "datasets", List(
+        WhereDatasetBinding.Option("WHERE", rWHERE),
+        DatasetIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        Elab.transformChild { child =>
+          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
+                  Predicates.dataset.observation.program.isVisibleTo(user),
+                  WHERE.getOrElse(True)
+                ))),
+                oss = Some(List(
+                  OrderSelection[lucuma.core.model.sequence.Dataset.Id](DatasetType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+            }
+          }
+        }
+    }
+  
 
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
