@@ -65,6 +65,8 @@ trait ObservationMapping[F[_]]
         SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
         EffectField("itc", itcQueryHandler, List("id", "programId")),
         SqlObject("execution"),
+        SqlField("groupId", ObservationView.GroupId),
+        SqlField("groupIndex", ObservationView.GroupIndex),
       )
     )
 
@@ -113,4 +115,3 @@ trait ObservationMapping[F[_]]
   }
 
 }
-

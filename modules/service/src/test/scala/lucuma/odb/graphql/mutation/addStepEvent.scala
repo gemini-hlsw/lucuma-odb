@@ -105,7 +105,7 @@ class addStepEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       staff,
       _ => query,
-      (_, _) => s"Step id 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
+      (_, _) => s"Step 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
     )
 
   }

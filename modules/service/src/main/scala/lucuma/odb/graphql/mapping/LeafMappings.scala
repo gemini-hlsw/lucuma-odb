@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
@@ -51,6 +52,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
       LeafMapping[Tag](ConditionsMeasurementSourceType),
       LeafMapping[Tag](ConditionsSourceType),
@@ -110,6 +112,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),
+      LeafMapping[PosShort](PosShortType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[Tag](ProposalAttachmentTypeType),

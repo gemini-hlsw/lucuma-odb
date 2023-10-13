@@ -14,7 +14,7 @@ object DatasetIdInput {
     ObjectFieldsBinding.rmap {
       case List(
         StepIdBinding("stepId", rStepId),
-        NonNegShortBinding("index", rIndex)
+        PosShortBinding("index", rIndex)
       ) =>
         (rStepId, rIndex).parMapN { (sid, index) =>
           Dataset.Id(sid, index)

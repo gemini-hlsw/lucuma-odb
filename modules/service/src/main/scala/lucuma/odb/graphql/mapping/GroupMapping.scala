@@ -25,8 +25,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       tpe = GroupType,
       fieldMappings = List(
         SqlField("id", GroupView.Id, key = true),
-        SqlField("parentId", GroupView.ParentId, hidden = true),
-        SqlField("parentIndex", GroupView.ParentIndex, hidden = true),
+        SqlField("parentId", GroupView.ParentId),
+        SqlField("parentIndex", GroupView.ParentIndex),
         SqlField("name", GroupView.Name),
         SqlField("description", GroupView.Description),
         SqlField("minimumRequired", GroupView.MinRequired),
