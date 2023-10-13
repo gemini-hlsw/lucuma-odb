@@ -56,6 +56,7 @@ object ExecutionDigestService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionDigestService[F] =
     new ExecutionDigestService[F] {
+
       override def selectOne(
         pid:  Program.Id,
         oid:  Observation.Id,
@@ -184,7 +185,7 @@ object ExecutionDigestService {
         c_sci_atom_count
       """
 
-    def SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
+    val SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
@@ -195,7 +196,7 @@ object ExecutionDigestService {
           c_observation_id = $observation_id
       """.query(md5_hash *: execution_digest)
 
-    def SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
+    val SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_observation_id,
@@ -206,7 +207,7 @@ object ExecutionDigestService {
           c_program_id = $program_id
       """.query(observation_id *: md5_hash *: execution_digest)
 
-    def InsertOrUpdateExecutionDigest: Command[(
+    val InsertOrUpdateExecutionDigest: Command[(
       Program.Id,
       Observation.Id,
       Md5Hash,

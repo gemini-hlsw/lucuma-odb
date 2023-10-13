@@ -76,7 +76,7 @@ object SmartGmosLoader {
 
   def encoder[G, L, U](using k: Encoder[TableKey[G, L, U]], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow[G, L, U]] =
     (
-      pos_long *:
+      int8_pos *:
       k        *:
       v
     ).contramap[TableRow[G, L, U]] { r => (

@@ -1,9 +1,12 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos.longslit
+package lucuma.odb.sequence
+package gmos.longslit
 
 import cats.Eq
+import cats.syntax.option.*
+import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
@@ -67,8 +70,7 @@ sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product
   def yBin: GmosYBinning =
     explicitYBin.getOrElse(defaultYBin)
 
-  def defaultYBin: GmosYBinning =
-    DefaultYBinning
+  def defaultYBin: GmosYBinning
 
   def explicitYBin: Option[GmosYBinning]
 
@@ -160,6 +162,7 @@ object Config {
     centralWavelength:         Wavelength,
     defaultXBin:               GmosXBinning,
     explicitXBin:              Option[GmosXBinning],
+    defaultYBin:               GmosYBinning,
     explicitYBin:              Option[GmosYBinning],
     explicitAmpReadMode:       Option[GmosAmpReadMode],
     explicitAmpGain:           Option[GmosAmpGain],
@@ -190,14 +193,17 @@ object Config {
       explicitRoi:               Option[GmosRoi]                = None,
       explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
       explicitSpatialOffsets:    Option[List[Q]]                = None
-    ): GmosNorth =
+    ): GmosNorth = {
+      val (x, y) = northBinning(fpu, sourceProfile, imageQuality, grating, sampling = sampling)
+
       GmosNorth(
         grating,
         filter,
         fpu,
         centralWavelength,
-        xbinNorth(fpu, sourceProfile, imageQuality, sampling),
+        x,
         explicitXBin,
+        y,
         explicitYBin,
         explicitAmpReadMode,
         explicitAmpGain,
@@ -205,6 +211,28 @@ object Config {
         explicitWavelengthDithers,
         explicitSpatialOffsets
       )
+    }
+
+    def reconcile(a: GmosNorth, modes: List[ObservingMode]): Option[GmosNorth] =
+      modes.headOption match {
+        case None                                                  =>
+          a.some
+
+        case Some(b: GmosNorth) =>
+          if (a === b)
+            reconcile(a, modes.tail)
+          else {
+            val x  = a.xBin min b.xBin
+            val y  = a.yBin min b.yBin
+            val aʹ = a.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
+            val bʹ = b.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
+            if (aʹ === bʹ) reconcile(aʹ, modes.tail) else none
+          }
+
+        case _                                                     =>
+          none
+      }
+
 
     given Eq[GmosNorth] =
       Eq.by { a => (
@@ -214,6 +242,7 @@ object Config {
         a.centralWavelength,
         a.defaultXBin,
         a.explicitXBin,
+        a.defaultYBin,
         a.explicitYBin,
         a.explicitAmpReadMode,
         a.explicitAmpGain,
@@ -231,6 +260,7 @@ object Config {
     centralWavelength:         Wavelength,
     defaultXBin:               GmosXBinning,
     explicitXBin:              Option[GmosXBinning],
+    defaultYBin:               GmosYBinning,
     explicitYBin:              Option[GmosYBinning],
     explicitAmpReadMode:       Option[GmosAmpReadMode],
     explicitAmpGain:           Option[GmosAmpGain],
@@ -261,14 +291,17 @@ object Config {
       explicitRoi:               Option[GmosRoi]                = None,
       explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
       explicitSpatialOffsets:    Option[List[Q]]                = None
-    ): GmosSouth =
+    ): GmosSouth = {
+      val (x, y) = southBinning(fpu, sourceProfile, imageQuality, grating, sampling = sampling)
+
       GmosSouth(
         grating,
         filter,
         fpu,
         centralWavelength,
-        xbinSouth(fpu, sourceProfile, imageQuality, sampling),
+        x,
         explicitXBin,
+        y,
         explicitYBin,
         explicitAmpReadMode,
         explicitAmpGain,
@@ -276,7 +309,27 @@ object Config {
         explicitWavelengthDithers,
         explicitSpatialOffsets
       )
+    }
 
+    def reconcile(a: GmosSouth, modes: List[ObservingMode]): Option[GmosSouth] =
+      modes.headOption match {
+        case None                                                  =>
+          a.some
+
+        case Some(b: GmosSouth) =>
+          if (a === b)
+            reconcile(a, modes.tail)
+          else {
+            val x  = a.xBin min b.xBin
+            val y  = a.yBin min b.yBin
+            val aʹ = a.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
+            val bʹ = b.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
+            if (aʹ === bʹ) reconcile(aʹ, modes.tail) else none
+          }
+
+        case _                                                     =>
+          none
+      }
 
     given Eq[GmosSouth] =
       Eq.by { a => (
@@ -286,6 +339,7 @@ object Config {
         a.centralWavelength,
         a.defaultXBin,
         a.explicitXBin,
+        a.defaultYBin,
         a.explicitYBin,
         a.explicitAmpReadMode,
         a.explicitAmpGain,

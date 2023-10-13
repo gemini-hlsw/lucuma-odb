@@ -11,11 +11,13 @@ opaque type Md5Hash = ByteVector
 
 object Md5Hash {
 
+  val Zero: Md5Hash = unsafeFromByteArray(Array.fill(16)(0.toByte))
+
   def fromByteArray(bytes: Array[Byte]): Option[Md5Hash] =
     Option.when(bytes.size === 16)(ByteVector(bytes))
 
   def unsafeFromByteArray(bytes: Array[Byte]): Md5Hash =
-    fromByteArray(bytes).getOrElse(sys.error(s"Expected 16 byte array but was ${bytes.size} bytes"))
+    fromByteArray(bytes).getOrElse(sys.error(s"Expected 16 byte array but was ${bytes.length} bytes"))
 
   def fromByteVector(bv: ByteVector): Option[Md5Hash] =
     Option.when(bv.size === 16)(bv)

@@ -8,6 +8,7 @@ import cats.effect.IO
 import io.circe.syntax.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.math.Angle
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -28,7 +29,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     createObservationWithModeAs(
       user,
       pid,
-      tids.toList,
+      tids,
       """
         gmosNorthLongSlit: {
           grating: R831_G5302,
@@ -36,7 +37,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
           fpu: LONG_SLIT_0_50,
           centralWavelength: {
             nanometers: 500
-          }
+          },
+          explicitYBin: TWO
         }
       """,
       status,
@@ -53,7 +55,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     createObservationWithModeAs(
       user,
       pid,
-      tids.toList,
+      tids,
       """
         gmosSouthLongSlit: {
           grating: R600_G5324,
@@ -61,7 +63,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
           fpu: LONG_SLIT_0_50,
           centralWavelength: {
             nanometers: 500
-          }
+          },
+          explicitYBin: TWO
         }
       """,
       status,
@@ -205,6 +208,76 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
     )
 
+  def createTargetWithGaussianAs(
+    user: User,
+    pid:  Program.Id,
+    fwhm: Angle
+  ): IO[Target.Id] =
+    query(
+      user  = user,
+      query =
+      s"""
+         mutation {
+           createTarget(input: {
+             programId: ${pid.asJson},
+             SET: {
+               name: "V1647 Orionis"
+               sidereal: {
+                 ra: { hms: "05:46:13.137" },
+                 dec: { dms: "-00:06:04.89" },
+                 epoch: "J2000.0",
+                 properMotion: {
+                   ra: {
+                     milliarcsecondsPerYear: 0.918
+                   },
+                   dec: {
+                     milliarcsecondsPerYear: -1.057
+                   },
+                 },
+                 radialVelocity: {
+                   kilometersPerSecond: 27.58
+                 },
+                 parallax: {
+                   milliarcseconds: 2.422
+                 }
+               },
+               sourceProfile: {
+                 gaussian: {
+                   fwhm: {
+                     microarcseconds: ${fwhm.toMicroarcseconds}
+                   },
+                   spectralDefinition: {
+                     bandNormalized: {
+                       sed: {
+                         stellarLibrary: O5_V
+                       },
+                       brightnesses: [
+                         {
+                           band: J,
+                           value: 14.74,
+                           units: VEGA_MAGNITUDE
+                         },
+                         {
+                           band: V,
+                           value: 18.1,
+                           units: VEGA_MAGNITUDE
+                         }
+                       ]
+                     }
+                   }
+                 }
+               }
+             }
+           }) {
+             target {
+               id
+             }
+           }
+         }
+      """
+    ).map(
+      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+    )
 
 }
 

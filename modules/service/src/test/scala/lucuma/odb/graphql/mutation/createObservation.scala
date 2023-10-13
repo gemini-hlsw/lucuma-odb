@@ -32,19 +32,24 @@ import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.math.Angle
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceUser
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.CoordinatesInput
 import lucuma.odb.service.AsterismService
 
 import java.time.LocalDateTime
+import scala.collection.immutable.SortedMap
 
 class createObservation extends OdbSuite {
 
@@ -718,7 +723,8 @@ class createObservation extends OdbSuite {
                 fpu: $fpu
                 centralWavelength: {
                   nanometers: 234.56
-                }
+                },
+                explicitYBin: TWO
               }
             }
             targetEnvironment: {
@@ -775,10 +781,10 @@ class createObservation extends OdbSuite {
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56,
-           GmosXBinning.Two,
+           GmosXBinning.One,
            GmosYBinning.Two,
-           Option.empty[GmosYBinning],
-           GmosYBinning.Two,
+           Some(GmosYBinning.Two),
+           GmosYBinning.One,
            GmosNorthGrating.B1200_G5301,
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
@@ -832,9 +838,9 @@ class createObservation extends OdbSuite {
               Some(GmosNorthFilter.GPrime),
               GmosNorthFpu.LongSlit_5_00,
               234.56,
-              GmosXBinning.Four,  // (5" slit min (0.647200" fwhm max 0.1" IQ)) = 647200, 647200 microarcsec / 80900 microarcsec = 8, 8 / binning 4 = 2, 2 > 2.0 sampling size
+              northSpectralBinning(GmosNorthFpu.LongSlit_5_00, SourceProfile.Gaussian(Angle.fromMicroarcseconds(647200), SpectralDefinition.BandNormalized(none, SortedMap.empty)), ImageQuality.PointOne, GmosNorthGrating.B1200_G5301),
               GmosYBinning.Two,
-              Option.empty[GmosYBinning],
+              Some(GmosYBinning.Two),
               GmosYBinning.Two,
               GmosNorthGrating.B1200_G5301,
               Some(GmosNorthFilter.GPrime),
@@ -870,10 +876,10 @@ class createObservation extends OdbSuite {
            Some(GmosSouthFilter.GPrime),
            GmosSouthFpu.LongSlit_0_25,
            234.56,
-           GmosXBinning.Two,
+           GmosXBinning.One,
            GmosYBinning.Two,
-           Option.empty[GmosYBinning],
-           GmosYBinning.Two,
+           Some(GmosYBinning.Two),
+           GmosYBinning.One,
            GmosSouthGrating.B1200_G5321,
            Some(GmosSouthFilter.GPrime),
            GmosSouthFpu.LongSlit_0_25,
@@ -994,10 +1000,10 @@ class createObservation extends OdbSuite {
           ).tupled,
           (GmosXBinning.Four,
            Some(GmosXBinning.Four),
-           GmosXBinning.Two,
+           GmosXBinning.One,
            GmosYBinning.Four,
            Some(GmosYBinning.Four),
-           GmosYBinning.Two,
+           GmosYBinning.One,
            GmosAmpReadMode.Fast,
            Some(GmosAmpReadMode.Fast),
            GmosAmpReadMode.Slow,

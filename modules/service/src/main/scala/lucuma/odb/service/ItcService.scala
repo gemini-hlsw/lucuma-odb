@@ -456,7 +456,7 @@ object ItcService {
 
   object Statements {
     private val integration_time: Codec[IntegrationTime] =
-      (time_span *: pos_int *: signal_to_noise).to[IntegrationTime]
+      (time_span *: int4_pos *: signal_to_noise).to[IntegrationTime]
 
     val UpdateItcVersion: Command[(
       Option[String],
@@ -541,18 +541,18 @@ object ItcService {
           $target_id,
           $md5_hash,
           $time_span,
-          $pos_int,
+          $int4_pos,
           $signal_to_noise,
           $time_span,
-          $pos_int,
+          $int4_pos,
           $signal_to_noise
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash                 = $md5_hash,
               c_sci_exposure_time    = $time_span,
-              c_sci_exposure_count   = $pos_int,
+              c_sci_exposure_count   = $int4_pos,
               c_sci_signal_to_noise  = $signal_to_noise,
               c_acq_exposure_time    = $time_span,
-              c_acq_exposure_count   = $pos_int,
+              c_acq_exposure_count   = $int4_pos,
               c_acq_signal_to_noise  = $signal_to_noise
       """.command
 
