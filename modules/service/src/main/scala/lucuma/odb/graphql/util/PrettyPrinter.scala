@@ -3,6 +3,8 @@
 
 package lucuma.odb.graphql.util
 
+import cats.syntax.all.*
+import edu.gemini.grackle.Directive
 import edu.gemini.grackle.Env
 import edu.gemini.grackle.Env.EmptyEnv
 import edu.gemini.grackle.Env.NonEmptyEnv
@@ -47,37 +49,41 @@ object PrettyPrinter {
   def obj(name: String, vs: Doc*)(using DummyImplicit): Doc =
     elems(vs.toList).tightBracketBy(text(name) + Paren.Open, Paren.Close)
 
-  def query(q: Query): Doc =
-    q match
-
-      // case Select(name, args, child) =>
-      //   var props = List("name" -> quoted(name))
-      //   if args.nonEmpty then props = props +: ("args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close))
-      //   if child != Query.Empty then props :+= "child" -> query(child)
-      //   if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
-
-      case Group(queries)                  => obj("Group", queries.map(query):_*)
-      case Unique(child)                   => obj("Unique", query(child))
-      case Filter(pred, child)             => obj("Filter", "pred" -> predicate(pred), "child" -> query(child))
-      case Component(mapping, join, child) => obj("Component", "mapping" -> str("<mapping>"), "join" -> str("<function>") , "child" -> query(child))
-      case Introspect(schema, child)       => obj("Introspect", "schema" -> str("<schema>"), "child" -> query(child))
-      case Effect(handler, child)          => obj("Effect", "handler" -> str("<handler>"), "child" -> query(child))
-      case Environment(e, child)           => obj("Environment", "env" -> env(e), "child" -> query(child))
-      // case Wrap(name, child)               => obj("Wrap", "name" -> quoted(name), "child" -> query(child))
-      // case Rename(name, child)             => obj("Rename", "name" -> quoted(name), "child" -> query(child))
-      // case UntypedNarrow(tpnme, child)     => obj("UntypedNarrow", "tpname" -> quoted(tpnme), "child" -> query(child))
-      case Narrow(subtpe, child)           => obj("Narrow", "subtpe" -> str(subtpe), "child" -> query(child))
-      // case Skip(sense, cond, child)        => obj("Skip", "sense" -> str(sense), "cond" -> str(cond), "child" -> query(child))
-      case Limit(num, child)               => obj("Limit", "num" -> str(num), "child" -> query(child))
-      case Offset(num, child)              => obj("Offset", "num" -> str(num), "child" -> query(child))
-      case OrderBy(selections, child)      => obj("OrderBy", "selections" -> orderSelections(selections), "child" -> query(child))
-      // case Count(name, child)              => obj("Limit", "name" -> quoted(name), "child" -> query(child))
-      case TransformCursor(f, child)       => obj("TransformCursor", "f" -> text("<function>"), "child" -> query(child))
-      // case Skipped                         => text("Skipped")
-      case Empty                           => text("Empty")
-
   def binding(b: Binding): Doc =
     obj("Binding", "name" -> quoted(b.name), "value" -> str(b.value))
+
+  def directives(ds: List[Directive]): Doc =
+    elems(ds.map { d => prop(d.name, elems(d.args.map(binding))) })
+
+  def query(q: Query): Doc =
+    q match
+      case Component(mapping, join, child) => obj("Component", "mapping" -> str("<mapping>"), "join" -> str("<function>") , "child" -> query(child))
+      case Count(child) => ???
+      case Effect(handler, child)          => obj("Effect", "handler" -> str("<handler>"), "child" -> query(child))
+      case Empty                           => text("Empty")
+      case Environment(e, child)           => obj("Environment", "env" -> env(e), "child" -> query(child))
+      case Filter(pred, child)             => obj("Filter", "pred" -> predicate(pred), "child" -> query(child))
+      case Group(queries)                  => obj("Group", queries.map(query):_*)
+      case Introspect(schema, child)       => obj("Introspect", "schema" -> str("<schema>"), "child" -> query(child))
+      case Limit(num, child)               => obj("Limit", "num" -> str(num), "child" -> query(child))
+      case Narrow(subtpe, child)           => obj("Narrow", "subtpe" -> str(subtpe), "child" -> query(child))
+      case Offset(num, child)              => obj("Offset", "num" -> str(num), "child" -> query(child))
+      case OrderBy(selections, child)      => obj("OrderBy", "selections" -> orderSelections(selections), "child" -> query(child))
+      case Select(name, alias, child) =>
+        var props = List("name" -> quoted(name)) ++ alias.foldMap(a => List("alias" -> quoted(a)))
+        if child != Query.Empty then props :+= "child" -> query(child)
+        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
+      case TransformCursor(f, child)       => obj("TransformCursor", "f" -> text("<function>"), "child" -> query(child))
+      case Unique(child)                   => obj("Unique", query(child))
+      case UntypedFragmentSpread(name, ds) => obj("UntypedFragmentSpread", "directives" -> directives(ds))
+      case UntypedInlineFragment(tpnme, ds, child) => 
+        val ps = tpnme.foldMap(n => List("tpnme" -> quoted(n))) :+ ("directives" -> directives(ds)) :+ ("child" -> query(child))
+        obj("UntypedInlineFragment", ps:_*)
+      case UntypedSelect(name, alias, args, ds, child) =>
+        var props = List("name" -> quoted(name)) ++ alias.foldMap(a => List("alias" -> quoted(a)))
+        if args.nonEmpty then props = props :+ ("args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close))
+        if child != Query.Empty then props :+= "child" -> query(child)
+        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
 
   def env(e: Env): Doc =
     e match
