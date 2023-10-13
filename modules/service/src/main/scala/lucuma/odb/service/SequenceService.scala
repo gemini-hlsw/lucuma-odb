@@ -400,6 +400,12 @@ object SequenceService {
           $step_type
       """.command
 
+    /**
+     * Selects completed step records for a particular observation.  A completed
+     * step is one for which the completion time has been set by the reception
+     * of an EndStep step event and for which there are no pending datasets or
+     * datasets which have a QA state set to anything other than Pass.
+     */
     val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Atom.Id, NonNegShort, SequenceType, Step.Id)] =
       (sql"""
         SELECT
