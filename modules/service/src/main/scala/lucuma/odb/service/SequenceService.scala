@@ -400,6 +400,12 @@ object SequenceService {
           $step_type
       """.command
 
+    /**
+     * Selects completed step records for a particular observation.  A completed
+     * step is one for which the completion time has been set by the reception
+     * of an EndStep step event and for which there are no pending datasets or
+     * datasets which have a QA state set to anything other than Pass.
+     */
     val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Atom.Id, NonNegShort, SequenceType, Step.Id)] =
       (sql"""
         SELECT
@@ -407,10 +413,24 @@ object SequenceService {
           a.c_step_count,
           a.c_sequence_type,
           s.c_step_id
-        FROM t_step_record s
-        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
-        WHERE """ ~> sql"""a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL ORDER BY s.c_completed"""
-      ).query(atom_id *: int2_nonneg *: sequence_type *: step_id)
+        FROM
+          t_step_record s
+        INNER JOIN
+          t_atom_record a
+        ON a.c_atom_id = s.c_atom_id
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL""" <~ sql"""
+          AND NOT EXISTS (
+            SELECT 1
+            FROM   t_dataset d
+            WHERE
+              d.c_step_id = s.c_step_id
+              AND (
+                d.c_end_time IS NULL
+                OR (d.c_qa_state IS NOT NULL AND d.c_qa_state <> 'Pass'::e_dataset_qa_state)
+              )
+          )
+        ORDER BY s.c_completed
+      """).query(atom_id *: int2_nonneg *: sequence_type *: step_id)
 
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
