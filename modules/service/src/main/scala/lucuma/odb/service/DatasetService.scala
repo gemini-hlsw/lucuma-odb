@@ -15,6 +15,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.DatasetPropertiesInput
 import lucuma.odb.util.Codecs.*
@@ -35,6 +36,16 @@ sealed trait DatasetService[F[_]] {
     SET:   DatasetPropertiesInput,
     which: AppliedFragment
   )(using Transaction[F]): F[List[Dataset.Id]]
+
+  def setStartTime(
+    datasetId: Dataset.Id,
+    time:      Timestamp
+  )(using Transaction[F]): F[Unit]
+
+  def setEndTime(
+    datasetId: Dataset.Id,
+    time:      Timestamp
+  )(using Transaction[F]): F[Unit]
 }
 
 object DatasetService {
@@ -103,7 +114,19 @@ object DatasetService {
           }
         }
 
-    }
+      def setStartTime(
+        datasetId: Dataset.Id,
+        time:      Timestamp
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.SetStartTime)(time, datasetId).void
+
+      def setEndTime(
+        datasetId: Dataset.Id,
+        time:      Timestamp
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.SetEndTime)(time, datasetId).void
+
+  }
 
   object Statements {
 
@@ -144,5 +167,20 @@ object DatasetService {
           void" RETURNING c_dataset_id"
       }
     }
+
+    val SetStartTime: Command[(Timestamp, Dataset.Id)] =
+      sql"""
+        UPDATE t_dataset
+           SET c_start_time = $core_timestamp,
+               c_end_time   = NULL
+         WHERE c_dataset_id = $dataset_id
+      """.command
+
+    val SetEndTime: Command[(Timestamp, Dataset.Id)] =
+      sql"""
+        UPDATE t_dataset
+           SET c_end_time   = $core_timestamp
+         WHERE c_dataset_id = $dataset_id
+      """.command
   }
 }

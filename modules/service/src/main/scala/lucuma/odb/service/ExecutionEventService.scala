@@ -5,10 +5,12 @@ package lucuma.odb.service
 
 import cats.data.EitherT
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
@@ -78,11 +80,11 @@ object ExecutionEventService {
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
         datasetStage: DatasetStage
-      )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
+      )(using xa: Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
 
         import InsertEventResponse.*
 
-        val insert: F[Either[DatasetNotFound, (ExecutionEvent.Id, Timestamp)]] =
+        val insertEvent: F[Either[DatasetNotFound, (ExecutionEvent.Id, Timestamp)]] =
           session
             .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, datasetId)
             .map(_.toRight(DatasetNotFound(datasetId)))
@@ -90,10 +92,31 @@ object ExecutionEventService {
               case SqlState.ForeignKeyViolation(_) => DatasetNotFound(datasetId).asLeft
             }
 
+        // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
+        // unchanged) if there is an end event but no start or if the end time comes before the
+        // start.
+        def setDatasetTime(t: Timestamp): F[Unit] = {
+          def setWith(f: (Dataset.Id, Timestamp) => F[Unit]): F[Unit] =
+            for {
+              s <- xa.savepoint
+              _ <- f(datasetId, t).recoverWith {
+                case SqlState.CheckViolation(_) => xa.rollback(s).void
+              }
+            } yield ()
+
+          // StartObserve signals the start of the dataset, EndWrite the end.
+          datasetStage match {
+            case DatasetStage.StartObserve => setWith(services.datasetService.setStartTime)
+            case DatasetStage.EndWrite     => setWith(services.datasetService.setEndTime)
+            case _                         => ().pure
+          }
+        }
+
         (for {
           _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
-          e <- EitherT(insert).leftWiden[InsertEventResponse]
+          e <- EitherT(insertEvent).leftWiden[InsertEventResponse]
           (eid, time) = e
+          _ <- EitherT.liftF(setDatasetTime(time))
         } yield Success(eid, time)).merge
 
       }
