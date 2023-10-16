@@ -8,10 +8,10 @@ package mapping
 import cats.Eq
 import cats.effect.Resource
 import cats.syntax.functor.*
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -70,36 +70,32 @@ trait ObservationMapping[F[_]]
       )
     )
 
-  lazy val ObservationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      ObservationType -> {
-        case Select("timingWindows", Nil, child) =>
-          Result(
-            Select("timingWindows", Nil,
-              FilterOrderByOffsetLimit(
-                pred = None,
-                oss = Some(List(
-                  OrderSelection[Long](TimingWindowType / "id", true, true)
-                )),
-                offset = None,
-                limit = None,
-                child
-              )
-            )
-          )
-
-        case Select("obsAttachments", Nil, child) =>
-          Result(
-            Select("obsAttachments", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
-            )
-          )
-
-        case Select("itc", List(BooleanBinding.Option("useCache", rUseCache)), child) =>
-          rUseCache.map { _ => Select("itc", Nil, child) }
-
+  lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    
+    case (ObservationType, "timingWindows", Nil) =>
+      Elab.transformChild { child =>
+        FilterOrderByOffsetLimit(
+          pred = None,
+          oss = Some(List(
+            OrderSelection[Long](TimingWindowType / "id", true, true)
+          )),
+          offset = None,
+          limit = None,
+          child
+        )
       }
-    )
+
+    case (ObservationType, "obsAttachments", Nil) =>
+      Elab.transformChild { child =>
+        OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
+      }
+
+    case (ObservationType, "itc", List(BooleanBinding.Option("useCache", rUseCache))) =>
+      Elab.transformChild { child =>
+          rUseCache.as(child)
+      }
+
+  }
 
   def itcQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success

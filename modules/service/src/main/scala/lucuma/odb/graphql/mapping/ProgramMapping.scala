@@ -12,12 +12,12 @@ import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate._
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
-import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -75,70 +75,67 @@ trait ProgramMapping[F[_]]
       )
     )
 
-  lazy val ProgramElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      ProgramType -> {
-        case Select("observations", List(
-          BooleanBinding("includeDeleted", rIncludeDeleted),
-          ObservationIdBinding.Option("OFFSET", rOFFSET),
-          NonNegIntBinding.Option("LIMIT", rLIMIT),
-        ), child) =>
-          (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
-            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
-            ResultMapping.selectResult("observations", child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  Predicates.observation.existence.includeDeleted(includeDeleted),
-                  OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
-                ))),
-                oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
-                offset = None,
-                limit = Some(limit + 1),
-                q
-              )
-            }
+  lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (ProgramType, "observations", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted),
+      ObservationIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+    )) =>
+      Elab.transformChild { child =>
+        (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
+          val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+              ))),
+              oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
+              offset = None,
+              limit = Some(limit + 1),
+              q
+            )
           }
-        case Select("groupElements", Nil, child) =>
-          Result(
-            Select("groupElements", Nil,
-              FilterOrderByOffsetLimit(
-                pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
-                oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
-                offset = None,
-                limit = None,
-                child
-              )
-            )
-          )
-        case Select("allGroupElements", Nil, child) =>
-          Result(
-            Select("allGroupElements", Nil,
-              FilterOrderByOffsetLimit(
-                pred = None,
-                oss = Some(List(
-                  OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
-                  OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
-                )),
-                offset = None,
-                limit = None,
-                child
-              )
-            )
-          )
-        case Select("obsAttachments", Nil, child) =>
-          Result(
-            Select("obsAttachments", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
-            )
-          )
-        case Select("proposalAttachments", Nil, child) =>
-          Result(
-            Select("proposalAttachments", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
-            )
-          )
+        }
       }
-    )
+
+    case (ProgramType, "groupElements", Nil) =>
+      Elab.transformChild { child => 
+        FilterOrderByOffsetLimit(
+          pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
+          oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
+          offset = None,
+          limit = None,
+          child
+        )
+      }
+
+    case (ProgramType, "allGroupElements", Nil) =>
+      Elab.transformChild { child => 
+        FilterOrderByOffsetLimit(
+          pred = None,
+          oss = Some(List(
+            OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
+            OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
+          )),
+          offset = None,
+          limit = None,
+          child
+        )
+      }
+
+    case (ProgramType, "obsAttachments", Nil) =>
+      Elab.transformChild { child => 
+        OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
+      }
+
+    case (ProgramType, "proposalAttachments", Nil) =>
+      Elab.transformChild { child => 
+        OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
+      }
+
+  }
 
   lazy val plannedTimeHandler: EffectHandler[F] =
     new EffectHandler[F] {
@@ -149,23 +146,24 @@ trait ProgramMapping[F[_]]
             .estimateProgram(pid)
         }
 
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
           ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Program.Id]("id") }.pure[F])
-          res <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
-        } yield
-          ctx
-            .flatMap(pid => res.find(r => r._1 === pid).map(_._2).toList)
-            .zip(queries)
-            .map { case (result, (child, parentCursor)) =>
-              import lucuma.odb.json.plannedtime.given
-              import lucuma.odb.json.time.query.given
-              val json: Json     = Json.fromFields(List("plannedTimeRange" -> result.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
-              (child, cursor)
-            }
+          prg <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
+          res <- ResultT(ctx
+                   .flatMap(pid => prg.find(r => r._1 === pid).map(_._2).toList)
+                   .zip(queries)
+                   .traverse { case (result, (query, parentCursor)) =>
+                     import lucuma.odb.json.plannedtime.given
+                     import lucuma.odb.json.time.query.given
+                     Query.childContext(parentCursor.context, query).map { childContext =>
+                       CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
+                     }
+                   }.pure[F]
+                 )
+          } yield res
         ).value
-    }
-
+        
+  }
 }
 

@@ -9,13 +9,14 @@ import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Context
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Predicate
 import edu.gemini.grackle.Predicate.*
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.*
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
 import edu.gemini.grackle.Term
@@ -124,8 +125,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   lazy val MutationMapping: ObjectMapping =
     ObjectMapping(tpe = MutationType, fieldMappings = mutationFields.map(_.FieldMapping))
 
-  lazy val MutationElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    mutationFields.foldMap(mf => Map(MutationType -> mf.Elaborator))
+  lazy val MutationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    mutationFields.foldMap(_.elaborator)
 
   // Resources defined in the final cake.
   def services: Resource[F, Services[F]]
@@ -133,26 +134,28 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
-    def Elaborator: PartialFunction[Select, Result[Query]]
+    def elaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]]
     def FieldMapping: RootEffect
   }
   private object MutationField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
       new MutationField {
         val FieldMapping =
-          RootEffect.computeQuery(fieldName) { (query, tpe, env) =>
-            query match {
-              case Environment(x, Select(y, z, child)) =>
-                Nested(env.getR[I]("input").flatTraverse(i => f(i, child)))
-                  .map(q => Environment(x, Select(y, z, q)))
+          RootEffect.computeChild(fieldName) { (child, _, _) =>
+            child match {
+              case Environment(env, child2) =>
+                Nested(env.getR[I]("input").flatTraverse(i => f(i, child2)))
+                  .map(child3 => Environment(env, child3))
                   .value
               case _ =>
-                Result.failure(s"Unexpected: $query").pure[F]
+                Result.failure(s"Unexpected: $child").pure[F]
             }
           }
-        val Elaborator =
-          case Select(`fieldName`, List(inputBinding("input", rInput)), child) =>
-            rInput.map(input => Environment(Env("input" -> input), Select(fieldName, Nil, child)))
+        val elaborator =
+          case (MutationType, `fieldName`, List(inputBinding("input", rInput))) =>
+            Elab.transformChild { child =>
+              rInput.map(input => Environment(Env("input" -> input), child))
+            }
       }
   }
 
@@ -577,8 +580,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         WHERE.getOrElse(True)
       ))
     MappedQuery(
-      Filter(whereObservation, Select("id", Nil, Query.Empty)),
-      Cursor.Context(QueryType, List("observations"), List("observations"), List(ObservationType))
+      Filter(whereObservation, Select("id", None, Query.Empty)),
+      Context(QueryType, List("observations"), List("observations"), List(ObservationType))
     ).flatMap(_.fragment)
   }
 
@@ -627,7 +630,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         ))
 
         val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("datasets"), List("datasets"), List(DatasetType))).flatMap(_.fragment)
+          MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("datasets"), List("datasets"), List(DatasetType))).flatMap(_.fragment)
 
         idSelect.flatTraverse { which =>
           datasetService
@@ -648,8 +651,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         val idSelect: Result[AppliedFragment] =
           MappedQuery(
-            Filter(filterPredicate, Select("id", Nil, Empty)),
-            Cursor.Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
+            Filter(filterPredicate, Select("id", Empty)),
+            Context(QueryType, List("obsAttachments"), List("obsAttachments"), List(ObsAttachmentType))
           ).flatMap(_.fragment)
 
         idSelect.flatTraverse { which =>
@@ -705,7 +708,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         // An applied fragment that selects all program ids that satisfy `filterPredicate`
         val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
+          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
 
         // Update the specified programs and then return a query for the affected programs.
         idSelect.flatTraverse { which =>
@@ -731,8 +734,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
           val typeSelect: Result[AppliedFragment] =
             MappedQuery(
-              Filter(filterPredicate, Select("attachmentType", Nil, Empty)),
-              Cursor.Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
+              Filter(filterPredicate, Select("attachmentType", None, Empty)),
+              Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
             ).flatMap(_.fragment)
 
           typeSelect.flatTraverse { which =>
@@ -766,7 +769,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         // An applied fragment that selects all target ids that satisfy `filterPredicate`
         val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
+          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
 
         // Update the specified targets and then return a query for the affected targets (or an error)
         idSelect.flatTraverse { which =>
@@ -801,7 +804,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         // An applied fragment that selects all group ids that satisfy `filterPredicate`
         val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", Nil, Empty)), Cursor.Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
+          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
 
         // Update the specified groups and then return a query for the affected groups (or an error)
         idSelect.flatTraverse { which =>

@@ -8,7 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import edu.gemini.grackle.Directive
+import edu.gemini.grackle.DirectiveDef
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.Schema
@@ -88,7 +88,7 @@ final class Enums(
     new Schema {
       def pos:        SourcePos       = SourcePos.instance
       def types:      List[NamedType] = enumMeta.unreferencedTypes
-      def directives: List[Directive] = Nil
+      def directives: List[DirectiveDef] = Nil
     }
 
 }

@@ -9,16 +9,15 @@ import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Predicate.True
 import edu.gemini.grackle.Predicate.and
 import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.Binding
 import edu.gemini.grackle.Query.EffectHandler
-import edu.gemini.grackle.Query.Environment
 import edu.gemini.grackle.Query.FilterOrderByOffsetLimit
 import edu.gemini.grackle.Query.OrderSelection
-import edu.gemini.grackle.Query.Select
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.syntax.*
@@ -61,41 +60,38 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] with Predicates
       )
     )
 
-  lazy val ExecutionElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      ExecutionType -> {
-        case Select("config", List(
-          Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
-        ), child) =>
-          rFutureLimit.map { futureLimit =>
-            Environment(
-              Env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default)),
-              Select("config", Nil, child)
+  lazy val ExecutionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (ExecutionType, "config", List(
+      Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
+    )) =>
+      Elab.liftR(rFutureLimit).flatMap { futureLimit =>
+        Elab.env(FutureLimitParam -> futureLimit.getOrElse(Generator.FutureLimit.Default))
+      }
+    case (ExecutionType, "datasets", List(
+      DatasetIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      Elab.transformChild { child =>
+        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
+                Predicates.dataset.observation.program.isVisibleTo(user),
+              ))),
+              oss = Some(List(
+                OrderSelection[Dataset.Id](DatasetType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
             )
           }
-        case Select("datasets", List(
-          DatasetIdBinding.Option("OFFSET", rOFFSET),
-          NonNegIntBinding.Option("LIMIT", rLIMIT)
-        ), child) =>
-          (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult("datasets", child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
-                  Predicates.dataset.observation.program.isVisibleTo(user),
-                ))),
-                oss = Some(List(
-                  OrderSelection[Dataset.Id](DatasetType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
-            }
-          }
+        }
       }
-    )
+    }
+    
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =

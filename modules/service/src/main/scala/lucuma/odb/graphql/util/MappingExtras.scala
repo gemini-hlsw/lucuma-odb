@@ -6,8 +6,8 @@ package lucuma.odb.graphql.util
 import cats.Eq
 import cats.kernel.Order
 import cats.syntax.all._
+import edu.gemini.grackle.Context
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Context
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.Path
 import edu.gemini.grackle.Result

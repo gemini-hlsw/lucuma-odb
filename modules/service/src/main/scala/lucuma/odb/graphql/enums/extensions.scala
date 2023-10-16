@@ -5,7 +5,7 @@ package lucuma.odb.graphql.enums
 
 import cats.syntax.option.*
 import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.EnumValue
+import edu.gemini.grackle.EnumValueDefinition
 import lucuma.core.util.Enumerated
 
 extension [A](e: Enumerated[A]) {
@@ -21,7 +21,8 @@ extension [A](e: Enumerated[A]) {
     EnumType(
       typeName,
       description.some,
-      e.all.map { v => EnumValue(e.tag(v).toUpperCase(), valueName(v).some) }
+      e.all.map { v => EnumValueDefinition(e.tag(v).toUpperCase(), valueName(v).some, Nil) },
+      Nil
     )
 
 }

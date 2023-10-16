@@ -5,7 +5,8 @@ package lucuma.odb.graphql.util
 
 import cats.Semigroup
 import cats.syntax.all._
-import edu.gemini.grackle.Directive
+import edu.gemini.grackle.DirectiveDef
+import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.Mapping
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.ObjectType
@@ -16,13 +17,14 @@ import org.tpolecat.sourcepos.SourcePos
 /** A mixin that provides Semigroup[Schema]. */
 trait SchemaSemigroup[F[_]] extends Mapping[F] {
 
-  private implicit val SemigroupDirective: Semigroup[Directive] = (a, b) =>
+  private implicit val SemigroupDirectiveDef: Semigroup[DirectiveDef] = (a, b) =>
     if (a.name != b.name) a
-    else Directive(
+    else DirectiveDef(
       a.name,
       a.description orElse b.description,
+      (a.args ++ b.args).distinctBy(_.name),
+      a.isRepeatable || b.isRepeatable,
       (a.locations ++ b.locations).distinct,
-      (a.args ++ b.args).distinctBy(_.name)
     )
 
   private implicit val SemigroupNamedType: Semigroup[NamedType] = {
@@ -32,6 +34,14 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
         a.description orElse b.description,
         (a.fields ++ b.fields).distinctBy(_.name),
         (a.interfaces ++ b.interfaces).distinctBy(_.name),
+        (a.directives ++ b.directives).distinctBy(_.name),
+      )
+    case ((a: EnumType, b: EnumType)) if sameName(a, b) =>
+      EnumType(
+        a.name, 
+        a.description, 
+        (a.enumValues ++ b.enumValues).distinctBy(_.name).filterNot(_.name == "DUMMY"), 
+        (a.directives ++ b.directives).distinctBy(_.name)
       )
     // todo: other named types
     case (a, _) => a
@@ -42,7 +52,7 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
       new Schema {
         val pos: SourcePos = a.pos
         val types: List[NamedType] = concatAndMergeWhen(a.types, b.types)(sameName)
-        val directives: List[Directive] = concatAndMergeWhen(a.directives, b.directives)(_.name == _.name)
+        val directives: List[DirectiveDef] = concatAndMergeWhen(a.directives, b.directives)(_.name == _.name)
       }
     }
 

@@ -1,3 +1,16 @@
+
+
+# These "empty" enums (they must have at least one element) will be replaced at runtime with
+# definitions based on database tables.
+
+enum Partner { DUMMY }
+enum ConditionsMeasurementSource { DUMMY }
+enum SeeingTrend { DUMMY }
+enum ConditionsExpectationType { DUMMY }
+enum ObsAttachmentType { DUMMY }
+enum FilterType { DUMMY }
+enum ProposalAttachmentType { DUMMY }
+
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
 
@@ -3169,7 +3182,7 @@ type RecordGmosSouthVisitResult {
 Right Ascension, choose one of the available units
 """
 input RightAscensionInput {
-  microarcseconds: Long @deprecated
+  microarcseconds: Long
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
