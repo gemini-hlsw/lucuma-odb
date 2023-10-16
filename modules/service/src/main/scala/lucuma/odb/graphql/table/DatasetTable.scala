@@ -36,7 +36,7 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
 
     object Time {
       val Start: ColumnRef     = col("c_start_time", core_timestamp.opt)
-      val End: ColumnRef       = col("c_start_time", core_timestamp.opt)
+      val End: ColumnRef       = col("c_end_time",   core_timestamp.opt)
     }
   }
 
