@@ -513,4 +513,17 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
       expected = List(s"Error calling Gaia: 'No valid guide star candidates were returned for observation $oid.'").asLeft)
     }
   }
+
+  test("no configuration") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithNoModeAs(pi, p, t)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid, aug3000),
+      expected = List(s"No configuration defined for observation $oid.").asLeft)
+    }
+  }
 }
