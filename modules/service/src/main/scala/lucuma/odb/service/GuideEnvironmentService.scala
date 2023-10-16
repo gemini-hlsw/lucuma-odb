@@ -77,12 +77,10 @@ trait GuideEnvironmentService[F[_]] {
 
   def get(pid: Program.Id, oid: Observation.Id, obsTime: Instant)(using
     NoTransaction[F]
-  ): F[Either[Error, GuideEnvironment]]
+  ): F[Either[Error, List[GuideEnvironment]]]
 }
 
 object GuideEnvironmentService {
-  // There is only one now, will eventually need to get this from somewhere.
-  val guideProbe: GuideProbe = GuideProbe.GmosOiwfs
 
   case class GuideTarget(probe: GuideProbe, target: Target)
 
@@ -254,6 +252,12 @@ object GuideEnvironmentService {
           offset
         }
 
+      extension (usable: NonEmptyList[AgsAnalysis.Usable])
+        def toGuideEnvironments: NonEmptyList[GuideEnvironment] = usable.map { ags =>
+          val target = GuideStarCandidate.siderealTarget.reverseGet(ags.target)
+          GuideEnvironment(ags.vignetting.head._1, List(GuideTarget(ags.guideProbe, target)))
+        }
+
       def getTimeAndOffsets(
         pid: Program.Id,
         oid: Observation.Id
@@ -297,7 +301,7 @@ object GuideEnvironmentService {
         scienceCoords: List[Coordinates],
         positions:     NonEmptyList[AgsPosition],
         candidates:    NonEmptyList[GuideStarCandidate]
-      ): Either[Error, NonEmptyList[AgsAnalysis]] =
+      ): Either[Error, NonEmptyList[AgsAnalysis.Usable]] =
         obsInfo.wavelength.flatMap { wavelength =>
           val analysis = Ags
             .agsAnalysis(obsInfo.constraints,
@@ -309,14 +313,15 @@ object GuideEnvironmentService {
                          candidates.toList
             )
             .sortUsablePositions
+            .collect { case usable: AgsAnalysis.Usable => usable }
           NonEmptyList
             .fromList(analysis)
             .toRight(Error.GeneralError(s"No usable guide targets were found for observation ${obsInfo.id}"))
         }
-
+        
       override def get(pid: Program.Id, oid: Observation.Id, obsTime: Instant)(using
         NoTransaction[F]
-      ): F[Either[Error, GuideEnvironment]] =
+      ): F[Either[Error, List[GuideEnvironment]]] =
         (for {
           obsInfo        <- EitherT(getObservationInfo(pid, oid))
           site           <- EitherT.fromEither(obsInfo.site)
@@ -353,12 +358,7 @@ object GuideEnvironmentService {
           usable         <- EitherT.fromEither(
                               processCandidates(obsInfo, baseCoords, scienceCoords, positions, candidates)
                             )
-          target          = GuideStarCandidate.siderealTarget.reverseGet(usable.head.target)
-          posAngle       <-
-            // "Can't" fail because all `Usable` candidates have a position angle
-            EitherT.fromEither(usable.head.posAngle.toRight(Error.GeneralError("No position angle for guide target.")))
-          ge              = GuideEnvironment(posAngle, List(GuideTarget(guideProbe, target)))
-        } yield ge).value
+        } yield usable.toGuideEnvironments.toList).value
     }
 
   object Statements {

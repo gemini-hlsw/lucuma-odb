@@ -184,72 +184,6 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
   |                        <TD>15.209204</TD>
   |                        <TD>13.883842</TD>
   |                    </TR>
-  |                    <TR>
-  |                        <TD>3219146093649682944</TD>
-  |                        <TD>86.53743300349264</TD>
-  |                        <TD>0.5692648114700383</TD>
-  |                        <TD>-0.0376789160090541</TD>
-  |                        <TD>-1.1071638747425834</TD>
-  |                        <TD>2.341690506609991</TD>
-  |                        <TD></TD>
-  |                        <TD>15.799698</TD>
-  |                        <TD>14.392714</TD>
-  |                    </TR>
-  |                    <TR>
-  |                        <TD>3219119189974545024</TD>
-  |                        <TD>86.55474182136356</TD>
-  |                        <TD>0.9180742337760139</TD>
-  |                        <TD>-0.10136166840483617</TD>
-  |                        <TD>-1.0570607348960717</TD>
-  |                        <TD>2.4220089902661854</TD>
-  |                        <TD></TD>
-  |                        <TD>17.311058</TD>
-  |                        <TD>15.646823</TD>
-  |                    </TR>
-  |                    <TR>
-  |                        <TD>3219118051807091968</TD>
-  |                        <TD>86.58944677577558</TD>
-  |                        <TD>15.866429710516812</TD>
-  |                        <TD>-0.15207273400511523</TD>
-  |                        <TD>-10.065610870235203</TD>
-  |                        <TD>3.0202124909661983</TD>
-  |                        <TD></TD>
-  |                        <TD>17.745539</TD>
-  |                        <TD>16.56105</TD>
-  |                    </TR>
-  |                    <TR>
-  |                        <TD>3219123240127693440</TD>
-  |                        <TD>86.49991695637847</TD>
-  |                        <TD>-0.6885542807840347</TD>
-  |                        <TD>-0.05177206898508793</TD>
-  |                        <TD>0.9481435397955559</TD>
-  |                        <TD>-0.15653933934116532</TD>
-  |                        <TD></TD>
-  |                        <TD>17.92497</TD>
-  |                        <TD>16.582914</TD>
-  |                    </TR>
-  |                    <TR>
-  |                        <TD>3219142859538567040</TD>
-  |                        <TD>86.62125043949084</TD>
-  |                        <TD>1.938773829505391</TD>
-  |                        <TD>-0.06343972217577211</TD>
-  |                        <TD>-3.1719765448158337</TD>
-  |                        <TD>1.4387020523568086</TD>
-  |                        <TD></TD>
-  |                        <TD>18.051426</TD>
-  |                        <TD>16.399946</TD>
-  |                    </TR>
-  |                    <TR>
-  |                        <TD>3219146054993993088</TD>
-  |                        <TD>86.56116636793416</TD>
-  |                        <TD>-22.496969846693275</TD>
-  |                        <TD>-0.0366983015234665</TD>
-  |                        <TD>-9.711260712719115</TD>
-  |                        <TD>2.5018955357529165</TD>
-  |                        <TD></TD>
-  |                        <TD>18.473146</TD>
-  |                        <TD>17.210957</TD>
-  |                    </TR>
   |                </TABLEDATA>
   |            </DATA>
   |        </TABLE>
@@ -334,7 +268,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
         observation(observationId: "$oid") {
           title
           targetEnvironment {
-            guideEnvironment(observationTime: "$obsTime") {
+            guideEnvironments(observationTime: "$obsTime") {
               posAngle {
                 degrees
               }
@@ -404,67 +338,191 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
       "observation": {
         "title": "V1647 Orionis",
         "targetEnvironment": {
-          "guideEnvironment": {
-            "posAngle": {
-              "degrees": 160.000000
-            },
-            "guideTargets": [
-              {
-                "name": "Gaia DR3 3219118090462918016",
-                "probe": "GMOS_OIWFS",
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "brightnesses": [
-                        {
-                          "band": "GAIA"
-                        }
-                      ]
+          "guideEnvironments": [
+            {
+              "posAngle": {
+                "degrees": 160.000000
+              },
+              "guideTargets": [
+                {
+                  "name": "Gaia DR3 3219118090462918016",
+                  "probe": "GMOS_OIWFS",
+                  "sourceProfile": {
+                    "point": {
+                      "bandNormalized": {
+                        "brightnesses": [
+                          {
+                            "band": "GAIA"
+                          }
+                        ]
+                      }
                     }
-                  }
-                },
-                "sidereal": {
-                  "catalogInfo": {
-                    "name": "GAIA",
-                    "id": "3219118090462918016",
-                    "objectType": null
                   },
-                  "epoch": "J2023.660",
-                  "ra": {
-                    "microseconds": 20782434012,
-                    "hms": "05:46:22.434012",
-                    "hours": 5.772898336666666666666666666666667,
-                    "degrees": 86.59347505
-                  },
-                  "dec": {
-                    "dms": "-00:08:52.651136",
-                    "degrees": 359.8520413511111,
-                    "microarcseconds": 1295467348864
-                  },
-                  "radialVelocity": {
-                    "metersPerSecond": 0,
-                    "centimetersPerSecond": 0,
-                    "kilometersPerSecond": 0
-                  },
-                  "properMotion": {
+                  "sidereal": {
+                    "catalogInfo": {
+                      "name": "GAIA",
+                      "id": "3219118090462918016",
+                      "objectType": null
+                    },
+                    "epoch": "J2023.660",
                     "ra": {
-                      "microarcsecondsPerYear": 438,
-                      "milliarcsecondsPerYear": 0.438
+                      "microseconds": 20782434012,
+                      "hms": "05:46:22.434012",
+                      "hours": 5.772898336666666666666666666666667,
+                      "degrees": 86.59347505
                     },
                     "dec": {
-                      "microarcsecondsPerYear": -741,
-                      "milliarcsecondsPerYear": -0.741
+                      "dms": "-00:08:52.651136",
+                      "degrees": 359.8520413511111,
+                      "microarcseconds": 1295467348864
+                    },
+                    "radialVelocity": {
+                      "metersPerSecond": 0,
+                      "centimetersPerSecond": 0,
+                      "kilometersPerSecond": 0
+                    },
+                    "properMotion": {
+                      "ra": {
+                        "microarcsecondsPerYear": 438,
+                        "milliarcsecondsPerYear": 0.438
+                      },
+                      "dec": {
+                        "microarcsecondsPerYear": -741,
+                        "milliarcsecondsPerYear": -0.741
+                      }
+                    },
+                    "parallax": {
+                      "microarcseconds": 2432,
+                      "milliarcseconds": 2.432
                     }
                   },
-                  "parallax": {
-                    "microarcseconds": 2432,
-                    "milliarcseconds": 2.432
-                  }
-                },
-                "nonsidereal": null
-              }
-            ]
-          }
+                  "nonsidereal": null
+                }
+              ]
+            },
+            {
+              "posAngle": {
+                "degrees": 270.000000
+              },
+              "guideTargets": [
+                {
+                  "name": "Gaia DR3 3219118640218737920",
+                  "probe": "GMOS_OIWFS",
+                  "sourceProfile": {
+                    "point": {
+                      "bandNormalized": {
+                        "brightnesses": [
+                          {
+                            "band": "GAIA"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "sidereal": {
+                    "catalogInfo": {
+                      "name": "GAIA",
+                      "id": "3219118640218737920",
+                      "objectType": null
+                    },
+                    "epoch": "J2023.660",
+                    "ra": {
+                      "microseconds": 20760248368,
+                      "hms": "05:46:00.248368",
+                      "hours": 5.766735657777777777777777777777778,
+                      "degrees": 86.50103486666666666666666666666667
+                    },
+                    "dec": {
+                      "dms": "-00:08:26.299165",
+                      "degrees": 359.8593613430556,
+                      "microarcseconds": 1295493700835
+                    },
+                    "radialVelocity": {
+                      "metersPerSecond": 0,
+                      "centimetersPerSecond": 0,
+                      "kilometersPerSecond": 0
+                    },
+                    "properMotion": {
+                      "ra": {
+                        "microarcsecondsPerYear": 806,
+                        "milliarcsecondsPerYear": 0.806
+                      },
+                      "dec": {
+                        "microarcsecondsPerYear": -1093,
+                        "milliarcsecondsPerYear": -1.093
+                      }
+                    },
+                    "parallax": {
+                      "microarcseconds": 2371,
+                      "milliarcseconds": 2.371
+                    }
+                  },
+                  "nonsidereal": null
+                }
+              ]
+            },
+            {
+              "posAngle": {
+                "degrees": 50.000000
+              },
+              "guideTargets": [
+                {
+                  "name": "Gaia DR3 3219142829474535424",
+                  "probe": "GMOS_OIWFS",
+                  "sourceProfile": {
+                    "point": {
+                      "bandNormalized": {
+                        "brightnesses": [
+                          {
+                            "band": "GAIA"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "sidereal": {
+                    "catalogInfo": {
+                      "name": "GAIA",
+                      "id": "3219142829474535424",
+                      "objectType": null
+                    },
+                    "epoch": "J2023.660",
+                    "ra": {
+                      "microseconds": 20782383800,
+                      "hms": "05:46:22.383800",
+                      "hours": 5.772884388888888888888888888888889,
+                      "degrees": 86.59326583333333333333333333333333
+                    },
+                    "dec": {
+                      "dms": "-00:03:38.949911",
+                      "degrees": 359.93918058027776,
+                      "microarcseconds": 1295781050089
+                    },
+                    "radialVelocity": {
+                      "metersPerSecond": 0,
+                      "centimetersPerSecond": 0,
+                      "kilometersPerSecond": 0
+                    },
+                    "properMotion": {
+                      "ra": {
+                        "microarcsecondsPerYear": -10331,
+                        "milliarcsecondsPerYear": -10.331
+                      },
+                      "dec": {
+                        "microarcsecondsPerYear": -29666,
+                        "milliarcsecondsPerYear": -29.666
+                      }
+                    },
+                    "parallax": {
+                      "microarcseconds": 2497,
+                      "milliarcseconds": 2.497
+                    }
+                  },
+                  "nonsidereal": null
+                }
+              ]
+            }
+          ]
         }
       }
     }
