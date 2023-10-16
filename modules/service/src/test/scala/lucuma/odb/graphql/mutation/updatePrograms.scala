@@ -10,9 +10,11 @@ import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Tag
 
-class updatePrograms extends OdbSuite {
+class updatePrograms extends OdbSuite(debug = true) {
 
   val pi       = TestUsers.Standard.pi(1, 101)
   val ngo      = TestUsers.Standard.ngo(2, 102, Partner.Ca)
@@ -20,8 +22,9 @@ class updatePrograms extends OdbSuite {
   val admin    = TestUsers.Standard.admin(4, 104)
   val guest    = TestUsers.guest(5)
   val service  = TestUsers.service(6)
+  val pi2      = TestUsers.Standard.pi(7, 105)
 
-  val validUsers = List(pi, ngo, staff, admin, guest, service).toList
+  val validUsers = List(pi, ngo, staff, admin, guest, service, pi2).toList
 
   test("edit name") {
     createProgramAs(pi).flatMap { pid =>
@@ -353,7 +356,7 @@ class updatePrograms extends OdbSuite {
                         percent: 70
                       }
                       {
-                        partner: KECK
+                        partner: CA
                         percent: 30
                       }
                     ]
@@ -398,7 +401,7 @@ class updatePrograms extends OdbSuite {
                           "percent" : 70
                         },
                         {
-                          "partner" : "KECK",
+                          "partner" : "CA",
                           "percent" : 30
                         }
                       ]
@@ -867,7 +870,7 @@ class updatePrograms extends OdbSuite {
                     toOActivation: RAPID
                     partnerSplits: [
                       {
-                        partner: KECK
+                        partner: CA
                         percent: 100
                       }
                     ]
@@ -910,7 +913,7 @@ class updatePrograms extends OdbSuite {
                       },
                       "partnerSplits" : [
                         {
-                          "partner" : "KECK",
+                          "partner" : "CA",
                           "percent" : 100
                         }
                       ]
@@ -924,7 +927,7 @@ class updatePrograms extends OdbSuite {
                       },
                       "partnerSplits" : [
                         {
-                          "partner" : "KECK",
+                          "partner" : "CA",
                           "percent" : 100
                         }
                       ]
@@ -933,6 +936,171 @@ class updatePrograms extends OdbSuite {
                 ]
               }
             }
+          """
+        )
+      )
+    }
+  }
+
+  test("[access control] pi/guest can't edit other people's programs") {
+    createUsers(pi2, guest) >> List(pi2, guest).traverse { u =>
+      createProgramAs(pi).flatMap { pid =>
+        expect(
+          user = u,
+          query = s"""
+            mutation {
+              updatePrograms(
+                input: {
+                  SET: {
+                    existence: DELETED
+                  }
+                  WHERE: {
+                    id: {
+                      EQ: "$pid"
+                    }
+                  }
+                }
+              ) {
+                programs {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+            {
+              "updatePrograms": {
+                "programs": []
+              }
+            }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("[access control] staff/admin/service can edit other people's programs") {
+    createUsers(staff, admin, service) >> List(staff, admin, service).traverse { u =>
+      createProgramAs(pi).flatMap { pid =>
+        expect(
+          user = u,
+          query = s"""
+            mutation {
+              updatePrograms(
+                input: {
+                  SET: {
+                    existence: DELETED
+                  }
+                  WHERE: {
+                    id: {
+                      EQ: "$pid"
+                    }
+                  }
+                }
+              ) {
+                programs {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+            {
+              "updatePrograms": {
+                "programs": [
+                  {
+                    "id": $pid
+                  }
+                ]
+              }
+            }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("[access control] ngo can't edit other people's programs without allocated time") {
+    createUsers(ngo) >>
+    createProgramAs(pi).flatMap { pid =>
+      setAllocationAs(admin, pid, Tag("US"), 42.hourTimeSpan) >> // ngo is canada!
+      expect(
+        user = ngo,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  name: "foo"
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+          {
+            "updatePrograms": {
+              "programs": []
+            }
+          }
+          """
+        )
+      )
+    }
+  }
+
+
+  test("[access control] ngo can edit other people's programs with allocated time") {
+    createUsers(ngo, admin) >>
+    createProgramAs(pi).flatMap { pid =>
+      setAllocationAs(admin, pid, Tag("CA"), 42.hourTimeSpan) >>
+      expect(
+        user = ngo,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  name: "foo"
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [ 
+                {
+                  "id": $pid 
+                }
+              ]
+            }
+          }
           """
         )
       )

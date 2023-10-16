@@ -23,4 +23,7 @@ class LeafPredicates[A](path: Path) {
   def isNull(b: Boolean): Predicate =
     IsNull(path, b)
 
+  def contains(a: A)(using Eq[A]): Predicate =
+    Contains(path, Const(a))
+
 }

@@ -47,7 +47,8 @@ trait ProgramMapping[F[_]]
      with Predicates[F]
      with ProposalAttachmentTable[F]
      with ResultMapping[F]
-     with GroupElementView[F] {
+     with GroupElementView[F]
+     with AllocationTable[F] {
 
   def user: User
   def itcClient: ItcClient[F]
@@ -71,7 +72,8 @@ trait ProgramMapping[F[_]]
         SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
         SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
         SqlObject("proposalAttachments", Join(ProgramTable.Id, ProposalAttachmentTable.ProgramId)),
-        EffectField("plannedTimeRange", plannedTimeHandler, List("id"))
+        EffectField("plannedTimeRange", plannedTimeHandler, List("id")),
+        SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
       )
     )
 
