@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
 import lucuma.odb.graphql.util.SchemaSemigroup
 

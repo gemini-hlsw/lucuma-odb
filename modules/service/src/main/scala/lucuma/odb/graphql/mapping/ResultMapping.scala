@@ -4,13 +4,13 @@
 package lucuma.odb.graphql.mapping
 
 import cats.syntax.all._
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.ListTransformCursor
-import edu.gemini.grackle.Env
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.*
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.Type
+import grackle.Cursor
+import grackle.Cursor.ListTransformCursor
+import grackle.Env
+import grackle.Query
+import grackle.Query.*
+import grackle.Result
+import grackle.Type
 import io.circe.Encoder
 import lucuma.odb.graphql.BaseMapping
 import skunk.codec.numeric.int8

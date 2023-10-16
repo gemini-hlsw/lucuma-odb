@@ -10,10 +10,10 @@ import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
-import edu.gemini.grackle.QueryCompiler.SelectElaborator
-import edu.gemini.grackle._
-import edu.gemini.grackle.skunk.SkunkMapping
-import edu.gemini.grackle.skunk.SkunkMonitor
+import grackle.QueryCompiler.SelectElaborator
+import grackle._
+import grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMonitor
 import fs2.concurrent.Topic
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient

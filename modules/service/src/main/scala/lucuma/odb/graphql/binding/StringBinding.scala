@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value.StringValue
+import grackle.Value.StringValue
 
 val StringBinding: Matcher[String] =
   primitiveBinding("String") { case StringValue(value) => value }

@@ -8,7 +8,7 @@ package sourceprofile
 import cats.data.NonEmptyMap
 import cats.syntax.all._
 import coulomb.Quantity
-import edu.gemini.grackle.Result
+import grackle.Result
 import eu.timepit.refined.types.numeric
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums._

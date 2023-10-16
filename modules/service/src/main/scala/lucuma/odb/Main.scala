@@ -11,7 +11,7 @@ import cats.implicits._
 import com.comcast.ip4s.Port
 import com.monovore.decline._
 import com.monovore.decline.effect.CommandIOApp
-import edu.gemini.grackle.skunk.SkunkMonitor
+import grackle.skunk.SkunkMonitor
 import fs2.io.net.Network
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User

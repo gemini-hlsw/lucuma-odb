@@ -7,13 +7,13 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all._
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
-import edu.gemini.grackle.QueryCompiler.Elab
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.Path
+import grackle.Predicate._
+import grackle.Query
+import grackle.Query._
+import grackle.QueryCompiler.Elab
+import grackle.TypeRef
+import grackle.skunk.SkunkMapping
 import lucuma.core.model
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole

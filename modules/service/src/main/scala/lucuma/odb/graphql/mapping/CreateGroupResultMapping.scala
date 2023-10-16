@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 
 import table.GroupView
 trait CreateGroupResultMapping[F[_]] extends GroupView[F] {

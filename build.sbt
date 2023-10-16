@@ -8,7 +8,7 @@ val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.0.4"
 val fs2Version                 = "3.9.2"
-val grackleVersion             = "0.14.0"
+val grackleVersion             = "0.15.0"
 val http4sBlazeVersion         = "0.23.14"
 val http4sEmberVersion         = "0.23.23"
 val http4sJdkHttpClientVersion = "0.9.0"
@@ -18,7 +18,7 @@ val log4catsVersion            = "2.6.0"
 val lucumaCatalogVersion       = "0.44.1"
 val lucumaItcVersion           = "0.20.3"
 val lucumaCoreVersion          = "0.88.0"
-val lucumaGraphQLRoutesVersion = "0.7.0"
+val lucumaGraphQLRoutesVersion = "0.8.0"
 val lucumaSsoVersion           = "0.6.8"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -111,7 +111,7 @@ lazy val service = project
       "com.monovore"   %% "decline-effect"                     % declineVersion,
       "com.monovore"   %% "decline"                            % declineVersion,
       "io.laserdisc"   %% "fs2-aws-s3"                         % fs2AwsVersion,
-      "edu.gemini"     %% "gsp-graphql-skunk"                  % grackleVersion,
+      "org.typelevel"  %% "grackle-skunk"                      % grackleVersion,
       "edu.gemini"     %% "lucuma-catalog"                     % lucumaCatalogVersion,
       "edu.gemini"     %% "lucuma-ags"                         % lucumaCatalogVersion,
       "edu.gemini"     %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,

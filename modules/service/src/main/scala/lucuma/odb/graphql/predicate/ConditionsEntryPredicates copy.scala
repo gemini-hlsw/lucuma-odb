@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
+import grackle.Path
 
 class ConditionsEntryPredicates(path: Path) {
   val id = LeafPredicates[Long](path / "id")

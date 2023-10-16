@@ -6,7 +6,7 @@ package input
 
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground

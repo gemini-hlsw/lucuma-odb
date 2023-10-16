@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
+import grackle.Path
 
 class TargetEditPredicates(path: Path) {
   val value = TargetPredicates(path / "value")

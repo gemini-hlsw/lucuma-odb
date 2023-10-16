@@ -8,7 +8,7 @@ import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.parallel._
-import edu.gemini.grackle.Result
+import grackle.Result
 import eu.timepit.refined.api.Refined.value
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour

@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.enums.EphemerisKeyType
 import lucuma.core.model.EphemerisKey
 import lucuma.odb.graphql.binding._

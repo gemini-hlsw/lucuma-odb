@@ -6,7 +6,7 @@ package input
 
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.odb.graphql.binding._

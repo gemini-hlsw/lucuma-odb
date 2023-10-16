@@ -7,8 +7,8 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
+import grackle.Path
+import grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Program
 import lucuma.core.model.Target

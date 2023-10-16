@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input
 package sourceprofile
 
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.LineFluxValue
 import lucuma.core.math.dimensional.Measure

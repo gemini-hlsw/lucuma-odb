@@ -7,7 +7,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.odb.data.ObservingModeType

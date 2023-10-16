@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.Result
+import grackle.skunk.SkunkMapping
 import lucuma.odb.data.EditType
 
 import table.ProgramTable

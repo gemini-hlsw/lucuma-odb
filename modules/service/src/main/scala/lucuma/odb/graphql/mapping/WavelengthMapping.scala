@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.GmosDynamicTables

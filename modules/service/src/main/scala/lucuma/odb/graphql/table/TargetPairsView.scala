@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 
 package table
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 
 trait TargetPairsView[F[_]] extends BaseMapping[F] {

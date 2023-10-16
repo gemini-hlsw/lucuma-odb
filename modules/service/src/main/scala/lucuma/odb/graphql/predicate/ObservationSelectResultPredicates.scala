@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
+import grackle.Path
 
 case class ObservationSelectResultPredicates(path: Path) {
   val hasMore = LeafPredicates[Boolean](path / "hasMore")

@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value
-import edu.gemini.grackle.Value.AbsentValue
-import edu.gemini.grackle.Value.NullValue
+import grackle.Value
+import grackle.Value.AbsentValue
+import grackle.Value.NullValue
 
 /** A primitive non-nullable binding. */
 def primitiveBinding[A](name: String)(pf: PartialFunction[Value, A]): Matcher[A] =

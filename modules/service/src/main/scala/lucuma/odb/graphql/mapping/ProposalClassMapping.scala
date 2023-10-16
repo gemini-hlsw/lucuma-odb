@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.Type
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.Cursor
+import grackle.Predicate
+import grackle.Result
+import grackle.Type
+import grackle.skunk.SkunkMapping
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ProposalTable
