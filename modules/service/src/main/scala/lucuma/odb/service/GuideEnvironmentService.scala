@@ -129,13 +129,15 @@ object GuideEnvironmentService {
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
     optWavelength:      Option[Wavelength],
-    fpu:                Either[GmosNorthFpu, GmosSouthFpu],
+    optFpu:             Option[Either[GmosNorthFpu, GmosSouthFpu]],
     explicitBase:       Option[Coordinates]
   ) {
-    def agsParams: AgsParams                  = AgsParams.GmosAgsParams(fpu.some, PortDisposition.Side)
+    def agsParams: AgsParams                 = AgsParams.GmosAgsParams(optFpu, PortDisposition.Side)
     def wavelength: Either[Error, Wavelength] =
       optWavelength.toRight(Error.GeneralError(s"No wavelength defined for observation $id."))
-    def site: Site = fpu.fold(_ => Site.GN, _ => Site.GS)
+    def fpu: Either[Error, Either[GmosNorthFpu, GmosSouthFpu]] =
+      optFpu.toRight(Error.GeneralError(s"No configuration defined for observation $id."))
+    def site:       Either[Error, Site] = fpu.map(_.fold(_ => Site.GN, _ => Site.GS))
   }
 
   def instantiate[F[_]: Concurrent](
@@ -317,6 +319,7 @@ object GuideEnvironmentService {
       ): F[Either[Error, GuideEnvironment]] =
         (for {
           obsInfo        <- EitherT(getObservationInfo(pid, oid))
+          site           <- EitherT.fromEither(obsInfo.site)
           asterism       <- EitherT(getAsterism(pid, oid))
           tracking        = ObjectTracking.fromAsterism(asterism)
           tAndO          <- EitherT(getTimeAndOffsets(pid, oid))
@@ -345,7 +348,7 @@ object GuideEnvironmentService {
                                 )
                             )
           positions      <- EitherT.fromEither(
-                              getPositions(oid, obsInfo.site, obsInfo.posAngleConstraint, offsets, tracking, obsTime, obsDuration)
+                              getPositions(oid, site, obsInfo.posAngleConstraint, offsets, tracking, obsTime, obsDuration)
                             )
           usable         <- EitherT.fromEither(
                               processCandidates(obsInfo, baseCoords, scienceCoords, positions, candidates)
@@ -437,22 +440,22 @@ object GuideEnvironmentService {
               )
               .toRight(s"Invalid elevation range in observation $id.")
 
-          val fpu: Either[String, Either[GmosNorthFpu, GmosSouthFpu]] =
+          val fpu: Option[Either[GmosNorthFpu, GmosSouthFpu]] =
             (nFpu, sFpu) match {
-              case (Some(north), None) => north.asLeft.asRight
-              case (None, Some(south)) => south.asRight.asRight
-              case _                   => s"No configuration for observation $id.".asLeft
+              case (Some(north), None) => north.asLeft.some
+              case (None, Some(south)) => south.asRight.some
+              case _                   => none
             }
 
           val explicitBase: Option[Coordinates] =
             (ra, dec).mapN(Coordinates(_, _))
 
-          (elevRange, fpu).mapN((elev, f) =>
+          elevRange.map(elev =>
             ObservationInfo(id,
                             ConstraintSet(image, cloud, sky, water, elev),
                             paConstraint,
                             wavelength,
-                            f,
+                            fpu,
                             explicitBase
             )
           )
