@@ -7,14 +7,17 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Wavelength
+import lucuma.core.math.WavelengthDither
 import lucuma.core.math.arb.ArbWavelength.*
+import lucuma.core.math.arb.ArbWavelengthDither.given
 import munit.DisciplineSuite
 
-abstract class WavelengthSuite(using Encoder[Wavelength]) extends DisciplineSuite with ArbitraryInstances {
+abstract class WavelengthSuite(using Encoder[Wavelength], Encoder[WavelengthDither]) extends DisciplineSuite with ArbitraryInstances {
 
   import wavelength.decoder.given
 
   checkAll("WavelengthCodec", CodecTests[Wavelength].codec)
+  checkAll("WavelengthDitherCodec", CodecTests[WavelengthDither].codec)
 
   test("all wavelength encoders produce the same wavelength") {
     conversionTest[Wavelength]()
@@ -23,9 +26,11 @@ abstract class WavelengthSuite(using Encoder[Wavelength]) extends DisciplineSuit
 }
 
 class WavelengthQuerySuite extends WavelengthSuite(using
-  wavelength.query.Encoder_Wavelength
+  wavelength.query.Encoder_Wavelength,
+  wavelength.query.Encoder_WavelengthDither
 )
 
 class WavelengthTransportSuite extends WavelengthSuite(using
-  wavelength.transport.Encoder_Wavelength
+  wavelength.transport.Encoder_Wavelength,
+  wavelength.transport.Encoder_WavelengthDither
 )
