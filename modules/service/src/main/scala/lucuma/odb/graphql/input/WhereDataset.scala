@@ -4,11 +4,11 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel._
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosShort
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate._
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Dataset

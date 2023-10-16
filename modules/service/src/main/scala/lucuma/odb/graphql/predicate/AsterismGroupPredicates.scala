@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
+import grackle.Path
 
 class AsterismGroupPredicates(path: Path) {
   val program = ProgramPredicates(path / "program")

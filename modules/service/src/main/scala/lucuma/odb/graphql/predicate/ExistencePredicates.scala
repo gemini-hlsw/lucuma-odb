@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate.*
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate.*
 import lucuma.odb.data.Existence
 
 class ExistencePredicates(path: Path) extends LeafPredicates[Existence](path) {

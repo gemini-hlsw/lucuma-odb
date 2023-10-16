@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 
 trait AddConditionsEntryResultMapping[F[_]] extends ChronConditionsEntryView[F] {

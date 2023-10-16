@@ -4,15 +4,15 @@
 package lucuma.odb.graphql.util
 
 import cats.syntax.all.*
-import edu.gemini.grackle.Directive
-import edu.gemini.grackle.Env
-import edu.gemini.grackle.Env.EmptyEnv
-import edu.gemini.grackle.Env.NonEmptyEnv
-import edu.gemini.grackle.PathTerm
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.*
-import edu.gemini.grackle.Term
+import grackle.Directive
+import grackle.Env
+import grackle.Env.EmptyEnv
+import grackle.Env.NonEmptyEnv
+import grackle.PathTerm
+import grackle.Predicate
+import grackle.Query
+import grackle.Query.*
+import grackle.Term
 import org.typelevel.paiges.Doc
 import org.typelevel.paiges.Doc.char
 import org.typelevel.paiges.Doc.intercalate

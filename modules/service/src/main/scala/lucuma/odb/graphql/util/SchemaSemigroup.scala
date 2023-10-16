@@ -5,13 +5,13 @@ package lucuma.odb.graphql.util
 
 import cats.Semigroup
 import cats.syntax.all._
-import edu.gemini.grackle.DirectiveDef
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.NamedType
-import edu.gemini.grackle.ObjectType
-import edu.gemini.grackle.Schema
-import edu.gemini.grackle.Type
+import grackle.DirectiveDef
+import grackle.EnumType
+import grackle.Mapping
+import grackle.NamedType
+import grackle.ObjectType
+import grackle.Schema
+import grackle.Type
 import org.tpolecat.sourcepos.SourcePos
 
 /** A mixin that provides Semigroup[Schema]. */

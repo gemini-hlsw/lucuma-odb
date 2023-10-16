@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.table
 
-import edu.gemini.grackle.sql.FailedJoin
+import grackle.sql.FailedJoin
 import skunk.Codec
 
 extension [A](self: Codec[A])

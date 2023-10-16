@@ -8,8 +8,8 @@ import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
-import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric.PosDouble
+import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter

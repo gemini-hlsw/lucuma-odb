@@ -6,9 +6,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel._
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate._
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation

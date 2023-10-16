@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel._
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.Wavelength
 import lucuma.core.optics.Format
 import lucuma.odb.graphql.binding._

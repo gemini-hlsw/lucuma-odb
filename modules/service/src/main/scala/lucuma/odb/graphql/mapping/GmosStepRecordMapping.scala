@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import edu.gemini.grackle.TypeRef
+import grackle.TypeRef
 
 import table.GmosDynamicTables
 import table.StepRecordTable

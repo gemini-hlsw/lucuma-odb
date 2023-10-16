@@ -6,9 +6,9 @@ package input
 
 import cats.Order
 import cats.syntax.parallel._
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate._
 import lucuma.odb.graphql.binding._
 
 object WhereOrder {

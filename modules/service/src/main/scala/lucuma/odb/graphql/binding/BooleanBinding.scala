@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value.BooleanValue
+import grackle.Value.BooleanValue
 
 val BooleanBinding: Matcher[Boolean] =
   primitiveBinding("Boolean") { case BooleanValue(value) => value }

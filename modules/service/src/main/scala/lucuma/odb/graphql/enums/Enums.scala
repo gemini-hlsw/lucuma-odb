@@ -8,10 +8,10 @@ import cats.data.NonEmptyList
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import edu.gemini.grackle.DirectiveDef
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.NamedType
-import edu.gemini.grackle.Schema
+import grackle.DirectiveDef
+import grackle.EnumType
+import grackle.NamedType
+import grackle.Schema
 import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan

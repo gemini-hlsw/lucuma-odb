@@ -6,11 +6,11 @@ package lucuma.odb.graphql.binding
 import cats.data.Ior
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import edu.gemini.grackle.Query.Binding
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.Value
-import edu.gemini.grackle.Value.AbsentValue
-import edu.gemini.grackle.Value.NullValue
+import grackle.Query.Binding
+import grackle.Result
+import grackle.Value
+import grackle.Value.AbsentValue
+import grackle.Value.NullValue
 import lucuma.odb.data
 
 trait Matcher[A] { outer =>

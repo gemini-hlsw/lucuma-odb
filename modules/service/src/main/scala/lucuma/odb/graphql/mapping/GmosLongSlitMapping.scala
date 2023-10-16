@@ -6,9 +6,9 @@ package mapping
 
 import cats.syntax.all.*
 import coulomb.*
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.Cursor
+import grackle.Result
+import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*

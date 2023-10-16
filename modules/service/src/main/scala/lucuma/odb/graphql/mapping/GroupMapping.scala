@@ -5,15 +5,15 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query.Binding
-import edu.gemini.grackle.Query.OrderBy
-import edu.gemini.grackle.Query.OrderSelection
-import edu.gemini.grackle.Query.OrderSelections
-import edu.gemini.grackle.QueryCompiler.Elab
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
+import grackle.Query
+import grackle.Query.Binding
+import grackle.Query.OrderBy
+import grackle.Query.OrderSelection
+import grackle.Query.OrderSelections
+import grackle.QueryCompiler.Elab
+import grackle.TypeRef
+import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable

@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.util.Codecs.*

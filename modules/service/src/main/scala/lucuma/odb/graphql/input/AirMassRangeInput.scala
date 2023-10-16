@@ -8,9 +8,9 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import grackle.Result
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.AirMass.DecimalValue
 import lucuma.odb.graphql.binding.*
