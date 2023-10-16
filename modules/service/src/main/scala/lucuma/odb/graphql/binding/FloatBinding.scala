@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value.FloatValue
+import grackle.Value.FloatValue
 
 val FloatBinding: Matcher[Double] =
   primitiveBinding("Float") { case FloatValue(value) => value }

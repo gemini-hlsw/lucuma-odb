@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import edu.gemini.grackle.Result
+import grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.SourceProfile

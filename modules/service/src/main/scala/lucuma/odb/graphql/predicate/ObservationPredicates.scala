@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
+import grackle.Path
 import lucuma.core.model.Observation
 
 class ObservationPredicates(path: Path) {

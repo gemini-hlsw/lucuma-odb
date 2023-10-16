@@ -7,8 +7,8 @@ import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.*
 import cats.syntax.all._
-import edu.gemini.grackle.Problem
-import edu.gemini.grackle.Result
+import grackle.Problem
+import grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import io.circe.Json

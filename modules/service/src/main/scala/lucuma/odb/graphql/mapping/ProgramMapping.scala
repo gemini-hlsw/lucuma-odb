@@ -7,16 +7,16 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all._
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
-import edu.gemini.grackle.QueryCompiler.Elab
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.ResultT
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.Cursor
+import grackle.Predicate
+import grackle.Predicate._
+import grackle.Query
+import grackle.Query._
+import grackle.QueryCompiler.Elab
+import grackle.Result
+import grackle.ResultT
+import grackle.TypeRef
+import grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.syntax.*
 import lucuma.core.model.Group

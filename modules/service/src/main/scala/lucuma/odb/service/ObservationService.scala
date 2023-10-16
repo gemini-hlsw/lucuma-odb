@@ -16,7 +16,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal

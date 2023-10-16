@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import lucuma.core.math.Parallax
 
 import java.math.MathContext

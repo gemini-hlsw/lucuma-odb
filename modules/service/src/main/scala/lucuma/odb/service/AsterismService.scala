@@ -12,7 +12,7 @@ import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.show.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion

@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate.*
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate.*
 import lucuma.core.model.Target
 import lucuma.odb.data.TargetRole
 

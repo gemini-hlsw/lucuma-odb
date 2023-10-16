@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 
 package table
 
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs._
 import skunk.circe.codec.all._
 

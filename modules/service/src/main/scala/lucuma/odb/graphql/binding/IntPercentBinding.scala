@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.model.IntPercent
 
 val IntPercentBinding: Matcher[IntPercent] =

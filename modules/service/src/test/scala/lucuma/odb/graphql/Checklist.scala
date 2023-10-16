@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.all._
-import edu.gemini.grackle.ObjectType
+import grackle.ObjectType
 
 @munit.IgnoreSuite // comment this out if you want to run this. there's probably a better way to do this
 class Checklist extends OdbSuite {

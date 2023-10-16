@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value
+import grackle.Value
 
 val ObjectFieldsBinding: Matcher[List[(String, Value)]] =
   ObjectBinding.map(_.fields)
