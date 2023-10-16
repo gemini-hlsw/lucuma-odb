@@ -15,28 +15,42 @@ class Checklist extends OdbSuite {
   // we manufacture. This includes ITC and SourceProfile stuff.
   val JsonMappedTypes: Set[String] =
     Set(
+      "AllConfigChangeEstimates",
+      "AllDetectorEstimates",
       "BandBrightnessIntegrated",
       "BandBrightnessSurface",
       "BandNormalizedIntegrated",
       "BandNormalizedSurface",
+      "ConfigChangeEstimate",
+      "DatasetEstimate",
+      "DetectorEstimate",
       "EmissionLineIntegrated",
       "EmissionLineSurface",
       "EmissionLinesIntegrated",
       "EmissionLinesSurface",
+      "ExecutionDigest",
       "FluxDensityContinuumIntegrated",
       "FluxDensityContinuumSurface",
       "FluxDensityEntry",
       "GaussianSource",
+      "Itc",
       "ItcMissingParams",
+      "ItcResult",
       "ItcResultSet",
       "ItcServiceError",
       "ItcSuccess",
       "LineFluxIntegrated",
       "LineFluxSurface",
       "PlannedTime",
+      "PlannedTimeCharge",
+      "PlannedTimeRange",
+      "SequenceDigest",
+      "SetupTime",
       "SourceProfile",
       "SpectralDefinitionIntegrated",
       "SpectralDefinitionSurface",
+      "StepEstimate",
+      "WavelengthDither"
     )
 
   def printObjectType(m: BaseMapping[IO], t: ObjectType): IO[Unit] =
