@@ -6,7 +6,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Extinction

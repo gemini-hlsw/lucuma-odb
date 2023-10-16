@@ -4,8 +4,8 @@
 package lucuma.odb.graphql.enums
 
 import cats.syntax.option.*
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.EnumValueDefinition
+import grackle.EnumType
+import grackle.EnumValueDefinition
 import lucuma.core.util.Enumerated
 
 extension [A](e: Enumerated[A]) {

@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate._
 import lucuma.core.model.Access._
 import lucuma.core.model.Program
 import lucuma.core.model.User

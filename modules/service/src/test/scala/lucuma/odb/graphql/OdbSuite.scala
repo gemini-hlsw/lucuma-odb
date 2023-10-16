@@ -19,9 +19,9 @@ import clue.http4s.Http4sWebSocketClient
 import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
-import edu.gemini.grackle.Mapping
-import edu.gemini.grackle.skunk.SkunkMonitor
 import eu.timepit.refined.types.numeric.PosInt
+import grackle.Mapping
+import grackle.skunk.SkunkMonitor
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json

@@ -6,7 +6,7 @@ package input
 package sourceprofile
 
 import cats.syntax.all._
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Units

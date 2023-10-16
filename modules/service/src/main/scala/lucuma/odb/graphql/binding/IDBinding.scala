@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value.IDValue
+import grackle.Value.IDValue
 
 val IDBinding: Matcher[String] =
   primitiveBinding("ID") { case IDValue(value) => value }

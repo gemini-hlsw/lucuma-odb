@@ -6,13 +6,13 @@ package mapping
 
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
-import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate.Const
-import edu.gemini.grackle.Predicate.Eql
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.Type
-import edu.gemini.grackle.TypeRef
+import grackle.Cursor
+import grackle.Predicate
+import grackle.Predicate.Const
+import grackle.Predicate.Eql
+import grackle.Result
+import grackle.Type
+import grackle.TypeRef
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.StepType
 

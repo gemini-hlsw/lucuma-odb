@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.all._
-import edu.gemini.grackle.skunk.SkunkMapping
+import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.ObservationView

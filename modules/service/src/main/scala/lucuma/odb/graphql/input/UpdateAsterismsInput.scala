@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
+import grackle.Path
+import grackle.Predicate
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
 

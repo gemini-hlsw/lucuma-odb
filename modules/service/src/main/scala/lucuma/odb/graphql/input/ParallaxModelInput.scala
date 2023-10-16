@@ -6,7 +6,7 @@ package input
 
 import cats.data.OptionT
 import cats.syntax.all._
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.Parallax
 import lucuma.odb.graphql.binding._
 

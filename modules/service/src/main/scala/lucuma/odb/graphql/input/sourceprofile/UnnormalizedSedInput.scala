@@ -8,8 +8,8 @@ package sourceprofile
 import cats.data.NonEmptyMap
 import cats.syntax.all._
 import coulomb.Quantity
-import edu.gemini.grackle.Result
 import eu.timepit.refined.types.numeric
+import grackle.Result
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums._
 import lucuma.core.model.UnnormalizedSED

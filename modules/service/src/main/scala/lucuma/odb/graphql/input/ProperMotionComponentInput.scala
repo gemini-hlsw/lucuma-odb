@@ -8,7 +8,7 @@ import cats.data.Nested
 import cats.syntax.all._
 import coulomb._
 import coulomb.syntax.withUnit
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
 import lucuma.core.math.units._

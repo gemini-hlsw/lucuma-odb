@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input.sourceprofile
 
 import cats.syntax.all._
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.math.BrightnessUnits._
 import lucuma.core.math.Wavelength
 import lucuma.core.model.EmissionLine

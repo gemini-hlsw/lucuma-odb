@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.GroupView
 

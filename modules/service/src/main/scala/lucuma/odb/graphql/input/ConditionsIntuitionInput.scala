@@ -7,7 +7,7 @@ package input
 
 import cats.data.Ior
 import cats.syntax.all.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 

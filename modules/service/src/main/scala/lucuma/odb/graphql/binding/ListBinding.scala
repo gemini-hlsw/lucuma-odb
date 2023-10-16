@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import edu.gemini.grackle.Value
-import edu.gemini.grackle.Value.ListValue
+import grackle.Value
+import grackle.Value.ListValue
 
 val ListBinding: Matcher[List[Value]] =
   primitiveBinding("List") { case ListValue(elems) => elems }

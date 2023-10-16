@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.foldable.*
-import edu.gemini.grackle.Result
+import grackle.Result
 
 def oneOrFail[A](options: (Option[A], String)*): Result[A] =
   options.toList.flatMap(_._1.toList) match {

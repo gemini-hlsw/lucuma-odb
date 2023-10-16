@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.binding
 
 import cats.syntax.all._
-import edu.gemini.grackle.Value
+import grackle.Value
 
 import scala.util.control.NonFatal
 

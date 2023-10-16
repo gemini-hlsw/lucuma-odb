@@ -7,14 +7,14 @@ package mapping
 
 import cats.data.Nested
 import cats.syntax.all._
-import edu.gemini.grackle.Env
-import edu.gemini.grackle.Query
-import edu.gemini.grackle.Query._
-import edu.gemini.grackle.QueryCompiler.Elab
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.TypeRef
-import edu.gemini.grackle.skunk.SkunkMapping
 import fs2.Stream
+import grackle.Env
+import grackle.Query
+import grackle.Query._
+import grackle.QueryCompiler.Elab
+import grackle.Result
+import grackle.TypeRef
+import grackle.skunk.SkunkMapping
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.OdbMapping.Topics

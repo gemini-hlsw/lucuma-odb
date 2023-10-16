@@ -7,9 +7,9 @@ import cats.data.OptionT
 import cats.effect._
 import cats.implicits._
 import cats.kernel.Order
-import edu.gemini.grackle.Operation
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.skunk.SkunkMonitor
+import grackle.Operation
+import grackle.Result
+import grackle.skunk.SkunkMonitor
 import io.circe.Json
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService

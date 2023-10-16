@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 
 import cats.*
 import cats.arrow.FunctionK
-import edu.gemini.grackle.Result
-import edu.gemini.grackle.Result.*
+import grackle.Result
+import grackle.Result.*
 
 given Parallel[Result] =
   new Parallel[Result]:

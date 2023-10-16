@@ -12,8 +12,8 @@ import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.show.*
-import edu.gemini.grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
 import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion
 import lucuma.core.model.CatalogInfo

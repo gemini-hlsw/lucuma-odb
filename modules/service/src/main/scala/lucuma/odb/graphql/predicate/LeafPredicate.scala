@@ -5,9 +5,9 @@ package lucuma.odb.graphql.predicate
 
 import cats.Eq
 import cats.Order
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
-import edu.gemini.grackle.Predicate._
+import grackle.Path
+import grackle.Predicate
+import grackle.Predicate._
 
 class LeafPredicates[A](path: Path) {
 

@@ -6,9 +6,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import edu.gemini.grackle.Path
-import edu.gemini.grackle.Predicate
 import eu.timepit.refined.types.numeric.NonNegInt
+import grackle.Path
+import grackle.Predicate
 import lucuma.odb.graphql.binding._
 
 case class UpdateProgramsInput(

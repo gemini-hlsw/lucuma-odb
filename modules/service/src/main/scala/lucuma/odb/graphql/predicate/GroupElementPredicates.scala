@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.predicate
 
-import edu.gemini.grackle.Path
 import eu.timepit.refined.types.numeric.NonNegShort
+import grackle.Path
 import lucuma.core.model.Group
 
 class GroupElementPredicates(path: Path) {

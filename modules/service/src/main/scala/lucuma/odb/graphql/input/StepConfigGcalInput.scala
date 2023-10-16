@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import edu.gemini.grackle.Result
+import grackle.Result
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.StepConfig.Gcal.Lamp
 import lucuma.odb.graphql.binding.*
