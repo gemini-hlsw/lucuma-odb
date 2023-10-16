@@ -10,7 +10,6 @@ import grackle.Cursor
 import grackle.Result
 import grackle.skunk.SkunkMapping
 import io.circe.Json
-import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -29,10 +28,11 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
 import lucuma.odb.json.sourceprofile.given
+import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.Config
 
-import java.math.RoundingMode
 import scala.reflect.ClassTag
 
 trait GmosLongSlitMapping[F[_]]
@@ -357,50 +357,19 @@ object GmosLongSlitMapping {
   private def parseCsvBigDecimals(s: String): List[BigDecimal] =
     s.split(',').toList.map(n => BigDecimal(n.trim))
 
-  private def toWavelengthDitherJson(wd: WavelengthDither): Json = {
-    val pm: Int = wd.toPicometers.value
-
-    json"""
-      {
-        "picometers":  $pm,
-        "angstroms":   ${BigDecimal(pm, 2)},
-        "nanometers":  ${BigDecimal(pm, 3)},
-        "micrometers": ${BigDecimal(pm, 6)}
-     }
-    """
-  }
-
   private def decodeWavelengthDithers(s: String): Json =
-    parseCsvBigDecimals(s).map(bd => toWavelengthDitherJson(WavelengthDither.nanometers.unsafeGet(Quantity[Nanometer](bd)))).asJson
+    parseCsvBigDecimals(s).map(bd => WavelengthDither.nanometers.unsafeGet(Quantity[Nanometer](bd)).asJson).asJson
 
   private def defaultWavelengthDithersNorthJson(g: GmosNorthGrating): Json =
-    Config.defaultWavelengthDithersNorth(g).map(q => toWavelengthDitherJson(q)).asJson
+    Config.defaultWavelengthDithersNorth(g).map(_.asJson).asJson
 
   private def defaultWavelengthDithersSouthJson(g: GmosSouthGrating): Json =
-    Config.defaultWavelengthDithersSouth(g).map(q => toWavelengthDitherJson(q)).asJson
-
-  private def toOffsetQJson(q: Q): Json = {
-    val micro: Long =
-      Q.signedDecimalArcseconds
-       .get(q)
-       .bigDecimal
-       .movePointRight(6)
-       .setScale(0, RoundingMode.HALF_UP)
-       .longValue
-
-    json"""
-     {
-       "microarcseconds": $micro,
-       "milliarcseconds": ${BigDecimal(micro, 3)},
-       "arcseconds":      ${BigDecimal(micro, 6)}
-     }
-    """
-  }
+    Config.defaultWavelengthDithersSouth(g).map(_.asJson).asJson
 
   private def decodeSpatialOffsets(s: String): Json =
-    parseCsvBigDecimals(s).map(arcsec => toOffsetQJson(Q.signedDecimalArcseconds.reverseGet(arcsec))).asJson
+    parseCsvBigDecimals(s).map(arcsec => Q.signedDecimalArcseconds.reverseGet(arcsec).asJson).asJson
 
   private val defaultSpatialOffsetsJson: Json =
-    Config.DefaultSpatialOffsets.map(q => toOffsetQJson(q)).asJson
+    Config.DefaultSpatialOffsets.map(_.asJson).asJson
 
 }
