@@ -7,10 +7,10 @@ import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.*
 import cats.syntax.all._
-import grackle.Problem
-import grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
+import grackle.Problem
+import grackle.Result
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.ProperMotion

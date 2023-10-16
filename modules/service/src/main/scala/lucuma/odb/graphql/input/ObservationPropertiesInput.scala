@@ -7,9 +7,9 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import grackle.Result
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Group

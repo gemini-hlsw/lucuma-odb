@@ -6,6 +6,7 @@ package lucuma.odb.graphql.util
 import cats.Eq
 import cats.kernel.Order
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Context
 import grackle.Cursor
 import grackle.Mapping
@@ -13,7 +14,6 @@ import grackle.Path
 import grackle.Result
 import grackle.Type
 import grackle.circe.CirceMappingLike
-import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Encoder
 import io.circe.Json
 import org.tpolecat.sourcepos.SourcePos

@@ -7,6 +7,7 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate._
@@ -17,7 +18,6 @@ import grackle.Result
 import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment

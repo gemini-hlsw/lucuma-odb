@@ -6,8 +6,8 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
 import lucuma.odb.data.Nullable

@@ -6,13 +6,13 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
+import eu.timepit.refined.cats._
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate._
 import grackle.Term
 import grackle.sql.Like
-import eu.timepit.refined.cats._
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.graphql.binding._
 
 object WhereOptionString {

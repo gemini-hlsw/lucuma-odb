@@ -9,6 +9,7 @@ import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Context
 import grackle.Env
 import grackle.Path
@@ -22,7 +23,6 @@ import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.Instrument
 import lucuma.core.model.Access
 import lucuma.core.model.Group

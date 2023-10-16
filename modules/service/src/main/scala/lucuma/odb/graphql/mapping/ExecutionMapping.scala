@@ -9,6 +9,7 @@ import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import eu.timepit.refined.cats.*
 import grackle.Env
 import grackle.Predicate.True
 import grackle.Predicate.and
@@ -21,7 +22,6 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.syntax.*
-import eu.timepit.refined.cats.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Observation
