@@ -16,12 +16,12 @@ import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import grackle.Result
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality

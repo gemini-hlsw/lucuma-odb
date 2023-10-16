@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.OrderBy
@@ -13,7 +14,6 @@ import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable

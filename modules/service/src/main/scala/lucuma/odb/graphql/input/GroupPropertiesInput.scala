@@ -6,9 +6,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all._
-import grackle.Result
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
 import lucuma.core.model.Group
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable

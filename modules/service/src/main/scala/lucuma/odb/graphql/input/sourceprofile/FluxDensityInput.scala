@@ -6,8 +6,8 @@ package input
 package sourceprofile
 
 import cats.syntax.all._
-import grackle.Result
 import eu.timepit.refined.types.numeric.PosBigDecimal
+import grackle.Result
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.binding._
 

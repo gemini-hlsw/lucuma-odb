@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import grackle.Result
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
 import lucuma.core.model.sequence.gmos.GmosFpuMask.Custom
 import lucuma.odb.graphql.binding.*
 
