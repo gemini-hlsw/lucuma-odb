@@ -288,7 +288,7 @@ class createProgram extends OdbSuite {
             "c_mod_pi_user_id"    : true,
             "c_mod_program_id"    : true,
             "c_new_pi_user_id"    : "u-1",
-            "c_new_program_id"    : "p-108",
+            "c_new_program_id"    : ${pid},
             "c_mod_pi_user_type"  : true,
             "c_new_pi_user_type"  : "standard",
             "c_mod_pts_execution" : true,

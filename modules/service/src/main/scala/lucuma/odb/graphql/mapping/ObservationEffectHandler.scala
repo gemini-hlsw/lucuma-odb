@@ -9,12 +9,11 @@ import cats.syntax.applicative.*
 import cats.syntax.eq.*
 import cats.syntax.traverse.*
 import edu.gemini.grackle.Cursor
-import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query.EffectHandler
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.ResultT
-import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -40,21 +39,22 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
           } yield (p, o, e)
         }
 
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[(Query, Cursor)]]] =
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
           ctx <- ResultT(queryContext(queries).pure[F])
-          res <- ctx.distinct.traverse { case (pid, oid, env) =>
+          obs <- ctx.distinct.traverse { case (pid, oid, env) =>
                    ResultT(calculate(pid, oid, env)).map((oid, env, _))
                  }
-        } yield
-          ctx
-            .flatMap { case (_, oid, env) => res.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
-            .zip(queries)
-            .map { case (result, (child, parentCursor)) =>
-              val json: Json     = Json.fromFields(List(fieldName -> result.asJson))
-              val cursor: Cursor = CirceCursor(parentCursor.context, json, Some(parentCursor), parentCursor.fullEnv)
-              (child, cursor)
-            }
+          res <- ResultT(ctx
+                   .flatMap { case (_, oid, env) => obs.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
+                   .zip(queries)
+                   .traverse { case (result, (query, parentCursor)) =>
+                     Query.childContext(parentCursor.context, query).map { childContext =>
+                       CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
+                     }
+                   }.pure[F]
+                 )
+          } yield res
         ).value
 
     }

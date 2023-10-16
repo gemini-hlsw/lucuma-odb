@@ -6,7 +6,7 @@ package lucuma.odb.graphql.enums
 import cats.Functor
 import cats.syntax.all._
 import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.EnumValue
+import edu.gemini.grackle.EnumValueDefinition
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
@@ -18,7 +18,8 @@ object SeeingTrendEnumType {
       EnumType(
         "SeeingTrend",
         Some("Enumerated type of seeing trends."),
-        elems.map { case (tag, desc) => EnumValue(tag.toUpperCase, Some(desc)) }
+        elems.map { case (tag, desc) => EnumValueDefinition(tag.toUpperCase, Some(desc), Nil) },
+        Nil
       )
     }
 

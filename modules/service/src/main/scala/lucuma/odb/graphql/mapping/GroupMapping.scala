@@ -6,11 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.Binding
 import edu.gemini.grackle.Query.OrderBy
 import edu.gemini.grackle.Query.OrderSelection
 import edu.gemini.grackle.Query.OrderSelections
-import edu.gemini.grackle.Query.Select
-import edu.gemini.grackle.Result
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -37,17 +37,11 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       )
     )
 
-  lazy val GroupElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      GroupType -> {
-        case Select("elements", Nil, child) =>
-          Result(
-            Select("elements", Nil,
-              OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))), child)
-            )
-          )
+  lazy val GroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GroupType, "elements", Nil) =>
+      Elab.transformChild { child =>
+        OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))), child)
       }
-    )
 
 }
 

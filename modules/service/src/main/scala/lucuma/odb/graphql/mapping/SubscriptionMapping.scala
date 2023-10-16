@@ -7,9 +7,10 @@ package mapping
 
 import cats.data.Nested
 import cats.syntax.all._
-import edu.gemini.grackle.Cursor.Env
+import edu.gemini.grackle.Env
 import edu.gemini.grackle.Query
 import edu.gemini.grackle.Query._
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.Result
 import edu.gemini.grackle.TypeRef
 import edu.gemini.grackle.skunk.SkunkMapping
@@ -46,30 +47,32 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
   lazy val SubscriptionMapping =
     ObjectMapping(tpe = SubscriptionType, fieldMappings = subscriptionFields.map(_.FieldMapping))
 
-  lazy val SubscriptionElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    subscriptionFields.foldMap(mf => Map(SubscriptionType -> mf.Elaborator))
+  lazy val SubscriptionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    subscriptionFields.foldMap(_.elaborator)
 
   // Convenience for constructing a Subscription stream and corresponding 1-arg elaborator.
   private trait SubscriptionField {
-    def Elaborator: PartialFunction[Select, Result[Query]]
+    def elaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]]
     def FieldMapping: RootStream
   }
   private object SubscriptionField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => Stream[F, Result[Query]]) =
       new SubscriptionField {
         val FieldMapping =
-          RootStream.computeQuery(fieldName) { (query, tpe, env) =>
-            query match
-              case Environment(a, Select(b, c, q)) =>
-                Nested(env.getR[I]("input").flatTraverse(f(_, q)))
-                  .map(q => Environment(a, Select(b, c, q)))
+          RootStream.computeChild(fieldName) { (child, _, _) =>
+            child match
+              case Environment(env, child2) =>
+                Nested(env.getR[I]("input").flatTraverse(f(_, child2)))
+                  .map(child3 => Environment(env, child3))
                   .value
               case _ =>
-                Result.failure(s"Unexpected: $query").pure[Stream[F, *]]
+                Result.failure(s"Unexpected: $child").pure[Stream[F, *]]
           }
-        val Elaborator =
-          case Select(`fieldName`, List(inputBinding("input", rInput)), child) =>
-            rInput.map(input => Environment(Env("input" -> input), Select(fieldName, Nil, child)))
+        val elaborator =
+          case (SubscriptionType, `fieldName`, List(inputBinding("input", rInput))) =>
+            Elab.transformChild { child =>
+              rInput.map(input => Environment(Env("input" -> input), child))
+            }
       }
   }
 

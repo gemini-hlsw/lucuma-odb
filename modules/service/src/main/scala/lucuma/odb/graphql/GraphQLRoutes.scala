@@ -7,10 +7,11 @@ import cats.data.OptionT
 import cats.effect._
 import cats.implicits._
 import cats.kernel.Order
+import edu.gemini.grackle.Operation
+import edu.gemini.grackle.Result
 import edu.gemini.grackle.skunk.SkunkMonitor
 import io.circe.Json
 import lucuma.core.model.User
-import lucuma.graphql.routes.GrackleGraphQLService
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.HttpRouteHandler
 import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
@@ -98,11 +99,11 @@ object GraphQLRoutes {
 
                       _    <- OptionT.liftF(info(user, s"New service instance."))
                       map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
-                      svc   = new GrackleGraphQLService(map) {
-                        override def query(request: ParsedGraphQLRequest): F[Either[Throwable, Json]] =
+                      svc   = new GraphQLService(map) {
+                        override def query(request: Operation): F[Result[Json]] =
                           super.query(request).retryOnInvalidCursorName.flatTap {
-                            case Left(t)  => warn(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}")
-                            case Right(j) => debug(user, s"Query (success).")
+                            case Result.InternalError(t)  => warn(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}")
+                            case _ => debug(user, s"Query (success).")
                           }
                       }
                     } yield svc
@@ -129,8 +130,8 @@ object GraphQLRoutes {
     val dsl = new Http4sDsl[F]{}; import dsl._
     // borrow HttpRouteHandler from lucuma-graphql-routes but hack it to return js
     val h = new HttpRouteHandler(service) {
-      override def toResponse(result: Either[Throwable, Json]): F[Response[F]] =
-        result match {
+      override def toResponse(result: Result[Json]): F[Response[F]] =
+        result.toEither match {
           case Left(err)   => super.toResponse(result)
           case Right(json) => 
             Ok(s"export const $name ='${json.noSpaces}'")

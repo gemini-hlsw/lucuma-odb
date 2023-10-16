@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package mapping
 
 import edu.gemini.grackle.Query
+import edu.gemini.grackle.Query.Binding
 import edu.gemini.grackle.Query.Filter
-import edu.gemini.grackle.Query.Select
-import edu.gemini.grackle.Result
+import edu.gemini.grackle.QueryCompiler.Elab
 import edu.gemini.grackle.TypeRef
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
@@ -38,19 +38,13 @@ trait AsterismGroupMapping[F[_]]
     )
 
   // Make sure the asterism is filtered by existence
-  lazy val AsterismGroupElaborator: Map[TypeRef, PartialFunction[Select, Result[Query]]] =
-    Map(
-      AsterismGroupType -> {
-        case Select("asterism", Nil, child) =>
-          Result(
-            Select("asterism", Nil,
-              Filter(
-                Predicates.target.existence.eql(Existence.Present),
-                child
-              )
-            )
-          )
+  lazy val AsterismGroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (AsterismGroupType, "asterism", Nil) =>
+      Elab.transformChild { child =>
+        Filter(
+          Predicates.target.existence.eql(Existence.Present),
+          child
+        )
       }
-    )
 
 }

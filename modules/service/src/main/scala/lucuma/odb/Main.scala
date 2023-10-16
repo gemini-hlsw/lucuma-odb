@@ -15,7 +15,7 @@ import edu.gemini.grackle.skunk.SkunkMonitor
 import fs2.io.net.Network
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
-import lucuma.graphql.routes.GrackleGraphQLService
+import lucuma.graphql.routes.GraphQLService
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.GraphQLRoutes
 import lucuma.odb.graphql.ObsAttachmentRoutes
@@ -238,7 +238,7 @@ object FMain extends MainParams {
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
-      metadataService    = GrackleGraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
+      metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
     } yield { wsb =>
       val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
       val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb)
