@@ -9182,12 +9182,12 @@ type TargetEnvironment {
   """
   The guide star(s) and related information
   """
-  guideEnvironment(
+  guideEnvironments(
     """
     The time used for the guide star calculations.
     """
     observationTime: Timestamp!
-  ): GuideEnvironment
+  ): [GuideEnvironment!]!
 
   """
   When set, overrides the default base position of the target group
