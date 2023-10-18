@@ -109,10 +109,10 @@ object OdbMapping {
           with CreateTargetResultMapping[F]
           with DeclinationMapping[F]
           with DatasetMapping[F]
-          with DatasetEventMapping[F]
           with DatasetSelectResultMapping[F]
           with ElevationRangeMapping[F]
           with ExecutionMapping[F]
+          with ExecutionEventMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosAtomRecordMapping[F]
           with GmosCcdModeMapping[F]
@@ -167,12 +167,10 @@ object OdbMapping {
           with RecordGmosStepResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
-          with SequenceEventMapping[F]
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
-          with StepEventMapping[F]
           with SubscriptionMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
@@ -240,6 +238,7 @@ object OdbMapping {
               DeclinationMapping,
               ElevationRangeMapping,
               ExecutionMapping,
+              ExecutionEventMapping,
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
               GmosCustomMaskMapping,

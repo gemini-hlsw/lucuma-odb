@@ -39,6 +39,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
+import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
@@ -188,6 +189,9 @@ trait Codecs {
 
   val execution_event_id: Codec[ExecutionEvent.Id] =
     gid[ExecutionEvent.Id]
+
+  val execution_event_type: Codec[ExecutionEventType] =
+    enumerated(Type("e_execution_event_type"))
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
