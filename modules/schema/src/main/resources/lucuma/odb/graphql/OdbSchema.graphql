@@ -607,6 +607,18 @@ input ExchangeInput {
   minPercentTime: IntPercent
 }
 
+"Execution event types."
+enum ExecutionEventType {
+  "Sequence-level event type."
+  SEQUENCE
+
+  "Step-level event type."
+  STEP
+
+  "Dataset-level event type."
+  DATASET
+}
+
 """
 Exposure time mode input.  Specify fixed or signal to noise, but not both
 """
@@ -4877,22 +4889,29 @@ type Dataset {
 Dataset-level events.  A single dataset will be associated with multiple events
 as it makes its way through observe, readout and write stages.
 """
-type DatasetEvent {
+type DatasetEvent implements ExecutionEvent {
 
   "Event id."
   id: ExecutionEventId!
 
-  "Dataset execution stage."
-  datasetStage: DatasetStage!
-
-  "Identifies the associated dataset."
-  dataset: Dataset!
+  "Visit associated with this event."
+  visitId: VisitId!
 
   "Observation whose execution produced this event."
   observation: Observation!
 
   "Time at which this event was received."
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Dataset execution stage."
+  datasetStage: DatasetStage!
+
+  "The associated dataset."
+  dataset: Dataset!
+
 }
 
 "Dataset filename in standard format."
@@ -5214,25 +5233,20 @@ interface ExecutionConfig {
 Execution event (sequence, step, or dataset events)
 """
 interface ExecutionEvent {
-  """
-  Event id
-  """
+  "Event id."
   id: ExecutionEventId!
 
-  """
-  Associated visit
-  """
+  "Visit associated with the event."
   visitId: VisitId!
 
-  """
-  Observation whose execution produced this event
-  """
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  """
-  Time at which this event was received
-  """
+  "Time at which this event was received."
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
 }
 
 """
@@ -8292,31 +8306,26 @@ type SequenceDigest {
 """
 Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
 """
-type SequenceEvent { # implements ExecutionEvent {
-  """
-  Event id
-  """
+type SequenceEvent implements ExecutionEvent {
+
+  "Event id."
   id: ExecutionEventId!
 
-  """
-  Associated visit
-  """
+  "Visit associated with this event."
   visitId: VisitId!
 
-  """
-  Sequence event data
-  """
-  command: SequenceCommand!
-
-  """
-  Observation whose execution produced this event
-  """
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  """
-  Time at which this event was received
-  """
+  "Time at which this event was received."
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Sequence event data."
+  command: SequenceCommand!
+
 }
 
 """
@@ -8778,25 +8787,29 @@ enum StellarLibrarySpectrum {
 """
 Step-level events.  The execution of a single step will generate multiple events.
 """
-type StepEvent {
+type StepEvent implements ExecutionEvent {
 
   "Event id"
   id: ExecutionEventId!
 
-  "Identifies the step to which the event refers."
-  stepId: StepId!
-
-  "Whether this is an acquisition or science sequence step."
-  sequenceType: SequenceType!
-
-  "Step execution stage."
-  stepStage: StepStage!
+  "Visit associated with this event."
+  visitId: VisitId!
 
   "Observation whose execution produced this event."
   observation: Observation!
 
   "Time at which this event was received"
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Step associated with this event."
+  stepId: StepId!
+
+  "Step execution stage."
+  stepStage: StepStage!
+
 }
 
 "StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
