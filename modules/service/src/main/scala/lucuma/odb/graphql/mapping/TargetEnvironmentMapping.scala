@@ -63,7 +63,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         asterismObject("asterism"),
         asterismObject("firstScienceTarget"),
         SqlObject("explicitBase"),
-        EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId"))
+        EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId"))
       )
     )
 
@@ -94,7 +94,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         }
       }
 
-    case (TargetEnvironmentType, "guideEnvironment", List(
+    case (TargetEnvironmentType, "guideEnvironments", List(
       TimestampBinding(ObsTimeParam, rObsTime)
     )) => 
       Elab.liftR(rObsTime).flatMap { obsTime =>
@@ -105,7 +105,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
 
-    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[GuideEnvironmentService.GuideEnvironment]] =
+    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideEnvironmentService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
         services.use { s =>
           s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
@@ -116,7 +116,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
             }
         }
 
-    effectHandler("guideEnvironment", readEnv, calculate)
+    effectHandler("guideEnvironments", readEnv, calculate)
   }
 }
 
