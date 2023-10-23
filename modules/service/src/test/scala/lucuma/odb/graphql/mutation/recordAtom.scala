@@ -56,7 +56,9 @@ class recordAtom extends OdbSuite {
             stepCount: 3
           }) {
             atomRecord {
-              visitId
+              visit {
+                id
+              }
               sequenceType
               stepCount
               steps {
@@ -70,7 +72,9 @@ class recordAtom extends OdbSuite {
         {
           "recordGmosNorthAtom": {
             "atomRecord": {
-              "visitId": ${vid.asJson},
+              "visit": {
+                "id": ${vid.asJson}
+              },
               "sequenceType": "ACQUISITION",
               "stepCount": 3,
               "steps": []
@@ -93,7 +97,9 @@ class recordAtom extends OdbSuite {
             stepCount: 3
           }) {
             atomRecord {
-              visitId
+              visit {
+                id
+              }
               sequenceType
               stepCount
               steps {
@@ -107,7 +113,9 @@ class recordAtom extends OdbSuite {
         {
           "recordGmosSouthAtom": {
             "atomRecord": {
-              "visitId": ${vid.asJson},
+              "visit": {
+                "id": ${vid.asJson}
+              },
               "sequenceType": "ACQUISITION",
               "stepCount": 3,
               "steps": []
@@ -130,7 +138,9 @@ class recordAtom extends OdbSuite {
             stepCount: 3
           }) {
             atomRecord {
-              visitId
+              visit {
+                id
+              }
             }
           }
         }

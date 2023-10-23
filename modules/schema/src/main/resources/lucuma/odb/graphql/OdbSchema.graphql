@@ -1223,8 +1223,8 @@ type GmosNorthAtomRecord {
   "Atom ID"
   id: AtomId!
 
-  "Visit ID"
-  visitId: VisitId!
+  "Visit in which this atom was executed."
+  visit: Visit!
 
   "Created by Observe at this time."
   created: Timestamp!
@@ -1763,8 +1763,8 @@ type GmosSouthAtomRecord {
   "Atom ID"
   id: AtomId!
 
-  "Visit ID"
-  visitId: VisitId!
+  "Visit in which this atom was executed."
+  visit: Visit!
 
   "Created by Observe at this time."
   created: Timestamp!
@@ -4881,7 +4881,7 @@ type DatasetEvent implements ExecutionEvent {
   id: ExecutionEventId!
 
   "Visit associated with this event."
-  visitId: VisitId!
+  visit: Visit!
 
   "Observation whose execution produced this event."
   observation: Observation!
@@ -5223,7 +5223,7 @@ interface ExecutionEvent {
   id: ExecutionEventId!
 
   "Visit associated with the event."
-  visitId: VisitId!
+  visit: Visit!
 
   "Observation whose execution produced this event."
   observation: Observation!
@@ -8298,7 +8298,7 @@ type SequenceEvent implements ExecutionEvent {
   id: ExecutionEventId!
 
   "Visit associated with this event."
-  visitId: VisitId!
+  visit: Visit!
 
   "Observation whose execution produced this event."
   observation: Observation!
@@ -8779,7 +8779,7 @@ type StepEvent implements ExecutionEvent {
   id: ExecutionEventId!
 
   "Visit associated with this event."
-  visitId: VisitId!
+  visit: Visit!
 
   "Observation whose execution produced this event."
   observation: Observation!

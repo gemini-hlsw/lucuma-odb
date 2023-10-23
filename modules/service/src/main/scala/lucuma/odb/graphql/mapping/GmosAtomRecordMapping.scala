@@ -8,15 +8,18 @@ import grackle.TypeRef
 
 import table.AtomRecordTable
 import table.StepRecordTable
+import table.VisitTable
 
-trait GmosAtomRecordMapping[F[_]] extends AtomRecordTable[F] with StepRecordTable[F] {
+trait GmosAtomRecordMapping[F[_]] extends AtomRecordTable[F]
+                                     with StepRecordTable[F]
+                                     with VisitTable[F] {
 
   private def atomRecordMapping(typeRef: TypeRef): ObjectMapping =
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
         SqlField("id", AtomRecordTable.Id, key = true),
-        SqlField("visitId", AtomRecordTable.VisitId),
+        SqlObject("visit", Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlField("sequenceType", AtomRecordTable.SequenceType),
         SqlField("stepCount", AtomRecordTable.StepCount),
 

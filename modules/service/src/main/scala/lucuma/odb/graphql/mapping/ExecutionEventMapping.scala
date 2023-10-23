@@ -29,8 +29,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
       discriminator = executionEventTypeDiscriminator,
       fieldMappings = List(
         SqlField("id",           ExecutionEventView.Id, key = true),
-//        SqlObject("visit",       Join(ExecutionEventView.VisitId,       VisitTable.Id)),
-        SqlField("visitId",      ExecutionEventView.VisitId),
+        SqlObject("visit",       Join(ExecutionEventView.VisitId,       VisitTable.Id)),
         SqlObject("observation", Join(ExecutionEventView.ObservationId, ObservationView.Id)),
         SqlField("received",     ExecutionEventView.Received),
         SqlField("eventType",    ExecutionEventView.EventType, discriminator = true)
