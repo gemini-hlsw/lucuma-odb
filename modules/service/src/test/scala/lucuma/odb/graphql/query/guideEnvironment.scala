@@ -581,7 +581,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid, aug3000),
-      expected = List(s"No configuration defined for observation $oid.").asLeft)
+      expected = List(s"Could not generate a sequence from the observation $oid: observing mode").asLeft)
     }
   }
 }
