@@ -1696,31 +1696,28 @@ type GmosNorthStepRecord {
 """
 A GmosNorth visit as recorded by Observe
 """
-type GmosNorthVisit {
-  """
-  Visit id
-  """
+type GmosNorthVisit implements Visit {
+
+  "Visit id."
   id: VisitId!
 
-  """
-  Created by Observe at time
-  """
+  "Implements the Visit.instrument field to return GMOS_NORTH."
+  instrument: Instrument!
+
+  "Created by Observe at time."
   created: Timestamp!
 
-  """
-  Started at time
-  """
+  "Started at time."
   startTime: Timestamp
 
-  """
-  Ended at time
-  """
+  "Ended at time."
   endTime: Timestamp
 
-  """
-  Step duration
-  """
+  "Visit duration."
   duration: TimeSpan!
+
+  "Execution events associated with this visit."
+  events: [ExecutionEvent!]!
 
   """
   GmosNorth static instrument configuration
@@ -1732,10 +1729,6 @@ type GmosNorthVisit {
   """
   atoms: [GmosNorthAtomRecord!]!
 
-  """
-  Sequence events associated with this visit
-  """
-  sequenceEvents: [SequenceEvent!]!
 }
 
 """
@@ -2247,31 +2240,28 @@ type GmosSouthStepRecord {
 """
 A GmosSouth visit as recorded by Observe
 """
-type GmosSouthVisit {
-  """
-  Visit id
-  """
+type GmosSouthVisit implements Visit {
+
+  "Visit id."
   id: VisitId!
 
-  """
-  Created by Observe at time
-  """
+  "Implements the Visit.instrument field to return GMOS_SOUTH."
+  instrument: Instrument!
+
+  "Created by Observe at time."
   created: Timestamp!
 
-  """
-  Started at time
-  """
+  "Started at time."
   startTime: Timestamp
 
-  """
-  Ended at time
-  """
+  "Ended at time."
   endTime: Timestamp
 
-  """
-  Step duration
-  """
-  duration: TimeSpan
+  "Visit duration."
+  duration: TimeSpan!
+
+  "Execution events associated with this visit."
+  events: [ExecutionEvent!]!
 
   """
   GmosSouth static instrument configuration
@@ -2283,10 +2273,6 @@ type GmosSouthVisit {
   """
   steps: [GmosSouthStepRecord!]!
 
-  """
-  Sequence events associated with this visit
-  """
-  sequenceEvents: [SequenceEvent!]!
 }
 
 """
@@ -9393,6 +9379,34 @@ type User {
   orcidCreditName: String,
   orcidFamilyName: String,
   orcidEmail:      String,
+}
+
+interface Visit {
+
+  "Visit id."
+  id: VisitId!
+
+  """
+  Instrument in use for this visit.  This serves as a discriminator between the
+  various specific instrument visit types.
+  """
+  instrument: Instrument!
+
+  "Created by Observe at time."
+  created: Timestamp!
+
+  "Started at time."
+  startTime: Timestamp
+
+  "Ended at time."
+  endTime: Timestamp
+
+  "Visit duration."
+  duration: TimeSpan!
+
+  "Execution events associated with this visit."
+  events: [ExecutionEvent!]!
+
 }
 
 """

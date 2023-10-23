@@ -122,9 +122,7 @@ object OdbMapping {
           with GmosGratingConfigMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
-          with GmosNorthVisitMapping[F]
           with GmosSouthStaticMapping[F]
-          with GmosSouthVisitMapping[F]
           with GmosStepRecordMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
@@ -189,6 +187,7 @@ object OdbMapping {
           with UpdateProposalAttachmentsResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
+          with VisitMapping[F]
           with WavelengthMapping[F]
         {
 
@@ -334,6 +333,7 @@ object OdbMapping {
               UpdateProposalAttachmentsResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
+              VisitMapping,
               WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings
 
