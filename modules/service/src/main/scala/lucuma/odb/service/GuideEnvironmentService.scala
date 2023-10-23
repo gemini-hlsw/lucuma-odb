@@ -19,8 +19,6 @@ import lucuma.ags.GuideProbe
 import lucuma.ags.GuideStarCandidate
 import lucuma.ags.*
 import lucuma.catalog.votable.*
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.geom.ShapeExpression
@@ -41,18 +39,20 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.GmosCodecs.*
 import org.http4s.Header
 import org.http4s.Headers
 import org.http4s.Method
@@ -127,15 +127,25 @@ object GuideEnvironmentService {
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
     optWavelength:      Option[Wavelength],
-    optFpu:             Option[Either[GmosNorthFpu, GmosSouthFpu]],
     explicitBase:       Option[Coordinates]
   ) {
-    def agsParams: AgsParams                 = AgsParams.GmosAgsParams(optFpu, PortDisposition.Side)
     def wavelength: Either[Error, Wavelength] =
       optWavelength.toRight(Error.GeneralError(s"No wavelength defined for observation $id."))
-    def fpu: Either[Error, Either[GmosNorthFpu, GmosSouthFpu]] =
-      optFpu.toRight(Error.GeneralError(s"No configuration defined for observation $id."))
-    def site:       Either[Error, Site] = fpu.map(_.fold(_ => Site.GN, _ => Site.GS))
+  }
+
+  private case class GeneratorInfo(
+    digest: ExecutionDigest,
+    params: GeneratorParams,
+    hash:        Md5Hash
+  ) {
+      val plannedTime = digest.fullPlannedTime.sum
+      val offsets = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
+      val (site, agsParams): (Site, AgsParams) = params match
+        case GeneratorParams.GmosNorthLongSlit(_, mode) => 
+          (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side))
+        case GeneratorParams.GmosSouthLongSlit(_, mode) => //(Site.GS, mode.fpu.asRight)
+          (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side))
+
   }
 
   def instantiate[F[_]: Concurrent](
@@ -258,18 +268,15 @@ object GuideEnvironmentService {
           GuideEnvironment(ags.vignetting.head._1, List(GuideTarget(ags.guideProbe, target)))
         }
 
-      def getTimeAndOffsets(
+      def getGeneratorInfo(
         pid: Program.Id,
         oid: Observation.Id
-      ): F[Either[Error, (TimeSpan, Option[NonEmptyList[Offset]])]] =
+      ): F[Either[Error, GeneratorInfo]] =
         generator(commitHash, itcClient, plannedTimeCalculator)
-          .digest(pid, oid)
+          .digestWithParamsAndHash(pid, oid)
           .map {
             _.leftMap(Error.GeneratorError(_))
-              .map { d => 
-                (d.fullPlannedTime.sum, 
-                NonEmptyList.fromFoldable(d.science.offsets.union(d.acquisition.offsets)))
-              }
+              .map { (d, p, h) => GeneratorInfo(d, p, h) }
           }
 
       def getPositions(
@@ -297,6 +304,7 @@ object GuideEnvironmentService {
 
       def processCandidates(
         obsInfo:       ObservationInfo,
+        genInfo:       GeneratorInfo,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
         positions:     NonEmptyList[AgsPosition],
@@ -309,7 +317,7 @@ object GuideEnvironmentService {
                          baseCoords,
                          scienceCoords,
                          positions,
-                         obsInfo.agsParams,
+                         genInfo.agsParams,
                          candidates.toList
             )
             .sortUsablePositions
@@ -324,11 +332,9 @@ object GuideEnvironmentService {
       ): F[Either[Error, List[GuideEnvironment]]] =
         (for {
           obsInfo        <- EitherT(getObservationInfo(pid, oid))
-          site           <- EitherT.fromEither(obsInfo.site)
           asterism       <- EitherT(getAsterism(pid, oid))
+          genInfo        <- EitherT(getGeneratorInfo(pid, oid))
           tracking        = ObjectTracking.fromAsterism(asterism)
-          tAndO          <- EitherT(getTimeAndOffsets(pid, oid))
-          (obsDuration, offsets) = tAndO
           candidates     <- EitherT(getCandidates(oid, obsTime, tracking))
           baseCoords     <- EitherT.fromEither(
                               obsInfo.explicitBase
@@ -353,10 +359,10 @@ object GuideEnvironmentService {
                                 )
                             )
           positions      <- EitherT.fromEither(
-                              getPositions(oid, site, obsInfo.posAngleConstraint, offsets, tracking, obsTime, obsDuration)
+                              getPositions(oid, genInfo.site, obsInfo.posAngleConstraint, genInfo.offsets, tracking, obsTime, genInfo.plannedTime)
                             )
           usable         <- EitherT.fromEither(
-                              processCandidates(obsInfo, baseCoords, scienceCoords, positions, candidates)
+                              processCandidates(obsInfo, genInfo, baseCoords, scienceCoords, positions, candidates)
                             )
         } yield usable.toGuideEnvironments.toList).value
     }
@@ -380,14 +386,8 @@ object GuideEnvironmentService {
           obs.c_pac_angle,
           obs.c_spec_wavelength,
           obs.c_explicit_ra,
-          obs.c_explicit_dec,
-          north.c_fpu,
-          south.c_fpu
+          obs.c_explicit_dec
         from t_observation obs
-        left join t_gmos_north_long_slit north
-        on obs.c_observation_id = north.c_observation_id
-        left join t_gmos_south_long_slit south
-        on obs.c_observation_id = south.c_observation_id
         where obs.c_program_id = $program_id
           and obs.c_observation_id = $observation_id
       """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
@@ -409,10 +409,8 @@ object GuideEnvironmentService {
         angle_µas *:
         wavelength_pm.opt *:
         right_ascension.opt *:
-        declination.opt *:
-        gmos_north_fpu.opt *:
-        gmos_south_fpu.opt).emap {
-        case (id, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, wavelength, ra, dec, nFpu, sFpu) =>
+        declination.opt).emap {
+        case (id, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, wavelength, ra, dec) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -440,13 +438,6 @@ object GuideEnvironmentService {
               )
               .toRight(s"Invalid elevation range in observation $id.")
 
-          val fpu: Option[Either[GmosNorthFpu, GmosSouthFpu]] =
-            (nFpu, sFpu) match {
-              case (Some(north), None) => north.asLeft.some
-              case (None, Some(south)) => south.asRight.some
-              case _                   => none
-            }
-
           val explicitBase: Option[Coordinates] =
             (ra, dec).mapN(Coordinates(_, _))
 
@@ -455,7 +446,6 @@ object GuideEnvironmentService {
                             ConstraintSet(image, cloud, sky, water, elev),
                             paConstraint,
                             wavelength,
-                            fpu,
                             explicitBase
             )
           )

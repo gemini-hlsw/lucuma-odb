@@ -57,14 +57,26 @@ import Generator.FutureLimit
 sealed trait Generator[F[_]] {
 
   /**
-   * Looks up the parameters required to calculate the ExecutionDigest, performs
-   * the calculation, and caches the results. If the observation is not
-   * completely defined (e.g., if missing the observing mode), an Error is produced.
+   * Looks up the parameters required to calculate the ExecutionDigest, and checks
+   * the cache. If not in the cache, it performs the calculation and caches the 
+   * results. If the observation is not completely defined (e.g., if missing the 
+   * observing mode), an Error is produced.
    */
   def digest(
     programId:     Program.Id,
     observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
+
+  /**
+   * The same is `digest()`, but it also returns the GeneratorParms and the hash used
+   * to determine if the digest needed to be recalculated. This is useful in things
+   * like the guide star availability calculations which depend on the digest and are
+   * also cached.
+   */
+  def digestWithParamsAndHash(
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
    * Calculates the ExecutionDigest given the AsterismResults from the ITC
@@ -229,13 +241,20 @@ object Generator {
       }
 
       override def digest(
+        programId:     Program.Id,
+        observationId: Observation.Id
+      )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
+        digestWithParamsAndHash(programId, observationId).map(_.map(_._1))
+
+      override def digestWithParamsAndHash(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
+      )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
         (for {
           c <- Context.lookup(pid, oid)
           d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c))(EitherT.pure(_)))
-        } yield d).value
+          r  = (d, c.params, c.hash)
+        } yield r).value
 
       override def calculateDigest(
         pid:            Program.Id,
