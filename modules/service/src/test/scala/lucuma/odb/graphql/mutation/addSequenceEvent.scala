@@ -52,7 +52,9 @@ class addSequenceEvent extends OdbSuite {
             command: START
           }) {
             event {
-              visitId
+              visit {
+                id
+              }
               observation {
                 id
               }
@@ -69,7 +71,9 @@ class addSequenceEvent extends OdbSuite {
       {
         "addSequenceEvent": {
           "event": {
-            "visitId": $vid,
+            "visit": {
+              "id": $vid
+            },
             "observation": {
               "id": $oid
             }
@@ -90,7 +94,9 @@ class addSequenceEvent extends OdbSuite {
             command: START
           }) {
             event {
-              visitId
+              visit {
+                id
+              }
               observation {
                 id
               }
