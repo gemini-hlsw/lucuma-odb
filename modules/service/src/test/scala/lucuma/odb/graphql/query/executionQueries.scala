@@ -35,23 +35,29 @@ class executionQueries extends OdbSuite with DatabaseOperations {
   val validUsers = List(pi, pi2, service).toList
 
   trait Node {
+    def allDatasets: List[Dataset.Id]
     def allEvents: List[ExecutionEvent.Id]
   }
 
   case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent.Id]) extends Node {
-    def allEvents: List[ExecutionEvent.Id] = events
+    def allDatasets = List(id)
+    def allEvents   = events
   }
   case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent.Id]) extends Node{
-    def allEvents: List[ExecutionEvent.Id] = (datasets.flatMap(_.allEvents) ::: events).sorted
+    def allDatasets = datasets.map(_.id).sorted
+    def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sorted
   }
   case class AtomNode(id: Atom.Id, steps: List[StepNode]) extends Node {
-    def allEvents: List[ExecutionEvent.Id] = steps.flatMap(_.allEvents).sorted
+    def allDatasets = steps.flatMap(_.allDatasets).sorted
+    def allEvents   = steps.flatMap(_.allEvents).sorted
   }
   case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent.Id]) extends Node {
-    def allEvents: List[ExecutionEvent.Id] = (atoms.flatMap(_.allEvents) ::: events).sorted
+    def allDatasets = atoms.flatMap(_.allDatasets).sorted
+    def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sorted
   }
   case class ObservationNode(id: Observation.Id, visits: List[VisitNode]) extends Node {
-    def allEvents: List[ExecutionEvent.Id] = visits.flatMap(_.allEvents).sorted
+    def allDatasets = visits.flatMap(_.allDatasets).sorted
+    def allEvents   = visits.flatMap(_.allEvents).sorted
   }
 
   case class Setup(
@@ -164,8 +170,76 @@ class executionQueries extends OdbSuite with DatabaseOperations {
       vs    <- (0 until setup.visitCount).toList.traverse { v => recordVisit(mode, setup, user, oid, v) }
     } yield ObservationNode(oid, vs)
 
+  test("`observation` -> `execution` -> `datasets`") {
+    recordAll(mode, Setup(offset = 0, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              datasets() {
+                matches {
+                  id
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val events = on.allDatasets.map(id => Json.obj("id" -> id.asJson))
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "datasets": {
+              "matches": $events
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("`observation` -> `execution` -> `events`") {
+    recordAll(mode, Setup(offset = 24, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              events() {
+                matches {
+                  id
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val events = on.allEvents.map(id => Json.obj("id" -> id.asJson))
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "events": {
+              "matches": $events
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
   test("`observation` -> `execution` -> `visits`") {
-    recordAll(mode, Setup(offset = 0, visitCount = 2), pi).flatMap { on =>
+    recordAll(mode, Setup(offset = 48, visitCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -198,37 +272,4 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `events`") {
-    recordAll(mode, Setup(offset = 2, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
-      val q = s"""
-        query {
-          observation(observationId: "${on.id}") {
-            execution {
-              events() {
-                matches {
-                  id
-                }
-              }
-            }
-          }
-        }
-      """
-
-      val events = on.allEvents.map(id => Json.obj("id" -> id.asJson))
-
-      val e = json"""
-      {
-        "observation": {
-          "execution": {
-            "events": {
-              "matches": $events
-            }
-          }
-        }
-      }
-      """.asRight
-
-      expect(pi, q, e)
-    }
-  }
 }
