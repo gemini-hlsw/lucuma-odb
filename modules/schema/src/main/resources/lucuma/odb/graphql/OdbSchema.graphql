@@ -1717,6 +1717,15 @@ type GmosNorthVisit implements Visit {
   "Visit duration."
   duration: TimeSpan!
 
+  "Datasets associated with this visit."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
   "Execution events associated with this visit."
   events(
     "Starts the result set at (or after if not existent) the given execution event id."
@@ -2268,6 +2277,15 @@ type GmosSouthVisit implements Visit {
 
   "Visit duration."
   duration: TimeSpan!
+
+  "Datasets associated with this visit."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
 
   "Execution events associated with this visit."
   events(
@@ -9431,6 +9449,15 @@ interface Visit {
 
   "Visit duration."
   duration: TimeSpan!
+
+  "Datasets associated with this visit."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
 
   "Execution events associated with this visit."
   events(
