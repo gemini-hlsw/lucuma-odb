@@ -4853,6 +4853,15 @@ type Dataset {
   "Visit associated with this dataset."
   visit: Visit!
 
+  "Events associated with the dataset."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
   "Dataset filename."
   filename: DatasetFilename!
 
