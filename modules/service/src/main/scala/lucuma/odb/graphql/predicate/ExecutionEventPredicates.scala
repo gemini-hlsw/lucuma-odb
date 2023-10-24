@@ -7,7 +7,9 @@ package predicate
 import grackle.Path
 import lucuma.core.model.ExecutionEvent
 
- class ExecutionEventPredicates(path: Path) {
-   lazy val id: LeafPredicates[ExecutionEvent.Id] =
-     LeafPredicates[ExecutionEvent.Id](path / "id")
+class ExecutionEventPredicates(path: Path) {
+  lazy val id: LeafPredicates[ExecutionEvent.Id] =
+    LeafPredicates[ExecutionEvent.Id](path / "id")
+
+  lazy val observation = new ObservationPredicates(path / "observation")
 }

@@ -68,6 +68,7 @@ trait BaseMapping[F[_]]
   lazy val ExecutionType                       = schema.ref("Execution")
   lazy val ExecutionEventType                  = schema.ref("ExecutionEvent")
   lazy val ExecutionEventTypeType              = schema.ref("ExecutionEventType")
+  lazy val ExecutionEventSelectResultType      = schema.ref("ExecutionEventSelectResult")
   lazy val ExistenceType                       = schema.ref("Existence")
   lazy val ExtinctionType                      = schema.ref("Extinction")
   lazy val FastTurnaroundType                  = schema.ref("FastTurnaround")

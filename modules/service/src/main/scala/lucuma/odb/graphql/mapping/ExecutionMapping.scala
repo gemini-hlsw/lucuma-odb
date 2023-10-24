@@ -24,6 +24,7 @@ import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -31,6 +32,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.DatasetIdBinding
+import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
@@ -58,8 +60,9 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] with Predicates
         SqlField("programId", ObservationView.ProgramId, hidden = true),
         EffectField("digest", digestHandler, List("id", "programId")),
         EffectField("config", configHandler, List("id", "programId")),
-        SqlObject("visits"),
-        SqlObject("datasets")
+        SqlObject("datasets"),
+        SqlObject("events"),
+        SqlObject("visits")
       )
     )
 
@@ -85,6 +88,29 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] with Predicates
               ))),
               oss = Some(List(
                 OrderSelection[Dataset.Id](DatasetType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
+        }
+      }
+    case (ExecutionType, "events", List(
+      ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      Elab.transformChild { child =>
+        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
+                Predicates.executionEvent.observation.program.isVisibleTo(user),
+              ))),
+              oss = Some(List(
+                OrderSelection[ExecutionEvent.Id](ExecutionEventType / "id")
               )),
               offset = None,
               limit = Some(limit + 1), // Select one extra row here.
