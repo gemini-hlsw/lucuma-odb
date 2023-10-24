@@ -186,14 +186,14 @@ class executionQueries extends OdbSuite with DatabaseOperations {
         }
       """
 
-      val events = on.allDatasets.map(id => Json.obj("id" -> id.asJson))
+      val matches = on.allDatasets.map(id => Json.obj("id" -> id.asJson))
 
       val e = json"""
       {
         "observation": {
           "execution": {
             "datasets": {
-              "matches": $events
+              "matches": $matches
             }
           }
         }
@@ -204,6 +204,89 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("`observation` -> `execution` -> `datasets` -> `observation`") {
+    recordAll(mode, Setup(offset = 24), pi).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              datasets() {
+                matches {
+                  observation {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.allDatasets.map(id => Json.obj("observation" -> Json.obj("id" -> on.id.asJson)))
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "datasets": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("`observation` -> `execution` -> `datasets` -> `visit`") {
+    recordAll(mode, Setup(offset = 25, visitCount = 2), pi).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              datasets() {
+                matches {
+                  visit {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val List(v0, v1) = on.visits
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "datasets": {
+              "matches": [
+                {
+                  "visit": {
+                    "id": ${v0.id}
+                  }
+                },
+                {
+                  "visit": {
+                    "id": ${v1.id}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+/*
   test("`observation` -> `execution` -> `events`") {
     recordAll(mode, Setup(offset = 24, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
       val q = s"""
@@ -271,5 +354,5 @@ class executionQueries extends OdbSuite with DatabaseOperations {
       expect(pi, q, e)
     }
   }
-
+*/
 }

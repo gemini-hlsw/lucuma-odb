@@ -4,11 +4,17 @@
 package lucuma.odb.graphql
 package mapping
 
+import table.AtomRecordTable
 import table.DatasetTable
 import table.ObservationView
+import table.StepRecordTable
+import table.VisitTable
 
 trait DatasetMapping[F[_]] extends DatasetTable[F]
-                              with ObservationView[F] {
+                              with AtomRecordTable[F]
+                              with ObservationView[F]
+                              with StepRecordTable[F]
+                              with VisitTable[F] {
 
   lazy val DatasetMapping: ObjectMapping =
     ObjectMapping(
@@ -19,6 +25,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
         SqlField("index",  DatasetTable.Index),
 
         SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
+        SqlObject("visit", Join(DatasetTable.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlField("filename", DatasetTable.File.Name),
         SqlField("qaState",  DatasetTable.QaState),
 

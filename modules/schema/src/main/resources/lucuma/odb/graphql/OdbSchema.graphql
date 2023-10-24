@@ -4847,29 +4847,22 @@ type Dataset {
   "Dataset index within the step."
   index: PosShort!
 
-  """
-  Observation associated with this dataset
-  """
+  "Observation associated with this dataset."
   observation: Observation!
 
-  """
-  Dataset filename
-  """
+  "Visit associated with this dataset."
+  visit: Visit!
+
+  "Dataset filename."
   filename: DatasetFilename!
 
-  """
-  Dataset QA state, if any has been set.
-  """
+  "Dataset QA state, if any has been set."
   qaState: DatasetQaState
 
-  """
-  Start time, if the dataset collection has started.
-  """
+  "Start time, if the dataset collection has started."
   start: Timestamp
 
-  """
-  End time, if the dataset collection has finished.
-  """
+  "End time, if the dataset collection has finished."
   end: Timestamp
 
 }
