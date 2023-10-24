@@ -20,6 +20,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val constraintSetGroup      = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
     val dataset                 = DatasetPredicates(Path.from(DatasetType))
     val datasetEvent            = ExecutionEventPredicates(Path.from(DatasetEventType))
+    val executionEvent          = ExecutionEventPredicates(Path.from(ExecutionEventType))
     val gmosNorthAtomRecord     = AtomPredicates(Path.from(GmosNorthAtomRecordType))
     val gmosNorthStep           = StepPredicates(Path.from(GmosNorthStepType))
     val gmosNorthVisit          = VisitPredicates(Path.from(GmosNorthVisitType))

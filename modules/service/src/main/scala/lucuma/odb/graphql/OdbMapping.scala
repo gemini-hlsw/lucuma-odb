@@ -113,6 +113,7 @@ object OdbMapping {
           with ElevationRangeMapping[F]
           with ExecutionMapping[F]
           with ExecutionEventMapping[F]
+          with ExecutionEventSelectResultMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosAtomRecordMapping[F]
           with GmosCcdModeMapping[F]
@@ -239,6 +240,7 @@ object OdbMapping {
               ElevationRangeMapping,
               ExecutionMapping,
               ExecutionEventMapping,
+              ExecutionEventSelectResultMapping,
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
               GmosCustomMaskMapping,
