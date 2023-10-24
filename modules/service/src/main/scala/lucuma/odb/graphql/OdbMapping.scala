@@ -357,6 +357,7 @@ object OdbMapping {
                 TargetEnvironmentElaborator,
                 TargetGroupElaborator,
                 QueryElaborator,
+                VisitElaborator
               ).combineAll
             )
 
