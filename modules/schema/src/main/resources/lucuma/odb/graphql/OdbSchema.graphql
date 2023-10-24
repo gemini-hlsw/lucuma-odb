@@ -1718,7 +1718,13 @@ type GmosNorthVisit implements Visit {
   duration: TimeSpan!
 
   "Execution events associated with this visit."
-  events: [ExecutionEvent!]!
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
 
   """
   GmosNorth static instrument configuration
@@ -2264,7 +2270,13 @@ type GmosSouthVisit implements Visit {
   duration: TimeSpan!
 
   "Execution events associated with this visit."
-  events: [ExecutionEvent!]!
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
 
   """
   GmosSouth static instrument configuration
@@ -9421,7 +9433,13 @@ interface Visit {
   duration: TimeSpan!
 
   "Execution events associated with this visit."
-  events: [ExecutionEvent!]!
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
 
 }
 

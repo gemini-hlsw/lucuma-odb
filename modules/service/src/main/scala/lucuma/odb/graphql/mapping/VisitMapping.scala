@@ -5,14 +5,26 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.option.*
+import cats.syntax.parallel.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
+import grackle.Predicate.True
+import grackle.Predicate.and
+import grackle.Query.Binding
+import grackle.Query.FilterOrderByOffsetLimit
+import grackle.Query.OrderSelection
+import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
 import grackle.TypeRef
 import lucuma.core.enums.Instrument
+import lucuma.core.model.ExecutionEvent
+import lucuma.core.model.User
+import lucuma.odb.graphql.binding.ExecutionEventIdBinding
+import lucuma.odb.graphql.binding.NonNegIntBinding
+import lucuma.odb.graphql.predicate.Predicates
 
 import table.ExecutionEventView
 import table.GmosStaticTables
@@ -22,7 +34,10 @@ import table.VisitTable
 trait VisitMapping[F[_]] extends VisitTable[F]
                             with ExecutionEventView[F]
                             with GmosStaticTables[F]
-                            with ObservationView[F] {
+                            with ObservationView[F]
+                            with Predicates[F] {
+
+  def user: User
 
   /*
   "Started at time."
@@ -44,7 +59,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlField("instrument",   VisitTable.Instrument, discriminator = true),
         SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
         SqlField("created",      VisitTable.Created),
-        SqlObject("events",      Join(VisitTable.Id, ExecutionEventView.VisitId))
+        SqlObject("events")
       )
     )
 
@@ -85,5 +100,29 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlObject("static", Join(VisitTable.Id, GmosSouthStaticTable.VisitId))
       )
     )
+
+  lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (VisitType, "events", List(
+      ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      Elab.transformChild { child =>
+        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
+                Predicates.executionEvent.observation.program.isVisibleTo(user),
+              ))),
+              oss = Some(List(OrderSelection[ExecutionEvent.Id](ExecutionEventType / "id"))),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
+        }
+      }
+  }
 
 }
