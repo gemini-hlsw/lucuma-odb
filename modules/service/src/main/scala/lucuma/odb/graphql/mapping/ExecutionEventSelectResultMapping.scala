@@ -4,15 +4,23 @@
 package lucuma.odb.graphql
 package mapping
 
+import table.DatasetTable
 import table.ObservationView
 import table.ExecutionEventView
 
 trait ExecutionEventSelectResultMapping[F[_]]
   extends ExecutionEventView[F]
+     with DatasetTable[F]
      with ObservationView[F]
      with ResultMapping[F] {
 
   lazy val ExecutionEventSelectResultMapping: TypeMapping =
-    nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventView.ObservationId))
+    SwitchMapping(
+      ExecutionEventSelectResultType,
+      List(
+        DatasetType / "events"   -> nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id, Join(DatasetTable.Id, ExecutionEventView.DatasetId)),
+        ExecutionType / "events" -> nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventView.ObservationId))
+      )
+    )
 
 }
