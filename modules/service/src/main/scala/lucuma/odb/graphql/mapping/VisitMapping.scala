@@ -16,22 +16,15 @@ import lucuma.core.enums.Instrument
 
 import table.ExecutionEventView
 import table.GmosStaticTables
+import table.ObservationView
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
                             with ExecutionEventView[F]
-                            with GmosStaticTables[F] {
+                            with GmosStaticTables[F]
+                            with ObservationView[F] {
 
   /*
-    "Visit id."
-  id: VisitId!
-
-  "Implements the Visit.instrument field to return GMOS_SOUTH."
-  instrument: Instrument!
-
-  "Created by Observe at time."
-  created: Timestamp!
-
   "Started at time."
   startTime: Timestamp
 
@@ -40,20 +33,18 @@ trait VisitMapping[F[_]] extends VisitTable[F]
 
   "Visit duration."
   duration: TimeSpan!
-
-  "Execution events associated with this visit."
-  events: [ExecutionEvent!]!
-     */
+  */
 
   lazy val VisitMapping: ObjectMapping =
     SqlInterfaceMapping(
       tpe           = VisitType,
       discriminator = visitTypeDiscriminator,
       fieldMappings = List(
-        SqlField("id",         VisitTable.Id,         key = true),
-        SqlField("instrument", VisitTable.Instrument, discriminator = true),
-        SqlField("created",    VisitTable.Created),
-        SqlObject("events",    Join(VisitTable.Id, ExecutionEventView.VisitId))
+        SqlField("id",           VisitTable.Id,         key = true),
+        SqlField("instrument",   VisitTable.Instrument, discriminator = true),
+        SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
+        SqlField("created",      VisitTable.Created),
+        SqlObject("events",      Join(VisitTable.Id, ExecutionEventView.VisitId))
       )
     )
 
@@ -95,15 +86,4 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       )
     )
 
-/*
-  """
-  GmosSouth static instrument configuration
-  """
-  static: GmosSouthStatic!
-
-  """
-  GmosSouth recorded steps
-  """
-  steps: [GmosSouthStepRecord!]!
- */
 }

@@ -27,10 +27,12 @@ import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
+import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
@@ -56,6 +58,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] with Predicates
         SqlField("programId", ObservationView.ProgramId, hidden = true),
         EffectField("digest", digestHandler, List("id", "programId")),
         EffectField("config", configHandler, List("id", "programId")),
+        SqlObject("visits"),
         SqlObject("datasets")
       )
     )
@@ -82,6 +85,29 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F] with Predicates
               ))),
               oss = Some(List(
                 OrderSelection[Dataset.Id](DatasetType / "id")
+              )),
+              offset = None,
+              limit = Some(limit + 1), // Select one extra row here.
+              child = q
+            )
+          }
+        }
+      }
+    case (ExecutionType, "visits", List(
+      VisitIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      Elab.transformChild { child =>
+        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                OFFSET.map(Predicates.visit.id.gtEql).getOrElse(True),
+                Predicates.visit.observation.program.isVisibleTo(user),
+              ))),
+              oss = Some(List(
+                OrderSelection[Visit.Id](VisitType / "id")
               )),
               offset = None,
               limit = Some(limit + 1), // Select one extra row here.
