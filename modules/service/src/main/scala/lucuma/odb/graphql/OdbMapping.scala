@@ -188,6 +188,7 @@ object OdbMapping {
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
           with VisitMapping[F]
+          with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
         {
 
@@ -334,6 +335,7 @@ object OdbMapping {
               UpdateTargetsResultMapping,
               UserMapping,
               VisitMapping,
+              VisitSelectResultMapping,
               WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings
 

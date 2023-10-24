@@ -1353,8 +1353,6 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   """
   science: GmosNorthExecutionSequence
 
-  #visits: [GmosNorthVisit!]!
-
   """
   Instrument type
   """
@@ -1704,6 +1702,9 @@ type GmosNorthVisit implements Visit {
   "Implements the Visit.instrument field to return GMOS_NORTH."
   instrument: Instrument!
 
+  "Observation associated with this visit."
+  observation: Observation!
+
   "Created by Observe at time."
   created: Timestamp!
 
@@ -1892,7 +1893,6 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   GMOS South science execution
   """
   science: GmosSouthExecutionSequence
-  #visits: [GmosSouthVisit!]!
 
   """
   Instrument type
@@ -2247,6 +2247,9 @@ type GmosSouthVisit implements Visit {
 
   "Implements the Visit.instrument field to return GMOS_SOUTH."
   instrument: Instrument!
+
+  "Observation associated with this visit."
+  observation: Observation!
 
   "Created by Observe at time."
   created: Timestamp!
@@ -5180,7 +5183,7 @@ type Execution {
 
   ): ExecutionConfig!
 
-  "Datasets associated with the observation."
+  "Datasets associated with the observation, across all visits."
   datasets(
     "Starts the result set at (or after if not existent) the given dataset id."
     OFFSET: DatasetId
@@ -5189,20 +5192,24 @@ type Execution {
     LIMIT: NonNegInt
   ): DatasetSelectResult!
 
-  """
-  Events associated with the observation
-  """
+  "Events associated with the observation, across all visits."
   events(
-    """
-    Starts the result set at (or after if not existent) the given execution event id.
-    """
+    "Starts the result set at (or after if not existent) the given execution event id."
     OFFSET: ExecutionEventId
 
-    """
-    Limits the result to at most this number of matches (but never more than 1000).
-    """
+    "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  "Visits associated with the observation."
+  visits(
+    "Starts the result set at (or after if not existent) the given visit id."
+    OFFSET: VisitId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): VisitSelectResult!
+
 }
 
 """
@@ -9381,6 +9388,10 @@ type User {
   orcidEmail:      String,
 }
 
+"""
+A visit is recorded whenever any part of an observation is attempted.  There
+are specific impementations for each instrument.
+"""
 interface Visit {
 
   "Visit id."
@@ -9391,6 +9402,9 @@ interface Visit {
   various specific instrument visit types.
   """
   instrument: Instrument!
+
+  "Observation associated with this visit."
+  observation: Observation!
 
   "Created by Observe at time."
   created: Timestamp!
@@ -9407,6 +9421,18 @@ interface Visit {
   "Execution events associated with this visit."
   events: [ExecutionEvent!]!
 
+}
+
+"""
+Matching visit results, limited to a maximum of 1000 entries.
+"""
+type VisitSelectResult {
+
+  "Matching visits up to the return size limit of 1000."
+  matches: [Visit!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
 }
 
 """
