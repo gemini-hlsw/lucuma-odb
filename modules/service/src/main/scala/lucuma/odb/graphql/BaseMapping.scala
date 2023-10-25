@@ -23,6 +23,8 @@ trait BaseMapping[F[_]]
   lazy val AsterismGroupSelectResultType       = schema.ref("AsterismGroupSelectResult")
   lazy val AngleType                           = schema.ref("Angle")
   lazy val AtomIdType                          = schema.ref("AtomId")
+  lazy val AtomRecordType                      = schema.ref("AtomRecord")
+  lazy val AtomRecordSelectResultType          = schema.ref("AtomRecordSelectResult")
   lazy val BiasType                            = schema.ref("Bias")
   lazy val BigDecimalType                      = schema.ref("BigDecimal")
   lazy val CatalogInfoType                     = schema.ref("CatalogInfo")

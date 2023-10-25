@@ -121,6 +121,58 @@ AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 scalar AtomId
 
 """
+An atom as recorded by Observe.  There will be one `AtomRecord` implementation
+per instrument.
+"""
+interface AtomRecord {
+
+  "Atom ID."
+  id: AtomId!
+
+  "A discriminator that can be used to determine the concrete implementation."
+  instrument: Instrument!
+
+  "Visit in which this atom was executed."
+  visit: Visit!
+
+  "Created by Observe at this time."
+  created: Timestamp!
+
+  "Sequence type."
+  sequenceType: SequenceType!
+
+  "Number of valid steps required to complete this atom."
+  stepCount: NonNegShort!
+
+  #TBD "Recorded steps."
+  #steps(
+  #  "Starts the result set at (or after if not existent) the given dataset id."
+  #  OFFSET: DatasetId
+  #
+  #  "Limits the result to at most this number of matches (but never more than 1000)."
+  #  LIMIT: NonNegInt
+  #): [StepRecord!]!
+
+}
+
+"""
+The matching atom results, limited to a maximum of 1000 entries.
+"""
+type AtomRecordSelectResult {
+
+  """
+  Matching atom records up to the return size limit of 1000.
+  """
+  matches: [AtomRecord!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+
+}
+
+"""
 Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
 """
 input BandBrightnessIntegratedInput {
@@ -1218,10 +1270,13 @@ type GmosNorthAtom implements Atom {
 }
 
 "GMOS North atom as recorded by Observe."
-type GmosNorthAtomRecord {
+type GmosNorthAtomRecord implements AtomRecord {
 
   "Atom ID"
   id: AtomId!
+
+  "Implements the AtomRecord.instrument field to return GMOS_NORTH."
+  instrument: Instrument!
 
   "Visit in which this atom was executed."
   visit: Visit!
@@ -1774,10 +1829,13 @@ type GmosSouthAtom implements Atom {
 }
 
 "GMOS South atom as recorded by Observe."
-type GmosSouthAtomRecord {
+type GmosSouthAtomRecord implements AtomRecord {
 
   "Atom ID"
   id: AtomId!
+
+  "Implements the AtomRecord.instrument field to return GMOS_SOUTH."
+  instrument: Instrument!
 
   "Visit in which this atom was executed."
   visit: Visit!
@@ -5214,6 +5272,15 @@ type Execution {
     futureLimit: NonNegInt = 25
 
   ): ExecutionConfig!
+
+  "Executed (or at least partially executed) atom records."
+  atomRecords(
+    "Starts the result set at the given atom creation time."
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): AtomRecordSelectResult!
 
   "Datasets associated with the observation, across all visits."
   datasets(
