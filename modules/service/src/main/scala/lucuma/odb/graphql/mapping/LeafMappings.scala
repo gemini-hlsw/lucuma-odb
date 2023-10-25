@@ -64,6 +64,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
+      LeafMapping[Tag](ExecutionEventTypeType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),

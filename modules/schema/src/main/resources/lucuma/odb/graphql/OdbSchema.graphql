@@ -607,6 +607,18 @@ input ExchangeInput {
   minPercentTime: IntPercent
 }
 
+"Execution event types."
+enum ExecutionEventType {
+  "Sequence-level event type."
+  SEQUENCE
+
+  "Step-level event type."
+  STEP
+
+  "Dataset-level event type."
+  DATASET
+}
+
 """
 Exposure time mode input.  Specify fixed or signal to noise, but not both
 """
@@ -1211,8 +1223,8 @@ type GmosNorthAtomRecord {
   "Atom ID"
   id: AtomId!
 
-  "Visit ID"
-  visitId: VisitId!
+  "Visit in which this atom was executed."
+  visit: Visit!
 
   "Created by Observe at this time."
   created: Timestamp!
@@ -1340,8 +1352,6 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   GMOS North science execution
   """
   science: GmosNorthExecutionSequence
-
-  #visits: [GmosNorthVisit!]!
 
   """
   Instrument type
@@ -1684,31 +1694,46 @@ type GmosNorthStepRecord {
 """
 A GmosNorth visit as recorded by Observe
 """
-type GmosNorthVisit {
-  """
-  Visit id
-  """
+type GmosNorthVisit implements Visit {
+
+  "Visit id."
   id: VisitId!
 
-  """
-  Created by Observe at time
-  """
+  "Implements the Visit.instrument field to return GMOS_NORTH."
+  instrument: Instrument!
+
+  "Observation associated with this visit."
+  observation: Observation!
+
+  "Created by Observe at time."
   created: Timestamp!
 
-  """
-  Started at time
-  """
+  "Started at time."
   startTime: Timestamp
 
-  """
-  Ended at time
-  """
+  "Ended at time."
   endTime: Timestamp
 
-  """
-  Step duration
-  """
+  "Visit duration."
   duration: TimeSpan!
+
+  "Datasets associated with this visit."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  "Execution events associated with this visit."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
 
   """
   GmosNorth static instrument configuration
@@ -1720,10 +1745,6 @@ type GmosNorthVisit {
   """
   atoms: [GmosNorthAtomRecord!]!
 
-  """
-  Sequence events associated with this visit
-  """
-  sequenceEvents: [SequenceEvent!]!
 }
 
 """
@@ -1758,8 +1779,8 @@ type GmosSouthAtomRecord {
   "Atom ID"
   id: AtomId!
 
-  "Visit ID"
-  visitId: VisitId!
+  "Visit in which this atom was executed."
+  visit: Visit!
 
   "Created by Observe at this time."
   created: Timestamp!
@@ -1887,7 +1908,6 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   GMOS South science execution
   """
   science: GmosSouthExecutionSequence
-  #visits: [GmosSouthVisit!]!
 
   """
   Instrument type
@@ -2235,31 +2255,46 @@ type GmosSouthStepRecord {
 """
 A GmosSouth visit as recorded by Observe
 """
-type GmosSouthVisit {
-  """
-  Visit id
-  """
+type GmosSouthVisit implements Visit {
+
+  "Visit id."
   id: VisitId!
 
-  """
-  Created by Observe at time
-  """
+  "Implements the Visit.instrument field to return GMOS_SOUTH."
+  instrument: Instrument!
+
+  "Observation associated with this visit."
+  observation: Observation!
+
+  "Created by Observe at time."
   created: Timestamp!
 
-  """
-  Started at time
-  """
+  "Started at time."
   startTime: Timestamp
 
-  """
-  Ended at time
-  """
+  "Ended at time."
   endTime: Timestamp
 
-  """
-  Step duration
-  """
-  duration: TimeSpan
+  "Visit duration."
+  duration: TimeSpan!
+
+  "Datasets associated with this visit."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  "Execution events associated with this visit."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
 
   """
   GmosSouth static instrument configuration
@@ -2271,10 +2306,6 @@ type GmosSouthVisit {
   """
   steps: [GmosSouthStepRecord!]!
 
-  """
-  Sequence events associated with this visit
-  """
-  sequenceEvents: [SequenceEvent!]!
 }
 
 """
@@ -4846,29 +4877,31 @@ type Dataset {
   "Dataset index within the step."
   index: PosShort!
 
-  """
-  Observation associated with this dataset
-  """
+  "Observation associated with this dataset."
   observation: Observation!
 
-  """
-  Dataset filename
-  """
+  "Visit associated with this dataset."
+  visit: Visit!
+
+  "Events associated with the dataset."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  "Dataset filename."
   filename: DatasetFilename!
 
-  """
-  Dataset QA state, if any has been set.
-  """
+  "Dataset QA state, if any has been set."
   qaState: DatasetQaState
 
-  """
-  Start time, if the dataset collection has started.
-  """
+  "Start time, if the dataset collection has started."
   start: Timestamp
 
-  """
-  End time, if the dataset collection has finished.
-  """
+  "End time, if the dataset collection has finished."
   end: Timestamp
 
 }
@@ -4877,22 +4910,29 @@ type Dataset {
 Dataset-level events.  A single dataset will be associated with multiple events
 as it makes its way through observe, readout and write stages.
 """
-type DatasetEvent {
+type DatasetEvent implements ExecutionEvent {
 
   "Event id."
   id: ExecutionEventId!
 
-  "Dataset execution stage."
-  datasetStage: DatasetStage!
-
-  "Identifies the associated dataset."
-  dataset: Dataset!
+  "Visit associated with this event."
+  visit: Visit!
 
   "Observation whose execution produced this event."
   observation: Observation!
 
   "Time at which this event was received."
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Dataset execution stage."
+  datasetStage: DatasetStage!
+
+  "The associated dataset."
+  dataset: Dataset!
+
 }
 
 "Dataset filename in standard format."
@@ -5175,7 +5215,7 @@ type Execution {
 
   ): ExecutionConfig!
 
-  "Datasets associated with the observation."
+  "Datasets associated with the observation, across all visits."
   datasets(
     "Starts the result set at (or after if not existent) the given dataset id."
     OFFSET: DatasetId
@@ -5184,20 +5224,24 @@ type Execution {
     LIMIT: NonNegInt
   ): DatasetSelectResult!
 
-  """
-  Events associated with the observation
-  """
+  "Events associated with the observation, across all visits."
   events(
-    """
-    Starts the result set at (or after if not existent) the given execution event id.
-    """
+    "Starts the result set at (or after if not existent) the given execution event id."
     OFFSET: ExecutionEventId
 
-    """
-    Limits the result to at most this number of matches (but never more than 1000).
-    """
+    "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  "Visits associated with the observation."
+  visits(
+    "Starts the result set at (or after if not existent) the given visit id."
+    OFFSET: VisitId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): VisitSelectResult!
+
 }
 
 """
@@ -5214,25 +5258,20 @@ interface ExecutionConfig {
 Execution event (sequence, step, or dataset events)
 """
 interface ExecutionEvent {
-  """
-  Event id
-  """
+  "Event id."
   id: ExecutionEventId!
 
-  """
-  Associated visit
-  """
-  visitId: VisitId!
+  "Visit associated with the event."
+  visit: Visit!
 
-  """
-  Observation whose execution produced this event
-  """
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  """
-  Time at which this event was received
-  """
+  "Time at which this event was received."
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
 }
 
 """
@@ -8292,31 +8331,26 @@ type SequenceDigest {
 """
 Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
 """
-type SequenceEvent { # implements ExecutionEvent {
-  """
-  Event id
-  """
+type SequenceEvent implements ExecutionEvent {
+
+  "Event id."
   id: ExecutionEventId!
 
-  """
-  Associated visit
-  """
-  visitId: VisitId!
+  "Visit associated with this event."
+  visit: Visit!
 
-  """
-  Sequence event data
-  """
-  command: SequenceCommand!
-
-  """
-  Observation whose execution produced this event
-  """
+  "Observation whose execution produced this event."
   observation: Observation!
 
-  """
-  Time at which this event was received
-  """
+  "Time at which this event was received."
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Sequence event data."
+  command: SequenceCommand!
+
 }
 
 """
@@ -8778,25 +8812,29 @@ enum StellarLibrarySpectrum {
 """
 Step-level events.  The execution of a single step will generate multiple events.
 """
-type StepEvent {
+type StepEvent implements ExecutionEvent {
 
   "Event id"
   id: ExecutionEventId!
 
-  "Identifies the step to which the event refers."
-  stepId: StepId!
-
-  "Whether this is an acquisition or science sequence step."
-  sequenceType: SequenceType!
-
-  "Step execution stage."
-  stepStage: StepStage!
+  "Visit associated with this event."
+  visit: Visit!
 
   "Observation whose execution produced this event."
   observation: Observation!
 
   "Time at which this event was received"
   received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Step associated with this event."
+  stepId: StepId!
+
+  "Step execution stage."
+  stepStage: StepStage!
+
 }
 
 "StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
@@ -9380,6 +9418,68 @@ type User {
   orcidCreditName: String,
   orcidFamilyName: String,
   orcidEmail:      String,
+}
+
+"""
+A visit is recorded whenever any part of an observation is attempted.  There
+are specific impementations for each instrument.
+"""
+interface Visit {
+
+  "Visit id."
+  id: VisitId!
+
+  """
+  Instrument in use for this visit.  This serves as a discriminator between the
+  various specific instrument visit types.
+  """
+  instrument: Instrument!
+
+  "Observation associated with this visit."
+  observation: Observation!
+
+  "Created by Observe at time."
+  created: Timestamp!
+
+  "Started at time."
+  startTime: Timestamp
+
+  "Ended at time."
+  endTime: Timestamp
+
+  "Visit duration."
+  duration: TimeSpan!
+
+  "Datasets associated with this visit."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  "Execution events associated with this visit."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+}
+
+"""
+Matching visit results, limited to a maximum of 1000 entries.
+"""
+type VisitSelectResult {
+
+  "Matching visits up to the return size limit of 1000."
+  matches: [Visit!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
 }
 
 """

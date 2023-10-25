@@ -46,7 +46,7 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] {
 
   private lazy val stepTypeDiscriminator: SqlDiscriminator =
     new SqlDiscriminator {
-      override def discriminate(c:  Cursor): Result[Type] =
+      override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[StepType]("stepType").map {
           case StepType.Bias      => BiasType
           case StepType.Dark      => DarkType

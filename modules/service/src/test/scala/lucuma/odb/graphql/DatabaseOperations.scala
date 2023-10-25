@@ -10,12 +10,16 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.enums.StepStage
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RightAscension
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
@@ -567,6 +571,30 @@ trait DatabaseOperations { this: OdbSuite =>
     }
   }
 
+  def addSequenceEventAs(
+    user: User,
+    vid:  Visit.Id,
+    cmd:  SequenceCommand
+  ): IO[ExecutionEvent.Id] = {
+    val q = s"""
+      mutation {
+        addSequenceEvent(input: {
+          visitId: "$vid",
+          command: ${cmd.tag.toUpperCase}
+        }) {
+          event {
+            id
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).map { json =>
+      json.hcursor.downFields("addSequenceEvent", "event", "id").require[ExecutionEvent.Id]
+    }
+  }
+
+
   def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] = {
     val name = s"record${instrument.tag}Atom"
 
@@ -672,6 +700,30 @@ trait DatabaseOperations { this: OdbSuite =>
     }
   }
 
+  def addStepEventAs(
+    user:  User,
+    sid:   Step.Id,
+    stage: StepStage
+  ): IO[ExecutionEvent.Id] = {
+    val q = s"""
+      mutation {
+        addStepEvent(input: {
+          stepId:    "$sid",
+          stepStage: ${stage.tag.toUpperCase}
+        }) {
+          event {
+            id
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).map { json =>
+      json.hcursor.downFields("addStepEvent", "event", "id").require[ExecutionEvent.Id]
+    }
+  }
+
+
   def recordDatasetAs(
     user:     User,
     sid:      Step.Id,
@@ -692,6 +744,29 @@ trait DatabaseOperations { this: OdbSuite =>
 
     query(user = user, query = q).map { json =>
       json.hcursor.downFields("recordDataset", "dataset", "id").require[Dataset.Id]
+    }
+  }
+
+  def addDatasetEventAs(
+    user:  User,
+    did:   Dataset.Id,
+    stage: DatasetStage
+  ): IO[ExecutionEvent.Id] = {
+    val q = s"""
+      mutation {
+        addDatasetEvent(input: {
+          datasetId: "$did",
+          datasetStage: ${stage.tag.toUpperCase}
+        }) {
+          event {
+            id
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).map { json =>
+      json.hcursor.downFields("addDatasetEvent", "event", "id").require[ExecutionEvent.Id]
     }
   }
 

@@ -12,6 +12,7 @@ import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
+import lucuma.odb.util.Codecs.visit_id
 import skunk.codec.temporal.date
 import skunk.codec.text.varchar
 
@@ -24,6 +25,7 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
     val StepId: ColumnRef        = col("c_step_id", step_id)
     val Index: ColumnRef         = col("c_index",   int2_pos)
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
+    val VisitId: ColumnRef       = col("c_visit_id", visit_id)
 
     object File {
       val Site: ColumnRef  = col("c_file_site",  site)
