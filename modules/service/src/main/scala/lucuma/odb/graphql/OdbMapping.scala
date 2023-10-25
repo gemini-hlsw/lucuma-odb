@@ -109,10 +109,11 @@ object OdbMapping {
           with CreateTargetResultMapping[F]
           with DeclinationMapping[F]
           with DatasetMapping[F]
-          with DatasetEventMapping[F]
           with DatasetSelectResultMapping[F]
           with ElevationRangeMapping[F]
           with ExecutionMapping[F]
+          with ExecutionEventMapping[F]
+          with ExecutionEventSelectResultMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosAtomRecordMapping[F]
           with GmosCcdModeMapping[F]
@@ -122,9 +123,7 @@ object OdbMapping {
           with GmosGratingConfigMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
-          with GmosNorthVisitMapping[F]
           with GmosSouthStaticMapping[F]
-          with GmosSouthVisitMapping[F]
           with GmosStepRecordMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
@@ -167,12 +166,10 @@ object OdbMapping {
           with RecordGmosStepResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
-          with SequenceEventMapping[F]
           with SetAllocationResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
-          with StepEventMapping[F]
           with SubscriptionMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
@@ -191,6 +188,8 @@ object OdbMapping {
           with UpdateProposalAttachmentsResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
+          with VisitMapping[F]
+          with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
         {
 
@@ -240,6 +239,8 @@ object OdbMapping {
               DeclinationMapping,
               ElevationRangeMapping,
               ExecutionMapping,
+              ExecutionEventMapping,
+              ExecutionEventSelectResultMapping,
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
               GmosCustomMaskMapping,
@@ -335,6 +336,8 @@ object OdbMapping {
               UpdateProposalAttachmentsResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
+              VisitMapping,
+              VisitSelectResultMapping,
               WavelengthMapping
             ) ++ LeafMappings ++ ProposalClassMappings
 
@@ -344,6 +347,7 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 ConstraintSetGroupElaborator,
+                DatasetElaborator,
                 ExecutionElaborator,
                 GroupElaborator,
                 MutationElaborator,
@@ -353,6 +357,7 @@ object OdbMapping {
                 TargetEnvironmentElaborator,
                 TargetGroupElaborator,
                 QueryElaborator,
+                VisitElaborator
               ).combineAll
             )
 
