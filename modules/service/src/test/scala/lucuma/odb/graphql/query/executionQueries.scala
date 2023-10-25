@@ -396,7 +396,7 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `visits` -> `datasets`".ignore) {
+  test("`observation` -> `execution` -> `visits` -> `datasets`") {
     recordAll(mode, Setup(offset = 57, visitCount = 2, stepCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
