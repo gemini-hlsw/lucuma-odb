@@ -24,7 +24,7 @@ trait DatasetSelectResultMapping[F[_]]
       List(
         QueryType / "datasets"     -> topLevelSelectResultMapping(DatasetSelectResultType),
         ExecutionType / "datasets" -> nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId)),
-        VisitType / "datasets"     -> nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id, Join(VisitTable.Id, AtomRecordTable.VisitId), Join(AtomRecordTable.Id, StepRecordTable.AtomId), Join(StepRecordTable.Id, DatasetTable.StepId))
+        VisitType / "datasets"     -> nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id, Join(VisitTable.Id, DatasetTable.VisitId))
       )
     )
 
