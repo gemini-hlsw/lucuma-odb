@@ -72,8 +72,8 @@ trait VisitMapping[F[_]] extends VisitTable[F]
           case inst                 => Result.failure(s"No Visit implementation for ${inst.shortName}")
         }
 
-      private def mkPredicate(tpe: Instrument): Option[Predicate] =
-        Eql(InstrumentType / "instrument", Const(tpe)).some
+      private def mkPredicate(instrument: Instrument): Option[Predicate] =
+        Eql(VisitType / "instrument", Const(instrument)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {

@@ -38,21 +38,24 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
 
   private lazy val executionEventTypeDiscriminator: SqlDiscriminator =
     new SqlDiscriminator {
+
+      import lucuma.odb.data.ExecutionEventType.*
+
       override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[lucuma.odb.data.ExecutionEventType]("eventType").map {
-          case lucuma.odb.data.ExecutionEventType.Sequence => SequenceEventType
-          case lucuma.odb.data.ExecutionEventType.Step     => StepEventType
-          case lucuma.odb.data.ExecutionEventType.Dataset  => DatasetEventType
+          case Sequence => SequenceEventType
+          case Step     => StepEventType
+          case Dataset  => DatasetEventType
         }
 
-      private def mkPredicate(tpe: lucuma.odb.data.ExecutionEventType): Option[Predicate] =
-        Eql(ExecutionEventTypeType / "eventType", Const(tpe)).some
+      private def mkPredicate(eventType: lucuma.odb.data.ExecutionEventType): Option[Predicate] =
+        Eql(ExecutionEventType / "eventType", Const(eventType)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
-          case SequenceEventType => mkPredicate(lucuma.odb.data.ExecutionEventType.Sequence)
-          case StepEventType     => mkPredicate(lucuma.odb.data.ExecutionEventType.Step)
-          case DatasetEventType  => mkPredicate(lucuma.odb.data.ExecutionEventType.Dataset)
+          case SequenceEventType => mkPredicate(Sequence)
+          case StepEventType     => mkPredicate(Step)
+          case DatasetEventType  => mkPredicate(Dataset)
           case _                 => none
         }
     }

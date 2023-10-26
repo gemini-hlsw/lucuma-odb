@@ -50,8 +50,8 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
           case inst                 => Result.failure(s"No AtomRecord implementation for ${inst.shortName}")
         }
 
-      private def mkPredicate(tpe: Instrument): Option[Predicate] =
-        Eql(InstrumentType / "instrument", Const(tpe)).some
+      private def mkPredicate(instrument: Instrument): Option[Predicate] =
+        Eql(AtomRecordType / "instrument", Const(instrument)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
