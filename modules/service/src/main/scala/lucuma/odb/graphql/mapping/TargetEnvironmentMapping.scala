@@ -109,7 +109,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, obsTime) =>
         services.use { s =>
           s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-            .get(pid, oid, obsTime.toInstant)
+            .get(pid, oid, obsTime)
             .map {
               case Left(e)  => Result.failure(e.format)
               case Right(s) => s.success
