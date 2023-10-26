@@ -120,16 +120,13 @@ AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 """
 scalar AtomId
 
-"""
-An atom as recorded by Observe.  There will be one `AtomRecord` implementation
-per instrument.
-"""
-interface AtomRecord {
+"An atom as recorded by Observe."
+type AtomRecord {
 
   "Atom ID."
   id: AtomId!
 
-  "A discriminator that can be used to determine the concrete implementation."
+  "The instrument associated with this atom."
   instrument: Instrument!
 
   "Visit in which this atom was executed."
@@ -1268,42 +1265,6 @@ type GmosNorthAtom implements Atom {
 
 }
 
-"GMOS North atom as recorded by Observe."
-type GmosNorthAtomRecord implements AtomRecord {
-
-  "Atom ID"
-  id: AtomId!
-
-  "Implements the AtomRecord.instrument field to return GMOS_NORTH."
-  instrument: Instrument!
-
-  "Visit in which this atom was executed."
-  visit: Visit!
-
-  "Created by Observe at this time."
-  created: Timestamp!
-
-  "Sequence type."
-  sequenceType: SequenceType!
-
-  "Number of valid steps required to complete this atom."
-  stepCount: NonNegShort!
-
-  "Recorded steps associated with this atom."
-  steps(
-
-    """
-    Starts the result set at (or after if not existent) the given step creation
-    time.
-    """
-    OFFSET: Timestamp
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-
-  ): StepRecordSelectResult!
-}
-
 """
 GmosNorth Detector type
 """
@@ -1827,42 +1788,6 @@ type GmosSouthAtom implements Atom {
   Individual steps that comprise the atom
   """
   steps: [GmosSouthStep!]!
-}
-
-"GMOS South atom as recorded by Observe."
-type GmosSouthAtomRecord implements AtomRecord {
-
-  "Atom ID"
-  id: AtomId!
-
-  "Implements the AtomRecord.instrument field to return GMOS_SOUTH."
-  instrument: Instrument!
-
-  "Visit in which this atom was executed."
-  visit: Visit!
-
-  "Created by Observe at this time."
-  created: Timestamp!
-
-  "Sequence type."
-  sequenceType: SequenceType!
-
-  "Number of valid steps required to complete this atom."
-  stepCount: NonNegShort!
-
-  "Recorded steps associated with this atom."
-  steps(
-
-    """
-    Starts the result set at (or after if not existent) the given step creation
-    time.
-    """
-    OFFSET: Timestamp
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-
-  ): StepRecordSelectResult!
 }
 
 """
@@ -2612,6 +2537,12 @@ type Mutation {
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
+  "Record a new atom"
+  recordAtom(
+    "Atom configuration parameters"
+    input: RecordAtomInput!
+  ): RecordAtomResult!
+
   """
   Records a new dataset.  This dataset may be subsequently referenced by dataset events.
   """
@@ -2621,13 +2552,6 @@ type Mutation {
     """
     input: RecordDatasetInput!
   ): RecordDatasetResult!
-
-
-  "Record a new GMOS North atom"
-  recordGmosNorthAtom(
-    "Atom configuration parameters"
-    input: RecordAtomInput!
-  ): RecordGmosNorthAtomResult!
 
   "Record a new GMOS North step"
   recordGmosNorthStep(
@@ -2644,12 +2568,6 @@ type Mutation {
     """
     input: RecordGmosNorthVisitInput!
   ): RecordGmosNorthVisitResult!
-
-  "Record a new GMOS South atom"
-  recordGmosSouthAtom(
-    "GMOS South atom configuration parameters"
-    input: RecordAtomInput!
-  ): RecordGmosSouthAtomResult!
 
   "Record a new GMOS South step"
   recordGmosSouthStep(
@@ -3166,8 +3084,15 @@ input RadialVelocityInput {
 "Input parameters for creating a new atom record"
 input RecordAtomInput {
   visitId: VisitId!
+  instrument: Instrument!
   sequenceType: SequenceType!
   stepCount: NonNegShort!
+}
+
+"The result of recording an atom."
+type RecordAtomResult {
+  "The newly added atom record itself."
+  atomRecord: AtomRecord!
 }
 
 "Dataset creation parameters."
@@ -3189,12 +3114,6 @@ type RecordDatasetResult {
   "The new dataset that was added."
   dataset: Dataset!
 
-}
-
-"The result of recording a GMOS North atom."
-type RecordGmosNorthAtomResult {
-  "The newly added atom record itself."
-  atomRecord: GmosNorthAtomRecord!
 }
 
 "Input parameters for creating a new GmosNorth StepRecord"
@@ -3230,12 +3149,6 @@ type RecordGmosNorthVisitResult {
   The newly added visit record itself.
   """
   visit: GmosNorthVisit!
-}
-
-"The result of recording a GMOS South atom."
-type RecordGmosSouthAtomResult {
-  "The newly added atom record itself."
-  atomRecord: GmosSouthAtomRecord!
 }
 
 """
