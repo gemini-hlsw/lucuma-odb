@@ -160,7 +160,7 @@ object OdbMapping {
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
-          with RecordGmosAtomResultMapping[F]
+          with RecordAtomResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
@@ -248,7 +248,6 @@ object OdbMapping {
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
               GmosCustomMaskMapping,
-              GmosNorthAtomRecordMapping,
               GmosNorthDynamicMapping,
               GmosNorthFpuMapping,
               GmosNorthGratingConfigMapping,
@@ -256,7 +255,6 @@ object OdbMapping {
               GmosNorthStaticMapping,
               GmosNorthStepRecordMapping,
               GmosNorthVisitMapping,
-              GmosSouthAtomRecordMapping,
               GmosSouthDynamicMapping,
               GmosSouthFpuMapping,
               GmosSouthGratingConfigMapping,
@@ -298,11 +296,10 @@ object OdbMapping {
               ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
+              RecordAtomResultMapping,
               RecordDatasetResultMapping,
-              RecordGmosNorthAtomResultMapping,
               RecordGmosNorthStepResultMapping,
               RecordGmosNorthVisitResultMapping,
-              RecordGmosSouthAtomResultMapping,
               RecordGmosSouthStepResultMapping,
               RecordGmosSouthVisitResultMapping,
               RightAscensionMapping,

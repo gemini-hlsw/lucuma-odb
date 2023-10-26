@@ -50,8 +50,9 @@ class recordAtom extends OdbSuite {
       staff,
       vid => s"""
         mutation {
-          recordGmosNorthAtom(input: {
+          recordAtom(input: {
             visitId: ${vid.asJson},
+            instrument: GMOS_NORTH,
             sequenceType: ACQUISITION,
             stepCount: 3
           }) {
@@ -72,7 +73,7 @@ class recordAtom extends OdbSuite {
       """,
       vid => json"""
         {
-          "recordGmosNorthAtom": {
+          "recordAtom": {
             "atomRecord": {
               "visit": {
                 "id": ${vid.asJson}
@@ -95,8 +96,9 @@ class recordAtom extends OdbSuite {
       staff,
       vid => s"""
         mutation {
-          recordGmosSouthAtom(input: {
+          recordAtom(input: {
             visitId: ${vid.asJson},
+            instrument: GMOS_SOUTH,
             sequenceType: ACQUISITION,
             stepCount: 3
           }) {
@@ -117,7 +119,7 @@ class recordAtom extends OdbSuite {
       """,
       vid => json"""
         {
-          "recordGmosSouthAtom": {
+          "recordAtom": {
             "atomRecord": {
               "visit": {
                 "id": ${vid.asJson}
@@ -140,8 +142,9 @@ class recordAtom extends OdbSuite {
       staff,
       vid => s"""
         mutation {
-          recordGmosSouthAtom(input: {
+          recordAtom(input: {
             visitId: ${vid.asJson},
+            instrument: GMOS_SOUTH,
             sequenceType: ACQUISITION,
             stepCount: 3
           }) {
