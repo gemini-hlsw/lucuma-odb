@@ -156,7 +156,7 @@ interface AtomRecord {
 }
 
 """
-The matching atom results, limited to a maximum of 1000 entries.
+AtomRecord query results, limited to a maximum of 1000 entries.
 """
 type AtomRecordSelectResult {
 
