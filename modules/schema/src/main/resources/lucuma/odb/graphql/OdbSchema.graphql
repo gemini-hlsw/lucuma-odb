@@ -144,30 +144,29 @@ interface AtomRecord {
   "Number of valid steps required to complete this atom."
   stepCount: NonNegShort!
 
-  #TBD "Recorded steps."
-  #steps(
-  #  "Starts the result set at (or after if not existent) the given dataset id."
-  #  OFFSET: DatasetId
-  #
-  #  "Limits the result to at most this number of matches (but never more than 1000)."
-  #  LIMIT: NonNegInt
-  #): [StepRecord!]!
+  "Recorded steps associated with this atom."
+  steps(
+
+    """
+    Starts the result set at (or after if not existent) the given step creation
+    time.
+    """
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+  ): StepRecordSelectResult!
 
 }
 
-"""
-AtomRecord query results, limited to a maximum of 1000 entries.
-"""
+"AtomRecord query results, limited to a maximum of 1000 entries."
 type AtomRecordSelectResult {
 
-  """
-  Matching atom records up to the return size limit of 1000.
-  """
+  "Matching atom records up to the return size limit of 1000."
   matches: [AtomRecord!]!
 
-  """
-  `true` when there were additional matches that were not returned.
-  """
+  "`true` when there were additional matches that were not returned."
   hasMore: Boolean!
 
 }
@@ -1290,8 +1289,19 @@ type GmosNorthAtomRecord implements AtomRecord {
   "Number of valid steps required to complete this atom."
   stepCount: NonNegShort!
 
-  "Recorded steps"
-  steps: [GmosNorthStepRecord!]!
+  "Recorded steps associated with this atom."
+  steps(
+
+    """
+    Starts the result set at (or after if not existent) the given step creation
+    time.
+    """
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+  ): StepRecordSelectResult!
 }
 
 """
@@ -1681,69 +1691,56 @@ type GmosNorthStep implements Step {
 }
 
 "GMOS North step configuration as recorded by Observe."
-type GmosNorthStepRecord {
-  """
-  Step id
-  """
+type GmosNorthStepRecord implements StepRecord {
+
+  "Step ID."
   id: StepId!
 
-  """
-  Atom id
-  """
-  atomId: AtomId!
+  "Instrument associated with the concrete implementation."
+  instrument: Instrument!
 
-  """
-  Created by Observe at time
-  """
+  "The atom in which the step was executed."
+  atom: AtomRecord!
+
+  "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Step index relative to the referenced atom."
-  stepIndex: NonNegShort!
-
-  """
-  Started at time
-  """
+  "Time of the first associated step event, if any."
   startTime: Timestamp
 
-  """
-  Ended at time
-  """
+  "Time of the last associated step event, if any."
   endTime: Timestamp
 
-  """
-  Step duration
-  """
+  "Step duration, the difference between 'endTime' and 'startTime'."
   duration: TimeSpan!
 
-  """
-  GmosNorth configuration for this step
-  """
-  instrumentConfig: GmosNorthDynamic!
-
-  """
-  The executed step itself
-  """
+  "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
 
-  """
-  Step events associated with this step
-  """
-  stepEvents: [StepEvent!]!
-
-  """
-  Step QA state based on a combination of dataset QA states
-  """
+  "Step QA state based on a combination of dataset QA states."
   stepQaState: StepQaState
 
-  """
-  Dataset events associated with this step
-  """
-  datasetEvents: [DatasetEvent!]!
+  "Datasets associated with this step."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
 
-  """
-  Datasets associated with this step
-  """
-  datasets: [Dataset!]!
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  "Execution events associated with this step."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  "GMOS North instrument configuration for this step."
+  instrumentConfig: GmosNorthDynamic!
+
 }
 
 """
@@ -1853,8 +1850,19 @@ type GmosSouthAtomRecord implements AtomRecord {
   "Number of valid steps required to complete this atom."
   stepCount: NonNegShort!
 
-  "Recorded steps"
-  steps: [GmosSouthStepRecord!]!
+  "Recorded steps associated with this atom."
+  steps(
+
+    """
+    Starts the result set at (or after if not existent) the given step creation
+    time.
+    """
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+  ): StepRecordSelectResult!
 }
 
 """
@@ -2249,69 +2257,56 @@ type GmosSouthStep implements Step {
 """
 A GmosSouth step configuration as recorded by Observe
 """
-type GmosSouthStepRecord {
-  """
-  Step id
-  """
+type GmosSouthStepRecord implements StepRecord {
+
+  "Step ID."
   id: StepId!
 
-  """
-  Atom id
-  """
-  atomId: AtomId!
+  "Instrument associated with the concrete implementation."
+  instrument: Instrument!
 
-  "Step index relative to the referenced atom."
-  stepIndex: NonNegShort!
+  "The atom in which the step was executed."
+  atom: AtomRecord!
 
-  """
-  Created by Observe at time
-  """
+  "The step was created by Observe at this time."
   created: Timestamp!
 
-  """
-  Started at time
-  """
+  "Time of the first associated step event, if any."
   startTime: Timestamp
 
-  """
-  Ended at time
-  """
+  "Time of the last associated step event, if any."
   endTime: Timestamp
 
-  """
-  Step duration
-  """
+  "Step duration, the difference between 'endTime' and 'startTime'."
   duration: TimeSpan!
 
-  """
-  GmosSouth configuration for this step
-  """
-  instrumentConfig: GmosSouthDynamic!
-
-  """
-  The executed step itself
-  """
+  "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
 
-  """
-  Step events associated with this step
-  """
-  stepEvents: [StepEvent!]!
-
-  """
-  Step QA state based on a combination of dataset QA states
-  """
+  "Step QA state based on a combination of dataset QA states."
   stepQaState: StepQaState
 
-  """
-  Dataset events associated with this step
-  """
-  datasetEvents: [DatasetEvent!]!
+  "Datasets associated with this step."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
 
-  """
-  Datasets associated with this step
-  """
-  datasets: [Dataset!]!
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  "Execution events associated with this step."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+  "GMOS South instrument configuration for this step."
+  instrumentConfig: GmosSouthDynamic!
+
 }
 
 """
@@ -9110,6 +9105,72 @@ type StepEstimate {
   total:        TimeSpan!
 }
 
+"""
+A step as recorded by Observe.  There will be one `StepRecord` implementation
+per instrument.
+"""
+interface StepRecord {
+
+  "Step ID."
+  id: StepId!
+
+  "Instrument associated with the concrete implementation."
+  instrument: Instrument!
+
+  "The atom in which the step was executed."
+  atom: AtomRecord!
+
+  "The step was created by Observe at this time."
+  created: Timestamp!
+
+  "Time of the first associated step event, if any."
+  startTime: Timestamp
+
+  "Time of the last associated step event, if any."
+  endTime: Timestamp
+
+  "Step duration, the difference between 'endTime' and 'startTime'."
+  duration: TimeSpan!
+
+  """
+  The step configuration, apart from instrument details found in the
+  instrument-specific 'StepRecord' implementation.
+  """
+  stepConfig: StepConfig!
+
+  "Step QA state based on a combination of dataset QA states."
+  stepQaState: StepQaState
+
+  "Datasets associated with this step."
+  datasets(
+    "Starts the result set at (or after if not existent) the given dataset id."
+    OFFSET: DatasetId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): DatasetSelectResult!
+
+  "Execution events associated with this step."
+  events(
+    "Starts the result set at (or after if not existent) the given execution event id."
+    OFFSET: ExecutionEventId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): ExecutionEventSelectResult!
+
+}
+
+"StepRecord query results, limited to a maximum of 1000 entries."
+type StepRecordSelectResult {
+
+  "Matching step records up to the return size limit of 1000."
+  matches: [StepRecord!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
+
+}
 
 """
 System Verification

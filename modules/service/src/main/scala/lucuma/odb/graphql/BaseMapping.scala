@@ -216,6 +216,8 @@ trait BaseMapping[F[_]]
   lazy val StepConfigType                      = schema.ref("StepConfig")
   lazy val StepEventType                       = schema.ref("StepEvent")
   lazy val StepIdType                          = schema.ref("StepId")
+  lazy val StepRecordType                      = schema.ref("StepRecord")
+  lazy val StepRecordSelectResultType          = schema.ref("StepRecordSelectResult")
   lazy val StepStageType                       = schema.ref("StepStage")
   lazy val StepTypeType                        = schema.ref("StepType")
   lazy val SystemVerificationType              = schema.ref("SystemVerification")

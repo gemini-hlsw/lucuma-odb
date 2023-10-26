@@ -62,7 +62,9 @@ class recordAtom extends OdbSuite {
               sequenceType
               stepCount
               steps {
-                id
+                matches {
+                  id
+                }
               }
             }
           }
@@ -77,7 +79,9 @@ class recordAtom extends OdbSuite {
               },
               "sequenceType": "ACQUISITION",
               "stepCount": 3,
-              "steps": []
+              "steps": {
+                "matches": []
+              }
             }
           }
         }
@@ -103,7 +107,9 @@ class recordAtom extends OdbSuite {
               sequenceType
               stepCount
               steps {
-                id
+                matches {
+                  id
+                }
               }
             }
           }
@@ -118,7 +124,9 @@ class recordAtom extends OdbSuite {
               },
               "sequenceType": "ACQUISITION",
               "stepCount": 3,
-              "steps": []
+              "steps": {
+                "matches": []
+              }
             }
           }
         }
