@@ -1772,6 +1772,15 @@ type GmosNorthVisit implements Visit {
   "Visit duration."
   duration: TimeSpan!
 
+  "Executed (or at least partially executed) atom records for this visit."
+  atomRecords(
+    "Starts the result set at the given atom creation time."
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): AtomRecordSelectResult!
+
   "Datasets associated with this visit."
   datasets(
     "Starts the result set at (or after if not existent) the given dataset id."
@@ -1794,11 +1803,6 @@ type GmosNorthVisit implements Visit {
   GmosNorth static instrument configuration
   """
   static: GmosNorthStatic!
-
-  """
-  GmosNorth recorded atoms
-  """
-  atoms: [GmosNorthAtomRecord!]!
 
 }
 
@@ -2335,6 +2339,15 @@ type GmosSouthVisit implements Visit {
 
   "Visit duration."
   duration: TimeSpan!
+
+  "Executed (or at least partially executed) atom records for this visit."
+  atomRecords(
+    "Starts the result set at the given atom creation time."
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): AtomRecordSelectResult!
 
   "Datasets associated with this visit."
   datasets(
@@ -5273,7 +5286,7 @@ type Execution {
 
   ): ExecutionConfig!
 
-  "Executed (or at least partially executed) atom records."
+  "Executed (or at least partially executed) atom records, across all visits."
   atomRecords(
     "Starts the result set at the given atom creation time."
     OFFSET: Timestamp
@@ -9516,6 +9529,15 @@ interface Visit {
 
   "Visit duration."
   duration: TimeSpan!
+
+  "Executed (or at least partially executed) atom records for this visit."
+  atomRecords(
+    "Starts the result set at the given atom creation time."
+    OFFSET: Timestamp
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): AtomRecordSelectResult!
 
   "Datasets associated with this visit."
   datasets(

@@ -484,8 +484,52 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("`observation` -> `execution` -> `visits` -> `atomRecords`") {
+    recordAll(mode, Setup(offset = 63, visitCount = 2, atomCount = 2), pi).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              visits {
+                matches {
+                  atomRecords {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.map { v =>
+        Json.obj(
+          "atomRecords" -> Json.obj(
+            "matches" -> v.atoms.map(a => Json.obj("id" -> a.id.asJson)).asJson
+          )
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "visits": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
   test("`observation` -> `execution` -> `atomRecords`") {
-    recordAll(mode, Setup(offset = 63, visitCount = 2), pi).flatMap { on =>
+    recordAll(mode, Setup(offset = 67, visitCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {

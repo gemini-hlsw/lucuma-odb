@@ -29,7 +29,7 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
       tpe           = AtomRecordType,
       discriminator = atomRecordTypeDiscriminator,
       fieldMappings = List(
-        SqlField("id",           AtomRecordTable.Id,         key = true),
+        SqlField("id",           AtomRecordTable.Id, key = true),
         SqlField("instrument",   AtomRecordTable.Instrument, discriminator = true),
         SqlObject("visit",       Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlField("created",      AtomRecordTable.Created),
