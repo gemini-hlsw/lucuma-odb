@@ -20,6 +20,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
+import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
 
 import table.ExecutionEventView
@@ -56,6 +57,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlField("instrument",   VisitTable.Instrument, discriminator = true),
         SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
         SqlField("created",      VisitTable.Created),
+        SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events")
       )
@@ -100,6 +102,12 @@ trait VisitMapping[F[_]] extends VisitTable[F]
     )
 
   lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (VisitType, "atomRecords", List(
+      TimestampBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "created", Predicates.atomRecord.created, Predicates.atomRecord.visit.observation.program)
 
     case (VisitType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),
