@@ -332,6 +332,19 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
+  val emptyGuideEnvironmentResults =
+    json"""
+    {
+      "observation": {
+        "title": "V1647 Orionis",
+        "targetEnvironment": {
+          "guideEnvironments": [
+          ]
+        }
+      }
+    }
+    """
+
   val guideEnvironmentResults =
     json"""
     {
@@ -567,8 +580,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid, aug3000),
-      expected = List(s"Error calling Gaia: 'No valid guide star candidates were returned for observation $oid.'").asLeft)
+      expect(pi, guideEnvironmentQuery(oid, aug3000), expected = emptyGuideEnvironmentResults.asRight)
     }
   }
 
