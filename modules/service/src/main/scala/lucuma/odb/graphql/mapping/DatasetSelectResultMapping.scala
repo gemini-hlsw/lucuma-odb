@@ -22,9 +22,10 @@ trait DatasetSelectResultMapping[F[_]]
     SwitchMapping(
       DatasetSelectResultType,
       List(
-        QueryType / "datasets"     -> topLevelSelectResultMapping(DatasetSelectResultType),
-        ExecutionType / "datasets" -> nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId)),
-        VisitType / "datasets"     -> nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id, Join(VisitTable.Id, DatasetTable.VisitId))
+        QueryType / "datasets"      -> topLevelSelectResultMapping(DatasetSelectResultType),
+        StepRecordType / "datasets" -> nestedSelectResultMapping(DatasetSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, DatasetTable.StepId)),
+        ExecutionType / "datasets"  -> nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId)),
+        VisitType / "datasets"      -> nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id,      Join(VisitTable.Id, DatasetTable.VisitId))
       )
     )
 

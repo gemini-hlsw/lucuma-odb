@@ -9,17 +9,24 @@ import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
+import grackle.Query.Binding
+import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
 import grackle.TypeRef
 import lucuma.core.enums.Instrument
 import lucuma.core.model.User
+import lucuma.odb.graphql.binding.NonNegIntBinding
+import lucuma.odb.graphql.binding.TimestampBinding
+import lucuma.odb.graphql.predicate.Predicates
 
 import table.AtomRecordTable
 import table.StepRecordTable
 import table.VisitTable
 
 trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
+                                 with Predicates[F]
+                                 with SelectSubquery
                                  with StepRecordTable[F]
                                  with VisitTable[F] {
   def user: User
@@ -35,9 +42,7 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
         SqlField("created",      AtomRecordTable.Created),
         SqlField("sequenceType", AtomRecordTable.SequenceType),
         SqlField("stepCount",    AtomRecordTable.StepCount),
-
-        // TBD: update to query with offset and limit, step record interface, etc.
-        SqlObject("steps",       Join(AtomRecordTable.Id, StepRecordTable.AtomId))
+        SqlObject("steps")
       )
     )
 
@@ -60,6 +65,16 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
           case _                       => none
         }
     }
+
+  lazy val AtomRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (AtomRecordType, "steps", List(
+      TimestampBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "created", Predicates.stepRecord.created, Predicates.stepRecord.atomRecord.visit.observation.program)
+
+  }
 
   lazy val GmosNorthAtomRecordMapping: ObjectMapping =
     ObjectMapping(
