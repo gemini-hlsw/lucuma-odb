@@ -4,27 +4,17 @@
 package lucuma.odb.graphql
 package query
 
-import cats.Order.catsKernelOrderingForOrder
-import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.option.*
-import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.DatasetStage
-import lucuma.core.enums.SequenceCommand
-import lucuma.core.enums.StepStage
-import lucuma.core.model.ExecutionEvent
-import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.ObservingModeType
 
-class executionQueries extends OdbSuite with DatabaseOperations {
+class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
@@ -34,143 +24,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
 
   val validUsers = List(pi, pi2, service).toList
 
-  trait Node {
-    def allDatasets: List[Dataset.Id]
-    def allEvents: List[ExecutionEvent.Id]
-  }
-
-  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent.Id]) extends Node {
-    def allDatasets = List(id)
-    def allEvents   = events
-  }
-  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent.Id]) extends Node{
-    def allDatasets = datasets.map(_.id).sorted
-    def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sorted
-  }
-  case class AtomNode(id: Atom.Id, steps: List[StepNode]) extends Node {
-    def allDatasets = steps.flatMap(_.allDatasets).sorted
-    def allEvents   = steps.flatMap(_.allEvents).sorted
-  }
-  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent.Id]) extends Node {
-    def allDatasets = atoms.flatMap(_.allDatasets).sorted
-    def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sorted
-  }
-  case class ObservationNode(id: Observation.Id, visits: List[VisitNode]) extends Node {
-    def allDatasets = visits.flatMap(_.allDatasets).sorted
-    def allEvents   = visits.flatMap(_.allEvents).sorted
-  }
-
-  case class Setup(
-    offset: Int       = 0,
-    visitCount: Int   = 1,
-    atomCount: Int    = 1,
-    stepCount: Int    = 1,
-    datasetCount: Int = 1
-  ) {
-    def nextOffset: Int =
-      visitCount * atomCount * stepCount * datasetCount
-  }
-
-  def recordDataset(
-    setup:   Setup,
-    user:    User,
-    sid:     Step.Id,
-    visit:   Int,
-    atom:    Int,
-    step:    Int,
-    dataset: Int
-  ): IO[DatasetNode] = {
-
-    val idx = setup.offset                                                     +
-              visit * (setup.atomCount * setup.stepCount * setup.datasetCount) +
-               atom * (setup.stepCount * setup.datasetCount)                   +
-               step * setup.datasetCount                                       +
-               dataset                                                         +
-               1
-
-    val stages = List(
-      DatasetStage.StartObserve,
-      DatasetStage.EndObserve,
-      DatasetStage.StartReadout,
-      DatasetStage.EndReadout,
-      DatasetStage.StartWrite,
-      DatasetStage.EndWrite
-    )
-
-    for {
-      did <- recordDatasetAs(user, sid, f"N18630101S$idx%04d.fits")
-      es  <- stages.traverse { stage => addDatasetEventAs(user, did, stage) }
-    } yield DatasetNode(did, es)
-  }
-
-  def recordStep(
-    mode:    ObservingModeType,
-    setup:   Setup,
-    user:    User,
-    aid:     Atom.Id,
-    visit:   Int,
-    atom:    Int,
-    step:    Int
-  ): IO[StepNode] = {
-
-    val stages0 = List(
-      StepStage.StartStep,
-      StepStage.StartConfigure,
-      StepStage.EndConfigure,
-      StepStage.StartObserve
-    )
-
-    val stages1 = List(
-      StepStage.EndObserve,
-      StepStage.EndStep
-    )
-    for {
-      sid <- recordStepAs(user, mode.instrument, aid)
-      es0 <- stages0.traverse { stage => addStepEventAs(user, sid, stage) }
-      ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, visit, atom, step, d) }
-      es1 <- stages1.traverse { stage => addStepEventAs(user, sid, stage) }
-    } yield StepNode(sid, ds, es0 ::: es1)
-  }
-
-  def recordAtom(
-    mode:    ObservingModeType,
-    setup:   Setup,
-    user:    User,
-    vid:     Visit.Id,
-    visit:   Int,
-    atom:    Int
-  ): IO[AtomNode] =
-    for {
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      ss  <- (0 until setup.stepCount).toList.traverse { s => recordStep(mode, setup, user, aid, visit, atom, s) }
-    } yield AtomNode(aid, ss)
-
-  def recordVisit(
-    mode:    ObservingModeType,
-    setup:   Setup,
-    user:    User,
-    oid:     Observation.Id,
-    visit:   Int
-  ): IO[VisitNode] =
-    for {
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      e0  <- addSequenceEventAs(user, vid, SequenceCommand.Start)
-      as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(mode, setup, user, vid, visit, a) }
-      e1  <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
-    } yield VisitNode(vid, as, List(e0, e1))
-
-  def recordAll(
-    mode:  ObservingModeType,
-    setup: Setup,
-    user:  User
-  ): IO[ObservationNode] =
-    for {
-      pid   <- createProgramAs(user)
-      oid   <- createObservationAs(user, pid, mode.some)
-      vs    <- (0 until setup.visitCount).toList.traverse { v => recordVisit(mode, setup, user, oid, v) }
-    } yield ObservationNode(oid, vs)
-
-  test("`observation` -> `execution` -> `datasets`") {
+  /*
+  test("observation -> execution -> datasets") {
     recordAll(mode, Setup(offset = 0, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
@@ -204,8 +59,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `datasets` -> `events`") {
-    recordAll(mode, Setup(offset = 24, stepCount = 2, datasetCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> datasets -> events") {
+    recordAll(mode, Setup(offset = 100, stepCount = 2, datasetCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -245,8 +100,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `datasets` -> `observation`") {
-    recordAll(mode, Setup(offset = 28), pi).flatMap { on =>
+  test("observation -> execution -> datasets -> observation") {
+    recordAll(mode, Setup(offset = 200), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -281,8 +136,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `datasets` -> `visit`") {
-    recordAll(mode, Setup(offset = 29, visitCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> datasets -> visit") {
+    recordAll(mode, Setup(offset = 300, visitCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -328,8 +183,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `events`") {
-    recordAll(mode, Setup(offset = 31, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> events") {
+    recordAll(mode, Setup(offset = 400, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -362,8 +217,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `visits`") {
-    recordAll(mode, Setup(offset = 55, visitCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> visits") {
+    recordAll(mode, Setup(offset = 500, visitCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -396,8 +251,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `visits` -> `datasets`") {
-    recordAll(mode, Setup(offset = 57, visitCount = 2, stepCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> visits -> datasets") {
+    recordAll(mode, Setup(offset = 600, visitCount = 2, stepCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -440,8 +295,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `visits` -> `events`") {
-    recordAll(mode, Setup(offset = 61, visitCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> visits -> events") {
+    recordAll(mode, Setup(offset = 700, visitCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -484,8 +339,8 @@ class executionQueries extends OdbSuite with DatabaseOperations {
     }
   }
 
-  test("`observation` -> `execution` -> `visits` -> `atomRecords`") {
-    recordAll(mode, Setup(offset = 63, visitCount = 2, atomCount = 2), pi).flatMap { on =>
+  test("observation -> execution -> visits -> atomRecords") {
+    recordAll(mode, Setup(offset = 800, visitCount = 2, atomCount = 2), pi).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -527,9 +382,9 @@ class executionQueries extends OdbSuite with DatabaseOperations {
       expect(pi, q, e)
     }
   }
-
-  test("`observation` -> `execution` -> `atomRecords`") {
-    recordAll(mode, Setup(offset = 67, visitCount = 2), pi).flatMap { on =>
+*/
+  test("observation -> execution -> atomRecords") {
+    recordAll(pi, mode, offset = 0, visitCount = 2, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -546,6 +401,162 @@ class executionQueries extends OdbSuite with DatabaseOperations {
 
       val matches = on.visits.flatMap(_.atoms).map { a =>
         Json.obj("id" -> a.id.asJson)
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("observation -> execution -> atomRecords -> steps") {
+    recordAll(pi, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.flatMap(_.atoms).map { a =>
+        Json.obj(
+          "steps" -> Json.obj(
+            "matches" -> a.steps.map(s => Json.obj("id" -> s.id.asJson)).asJson
+          )
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("observation -> execution -> atomRecords -> steps -> datasets") {
+    recordAll(pi, mode, offset = 200, atomCount = 2, stepCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      datasets {
+                        matches {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.flatMap(_.atoms).map { a =>
+        Json.obj(
+          "steps" -> Json.obj(
+            "matches" -> a.steps.map { s =>
+              Json.obj(
+                "datasets" -> Json.obj(
+                  "matches" -> s.datasets.map { d =>
+                    Json.obj("id" -> d.id.asJson)
+                  }.asJson
+                )
+              )
+            }.asJson
+          )
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("observation -> execution -> atomRecords -> steps -> events") {
+    recordAll(pi, mode, offset = 300).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      events {
+                        matches {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.flatMap(_.atoms).map { a =>
+        Json.obj(
+          "steps" -> Json.obj(
+            "matches" -> a.steps.map { s =>
+              Json.obj(
+                "events" -> Json.obj(
+                  "matches" -> s.allEvents.map { e =>
+                    Json.obj("id" -> e.asJson)
+                  }.asJson
+                )
+              )
+            }.asJson
+          )
+        )
       }
 
       val e = json"""
