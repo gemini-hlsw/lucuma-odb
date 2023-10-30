@@ -189,4 +189,156 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
+/*
+                  atomRecords {
+                    matches {
+                      steps {
+                        matches {
+                          ... on GmosNorthStepRecord {
+                            instrumentConfig {
+                              fpu {
+                                builtin
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+
+*/
+
+  test("observation -> execution -> visits -> atomRecords GmosNorthVisit static") {
+    recordAll(pi, mode, offset = 400).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              visits {
+                matches {
+                  ... on GmosNorthVisit {
+                    static {
+                      stageMode
+                    }
+                    atomRecords {
+                      matches {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.map { v =>
+        Json.obj(
+          "static" -> Json.obj(
+            "stageMode" -> "FOLLOW_XY".asJson,
+          ),
+          "atomRecords" -> Json.obj(
+            "matches" -> v.atoms.map(a => Json.obj("id" -> a.id.asJson)).asJson
+          )
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "visits": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("observation -> execution -> visits -> atomRecords GmosNorthStepRecord") {
+    recordAll(pi, mode, offset = 500).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              visits {
+                matches {
+                  ... on GmosNorthVisit {
+                    static {
+                      stageMode
+                    }
+                    atomRecords {
+                      matches {
+                        steps {
+                          matches {
+                            ... on GmosNorthStepRecord {
+                              instrumentConfig {
+                                fpu {
+                                  builtin
+                                }
+                              }
+                              stepConfig {
+                                stepType
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.map { v =>
+        Json.obj(
+          "static" -> Json.obj(
+            "stageMode" -> "FOLLOW_XY".asJson,
+          ),
+          "atomRecords" -> Json.obj(
+            "matches" ->
+               v.atoms.map { a =>
+                 Json.obj(
+                   "steps" -> Json.obj(
+                     "matches" ->
+                       a.steps.map { s =>
+                         Json.obj(
+                           "instrumentConfig" -> Json.obj(
+                             "fpu" -> Json.obj("builtin" -> "LONG_SLIT_0_50".asJson)
+                           ),
+                           "stepConfig" -> Json.obj(
+                             "stepType" -> "SCIENCE".asJson
+                           )
+                         )
+                       }.asJson
+                    )
+                  )
+               }.asJson
+            )
+          )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "visits": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
 }

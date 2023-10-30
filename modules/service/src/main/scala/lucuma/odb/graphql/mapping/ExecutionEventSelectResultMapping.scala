@@ -13,20 +13,35 @@ import table.VisitTable
 trait ExecutionEventSelectResultMapping[F[_]]
   extends ExecutionEventView[F]
      with DatasetTable[F]
+     with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
      with StepRecordTable[F]
      with VisitTable[F] {
 
-  lazy val ExecutionEventSelectResultMapping: TypeMapping =
+  lazy val ExecutionEventSelectResultMapping: TypeMapping = {
+
+    val fromDataset: ObjectMapping =
+      nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventView.DatasetId))
+
+    val fromExecution: ObjectMapping =
+      nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventView.ObservationId))
+
+    val fromStepRecord: ObjectMapping =
+      nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, ExecutionEventView.StepId))
+
+    val fromVisit: ObjectMapping =
+      nestedSelectResultMapping(ExecutionEventSelectResultType, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventView.VisitId))
+
     SwitchMapping(
       ExecutionEventSelectResultType,
       List(
-        DatasetType / "events"    -> nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventView.DatasetId)),
-        ExecutionType / "events"  -> nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventView.ObservationId)),
-        StepRecordType / "events" -> nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, ExecutionEventView.StepId)),
-        VisitType / "events"      -> nestedSelectResultMapping(ExecutionEventSelectResultType, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventView.VisitId))
-      )
+        DatasetType   / "events" -> fromDataset,
+        ExecutionType / "events" -> fromExecution
+      ) ++
+      lookupFromStepRecord(fromStepRecord, "events") ++
+      lookupFromVisit(fromVisit, "events")
     )
+  }
 
 }
