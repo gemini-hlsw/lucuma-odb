@@ -4850,8 +4850,8 @@ type Dataset {
   "Dataset id."
   id: DatasetId!
 
-  "The corresponding step's id."
-  stepId: StepId!
+  "The corresponding step."
+  step: Step!
 
   "Dataset index within the step."
   index: PosShort!
@@ -8818,7 +8818,7 @@ type StepEvent implements ExecutionEvent {
   eventType: ExecutionEventType!
 
   "Step associated with this event."
-  stepId: StepId!
+  step: StepRecord!
 
   "Step execution stage."
   stepStage: StepStage!

@@ -33,7 +33,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       tpe = DatasetType,
       fieldMappings = List(
         SqlField("id",     DatasetTable.Id,   key = true),
-        SqlField("stepId", DatasetTable.StepId),
+        SqlObject("step",  Join(DatasetTable.StepId, StepRecordTable.Id)),
         SqlField("index",  DatasetTable.Index),
 
         SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
