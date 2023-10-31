@@ -304,4 +304,248 @@ class groupEdit extends OdbSuite {
     }
   }
 
+  test("trigger on top-level observation creation") {
+    Deferred[IO, Program.Id].flatMap { d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              editType
+              program {
+                id
+              }
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid <- createProgramAs(pi)
+              _   <- d.complete(pid)
+              oid <- createObservationAs(pi, pid)
+              _   <- IO.sleep(300.milli)
+            } yield ()
+          ),
+        expectedF =
+          d.get.map { pid =>
+            List(
+              json"""
+              {
+                "groupEdit": {
+                  "editType": "UPDATED",
+                  "program": {
+                    "id": $pid
+                  },
+                  "value": null
+                }
+              }
+              """
+            )  
+          }
+      )
+    }
+  }
+
+  test("trigger on in-group observation creation") {
+    Deferred[IO, (Program.Id, Group.Id)].flatMap { d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              editType
+              program {
+                id
+              }
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid <- createProgramAs(pi)
+              gid <- createGroupAs(pi, pid, None, None, None)
+              oid <- createObservationInGroupAs(pi, pid, Some(gid), None)
+              _   <- d.complete((pid, gid))
+              _   <- IO.sleep(300.milli)
+            } yield ()
+          ),
+        expectedF =
+          d.get.map { (pid, gid) =>
+            List(
+              json"""{
+                "groupEdit" : {
+                  "editType" : "CREATED",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "value" : {
+                    "id" : $gid
+                  }
+                }
+              }""",
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "value" : {
+                    "id" : $gid
+                  }
+                }
+              }"""
+            )
+          }
+      )
+    }
+  }
+
+  test("trigger on observation move") {
+    Deferred[IO, (Program.Id, Group.Id)].flatMap { d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              editType
+              program {
+                id
+              }
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid <- createProgramAs(pi)
+              gid <- createGroupAs(pi, pid, None, None, None)
+              oid <- createObservationAs(pi, pid)
+              _   <- moveObservationAs(pi, pid, oid, Some(gid))
+              _   <- d.complete((pid, gid))
+            } yield ()
+          ),
+        expectedF =
+          d.get.map { (pid, gid) =>
+            List(
+              // group created
+              json"""{
+                "groupEdit" : {
+                  "editType" : "CREATED",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "value" : {
+                    "id" : $gid
+                  }
+                }
+              }""",
+              // observation added to root
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "value" : null
+                }
+              }""",
+              // observation removed from root
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "value" : null
+                }
+              }""",
+              // observation inserted into group
+              json"""{
+                "groupEdit" : {
+                  "editType" : "UPDATED",
+                  "program" : {
+                    "id" : $pid
+                  },
+                  "value" : {
+                    "id" : $gid
+                  }
+                }
+              }"""
+            )
+          }
+      )
+    }
+  }
+
+  test("trigger on observation move (limited selection)") {
+    Deferred[IO, (Program.Id, Group.Id)].flatMap { d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid <- createProgramAs(pi)
+              gid <- createGroupAs(pi, pid, None, None, None)
+              oid <- createObservationAs(pi, pid)
+              _   <- moveObservationAs(pi, pid, oid, Some(gid))
+              _   <- d.complete((pid, gid))
+            } yield ()
+          ),
+        expectedF =
+          d.get.map { (_, gid) =>
+            List(
+              // group created
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid
+                  }
+                }
+              }""",
+              // observation added to root
+              json"""{
+                "groupEdit" : {
+                  "value" : null
+                }
+              }""",
+              // observation removed from root
+              json"""{
+                "groupEdit" : {
+                  "value" : null
+                }
+              }""",
+              // observation inserted into group
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid
+                  }
+                }
+              }"""
+            )
+          }
+      )
+    }
+  }
+
 }
