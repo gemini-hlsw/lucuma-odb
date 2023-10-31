@@ -7,10 +7,11 @@ package input
 import cats.syntax.apply.*
 import lucuma.core.model.Group
 import lucuma.core.model.Program
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 final case class GroupEditInput(
-  groupId:   Option[Group.Id],
+  groupId:   Nullable[Group.Id],
   programId: Option[Program.Id]
 )
 
@@ -18,7 +19,7 @@ object GroupEditInput {
 
   val Binding = ObjectFieldsBinding.rmap {
     case List(
-      GroupIdBinding.Option("groupId", rGroupId),
+      GroupIdBinding.Nullable("groupId", rGroupId),
       ProgramIdBinding.Option("programId", rProgramId)
     ) =>
       (rGroupId, rProgramId).mapN(apply)
