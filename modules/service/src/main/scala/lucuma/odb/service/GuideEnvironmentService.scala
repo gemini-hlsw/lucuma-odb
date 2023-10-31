@@ -112,10 +112,27 @@ object GuideEnvironmentService {
   }
 
   case class AvailabilityPeriod(
-    start:  Timestamp,
-    end:    Timestamp,
-    angles: List[Angle]
+    start:     Timestamp,
+    end:       Timestamp,
+    posAngles: List[Angle]
   )
+
+  object AvailabilityPeriod {
+    given Encoder[AvailabilityPeriod] = deriveEncoder
+  }
+
+  private case class AvailabilityList private (periods: List[AvailabilityPeriod]) {
+    def add(ap: AvailabilityPeriod): AvailabilityList =
+      periods match
+        case h :: t if h.end === ap.start && h.posAngles === ap.posAngles => AvailabilityList(h.copy(end = ap.end) :: t)
+        case _                                                            => AvailabilityList(ap :: periods)
+
+    def toList: List[AvailabilityPeriod] = periods.reverse
+  }
+
+  private object AvailabilityList {
+    def empty: AvailabilityList = AvailabilityList(List.empty)
+  }
 
   sealed trait Error {
     def format: String
@@ -260,12 +277,14 @@ object GuideEnvironmentService {
         }
 
       extension (target: Target)
-        def masy: Option[Double] =
-          Target.siderealTracking.getOption(target).flatMap(_.masy)
+        def masy: Double =
+          Target.siderealTracking.getOption(target).map(_.masy).getOrElse(0.0)
 
       extension (sidereal: SiderealTracking)
-        def masy: Option[Double] =
-          sidereal.properMotion.map(pm => (pm.ra.masy.value.pow(2) + pm.dec.masy.value.pow(2)).toReal.sqrt.toDouble)
+        def masy: Double =
+          sidereal.properMotion
+            .map(pm => (pm.ra.masy.value.pow(2) + pm.dec.masy.value.pow(2)).toReal.sqrt.toDouble)
+            .getOrElse(0.0)
 
       extension (usable: List[AgsAnalysis.Usable])
         def toGuideEnvironments: List[GuideEnvironment] = usable.map { ags =>
@@ -353,19 +372,17 @@ object GuideEnvironmentService {
         positions:  NonEmptyList[AgsPosition]
       ): Either[Error, List[AvailabilityPeriod]] = {
         @scala.annotation.tailrec
-        def go(startTime: Timestamp, accum: List[AvailabilityPeriod]): Either[Error, List[AvailabilityPeriod]] = {
+        def go(startTime: Timestamp, accum: AvailabilityList): Either[Error, AvailabilityList] = {
           val period =
             buildAvailabilityPeriod(startTime, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
           period match
             case Left(error)                       => error.asLeft
-            case Right(period) if period.end < end =>
-              go(period.end, period :: accum)
-            case Right(period)                     =>
-              (period :: accum).asRight
+            case Right(period) if period.end < end => go(period.end, accum.add(period))
+            case Right(period)                     => accum.add(period.copy(end = end)).asRight
         }
         candidates match
           case Nil => List(AvailabilityPeriod(start, end, List.empty)).asRight
-          case _   => go(start, List.empty).map(_.reverse)
+          case _   => go(start, AvailabilityList.empty).map(_.toList)
       }
 
       def buildAvailabilityPeriod(
@@ -397,14 +414,7 @@ object GuideEnvironmentService {
                                    s"Unable to get coordinates for science targets in observation ${obsInfo.id}"
                                  )
                                )
-          scienceSpeed    <- asterism.toList
-                               .traverse(_.masy)
-                               .map(_.max)
-                               .toRight(
-                                 Error.GeneralError(
-                                   s"Unable to get speed for at least one science target in observation ${obsInfo.id}"
-                                 )
-                               )
+          scienceSpeed     = asterism.toList.map(_.masy).max
           candidatesAt     = candidates.map(_.at(start.toInstant))
           analysis         = Ags.agsAnalysis(obsInfo.constraints,
                                              wavelength,
@@ -416,15 +426,7 @@ object GuideEnvironmentService {
                              )
           // we don't care about specific targets, just their angles and speeds.
           // At this point, each candidate only has a single vignetting
-          candidateSpeeds <- analysis
-                               .collect { case u: AgsAnalysis.Usable => u }
-                               .traverse(u => u.target.tracking.masy.map(s => (u.vignetting.head._1, s)))
-                               .toRight(
-                                 // All Usables should have proper motion at this point, but the types don't indicate that
-                                 Error.GeneralError(
-                                   s"Unable to get speed for at least one guide candidate in observation ${obsInfo.id}"
-                                 )
-                               )
+          candidateSpeeds  = analysis.collect { case u: AgsAnalysis.Usable => (u.vignetting.head._1, u.target.tracking.masy) }
           // At this point, each Usable has a single vignetting
           angleGroups      = candidateSpeeds.groupMap(_._1)(_._2)
           // we want the slowest speed at each angle, because that will be the one that is available longest,
@@ -438,7 +440,6 @@ object GuideEnvironmentService {
           // This is approximate, but so is the invalidThreshold...
           // These should always be big values (until nonsidereal), but if it is 0, we'd go infinite.
           daysTilInvalid   = scala.math.max((invalidThreshold / fastest * 365).intValue, 1)
-          _                = println(s"fastest: $fastest days: $daysTilInvalid")
           invalidDate      = Timestamp
                                .fromInstantTruncated(start.toInstant.plus(daysTilInvalid, ChronoUnit.DAYS))
                                .getOrElse(Timestamp.Max)
@@ -492,14 +493,6 @@ object GuideEnvironmentService {
                              )
                            )
           usable         = processCandidates(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
-          // temporary
-          _             <- EitherT(
-                             availability(pid,
-                                          oid,
-                                          obsTime,
-                                          Timestamp.unsafeFromInstantTruncated(obsTime.toInstant.plus(190, ChronoUnit.DAYS))
-                             )
-                           )
         } yield usable.toGuideEnvironments.toList).value
 
       override def availability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
@@ -521,8 +514,6 @@ object GuideEnvironmentService {
             EitherT.fromEither(
               buildAvailability(start, end, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
             )
-          // Temporary
-          _             = availability.foreach(a => println(s"Period ${a.start}-${a.end}: ${a.angles.map(_.toDoubleDegrees)}"))
         } yield availability).value
     }
 
