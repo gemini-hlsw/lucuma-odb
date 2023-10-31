@@ -18,7 +18,7 @@ import lucuma.core.enums.StepType
 
 import table.StepRecordTable
 
-trait StepConfigMapping[F[_]] extends StepRecordTable[F] {
+trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
 
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
@@ -26,13 +26,7 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] {
     typeRef:    TypeRef,
     underlying: ObjectMapping
   ): TypeMapping =
-    SwitchMapping(
-      typeRef,
-      List(
-        GmosNorthStepRecordType / "stepConfig" -> underlying,
-        GmosSouthStepRecordType / "stepConfig" -> underlying
-      )
-    )
+    SwitchMapping(typeRef, lookupFromStepRecord(underlying, "stepConfig"))
 
   private lazy val stepConfigInterfaceMapping: ObjectMapping =
     SqlInterfaceMapping(
