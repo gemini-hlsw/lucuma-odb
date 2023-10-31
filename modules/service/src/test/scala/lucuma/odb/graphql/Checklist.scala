@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.all._
+import grackle.Field
 import grackle.ObjectType
 
 @munit.IgnoreSuite // comment this out if you want to run this. there's probably a better way to do this
@@ -56,26 +57,40 @@ class Checklist extends OdbSuite {
   def printObjectType(m: BaseMapping[IO], t: ObjectType): IO[Unit] =
     if JsonMappedTypes.contains(t.name) then
       IO.println(s"- [x] ${t.name} (via Json blob)")
-    else
-      m.typeMapping(t) match
-        case None    => IO.println(s"- [ ] ${t.name}")
-        case Some(om: m.ObjectMapping) =>
-          IO.println(s"- [x] ${t.name}") >>
-          t.fields.traverse_ { f =>
-            om.fieldMapping(f.name) match
-              case None => IO.println(s"  - [ ] ${f.name}")
-              case Some(_) => IO.println(s"  - [x] ${f.name}")
+    else {
+
+      def definedInInterface(f: Field): Option[String] =
+        t.interfaces.find { nt =>
+          m.typeMapping(nt).exists {
+            case om: m.ObjectMapping =>
+               om.fieldMapping(f.name).isDefined
+            case sm: m.SwitchMapping =>
+               sm.lookup.exists { case (p, om) =>
+                 om.fieldMapping(f.name).isDefined
+               }
+            case _                   =>
+               false
           }
+        }.map(_.name)
+
+      def printField(om: m.ObjectMapping, f: Field): IO[Unit] =
+        om.fieldMapping(f.name) match {
+          case None    => IO.println(s"  - ${definedInInterface(f).fold(s"[ ] ${f.name}")(n => s"[x] ${f.name} (via $n)")}")
+          case Some(_) => IO.println(s"  - [x] ${f.name}")
+        }
+
+      m.typeMapping(t) match
+        case None                      =>
+          IO.println(s"- [ ] ${t.name}")
+        case Some(om: m.ObjectMapping) =>
+          IO.println(s"- [x] ${t.name}") >> t.fields.traverse_ { f => printField(om, f) }
         case Some(sm: m.SwitchMapping) =>
           sm.lookup.traverse_ { (p, om) =>
             IO.println(s"- [x] ${t.name} (at ${p.path.mkString(s"${p.rootTpe}/", "/", "")})") >>
-            t.fields.traverse_ { f =>
-              om.fieldMapping(f.name) match
-                case None => IO.println(s"  - [ ] ${f.name}")
-                case Some(_) => IO.println(s"  - [x] ${f.name}")
-            }
+            t.fields.traverse_ { f => printField(om, f) }
           }
         case m => fail(s"Can't handle object mapping $m")
+  }
 
   def printChecklist(m: BaseMapping[IO]): IO[Unit] = {
     IO.println("\n\n# Schema Coverage") >>
