@@ -8,7 +8,7 @@ import cats.syntax.all._
 import grackle.Field
 import grackle.ObjectType
 
-//@munit.IgnoreSuite // comment this out if you want to run this. there's probably a better way to do this
+@munit.IgnoreSuite // comment this out if you want to run this. there's probably a better way to do this
 class Checklist extends OdbSuite {
   val validUsers = Nil
 
