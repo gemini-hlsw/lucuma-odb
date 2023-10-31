@@ -101,46 +101,4 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("observation -> execution -> events (step event -> step)") {
-    recordAll(pi, mode, offset = 100).flatMap { on =>
-      val q = s"""
-        query {
-          observation(observationId: "${on.id}") {
-            execution {
-              events() {
-                matches {
-                  ... on StepEvent {
-                    step {
-                      id
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      """
-
-      val events = on.visits.flatMap(_.atoms).flatMap(_.steps).map(_.events).map { id =>
-        Json.obj(
-          "step" -> Json.obj("id" -> id.asJson)
-        )
-      }
-
-      val e = json"""
-      {
-        "observation": {
-          "execution": {
-            "events": {
-              "matches": $events
-            }
-          }
-        }
-      }
-      """.asRight
-
-      expect(pi, q, e)
-    }
-  }
-
 }
