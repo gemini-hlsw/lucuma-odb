@@ -9,7 +9,7 @@ import lucuma.core.math.Angle
 
 import table.StepRecordTable
 
-trait OffsetMapping[F[_]] extends StepRecordTable[F] {
+trait OffsetMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
 
   private def offsetComponentMapping(
     typeRef:     TypeRef,
@@ -35,10 +35,7 @@ trait OffsetMapping[F[_]] extends StepRecordTable[F] {
   ): TypeMapping =
     SwitchMapping(
       typeRef,
-      List(
-        GmosNorthStepRecordType / "stepConfig" / "offset" / name -> offsetComponentMapping(typeRef, idColumn, valueColumn),
-        GmosSouthStepRecordType / "stepConfig" / "offset" / name -> offsetComponentMapping(typeRef, idColumn, valueColumn)
-      )
+      lookupFromStepRecord(offsetComponentMapping(typeRef, idColumn, valueColumn), "stepConfig", "offset", name)
     )
 
   lazy val OffsetPMapping: TypeMapping =
@@ -62,9 +59,6 @@ trait OffsetMapping[F[_]] extends StepRecordTable[F] {
   lazy val OffsetMapping: TypeMapping =
     SwitchMapping(
       OffsetType,
-      List(
-        GmosNorthStepRecordType / "stepConfig" / "offset" -> offsetMapping(StepRecordTable.Id),
-        GmosSouthStepRecordType / "stepConfig" / "offset" -> offsetMapping(StepRecordTable.Id)
-      )
+      lookupFromStepRecord(offsetMapping(StepRecordTable.Id), "stepConfig", "offset")
     )
 }
