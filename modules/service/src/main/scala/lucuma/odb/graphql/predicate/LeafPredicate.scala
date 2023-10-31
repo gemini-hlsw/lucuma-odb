@@ -23,9 +23,4 @@ class LeafPredicates[A](path: Path) {
   def isNull(b: Boolean): Predicate =
     IsNull(path, b)
 
-  def notDistinctFrom(a: Option[A])(using Eq[A]): Predicate =
-    a match
-      case None => isNull(true)
-      case Some(value) => eql(value)
-
 }
