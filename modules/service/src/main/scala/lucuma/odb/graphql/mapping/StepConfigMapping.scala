@@ -18,7 +18,7 @@ import lucuma.core.enums.StepType
 
 import table.StepRecordTable
 
-trait StepConfigMapping[F[_]] extends StepRecordTable[F] {
+trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
 
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
@@ -26,45 +26,41 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] {
     typeRef:    TypeRef,
     underlying: ObjectMapping
   ): TypeMapping =
-    SwitchMapping(
-      typeRef,
-      List(
-        GmosNorthStepRecordType / "stepConfig" -> underlying,
-        GmosSouthStepRecordType / "stepConfig" -> underlying
-      )
-    )
+    SwitchMapping(typeRef, lookupFromStepRecord(underlying, "stepConfig"))
 
   private lazy val stepConfigInterfaceMapping: ObjectMapping =
     SqlInterfaceMapping(
       tpe           = StepConfigType,
-      discriminator = stepTypeDiscriminator,
+      discriminator = stepConfigDiscriminator,
       fieldMappings = List(
         SqlField("id",       StepRecordTable.Id,       key = true, hidden = true),
         SqlField("stepType", StepRecordTable.StepType, discriminator = true)
       )
     )
 
-  private lazy val stepTypeDiscriminator: SqlDiscriminator =
+  private lazy val stepConfigDiscriminator: SqlDiscriminator =
     new SqlDiscriminator {
+      import StepType.*
+
       override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[StepType]("stepType").map {
-          case StepType.Bias      => BiasType
-          case StepType.Dark      => DarkType
-          case StepType.Gcal      => GcalType
-          case StepType.Science   => ScienceType
-          case StepType.SmartGcal => SmartGcalType
+          case Bias      => BiasType
+          case Dark      => DarkType
+          case Gcal      => GcalType
+          case Science   => ScienceType
+          case SmartGcal => SmartGcalType
         }
 
-      private def mkPredicate(tpe: StepType): Option[Predicate] =
-        Eql(StepTypeType / "stepType", Const(tpe)).some
+      private def mkPredicate(stepType: StepType): Option[Predicate] =
+        Eql(StepConfigType / "stepType", Const(stepType)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
-          case BiasType      => mkPredicate(StepType.Bias)
-          case DarkType      => mkPredicate(StepType.Dark)
-          case GcalType      => mkPredicate(StepType.Gcal)
-          case ScienceType   => mkPredicate(StepType.Science)
-          case SmartGcalType => mkPredicate(StepType.SmartGcal)
+          case BiasType      => mkPredicate(Bias)
+          case DarkType      => mkPredicate(Dark)
+          case GcalType      => mkPredicate(Gcal)
+          case ScienceType   => mkPredicate(Science)
+          case SmartGcalType => mkPredicate(SmartGcal)
           case _             => none
         }
     }

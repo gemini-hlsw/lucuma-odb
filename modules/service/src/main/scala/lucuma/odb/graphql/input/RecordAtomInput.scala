@@ -19,13 +19,14 @@ case class RecordAtomInput(
 
 object RecordAtomInput {
 
-  def bindingFor(instrument: Instrument): Matcher[RecordAtomInput] =
+  val Binding: Matcher[RecordAtomInput] =
     ObjectFieldsBinding.rmap {
       case List(
         VisitIdBinding("visitId", rVisitId),
+        InstrumentBinding("instrument", rInstrument),
         SequenceTypeBinding("sequenceType", rSequenceType),
         NonNegShortBinding("stepCount", rStepCount)
-      ) => (rVisitId, rSequenceType, rStepCount).parMapN { (visitId, sequenceType, stepCount) =>
+      ) => (rVisitId, rInstrument, rSequenceType, rStepCount).parMapN { (visitId, instrument, sequenceType, stepCount) =>
         RecordAtomInput(visitId, instrument, sequenceType, stepCount)
       }
     }

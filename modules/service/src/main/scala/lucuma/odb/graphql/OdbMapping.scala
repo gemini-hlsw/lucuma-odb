@@ -92,6 +92,8 @@ object OdbMapping {
           with AngleMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
+          with AtomRecordMapping[F]
+          with AtomRecordSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
@@ -115,7 +117,6 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with FilterTypeMetaMapping[F]
-          with GmosAtomRecordMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
           with GmosDynamicMapping[F]
@@ -124,7 +125,6 @@ object OdbMapping {
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
-          with GmosStepRecordMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
           with GroupElementMapping[F]
@@ -160,7 +160,7 @@ object OdbMapping {
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
-          with RecordGmosAtomResultMapping[F]
+          with RecordAtomResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
@@ -170,6 +170,8 @@ object OdbMapping {
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
+          with StepRecordMapping[F]
+          with StepRecordSelectResultMapping[F]
           with SubscriptionMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
@@ -218,6 +220,8 @@ object OdbMapping {
               AngleMapping,
               AsterismGroupMapping,
               AsterismGroupSelectResultMapping,
+              AtomRecordMapping,
+              AtomRecordSelectResultMapping,
               CatalogInfoMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
@@ -244,7 +248,6 @@ object OdbMapping {
               FilterTypeMetaMapping,
               GmosCcdModeMapping,
               GmosCustomMaskMapping,
-              GmosNorthAtomRecordMapping,
               GmosNorthDynamicMapping,
               GmosNorthFpuMapping,
               GmosNorthGratingConfigMapping,
@@ -252,7 +255,6 @@ object OdbMapping {
               GmosNorthStaticMapping,
               GmosNorthStepRecordMapping,
               GmosNorthVisitMapping,
-              GmosSouthAtomRecordMapping,
               GmosSouthDynamicMapping,
               GmosSouthFpuMapping,
               GmosSouthGratingConfigMapping,
@@ -294,11 +296,10 @@ object OdbMapping {
               ProposalMapping,
               QueryMapping,
               RadialVelocityMapping,
+              RecordAtomResultMapping,
               RecordDatasetResultMapping,
-              RecordGmosNorthAtomResultMapping,
               RecordGmosNorthStepResultMapping,
               RecordGmosNorthVisitResultMapping,
-              RecordGmosSouthAtomResultMapping,
               RecordGmosSouthStepResultMapping,
               RecordGmosSouthVisitResultMapping,
               RightAscensionMapping,
@@ -314,6 +315,8 @@ object OdbMapping {
               StepConfigScienceMapping,
               StepConfigSmartGcalMapping,
               StepEventMapping,
+              StepRecordMapping,
+              StepRecordSelectResultMapping,
               SubscriptionMapping,
               TargetEditMapping,
               TargetEnvironmentMapping,
@@ -346,6 +349,7 @@ object OdbMapping {
             SelectElaborator(
               List(
                 AsterismGroupElaborator,
+                AtomRecordElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,
@@ -353,6 +357,7 @@ object OdbMapping {
                 MutationElaborator,
                 ObservationElaborator,
                 ProgramElaborator,
+                StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
                 TargetGroupElaborator,

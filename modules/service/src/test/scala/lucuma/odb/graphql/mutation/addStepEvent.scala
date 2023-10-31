@@ -55,7 +55,9 @@ class addStepEvent extends OdbSuite {
             stepStage: START_STEP
           }) {
             event {
-              stepId
+              step {
+                id
+              }
               stepStage
               observation {
                 id
@@ -73,7 +75,9 @@ class addStepEvent extends OdbSuite {
       {
         "addStepEvent": {
           "event": {
-            "stepId": $sid,
+            "step": {
+               "id": $sid
+            },
             "stepStage": "START_STEP",
             "observation": {
               "id": $oid
@@ -95,7 +99,9 @@ class addStepEvent extends OdbSuite {
             stepStage: START_STEP
           }) {
             event {
-              stepId
+              step {
+                id
+              }
             }
           }
         }

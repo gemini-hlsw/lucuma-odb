@@ -23,7 +23,6 @@ import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.Instrument
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -104,11 +103,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProgram,
       CreateTarget,
       LinkUser,
+      RecordAtom,
       RecordDataset,
-      RecordGmosNorthAtom,
       RecordGmosNorthStep,
       RecordGmosNorthVisit,
-      RecordGmosSouthAtom,
       RecordGmosSouthStep,
       RecordGmosSouthVisit,
       SetAllocation,
@@ -449,23 +447,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
   }
 
-  private lazy val RecordGmosNorthAtom: MutationField =
-    MutationField("recordGmosNorthAtom", RecordAtomInput.bindingFor(Instrument.GmosNorth)) { (input, child) =>
+  private lazy val RecordAtom: MutationField =
+    MutationField("recordAtom", RecordAtomInput.Binding) { (input, child) =>
       services.useTransactionally {
         recordAtom(
           sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
-          Predicates.gmosNorthAtomRecord.id,
-          child
-        )
-      }
-    }
-
-  private lazy val RecordGmosSouthAtom: MutationField =
-    MutationField("recordGmosSouthAtom", RecordAtomInput.bindingFor(Instrument.GmosSouth)) { (input, child) =>
-      services.useTransactionally {
-        recordAtom(
-          sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
-          Predicates.gmosSouthAtomRecord.id,
+          Predicates.atomRecord.id,
           child
         )
       }

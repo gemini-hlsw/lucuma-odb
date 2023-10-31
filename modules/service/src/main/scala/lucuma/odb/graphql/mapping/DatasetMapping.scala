@@ -4,12 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.parallel.*
-import grackle.Predicate.True
-import grackle.Predicate.and
 import grackle.Query.Binding
-import grackle.Query.FilterOrderByOffsetLimit
-import grackle.Query.OrderSelection
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import lucuma.core.model.ExecutionEvent
@@ -28,6 +23,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
                               with AtomRecordTable[F]
                               with ObservationView[F]
                               with Predicates[F]
+                              with SelectSubquery
                               with StepRecordTable[F]
                               with VisitTable[F] {
   def user: User
@@ -37,7 +33,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       tpe = DatasetType,
       fieldMappings = List(
         SqlField("id",     DatasetTable.Id,   key = true),
-        SqlField("stepId", DatasetTable.StepId),
+        SqlObject("step",  Join(DatasetTable.StepId, StepRecordTable.Id)),
         SqlField("index",  DatasetTable.Index),
 
         SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
@@ -56,23 +52,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      Elab.transformChild { child =>
-        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
-          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-          ResultMapping.selectResult(child, limit) { q =>
-            FilterOrderByOffsetLimit(
-              pred = Some(and(List(
-                OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
-                Predicates.executionEvent.observation.program.isVisibleTo(user),
-              ))),
-              oss = Some(List(OrderSelection[ExecutionEvent.Id](ExecutionEventType / "id"))),
-              offset = None,
-              limit = Some(limit + 1), // Select one extra row here.
-              child = q
-            )
-          }
-        }
-      }
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
 
 

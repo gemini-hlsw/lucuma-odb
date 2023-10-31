@@ -5,17 +5,11 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.option.*
-import cats.syntax.parallel.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
-import grackle.Predicate.True
-import grackle.Predicate.and
 import grackle.Query.Binding
-import grackle.Query.FilterOrderByOffsetLimit
-import grackle.Query.OrderSelection
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
@@ -23,13 +17,11 @@ import grackle.TypeRef
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
-import lucuma.core.util.Gid
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
-import lucuma.odb.graphql.predicate.LeafPredicates
+import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.predicate.ProgramPredicates
 
 import table.ExecutionEventView
 import table.GmosStaticTables
@@ -40,7 +32,8 @@ trait VisitMapping[F[_]] extends VisitTable[F]
                             with ExecutionEventView[F]
                             with GmosStaticTables[F]
                             with ObservationView[F]
-                            with Predicates[F] {
+                            with Predicates[F]
+                            with SelectSubquery {
 
   def user: User
 
@@ -64,6 +57,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlField("instrument",   VisitTable.Instrument, discriminator = true),
         SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
         SqlField("created",      VisitTable.Created),
+        SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events")
       )
@@ -78,8 +72,8 @@ trait VisitMapping[F[_]] extends VisitTable[F]
           case inst                 => Result.failure(s"No Visit implementation for ${inst.shortName}")
         }
 
-      private def mkPredicate(tpe: Instrument): Option[Predicate] =
-        Eql(InstrumentType / "instrument", Const(tpe)).some
+      private def mkPredicate(instrument: Instrument): Option[Predicate] =
+        Eql(VisitType / "instrument", Const(instrument)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
@@ -107,44 +101,25 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       )
     )
 
-  private def subquery[A: Gid](
-    rOFFSET:       Result[Option[A]],
-    rLIMIT:        Result[Option[NonNegInt]],
-    typeRef:       TypeRef,
-    idPredicate:   LeafPredicates[A],
-    progPredicate: ProgramPredicates
-  ): Elab[Unit] =
-    Elab.transformChild { child =>
-      (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
-        val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-        ResultMapping.selectResult(child, limit) { q =>
-          FilterOrderByOffsetLimit(
-            pred = Some(and(List(
-              OFFSET.map(idPredicate.gtEql).getOrElse(True),
-              progPredicate.isVisibleTo(user),
-            ))),
-            oss = Some(List(OrderSelection[A](typeRef / "id"))),
-            offset = None,
-            limit = Some(limit + 1), // Select one extra row here.
-            child = q
-          )
-        }
-      }
-    }
-
   lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (VisitType, "atomRecords", List(
+      TimestampBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT)
+    )) =>
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "created", Predicates.atomRecord.created, Predicates.atomRecord.visit.observation.program)
 
     case (VisitType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      subquery(rOFFSET, rLIMIT, DatasetType, Predicates.dataset.id, Predicates.dataset.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
 
     case (VisitType, "events", List(
       ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      subquery(rOFFSET, rLIMIT, ExecutionEventType, Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
 
 }

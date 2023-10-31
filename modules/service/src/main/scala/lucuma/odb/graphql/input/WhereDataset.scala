@@ -20,7 +20,7 @@ object WhereDataset {
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderDatasetIdBinding     = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
     val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "observation" / "id", ObservationIdBinding)
-    val WhereEqStepIdBinding           = WhereEq.binding[Step.Id](path / "stepId", StepIdBinding)
+    val WhereEqStepIdBinding           = WhereEq.binding[Step.Id](path / "step" / "id", StepIdBinding)
     val WhereOrderIndexBinding         = WhereOrder.binding[PosShort](path / "index", PosShortBinding)
     val WhereFilenameBinding           = WhereString.binding(path / "filename")
     val QaStateBinding                 = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
