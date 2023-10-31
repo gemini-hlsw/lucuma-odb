@@ -4851,7 +4851,7 @@ type Dataset {
   id: DatasetId!
 
   "The corresponding step."
-  step: Step!
+  step: StepRecord!
 
   "Dataset index within the step."
   index: PosShort!
