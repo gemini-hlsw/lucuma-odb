@@ -59,7 +59,9 @@ class recordDataset extends OdbSuite {
             filename: "N18630101S0001.fits"
           }) {
             dataset {
-              stepId
+              step {
+                id
+              }
               index
               observation {
                 id
@@ -76,7 +78,9 @@ class recordDataset extends OdbSuite {
         {
           "recordDataset": {
             "dataset": {
-              "stepId": $sid,
+              "step": {
+                "id": $sid
+              },
               "index": 1,
               "observation": {
                 "id": $oid
@@ -104,7 +108,9 @@ class recordDataset extends OdbSuite {
             qaState: USABLE
           }) {
             dataset {
-              stepId
+              step {
+                id
+              }
               index
               observation {
                 id
@@ -121,7 +127,9 @@ class recordDataset extends OdbSuite {
         {
           "recordDataset": {
             "dataset": {
-              "stepId": $sid,
+              "step": {
+                "id": $sid
+              },
               "index": 1,
               "observation": {
                 "id": $oid

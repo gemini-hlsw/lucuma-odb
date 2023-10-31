@@ -22,7 +22,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("observation -> execution -> events") {
-    recordAll(pi, mode, offset = 400, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
+    recordAll(pi, mode, offset = 0, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -54,4 +54,93 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       expect(pi, q, e)
     }
   }
+
+  test("observation -> execution -> events (visit, observation)") {
+    recordAll(pi, mode, offset = 100).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              events() {
+                matches {
+                  id
+                  observation {
+                    id
+                  }
+                  visit {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val events = on.allEvents.map { id =>
+        Json.obj(
+          "id" -> id.asJson,
+          "observation" -> Json.obj("id" -> on.id.asJson),
+          "visit" -> Json.obj("id" -> on.visits.head.id.asJson)
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "events": {
+              "matches": $events
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("observation -> execution -> events (step event -> step)") {
+    recordAll(pi, mode, offset = 100).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              events() {
+                matches {
+                  ... on StepEvent {
+                    step {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val events = on.visits.flatMap(_.atoms).flatMap(_.steps).map(_.events).map { id =>
+        Json.obj(
+          "step" -> Json.obj("id" -> id.asJson)
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "events": {
+              "matches": $events
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
 }
