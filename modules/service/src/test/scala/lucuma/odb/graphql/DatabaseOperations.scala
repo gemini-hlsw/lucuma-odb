@@ -34,6 +34,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
@@ -595,17 +596,16 @@ trait DatabaseOperations { this: OdbSuite =>
   }
 
 
-  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] = {
-    val name = s"record${instrument.tag}Atom"
-
+  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] =
     query(
       user = user,
       query =
         s"""
           mutation {
-            $name(input: {
+            recordAtom(input: {
               visitId: ${vid.asJson},
-              sequenceType: ${sequenceType.tag.toUpperCase},
+              instrument: ${instrument.tag.toScreamingSnakeCase},
+              sequenceType: ${sequenceType.tag.toScreamingSnakeCase},
               stepCount: ${stepCount.asJson}
             }) {
               atomRecord {
@@ -615,9 +615,8 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         """
     ).map { json =>
-      json.hcursor.downFields(name, "atomRecord", "id").require[Atom.Id]
+      json.hcursor.downFields("recordAtom", "atomRecord", "id").require[Atom.Id]
     }
-  }
 
   def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
     recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigScience)

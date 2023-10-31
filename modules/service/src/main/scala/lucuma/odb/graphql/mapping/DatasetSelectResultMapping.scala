@@ -13,19 +13,32 @@ import table.VisitTable
 trait DatasetSelectResultMapping[F[_]]
   extends DatasetTable[F]
      with AtomRecordTable[F]
+     with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
      with StepRecordTable[F]
      with VisitTable[F] {
 
-  lazy val DatasetSelectResultMapping: TypeMapping =
+  lazy val DatasetSelectResultMapping: TypeMapping = {
+
+    val fromExecution: ObjectMapping =
+      nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
+
+    val fromStepRecord: ObjectMapping =
+      nestedSelectResultMapping(DatasetSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, DatasetTable.StepId))
+
+    val fromVisit: ObjectMapping =
+      nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id,      Join(VisitTable.Id, DatasetTable.VisitId))
+
     SwitchMapping(
       DatasetSelectResultType,
       List(
-        QueryType / "datasets"     -> topLevelSelectResultMapping(DatasetSelectResultType),
-        ExecutionType / "datasets" -> nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId)),
-        VisitType / "datasets"     -> nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id, Join(VisitTable.Id, DatasetTable.VisitId))
-      )
+        QueryType     / "datasets" -> topLevelSelectResultMapping(DatasetSelectResultType),
+        ExecutionType / "datasets" -> fromExecution
+      ) ++
+      lookupFromStepRecord(fromStepRecord, "datasets") ++
+      lookupFromVisit(fromVisit, "datasets")
     )
+}
 
 }

@@ -1883,7 +1883,9 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           stepStage: END_STEP
         }) {
           event {
-            stepId
+            step {
+              id
+            }
           }
         }
       }
