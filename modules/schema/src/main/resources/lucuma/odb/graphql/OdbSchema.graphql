@@ -2292,11 +2292,6 @@ type GmosSouthVisit implements Visit {
   """
   static: GmosSouthStatic!
 
-  """
-  GmosSouth recorded steps
-  """
-  steps: [GmosSouthStepRecord!]!
-
 }
 
 """
