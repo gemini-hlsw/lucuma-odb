@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
@@ -216,8 +217,11 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord)") {
-    recordAll(pi, mode, offset = 400).flatMap { on =>
+  private def testInterfaceMapping(
+    offset:       Int,
+    matchesQuery: String
+  ): IO[Unit] =
+    recordAll(pi, mode, offset = offset).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -226,16 +230,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
                 matches {
                   steps {
                     matches {
-                      ... on GmosNorthStepRecord {
-                        instrumentConfig {
-                          fpu {
-                            builtin
-                          }
-                        }
-                      }
-                      stepConfig {
-                        stepType
-                      }
+                      $matchesQuery
                     }
                   }
                 }
@@ -277,5 +272,39 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
       expect(pi, q, e)
     }
+
+  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord) 1") {
+    testInterfaceMapping(400,
+      s"""
+        ... on GmosNorthStepRecord {
+          instrumentConfig {
+            fpu {
+              builtin
+            }
+          }
+          stepConfig {
+            stepType
+          }
+        }
+      """
+    )
   }
+
+  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord) 2") {
+    testInterfaceMapping(500,
+      s"""
+        ... on GmosNorthStepRecord {
+          instrumentConfig {
+            fpu {
+              builtin
+            }
+          }
+        }
+        stepConfig {
+          stepType
+        }
+      """
+    )
+  }
+
 }

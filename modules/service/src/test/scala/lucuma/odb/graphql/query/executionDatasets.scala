@@ -18,7 +18,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
   val pi2     = TestUsers.Standard.pi(2, 32)
   val service = TestUsers.service(3)
 
-  val mode    = ObservingModeType.GmosNorthLongSlit
+  val mode    = ObservingModeType.GmosSouthLongSlit
 
   val validUsers = List(pi, pi2, service).toList
 

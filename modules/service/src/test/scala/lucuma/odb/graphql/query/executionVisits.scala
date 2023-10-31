@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
@@ -189,24 +190,18 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("observation -> execution -> visits (GmosNorthVisit)") {
-    recordAll(pi, mode, offset = 400).flatMap { on =>
+  private def testInterfaceMapping(
+    offset:       Int,
+    matchesQuery: String
+  ): IO[Unit] =
+    recordAll(pi, mode, offset = offset).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
             execution {
               visits {
                 matches {
-                  ... on GmosNorthVisit {
-                    static {
-                      stageMode
-                    }
-                    atomRecords {
-                      matches {
-                        id
-                      }
-                    }
-                  }
+                  $matchesQuery
                 }
               }
             }
@@ -239,6 +234,39 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
 
       expect(pi, q, e)
     }
+
+  test("observation -> execution -> visits (GmosNorthVisit) 1") {
+    testInterfaceMapping(400,
+      s"""
+        ... on GmosNorthVisit {
+          static {
+            stageMode
+          }
+          atomRecords {
+            matches {
+              id
+            }
+          }
+        }
+      """
+    )
+  }
+
+  test("observation -> execution -> visits (GmosNorthVisit) 2") {
+    testInterfaceMapping(500,
+      s"""
+        ... on GmosNorthVisit {
+          static {
+            stageMode
+          }
+        }
+        atomRecords {
+          matches {
+            id
+          }
+        }
+      """
+    )
   }
 
 }
