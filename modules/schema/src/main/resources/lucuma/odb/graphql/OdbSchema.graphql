@@ -3635,7 +3635,7 @@ input TargetEditInput {
 
 input GroupEditInput {
     """
-    Group ID
+    Group ID, or Null to watch top-level group(s), or omit to watch all groups.
     """
     groupId: GroupId
 
@@ -3691,10 +3691,13 @@ type GroupEdit {
   """
   editType: EditType!
 
+  "Assocated program"
+  program: Program!
+
   """
-  Edited object
+  Edited group, or null if it's the top-level group.
   """
-  value: Group!
+  value: Group
   id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
