@@ -25,7 +25,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.GuideEnvironmentService
+import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
 import org.http4s.client.Client
 
@@ -117,11 +117,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
 
-    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideEnvironmentService.GuideEnvironment]]] =
+    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
         services.use { s =>
-          s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-            .get(pid, oid, obsTime)
+          s.guideService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+            .getGuideEnvironment(pid, oid, obsTime)
             .map {
               case Left(e)  => Result.failure(e.format)
               case Right(s) => s.success
@@ -138,11 +138,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         end   <- env.getR[Timestamp](AvailabilityEndParam)
       } yield (start, end)
 
-    val calculate: (Program.Id, Observation.Id, (Timestamp, Timestamp)) => F[Result[List[GuideEnvironmentService.AvailabilityPeriod]]] =
+    val calculate: (Program.Id, Observation.Id, (Timestamp, Timestamp)) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
         services.use { s =>
-          s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-            .availability(pid, oid, period._1, period._2)
+          s.guideService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+            .getGuideAvailability(pid, oid, period._1, period._2)
             .map {
               case Left(e)  => Result.failure(e.format)
               case Right(s) => s.success

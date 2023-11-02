@@ -70,21 +70,21 @@ import java.time.temporal.ChronoUnit
 
 import Services.Syntax.*
 
-trait GuideEnvironmentService[F[_]] {
-  import GuideEnvironmentService.AvailabilityPeriod
-  import GuideEnvironmentService.Error
-  import GuideEnvironmentService.GuideEnvironment
+trait GuideService[F[_]] {
+  import GuideService.AvailabilityPeriod
+  import GuideService.Error
+  import GuideService.GuideEnvironment
 
-  def get(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
+  def getGuideEnvironment(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F]
   ): F[Either[Error, List[GuideEnvironment]]]
 
-  def availability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+  def getGuideAvailability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
     NoTransaction[F]
   ): F[Either[Error, List[AvailabilityPeriod]]]
 }
 
-object GuideEnvironmentService {
+object GuideService {
   // if any science target or guide star candidate moves more than this many milliarcseconds,
   // we consider it to potentially invalidate the availability.
   val invalidThreshold = 100.0
@@ -185,8 +185,8 @@ object GuideEnvironmentService {
     itcClient:             ItcClient[F],
     commitHash:            CommitHash,
     plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
-  )(using Services[F]): GuideEnvironmentService[F] =
-    new GuideEnvironmentService[F] {
+  )(using Services[F]): GuideService[F] =
+    new GuideService[F] {
 
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -445,7 +445,7 @@ object GuideEnvironmentService {
                                .getOrElse(Timestamp.Max)
         } yield AvailabilityPeriod(start, invalidDate, slowestPerAngle.map(_._1).sorted)
 
-      override def get(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
+      override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
         NoTransaction[F]
       ): F[Either[Error, List[GuideEnvironment]]] =
         (for {
@@ -495,7 +495,7 @@ object GuideEnvironmentService {
           usable         = processCandidates(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
-      override def availability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+      override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
         NoTransaction[F]
       ): F[Either[Error, List[AvailabilityPeriod]]] =
         (for {
