@@ -7,4 +7,5 @@ import grackle.Path
 
 class GroupEditPredicates(path: Path) {
   val value = GroupPredicates(path / "value")
+  val program = ProgramPredicates(path / "program")
 }

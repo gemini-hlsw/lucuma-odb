@@ -819,4 +819,44 @@ trait DatabaseOperations { this: OdbSuite =>
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
   }
+
+  def moveObservationAs(user: User, pid: Program.Id, oid: Observation.Id, gid: Option[Group.Id]): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            programId: ${pid.asJson}
+            SET: {
+              groupId: ${gid.asJson}
+            }
+            WHERE: {
+              id: {
+                EQ: ${oid.asJson}
+              }
+            }
+          }) {
+            observations {
+              id
+              groupId
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "id": $oid,
+                  "groupId": $gid
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
+
 }

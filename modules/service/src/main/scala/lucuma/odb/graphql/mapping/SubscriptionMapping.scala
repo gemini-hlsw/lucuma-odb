@@ -15,8 +15,10 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.input.GroupEditInput
@@ -138,15 +140,40 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .filter { e =>
           e.canRead(user) &&
           input.flatMap(_.programId).forall(_ === e.programId) &&
-          input.flatMap(_.groupId).forall(_ === e.groupId)
+          {
+            input match
+              case None    => true
+              case Some(i) =>
+                i.groupId match
+                  case Nullable.Absent       => true
+                  case Nullable.Null         => e.groupId.isEmpty
+                  case Nullable.NonNull(gid) => e.groupId.exists(_ == gid)            
+          }
         }
         .map { e =>
+
+          // We need to burrow down into the query to add a filter to the `value` selection to handle
+          // the case where it may be null (in which case we add a filter that will never match).
+          val lastGroupId = Group.Id.fromLong(Long.MaxValue).get // will never match
+          val predicate   = Predicates.group.id.eql(e.groupId.getOrElse(lastGroupId))
+          def addValueFilter(q: Query): Query =
+            q match
+              case Select("value", a, c) => Select("value", a, Unique(Filter(predicate, c)))
+              case Query.Group(queries)  => Query.Group(queries.map(addValueFilter))
+              case c                     => c
+
           Result(
             Environment(
-              Env("editType" -> e.editType),
-              Unique(Filter(Predicates.groupEdit.value.id.eql(e.groupId), child))
+              Env("editType" -> e.editType, "programId" -> e.programId), 
+              Unique(
+                Filter(
+                  Predicates.groupEdit.program.id.eql(e.programId),
+                  addValueFilter(child)
+                )
+              )                
             )
           )
+          
         }
     }
 
