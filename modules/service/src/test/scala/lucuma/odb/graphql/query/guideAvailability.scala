@@ -41,13 +41,16 @@ import org.http4s.Request
 import org.http4s.Response
 import skunk.Session
 
-class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
+class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
 
   val pi         = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  val aug2023 = "2023-08-30T00:00:00Z"
-  val aug3000 = "3000-08-30T00:00:00Z"
+  val successStart = "2023-10-31T00:00:00Z"
+  val successEnd   = "2024-02-28T00:00:00Z"
+
+  val emptyStart   = "3025-10-31T00:00:00Z"
+  val emptyEnd     = "3026-10-31T01:00:00Z"
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val tableRow: TableRow.North =
@@ -85,6 +88,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  // increased the proper motion of the second candidate so we could get multiple availabilities.
   val gaiaReponseString = 
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
@@ -163,22 +167,11 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
   |                        <TD>13.172072</TD>
   |                    </TR>
   |                    <TR>
-  |                        <TD>3219142829474535424</TD>
-  |                        <TD>86.59328782338685</TD>
-  |                        <TD>-10.331736040138617</TD>
-  |                        <TD>-0.06075629321549123</TD>
-  |                        <TD>-29.666695525022078</TD>
-  |                        <TD>2.496796996582742</TD>
-  |                        <TD></TD>
-  |                        <TD>15.189251</TD>
-  |                        <TD>14.364465</TD>
-  |                    </TR>
-  |                    <TR>
   |                        <TD>3219118640218737920</TD>
   |                        <TD>86.50103315602114</TD>
-  |                        <TD>0.8061180282403659</TD>
+  |                        <TD>-800.8061180282403659</TD>
   |                        <TD>-0.1406363314163743</TD>
-  |                        <TD>-1.0936840305376552</TD>
+  |                        <TD>10000.0936840305376552</TD>
   |                        <TD>2.3714995175435116</TD>
   |                        <TD></TD>
   |                        <TD>15.209204</TD>
@@ -262,279 +255,129 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
-  def guideEnvironmentQuery(oid: Observation.Id, obsTime: String) =
+  def guideAvailabilityQuery(oid: Observation.Id, startTime: String, endTime: String) =
     s"""
       query {
         observation(observationId: "$oid") {
           title
           targetEnvironment {
-            guideEnvironments(observationTime: "$obsTime") {
-              posAngle {
-                degrees
-              }
-              guideTargets {
-                name
-                probe
-                sourceProfile {
-                  point {
-                    bandNormalized {
-                      brightnesses {
-                        band
-                      }
-                    }
-                  }
-                }
-                sidereal {
-                  catalogInfo {
-                    name
-                    id
-                    objectType
-                  }
-                  epoch
-                  ra {
-                    microseconds
-                    hms
-                    hours
-                    degrees
-                  }
-                  dec {
-                    dms
-                    degrees
-                    microarcseconds
-                  }
-                  radialVelocity {
-                    metersPerSecond
-                    centimetersPerSecond
-                    kilometersPerSecond
-                  }
-                  properMotion {
-                    ra {
-                      microarcsecondsPerYear
-                      milliarcsecondsPerYear
-                    }
-                    dec {
-                      microarcsecondsPerYear
-                      milliarcsecondsPerYear
-                    }
-                  }
-                  parallax {
-                    microarcseconds
-                    milliarcseconds
-                  }
-                }
-                nonsidereal {
-                  des
-                }
-              }
+            guideAvailability(start: "$startTime", end: "$endTime") {
+              start
+              end
+              posAngles { degrees }
             }
           }
         }
       }
     """
 
-  val emptyGuideEnvironmentResults =
+  val emptyGuideAvailabilityResults =
     json"""
     {
       "observation": {
         "title": "V1647 Orionis",
         "targetEnvironment": {
-          "guideEnvironments": [
+          "guideAvailability": [
+            {
+              "start" : "3025-10-31 00:00:00",
+              "end" : "3026-10-31 01:00:00",
+              "posAngles" : [
+              ]
+            }
           ]
         }
       }
     }
     """
 
-  val guideEnvironmentResults =
+  val guideAvailabilityResults =
     json"""
     {
       "observation": {
         "title": "V1647 Orionis",
         "targetEnvironment": {
-          "guideEnvironments": [
+          "guideAvailability": [
             {
-              "posAngle": {
-                "degrees": 160.000000
-              },
-              "guideTargets": [
+              "start" : "2023-10-31 00:00:00",
+              "end" : "2024-02-01 00:00:00",
+              "posAngles" : [
                 {
-                  "name": "Gaia DR3 3219118090462918016",
-                  "probe": "GMOS_OIWFS",
-                  "sourceProfile": {
-                    "point": {
-                      "bandNormalized": {
-                        "brightnesses": [
-                          {
-                            "band": "GAIA"
-                          }
-                        ]
-                      }
-                    }
-                  },
-                  "sidereal": {
-                    "catalogInfo": {
-                      "name": "GAIA",
-                      "id": "3219118090462918016",
-                      "objectType": null
-                    },
-                    "epoch": "J2023.660",
-                    "ra": {
-                      "microseconds": 20782434012,
-                      "hms": "05:46:22.434012",
-                      "hours": 5.772898336666666666666666666666667,
-                      "degrees": 86.59347505
-                    },
-                    "dec": {
-                      "dms": "-00:08:52.651136",
-                      "degrees": 359.8520413511111,
-                      "microarcseconds": 1295467348864
-                    },
-                    "radialVelocity": {
-                      "metersPerSecond": 0,
-                      "centimetersPerSecond": 0,
-                      "kilometersPerSecond": 0
-                    },
-                    "properMotion": {
-                      "ra": {
-                        "microarcsecondsPerYear": 438,
-                        "milliarcsecondsPerYear": 0.438
-                      },
-                      "dec": {
-                        "microarcsecondsPerYear": -741,
-                        "milliarcsecondsPerYear": -0.741
-                      }
-                    },
-                    "parallax": {
-                      "microarcseconds": 2432,
-                      "milliarcseconds": 2.432
-                    }
-                  },
-                  "nonsidereal": null
+                  "degrees" : 160.000000
+                },
+                {
+                  "degrees" : 170.000000
+                },
+                {
+                  "degrees" : 180.000000
+                },
+                {
+                  "degrees" : 190.000000
+                },
+                {
+                  "degrees" : 200.000000
+                },
+                {
+                  "degrees" : 250.000000
+                },
+                {
+                  "degrees" : 260.000000
+                },
+                {
+                  "degrees" : 270.000000
+                },
+                {
+                  "degrees" : 280.000000
+                },
+                {
+                  "degrees" : 290.000000
+                },
+                {
+                  "degrees" : 300.000000
+                },
+                {
+                  "degrees" : 310.000000
                 }
               ]
             },
             {
-              "posAngle": {
-                "degrees": 270.000000
-              },
-              "guideTargets": [
+              "start" : "2024-02-01 00:00:00",
+              "end" : "2024-02-28 00:00:00",
+              "posAngles" : [
                 {
-                  "name": "Gaia DR3 3219118640218737920",
-                  "probe": "GMOS_OIWFS",
-                  "sourceProfile": {
-                    "point": {
-                      "bandNormalized": {
-                        "brightnesses": [
-                          {
-                            "band": "GAIA"
-                          }
-                        ]
-                      }
-                    }
-                  },
-                  "sidereal": {
-                    "catalogInfo": {
-                      "name": "GAIA",
-                      "id": "3219118640218737920",
-                      "objectType": null
-                    },
-                    "epoch": "J2023.660",
-                    "ra": {
-                      "microseconds": 20760248368,
-                      "hms": "05:46:00.248368",
-                      "hours": 5.766735657777777777777777777777778,
-                      "degrees": 86.50103486666666666666666666666667
-                    },
-                    "dec": {
-                      "dms": "-00:08:26.299165",
-                      "degrees": 359.8593613430556,
-                      "microarcseconds": 1295493700835
-                    },
-                    "radialVelocity": {
-                      "metersPerSecond": 0,
-                      "centimetersPerSecond": 0,
-                      "kilometersPerSecond": 0
-                    },
-                    "properMotion": {
-                      "ra": {
-                        "microarcsecondsPerYear": 806,
-                        "milliarcsecondsPerYear": 0.806
-                      },
-                      "dec": {
-                        "microarcsecondsPerYear": -1093,
-                        "milliarcsecondsPerYear": -1.093
-                      }
-                    },
-                    "parallax": {
-                      "microarcseconds": 2371,
-                      "milliarcseconds": 2.371
-                    }
-                  },
-                  "nonsidereal": null
+                  "degrees" : 160.000000
+                },
+                {
+                  "degrees" : 170.000000
+                },
+                {
+                  "degrees" : 180.000000
+                },
+                {
+                  "degrees" : 190.000000
+                },
+                {
+                  "degrees" : 200.000000
+                },
+                {
+                  "degrees" : 260.000000
+                },
+                {
+                  "degrees" : 270.000000
+                },
+                {
+                  "degrees" : 280.000000
+                },
+                {
+                  "degrees" : 290.000000
+                },
+                {
+                  "degrees" : 300.000000
+                },
+                {
+                  "degrees" : 310.000000
                 }
               ]
-            },
-            {
-              "posAngle": {
-                "degrees": 50.000000
-              },
-              "guideTargets": [
-                {
-                  "name": "Gaia DR3 3219142829474535424",
-                  "probe": "GMOS_OIWFS",
-                  "sourceProfile": {
-                    "point": {
-                      "bandNormalized": {
-                        "brightnesses": [
-                          {
-                            "band": "GAIA"
-                          }
-                        ]
-                      }
-                    }
-                  },
-                  "sidereal": {
-                    "catalogInfo": {
-                      "name": "GAIA",
-                      "id": "3219142829474535424",
-                      "objectType": null
-                    },
-                    "epoch": "J2023.660",
-                    "ra": {
-                      "microseconds": 20782383800,
-                      "hms": "05:46:22.383800",
-                      "hours": 5.772884388888888888888888888888889,
-                      "degrees": 86.59326583333333333333333333333333
-                    },
-                    "dec": {
-                      "dms": "-00:03:38.949911",
-                      "degrees": 359.93918058027776,
-                      "microarcseconds": 1295781050089
-                    },
-                    "radialVelocity": {
-                      "metersPerSecond": 0,
-                      "centimetersPerSecond": 0,
-                      "kilometersPerSecond": 0
-                    },
-                    "properMotion": {
-                      "ra": {
-                        "microarcsecondsPerYear": -10331,
-                        "milliarcsecondsPerYear": -10.331
-                      },
-                      "dec": {
-                        "microarcsecondsPerYear": -29666,
-                        "milliarcsecondsPerYear": -29.666
-                      }
-                    },
-                    "parallax": {
-                      "microarcseconds": 2497,
-                      "milliarcseconds": 2.497
-                    }
-                  },
-                  "nonsidereal": null
-                }
-              ]
-            }
+            } 
           ]
         }
       }
@@ -544,11 +387,12 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val respStr =
-        if (req.uri.renderString.contains("20-0.10137")) gaiaReponseString else gaiaEmptyReponseString
+        if (req.uri.renderString.contains("20-0.10137")) gaiaReponseString
+        else gaiaEmptyReponseString
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
 
-  test("successfully obtain guide environment") {
+  test("successfully obtain guide availability") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -556,7 +400,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid, aug2023), expected = guideEnvironmentResults.asRight)
+      expect(pi, guideAvailabilityQuery(oid, successStart, successEnd), expected = guideAvailabilityResults.asRight)
     }
   }
 
@@ -567,12 +411,12 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List.empty)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid, aug2023),
+      expect(pi, guideAvailabilityQuery(oid, successStart, successEnd),
       expected = List(s"No targets have been defined for observation $oid.").asLeft)
     }
   }
 
-  test("no guide stars") {
+  test("no guide availability") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -580,7 +424,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid, aug3000), expected = emptyGuideEnvironmentResults.asRight)
+      expect(pi, guideAvailabilityQuery(oid, emptyStart, emptyEnd), expected = emptyGuideAvailabilityResults.asRight)
     }
   }
 
@@ -592,7 +436,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
         o <- createObservationWithNoModeAs(pi, p, t)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid, aug3000),
+      expect(pi, guideAvailabilityQuery(oid, successStart, successEnd),
       expected = List(s"Could not generate a sequence from the observation $oid: observing mode").asLeft)
     }
   }
