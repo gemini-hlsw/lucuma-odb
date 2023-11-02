@@ -315,7 +315,7 @@ object GuideEnvironmentService {
         val angles     =
           posAngleConstraint
             .anglesToTestAt(site, tracking, obsTime.toInstant, obsDuration.toDuration)
-            .map(_.sorted(Angle.AngleOrder))
+            .map(_.sorted)
         val newOffsets = offsets.getOrElse(NonEmptyList.of(Offset.Zero))
 
         angles
