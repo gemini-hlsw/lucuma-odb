@@ -3,6 +3,8 @@
 
 package lucuma.odb.service
 
+import cats.Order
+import cats.Order.*
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
@@ -36,6 +38,7 @@ import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
+import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
@@ -43,6 +46,7 @@ import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.PosAngleConstraintMode
@@ -62,25 +66,30 @@ import skunk.AppliedFragment
 import skunk.Decoder
 import skunk.implicits.*
 
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.Month
-import java.time.ZoneOffset
-import java.time.temporal.ChronoField
 import java.time.temporal.ChronoUnit
 
 import Services.Syntax.*
 
 trait GuideEnvironmentService[F[_]] {
+  import GuideEnvironmentService.AvailabilityPeriod
   import GuideEnvironmentService.Error
   import GuideEnvironmentService.GuideEnvironment
 
-  def get(pid: Program.Id, oid: Observation.Id, obsTime: Instant)(using
+  def get(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F]
   ): F[Either[Error, List[GuideEnvironment]]]
+
+  def availability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+    NoTransaction[F]
+  ): F[Either[Error, List[AvailabilityPeriod]]]
 }
 
 object GuideEnvironmentService {
+  // if any science target or guide star candidate moves more than this many milliarcseconds,
+  // we consider it to potentially invalidate the availability.
+  val invalidThreshold = 100.0
+
+  given Order[Angle] = Angle.AngleOrder
 
   case class GuideTarget(probe: GuideProbe, target: Target)
 
@@ -100,6 +109,29 @@ object GuideEnvironmentService {
 
   object GuideEnvironment {
     given Encoder[GuideEnvironment] = deriveEncoder
+  }
+
+  case class AvailabilityPeriod(
+    start:     Timestamp,
+    end:       Timestamp,
+    posAngles: List[Angle]
+  )
+
+  object AvailabilityPeriod {
+    given Encoder[AvailabilityPeriod] = deriveEncoder
+  }
+
+  private case class AvailabilityList private (periods: List[AvailabilityPeriod]) {
+    def add(ap: AvailabilityPeriod): AvailabilityList =
+      periods match
+        case h :: t if h.end === ap.start && h.posAngles === ap.posAngles => AvailabilityList(h.copy(end = ap.end) :: t)
+        case _                                                            => AvailabilityList(ap :: periods)
+
+    def toList: List[AvailabilityPeriod] = periods.reverse
+  }
+
+  private object AvailabilityList {
+    def empty: AvailabilityList = AvailabilityList(List.empty)
   }
 
   sealed trait Error {
@@ -136,15 +168,15 @@ object GuideEnvironmentService {
   private case class GeneratorInfo(
     digest: ExecutionDigest,
     params: GeneratorParams,
-    hash:        Md5Hash
+    hash:   Md5Hash
   ) {
-      val plannedTime = digest.fullPlannedTime.sum
-      val offsets = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
-      val (site, agsParams): (Site, AgsParams) = params match
-        case GeneratorParams.GmosNorthLongSlit(_, mode) => 
-          (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side))
-        case GeneratorParams.GmosSouthLongSlit(_, mode) => //(Site.GS, mode.fpu.asRight)
-          (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side))
+    val plannedTime                          = digest.fullPlannedTime.sum
+    val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
+    val (site, agsParams): (Site, AgsParams) = params match
+      case GeneratorParams.GmosNorthLongSlit(_, mode) =>
+        (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side))
+      case GeneratorParams.GmosSouthLongSlit(_, mode) =>
+        (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side))
 
   }
 
@@ -158,14 +190,16 @@ object GuideEnvironmentService {
 
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
-      ): F[Either[Error, NonEmptyList[Target]]] = {
-        asterismService.getAsterism(pid, oid)
-          .map(l => 
-            NonEmptyList.fromList(
-              l.map(_._2)
-            ).toRight(Error.GeneralError(s"No targets have been defined for observation $oid."))
+      ): F[Either[Error, NonEmptyList[Target]]] =
+        asterismService
+          .getAsterism(pid, oid)
+          .map(l =>
+            NonEmptyList
+              .fromList(
+                l.map(_._2)
+              )
+              .toRight(Error.GeneralError(s"No targets have been defined for observation $oid."))
           )
-      }
 
       def getObservationInfo(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -182,22 +216,12 @@ object GuideEnvironmentService {
 
       def getGaiaQuery(
         oid:             Observation.Id,
-        obsTime:         Instant,
+        start:           Timestamp,
+        end:             Timestamp,
         tracking:        ObjectTracking,
         shapeConstraint: ShapeExpression
-      ): Either[Error, ADQLQuery] = {
-        // We want the query dates to be in discreet units to make them more cachable, but
-        // we always want at least six months in the future for the scheduler. So, we'll use one year 
-        // starting at either January or July 1st.
-        val ldt   = LocalDateTime.ofInstant(obsTime, ZoneOffset.UTC)
-        val firstOfYear = ldt.`with`(ChronoField.DAY_OF_YEAR, 1L).`with`(ChronoField.NANO_OF_DAY, 0)
-        val start =
-          if (ldt.getMonthValue() < Month.JULY.getValue())
-            firstOfYear
-          else firstOfYear.`with`(ChronoField.MONTH_OF_YEAR, Month.JULY.getValue())
-        val end   = start.plus(1, ChronoUnit.YEARS)
-
-        (tracking.at(start.toInstant(ZoneOffset.UTC)), tracking.at(end.toInstant(ZoneOffset.UTC)))
+      ): Either[Error, ADQLQuery] =
+        (tracking.at(start.toInstant), tracking.at(end.toInstant))
           .mapN { (a, b) =>
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
@@ -211,13 +235,11 @@ object GuideEnvironmentService {
               s"Unable to get tracking information for asterism for observation $oid."
             )
           )
-      }
 
       def callGaia(
-        oid:     Observation.Id,
-        obsTime: Instant,
-        query:   ADQLQuery
-      ): F[Either[Error, NonEmptyList[GuideStarCandidate]]] = {
+        oid:   Observation.Id,
+        query: ADQLQuery
+      ): F[Either[Error, List[GuideStarCandidate]]] = {
         val MaxTargets                     = 100
         given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
         given ci: ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
@@ -234,27 +256,19 @@ object GuideEnvironmentService {
           )
           .compile
           .toList
-          .map(_.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s).at(obsTime) })
-          .map(
-            NonEmptyList
-              .fromList(_)
-              .toRight(
-                Error
-                  .GaiaError(s"No valid guide star candidates were returned for observation $oid.")
-              )
-          )
+          .map(_.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s) }.asRight)
           .handleError(e => Error.GaiaError(e.getMessage()).asLeft)
       }
 
-      // TODO: use caching
       def getCandidates(
         oid:      Observation.Id,
-        obsTime:  Instant,
+        start:    Timestamp,
+        end:      Timestamp,
         tracking: ObjectTracking
-      ): F[Either[Error, NonEmptyList[GuideStarCandidate]]] =
+      ): F[Either[Error, List[GuideStarCandidate]]] =
         (for {
-          query      <- EitherT.fromEither(getGaiaQuery(oid, obsTime, tracking, probeArm.candidatesArea))
-          candidates <- EitherT(callGaia(oid, obsTime, query))
+          query      <- EitherT.fromEither(getGaiaQuery(oid, start, end, tracking, probeArm.candidatesArea))
+          candidates <- EitherT(callGaia(oid, query))
         } yield candidates).value
 
       extension [D](steps: NonEmptyList[Step[D]])
@@ -262,8 +276,18 @@ object GuideEnvironmentService {
           offset
         }
 
-      extension (usable: NonEmptyList[AgsAnalysis.Usable])
-        def toGuideEnvironments: NonEmptyList[GuideEnvironment] = usable.map { ags =>
+      extension (target: Target)
+        def masy: Double =
+          Target.siderealTracking.getOption(target).map(_.masy).getOrElse(0.0)
+
+      extension (sidereal: SiderealTracking)
+        def masy: Double =
+          sidereal.properMotion
+            .map(pm => (pm.ra.masy.value.pow(2) + pm.dec.masy.value.pow(2)).toReal.sqrt.toDouble)
+            .getOrElse(0.0)
+
+      extension (usable: List[AgsAnalysis.Usable])
+        def toGuideEnvironments: List[GuideEnvironment] = usable.map { ags =>
           val target = GuideStarCandidate.siderealTarget.reverseGet(ags.target)
           GuideEnvironment(ags.vignetting.head._1, List(GuideTarget(ags.guideProbe, target)))
         }
@@ -276,7 +300,7 @@ object GuideEnvironmentService {
           .digestWithParamsAndHash(pid, oid)
           .map {
             _.leftMap(Error.GeneratorError(_))
-              .map { (d, p, h) => GeneratorInfo(d, p, h) }
+              .map((d, p, h) => GeneratorInfo(d, p, h))
           }
 
       def getPositions(
@@ -285,11 +309,13 @@ object GuideEnvironmentService {
         posAngleConstraint: PosAngleConstraint,
         offsets:            Option[NonEmptyList[Offset]],
         tracking:           ObjectTracking,
-        obsTime:            Instant,
-        obsDuration:        TimeSpan,
+        obsTime:            Timestamp,
+        obsDuration:        TimeSpan
       ): Either[Error, NonEmptyList[AgsPosition]] = {
         val angles     =
-          posAngleConstraint.anglesToTestAt(site, tracking, obsTime, obsDuration.toDuration).map(_.sorted(Angle.AngleOrder))
+          posAngleConstraint
+            .anglesToTestAt(site, tracking, obsTime.toInstant, obsDuration.toDuration)
+            .map(_.sorted)
         val newOffsets = offsets.getOrElse(NonEmptyList.of(Offset.Zero))
 
         angles
@@ -302,69 +328,193 @@ object GuideEnvironmentService {
           .toRight(Error.GeneralError(s"No angles to test for guide target candidates for observation $oid."))
       }
 
+      private val AllAngles =
+        NonEmptyList.fromListUnsafe(
+          (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
+        )
+
+      def getAllAnglePositions(offsets: Option[NonEmptyList[Offset]]): NonEmptyList[AgsPosition] =
+        for {
+          pa  <- AllAngles
+          off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
+        } yield AgsPosition(pa, off)
+
       def processCandidates(
         obsInfo:       ObservationInfo,
+        wavelength:    Wavelength,
         genInfo:       GeneratorInfo,
         baseCoords:    Coordinates,
         scienceCoords: List[Coordinates],
         positions:     NonEmptyList[AgsPosition],
-        candidates:    NonEmptyList[GuideStarCandidate]
-      ): Either[Error, NonEmptyList[AgsAnalysis.Usable]] =
-        obsInfo.wavelength.flatMap { wavelength =>
-          val analysis = Ags
-            .agsAnalysis(obsInfo.constraints,
-                         wavelength,
-                         baseCoords,
-                         scienceCoords,
-                         positions,
-                         genInfo.agsParams,
-                         candidates.toList
-            )
-            .sortUsablePositions
-            .collect { case usable: AgsAnalysis.Usable => usable }
-          NonEmptyList
-            .fromList(analysis)
-            .toRight(Error.GeneralError(s"No usable guide targets were found for observation ${obsInfo.id}"))
+        candidates:    List[GuideStarCandidate]
+      ): List[AgsAnalysis.Usable] =
+        Ags
+          .agsAnalysis(obsInfo.constraints,
+                       wavelength,
+                       baseCoords,
+                       scienceCoords,
+                       positions,
+                       genInfo.agsParams,
+                       candidates
+          )
+          .sortUsablePositions
+          .collect { case usable: AgsAnalysis.Usable => usable }
+
+      def buildAvailability(
+        start:      Timestamp,
+        end:        Timestamp,
+        obsInfo:    ObservationInfo,
+        genInfo:    GeneratorInfo,
+        wavelength: Wavelength,
+        asterism:   NonEmptyList[Target],
+        tracking:   ObjectTracking,
+        candidates: List[GuideStarCandidate],
+        positions:  NonEmptyList[AgsPosition]
+      ): Either[Error, List[AvailabilityPeriod]] = {
+        @scala.annotation.tailrec
+        def go(startTime: Timestamp, accum: AvailabilityList): Either[Error, AvailabilityList] = {
+          val period =
+            buildAvailabilityPeriod(startTime, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
+          period match
+            case Left(error)                       => error.asLeft
+            case Right(period) if period.end < end => go(period.end, accum.add(period))
+            case Right(period)                     => accum.add(period.copy(end = end)).asRight
         }
-        
-      override def get(pid: Program.Id, oid: Observation.Id, obsTime: Instant)(using
+        candidates match
+          case Nil => List(AvailabilityPeriod(start, end, List.empty)).asRight
+          case _   => go(start, AvailabilityList.empty).map(_.toList)
+      }
+
+      def buildAvailabilityPeriod(
+        start:      Timestamp,
+        obsInfo:    ObservationInfo,
+        genInfo:    GeneratorInfo,
+        wavelength: Wavelength,
+        asterism:   NonEmptyList[Target],
+        tracking:   ObjectTracking,
+        candidates: List[GuideStarCandidate],
+        positions:  NonEmptyList[AgsPosition]
+      ): Either[Error, AvailabilityPeriod] =
+        for {
+          baseCoords      <- obsInfo.explicitBase
+                               .orElse(
+                                 tracking
+                                   .at(start.toInstant)
+                                   .map(_.value)
+                               )
+                               .toRight(
+                                 Error.GeneralError(
+                                   s"Unable to get coordinates for asterism in observation ${obsInfo.id}"
+                                 )
+                               )
+          scienceCoords   <- asterism.toList
+                               .traverse(t => ObjectTracking.fromTarget(t).at(start.toInstant).map(_.value))
+                               .toRight(
+                                 Error.GeneralError(
+                                   s"Unable to get coordinates for science targets in observation ${obsInfo.id}"
+                                 )
+                               )
+          scienceSpeed     = asterism.toList.map(_.masy).max
+          candidatesAt     = candidates.map(_.at(start.toInstant))
+          analysis         = Ags.agsAnalysis(obsInfo.constraints,
+                                             wavelength,
+                                             baseCoords,
+                                             scienceCoords,
+                                             positions,
+                                             genInfo.agsParams,
+                                             candidatesAt
+                             )
+          // we don't care about specific targets, just their angles and speeds.
+          // At this point, each candidate only has a single vignetting
+          candidateSpeeds  = analysis.collect { case u: AgsAnalysis.Usable => (u.vignetting.head._1, u.target.tracking.masy) }
+          // At this point, each Usable has a single vignetting
+          angleGroups      = candidateSpeeds.groupMap(_._1)(_._2)
+          // we want the slowest speed at each angle, because that will be the one that is available longest,
+          // maintaing the same list of angles.
+          slowestPerAngle  = angleGroups.toList.map((angle, speeds) => (angle, speeds.min))
+          // Now we want to know which angle will be invalid first. If there are no available candidates,
+          // we'll invalidate on the science targets.
+          fastestAngle     = slowestPerAngle.maxByOption((_, speed) => speed).fold(0.0)(_._2)
+          // And now, which is faster, the science target or the candidates?
+          fastest          = scala.math.max(scienceSpeed, fastestAngle)
+          // This is approximate, but so is the invalidThreshold...
+          // These should always be big values (until nonsidereal), but if it is 0, we'd go infinite.
+          daysTilInvalid   = scala.math.max((invalidThreshold / fastest * 365).intValue, 1)
+          invalidDate      = Timestamp
+                               .fromInstantTruncated(start.toInstant.plus(daysTilInvalid, ChronoUnit.DAYS))
+                               .getOrElse(Timestamp.Max)
+        } yield AvailabilityPeriod(start, invalidDate, slowestPerAngle.map(_._1).sorted)
+
+      override def get(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
         NoTransaction[F]
       ): F[Either[Error, List[GuideEnvironment]]] =
         (for {
-          obsInfo        <- EitherT(getObservationInfo(pid, oid))
-          asterism       <- EitherT(getAsterism(pid, oid))
-          genInfo        <- EitherT(getGeneratorInfo(pid, oid))
-          tracking        = ObjectTracking.fromAsterism(asterism)
-          candidates     <- EitherT(getCandidates(oid, obsTime, tracking))
-          baseCoords     <- EitherT.fromEither(
-                              obsInfo.explicitBase
-                                .orElse(
-                                  tracking
-                                    .at(obsTime)
-                                    .map(_.value)
-                                )
-                                .toRight(
-                                  Error.GeneralError(
-                                    s"Unable to get coordinates for asterism in observation $oid"
-                                  )
-                                )
-                            )
-          scienceCoords  <- EitherT.fromEither(
-                              asterism.toList
-                                .traverse(t => ObjectTracking.fromTarget(t).at(obsTime).map(_.value))
-                                .toRight(
-                                  Error.GeneralError(
-                                    s"Unable to get coordinates for science targets in observation $oid"
-                                  )
-                                )
-                            )
-          positions      <- EitherT.fromEither(
-                              getPositions(oid, genInfo.site, obsInfo.posAngleConstraint, genInfo.offsets, tracking, obsTime, genInfo.plannedTime)
-                            )
-          usable         <- EitherT.fromEither(
-                              processCandidates(obsInfo, genInfo, baseCoords, scienceCoords, positions, candidates)
-                            )
+          obsInfo       <- EitherT(getObservationInfo(pid, oid))
+          wavelength    <- EitherT.fromEither(obsInfo.wavelength)
+          asterism      <- EitherT(getAsterism(pid, oid))
+          genInfo       <- EitherT(getGeneratorInfo(pid, oid))
+          tracking       = ObjectTracking.fromAsterism(asterism)
+          visitEnd      <- EitherT.fromEither(
+                             obsTime
+                               .plusMicrosOption(genInfo.plannedTime.toMicroseconds)
+                               .toRight(Error.GeneralError("Visit end time out of range"))
+                           )
+          candidates    <- EitherT(getCandidates(oid, obsTime, visitEnd, tracking)).map(_.map(_.at(obsTime.toInstant)))
+          baseCoords    <- EitherT.fromEither(
+                             obsInfo.explicitBase
+                               .orElse(
+                                 tracking
+                                   .at(obsTime.toInstant)
+                                   .map(_.value)
+                               )
+                               .toRight(
+                                 Error.GeneralError(
+                                   s"Unable to get coordinates for asterism in observation $oid"
+                                 )
+                               )
+                           )
+          scienceCoords <- EitherT.fromEither(
+                             asterism.toList
+                               .traverse(t => ObjectTracking.fromTarget(t).at(obsTime.toInstant).map(_.value))
+                               .toRight(
+                                 Error.GeneralError(
+                                   s"Unable to get coordinates for science targets in observation $oid"
+                                 )
+                               )
+                           )
+          positions     <- EitherT.fromEither(
+                             getPositions(oid,
+                                          genInfo.site,
+                                          obsInfo.posAngleConstraint,
+                                          genInfo.offsets,
+                                          tracking,
+                                          obsTime,
+                                          genInfo.plannedTime
+                             )
+                           )
+          usable         = processCandidates(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
         } yield usable.toGuideEnvironments.toList).value
+
+      override def availability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+        NoTransaction[F]
+      ): F[Either[Error, List[AvailabilityPeriod]]] =
+        (for {
+          _            <- EitherT.fromEither(
+                            if (start < end) ().asRight
+                            else Error.GeneralError("Start time must be prior to end time for guide star availability").asLeft
+                          )
+          obsInfo      <- EitherT(getObservationInfo(pid, oid))
+          wavelength   <- EitherT.fromEither(obsInfo.wavelength)
+          asterism     <- EitherT(getAsterism(pid, oid))
+          genInfo      <- EitherT(getGeneratorInfo(pid, oid))
+          tracking      = ObjectTracking.fromAsterism(asterism)
+          candidates   <- EitherT(getCandidates(oid, start, end, tracking))
+          positions     = getAllAnglePositions(genInfo.offsets)
+          availability <-
+            EitherT.fromEither(
+              buildAvailability(start, end, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
+            )
+        } yield availability).value
     }
 
   object Statements {
@@ -442,12 +592,7 @@ object GuideEnvironmentService {
             (ra, dec).mapN(Coordinates(_, _))
 
           elevRange.map(elev =>
-            ObservationInfo(id,
-                            ConstraintSet(image, cloud, sky, water, elev),
-                            paConstraint,
-                            wavelength,
-                            explicitBase
-            )
+            ObservationInfo(id, ConstraintSet(image, cloud, sky, water, elev), paConstraint, wavelength, explicitBase)
           )
       }
   }

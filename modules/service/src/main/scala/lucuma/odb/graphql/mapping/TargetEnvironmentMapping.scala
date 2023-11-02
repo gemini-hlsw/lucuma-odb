@@ -45,7 +45,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def commitHash: CommitHash
   def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
 
-  private val ObsTimeParam = "observationTime"
+  private val ObsTimeParam           = "observationTime"
+  private val AvailabilityStartParam = "start"
+  private val AvailabilityEndParam   = "end"
 
   private def asterismObject(name: String): SqlObject =
     SqlObject(
@@ -63,7 +65,8 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         asterismObject("asterism"),
         asterismObject("firstScienceTarget"),
         SqlObject("explicitBase"),
-        EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId"))
+        EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId")),
+        EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId"))
       )
     )
 
@@ -100,6 +103,15 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       Elab.liftR(rObsTime).flatMap { obsTime =>
         Elab.env(ObsTimeParam -> obsTime)
       }
+
+    case (TargetEnvironmentType, "guideAvailability", List(
+      TimestampBinding(AvailabilityStartParam, rStart),
+      TimestampBinding(AvailabilityEndParam, rEnd)
+    )) => for {
+      start <- Elab.liftR(rStart)
+      end   <- Elab.liftR(rEnd)
+      env   <- Elab.env(AvailabilityStartParam -> start, AvailabilityEndParam -> end)
+    } yield env
   }
 
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
@@ -109,7 +121,28 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       (pid, oid, obsTime) =>
         services.use { s =>
           s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-            .get(pid, oid, obsTime.toInstant)
+            .get(pid, oid, obsTime)
+            .map {
+              case Left(e)  => Result.failure(e.format)
+              case Right(s) => s.success
+            }
+        }
+
+    effectHandler("guideEnvironments", readEnv, calculate)
+  }
+
+  def guideAvailabilityQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[(Timestamp, Timestamp)] = env =>
+      for {
+        start <- env.getR[Timestamp](AvailabilityStartParam)
+        end   <- env.getR[Timestamp](AvailabilityEndParam)
+      } yield (start, end)
+
+    val calculate: (Program.Id, Observation.Id, (Timestamp, Timestamp)) => F[Result[List[GuideEnvironmentService.AvailabilityPeriod]]] =
+      (pid, oid, period) =>
+        services.use { s =>
+          s.guideEnvironmentService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+            .availability(pid, oid, period._1, period._2)
             .map {
               case Left(e)  => Result.failure(e.format)
               case Right(s) => s.success
