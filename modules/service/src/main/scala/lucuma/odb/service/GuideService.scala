@@ -21,6 +21,7 @@ import lucuma.ags.GuideProbe
 import lucuma.ags.GuideStarCandidate
 import lucuma.ags.*
 import lucuma.catalog.votable.*
+import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.geom.ShapeExpression
@@ -219,15 +220,18 @@ object GuideService {
         start:           Timestamp,
         end:             Timestamp,
         tracking:        ObjectTracking,
-        shapeConstraint: ShapeExpression
+        shapeConstraint: ShapeExpression,
+        wavelength:      Wavelength,
+        constraints:     ConstraintSet
       ): Either[Error, ADQLQuery] =
         (tracking.at(start.toInstant), tracking.at(end.toInstant))
           .mapN { (a, b) =>
+            val brightnessConstraints = gaiaBrightnessConstraints(constraints, GuideSpeed.Slow, wavelength)
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
               NonEmptyList.of(a.value, b.value),
               shapeConstraint,
-              ags.widestConstraints.some
+              brightnessConstraints.some
             )
           }
           .toRight(
@@ -261,13 +265,17 @@ object GuideService {
       }
 
       def getCandidates(
-        oid:      Observation.Id,
-        start:    Timestamp,
-        end:      Timestamp,
-        tracking: ObjectTracking
+        oid:         Observation.Id,
+        start:       Timestamp,
+        end:         Timestamp,
+        tracking:    ObjectTracking,
+        wavelength:  Wavelength,
+        constraints: ConstraintSet
       ): F[Either[Error, List[GuideStarCandidate]]] =
         (for {
-          query      <- EitherT.fromEither(getGaiaQuery(oid, start, end, tracking, probeArm.candidatesArea))
+          query      <- EitherT.fromEither(
+                          getGaiaQuery(oid, start, end, tracking, probeArm.candidatesArea, wavelength, constraints)
+                        )
           candidates <- EitherT(callGaia(oid, query))
         } yield candidates).value
 
@@ -459,7 +467,9 @@ object GuideService {
                                .plusMicrosOption(genInfo.plannedTime.toMicroseconds)
                                .toRight(Error.GeneralError("Visit end time out of range"))
                            )
-          candidates    <- EitherT(getCandidates(oid, obsTime, visitEnd, tracking)).map(_.map(_.at(obsTime.toInstant)))
+          candidates    <- EitherT(
+                            getCandidates(oid, obsTime, visitEnd, tracking, wavelength, obsInfo.constraints)
+                          ).map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- EitherT.fromEither(
                              obsInfo.explicitBase
                                .orElse(
@@ -508,7 +518,7 @@ object GuideService {
           asterism     <- EitherT(getAsterism(pid, oid))
           genInfo      <- EitherT(getGeneratorInfo(pid, oid))
           tracking      = ObjectTracking.fromAsterism(asterism)
-          candidates   <- EitherT(getCandidates(oid, start, end, tracking))
+          candidates   <- EitherT(getCandidates(oid, start, end, tracking, wavelength, obsInfo.constraints))
           positions     = getAllAnglePositions(genInfo.offsets)
           availability <-
             EitherT.fromEither(
