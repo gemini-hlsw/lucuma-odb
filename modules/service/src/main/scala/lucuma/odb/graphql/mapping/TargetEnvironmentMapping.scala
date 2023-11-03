@@ -128,7 +128,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
             }
         }
 
-    effectHandler("guideEnvironments", readEnv, calculate)
+    effectHandler(readEnv, calculate)
   }
 
   def guideAvailabilityQueryHandler: EffectHandler[F] = {
@@ -149,7 +149,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
             }
         }
 
-    effectHandler("guideEnvironments", readEnv, calculate)
+    effectHandler(readEnv, calculate)
   }
 }
 
