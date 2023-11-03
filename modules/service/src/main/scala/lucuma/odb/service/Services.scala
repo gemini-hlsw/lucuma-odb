@@ -146,8 +146,8 @@ trait Services[F[_]]:
   /** Construct a `PlannedTimeRangeService`, given a `CommitHash` and an `ItcClient`.*/
   def plannedTimeRangeService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): PlannedTimeRangeService[F]
 
-  /** Construct a `GuideEnvironmentService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `PlannedTimeCalculator`. */
-  def guideEnvironmentService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode): GuideEnvironmentService[F]
+  /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `PlannedTimeCalculator`. */
+  def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode): GuideService[F]
   
 
 object Services:
@@ -208,7 +208,7 @@ object Services:
       def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
       def plannedTimeRangeService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = PlannedTimeRangeService.instantiate(commitHash, itcClient, ptc)
-      def guideEnvironmentService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode) = GuideEnvironmentService.instantiate(httpClient, itcClient, commitHash, ptc)
+      def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode) = GuideService.instantiate(httpClient, itcClient, commitHash, ptc)
 
 
   /**
@@ -248,7 +248,7 @@ object Services:
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
     def plannedTimeRangeService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): PlannedTimeRangeService[F] = summon[Services[F]].plannedTimeRangeService(commitHash, itcClient, ptc)
-    def guideEnvironmentService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): GuideEnvironmentService[F] = summon[Services[F]].guideEnvironmentService(httpClient, itcClient, commitHash, ptc)
+    def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 
