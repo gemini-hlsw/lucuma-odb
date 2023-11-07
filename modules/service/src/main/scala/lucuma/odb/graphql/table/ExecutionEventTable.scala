@@ -15,9 +15,9 @@ import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_stage
 import lucuma.odb.util.Codecs.visit_id
 
-trait ExecutionEventView[F[_]] extends BaseMapping[F] {
+trait ExecutionEventTable[F[_]] extends BaseMapping[F] {
 
-  object ExecutionEventView extends TableDef("v_execution_event") {
+  object ExecutionEventTable extends TableDef("t_execution_event") {
     val Id: ColumnRef              = col("c_execution_event_id", execution_event_id)
     val EventType: ColumnRef       = col("c_event_type",         execution_event_type)
     val Received: ColumnRef        = col("c_received",           core_timestamp)

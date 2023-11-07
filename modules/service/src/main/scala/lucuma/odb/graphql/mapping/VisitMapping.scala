@@ -23,13 +23,13 @@ import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
 
-import table.ExecutionEventView
+import table.ExecutionEventTable
 import table.GmosStaticTables
 import table.ObservationView
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
-                            with ExecutionEventView[F]
+                            with ExecutionEventTable[F]
                             with GmosStaticTables[F]
                             with ObservationView[F]
                             with Predicates[F]
