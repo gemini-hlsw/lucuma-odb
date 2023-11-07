@@ -15,7 +15,9 @@ import grackle.NullableType
 import grackle.ObjectType
 import grackle.ScalarType
 import grackle.Schema
+import grackle.SchemaExtension
 import grackle.Type
+import grackle.TypeExtension
 import grackle.TypeRef
 import grackle.UnionType
 import org.tpolecat.sourcepos.SourcePos
@@ -26,8 +28,16 @@ object Remapper {
   def remap(s: Schema): Schema =
     new Schema {
       val pos: SourcePos = s.pos
-      val types: List[NamedType] = s.types.map(new Remapper(this).remapNamedType)
+      val baseTypes: List[NamedType] = s.baseTypes.map(new Remapper(this).remapNamedType)
       val directives: List[DirectiveDef] = s.directives
+      def schemaExtensions: List[SchemaExtension] = 
+        s.schemaExtensions match
+          case Nil => Nil
+          case _   => sys.error("Unimplemented: remap for schema extensions")
+      def typeExtensions: List[TypeExtension] = 
+        s.typeExtensions match
+          case Nil => Nil
+          case _   => sys.error("Unimplemented: remap for type extensions")
     }
 
 }

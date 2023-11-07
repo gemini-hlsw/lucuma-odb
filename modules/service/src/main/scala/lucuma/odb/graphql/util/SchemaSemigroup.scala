@@ -51,8 +51,16 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
     Remapper.remap {
       new Schema {
         val pos: SourcePos = a.pos
-        val types: List[NamedType] = concatAndMergeWhen(a.types, b.types)(sameName)
+        val baseTypes: List[NamedType] = concatAndMergeWhen(a.types, b.types)(sameName)
         val directives: List[DirectiveDef] = concatAndMergeWhen(a.directives, b.directives)(_.name == _.name)
+        def schemaExtensions =
+          (a.schemaExtensions, b.schemaExtensions) match
+            case (Nil, Nil) => Nil
+            case _ => sys.error("Unimplemented: schema addition with schema extensions")
+        def typeExtensions =
+          (a.typeExtensions, b.typeExtensions) match
+            case (Nil, Nil) => Nil
+            case _ => sys.error("Unimplemented: schema addition with type extensions")
       }
     }
 

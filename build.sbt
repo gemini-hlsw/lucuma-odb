@@ -2,23 +2,23 @@ val catsParseVersion           = "0.3.10"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.6"
 val cirisVersion               = "3.4.0"
-val clueVersion                = "0.31.1"
+val clueVersion                = "0.34.0"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.0.4"
 val fs2Version                 = "3.9.3"
-val grackleVersion             = "0.15.0"
-val http4sBlazeVersion         = "0.23.14"
+val grackleVersion             = "0.16.0"
+val http4sBlazeVersion         = "0.23.15"
 val http4sEmberVersion         = "0.23.23"
-val http4sJdkHttpClientVersion = "0.9.0"
+val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.4.11"
 val log4catsVersion            = "2.6.0"
 val lucumaCatalogVersion       = "0.44.1"
-val lucumaItcVersion           = "0.20.3"
-val lucumaCoreVersion          = "0.88.0"
-val lucumaGraphQLRoutesVersion = "0.8.0"
+val lucumaItcVersion           = "0.21.0"
+val lucumaCoreVersion          = "0.88.1"
+val lucumaGraphQLRoutesVersion = "0.8.2"
 val lucumaSsoVersion           = "0.6.8"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
@@ -144,7 +144,7 @@ lazy val service = project
       "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
       "org.typelevel"  %% "paiges-core"                        % paigesVersion,
-      "com.github.vertical-blank" % "sql-formatter" % "2.0.3",
+      "com.github.vertical-blank" % "sql-formatter" % "2.0.4",
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs       += "serve"
