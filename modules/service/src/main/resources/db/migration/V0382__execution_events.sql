@@ -42,10 +42,3 @@ DROP VIEW v_execution_event;
 DROP TABLE t_dataset_event;
 DROP TABLE t_step_event;
 DROP TABLE t_sequence_event;
-
--- Time accounting is per visit so we'll need to select on visit_id.
--- Also, we need to know all events that happened during the visit whether
--- or not associated with that visit.
-
-CREATE INDEX execution_event_received_index ON t_execution_event (c_received);
-CREATE INDEX execution_event_id_index       ON t_execution_event (c_observation_id, c_visit_id);
