@@ -130,8 +130,8 @@ object ExecutionEventService {
 
         val insert: F[Either[VisitNotFound, (ExecutionEvent.Id, Timestamp)]] =
           session
-            .unique(Statements.InsertSequenceEvent)(visitId, command)
-            .map(_.asRight)
+            .option(Statements.InsertSequenceEvent)(visitId, command, visitId)
+            .map(_.toRight(VisitNotFound(visitId)))
             .recover {
               case SqlState.ForeignKeyViolation(_) => VisitNotFound(visitId).asLeft
             }
@@ -177,31 +177,47 @@ object ExecutionEventService {
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (ExecutionEvent.Id, Timestamp)] =
       sql"""
-        INSERT INTO t_dataset_event (
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_observation_id,
+          c_visit_id,
+          c_step_id,
           c_dataset_id,
           c_dataset_stage
         )
         SELECT
+          'dataset' :: e_execution_event_type,
+          d.c_observation_id,
+          d.c_visit_id,
+          d.c_step_id,
           $dataset_id,
           $dataset_stage
         FROM
-          t_dataset
+          t_dataset d
         WHERE
-          t_dataset.c_dataset_id = $dataset_id
+          d.c_dataset_id = $dataset_id
         RETURNING
           c_execution_event_id,
           c_received
       """.query(execution_event_id *: core_timestamp)
 
-    val InsertSequenceEvent: Query[(Visit.Id, SequenceCommand), (ExecutionEvent.Id, Timestamp)] =
+    val InsertSequenceEvent: Query[(Visit.Id, SequenceCommand, Visit.Id), (ExecutionEvent.Id, Timestamp)] =
       sql"""
-        INSERT INTO t_sequence_event (
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_observation_id,
           c_visit_id,
           c_sequence_command
         )
         SELECT
+          'sequence' :: e_execution_event_type,
+          v.c_observation_id,
           $visit_id,
           $sequence_command
+        FROM
+          t_visit v
+        WHERE
+          v.c_visit_id = $visit_id
         RETURNING
           c_execution_event_id,
           c_received
@@ -209,17 +225,24 @@ object ExecutionEventService {
 
     val InsertStepEvent: Query[(Step.Id, StepStage, Step.Id), (ExecutionEvent.Id, Timestamp)] =
       sql"""
-        INSERT INTO t_step_event (
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_observation_id,
+          c_visit_id,
           c_step_id,
           c_step_stage
         )
         SELECT
+          'step' :: e_execution_event_type,
+          a.c_observation_id,
+          a.c_visit_id,
           $step_id,
           $step_stage
         FROM
-          t_step_record
+          t_step_record s
+        LEFT JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
         WHERE
-          t_step_record.c_step_id = $step_id
+          s.c_step_id = $step_id
         RETURNING
           c_execution_event_id,
           c_received

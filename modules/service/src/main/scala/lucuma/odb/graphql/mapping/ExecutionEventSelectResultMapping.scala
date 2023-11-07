@@ -6,12 +6,12 @@ package mapping
 
 import table.DatasetTable
 import table.ObservationView
-import table.ExecutionEventView
+import table.ExecutionEventTable
 import table.StepRecordTable
 import table.VisitTable
 
 trait ExecutionEventSelectResultMapping[F[_]]
-  extends ExecutionEventView[F]
+  extends ExecutionEventTable[F]
      with DatasetTable[F]
      with LookupFrom[F]
      with ObservationView[F]
@@ -22,16 +22,16 @@ trait ExecutionEventSelectResultMapping[F[_]]
   lazy val ExecutionEventSelectResultMapping: TypeMapping = {
 
     val fromDataset: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventView.DatasetId))
+      nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventTable.DatasetId))
 
     val fromExecution: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventView.ObservationId))
+      nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventTable.ObservationId))
 
     val fromStepRecord: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, ExecutionEventView.StepId))
+      nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, ExecutionEventTable.StepId))
 
     val fromVisit: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventView.VisitId))
+      nestedSelectResultMapping(ExecutionEventSelectResultType, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventTable.VisitId))
 
     SwitchMapping(
       ExecutionEventSelectResultType,
