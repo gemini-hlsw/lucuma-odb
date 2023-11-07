@@ -14,12 +14,12 @@ import grackle.Type
 import grackle.TypeRef
 
 import table.DatasetTable
-import table.ExecutionEventView
+import table.ExecutionEventTable
 import table.ObservationView
 import table.StepRecordTable
 import table.VisitTable
 
-trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
+trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
                                      with DatasetTable[F]
                                      with ObservationView[F]
                                      with StepRecordTable[F]
@@ -30,11 +30,11 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
       tpe           = ExecutionEventType,
       discriminator = executionEventTypeDiscriminator,
       fieldMappings = List(
-        SqlField("id",           ExecutionEventView.Id, key = true),
-        SqlObject("visit",       Join(ExecutionEventView.VisitId,       VisitTable.Id)),
-        SqlObject("observation", Join(ExecutionEventView.ObservationId, ObservationView.Id)),
-        SqlField("received",     ExecutionEventView.Received),
-        SqlField("eventType",    ExecutionEventView.EventType, discriminator = true)
+        SqlField("id",           ExecutionEventTable.Id, key = true),
+        SqlObject("visit",       Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
+        SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
+        SqlField("received",     ExecutionEventTable.Received),
+        SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true)
       )
     )
 
@@ -66,8 +66,8 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
     ObjectMapping(
       tpe = SequenceEventType,
       fieldMappings = List(
-        SqlField("id",      ExecutionEventView.Id, key = true),
-        SqlField("command", ExecutionEventView.SequenceCommand)
+        SqlField("id",      ExecutionEventTable.Id, key = true),
+        SqlField("command", ExecutionEventTable.SequenceCommand)
       )
     )
 
@@ -75,9 +75,9 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
     ObjectMapping(
       tpe = StepEventType,
       fieldMappings = List(
-        SqlField("id",        ExecutionEventView.Id, key = true),
-        SqlObject("step",     Join(ExecutionEventView.StepId, StepRecordTable.Id)),
-        SqlField("stepStage", ExecutionEventView.StepStage)
+        SqlField("id",        ExecutionEventTable.Id, key = true),
+        SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordTable.Id)),
+        SqlField("stepStage", ExecutionEventTable.StepStage)
       )
     )
 
@@ -85,9 +85,9 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventView[F]
     ObjectMapping(
       tpe = DatasetEventType,
       fieldMappings = List(
-        SqlField("id",           ExecutionEventView.Id, key = true),
-        SqlField("datasetStage", ExecutionEventView.DatasetStage),
-        SqlObject("dataset",     Join(ExecutionEventView.DatasetId, DatasetTable.Id))
+        SqlField("id",           ExecutionEventTable.Id, key = true),
+        SqlField("datasetStage", ExecutionEventTable.DatasetStage),
+        SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id))
       )
     )
 
