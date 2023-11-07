@@ -24,7 +24,7 @@ val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.5.0"
-val natchezVersion             = "0.3.1"
+val natchezVersion             = "0.3.4"
 val paigesVersion              = "0.4.3"
 val postgresVersion            = "42.6.0"
 val skunkVersion               = "0.6.0"
@@ -134,7 +134,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.556"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.582"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
