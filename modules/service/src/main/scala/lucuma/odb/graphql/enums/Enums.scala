@@ -12,6 +12,8 @@ import grackle.DirectiveDef
 import grackle.EnumType
 import grackle.NamedType
 import grackle.Schema
+import grackle.SchemaExtension
+import grackle.TypeExtension
 import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
@@ -86,9 +88,11 @@ final class Enums(
 
   val schema: Schema =
     new Schema {
-      def pos:        SourcePos       = SourcePos.instance
-      def types:      List[NamedType] = enumMeta.unreferencedTypes
+      def pos: SourcePos = SourcePos.instance
+      def baseTypes: List[NamedType] = enumMeta.unreferencedTypes
       def directives: List[DirectiveDef] = Nil
+      def schemaExtensions: List[SchemaExtension] = Nil
+      def typeExtensions: List[TypeExtension] = Nil
     }
 
 }
