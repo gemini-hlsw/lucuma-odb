@@ -4,7 +4,7 @@ This generates a report with the database tables and so on. To run it, just `cd`
 and run the following command.
 
 ```
-java -jar schemaspy-6.1.0.jar -configFile schemaspy.properties
+java -jar schemaspy-6.2.4.jar -configFile schemaspy.properties
 ```
 
 The resulting website will be in `./out`.
