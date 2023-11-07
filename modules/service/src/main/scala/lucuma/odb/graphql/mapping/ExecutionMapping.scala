@@ -119,7 +119,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         }
       }
 
-    effectHandler("config", readEnv, calculate)
+    effectHandler(readEnv, calculate)
   }
 
   private lazy val digestHandler: EffectHandler[F] = {
@@ -132,7 +132,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         }
       }
 
-    effectHandler("digest", _ => ().success, calculate)
+    effectHandler(_ => ().success, calculate)
   }
 
 }

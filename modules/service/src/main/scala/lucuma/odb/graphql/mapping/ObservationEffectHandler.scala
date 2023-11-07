@@ -23,7 +23,6 @@ import table.ObservationView
 trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
 
   protected def effectHandler[E, R](
-    fieldName: String,
     readEnv:   Env => Result[E],
     calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
   )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =

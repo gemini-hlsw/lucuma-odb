@@ -3635,7 +3635,7 @@ input TargetEditInput {
 
 input GroupEditInput {
     """
-    Group ID
+    Group ID, or Null to watch top-level group(s), or omit to watch all groups.
     """
     groupId: GroupId
 
@@ -3691,10 +3691,13 @@ type GroupEdit {
   """
   editType: EditType!
 
+  "Assocated program"
+  program: Program!
+
   """
-  Edited object
+  Edited group, or null if it's the top-level group.
   """
-  value: Group!
+  value: Group
   id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 
@@ -6581,9 +6584,24 @@ type CreateGroupResult {
   group: Group!
 }
 
-  """
-  The guide star(s) and related information
-  """
+"""
+A period of time showing which position angles have guide stars available during the period.
+The position angles are tested every 10 degrees.
+"""
+type GuideAvailabilityPeriod {
+  "The start time of the availability period."
+  start: Timestamp!
+
+  "Then end time of the availability period."
+  end:   Timestamp!
+  
+  "The position angles available during this period."
+  posAngles: [Angle!]!
+}
+
+"""
+The guide star(s) and related information
+"""
 type GuideEnvironment {
   """
   The position angle
@@ -9275,6 +9293,19 @@ type TargetEnvironment {
     """
     observationTime: Timestamp!
   ): [GuideEnvironment!]!
+
+  """
+  Availability of guide stars during a specified time range.
+  There can be multiple `GuideAvailabilityPeriod`s returned if availability changes over the time
+  range. In this case, the `end` of one period will be the same as the `start` of the next period.
+  """
+  guideAvailability(
+    "The starting time of the time range of interest."
+    start: Timestamp!
+    
+    "The ending time of the time range of interest."
+    end:   Timestamp!
+  ): [GuideAvailabilityPeriod!]!
 
   """
   When set, overrides the default base position of the target group

@@ -33,7 +33,7 @@ object GroupTopic {
    * @param users users associated with this program
    */
   case class Element(
-    groupId:   Group.Id,
+    groupId:   Option[Group.Id],
     programId: Program.Id,
     editType:  EditType,
     users:     List[User.Id]
@@ -49,13 +49,13 @@ object GroupTopic {
   }
 
   /** Infinite stream of group id, program id, event id, and edit type. */
-  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Group.Id, Program.Id, EditType)] =
+  def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Option[Group.Id], Program.Id, EditType)] =
     s.channel(id"ch_group_edit").listen(maxQueued).flatMap { n =>
       n.value.split(",") match {
         case Array(_oid, _pid, _tg_op) =>
-          (Gid[Group.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), EditType.fromTgOp(_tg_op)).tupled match {
-            case Some(tuple) => Stream(tuple)
-            case None        => Stream.exec(Logger[F].warn(s"Invalid group and/or event: $n"))
+          (Gid[Group.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), EditType.fromTgOp(_tg_op)) match {
+            case (gid, Some(pid), Some(op)) => Stream((gid, pid, op))
+            case _                          => Stream.exec(Logger[F].warn(s"Invalid group and/or event: $n"))
           }
         case _ => Stream.exec(Logger[F].warn(s"Invalid group and/or event: $n"))
       }
@@ -69,7 +69,7 @@ object GroupTopic {
       oid   <- updates(s, maxQueued)
       users <- Stream.eval(ProgramTopic.selectProgramUsers(s, oid._2))
       elem   = Element(oid._1, oid._2, oid._3, users)
-      _     <- Stream.eval(Logger[F].info(s"GroupChannel: $elem"))
+      _     <- Stream.eval(Logger[F].warn(s"GroupChannel: $elem"))
     } yield elem
 
   def apply[F[_]: Concurrent: Logger](

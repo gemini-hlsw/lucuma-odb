@@ -111,7 +111,7 @@ trait ObservationMapping[F[_]]
            }
         }
 
-    effectHandler("itc", readEnv, calculate)
+    effectHandler(readEnv, calculate)
   }
 
 }
