@@ -24,8 +24,8 @@ CREATE TABLE t_execution_event (
 
   CONSTRAINT check_event_type_conditions CHECK (
     CASE
-      WHEN c_event_type = 'sequence' THEN c_sequence_command IS NOT NULL
-      WHEN c_event_type = 'step'     THEN c_step_stage       IS NOT NULL AND c_step_id IS NOT NULL
+      WHEN c_event_type = 'sequence' THEN c_sequence_command IS NOT NULL AND c_step_ID IS NULL     AND c_dataset_id IS NULL
+      WHEN c_event_type = 'step'     THEN c_step_stage       IS NOT NULL AND c_step_id IS NOT NULL AND c_dataset_id IS NULL
       WHEN c_event_type = 'dataset'  THEN c_dataset_stage    IS NOT NULL AND c_step_id IS NOT NULL AND c_dataset_id IS NOT NULL
       ELSE FALSE
     END
