@@ -309,12 +309,6 @@ object GuideService {
           }
         }
 
-      extension (timestamp: Timestamp)
-        def laterOf(time2: Timestamp): Timestamp =
-          if (timestamp > time2) timestamp else time2
-        def earlierOf(time2: Timestamp): Timestamp =
-          if (timestamp < time2) timestamp else time2
-
       extension (usable: List[AgsAnalysis.Usable])
         def toGuideEnvironments: List[GuideEnvironment] = usable.map { ags =>
           val target = GuideStarCandidate.siderealTarget.reverseGet(ags.target)
@@ -437,7 +431,7 @@ object GuideService {
           scienceCutoff    = asterism.map(_.invalidDate(start)).toList.min
           // we can stop testing candidates when all angles being tested have invalid dates that are farther
           // in the future than either the end time passed in, or a science candidate will be invalid
-          endCutoff        = scienceCutoff.earlierOf(end)
+          endCutoff        = scienceCutoff.min(end)
           candidatesAt     = candidates.map(_.at(start.toInstant))
           angleMap         = getAvailabilityMap(
                                candidatesAt,
@@ -452,7 +446,7 @@ object GuideService {
                                genInfo.agsParams
                              )
           candidateCutoff  = angleMap.values.minOption.getOrElse(Timestamp.Max) 
-          finalEnd         = endCutoff.earlierOf(candidateCutoff)
+          finalEnd         = endCutoff.min(candidateCutoff)
         } yield AvailabilityPeriod(start, finalEnd, angleMap.keys.toList)
 
       def getAvailabilityMap(
@@ -483,7 +477,7 @@ object GuideService {
             val invalidDate = usable.target.tracking.invalidDate(start)
             val angle       = usable.vignetting.head._1
             // Always keep the oldest invalidation date for each angle
-            map.updatedWith(angle)(_.fold(invalidDate)(_.laterOf(invalidDate)).some)
+            map.updatedWith(angle)(_.fold(invalidDate)(_.max(invalidDate)).some)
           }
           // stop if/when we have all the angles and they all have expirations beyond the cutoff
           .takeThrough(map => map.size < angles.length || map.exists((_, t) => t <= endCutoff))
