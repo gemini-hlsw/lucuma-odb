@@ -24,6 +24,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.ExecutionEvent
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.util.Codecs.*
@@ -42,7 +43,7 @@ trait ExecutionEventService[F[_]] {
    */
   def streamEvents(
     visitId: Visit.Id
-  ): Stream[F, ExecutionEvent]
+  )(using Transaction[F]): Stream[F, ExecutionEvent]
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
@@ -93,12 +94,12 @@ object ExecutionEventService {
 
       override def streamEvents(
         visitId: Visit.Id
-      ): Stream[F, ExecutionEvent] =
+      )(using xa: Transaction[F]): Stream[F, ExecutionEvent] =
         Stream
           .eval(session.unique(Statements.SelectVisitRange)(visitId))
           .flatMap {
             case None        => Stream.empty
-            case Some(range) => session.stream(Statements.SelectEventsInRange)(range, 1024)
+            case Some(range) => session.stream(Statements.SelectEventsInRange)((range.start, range.end), 1024)
           }
 
       override def insertDatasetEvent(
@@ -199,7 +200,7 @@ object ExecutionEventService {
 
   object Statements {
 
-    val SelectVisitRange: Query[Visit.Id, Option[(Timestamp, Timestamp)]] =
+    val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
           MIN(c_received),
@@ -208,9 +209,7 @@ object ExecutionEventService {
           t_execution_event
         WHERE
           c_visit_id = $visit_id
-      """.query(
-        (core_timestamp.opt *: core_timestamp.opt).map(_.tupled)
-      )
+      """.query(timestamp_interval.opt)
 
     private val execution_event: Codec[ExecutionEvent] =
       (
@@ -268,6 +267,8 @@ object ExecutionEventService {
           t_execution_event
         WHERE
           c_received BETWEEN $core_timestamp AND $core_timestamp
+        ORDER BY
+          c_received
       """.query(execution_event)
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp)] =

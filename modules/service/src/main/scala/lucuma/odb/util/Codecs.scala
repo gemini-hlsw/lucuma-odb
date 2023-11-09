@@ -37,6 +37,7 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
@@ -511,6 +512,11 @@ trait Codecs {
 
   val step_config_smart_gcal: Codec[StepConfig.SmartGcal] =
     smart_gcal_type.to[StepConfig.SmartGcal]
+
+  val timestamp_interval: Codec[TimestampInterval] =
+    (core_timestamp *: core_timestamp).imap { case (min, max) =>
+      TimestampInterval.between(min, max)
+    } { interval => (interval.start, interval.end) }
 
   val void: Codec[Unit] =
     val rightUnit = Right(())
