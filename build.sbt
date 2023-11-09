@@ -1,4 +1,4 @@
-val catsParseVersion           = "0.3.10"
+val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.6"
 val cirisVersion               = "3.4.0"
@@ -17,7 +17,7 @@ val logbackVersion             = "1.4.11"
 val log4catsVersion            = "2.6.0"
 val lucumaCatalogVersion       = "0.44.1"
 val lucumaItcVersion           = "0.21.0"
-val lucumaCoreVersion          = "0.88.1"
+val lucumaCoreVersion          = "0.88.2"
 val lucumaGraphQLRoutesVersion = "0.8.2"
 val lucumaSsoVersion           = "0.6.8"
 val munitVersion               = "0.7.29"
@@ -54,6 +54,7 @@ lazy val schema =
     .in(file("modules/schema"))
     .settings(
       name := "lucuma-odb-schema",
+      libraryDependencySchemes += "org.typelevel" %% "cats-parse" % "always", // Workaround until http4s updates to 1.0.0 as well
       libraryDependencies ++= Seq(
         "io.circe"       %%% "circe-parser"                    % circeVersion,
         "io.circe"       %%% "circe-literal"                   % circeVersion,
@@ -73,6 +74,7 @@ lazy val sequence = project
   .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-sequence",
+    libraryDependencySchemes += "org.typelevel" %% "cats-parse" % "always", // Workaround until http4s updates to 1.0.0 as well
     libraryDependencies ++= Seq(
       "edu.gemini"     %% "lucuma-itc-client"               % lucumaItcVersion,
       "edu.gemini"     %% "lucuma-itc-testkit"              % lucumaItcVersion          % Test,
@@ -87,6 +89,7 @@ lazy val smartgcal = project
   .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-odb-smartgcal",
+    libraryDependencySchemes += "org.typelevel" %% "cats-parse" % "always", // Workaround until http4s updates to 1.0.0 as well
     libraryDependencies ++= Seq(
       "org.typelevel"  %% "cats-parse"                      % catsParseVersion,
       "co.fs2"         %% "fs2-core"                        % fs2Version,
@@ -106,6 +109,7 @@ lazy val service = project
   .settings(
     name := "lucuma-odb-service",
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
+    libraryDependencySchemes += "org.typelevel" %% "cats-parse" % "always", // Workaround until http4s updates to 1.0.0 as well
     libraryDependencies ++= Seq(
       "ch.qos.logback" %  "logback-classic"                    % logbackVersion,
       "com.monovore"   %% "decline-effect"                     % declineVersion,
