@@ -399,8 +399,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         Result.failure(s"Step '$id' not found")
       case VisitNotFound(id)   =>
         Result.failure(s"Visit '$id' not found")
-      case Success(eid, _)     =>
-        Result(Unique(Filter(predicates.id.eql(eid), child)))
+      case Success(e)     =>
+        Result(Unique(Filter(predicates.id.eql(e.id), child)))
     }
   }
 
