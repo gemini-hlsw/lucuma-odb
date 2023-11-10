@@ -4904,6 +4904,9 @@ type DatasetEvent implements ExecutionEvent {
   "Event type."
   eventType: ExecutionEventType!
 
+  "The associated step."
+  step: StepRecord!
+
   "Dataset execution stage."
   datasetStage: DatasetStage!
 

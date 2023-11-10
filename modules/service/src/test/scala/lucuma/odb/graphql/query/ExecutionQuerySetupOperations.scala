@@ -53,7 +53,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     for {
       did <- recordDatasetAs(user, sid, f"N18630101S$idx%04d.fits")
       es  <- stages.traverse { stage => addDatasetEventAs(user, did, stage) }
-    } yield DatasetNode(did, es)
+    } yield DatasetNode(did, es.map(_.id))
   }
 
   def recordStep(
@@ -82,7 +82,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       es0 <- stages0.traverse { stage => addStepEventAs(user, sid, stage) }
       ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, visit, atom, step, d) }
       es1 <- stages1.traverse { stage => addStepEventAs(user, sid, stage) }
-    } yield StepNode(sid, ds, es0 ::: es1)
+    } yield StepNode(sid, ds, es0.map(_.id) ::: es1.map(_.id))
   }
 
   def recordAtom(
@@ -110,7 +110,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       e0  <- addSequenceEventAs(user, vid, SequenceCommand.Start)
       as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(mode, setup, user, vid, visit, a) }
       e1  <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
-    } yield VisitNode(vid, as, List(e0, e1))
+    } yield VisitNode(vid, as, List(e0.id, e1.id))
 
   def recordAll(
     user: User,

@@ -11,9 +11,9 @@ import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.odb.data.ExecutionEvent
 import lucuma.odb.data.ObservingModeType
 
 class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
