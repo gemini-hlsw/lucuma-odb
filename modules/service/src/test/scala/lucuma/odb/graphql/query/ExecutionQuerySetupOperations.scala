@@ -53,7 +53,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     for {
       did <- recordDatasetAs(user, sid, f"N18630101S$idx%04d.fits")
       es  <- stages.traverse { stage => addDatasetEventAs(user, did, stage) }
-    } yield DatasetNode(did, es.map(_.id))
+    } yield DatasetNode(did, es)
   }
 
   def recordStep(
@@ -82,7 +82,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       es0 <- stages0.traverse { stage => addStepEventAs(user, sid, stage) }
       ds  <- (0 until setup.datasetCount).toList.traverse { d => recordDataset(setup, user, sid, visit, atom, step, d) }
       es1 <- stages1.traverse { stage => addStepEventAs(user, sid, stage) }
-    } yield StepNode(sid, ds, es0.map(_.id) ::: es1.map(_.id))
+    } yield StepNode(sid, ds, es0 ::: es1)
   }
 
   def recordAtom(
@@ -110,7 +110,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       e0  <- addSequenceEventAs(user, vid, SequenceCommand.Start)
       as  <- (0 until setup.atomCount).toList.traverse { a => recordAtom(mode, setup, user, vid, visit, a) }
       e1  <- addSequenceEventAs(user, vid, SequenceCommand.Stop)
-    } yield VisitNode(vid, as, List(e0.id, e1.id))
+    } yield VisitNode(vid, as, List(e0, e1))
 
   def recordAll(
     user: User,
@@ -135,32 +135,32 @@ object ExecutionQuerySetupOperations {
 
   trait Node {
     def allDatasets: List[Dataset.Id]
-    def allEvents: List[ExecutionEvent.Id]
+    def allEvents: List[ExecutionEvent]
   }
 
-  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent.Id]) extends Node {
+  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent]) extends Node {
     def allDatasets = List(id)
     def allEvents   = events
   }
 
-  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent.Id]) extends Node{
+  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent]) extends Node{
     def allDatasets = datasets.map(_.id).sorted
-    def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sorted
+    def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sortBy(_.id)
   }
 
   case class AtomNode(id: Atom.Id, steps: List[StepNode]) extends Node {
     def allDatasets = steps.flatMap(_.allDatasets).sorted
-    def allEvents   = steps.flatMap(_.allEvents).sorted
+    def allEvents   = steps.flatMap(_.allEvents).sortBy(_.id)
   }
 
-  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent.Id]) extends Node {
+  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent]) extends Node {
     def allDatasets = atoms.flatMap(_.allDatasets).sorted
-    def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sorted
+    def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sortBy(_.id)
   }
 
   case class ObservationNode(id: Observation.Id, visits: List[VisitNode]) extends Node {
     def allDatasets = visits.flatMap(_.allDatasets).sorted
-    def allEvents   = visits.flatMap(_.allEvents).sorted
+    def allEvents   = visits.flatMap(_.allEvents).sortBy(_.id)
   }
 
   case class Setup(
