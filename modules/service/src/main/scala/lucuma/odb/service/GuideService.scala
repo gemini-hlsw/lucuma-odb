@@ -49,7 +49,9 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ContiguousTimestampMap
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.json.all.query.given
@@ -82,7 +84,7 @@ trait GuideService[F[_]] {
     NoTransaction[F]
   ): F[Either[Error, List[GuideEnvironment]]]
 
-  def getGuideAvailability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+  def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
     NoTransaction[F]
   ): F[Either[Error, List[AvailabilityPeriod]]]
 }
@@ -115,26 +117,25 @@ object GuideService {
   }
 
   case class AvailabilityPeriod(
-    start:     Timestamp,
-    end:       Timestamp,
+    period:    TimestampInterval,
     posAngles: List[Angle]
   )
 
   object AvailabilityPeriod {
-    given Encoder[AvailabilityPeriod] = deriveEncoder
-  }
+    def apply(start: Timestamp, end: Timestamp, posAngles: List[Angle]): AvailabilityPeriod =
+      AvailabilityPeriod(TimestampInterval.between(start, end), posAngles)
 
-  private case class AvailabilityList private (periods: List[AvailabilityPeriod]) {
-    def add(ap: AvailabilityPeriod): AvailabilityList =
-      periods match
-        case h :: t if h.end === ap.start && h.posAngles === ap.posAngles => AvailabilityList(h.copy(end = ap.end) :: t)
-        case _                                                            => AvailabilityList(ap :: periods)
+    def fromTuple(tuple: (TimestampInterval, List[Angle])): AvailabilityPeriod =
+      AvailabilityPeriod(tuple._1, tuple._2)
 
-    def toList: List[AvailabilityPeriod] = periods.reverse
-  }
-
-  private object AvailabilityList {
-    def empty: AvailabilityList = AvailabilityList(List.empty)
+    given Encoder[AvailabilityPeriod] =
+      Encoder.instance { ap =>
+        Json.obj(
+          "start"     -> ap.period.start.asJson,
+          "end"       -> ap.period.end.asJson,
+          "posAngles" -> ap.posAngles.asJson
+        )
+      }
   }
 
   sealed trait Error {
@@ -261,10 +262,11 @@ object GuideService {
             _.body
               .through(utf8.decode)
               .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
+              .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
           )
           .compile
           .toList
-          .map(_.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s) }.asRight)
+          .map(_.asRight)
           .handleError(e => Error.GaiaError(e.getMessage()).asLeft)
       }
 
@@ -384,17 +386,19 @@ object GuideService {
         val positions = getPositions(angles, genInfo.offsets)
 
         @scala.annotation.tailrec
-        def go(startTime: Timestamp, accum: AvailabilityList): Either[Error, AvailabilityList] = {
-          val period =
+        def go(startTime: Timestamp, accum: ContiguousTimestampMap[List[Angle]]): Either[Error, ContiguousTimestampMap[List[Angle]]] = {
+          val eap =
             buildAvailabilityPeriod(startTime, end, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions, angles)
-          period match
-            case Left(error)                       => error.asLeft
-            case Right(period) if period.end < end => go(period.end, accum.add(period))
-            case Right(period)                     => accum.add(period.copy(end = end)).asRight
+          eap match
+            case Left(error)                      => error.asLeft
+            case Right(ap) if ap.period.end < end => go(ap.period.end, accum.unsafeAdd(ap.period, ap.posAngles))
+            case Right(ap)                        => 
+              val newPeriod = TimestampInterval.between(ap.period.start, end)
+              accum.unsafeAdd(newPeriod, ap.posAngles).asRight
         }
         candidates match
           case Nil => List(AvailabilityPeriod(start, end, List.empty)).asRight
-          case _   => go(start, AvailabilityList.empty).map(_.toList)
+          case _   => go(start, ContiguousTimestampMap.empty[List[Angle]]).map(_.intervals.toList.map(AvailabilityPeriod.fromTuple))
       }
 
       def buildAvailabilityPeriod(
@@ -531,20 +535,18 @@ object GuideService {
           usable         = processCandidates(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
-      override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+      override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
         NoTransaction[F]
       ): F[Either[Error, List[AvailabilityPeriod]]] =
         (for {
-          _            <- EitherT.fromEither(
-                            if (start < end) ().asRight
-                            else Error.GeneralError("Start time must be prior to end time for guide star availability").asLeft
-                          )
           obsInfo      <- EitherT(getObservationInfo(pid, oid))
+          start         = period.start
+          end           = period.end
           wavelength   <- EitherT.fromEither(obsInfo.wavelength)
           asterism     <- EitherT(getAsterism(pid, oid))
           genInfo      <- EitherT(getGeneratorInfo(pid, oid))
           tracking      = ObjectTracking.fromAsterism(asterism)
-          candidates   <- EitherT(getCandidates(oid, start, end, tracking, wavelength, obsInfo.constraints))
+          candidates   <- EitherT(getCandidates(oid, period.start, period.end, tracking, wavelength, obsInfo.constraints))
           availability <-
             EitherT.fromEither(
               buildAvailability(start, end, obsInfo, genInfo, wavelength, asterism, tracking, candidates)
