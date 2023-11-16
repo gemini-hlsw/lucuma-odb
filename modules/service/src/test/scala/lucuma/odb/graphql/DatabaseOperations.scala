@@ -20,6 +20,9 @@ import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RightAscension
 import lucuma.core.model.ExecutionEvent
+import lucuma.core.model.ExecutionEvent.DatasetEvent
+import lucuma.core.model.ExecutionEvent.SequenceEvent
+import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
@@ -36,6 +39,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -576,7 +580,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     vid:  Visit.Id,
     cmd:  SequenceCommand
-  ): IO[ExecutionEvent.Id] = {
+  ): IO[SequenceEvent] = {
     val q = s"""
       mutation {
         addSequenceEvent(input: {
@@ -585,13 +589,21 @@ trait DatabaseOperations { this: OdbSuite =>
         }) {
           event {
             id
+            received
+            observation { id }
           }
         }
       }
     """
 
     query(user = user, query = q).map { json =>
-      json.hcursor.downFields("addSequenceEvent", "event", "id").require[ExecutionEvent.Id]
+      val c = json.hcursor.downFields("addSequenceEvent", "event")
+      val e = for {
+        i <- c.downField("id").as[ExecutionEvent.Id]
+        r <- c.downField("received").as[Timestamp]
+        o <- c.downFields("observation", "id").as[Observation.Id]
+      } yield SequenceEvent(i, r, o, vid, cmd)
+      e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
 
@@ -703,7 +715,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user:  User,
     sid:   Step.Id,
     stage: StepStage
-  ): IO[ExecutionEvent.Id] = {
+  ): IO[StepEvent] = {
     val q = s"""
       mutation {
         addStepEvent(input: {
@@ -712,13 +724,23 @@ trait DatabaseOperations { this: OdbSuite =>
         }) {
           event {
             id
+            received
+            observation { id }
+            visit { id }
           }
         }
       }
     """
 
     query(user = user, query = q).map { json =>
-      json.hcursor.downFields("addStepEvent", "event", "id").require[ExecutionEvent.Id]
+      val c = json.hcursor.downFields("addStepEvent", "event")
+      val e = for {
+        i <- c.downField("id").as[ExecutionEvent.Id]
+        r <- c.downField("received").as[Timestamp]
+        o <- c.downFields("observation", "id").as[Observation.Id]
+        v <- c.downFields("visit", "id").as[Visit.Id]
+      } yield StepEvent(i, r, o, v, sid, stage)
+      e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
 
@@ -750,7 +772,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user:  User,
     did:   Dataset.Id,
     stage: DatasetStage
-  ): IO[ExecutionEvent.Id] = {
+  ): IO[DatasetEvent] = {
     val q = s"""
       mutation {
         addDatasetEvent(input: {
@@ -759,13 +781,25 @@ trait DatabaseOperations { this: OdbSuite =>
         }) {
           event {
             id
+            received
+            observation { id }
+            visit { id }
+            step { id }
           }
         }
       }
     """
 
     query(user = user, query = q).map { json =>
-      json.hcursor.downFields("addDatasetEvent", "event", "id").require[ExecutionEvent.Id]
+      val c = json.hcursor.downFields("addDatasetEvent", "event")
+      val e = for {
+        i <- c.downField("id").as[ExecutionEvent.Id]
+        r <- c.downField("received").as[Timestamp]
+        o <- c.downFields("observation", "id").as[Observation.Id]
+        v <- c.downFields("visit", "id").as[Visit.Id]
+        s <- c.downFields("step", "id").as[Step.Id]
+      } yield DatasetEvent(i, r, o, v, s, did, stage)
+      e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
 

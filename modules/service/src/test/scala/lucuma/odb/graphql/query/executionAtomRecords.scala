@@ -192,7 +192,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
               Json.obj(
                 "events" -> Json.obj(
                   "matches" -> s.allEvents.map { e =>
-                    Json.obj("id" -> e.asJson)
+                    Json.obj("id" -> e.id.asJson)
                   }.asJson
                 )
               )
