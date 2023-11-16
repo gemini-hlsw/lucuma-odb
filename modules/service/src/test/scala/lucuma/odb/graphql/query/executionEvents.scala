@@ -7,6 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
@@ -15,6 +16,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.odb.data.ObservingModeType
 
 class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
@@ -109,7 +111,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
 
   private def extractEvents(
     vid: Visit.Id
-  ): IO[List[ExecutionEvent]] =
+  ): IO[List[(ExecutionEvent, Option[Atom.Id])]] =
     withServices(service) { services =>
       services.session.transaction.use { xa =>
         services
@@ -128,7 +130,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     } yield
       vs.zip(es).foreach { case (visit, events) =>
         assertEquals(events.size, visit.allEvents.size)
-        assert(events.forall(_.visitId === visit.id))
+        assert(events.forall { case (event, _) => event.visitId === visit.id })
       }
   }
 
@@ -150,9 +152,23 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       es  <- extractEvents(vs0.id)
     } yield
       assertEquals(
-        es.map(_.id),
+        es.map { case (event, _) => event.id },
         (on0.allEvents ::: on1.allEvents ::: List(se)).map(_.id)
       )
+  }
+
+  test("atom ids") {
+    for {
+      on <- recordAll(service, mode, offset=500, visitCount = 3)
+      vs = on.visits
+      es <- vs.traverse(v => extractEvents(v.id))
+    } yield
+      vs.zip(es).foreach { case (visit, events) =>
+        assertEquals(
+          events.collect { case (event, Some(aid)) => (event, aid) },
+          visit.atoms.flatMap(a => a.allEvents.tupleRight(a.id))
+        )
+      }
   }
 
 }
