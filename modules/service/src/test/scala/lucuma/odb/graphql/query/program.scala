@@ -225,4 +225,49 @@ class program extends OdbSuite {
     }
   }
 
+  test("program / timeCharge placeholder") {
+    createProgramAs(pi, "program with no executed time").flatMap { pid =>
+      expect(
+        user = pi,
+        query =
+          s"""
+            query {
+              program(programId: "$pid") {
+                timeCharge {
+                  program { seconds }
+                  partner { seconds }
+                  nonCharged { seconds }
+                  total { seconds }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "program": {
+                  "timeCharge": {
+                    "program": {
+                      "seconds": 0.000000
+                    },
+                    "partner": {
+                      "seconds": 0.000000
+                    },
+                    "nonCharged": {
+                      "seconds": 0.000000
+                    },
+                    "total": {
+                      "seconds": 0.000000
+                    }
+                  }
+                }
+
+              }
+            """
+          )
+
+      )
+    }
+  }
+
 }

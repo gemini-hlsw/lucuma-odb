@@ -28,12 +28,6 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F] with GmosDynamicTables[F]
         GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
         IntensiveType / "totalTime"                   -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         LargeProgramType / "totalTime"                -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        ObservationType / "plannedTime" / "execution" -> timeSpanMapping(ObservationView.PlannedTime.Execution)(ObservationView.Id),
-        ObservationType / "plannedTime" / "pi"        -> timeSpanMapping(ObservationView.PlannedTime.Pi)(ObservationView.Id),
-        ObservationType / "plannedTime" / "uncharged" -> timeSpanMapping(ObservationView.PlannedTime.Uncharged)(ObservationView.Id),
-        ProgramType / "plannedTime" / "execution"     -> timeSpanMapping(ProgramTable.PlannedTime.Execution)(ProgramTable.Id),
-        ProgramType / "plannedTime" / "pi"            -> timeSpanMapping(ProgramTable.PlannedTime.Pi)(ProgramTable.Id),
-        ProgramType / "plannedTime" / "uncharged"     -> timeSpanMapping(ProgramTable.PlannedTime.Uncharged)(ProgramTable.Id),
         TimingWindowEndAfterType / "after"            -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
         TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )

@@ -14,14 +14,20 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
 import grackle.TypeRef
+import grackle.syntax.*
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.json.time.query.given
+import lucuma.odb.json.timeaccounting.given
 
 import table.ExecutionEventTable
 import table.GmosStaticTables
@@ -36,6 +42,14 @@ trait VisitMapping[F[_]] extends VisitTable[F]
                             with SelectSubquery {
 
   def user: User
+
+  lazy val breakdownPlaceholder: Json =
+    Json.obj(
+      "executionTime" -> CategorizedTime.Zero.asJson,
+      "discounts" -> Json.arr(),
+      "corrections" -> Json.arr(),
+      "finalCharge" -> CategorizedTime.Zero.asJson
+    )
 
   /*
   "Started at time."
@@ -59,7 +73,8 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlField("created",      VisitTable.Created),
         SqlObject("atomRecords"),
         SqlObject("datasets"),
-        SqlObject("events")
+        SqlObject("events"),
+        CursorFieldJson("timeChargeBreakdown", _ => breakdownPlaceholder.success, List("id"))
       )
     )
 

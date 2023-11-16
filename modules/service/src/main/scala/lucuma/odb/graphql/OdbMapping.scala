@@ -26,7 +26,7 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util._
-import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
@@ -78,7 +78,7 @@ object OdbMapping {
     itcClient0:  ItcClient[F],
     commitHash0: CommitHash,
     enums:       Enums,
-    ptc:         PlannedTimeCalculator.ForInstrumentMode,
+    tec:         TimeEstimateCalculator.ForInstrumentMode,
     httpClient0:  Client[F]
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
@@ -144,7 +144,6 @@ object OdbMapping {
           with ParallaxMapping[F]
           with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
-          with PlannedTimeSummaryMapping[F]
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
@@ -205,7 +204,7 @@ object OdbMapping {
           override val user: User = user0
           override val topics: Topics[F] = topics0
           override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
-          override val plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode = ptc
+          override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
 
           // Our combined type mappings
@@ -282,7 +281,6 @@ object OdbMapping {
               ParallaxMapping,
               PartnerMetaMapping,
               PartnerSplitMapping,
-              PlannedTimeSummaryMapping,
               PosAngleConstraintMapping,
               ProgramMapping,
               ProgramEditMapping,

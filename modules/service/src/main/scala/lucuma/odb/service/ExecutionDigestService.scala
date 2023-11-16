@@ -16,8 +16,8 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.TimeSpan
@@ -86,30 +86,30 @@ object ExecutionDigestService {
           digest.setup.full,
           digest.setup.reacquisition,
           digest.acquisition.observeClass,
-          digest.acquisition.plannedTime(ChargeClass.NonCharged),
-          digest.acquisition.plannedTime(ChargeClass.Partner),
-          digest.acquisition.plannedTime(ChargeClass.Program),
+          digest.acquisition.timeEstimate(ChargeClass.NonCharged),
+          digest.acquisition.timeEstimate(ChargeClass.Partner),
+          digest.acquisition.timeEstimate(ChargeClass.Program),
           digest.acquisition.offsets.toList,
           digest.acquisition.atomCount,
           digest.science.observeClass,
-          digest.science.plannedTime(ChargeClass.NonCharged),
-          digest.science.plannedTime(ChargeClass.Partner),
-          digest.science.plannedTime(ChargeClass.Program),
+          digest.science.timeEstimate(ChargeClass.NonCharged),
+          digest.science.timeEstimate(ChargeClass.Partner),
+          digest.science.timeEstimate(ChargeClass.Program),
           digest.science.offsets.toList,
           digest.science.atomCount,
           hash,
           digest.setup.full,
           digest.setup.reacquisition,
           digest.acquisition.observeClass,
-          digest.acquisition.plannedTime(ChargeClass.NonCharged),
-          digest.acquisition.plannedTime(ChargeClass.Partner),
-          digest.acquisition.plannedTime(ChargeClass.Program),
+          digest.acquisition.timeEstimate(ChargeClass.NonCharged),
+          digest.acquisition.timeEstimate(ChargeClass.Partner),
+          digest.acquisition.timeEstimate(ChargeClass.Program),
           digest.acquisition.offsets.toList,
           digest.acquisition.atomCount,
           digest.science.observeClass,
-          digest.science.plannedTime(ChargeClass.NonCharged),
-          digest.science.plannedTime(ChargeClass.Partner),
-          digest.science.plannedTime(ChargeClass.Program),
+          digest.science.timeEstimate(ChargeClass.NonCharged),
+          digest.science.timeEstimate(ChargeClass.Partner),
+          digest.science.timeEstimate(ChargeClass.Program),
           digest.science.offsets.toList,
           digest.science.atomCount
         ).void
@@ -121,16 +121,16 @@ object ExecutionDigestService {
     private val setup_time: Codec[SetupTime] =
       (time_span *: time_span).to[SetupTime]
 
-    private val planned_time: Codec[PlannedTime] =
+    private val categorized_time: Codec[CategorizedTime] =
       (time_span *: time_span *: time_span).imap {
         case (non_charged, partner_time, program_time) =>
-          PlannedTime(
+          CategorizedTime(
             ChargeClass.NonCharged -> non_charged,
             ChargeClass.Partner    -> partner_time,
             ChargeClass.Program    -> program_time
           )
-      } { pt =>
-        (pt(ChargeClass.NonCharged), pt(ChargeClass.Partner), pt(ChargeClass.Program))
+      } { ct =>
+        (ct(ChargeClass.NonCharged), ct(ChargeClass.Partner), ct(ChargeClass.Program))
       }
 
     private val offset_array: Codec[List[Offset]] =
@@ -155,11 +155,11 @@ object ExecutionDigestService {
       }
 
     private val sequence_digest: Codec[SequenceDigest] =
-      (obs_class *: planned_time *: offset_array *: int4_nonneg).imap { case (oClass, pTime, offsets, aCount) =>
+      (obs_class *: categorized_time *: offset_array *: int4_nonneg).imap { case (oClass, pTime, offsets, aCount) =>
         SequenceDigest(oClass, pTime, SortedSet.from(offsets), aCount)
       } { sd => (
         sd.observeClass,
-        sd.plannedTime,
+        sd.timeEstimate,
         sd.offsets.toList,
         sd.atomCount
       )}
