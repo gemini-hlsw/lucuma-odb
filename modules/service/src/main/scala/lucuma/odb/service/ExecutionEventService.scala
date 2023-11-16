@@ -23,6 +23,7 @@ import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
@@ -44,7 +45,7 @@ trait ExecutionEventService[F[_]] {
    */
   def streamEvents(
     visitId: Visit.Id
-  )(using Transaction[F]): Stream[F, ExecutionEvent]
+  )(using Transaction[F]): Stream[F, (ExecutionEvent, Option[Atom.Id])]
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
@@ -94,7 +95,7 @@ object ExecutionEventService {
 
       override def streamEvents(
         visitId: Visit.Id
-      )(using xa: Transaction[F]): Stream[F, ExecutionEvent] =
+      )(using xa: Transaction[F]): Stream[F, (ExecutionEvent, Option[Atom.Id])] =
         Stream
           .eval(session.unique(Statements.SelectVisitRange)(visitId))
           .flatMap {
@@ -252,26 +253,28 @@ object ExecutionEventService {
         )
       }
 
-    val SelectEventsInRange: Query[(Timestamp, Timestamp), ExecutionEvent] =
+    val SelectEventsInRange: Query[(Timestamp, Timestamp), (ExecutionEvent, Option[Atom.Id])] =
       sql"""
         SELECT
-          c_event_type,
-          c_execution_event_id,
-          c_received,
-          c_observation_id,
-          c_visit_id,
-          c_step_id,
-          c_dataset_id,
-          c_sequence_command,
-          c_step_stage,
-          c_dataset_stage
+          e.c_event_type,
+          e.c_execution_event_id,
+          e.c_received,
+          e.c_observation_id,
+          e.c_visit_id,
+          e.c_step_id,
+          e.c_dataset_id,
+          e.c_sequence_command,
+          e.c_step_stage,
+          e.c_dataset_stage,
+          s.c_atom_id
         FROM
-          t_execution_event
+          t_execution_event e
+        LEFT JOIN t_step_record s ON s.c_step_id = e.c_step_id
         WHERE
-          c_received BETWEEN $core_timestamp AND $core_timestamp
+          e.c_received BETWEEN $core_timestamp AND $core_timestamp
         ORDER BY
-          c_received
-      """.query(execution_event)
+          e.c_received
+      """.query(execution_event *: atom_id.opt)
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
       sql"""
