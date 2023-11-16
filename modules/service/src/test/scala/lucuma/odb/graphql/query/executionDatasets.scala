@@ -78,7 +78,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
 
       val List(s0, s1) = on.visits.head.atoms.head.steps
       val matches      = (s0.datasets ++ s1.datasets).map { d =>
-        Json.obj("events" -> Json.obj("matches" -> d.allEvents.map(eid => Json.obj("id" -> eid.asJson)).asJson))
+        Json.obj("events" -> Json.obj("matches" -> d.allEvents.map(e => Json.obj("id" -> e.id.asJson)).asJson))
       }
 
       val e = json"""

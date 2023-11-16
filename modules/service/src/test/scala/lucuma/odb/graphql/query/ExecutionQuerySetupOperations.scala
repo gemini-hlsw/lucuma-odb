@@ -135,32 +135,32 @@ object ExecutionQuerySetupOperations {
 
   trait Node {
     def allDatasets: List[Dataset.Id]
-    def allEvents: List[ExecutionEvent.Id]
+    def allEvents: List[ExecutionEvent]
   }
 
-  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent.Id]) extends Node {
+  case class DatasetNode(id: Dataset.Id, events: List[ExecutionEvent]) extends Node {
     def allDatasets = List(id)
     def allEvents   = events
   }
 
-  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent.Id]) extends Node{
+  case class StepNode(id: Step.Id, datasets: List[DatasetNode], events: List[ExecutionEvent]) extends Node{
     def allDatasets = datasets.map(_.id).sorted
-    def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sorted
+    def allEvents   = (datasets.flatMap(_.allEvents) ::: events).sortBy(_.id)
   }
 
   case class AtomNode(id: Atom.Id, steps: List[StepNode]) extends Node {
     def allDatasets = steps.flatMap(_.allDatasets).sorted
-    def allEvents   = steps.flatMap(_.allEvents).sorted
+    def allEvents   = steps.flatMap(_.allEvents).sortBy(_.id)
   }
 
-  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent.Id]) extends Node {
+  case class VisitNode(id: Visit.Id, atoms: List[AtomNode], events: List[ExecutionEvent]) extends Node {
     def allDatasets = atoms.flatMap(_.allDatasets).sorted
-    def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sorted
+    def allEvents   = (atoms.flatMap(_.allEvents) ::: events).sortBy(_.id)
   }
 
   case class ObservationNode(id: Observation.Id, visits: List[VisitNode]) extends Node {
     def allDatasets = visits.flatMap(_.allDatasets).sorted
-    def allEvents   = visits.flatMap(_.allEvents).sorted
+    def allEvents   = visits.flatMap(_.allEvents).sortBy(_.id)
   }
 
   case class Setup(

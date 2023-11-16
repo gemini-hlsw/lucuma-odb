@@ -4,11 +4,17 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
+import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.SequenceCommand
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.odb.data.ObservingModeType
 
 class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
@@ -37,7 +43,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val events = on.allEvents.map(id => Json.obj("id" -> id.asJson))
+      val events = on.allEvents.map(e => Json.obj("id" -> e.id.asJson))
 
       val e = json"""
       {
@@ -77,9 +83,9 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val events = on.allEvents.map { id =>
+      val events = on.allEvents.map { e =>
         Json.obj(
-          "id" -> id.asJson,
+          "id" -> e.id.asJson,
           "observation" -> Json.obj("id" -> on.id.asJson),
           "visit" -> Json.obj("id" -> on.visits.head.id.asJson)
         )
@@ -99,6 +105,54 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
 
       expect(pi, q, e)
     }
+  }
+
+  private def extractEvents(
+    vid: Visit.Id
+  ): IO[List[ExecutionEvent]] =
+    withServices(service) { services =>
+      services.session.transaction.use { xa =>
+        services
+          .executionEventService
+          .streamEvents(vid)(using xa)
+          .compile
+          .toList
+      }
+    }
+
+  test("simple events stream") {
+    for {
+      on <- recordAll(service, mode, offset=200, visitCount = 3)
+      vs = on.visits
+      es <- vs.traverse(v => extractEvents(v.id))
+    } yield
+      vs.zip(es).foreach { case (visit, events) =>
+        assertEquals(events.size, visit.allEvents.size)
+        assert(events.forall(_.visitId === visit.id))
+      }
+  }
+
+  // `streamEvents` for a vist should include all events from the first to the
+  // last including events for other visits that are interleaved.  This is to
+  // accommodate "overlap event" (non) charging.  When you start a second visit
+  // before the first has finished, the first visit is no longer charged.  In
+  // other words, no double charging.  To detect this, we need all the events
+  // that were generated chronologically from the start to the end of the events
+  // for a visit.
+
+  test("interleaved event stream") {
+    for {
+      on0 <- recordAll(service, mode, offset=300)
+      on1 <- recordAll(service, mode, offset=400)
+      vs0 = on0.visits.last
+      vs1 = on1.visits.last
+      se  <- addSequenceEventAs(service, vs0.id, SequenceCommand.Continue)
+      es  <- extractEvents(vs0.id)
+    } yield
+      assertEquals(
+        es.map(_.id),
+        (on0.allEvents ::: on1.allEvents ::: List(se)).map(_.id)
+      )
   }
 
 }

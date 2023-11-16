@@ -86,8 +86,9 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       tpe = DatasetEventType,
       fieldMappings = List(
         SqlField("id",           ExecutionEventTable.Id, key = true),
-        SqlField("datasetStage", ExecutionEventTable.DatasetStage),
-        SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id))
+        SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordTable.Id)),
+        SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
+        SqlField("datasetStage", ExecutionEventTable.DatasetStage)
       )
     )
 

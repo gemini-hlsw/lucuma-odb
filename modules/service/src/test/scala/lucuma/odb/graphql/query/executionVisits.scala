@@ -125,7 +125,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
       val matches = on.visits.map { v =>
         Json.obj(
           "events" -> Json.obj(
-            "matches" -> v.allEvents.map(eid => Json.obj("id" -> eid.asJson)).asJson
+            "matches" -> v.allEvents.map(e => Json.obj("id" -> e.id.asJson)).asJson
           )
         )
       }
