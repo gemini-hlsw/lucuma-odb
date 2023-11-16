@@ -17,7 +17,7 @@ val logbackVersion             = "1.4.12"
 val log4catsVersion            = "2.6.0"
 val lucumaCatalogVersion       = "0.44.2"
 val lucumaItcVersion           = "0.21.1"
-val lucumaCoreVersion          = "0.89.1"
+val lucumaCoreVersion          = "0.90-a7c7eb7-SNAPSHOT"
 val lucumaGraphQLRoutesVersion = "0.8.3"
 val lucumaSsoVersion           = "0.6.9"
 val munitVersion               = "0.7.29"
@@ -31,7 +31,7 @@ val skunkVersion               = "0.6.1"
 val pprintVersion              = "0.8.1"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
-ThisBuild / tlBaseVersion      := "0.7"
+ThisBuild / tlBaseVersion      := "0.8"
 ThisBuild / scalaVersion       := "3.3.1"
 ThisBuild / crossScalaVersions := Seq("3.3.1")
 
@@ -61,6 +61,7 @@ lazy val schema =
         "io.circe"       %%% "circe-testing"                   % circeVersion               % Test,
         "edu.gemini"     %%% "lucuma-core"                     % lucumaCoreVersion,
         "edu.gemini"     %%% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+        "edu.gemini"     %%% "lucuma-sso-frontend-client"      % lucumaSsoVersion,
         "org.scalameta"  %%% "munit"                           % munitVersion               % Test,
         "org.scalameta"  %%% "munit-scalacheck"                % munitVersion               % Test,
         "org.typelevel"  %%% "discipline-munit"                % munitDisciplineVersion     % Test,

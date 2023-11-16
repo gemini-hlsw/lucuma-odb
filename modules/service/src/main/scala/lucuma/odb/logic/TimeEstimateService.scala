@@ -17,9 +17,9 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.PlannedTime
-import lucuma.core.model.sequence.PlannedTimeRange
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.GroupTree
 import lucuma.odb.sequence.data.GeneratorParams
@@ -32,20 +32,20 @@ import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
 /**
- * A service that can estimate the PlannedTimeRange for a program.
+ * A service that can estimate the time for a program.
  */
-sealed trait PlannedTimeRangeService[F[_]] {
+sealed trait TimeEstimateService[F[_]] {
 
   /**
-   * Estimates the program planned time for observations that are well defined.
+   * Estimates the remaining time for observations that are well defined.
    */
   def estimateProgram(
     programId: Program.Id
-  )(using NoTransaction[F]): F[Option[PlannedTimeRange]]
+  )(using NoTransaction[F]): F[Option[CategorizedTimeRange]]
 
 }
 
-object PlannedTimeRangeService {
+object TimeEstimateService {
 
   private case class ObservationData(
     generatorParams: GeneratorParams,
@@ -53,8 +53,8 @@ object PlannedTimeRangeService {
     executionDigest: Option[ExecutionDigest]
   ) {
 
-    def cachedFullPlannedTime: Option[PlannedTime] =
-      executionDigest.map(_.fullPlannedTime)
+    def cachedFullTimeEstimate: Option[CategorizedTime] =
+      executionDigest.map(_.fullTimeEstimate)
 
   }
 
@@ -77,21 +77,21 @@ object PlannedTimeRangeService {
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    calculator:   PlannedTimeCalculator.ForInstrumentMode,
-  )(using Services[F]): PlannedTimeRangeService[F] =
-    new PlannedTimeRangeService[F] {
+    calculator:   TimeEstimateCalculator.ForInstrumentMode,
+  )(using Services[F]): TimeEstimateService[F] =
+    new TimeEstimateService[F] {
 
-      // PlannedTime Ordering that sorts longest to shortest.
-      val longestToShortest: Ordering[PlannedTime] =
-        catsKernelOrderingForOrder(Order.reverse(Order[PlannedTime]))
+      // CategorizedTime Ordering that sorts longest to shortest.
+      val longestToShortest: Ordering[CategorizedTime] =
+        catsKernelOrderingForOrder(Order.reverse(Order[CategorizedTime]))
 
-      def combine(minRequired: Int, children: List[PlannedTimeRange]): Option[PlannedTimeRange] =
+      def combine(minRequired: Int, children: List[CategorizedTimeRange]): Option[CategorizedTimeRange] =
         Option.when(children.size >= minRequired) {
-          PlannedTimeRange.from(
-            // Combines the first minRequired elements after sorting by ascending min PlannedTime
-            children.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero),
-            // Combines the first minRequired elements after sorting by descending max PlannedTime
-            children.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(PlannedTime.Zero)
+          CategorizedTimeRange.from(
+            // Combines the first minRequired elements after sorting by ascending min CategorizedTime
+            children.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero),
+            // Combines the first minRequired elements after sorting by descending max CategorizedTime
+            children.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero)
           )
         }
 
@@ -99,10 +99,10 @@ object PlannedTimeRangeService {
         pid: Program.Id,
         oid: Observation.Id,
         m:   Map[Observation.Id, ObservationData]
-      ): F[Option[PlannedTimeRange]] =
+      ): F[Option[CategorizedTimeRange]] =
         OptionT.fromOption(m.get(oid)).flatMap { data =>
           OptionT
-            .fromOption(data.cachedFullPlannedTime)  // try the cache first
+            .fromOption(data.cachedFullTimeEstimate)  // try the cache first
             .orElse {
               // ExecutionDigest not in the cache, we'll need to calculate it.
               // For that we need the ITC results, which may be cached.  Use the
@@ -113,14 +113,14 @@ object PlannedTimeRangeService {
                    .map(_.toOption)
               }
 
-              // Calculate planned time using provided ITC result and params.
+              // Calculate time estimate using provided ITC result and params.
               asterismResult.flatMapF { ar =>
                 generator(commitHash, itcClient, calculator)
                   .calculateDigest(pid, oid, ar, data.generatorParams)
-                  .map(_.toOption.map(_.fullPlannedTime))
+                  .map(_.toOption.map(_.fullTimeEstimate))
               }
             }
-            .map(PlannedTimeRange.single)
+            .map(CategorizedTimeRange.single)
         }.value
 
 
@@ -129,11 +129,11 @@ object PlannedTimeRangeService {
         minRequired: Option[NonNegShort],
         children:    List[GroupTree.Child],
         m:           Map[Observation.Id, ObservationData]
-      ): F[Option[PlannedTimeRange]] =
+      ): F[Option[CategorizedTimeRange]] =
         children
-          .traverse(plannedTimeRange(pid, _, m))
+          .traverse(timeEstimateRange(pid, _, m))
           // combine after skipping any elements for which we cannot compute the
-          // planned time
+          // time estimate
           .map { lst =>
             val valid = lst.flattenOption
             // If no expicit `minRequired` is set, only count the complete and
@@ -141,11 +141,11 @@ object PlannedTimeRangeService {
             combine(minRequired.fold(valid.size)(_.value.toInt), valid)
           }
 
-      def plannedTimeRange(
+      def timeEstimateRange(
         pid:  Program.Id,
         root: GroupTree,
         m:    Map[Observation.Id, ObservationData]
-      ): F[Option[PlannedTimeRange]] =
+      ): F[Option[CategorizedTimeRange]] =
         root match {
           case GroupTree.Leaf(oid)                               => leafRange(pid, oid, m)
           case GroupTree.Branch(_, min, _, children, _, _, _, _) => parentRange(pid, min, children, m)
@@ -154,11 +154,11 @@ object PlannedTimeRangeService {
 
       override def estimateProgram(
         pid: Program.Id
-      )(using NoTransaction[F]): F[Option[PlannedTimeRange]] =
+      )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
         services.transactionally {
           (groupService.selectGroups(pid), ObservationData.load(pid, itcClient)).tupled
         }.flatMap { case (tree, dataMap) =>
-          plannedTimeRange(pid, tree, dataMap)
+          timeEstimateRange(pid, tree, dataMap)
         }
   }
 }

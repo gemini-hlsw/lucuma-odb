@@ -59,6 +59,23 @@ type AddStepEventResult {
 }
 
 """
+Input to the 'addTimeChargeCorrection' mutation. Identifies the visit
+that will be corrected and describes the correction itself.
+"""
+input AddTimeChargeCorrectionInput {
+  observation: VisitId!
+  correction:  TimeChargeCorrection!
+}
+
+"""
+The result of the 'addTimeChargeCorrection' mutation.  It contains the
+visit's updated TimeChargeBreakdown after applying the correction.
+"""
+type AddTimeChargeCorrectionResult {
+  timeChargeBreakdown: TimeChargeBreakdown!
+}
+
+"""
 Air mass range creation and edit parameters
 """
 input AirMassRangeInput {
@@ -285,6 +302,37 @@ input CatalogInfoInput {
   The objectType field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   objectType: NonEmptyString
+}
+
+"A time amount broken into charge class categories."
+type CategorizedTime {
+
+  "Time charged to the program / PI."
+  program: TimeSpan!
+
+  "Time charged to the partner."
+  partner: TimeSpan!
+
+  "Execution time that is not charged."
+  nonCharged: TimeSpan!
+
+  "Total of program, partner and uncharged times."
+  total: TimeSpan!
+
+}
+
+"""
+A minimum to maximum categorized time estimate.  The actual execution time
+should vary between the two extremes, depending upon which observations and
+groups are ultimately completed.
+"""
+type CategorizedTimeRange {
+
+   """Minimum remaining time estimate."""
+   minimum: CategorizedTime!
+
+   """Maximum remaining time estimate."""
+   maximum: CategorizedTime!
 }
 
 """
@@ -1760,6 +1808,9 @@ type GmosNorthVisit implements Visit {
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
 
+  "Time accounting details for this visit."
+  timeChargeBreakdown: TimeChargeBreakdown!
+
   """
   GmosNorth static instrument configuration
   """
@@ -2293,6 +2344,9 @@ type GmosSouthVisit implements Visit {
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
 
+  "Time accounting details for this visit."
+  timeChargeBreakdown: TimeChargeBreakdown!
+
   """
   GmosSouth static instrument configuration
   """
@@ -2478,6 +2532,17 @@ type Mutation {
     input: AddStepEventInput!
 
   ): AddStepEventResult!
+
+  """
+  Adds a new time accounting correction for a particular observation.  Note
+  that time accounting corrections are additive and cannot be adjusted or
+  deleted except via a future correction.  For example, to undo the impact
+  of an 'Add' operation, a new 'Subtract' operation of the same amount can
+  be introduced.
+  """
+  addTimeChargeCorrection(
+    input: AddTimeChargeCorrectionInput!
+  ): AddTimeChargeCorrectionResult!
 
   cloneObservation(
     """
@@ -5243,6 +5308,8 @@ type Execution {
     LIMIT: NonNegInt
   ): VisitSelectResult!
 
+  "Time accounting calculation for this observation."
+  timeCharge: CategorizedTime!
 }
 
 """
@@ -7577,8 +7644,21 @@ type Program {
   that are required and which are not fully defined, the planned time range
   cannot be calculated.
   """
-  plannedTimeRange: PlannedTimeRange
+  plannedTimeRange: PlannedTimeRange @deprecated(reason: "Use timeEstimateRange instead.")
 
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have an estimate, it must be fully defined such
+  that a sequence can be generated for it.  If a program has observations that
+  are required and which are not fully defined, the remaining time estimate
+  cannot be calculated.
+  """
+  timeEstimateRange: CategorizedTimeRange
+
+  """
+  Program-wide time charge, summing all corrected observation time charges.
+  """
+  timeCharge: CategorizedTime!
 }
 
 """
@@ -8332,7 +8412,10 @@ type SequenceDigest {
   observeClass: ObserveClass!
 
   """PlannedTime for the whole sequence. """
-  plannedTime: PlannedTime!
+  plannedTime: PlannedTime! @deprecated(reason: "Use timeEstimate instead.")
+
+  """Time estimate for the whole sequence."""
+  timeEstimate: CategorizedTime!
 
   """Unique offsets that occur in the sequence."""
   offsets: [Offset!]!
@@ -9449,6 +9532,117 @@ type TargetSelectResult {
 }
 
 """
+Detailed time accounting information for a visit, showing the raw execution
+time along with any automatically applied discounts (e.g., for bad weather)
+and manual adjusts made by staff.
+"""
+type TimeChargeBreakdown {
+
+  "Raw execution time."
+  executionTime: CategorizedTime!
+
+  "Automatic discounts for weather loss, fault reports, and non-passing datasets."
+  discounts: [TimeChargeDiscount!]!
+
+  "Any manual corrections to the execution time."
+  corrections: [TimeChargeCorrection!]!
+
+  """
+  Final time charge once discounts and corrections have been applied to the
+  initial 'executionTime'.
+  """
+  finalCharge: CategorizedTime!
+
+}
+
+"""
+A manual correction to time accounting calculations.  Note that the
+application of a correction is bounded by a zero time span and the
+maximum time span.
+"""
+type TimeChargeCorrection {
+
+  "When the correction was made."
+  timestamp:   Timestamp!
+
+  "The charge class to be corrected."
+  chargeClass: ChargeClass!
+
+  "The operation (add or subtract) to perform."
+  op:          TimeChargeCorrectionOp!
+
+  "The amount of time to add or subtract (respecting the min and max time span)."
+  amount:      TimeSpan!
+
+  "The user responsible for the change."
+  user:        User!
+
+  "Optional justification for the correction."
+  comment:     String
+}
+
+"Time accounting correction operations."
+enum TimeChargeCorrectionOp {
+  ADD,
+  SUBTRACT
+}
+
+"""
+Describes a time charge discount, broken out by charge class (program vs.
+partner).  For each class, the associated time is subtracted and then added to
+uncharged.
+"""
+interface TimeChargeDiscount {
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  """
+  The atoms that are impacted (i.e., whose execution time is discounted) by this
+  discount.
+  """
+  atoms: [AtomRecord!]!
+
+  "Optional additional detail."
+  comment: String
+
+}
+
+# TBD
+#type TimeChargeFaultDiscount implements TimeChargeDiscount
+#type TimeChargeOverlapDiscount implements TimeChargeDiscount
+#type TimeChargeWeatherDiscount implements TimeChargeDiscount
+
+"""
+A time charge discount that is applied when one or more datasets are marked
+usable (as opposed to pas) or fail.
+"""
+type TimeChargeQaDiscount implements TimeChargeDiscount {
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  """
+  The atoms that are impacted (i.e., whose execution time is discounted) by this
+  discount.
+  """
+  atoms: [AtomRecord!]!
+
+  "Optional additional detail."
+  comment: String
+
+  "Datasets with non-passing QA states."
+  datasets: [Dataset!]!
+
+}
+
+"""
 ToO Activation
 """
 enum ToOActivation {
@@ -9574,6 +9768,9 @@ interface Visit {
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  "Time accounting details for this visit."
+  timeChargeBreakdown: TimeChargeBreakdown!
 
 }
 

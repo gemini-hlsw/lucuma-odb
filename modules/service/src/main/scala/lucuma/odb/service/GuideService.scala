@@ -58,7 +58,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
@@ -218,7 +218,7 @@ object GuideService {
     params: GeneratorParams,
     hash:   Md5Hash
   ) {
-    val plannedTime                          = digest.fullPlannedTime.sum
+    val timeEstimate                         = digest.fullTimeEstimate.sum
     val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
     val (site, agsParams): (Site, AgsParams) = params match
       case GeneratorParams.GmosNorthLongSlit(_, mode) =>
@@ -229,10 +229,10 @@ object GuideService {
   }
 
   def instantiate[F[_]: Concurrent](
-    httpClient:            Client[F],
-    itcClient:             ItcClient[F],
-    commitHash:            CommitHash,
-    plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
+    httpClient:             Client[F],
+    itcClient:              ItcClient[F],
+    commitHash:             CommitHash,
+    timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 
@@ -404,7 +404,7 @@ object GuideService {
         }
 
       extension (target: Target)
-        def invalidDate(startDate: Timestamp): Timestamp = 
+        def invalidDate(startDate: Timestamp): Timestamp =
           Target.siderealTracking.getOption(target).map(_.invalidDate(startDate)).getOrElse(Timestamp.Max)
 
       extension (sidereal: SiderealTracking)
@@ -434,7 +434,7 @@ object GuideService {
         pid: Program.Id,
         oid: Observation.Id
       ): F[Either[Error, GeneratorInfo]] =
-        generator(commitHash, itcClient, plannedTimeCalculator)
+        generator(commitHash, itcClient, timeEstimateCalculator)
           .digestWithParamsAndHash(pid, oid)
           .map {
             _.leftMap(Error.GeneratorError(_))
@@ -444,7 +444,7 @@ object GuideService {
       def getPositions(
         angles:             NonEmptyList[Angle],
         offsets:            Option[NonEmptyList[Offset]],
-      ): NonEmptyList[AgsPosition] = 
+      ): NonEmptyList[AgsPosition] =
         for {
           pa  <- angles
           off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
@@ -574,7 +574,7 @@ object GuideService {
                                positions,
                                genInfo.agsParams
                              )
-          candidateCutoff  = angleMap.values.minOption.getOrElse(Timestamp.Max) 
+          candidateCutoff  = angleMap.values.minOption.getOrElse(Timestamp.Max)
           finalEnd         = endCutoff.min(candidateCutoff)
         } yield AvailabilityPeriod(start, finalEnd, angleMap.keys.toList)
 
@@ -602,7 +602,7 @@ object GuideService {
             )
           )
           .collect { case u: AgsAnalysis.Usable => u }
-          .scan(SortedMap.empty[Angle, Timestamp]){ (map, usable) => 
+          .scan(SortedMap.empty[Angle, Timestamp]){ (map, usable) =>
             val invalidDate = usable.target.tracking.invalidDate(start)
             val angle       = usable.vignetting.head._1
             // Always keep the oldest invalidation date for each angle
@@ -628,7 +628,7 @@ object GuideService {
           baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
           visitEnd      <- EitherT.fromEither(
                              obsTime
-                               .plusMicrosOption(genInfo.plannedTime.toMicroseconds)
+                               .plusMicrosOption(genInfo.timeEstimate.toMicroseconds)
                                .toRight(Error.GeneralError("Visit end time out of range"))
                            )
           candidates    <- EitherT(
@@ -653,7 +653,7 @@ object GuideService {
                            )
           angles        <- EitherT.fromEither(
                              obsInfo.posAngleConstraint
-                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.plannedTime.toDuration)
+                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
                               .toRight(Error.GeneralError(s"No angles to test for guide target candidates for observation $oid."))
                            )
           positions      = getPositions(angles, genInfo.offsets)

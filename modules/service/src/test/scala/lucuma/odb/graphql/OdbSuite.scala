@@ -42,7 +42,7 @@ import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ProposalService
@@ -229,7 +229,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
-      ptc <- db.evalMap(PlannedTimeCalculator.fromSession(_, enm))
+      ptc <- db.evalMap(TimeEstimateCalculator.fromSession(_, enm))
       map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient)
     } yield map
 

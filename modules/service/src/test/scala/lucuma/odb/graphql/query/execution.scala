@@ -162,11 +162,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                      }
                      acquisition {
                        observeClass
-                       plannedTime {
-                         charges {
-                           chargeClass
-                           time { seconds }
-                         }
+                       timeEstimate {
+                         program { seconds }
+                         partner { seconds }
+                         nonCharged { seconds }
                          total { seconds }
                        }
                        offsets {
@@ -177,11 +176,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                      }
                      science {
                        observeClass
-                       plannedTime {
-                         charges {
-                           chargeClass
-                           time { seconds }
-                         }
+                       timeEstimate {
+                         program { seconds }
+                         partner { seconds }
+                         nonCharged { seconds }
                          total { seconds }
                        }
                        offsets {
@@ -211,27 +209,16 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                     },
                     "acquisition" : {
                       "observeClass" : "ACQUISITION",
-                      "plannedTime" : {
-                        "charges" : [
-                          {
-                            "chargeClass" : "NON_CHARGED",
-                            "time" : {
-                              "seconds" : 0.000000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PARTNER",
-                            "time" : {
-                              "seconds" : 0.000000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PROGRAM",
-                            "time" : {
-                              "seconds" : 175.162500
-                            }
-                          }
-                        ],
+                      "timeEstimate" : {
+                        "program" : {
+                          "seconds" : 175.162500
+                        },
+                        "partner" : {
+                          "seconds" : 0.000000
+                        },
+                        "nonCharged" : {
+                          "seconds" : 0.000000
+                        },
                         "total" : {
                           "seconds" : 175.162500
                         }
@@ -258,27 +245,16 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                     },
                     "science" : {
                       "observeClass" : "SCIENCE",
-                      "plannedTime" : {
-                        "charges" : [
-                          {
-                            "chargeClass" : "NON_CHARGED",
-                            "time" : {
-                              "seconds" : 0.000000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PARTNER",
-                            "time" : {
-                              "seconds" : 357.600000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PROGRAM",
-                            "time" : {
-                              "seconds" : 411.600000
-                            }
-                          }
-                        ],
+                      "timeEstimate" : {
+                        "program" : {
+                          "seconds" : 411.600000
+                        },
+                        "partner" : {
+                          "seconds" : 357.600000
+                        },
+                        "nonCharged" : {
+                          "seconds" : 0.000000
+                        },
                         "total" : {
                           "seconds" : 769.200000
                         }
@@ -1411,7 +1387,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
-  test("planned time: config and detector estimates") {
+  test("time estimate: config and detector estimates") {
 
     val setup: IO[Observation.Id] =
       for {
@@ -1425,18 +1401,6 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         user  = user,
         query =
           s"""
-             fragment plannedTimeFields on PlannedTime {
-               total {
-                 seconds
-               }
-               charges {
-                 chargeClass
-                 time {
-                   seconds
-                 }
-               }
-             }
-
              fragment configChangeEstimateFields on ConfigChangeEstimate {
                name
                description
@@ -1822,7 +1786,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("planned time: observation level") {
+  test("time estimate: observation level") {
 
     val setup: IO[Observation.Id] =
       for {
@@ -1836,15 +1800,18 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         user  = user,
         query =
           s"""
-             fragment plannedTimeFields on PlannedTime {
-               total {
+             fragment categorizedTimeFields on CategorizedTime {
+               program {
                  seconds
                }
-               charges {
-                 chargeClass
-                 time {
-                   seconds
-                 }
+               partner {
+                 seconds
+               }
+               nonCharged {
+                 seconds
+               }
+               total {
+                 seconds
                }
              }
 
@@ -1875,8 +1842,8 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                        }
                      }
                      science {
-                       plannedTime {
-                         ...plannedTimeFields
+                       timeEstimate {
+                         ...categorizedTimeFields
                        }
                      }
                    }
@@ -1911,30 +1878,19 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                       }
                     },
                     "science": {
-                      "plannedTime" : {
+                      "timeEstimate" : {
+                        "program" : {
+                          "seconds" : 411.600000
+                        },
+                        "partner" : {
+                          "seconds" : 357.600000
+                        },
+                        "nonCharged": {
+                          "seconds": 0.000000
+                        },
                         "total" : {
                           "seconds" : 769.200000
-                        },
-                        "charges" : [
-                          {
-                            "chargeClass" : "NON_CHARGED",
-                            "time" : {
-                              "seconds" : 0.000000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PARTNER",
-                            "time" : {
-                              "seconds" : 357.600000
-                            }
-                          },
-                          {
-                            "chargeClass" : "PROGRAM",
-                            "time" : {
-                              "seconds" : 411.600000
-                            }
-                          }
-                        ]
+                        }
                       }
                     }
                   },
@@ -2631,6 +2587,62 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         )
       )
     }
+  }
+
+  test("time accounting: observation level") {
+
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      } yield o
+
+    setup.flatMap { oid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   timeCharge {
+                     program { seconds }
+                     partner { seconds }
+                     nonCharged { seconds }
+                     total { seconds }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "timeCharge": {
+                    "program": {
+                      "seconds": 0.000000
+                    },
+                    "partner": {
+                      "seconds": 0.000000
+                    },
+                    "nonCharged": {
+                      "seconds": 0.000000
+                    },
+                    "total": {
+                      "seconds": 0.000000
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
   }
 
 }

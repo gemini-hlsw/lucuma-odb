@@ -9,19 +9,19 @@ import lucuma.odb.graphql.enums.Enums
 import skunk.Session
 
 /**
- * Planned time duration estimates loaded from the database upon startup and
- * subsequently used for planned time calculation.
+ * Time estimates loaded from the database upon startup and subsequently used
+ * for time estimate calculation.
  */
-case class PlannedTimeContext(
+case class TimeEstimateContext(
   enums:       Enums,
   gmosReadout: GmosReadoutTime
 )
 
-object PlannedTimeContext {
+object TimeEstimateContext {
 
-  def select[F[_]](s: Session[F], enums: Enums)(using MonadError[F, Throwable]): F[PlannedTimeContext] =
+  def select[F[_]](s: Session[F], enums: Enums)(using MonadError[F, Throwable]): F[TimeEstimateContext] =
     GmosReadoutTime.load(s).map { g =>
-      PlannedTimeContext(enums, g)
+      TimeEstimateContext(enums, g)
     }
 
 

@@ -22,6 +22,8 @@ class Checklist extends OdbSuite {
       "BandBrightnessSurface",
       "BandNormalizedIntegrated",
       "BandNormalizedSurface",
+      "CategorizedTime",
+      "CategorizedTimeRange",
       "ConfigChangeEstimate",
       "DatasetEstimate",
       "DetectorEstimate",
