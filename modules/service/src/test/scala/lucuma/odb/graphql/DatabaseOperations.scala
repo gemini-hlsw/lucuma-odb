@@ -12,6 +12,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StellarLibrarySpectrum
@@ -648,7 +649,8 @@ trait DatabaseOperations { this: OdbSuite =>
         $name(input: {
           atomId: ${aid.asJson},
           $instrumentInput,
-          $stepConfigInput
+          $stepConfigInput,
+          observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
         }) {
           stepRecord {
             id
@@ -671,7 +673,8 @@ trait DatabaseOperations { this: OdbSuite =>
     aid:             Atom.Id,
     instrument:      Instrument,
     instrumentInput: D,
-    stepConfig:      StepConfig
+    stepConfig:      StepConfig,
+    observeClass:    ObserveClass = ObserveClass.Science
   ): IO[Step.Id] = {
 
     val name = s"record${instrument.tag}Step"
@@ -688,7 +691,8 @@ trait DatabaseOperations { this: OdbSuite =>
           case StepConfig.Gcal(_,_,_,_) => Json.obj("gcal" -> step)
           case StepConfig.Science(_,_)  => Json.obj("science" -> step)
           case StepConfig.SmartGcal(_)  => Json.obj("smartGcal" -> step)
-        })
+        }),
+        "observeClass" -> observeClass.asJson
       )
     )
 

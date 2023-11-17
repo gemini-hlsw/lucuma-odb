@@ -13,13 +13,13 @@ import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
 
 import table.AtomRecordTable
-import table.StepRecordTable
+import table.StepRecordView
 import table.VisitTable
 
 trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
                                  with Predicates[F]
                                  with SelectSubquery
-                                 with StepRecordTable[F]
+                                 with StepRecordView[F]
                                  with VisitTable[F] {
   def user: User
 

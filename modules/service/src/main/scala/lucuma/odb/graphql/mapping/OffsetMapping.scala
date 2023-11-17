@@ -7,9 +7,9 @@ package mapping
 import grackle.TypeRef
 import lucuma.core.math.Angle
 
-import table.StepRecordTable
+import table.StepRecordView
 
-trait OffsetMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
+trait OffsetMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
 
   private def offsetComponentMapping(
     typeRef:     TypeRef,
@@ -39,10 +39,10 @@ trait OffsetMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
     )
 
   lazy val OffsetPMapping: TypeMapping =
-    offsetComponentSwitchMapping("p", OffsetPType, StepRecordTable.Id, StepRecordTable.Science.OffsetP)
+    offsetComponentSwitchMapping("p", OffsetPType, StepRecordView.Id, StepRecordView.Science.OffsetP)
 
   lazy val OffsetQMapping: TypeMapping =
-    offsetComponentSwitchMapping("q", OffsetQType, StepRecordTable.Id, StepRecordTable.Science.OffsetQ)
+    offsetComponentSwitchMapping("q", OffsetQType, StepRecordView.Id, StepRecordView.Science.OffsetQ)
 
   private def offsetMapping(
     idColumn: ColumnRef
@@ -59,6 +59,6 @@ trait OffsetMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
   lazy val OffsetMapping: TypeMapping =
     SwitchMapping(
       OffsetType,
-      lookupFromStepRecord(offsetMapping(StepRecordTable.Id), "stepConfig", "offset")
+      lookupFromStepRecord(offsetMapping(StepRecordView.Id), "stepConfig", "offset")
     )
 }
