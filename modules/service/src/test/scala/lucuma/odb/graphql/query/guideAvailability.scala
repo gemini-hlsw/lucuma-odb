@@ -50,7 +50,7 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
   val successEnd   = "2024-02-28T00:00:00Z"
 
   val emptyStart   = "3025-10-31T00:00:00Z"
-  val emptyEnd     = "3026-10-31T01:00:00Z"
+  val emptyEnd     = "3025-12-31T01:00:00Z"
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val tableRow: TableRow.North =
@@ -280,7 +280,7 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
           "guideAvailability": [
             {
               "start" : "3025-10-31 00:00:00",
-              "end" : "3026-10-31 01:00:00",
+              "end" : "3025-12-31 01:00:00",
               "posAngles" : [
               ]
             }
@@ -412,7 +412,7 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideAvailabilityQuery(oid, successStart, successEnd),
-      expected = List(s"No targets have been defined for observation $oid.").asLeft)
+      expected = List(s"Could not generate a sequence from the observation $oid: target").asLeft)
     }
   }
 

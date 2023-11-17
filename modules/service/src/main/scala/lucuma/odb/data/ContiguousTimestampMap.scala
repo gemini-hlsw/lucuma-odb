@@ -64,6 +64,9 @@ final case class ContiguousTimestampMap[A: Eq] private (
 object ContiguousTimestampMap {
   def empty[A: Eq]: ContiguousTimestampMap[A] = ContiguousTimestampMap(none, SortedMap.empty)
 
+  def single[A: Eq](period: TimestampInterval, a: A): ContiguousTimestampMap[A] =
+    ContiguousTimestampMap(period.some, SortedMap.from(List((period, a))))
+
   def fromList[A: Eq](list: List[(TimestampInterval, A)]): Option[ContiguousTimestampMap[A]] =
     list.sortBy(_._1).foldRight(empty.some){ case ((i, a), ectm) => ectm.flatMap(_.add(i, a)) }
 
