@@ -23,10 +23,10 @@ import lucuma.odb.graphql.predicate.Predicates
 
 import table.AtomRecordTable
 import table.GmosDynamicTables
-import table.StepRecordTable
+import table.StepRecordView
 import table.VisitTable
 
-trait StepRecordMapping[F[_]] extends StepRecordTable[F]
+trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with AtomRecordTable[F]
                                  with GmosDynamicTables[F]
                                  with Predicates[F]
@@ -39,11 +39,12 @@ trait StepRecordMapping[F[_]] extends StepRecordTable[F]
       tpe           = StepRecordType,
       discriminator = stepRecordTypeDiscriminator,
       fieldMappings = List(
-        SqlField("id",           StepRecordTable.Id, key = true),
-        SqlField("instrument",   StepRecordTable.Instrument, discriminator = true),
-        SqlObject("atom",        Join(StepRecordTable.AtomId, AtomRecordTable.Id)),
-        SqlField("created",      StepRecordTable.Created),
+        SqlField("id",           StepRecordView.Id, key = true),
+        SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
+        SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
+        SqlField("created",      StepRecordView.Created),
         SqlObject("stepConfig"),
+        SqlField("observeClass", StepRecordView.ObserveClass),
 
         // TBD: startTime, endTime, duration, stepQaState
 
@@ -92,8 +93,8 @@ trait StepRecordMapping[F[_]] extends StepRecordTable[F]
     ObjectMapping(
       tpe = GmosNorthStepRecordType,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true),
-        SqlObject("instrumentConfig", Join(StepRecordTable.Id, GmosNorthDynamicTable.Id))
+        SqlField("id", StepRecordView.Id, key = true),
+        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosNorthDynamicTable.Id))
       )
     )
 
@@ -101,8 +102,8 @@ trait StepRecordMapping[F[_]] extends StepRecordTable[F]
     ObjectMapping(
       tpe = GmosSouthStepRecordType,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true),
-        SqlObject("instrumentConfig", Join(StepRecordTable.Id, GmosSouthDynamicTable.Id))
+        SqlField("id", StepRecordView.Id, key = true),
+        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
       )
     )
 

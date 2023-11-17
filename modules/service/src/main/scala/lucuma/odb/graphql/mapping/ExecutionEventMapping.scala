@@ -16,13 +16,13 @@ import grackle.TypeRef
 import table.DatasetTable
 import table.ExecutionEventTable
 import table.ObservationView
-import table.StepRecordTable
+import table.StepRecordView
 import table.VisitTable
 
 trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
                                      with DatasetTable[F]
                                      with ObservationView[F]
-                                     with StepRecordTable[F]
+                                     with StepRecordView[F]
                                      with VisitTable[F] {
 
   lazy val ExecutionEventMapping: ObjectMapping =
@@ -76,7 +76,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       tpe = StepEventType,
       fieldMappings = List(
         SqlField("id",        ExecutionEventTable.Id, key = true),
-        SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordTable.Id)),
+        SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
         SqlField("stepStage", ExecutionEventTable.StepStage)
       )
     )
@@ -86,7 +86,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       tpe = DatasetEventType,
       fieldMappings = List(
         SqlField("id",           ExecutionEventTable.Id, key = true),
-        SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordTable.Id)),
+        SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
         SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
         SqlField("datasetStage", ExecutionEventTable.DatasetStage)
       )

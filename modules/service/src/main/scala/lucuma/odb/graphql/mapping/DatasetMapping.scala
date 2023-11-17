@@ -16,7 +16,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import table.AtomRecordTable
 import table.DatasetTable
 import table.ObservationView
-import table.StepRecordTable
+import table.StepRecordView
 import table.VisitTable
 
 trait DatasetMapping[F[_]] extends DatasetTable[F]
@@ -24,7 +24,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
                               with ObservationView[F]
                               with Predicates[F]
                               with SelectSubquery
-                              with StepRecordTable[F]
+                              with StepRecordView[F]
                               with VisitTable[F] {
   def user: User
 
@@ -33,11 +33,11 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       tpe = DatasetType,
       fieldMappings = List(
         SqlField("id",     DatasetTable.Id,   key = true),
-        SqlObject("step",  Join(DatasetTable.StepId, StepRecordTable.Id)),
+        SqlObject("step",  Join(DatasetTable.StepId, StepRecordView.Id)),
         SqlField("index",  DatasetTable.Index),
 
         SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
-        SqlObject("visit", Join(DatasetTable.StepId, StepRecordTable.Id), Join(StepRecordTable.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
+        SqlObject("visit", Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlObject("events"),
         SqlField("filename", DatasetTable.File.Name),
         SqlField("qaState",  DatasetTable.QaState),

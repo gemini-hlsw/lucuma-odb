@@ -16,6 +16,7 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
@@ -66,15 +67,17 @@ trait SequenceService[F[_]] {
   )(using Transaction[F]): F[SequenceService.InsertAtomResponse]
 
   def insertGmosNorthStepRecord(
-    atomId:     Atom.Id,
-    instrument: GmosNorth,
-    step:       StepConfig
+    atomId:       Atom.Id,
+    instrument:   GmosNorth,
+    step:         StepConfig,
+    observeClass: ObserveClass
   )(using Transaction[F]): F[SequenceService.InsertStepResponse]
 
   def insertGmosSouthStepRecord(
-    atomId:     Atom.Id,
-    instrument: GmosSouth,
-    step:       StepConfig
+    atomId:       Atom.Id,
+    instrument:   GmosSouth,
+    step:         StepConfig,
+    observeClass: ObserveClass
   )(using Transaction[F]): F[SequenceService.InsertStepResponse]
 
 }
@@ -307,6 +310,7 @@ object SequenceService {
         atomId:              Atom.Id,
         instrument:          Instrument,
         stepConfig:          StepConfig,
+        observeClass:        ObserveClass,
         insertDynamicConfig: Step.Id => F[Unit]
       )(using Transaction[F]): F[InsertStepResponse] =
         (for {
@@ -314,7 +318,7 @@ object SequenceService {
           a    = session.unique(Statements.AtomExists)((atomId, instrument)).map(Option.when(_)(()))
           _   <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
           sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
-          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType)).void
+          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType, observeClass)).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
         } yield Success(sid)).merge
@@ -322,24 +326,28 @@ object SequenceService {
       override def insertGmosNorthStepRecord(
         atomId:        Atom.Id,
         dynamicConfig: GmosNorth,
-        stepConfig:    StepConfig
+        stepConfig:    StepConfig,
+        observeClass:  ObserveClass
       )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
           stepConfig,
+          observeClass,
           sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
         )
 
       override def insertGmosSouthStepRecord(
         atomId:        Atom.Id,
         dynamicConfig: GmosSouth,
-        stepConfig:    StepConfig
+        stepConfig:    StepConfig,
+        observeClass:  ObserveClass
       )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,
           stepConfig,
+          observeClass,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
         )
 
@@ -385,19 +393,22 @@ object SequenceService {
       Step.Id,
       Atom.Id,
       Instrument,
-      StepType
+      StepType,
+      ObserveClass
     )] =
       sql"""
         INSERT INTO t_step_record (
           c_step_id,
           c_atom_id,
           c_instrument,
-          c_step_type
+          c_step_type,
+          c_observe_class
         ) SELECT
           $step_id,
           $atom_id,
           $instrument,
-          $step_type
+          $step_type,
+          $obs_class
       """.command
 
     /**

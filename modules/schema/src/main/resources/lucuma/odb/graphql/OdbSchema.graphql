@@ -1678,6 +1678,9 @@ type GmosNorthStepRecord implements StepRecord {
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
 
+  "The observe class of this step."
+  observeClass: ObserveClass!
+
   "Step QA state based on a combination of dataset QA states."
   stepQaState: StepQaState
 
@@ -2207,6 +2210,9 @@ type GmosSouthStepRecord implements StepRecord {
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
+
+  "The observe class of this step."
+  observeClass: ObserveClass!
 
   "Step QA state based on a combination of dataset QA states."
   stepQaState: StepQaState
@@ -3113,9 +3119,10 @@ type RecordDatasetResult {
 
 "Input parameters for creating a new GmosNorth StepRecord"
 input RecordGmosNorthStepInput {
-  atomId: AtomId!
-  instrument: GmosNorthDynamicInput!
-  stepConfig: StepConfigInput!
+  atomId:       AtomId!
+  instrument:   GmosNorthDynamicInput!
+  stepConfig:   StepConfigInput!
+  observeClass: ObserveClass!
 }
 
 """
@@ -3150,9 +3157,10 @@ type RecordGmosNorthVisitResult {
 Input parameters for creating a new GmosSouth StepRecord
 """
 input RecordGmosSouthStepInput {
-  atomId: AtomId!
-  instrument: GmosSouthDynamicInput!
-  stepConfig: StepConfigInput!
+  atomId:       AtomId!
+  instrument:   GmosSouthDynamicInput!
+  stepConfig:   StepConfigInput!
+  observeClass: ObserveClass!
 }
 
 """
@@ -9066,6 +9074,9 @@ interface StepRecord {
   instrument-specific 'StepRecord' implementation.
   """
   stepConfig: StepConfig!
+
+  "The observe class of this step."
+  observeClass: ObserveClass!
 
   "Step QA state based on a combination of dataset QA states."
   stepQaState: StepQaState
