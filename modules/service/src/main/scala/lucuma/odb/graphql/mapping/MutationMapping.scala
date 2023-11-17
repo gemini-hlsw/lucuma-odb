@@ -50,10 +50,8 @@ import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.RecordAtomInput
 import lucuma.odb.graphql.input.RecordDatasetInput
-import lucuma.odb.graphql.input.RecordGmosNorthStepInput
-import lucuma.odb.graphql.input.RecordGmosNorthVisitInput
-import lucuma.odb.graphql.input.RecordGmosSouthStepInput
-import lucuma.odb.graphql.input.RecordGmosSouthVisitInput
+import lucuma.odb.graphql.input.RecordGmosStepInput
+import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
@@ -475,10 +473,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   }
 
   private lazy val RecordGmosNorthStep: MutationField =
-    MutationField("recordGmosNorthStep", RecordGmosNorthStepInput.Binding) { (input, child) =>
+    MutationField("recordGmosNorthStep", RecordGmosStepInput.GmosNorthBinding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step),
+          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass),
           Predicates.gmosNorthStep.id,
           child
         )
@@ -486,10 +484,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val RecordGmosSouthStep: MutationField =
-    MutationField("recordGmosSouthStep", RecordGmosSouthStepInput.Binding) { (input, child) =>
+    MutationField("recordGmosSouthStep", RecordGmosStepInput.GmosSouthBinding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step),
+          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass),
           Predicates.gmosSouthStep.id,
           child
         )
@@ -514,7 +512,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
 
   private lazy val RecordGmosNorthVisit: MutationField =
-    MutationField("recordGmosNorthVisit", RecordGmosNorthVisitInput.Binding) { (input, child) =>
+    MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding) { (input, child) =>
       services.useTransactionally {
         recordVisit(
           visitService.insertGmosNorth(input.observationId, input.static),
@@ -525,7 +523,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val RecordGmosSouthVisit: MutationField =
-    MutationField("recordGmosSouthVisit", RecordGmosSouthVisitInput.Binding) { (input, child) =>
+    MutationField("recordGmosSouthVisit", RecordGmosVisitInput.GmosSouthBinding) { (input, child) =>
       services.useTransactionally {
         recordVisit(
           visitService.insertGmosSouth(input.observationId, input.static),

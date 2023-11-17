@@ -6,9 +6,9 @@ package mapping
 
 import grackle.TypeRef
 
-import table.StepRecordTable
+import table.StepRecordView
 
-trait RecordGmosStepResultMapping[F[_]] extends StepRecordTable[F] {
+trait RecordGmosStepResultMapping[F[_]] extends StepRecordView[F] {
 
   private def recordStepResultMapping(
     typeRef: TypeRef
@@ -16,7 +16,7 @@ trait RecordGmosStepResultMapping[F[_]] extends StepRecordTable[F] {
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true),
+        SqlField("id", StepRecordView.Id, key = true),
         SqlObject("stepRecord")
       )
     )

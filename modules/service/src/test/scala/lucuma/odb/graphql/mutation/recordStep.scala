@@ -16,6 +16,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.syntax.string.toScreamingSnakeCase
 import lucuma.odb.data.ObservingModeType
 
 class recordStep extends OdbSuite {
@@ -56,7 +57,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               instrumentConfig {
@@ -88,6 +90,7 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
+              observeClass
             }
           }
         }
@@ -121,7 +124,8 @@ class recordStep extends OdbSuite {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
                 }
-              }
+              },
+              "observeClass": "ACQUISITION"
             }
           }
         }
@@ -138,7 +142,8 @@ class recordStep extends OdbSuite {
           recordGmosSouthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               instrumentConfig {
@@ -169,7 +174,8 @@ class recordStep extends OdbSuite {
                   }
                   builtin
                 }
-              }
+              },
+              observeClass
             }
           }
         }
@@ -203,7 +209,8 @@ class recordStep extends OdbSuite {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
                 }
-              }
+              },
+              "observeClass": "ACQUISITION"
             }
           }
         }
@@ -220,7 +227,8 @@ class recordStep extends OdbSuite {
           recordGmosSouthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               instrumentConfig {
@@ -266,7 +274,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               instrumentConfig {
@@ -329,7 +338,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               instrumentConfig {
@@ -394,7 +404,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               instrumentConfig {
@@ -452,7 +463,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigBias
+            $stepConfigBias,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               stepConfig {
@@ -492,7 +504,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigDark
+            $stepConfigDark,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               stepConfig {
@@ -537,7 +550,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigGcal
+            $stepConfigGcal,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               stepConfig {
@@ -580,7 +594,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience
+            $stepConfigScience,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               stepConfig {
@@ -642,7 +657,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigSmartGcal
+            $stepConfigSmartGcal,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
               stepConfig {

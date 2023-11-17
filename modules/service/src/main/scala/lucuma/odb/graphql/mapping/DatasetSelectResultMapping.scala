@@ -7,7 +7,7 @@ package mapping
 import table.AtomRecordTable
 import table.DatasetTable
 import table.ObservationView
-import table.StepRecordTable
+import table.StepRecordView
 import table.VisitTable
 
 trait DatasetSelectResultMapping[F[_]]
@@ -16,7 +16,7 @@ trait DatasetSelectResultMapping[F[_]]
      with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
-     with StepRecordTable[F]
+     with StepRecordView[F]
      with VisitTable[F] {
 
   lazy val DatasetSelectResultMapping: TypeMapping = {
@@ -25,7 +25,7 @@ trait DatasetSelectResultMapping[F[_]]
       nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
 
     val fromStepRecord: ObjectMapping =
-      nestedSelectResultMapping(DatasetSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, DatasetTable.StepId))
+      nestedSelectResultMapping(DatasetSelectResultType, StepRecordView.Id, Join(StepRecordView.Id, DatasetTable.StepId))
 
     val fromVisit: ObjectMapping =
       nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id,      Join(VisitTable.Id, DatasetTable.VisitId))

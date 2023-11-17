@@ -16,9 +16,9 @@ import grackle.TypeRef
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.StepType
 
-import table.StepRecordTable
+import table.StepRecordView
 
-trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
+trait StepConfigMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
 
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
@@ -33,8 +33,8 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
       tpe           = StepConfigType,
       discriminator = stepConfigDiscriminator,
       fieldMappings = List(
-        SqlField("id",       StepRecordTable.Id,       key = true, hidden = true),
-        SqlField("stepType", StepRecordTable.StepType, discriminator = true)
+        SqlField("id",       StepRecordView.Id,       key = true, hidden = true),
+        SqlField("stepType", StepRecordView.StepType, discriminator = true)
       )
     )
 
@@ -69,7 +69,7 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
     ObjectMapping(
       tpe           = BiasType,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true, hidden = true)
+        SqlField("id", StepRecordView.Id, key = true, hidden = true)
       )
     )
 
@@ -77,7 +77,7 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
     ObjectMapping(
       tpe           = DarkType,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true, hidden = true)
+        SqlField("id", StepRecordView.Id, key = true, hidden = true)
       )
     )
 
@@ -88,12 +88,12 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
     ObjectMapping(
       tpe           = GcalType,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true, hidden = true),
-        SqlField("continuum", StepRecordTable.Gcal.Continuum),
-        SqlField("arArc",     StepRecordTable.Gcal.ArArc,   hidden = true),
-        SqlField("cuarArc",   StepRecordTable.Gcal.CuarArc, hidden = true),
-        SqlField("tharArc",   StepRecordTable.Gcal.TharArc, hidden = true),
-        SqlField("xeArc",     StepRecordTable.Gcal.XeArc,   hidden = true),
+        SqlField("id", StepRecordView.Id, key = true, hidden = true),
+        SqlField("continuum", StepRecordView.Gcal.Continuum),
+        SqlField("arArc",     StepRecordView.Gcal.ArArc,   hidden = true),
+        SqlField("cuarArc",   StepRecordView.Gcal.CuarArc, hidden = true),
+        SqlField("tharArc",   StepRecordView.Gcal.TharArc, hidden = true),
+        SqlField("xeArc",     StepRecordView.Gcal.XeArc,   hidden = true),
         CursorField(
           "arcs",
           cursor =>
@@ -105,9 +105,9 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
             } yield List(ar, cuar, thar, xe).flattenOption,
           List("arArc", "cuarArc", "tharArc", "xeArc")
         ),
-        SqlField("filter",    StepRecordTable.Gcal.Filter),
-        SqlField("diffuser",  StepRecordTable.Gcal.Diffuser),
-        SqlField("shutter",   StepRecordTable.Gcal.Shutter)
+        SqlField("filter",    StepRecordView.Gcal.Filter),
+        SqlField("diffuser",  StepRecordView.Gcal.Diffuser),
+        SqlField("shutter",   StepRecordView.Gcal.Shutter)
       )
     )
   }
@@ -116,9 +116,9 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
     ObjectMapping(
       tpe           = ScienceType,
       fieldMappings = List(
-        SqlField("synthetic_id", StepRecordTable.Id, key = true, hidden = true),
+        SqlField("synthetic_id", StepRecordView.Id, key = true, hidden = true),
         SqlObject("offset"),
-        SqlField("guiding", StepRecordTable.Science.GuideState)
+        SqlField("guiding", StepRecordView.Science.GuideState)
       )
     )
 
@@ -126,8 +126,8 @@ trait StepConfigMapping[F[_]] extends StepRecordTable[F] with LookupFrom[F] {
     ObjectMapping(
       tpe           = SmartGcalType,
       fieldMappings = List(
-        SqlField("id", StepRecordTable.Id, key = true, hidden = true),
-        SqlField("smartGcalType", StepRecordTable.SmartGcal.Type)
+        SqlField("id", StepRecordView.Id, key = true, hidden = true),
+        SqlField("smartGcalType", StepRecordView.SmartGcal.Type)
       )
     )
 

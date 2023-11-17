@@ -7,7 +7,7 @@ package mapping
 import table.DatasetTable
 import table.ObservationView
 import table.ExecutionEventTable
-import table.StepRecordTable
+import table.StepRecordView
 import table.VisitTable
 
 trait ExecutionEventSelectResultMapping[F[_]]
@@ -16,7 +16,7 @@ trait ExecutionEventSelectResultMapping[F[_]]
      with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
-     with StepRecordTable[F]
+     with StepRecordView[F]
      with VisitTable[F] {
 
   lazy val ExecutionEventSelectResultMapping: TypeMapping = {
@@ -28,7 +28,7 @@ trait ExecutionEventSelectResultMapping[F[_]]
       nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventTable.ObservationId))
 
     val fromStepRecord: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordTable.Id, Join(StepRecordTable.Id, ExecutionEventTable.StepId))
+      nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordView.Id, Join(StepRecordView.Id, ExecutionEventTable.StepId))
 
     val fromVisit: ObjectMapping =
       nestedSelectResultMapping(ExecutionEventSelectResultType, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventTable.VisitId))
