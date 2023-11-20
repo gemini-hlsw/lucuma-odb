@@ -61,8 +61,8 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.syntax.hash.*
-import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.util.Codecs.*
 import org.http4s.Header
 import org.http4s.Headers
@@ -79,8 +79,6 @@ import java.time.temporal.ChronoUnit
 import scala.collection.immutable.SortedMap
 
 import Services.Syntax.*
-import lucuma.odb.service.GuideService.Statements.insertOrUpdateGuideAvailabilityHash
-import lucuma.odb.service.GuideService.Statements.insertManyAvailabilityPeriods
 
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
