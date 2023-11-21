@@ -167,7 +167,7 @@ object GuideService {
     }
   }
 
-  private case class ObservationInfo(
+  case class ObservationInfo(
     id:                 Observation.Id,
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
@@ -198,6 +198,8 @@ object GuideService {
       given HashBytes[ConstraintSet] = HashBytes.forJsonEncoder
       md5.update(constraints.hashBytes)
 
+      // For our purposes, we don't care about the actual PosAngleConstraint, just what
+      // angles we need to check.
       given HashBytes[NonEmptyList[Angle]] = HashBytes.forJsonEncoder
       md5.update(availabilityAngles.hashBytes)
 
