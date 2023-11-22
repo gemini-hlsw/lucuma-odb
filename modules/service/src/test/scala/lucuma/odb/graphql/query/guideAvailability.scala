@@ -12,7 +12,7 @@ import eu.timepit.refined.types.numeric.PosLong
 import fs2.Stream
 import fs2.text.utf8
 import io.circe.Json
-import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
@@ -25,11 +25,17 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
+import lucuma.odb.json.angle.query.given
+import lucuma.odb.service.GuideService
+import lucuma.odb.service.GuideService.AvailabilityPeriod
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -46,11 +52,20 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
   val pi         = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  val successStart = "2023-10-31T00:00:00Z"
-  val successEnd   = "2024-02-28T00:00:00Z"
+  val oct15_2023 = "2023-10-15T00:00:00Z"
+  val oct25_2023 = "2023-10-25T00:00:00Z"
+  val oct31_2023 = "2023-10-31T00:00:00Z"
+  val nov30_2023 = "2023-11-30T00:00:00Z"
+  val feb01_2024 = "2024-02-01T00:00:00Z"
+  val feb28_2024 = "2024-02-28T00:00:00Z"
+  val mar05_2024 = "2024-03-05T00:00:00Z"
+  val mar10_2024 = "2024-03-10T00:00:00Z"
 
   val emptyStart   = "3025-10-31T00:00:00Z"
-  val emptyEnd     = "3026-10-31T01:00:00Z"
+  val emptyEnd     = "3025-12-31T01:00:00Z"
+
+  val earlyAngles = List(160, 170, 180, 190, 200, 250, 260, 270, 280, 290, 300, 310)
+  val laterAngles = earlyAngles.filter(_ =!= 250)
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val tableRow: TableRow.North =
@@ -198,7 +213,7 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
   |            <![CDATA[SELECT TOP 100 source_id,ra,pmra,dec,pmdec,parallax,radial_velocity,phot_g_mean_mag,phot_rp_mean_mag 
   |     FROM gaiadr3.gaia_source_lite
   |     WHERE CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS', 86.55474, -0.10137, 0.08167))=1
-  |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag < 17.228))
+  |     and ((phot_rp_mean_mag < 17.228) or (phot_g_mean_mag  17.228))
   |     and (ruwe < 1.4)
   |     ORDER BY phot_g_mean_mag
   |      ]]>
@@ -264,131 +279,58 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
             guideAvailability(start: "$startTime", end: "$endTime") {
               start
               end
-              posAngles { degrees }
+              posAngles {
+                microarcseconds
+                microseconds
+                milliarcseconds
+                milliseconds
+                arcseconds
+                seconds
+                arcminutes
+                minutes
+                degrees
+                hours
+                dms
+                hms
+              }
             }
           }
         }
       }
     """
 
-  val emptyGuideAvailabilityResults =
-    json"""
-    {
-      "observation": {
-        "title": "V1647 Orionis",
-        "targetEnvironment": {
-          "guideAvailability": [
-            {
-              "start" : "3025-10-31 00:00:00",
-              "end" : "3026-10-31 01:00:00",
-              "posAngles" : [
-              ]
-            }
-          ]
-        }
-      }
-    }
-    """
+  def availabilityResult(title: String, periods: List[AvailabilityPeriod]): Json =
+    Json.obj(
+      "observation" -> Json.obj(
+        "title"            -> title.asJson,
+        "targetEnvironment" -> Json.obj(
+          "guideAvailability" -> Json.fromValues(
+            periods.map(ap =>
+              Json.obj(
+                "start"     -> ap.period.start.asJson,
+                "end"       -> ap.period.end.asJson,
+                "posAngles" -> ap.posAngles.asJson
+              )
+            )
+          )
+        )
+      )
+    )
 
-  val guideAvailabilityResults =
-    json"""
-    {
-      "observation": {
-        "title": "V1647 Orionis",
-        "targetEnvironment": {
-          "guideAvailability": [
-            {
-              "start" : "2023-10-31 00:00:00",
-              "end" : "2024-02-01 00:00:00",
-              "posAngles" : [
-                {
-                  "degrees" : 160.000000
-                },
-                {
-                  "degrees" : 170.000000
-                },
-                {
-                  "degrees" : 180.000000
-                },
-                {
-                  "degrees" : 190.000000
-                },
-                {
-                  "degrees" : 200.000000
-                },
-                {
-                  "degrees" : 250.000000
-                },
-                {
-                  "degrees" : 260.000000
-                },
-                {
-                  "degrees" : 270.000000
-                },
-                {
-                  "degrees" : 280.000000
-                },
-                {
-                  "degrees" : 290.000000
-                },
-                {
-                  "degrees" : 300.000000
-                },
-                {
-                  "degrees" : 310.000000
-                }
-              ]
-            },
-            {
-              "start" : "2024-02-01 00:00:00",
-              "end" : "2024-02-28 00:00:00",
-              "posAngles" : [
-                {
-                  "degrees" : 160.000000
-                },
-                {
-                  "degrees" : 170.000000
-                },
-                {
-                  "degrees" : 180.000000
-                },
-                {
-                  "degrees" : 190.000000
-                },
-                {
-                  "degrees" : 200.000000
-                },
-                {
-                  "degrees" : 260.000000
-                },
-                {
-                  "degrees" : 270.000000
-                },
-                {
-                  "degrees" : 280.000000
-                },
-                {
-                  "degrees" : 290.000000
-                },
-                {
-                  "degrees" : 300.000000
-                },
-                {
-                  "degrees" : 310.000000
-                }
-              ]
-            } 
-          ]
-        }
-      }
-    }
-    """
+  def makeAvailabilityPeriod(start: String, end: String, angles: List[Int]) =
+    AvailabilityPeriod(
+      TimestampInterval.between(
+        Timestamp.FromString.getOption(start).get,
+        Timestamp.FromString.getOption(end).get
+      ),
+      angles.map(i => Angle.fromBigDecimalDegrees(BigDecimal(i)))
+    )
 
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val respStr =
-        if (req.uri.renderString.contains("20-0.10137")) gaiaReponseString
-        else gaiaEmptyReponseString
+        if (req.uri.renderString.contains("20-0.10166")) gaiaEmptyReponseString
+        else gaiaReponseString
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
 
@@ -399,8 +341,13 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
+    val periods = List(
+      makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+      makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+    )
+    val expected = availabilityResult("V1647 Orionis", periods).asRight
     setup.flatMap { oid =>
-      expect(pi, guideAvailabilityQuery(oid, successStart, successEnd), expected = guideAvailabilityResults.asRight)
+      expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected)
     }
   }
 
@@ -411,8 +358,8 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List.empty)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideAvailabilityQuery(oid, successStart, successEnd),
-      expected = List(s"No targets have been defined for observation $oid.").asLeft)
+      expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024),
+      expected = List(s"Could not generate a sequence from the observation $oid: target").asLeft)
     }
   }
 
@@ -423,8 +370,12 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
+    val periods = List(
+      makeAvailabilityPeriod(emptyStart, emptyEnd, List.empty)
+    )
+    val expected = availabilityResult("V1647 Orionis", periods).asRight
     setup.flatMap { oid =>
-      expect(pi, guideAvailabilityQuery(oid, emptyStart, emptyEnd), expected = emptyGuideAvailabilityResults.asRight)
+      expect(pi, guideAvailabilityQuery(oid, emptyStart, emptyEnd), expected = expected)
     }
   }
 
@@ -436,8 +387,253 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
         o <- createObservationWithNoModeAs(pi, p, t)
       } yield o
     setup.flatMap { oid =>
-      expect(pi, guideAvailabilityQuery(oid, successStart, successEnd),
+      expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024),
       expected = List(s"Could not generate a sequence from the observation $oid: observing mode").asLeft)
     }
   }
+
+  test("range too big") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithNoModeAs(pi, p, t)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideAvailabilityQuery(oid, oct31_2023, emptyEnd),
+      expected = List(s"Period for guide availability cannot be greater than ${GuideService.maxAvailabilityPeriodDays} days.").asLeft)
+    }
+  }
+
+  // There isn't a lot of visibility into how the service is deciding what it needs to calculate
+  // based on what it already has, but we can make sure the various scenarios don't break things.
+  // Much of the decision behavior is encapsulated in ContiguousTimestampMap, which is well tested.
+
+  test("extends both ends") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(oct25_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, mar05_2024, laterAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, oct25_2023, mar05_2024), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("subset") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(nov30_2023, feb01_2024, earlyAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, nov30_2023, feb01_2024), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("disjoint in front") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(oct15_2023, oct25_2023, earlyAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, oct15_2023, oct25_2023), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("abuts in front") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(oct15_2023, oct31_2023, earlyAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, oct15_2023, oct31_2023), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("overlaps at front") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(oct15_2023, nov30_2023, earlyAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, oct15_2023, nov30_2023), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("disjoint at end") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(mar05_2024, mar10_2024, laterAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, mar05_2024, mar10_2024), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("abuts at end") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(feb28_2024, mar10_2024, laterAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, feb28_2024, mar10_2024), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("overlaps at end") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(nov30_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, mar05_2024, laterAngles)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, nov30_2023, mar05_2024), expected = expected2)
+
+      one >> two 
+    }
+  }
+
+  test("disjoint and far away") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      val periods1 = List(
+        makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
+        makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAngles)
+      )
+      val expected1 = availabilityResult("V1647 Orionis", periods1).asRight
+      val one = expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected1)
+
+      val periods2 = List(
+        makeAvailabilityPeriod(emptyStart, emptyEnd, List.empty)
+      )
+      val expected2 = availabilityResult("V1647 Orionis", periods2).asRight
+      val two = expect(pi, guideAvailabilityQuery(oid, emptyStart, emptyEnd), expected = expected2)
+
+      one >> two 
+    }
+  }
+
 }
