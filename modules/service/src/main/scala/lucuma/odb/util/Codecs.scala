@@ -146,6 +146,13 @@ trait Codecs {
   val angle_µas: Codec[Angle] =
     int8.imap(Angle.microarcseconds.reverseGet)(Angle.microarcseconds.get)
 
+  val _angle_µas: Codec[Arr[Angle]] =
+    Codec.array(
+      a => Angle.microarcseconds.get(a).toString, 
+      safe(s => Angle.microarcseconds.reverseGet(s.toLong)),
+      Type("_d_angle_µas", List(Type("d_angle_µas")))
+    )
+
   val atom_id: Codec[Atom.Id] =
     uid[Atom.Id]
 

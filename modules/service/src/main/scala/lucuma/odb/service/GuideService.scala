@@ -49,7 +49,10 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
+import lucuma.itc.client.json.given
+import lucuma.odb.data.ContiguousTimestampMap
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.json.all.query.given
@@ -57,17 +60,21 @@ import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.PlannedTimeCalculator
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.util.Codecs.*
 import org.http4s.Header
 import org.http4s.Headers
 import org.http4s.Method
 import org.http4s.Request
 import org.http4s.client.Client
-import skunk.AppliedFragment
-import skunk.Decoder
+import skunk.*
+import skunk.data.Arr
 import skunk.implicits.*
 
+import java.security.MessageDigest
+import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.collection.immutable.SortedMap
 
@@ -82,7 +89,7 @@ trait GuideService[F[_]] {
     NoTransaction[F]
   ): F[Either[Error, List[GuideEnvironment]]]
 
-  def getGuideAvailability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+  def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
     NoTransaction[F]
   ): F[Either[Error, List[AvailabilityPeriod]]]
 }
@@ -91,6 +98,10 @@ object GuideService {
   // if any science target or guide star candidate moves more than this many milliarcseconds,
   // we consider it to potentially invalidate the availability.
   val invalidThreshold = 100.0
+
+  // The longest availability period we will calculate.
+  val maxAvailabilityPeriodDays = 200L
+  val maxAvailabilityPeriod = TimeSpan.unsafeFromDuration(Duration.ofDays(maxAvailabilityPeriodDays))
 
   given Order[Angle] = Angle.AngleOrder
 
@@ -115,26 +126,25 @@ object GuideService {
   }
 
   case class AvailabilityPeriod(
-    start:     Timestamp,
-    end:       Timestamp,
+    period:    TimestampInterval,
     posAngles: List[Angle]
   )
 
   object AvailabilityPeriod {
-    given Encoder[AvailabilityPeriod] = deriveEncoder
-  }
+    def apply(start: Timestamp, end: Timestamp, posAngles: List[Angle]): AvailabilityPeriod =
+      AvailabilityPeriod(TimestampInterval.between(start, end), posAngles)
 
-  private case class AvailabilityList private (periods: List[AvailabilityPeriod]) {
-    def add(ap: AvailabilityPeriod): AvailabilityList =
-      periods match
-        case h :: t if h.end === ap.start && h.posAngles === ap.posAngles => AvailabilityList(h.copy(end = ap.end) :: t)
-        case _                                                            => AvailabilityList(ap :: periods)
+    def fromTuple(tuple: (TimestampInterval, List[Angle])): AvailabilityPeriod =
+      AvailabilityPeriod(tuple._1, tuple._2)
 
-    def toList: List[AvailabilityPeriod] = periods.reverse
-  }
-
-  private object AvailabilityList {
-    def empty: AvailabilityList = AvailabilityList(List.empty)
+    given Encoder[AvailabilityPeriod] =
+      Encoder.instance { ap =>
+        Json.obj(
+          "start"     -> ap.period.start.asJson,
+          "end"       -> ap.period.end.asJson,
+          "posAngles" -> ap.posAngles.asJson
+        )
+      }
   }
 
   sealed trait Error {
@@ -157,7 +167,7 @@ object GuideService {
     }
   }
 
-  private case class ObservationInfo(
+  case class ObservationInfo(
     id:                 Observation.Id,
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
@@ -166,6 +176,41 @@ object GuideService {
   ) {
     def wavelength: Either[Error, Wavelength] =
       optWavelength.toRight(Error.GeneralError(s"No wavelength defined for observation $id."))
+
+    private val AllAngles =
+      NonEmptyList.fromListUnsafe(
+        (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
+      )
+
+    val availabilityAngles: NonEmptyList[Angle] =
+      posAngleConstraint match 
+        case PosAngleConstraint.Fixed(a)               => NonEmptyList.of(a)
+        case PosAngleConstraint.AllowFlip(a)           => NonEmptyList.of(a, a.flip)
+        case PosAngleConstraint.ParallacticOverride(a) => NonEmptyList.of(a)
+        case PosAngleConstraint.AverageParallactic     => AllAngles
+        case PosAngleConstraint.Unbounded              => AllAngles
+
+    def hash(generatorHash: Md5Hash): Md5Hash = {
+      val md5 = MessageDigest.getInstance("MD5")
+
+      md5.update(generatorHash.toByteArray)
+
+      given HashBytes[ConstraintSet] = HashBytes.forJsonEncoder
+      md5.update(constraints.hashBytes)
+
+      // For our purposes, we don't care about the actual PosAngleConstraint, just what
+      // angles we need to check.
+      given HashBytes[NonEmptyList[Angle]] = HashBytes.forJsonEncoder
+      md5.update(availabilityAngles.hashBytes)
+
+      given HashBytes[Option[Wavelength]] = HashBytes.forJsonEncoder
+      md5.update(optWavelength.hashBytes)
+
+      given Encoder[Coordinates] = deriveEncoder
+      md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
+
+      Md5Hash.unsafeFromByteArray(md5.digest())
+    }
   }
 
   private case class GeneratorInfo(
@@ -217,6 +262,75 @@ object GuideService {
           )
       }
 
+      def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
+        NoTransaction[F]
+      ): F[Option[Md5Hash]] = {
+        val af = Statements.getGuideAvailabilityHash(user, pid, oid)
+        session
+          .prepareR(af.fragment.query(md5_hash))
+          .use(_.option(af.argument))
+      }
+
+      def insertOrUpdateAvailabilityHash(pid: Program.Id, oid: Observation.Id, hash: Md5Hash)(using
+        Transaction[F]
+      ): F[Unit] = {
+        val af = Statements.insertOrUpdateGuideAvailabilityHash(user, pid, oid, hash)
+        session
+          .prepareR(af.fragment.command)
+          .use(_.execute(af.argument).void)
+      }
+
+      def getAvailabilityPeriods(pid: Program.Id, oid: Observation.Id)(using
+        NoTransaction[F]
+      ): F[List[AvailabilityPeriod]] = {
+        val af = Statements.getAvailabilityPeriods(user, pid, oid)
+        session
+          .prepareR(af.fragment.query(Decoders.availability_period))
+          .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+      }
+
+      def insertAvailabilityPeriods(pid: Program.Id, oid: Observation.Id, aps: List[AvailabilityPeriod])(using
+        Transaction[F]
+      ): F[Unit] = {
+        val af = Statements.insertManyAvailabilityPeriods(user, pid, oid, aps)
+        session
+          .prepareR(af.fragment.command)
+          .use(_.execute(af.argument).void)
+      }
+
+      def deleteAvailabilityPeriods(pid: Program.Id, oid: Observation.Id)(using Transaction[F]): F[Unit] = {
+        val af = Statements.deleteAvailabilityPeriods(user, pid, oid)
+        session
+          .prepareR(af.fragment.command)
+          .use(_.execute(af.argument).void)
+      }
+
+      def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
+        using NoTransaction[F]
+      ): F[ContiguousTimestampMap[List[Angle]]] =
+        getAvailabilityHash(pid, oid).flatMap(oldHash =>
+          if (oldHash.exists(_ === newHash))
+            getAvailabilityPeriods(pid, oid)
+              .map(l => 
+                // If for some reason the cache is invalid, we'll just ignore it
+                ContiguousTimestampMap.fromList(l.map(ap => (ap.period, ap.posAngles)))
+                  .getOrElse(ContiguousTimestampMap.empty[List[Angle]])
+              )
+          else ContiguousTimestampMap.empty[List[Angle]].pure[F]
+        )
+      
+      def cacheAvailability(
+        pid:          Program.Id,
+        oid:          Observation.Id,
+        hash:         Md5Hash,
+        availability: ContiguousTimestampMap[List[Angle]]
+      ): F[Unit] =
+        services.transactionally {
+          deleteAvailabilityPeriods(pid, oid) >>
+          insertOrUpdateAvailabilityHash(pid, oid, hash) >>
+          insertAvailabilityPeriods(pid, oid, availability.intervals.toList.map(AvailabilityPeriod.fromTuple))
+        }
+
       def getGaiaQuery(
         oid:             Observation.Id,
         start:           Timestamp,
@@ -261,10 +375,11 @@ object GuideService {
             _.body
               .through(utf8.decode)
               .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
+              .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
           )
           .compile
           .toList
-          .map(_.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s) }.asRight)
+          .map(_.asRight)
           .handleError(e => Error.GaiaError(e.getMessage()).asLeft)
       }
 
@@ -335,20 +450,6 @@ object GuideService {
           off <- offsets.getOrElse(NonEmptyList.of(Offset.Zero))
         } yield AgsPosition(pa, off)
 
-      private val AllAngles =
-        NonEmptyList.fromListUnsafe(
-          (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
-        )
-
-      def getAnglesForAvailability(posAngleConstraint: PosAngleConstraint): NonEmptyList[Angle] =
-        posAngleConstraint match 
-          case PosAngleConstraint.Fixed(a)               => NonEmptyList.of(a)
-          case PosAngleConstraint.AllowFlip(a)           => NonEmptyList.of(a, a.flip)
-          case PosAngleConstraint.ParallacticOverride(a) => NonEmptyList.of(a)
-          case PosAngleConstraint.AverageParallactic     => AllAngles
-          case PosAngleConstraint.Unbounded              => AllAngles
-        
-        
       def processCandidates(
         obsInfo:       ObservationInfo,
         wavelength:    Wavelength,
@@ -370,31 +471,60 @@ object GuideService {
           .sortUsablePositions
           .collect { case usable: AgsAnalysis.Usable => usable }
 
-      def buildAvailability(
-        start:      Timestamp,
-        end:        Timestamp,
+      def buildAvailabilityAndCache(
+        pid:             Program.Id,
+        requestedPeriod: TimestampInterval,
+        neededPeriods:   NonEmptyList[TimestampInterval],
+        obsInfo:         ObservationInfo,
+        genInfo:         GeneratorInfo,
+        currentAvail:    ContiguousTimestampMap[List[Angle]],
+        newHash:         Md5Hash
+      ): F[Either[Error, ContiguousTimestampMap[List[Angle]]]] = 
+        (for {
+          wavelength   <- EitherT.fromEither(obsInfo.wavelength)
+          asterism     <- EitherT(getAsterism(pid, obsInfo.id))
+          tracking      = ObjectTracking.fromAsterism(asterism)
+          candPeriod    = neededPeriods.tail.fold(neededPeriods.head)((a, b) => a.span(b))
+          candidates   <- EitherT(
+                           getCandidates(obsInfo.id, candPeriod.start, candPeriod.end, tracking, wavelength, obsInfo.constraints)
+                          )
+          positions     = getPositions(obsInfo.availabilityAngles, genInfo.offsets)
+          neededLists  <- EitherT.fromEither(
+                            neededPeriods.traverse(p => 
+                              buildAvailabilityList(p, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
+                            )
+                          )
+          availability <- EitherT.fromEither(
+                            neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
+                              .toRight(Error.GeneralError("Error creating guide availability"))
+                          )
+          _            <- EitherT.right(cacheAvailability(pid, obsInfo.id, newHash, availability))
+        } yield availability).value
+
+      def buildAvailabilityList(
+        period:     TimestampInterval,
         obsInfo:    ObservationInfo,
         genInfo:    GeneratorInfo,
         wavelength: Wavelength,
         asterism:   NonEmptyList[Target],
         tracking:   ObjectTracking,
-        candidates: List[GuideStarCandidate]
-      ): Either[Error, List[AvailabilityPeriod]] = {
-        val angles    = getAnglesForAvailability(obsInfo.posAngleConstraint)
-        val positions = getPositions(angles, genInfo.offsets)
-
+        candidates: List[GuideStarCandidate],
+        positions:  NonEmptyList[AgsPosition]
+      ): Either[Error, ContiguousTimestampMap[List[Angle]]] = {
         @scala.annotation.tailrec
-        def go(startTime: Timestamp, accum: AvailabilityList): Either[Error, AvailabilityList] = {
-          val period =
-            buildAvailabilityPeriod(startTime, end, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions, angles)
-          period match
-            case Left(error)                       => error.asLeft
-            case Right(period) if period.end < end => go(period.end, accum.add(period))
-            case Right(period)                     => accum.add(period.copy(end = end)).asRight
+        def go(startTime: Timestamp, accum: ContiguousTimestampMap[List[Angle]]): Either[Error, ContiguousTimestampMap[List[Angle]]] = {
+          val eap =
+            buildAvailabilityPeriod(startTime, period.end, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
+          eap match
+            case Left(error)                      => error.asLeft
+            case Right(ap) if ap.period.end < period.end => go(ap.period.end, accum.unsafeAdd(ap.period, ap.posAngles))
+            case Right(ap)                        => 
+              val newPeriod = TimestampInterval.between(ap.period.start, period.end)
+              accum.unsafeAdd(newPeriod, ap.posAngles).asRight
         }
         candidates match
-          case Nil => List(AvailabilityPeriod(start, end, List.empty)).asRight
-          case _   => go(start, AvailabilityList.empty).map(_.toList)
+          case Nil => ContiguousTimestampMap.single(period, List.empty).asRight
+          case _   => go(period.start, ContiguousTimestampMap.empty[List[Angle]])
       }
 
       def buildAvailabilityPeriod(
@@ -407,7 +537,6 @@ object GuideService {
         tracking:   ObjectTracking,
         candidates: List[GuideStarCandidate],
         positions:  NonEmptyList[AgsPosition],
-        angles:     NonEmptyList[Angle]
       ): Either[Error, AvailabilityPeriod] =
         for {
           baseCoords      <- obsInfo.explicitBase
@@ -441,7 +570,7 @@ object GuideService {
                                wavelength,
                                baseCoords,
                                scienceCoords,
-                               angles,
+                               obsInfo.availabilityAngles,
                                positions,
                                genInfo.agsParams
                              )
@@ -531,29 +660,36 @@ object GuideService {
           usable         = processCandidates(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
-      override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, start: Timestamp, end: Timestamp)(using
+      override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
         NoTransaction[F]
       ): F[Either[Error, List[AvailabilityPeriod]]] =
         (for {
-          _            <- EitherT.fromEither(
-                            if (start < end) ().asRight
-                            else Error.GeneralError("Start time must be prior to end time for guide star availability").asLeft
-                          )
-          obsInfo      <- EitherT(getObservationInfo(pid, oid))
-          wavelength   <- EitherT.fromEither(obsInfo.wavelength)
-          asterism     <- EitherT(getAsterism(pid, oid))
-          genInfo      <- EitherT(getGeneratorInfo(pid, oid))
-          tracking      = ObjectTracking.fromAsterism(asterism)
-          candidates   <- EitherT(getCandidates(oid, start, end, tracking, wavelength, obsInfo.constraints))
-          availability <-
-            EitherT.fromEither(
-              buildAvailability(start, end, obsInfo, genInfo, wavelength, asterism, tracking, candidates)
-            )
+          _             <- EitherT.fromEither(
+                             if (period.boundedTimeSpan <= maxAvailabilityPeriod) ().asRight
+                             else Error.GeneralError(
+                              s"Period for guide availability cannot be greater than $maxAvailabilityPeriodDays days."
+                             ).asLeft
+                           )
+          obsInfo       <- EitherT(getObservationInfo(pid, oid))
+          genInfo       <- EitherT(getGeneratorInfo(pid, oid))
+          newHash        = obsInfo.hash(genInfo.hash)
+          currentAvail  <- EitherT.right(getFromCacheOrEmpty(pid, oid, newHash))
+          missingPeriods = currentAvail.findMissingIntervals(period)
+          // only happens if we have disjoint periods too far apart. If so, we'll just replace the existing
+          (neededPeriods, startAvail) = if (missingPeriods.exists(_.boundedTimeSpan > maxAvailabilityPeriod)) 
+                             (NonEmptyList.of(period).some, ContiguousTimestampMap.empty[List[Angle]])
+                           else (NonEmptyList.fromList(missingPeriods), currentAvail)
+          // if we don't need anything, then we already have what we need
+          fullAvail     <- neededPeriods.fold(EitherT.pure(startAvail))(nel =>
+                             EitherT(buildAvailabilityAndCache(pid, period, nel, obsInfo, genInfo, startAvail, newHash))
+                           )
+          availability   = fullAvail.slice(period).intervals.toList.map(AvailabilityPeriod.fromTuple)
         } yield availability).value
     }
 
   object Statements {
     import ProgramService.Statements.andWhereUserAccess
+    import ProgramService.Statements.whereUserAccess
 
     def getObservationInfo(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
@@ -573,8 +709,83 @@ object GuideService {
           obs.c_explicit_ra,
           obs.c_explicit_dec
         from t_observation obs
-        where obs.c_program_id = $program_id
+        where obs.c_program_id     = $program_id
           and obs.c_observation_id = $observation_id
+      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+
+    def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment = 
+      sql"""
+        select c_hash
+        from t_guide_availability
+        where c_program_id     = $program_id
+          and c_observation_id = $observation_id
+      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+
+    def insertOrUpdateGuideAvailabilityHash(
+      user: User,
+      pid: Program.Id,
+      oid: Observation.Id,
+      hash: Md5Hash
+    ): AppliedFragment = 
+      sql"""
+        insert into t_guide_availability (
+          c_program_id,
+          c_observation_id,
+          c_hash
+        )
+        select
+          $program_id,
+          $observation_id,
+          $md5_hash
+      """.apply(pid, oid, hash) |+| 
+      whereUserAccess(user, pid) |+|
+      sql"""
+        on conflict on constraint t_guide_availability_pkey do update
+          set c_hash = $md5_hash
+      """.apply(hash)
+    
+    def getAvailabilityPeriods(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
+      sql"""
+        select
+          c_start,
+          c_end,
+          c_angles
+        from t_guide_availability_period
+        where c_program_id     = $program_id
+          and c_observation_id = $observation_id
+      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+    
+    def insertManyAvailabilityPeriods(
+      user: User,
+      pid: Program.Id,
+      oid: Observation.Id,
+      periods: List[AvailabilityPeriod]): AppliedFragment = 
+      sql"""
+        insert into t_guide_availability_period (
+          c_program_id,
+          c_observation_id,
+          c_start,
+          c_end,
+          c_angles
+        ) values ${(
+          program_id *:
+          observation_id *:
+          core_timestamp *:
+          core_timestamp *:
+          Decoders.angle_µas_list
+        ).values.list(periods.length)}
+      """
+      .apply(
+        periods.map { ap =>
+          (pid, oid, ap.period.start, ap.period.end, ap.posAngles)
+        }
+      )
+
+    def deleteAvailabilityPeriods(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
+      sql"""
+        delete from t_guide_availability_period
+        where c_program_id     = $program_id
+          and c_observation_id = $observation_id
       """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
   }
 
@@ -630,5 +841,13 @@ object GuideService {
             ObservationInfo(id, ConstraintSet(image, cloud, sky, water, elev), paConstraint, wavelength, explicitBase)
           )
       }
+
+    val angle_µas_list: Codec[List[Angle]] =
+      _angle_µas.imap(_.toList)(l => Arr.fromFoldable(l))
+
+    val availability_period: Codec[AvailabilityPeriod] =
+      (timestamp_interval *: angle_µas_list).imap((period, angles) =>
+        AvailabilityPeriod(period, angles)
+      )(ap => (ap.period, ap.posAngles))
   }
 }

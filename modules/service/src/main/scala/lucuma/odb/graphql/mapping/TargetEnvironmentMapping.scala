@@ -20,6 +20,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
@@ -132,17 +133,19 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   }
 
   def guideAvailabilityQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[(Timestamp, Timestamp)] = env =>
+    val readEnv: Env => Result[TimestampInterval] = env =>
       for {
         start <- env.getR[Timestamp](AvailabilityStartParam)
         end   <- env.getR[Timestamp](AvailabilityEndParam)
-      } yield (start, end)
+        period <- if (start < end) Result.success(TimestampInterval.between(start, end))
+                  else Result.failure("Start time must be prior to end time for guide star availability")
+      } yield period
 
-    val calculate: (Program.Id, Observation.Id, (Timestamp, Timestamp)) => F[Result[List[GuideService.AvailabilityPeriod]]] =
+    val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
         services.use { s =>
           s.guideService(httpClient, itcClient, commitHash, plannedTimeCalculator)
-            .getGuideAvailability(pid, oid, period._1, period._2)
+            .getGuideAvailability(pid, oid, period)
             .map {
               case Left(e)  => Result.failure(e.format)
               case Right(s) => s.success
