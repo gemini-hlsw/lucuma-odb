@@ -114,7 +114,7 @@ object S3FileService {
           val f = for {
             ref  <- Ref.of(0L)
             pipe  = s3.uploadFileMultipart(awsConfig.bucketName, filePath.toKey, partSize)
-            _    <- data.evalTapChunk(c => ref.update(_ + 1)).through(pipe).compile.drain
+            _    <- data.chunks.evalTap(c => ref.update(_ + c.size)).unchunks.through(pipe).compile.drain
             size <- ref.get
           } yield size
           f.onError { case e => Trace[F].attachError(e, ("error", true)) }
