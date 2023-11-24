@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.data.Ior
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.effect.unsafe.IORuntime
@@ -343,6 +344,34 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       op.map(_.spaces2)
         .assertEquals(success.spaces2) // by comparing strings we get more useful errors
     })
+  }
+
+  def expectIor(
+    user:      User,
+    query:     String,
+    expected:  Ior[List[String], Json],
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Http,
+  ): IO[Unit] = {
+    val op = this.query(user, query, variables, client)
+    expected.fold(
+      errors => {
+        op.intercept[ResponseException[Any]]
+          .map(_.errors.toList.map(_.message))
+          .assertEquals(errors)
+      },
+      success => {
+        op.map(_.spaces2)
+          .assertEquals(success.spaces2) // by comparing strings we get more useful errors
+      },
+      (errors, success) => {
+        op.intercept[ResponseException[Json]]
+          .map { case ResponseException(e, d) =>
+            assertEquals(e.toList.map(_.message), errors)
+            assertEquals(d.map(_.spaces2), success.spaces2.some)
+          }
+      }
+    )
   }
 
   def query(
