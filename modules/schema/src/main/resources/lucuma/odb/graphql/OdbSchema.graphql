@@ -5183,11 +5183,15 @@ type Execution {
 
   """
   Calculations dependent on the sequence, such as planned time and offsets.
+  If a sequence cannot be generated for this observation, `null` is returned
+  along with warning messages.
   """
-  digest: ExecutionDigest!
+  digest: ExecutionDigest
 
   """
-  Full execution config, including acquisition and science sequences.
+  Full execution config, including acquisition and science sequences.  If a
+  sequence cannot be generated for this observation, `null` is returned along
+  with warning messages.
   """
   config(
 
@@ -5201,7 +5205,7 @@ type Execution {
     """
     futureLimit: NonNegInt = 25
 
-  ): ExecutionConfig!
+  ): ExecutionConfig
 
   "Executed (or at least partially executed) atom records, across all visits."
   atomRecords(
