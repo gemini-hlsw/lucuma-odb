@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -313,6 +314,194 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
+  test("digest: one bad") {
+
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservationWithNoModeAs(user, p, t)
+      } yield (p, o)
+
+    setup.flatMap { (pid, oid) =>
+      expectIor(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 observations {
+                   matches {
+                     id
+                     execution {
+                       digest {
+                         setup {
+                           full { seconds }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Ior.both(
+          List(s"Could not generate a sequence from the observation $oid: observing mode"),
+          json"""
+            {
+              "program": {
+                "observations": {
+                  "matches": [
+                    {
+                      "id": $oid,
+                      "execution": {
+                        "digest": null
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("digest: one good, one bad") {
+
+    val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o1 <- createObservationWithNoModeAs(user, p, t)
+      } yield (p, o0, o1)
+
+    setup.flatMap { (pid, oid0, oid1) =>
+      expectIor(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 observations {
+                   matches {
+                     id
+                     execution {
+                       digest {
+                         setup {
+                           full { seconds }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Ior.both(
+          List(s"Could not generate a sequence from the observation $oid1: observing mode"),
+          json"""
+            {
+              "program": {
+                "observations": {
+                  "matches": [
+                    {
+                      "id": $oid0,
+                      "execution": {
+                        "digest": {
+                          "setup" : {
+                            "full" : {
+                              "seconds" : 960.000000
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": $oid1,
+                      "execution": {
+                        "digest": null
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("digest: one bad, one good") {
+
+    val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createObservationWithNoModeAs(user, p, t)
+        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      } yield (p, o0, o1)
+
+    setup.flatMap { (pid, oid0, oid1) =>
+      expectIor(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 observations {
+                   matches {
+                     id
+                     execution {
+                       digest {
+                         setup {
+                           full { seconds }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Ior.both(
+          List(s"Could not generate a sequence from the observation $oid0: observing mode"),
+          json"""
+            {
+              "program": {
+                "observations": {
+                  "matches": [
+                    {
+                      "id": $oid0,
+                      "execution": {
+                        "digest": null
+                      }
+                    },
+                    {
+                      "id": $oid1,
+                      "execution": {
+                        "digest": {
+                          "setup" : {
+                            "full" : {
+                              "seconds" : 960.000000
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
   test("simple generation") {
     val setup: IO[Observation.Id] =
       for {
@@ -506,6 +695,49 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       )
     }
 
+  }
+
+  test("cannot generate, missing mode") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservationWithNoModeAs(user, p, t)
+      } yield o
+
+    setup.flatMap { oid =>
+      expectIor(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     ... on GmosNorthExecutionConfig {
+                       static {
+                         stageMode
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Ior.both(
+          List(s"Could not generate a sequence from the observation $oid: observing mode"),
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "config": null
+                }
+              }
+            }
+          """
+        )
+      )
+    }
   }
 
   test("simple generation - limited future") {
@@ -2400,4 +2632,5 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       )
     }
   }
+
 }
