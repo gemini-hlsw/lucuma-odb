@@ -15,7 +15,7 @@ trait ProposalTable[F[_]] extends BaseMapping[F] {
     val Title           = col("c_title", text_nonempty.opt)
     val Abstrakt        = col("c_abstract", text_nonempty.opt)
     val Category        = col("c_category", tag.opt)
-    val TooActivation   = col("c_too_activation", too_activation.opt)
+    val TooActivation   = col("c_too_activation", too_activation)
     val Clazz           = col("c_class", tag)
     val MinPercent      = col("c_min_percent", int_percent)
     val MinPercentTotal = col("c_min_percent_total", int_percent.embedded)

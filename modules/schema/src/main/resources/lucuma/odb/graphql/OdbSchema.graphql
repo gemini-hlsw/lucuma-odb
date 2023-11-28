@@ -3047,7 +3047,7 @@ input ProposalInput {
   category: TacCategory
 
   """
-  The toOActivation field is required when creating a new instance of proposal, but optional when editing
+  The toOActivation field is optional. If not specified when creating a proposal, it defaults to `NONE'.
   """
   toOActivation: ToOActivation
 
@@ -7690,7 +7690,7 @@ type Proposal {
   """
   Target of Opportunity activation
   """
-  toOActivation: ToOActivation
+  toOActivation: ToOActivation!
 
   """
   Abstract
