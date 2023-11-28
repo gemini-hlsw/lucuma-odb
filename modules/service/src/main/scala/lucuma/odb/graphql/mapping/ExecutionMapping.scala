@@ -103,7 +103,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =
-      Result.failure(e.format)
+      Result.warning(e.format, Json.Null)
   }
 
   private lazy val configHandler: EffectHandler[F] = {
