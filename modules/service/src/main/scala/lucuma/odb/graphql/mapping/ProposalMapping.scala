@@ -5,7 +5,13 @@ package lucuma.odb.graphql
 
 package mapping
 
+import eu.timepit.refined.cats.*
+import grackle.Query.*
+import grackle.QueryCompiler.Elab
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.model.IntPercent
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalTable
 
@@ -27,5 +33,19 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F] with ProgramTable[F] wi
       )
     )
 
+  lazy val ProposalElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (ProposalType, "partnerSplits", Nil) =>
+      Elab.transformChild{ child =>
+        OrderBy(
+          OrderSelections(
+            List(
+              OrderSelection[IntPercent](PartnerSplitType / "percent", ascending = false),
+              OrderSelection[Tag](PartnerSplitType / "partner")
+            )
+          ),
+          child
+        )
+      }
   }
+}
 
