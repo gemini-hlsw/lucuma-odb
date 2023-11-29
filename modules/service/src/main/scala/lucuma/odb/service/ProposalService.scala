@@ -118,7 +118,11 @@ object ProposalService {
       val proposalClassUpdates: List[AppliedFragment] =
         SET.proposalClass.toList.flatMap {
           case Left(ta) =>
-              ta.minPercentTime.map(sql"c_min_percent = $int_percent").toList
+            List(
+              ta.minPercentTime.map(sql"c_min_percent = $int_percent"),
+              void"c_min_percent_total = null".some,
+              void"c_total_time = null".some,
+            ).flatten
           case Right(tb) =>
             List(
               tb.minPercentTime.map(sql"c_min_percent = $int_percent"),
