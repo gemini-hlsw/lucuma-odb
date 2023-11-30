@@ -269,7 +269,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     )
   }
 
-  test("observation -> execution -> visits -> timeChargeBreakdown") {
+  test("observation -> execution -> visits -> timeChargeInvoice") {
     recordAll(pi, mode, offset = 600, visitCount = 2, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
@@ -277,7 +277,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
             execution {
               visits {
                 matches {
-                  timeChargeBreakdown {
+                  timeChargeInvoice {
                     executionTime {
                       program { seconds }
                       partner { seconds }
@@ -305,7 +305,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
       val matches = on.visits.map { v =>
         json"""
         {
-          "timeChargeBreakdown": {
+          "timeChargeInvoice": {
             "executionTime": {
               "program": {
                 "seconds": 0.000000

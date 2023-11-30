@@ -69,10 +69,10 @@ input AddTimeChargeCorrectionInput {
 
 """
 The result of the 'addTimeChargeCorrection' mutation.  It contains the
-visit's updated TimeChargeBreakdown after applying the correction.
+visit's updated TimeChargeInvoice after applying the correction.
 """
 type AddTimeChargeCorrectionResult {
-  timeChargeBreakdown: TimeChargeBreakdown!
+  timeChargeInvoice: TimeChargeInvoice!
 }
 
 """
@@ -1809,7 +1809,7 @@ type GmosNorthVisit implements Visit {
   ): ExecutionEventSelectResult!
 
   "Time accounting details for this visit."
-  timeChargeBreakdown: TimeChargeBreakdown!
+  timeChargeInvoice: TimeChargeInvoice!
 
   """
   GmosNorth static instrument configuration
@@ -2345,7 +2345,7 @@ type GmosSouthVisit implements Visit {
   ): ExecutionEventSelectResult!
 
   "Time accounting details for this visit."
-  timeChargeBreakdown: TimeChargeBreakdown!
+  timeChargeInvoice: TimeChargeInvoice!
 
   """
   GmosSouth static instrument configuration
@@ -9532,30 +9532,6 @@ type TargetSelectResult {
 }
 
 """
-Detailed time accounting information for a visit, showing the raw execution
-time along with any automatically applied discounts (e.g., for bad weather)
-and manual adjusts made by staff.
-"""
-type TimeChargeBreakdown {
-
-  "Raw execution time."
-  executionTime: CategorizedTime!
-
-  "Automatic discounts for weather loss, fault reports, and non-passing datasets."
-  discounts: [TimeChargeDiscount!]!
-
-  "Any manual corrections to the execution time."
-  corrections: [TimeChargeCorrection!]!
-
-  """
-  Final time charge once discounts and corrections have been applied to the
-  initial 'executionTime'.
-  """
-  finalCharge: CategorizedTime!
-
-}
-
-"""
 A manual correction to time accounting calculations.  Note that the
 application of a correction is bounded by a zero time span and the
 maximum time span.
@@ -9639,6 +9615,30 @@ type TimeChargeQaDiscount implements TimeChargeDiscount {
 
   "Datasets with non-passing QA states."
   datasets: [Dataset!]!
+
+}
+
+"""
+Detailed time accounting information for a visit, showing the raw execution
+time along with any automatically applied discounts (e.g., for bad weather)
+and manual adjusts made by staff.
+"""
+type TimeChargeInvoice {
+
+  "Raw execution time."
+  executionTime: CategorizedTime!
+
+  "Automatic discounts for weather loss, fault reports, and non-passing datasets."
+  discounts: [TimeChargeDiscount!]!
+
+  "Any manual corrections to the execution time."
+  corrections: [TimeChargeCorrection!]!
+
+  """
+  Final time charge once discounts and corrections have been applied to the
+  initial 'executionTime'.
+  """
+  finalCharge: CategorizedTime!
 
 }
 
@@ -9770,7 +9770,7 @@ interface Visit {
   ): ExecutionEventSelectResult!
 
   "Time accounting details for this visit."
-  timeChargeBreakdown: TimeChargeBreakdown!
+  timeChargeInvoice: TimeChargeInvoice!
 
 }
 
