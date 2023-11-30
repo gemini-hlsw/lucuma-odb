@@ -43,24 +43,13 @@ trait VisitMapping[F[_]] extends VisitTable[F]
 
   def user: User
 
-  lazy val breakdownPlaceholder: Json =
+  lazy val invoicePlaceholder: Json =
     Json.obj(
       "executionTime" -> CategorizedTime.Zero.asJson,
       "discounts" -> Json.arr(),
       "corrections" -> Json.arr(),
       "finalCharge" -> CategorizedTime.Zero.asJson
     )
-
-  /*
-  "Started at time."
-  startTime: Timestamp
-
-  "Ended at time."
-  endTime: Timestamp
-
-  "Visit duration."
-  duration: TimeSpan!
-  */
 
   lazy val VisitMapping: ObjectMapping =
     SqlInterfaceMapping(
@@ -74,7 +63,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events"),
-        CursorFieldJson("timeChargeBreakdown", _ => breakdownPlaceholder.success, List("id"))
+        CursorFieldJson("timeChargeInvoice", _ => invoicePlaceholder.success, List("id"))
       )
     )
 
