@@ -24,6 +24,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
@@ -35,7 +36,7 @@ import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 
@@ -49,7 +50,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
-  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   lazy val ExecutionMapping: ObjectMapping =
     ObjectMapping(
@@ -62,7 +63,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events"),
-        SqlObject("visits")
+        SqlObject("visits"),
+        CursorFieldJson("timeCharge", _ => CategorizedTime.Zero.asJson.success, List("id")) // placeholder
       )
     )
 
@@ -113,7 +115,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
       (pid, oid, limit) => {
         services.use { s =>
-          s.generator(commitHash, itcClient, plannedTimeCalculator)
+          s.generator(commitHash, itcClient, timeEstimateCalculator)
            .generate(pid, oid, limit)
            .map(_.bimap(_.toResult, _.asJson.success).merge)
         }
@@ -126,7 +128,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, _) => {
         services.use { s =>
-          s.generator(commitHash, itcClient, plannedTimeCalculator)
+          s.generator(commitHash, itcClient, timeEstimateCalculator)
            .digest(pid, oid)
            .map(_.bimap(_.toResult, _.asJson.success).merge)
         }

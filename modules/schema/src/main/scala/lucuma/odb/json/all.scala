@@ -13,6 +13,7 @@ object all {
        with SequenceCodec
        with SourceProfileCodec
        with StepConfigCodec
+       with TimeAccountingCodec
 
   object query
     extends angle.QueryCodec

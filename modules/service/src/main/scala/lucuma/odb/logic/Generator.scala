@@ -21,11 +21,11 @@ import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
-import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
@@ -159,7 +159,7 @@ object Generator {
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    calculator:   PlannedTimeCalculator.ForInstrumentMode,
+    calculator:   TimeEstimateCalculator.ForInstrumentMode,
   )(using Services[F]): Generator[F] =
     new Generator[F] {
 
@@ -320,7 +320,7 @@ object Generator {
 
 
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
-      // or planned time calculation.
+      // or time estimate calculation.
       private def gmosLongSlit[S, D, G, L, U](
         oid:            Observation.Id,
         acquisitionItc: IntegrationTime,
@@ -335,11 +335,11 @@ object Generator {
           }
         )
 
-      // Performs smart-gcal expansion and planned time calculation.
+      // Performs smart-gcal expansion and time estimate calculation.
       private def expandAndEstimate[S, K, D](
         proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
         expander: SmartGcalExpander[F, K, D],
-        calc:     PlannedTimeCalculator[S, D],
+        calc:     TimeEstimateCalculator[S, D],
         compMap:  CompletedAtomMap[D]
       ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] = {
 
@@ -394,7 +394,7 @@ object Generator {
                 eAtom.bimap(
                   missingSmartGcalDef,
                   _.steps.foldLeft(incDigest) { (d, s) =>
-                    val dʹ = d.add(s.observeClass).add(PlannedTime.fromStep(s.observeClass, s.value._2))
+                    val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.value._2))
                     offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
                   }
                 )

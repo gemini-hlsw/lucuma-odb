@@ -17,26 +17,26 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import skunk.Session
 
-trait PlannedTimeCalculator[S, D] {
+trait TimeEstimateCalculator[S, D] {
   def estimateSetup: SetupTime
 
   def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]]
 }
 
-object PlannedTimeCalculator {
+object TimeEstimateCalculator {
 
-  def fromSession[F[_]](s: Session[F], enums: Enums)(using MonadError[F, Throwable]): F[PlannedTimeCalculator.ForInstrumentMode] =
-    PlannedTimeContext.select(s, enums).map(fromContext)
+  def fromSession[F[_]](s: Session[F], enums: Enums)(using MonadError[F, Throwable]): F[TimeEstimateCalculator.ForInstrumentMode] =
+    TimeEstimateContext.select(s, enums).map(fromContext)
 
-  private def fromContext(ctx: PlannedTimeContext): ForInstrumentMode =
+  private def fromContext(ctx: TimeEstimateContext): ForInstrumentMode =
     new ForInstrumentMode(ctx)
 
   private def fromEstimators[S, D](
     setup:             SetupTime,
     configChange:      ConfigChangeEstimator[D],
     detectorEstimator: DetectorEstimator[S, D]
-  ): PlannedTimeCalculator[S, D] =
-    new PlannedTimeCalculator[S, D] {
+  ): TimeEstimateCalculator[S, D] =
+    new TimeEstimateCalculator[S, D] {
       def estimateSetup: SetupTime =
         setup
 
@@ -58,11 +58,11 @@ object PlannedTimeCalculator {
         }.map(_._2)  // discard the state
     }
 
-  class ForInstrumentMode private[PlannedTimeCalculator] (private val ctx: PlannedTimeContext) {
+  class ForInstrumentMode private[TimeEstimateCalculator] (private val ctx: TimeEstimateContext) {
     private val cce = ConfigChangeEstimator.using(ctx.enums)
     private val de  = DetectorEstimator.using(ctx)
 
-    lazy val gmosNorth: PlannedTimeCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
+    lazy val gmosNorth: TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
       fromEstimators(
         SetupTime(
           ctx.enums.TimeEstimate.GmosNorthLongslitSetup.time,
@@ -72,7 +72,7 @@ object PlannedTimeCalculator {
         de.gmosNorth
       )
 
-    lazy val gmosSouth: PlannedTimeCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
+    lazy val gmosSouth: TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
       fromEstimators(
         SetupTime(
           ctx.enums.TimeEstimate.GmosSouthLongslitSetup.time,

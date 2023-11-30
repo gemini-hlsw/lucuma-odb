@@ -166,7 +166,6 @@ trait BaseMapping[F[_]]
   lazy val PartnerMetaType                     = schema.ref("PartnerMeta")
   lazy val PartnerSplitType                    = schema.ref("PartnerSplit")
   lazy val PartnerType                         = schema.ref("Partner")
-  lazy val PlannedTimeSummaryType              = schema.ref("PlannedTimeSummary")
   lazy val PoorWeatherType                     = schema.ref("PoorWeather")
   lazy val PosAngleConstraintModeType          = schema.ref("PosAngleConstraintMode")
   lazy val PosAngleConstraintType              = schema.ref("PosAngleConstraint")

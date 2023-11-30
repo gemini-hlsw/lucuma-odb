@@ -1,37 +1,37 @@
 val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.6"
-val cirisVersion               = "3.4.0"
-val clueVersion                = "0.34.1"
+val cirisVersion               = "3.5.0"
+val clueVersion                = "0.35.0"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
-val fs2AwsVersion              = "6.0.4"
+val fs2AwsVersion              = "6.0.5"
 val fs2Version                 = "3.9.3"
-val grackleVersion             = "0.16.1"
+val grackleVersion             = "0.17.0"
 val http4sBlazeVersion         = "0.23.15"
 val http4sEmberVersion         = "0.23.24"
 val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.4.12"
+val logbackVersion             = "1.4.13"
 val log4catsVersion            = "2.6.0"
-val lucumaCatalogVersion       = "0.44.2"
-val lucumaItcVersion           = "0.21.1"
-val lucumaCoreVersion          = "0.89.1"
-val lucumaGraphQLRoutesVersion = "0.8.3"
-val lucumaSsoVersion           = "0.6.9"
+val lucumaCatalogVersion       = "0.44.3"
+val lucumaItcVersion           = "0.21.2"
+val lucumaCoreVersion          = "0.90.0"
+val lucumaGraphQLRoutesVersion = "0.8.5"
+val lucumaSsoVersion           = "0.6.10"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.4"
 val paigesVersion              = "0.4.3"
-val postgresVersion            = "42.6.0"
-val skunkVersion               = "0.6.1"
+val postgresVersion            = "42.7.0"
+val skunkVersion               = "0.6.2"
 val pprintVersion              = "0.8.1"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
-ThisBuild / tlBaseVersion      := "0.7"
+ThisBuild / tlBaseVersion      := "0.8"
 ThisBuild / scalaVersion       := "3.3.1"
 ThisBuild / crossScalaVersions := Seq("3.3.1")
 
@@ -61,6 +61,7 @@ lazy val schema =
         "io.circe"       %%% "circe-testing"                   % circeVersion               % Test,
         "edu.gemini"     %%% "lucuma-core"                     % lucumaCoreVersion,
         "edu.gemini"     %%% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+        "edu.gemini"     %%% "lucuma-sso-frontend-client"      % lucumaSsoVersion,
         "org.scalameta"  %%% "munit"                           % munitVersion               % Test,
         "org.scalameta"  %%% "munit-scalacheck"                % munitVersion               % Test,
         "org.typelevel"  %%% "discipline-munit"                % munitDisciplineVersion     % Test,

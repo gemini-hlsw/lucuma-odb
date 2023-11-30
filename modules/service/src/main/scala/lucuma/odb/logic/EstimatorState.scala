@@ -8,7 +8,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
- * State kept while computing planned time.  Figuring out how long a step will
+ * State kept while computing time estimates.  Figuring out how long a step will
  * take requires information about what has happened in previous steps.
  *
  * @param gcal    last GCAL configuration, if any

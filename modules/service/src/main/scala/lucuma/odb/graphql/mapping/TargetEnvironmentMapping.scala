@@ -24,7 +24,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
-import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
@@ -44,7 +44,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def httpClient: Client[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
-  def plannedTimeCalculator: PlannedTimeCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   private val ObsTimeParam           = "observationTime"
   private val AvailabilityStartParam = "start"
@@ -100,7 +100,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
     case (TargetEnvironmentType, "guideEnvironments", List(
       TimestampBinding(ObsTimeParam, rObsTime)
-    )) => 
+    )) =>
       Elab.liftR(rObsTime).flatMap { obsTime =>
         Elab.env(ObsTimeParam -> obsTime)
       }
@@ -121,7 +121,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
         services.use { s =>
-          s.guideService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideEnvironment(pid, oid, obsTime)
             .map {
               case Left(e)  => Result.failure(e.format)
@@ -144,7 +144,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
         services.use { s =>
-          s.guideService(httpClient, itcClient, commitHash, plannedTimeCalculator)
+          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideAvailability(pid, oid, period)
             .map {
               case Left(e)  => Result.failure(e.format)

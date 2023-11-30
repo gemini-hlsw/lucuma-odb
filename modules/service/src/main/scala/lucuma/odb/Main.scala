@@ -22,7 +22,7 @@ import lucuma.odb.graphql.ObsAttachmentRoutes
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.PlannedTimeCalculator
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
@@ -233,7 +233,7 @@ object FMain extends MainParams {
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
-      ptc               <- Resource.eval(pool.use(PlannedTimeCalculator.fromSession(_, enums)))
+      ptc               <- Resource.eval(pool.use(TimeEstimateCalculator.fromSession(_, enums)))
       graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
