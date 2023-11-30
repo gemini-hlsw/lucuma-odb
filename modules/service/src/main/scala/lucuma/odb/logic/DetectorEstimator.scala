@@ -28,10 +28,10 @@ trait DetectorEstimator[S, D] {
 
 object DetectorEstimator {
 
-  def using(ctx: PlannedTimeContext): Applied =
+  def using(ctx: TimeEstimateContext): Applied =
     new Applied(ctx)
 
-  class Applied private[DetectorEstimator] (private val ctx: PlannedTimeContext) {
+  class Applied private[DetectorEstimator] (private val ctx: TimeEstimateContext) {
 
     extension (gn: DynamicConfig.GmosNorth) {
       def readoutKey(detector: GmosNorthDetector): GmosReadoutTime.Key =

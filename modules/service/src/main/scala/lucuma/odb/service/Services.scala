@@ -12,8 +12,8 @@ import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.PlannedTimeCalculator
-import lucuma.odb.logic.PlannedTimeRangeService
+import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateService
 import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import org.http4s.client.Client
@@ -141,14 +141,14 @@ trait Services[F[_]]:
   def itcService(itcClient: ItcClient[F]): ItcService[F]
 
   /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
-  def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): Generator[F]
+  def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode): Generator[F]
 
-  /** Construct a `PlannedTimeRangeService`, given a `CommitHash` and an `ItcClient`.*/
-  def plannedTimeRangeService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode): PlannedTimeRangeService[F]
+  /** Construct a `TimeEstimateService`, given a `CommitHash` and an `ItcClient`.*/
+  def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode): TimeEstimateService[F]
 
-  /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `PlannedTimeCalculator`. */
-  def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode): GuideService[F]
-  
+  /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
+  def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode): GuideService[F]
+
 
 object Services:
 
@@ -206,9 +206,9 @@ object Services:
       def proposalAttachmentFileService(s3: S3FileService[F]) = ProposalAttachmentFileService.instantiate(s3)
       def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
       def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
-      def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
-      def plannedTimeRangeService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode) = PlannedTimeRangeService.instantiate(commitHash, itcClient, ptc)
-      def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode) = GuideService.instantiate(httpClient, itcClient, commitHash, ptc)
+      def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
+      def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, itcClient, ptc)
+      def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode) = GuideService.instantiate(httpClient, itcClient, commitHash, ptc)
 
 
   /**
@@ -246,9 +246,9 @@ object Services:
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)
-    def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
-    def plannedTimeRangeService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): PlannedTimeRangeService[F] = summon[Services[F]].plannedTimeRangeService(commitHash, itcClient, ptc)
-    def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
+    def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
+    def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
+    def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 

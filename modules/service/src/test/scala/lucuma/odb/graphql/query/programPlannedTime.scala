@@ -147,7 +147,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -158,7 +158,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : $ShortTime
@@ -194,7 +194,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -205,7 +205,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : 0.000000
@@ -241,7 +241,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -252,7 +252,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : 0.000000
@@ -289,7 +289,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -300,7 +300,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : ${ShortTime * 2}
@@ -336,7 +336,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -347,7 +347,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                 "plannedTimeRange": {
+                 "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : $ShortTime
@@ -406,7 +406,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -417,7 +417,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : $ShortTime
@@ -455,7 +455,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -466,7 +466,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : ${ShortTime * 2}
@@ -504,7 +504,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -515,7 +515,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : $ShortTime
@@ -553,7 +553,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -564,7 +564,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : 0.000000
@@ -606,7 +606,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           s"""
              query {
                program(programId: "$pid") {
-                 plannedTimeRange {
+                 timeEstimateRange {
                    minimum { total { seconds } }
                    maximum { total { seconds } }
                  }
@@ -617,7 +617,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
           json"""
             {
               "program": {
-                "plannedTimeRange": {
+                "timeEstimateRange": {
                   "minimum": {
                     "total" : {
                         "seconds" : ${ShortTime * 2}

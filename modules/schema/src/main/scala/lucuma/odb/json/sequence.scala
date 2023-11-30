@@ -21,6 +21,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
@@ -42,7 +43,8 @@ trait SequenceCodec {
 
   import offset.decoder.given
   import stepconfig.given
-  import plannedtime.given
+  import plannedtime.given_Encoder_PlannedTime  // deprecated
+  import timeaccounting.given
 
   given Decoder[Dataset.Filename] =
     Decoder[String].emap { s =>
@@ -100,7 +102,7 @@ trait SequenceCodec {
     Decoder.instance { c =>
       for {
         o <- c.downField("observeClass").as[ObserveClass]
-        t <- c.downField("plannedTime").as[PlannedTime]
+        t <- c.downField("timeEstimate").as[CategorizedTime]
         f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
         n <- c.downField("atomCount").as[NonNegInt]
       } yield SequenceDigest(o, t, f, n)
@@ -110,7 +112,8 @@ trait SequenceCodec {
     Encoder.instance { (a: SequenceDigest) =>
       Json.obj(
         "observeClass" -> a.observeClass.asJson,
-        "plannedTime"  -> a.plannedTime.asJson,
+        "plannedTime"  -> PlannedTime.ToCategorizedTime.reverseGet(a.timeEstimate).asJson,
+        "timeEstimate" -> a.timeEstimate.asJson,
         "offsets"      -> a.offsets.toList.asJson,
         "atomCount"    -> a.atomCount.asJson
       )

@@ -269,4 +269,91 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     )
   }
 
+  test("observation -> execution -> visits -> timeChargeInvoice") {
+    recordAll(pi, mode, offset = 600, visitCount = 2, atomCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              visits {
+                matches {
+                  timeChargeInvoice {
+                    executionTime {
+                      program { seconds }
+                      partner { seconds }
+                      nonCharged { seconds }
+                      total { seconds }
+                    }
+                    corrections {
+                      op
+                      amount { seconds }
+                    }
+                    finalCharge {
+                      program { seconds }
+                      partner { seconds }
+                      nonCharged { seconds }
+                      total { seconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.map { v =>
+        json"""
+        {
+          "timeChargeInvoice": {
+            "executionTime": {
+              "program": {
+                "seconds": 0.000000
+              },
+              "partner": {
+                "seconds": 0.000000
+              },
+              "nonCharged": {
+                "seconds": 0.000000
+              },
+              "total": {
+                "seconds": 0.000000
+              }
+            },
+            "corrections": [],
+            "finalCharge": {
+              "program": {
+                "seconds": 0.000000
+              },
+              "partner": {
+                "seconds": 0.000000
+              },
+              "nonCharged": {
+                "seconds": 0.000000
+              },
+              "total": {
+                "seconds": 0.000000
+              }
+            }
+          }
+        }
+        """
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "visits": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
 }
