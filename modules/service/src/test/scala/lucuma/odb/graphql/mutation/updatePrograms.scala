@@ -200,7 +200,7 @@ class updatePrograms extends OdbSuite {
     }
   }
 
-  test("edit proposal (add)") {
+  test("edit proposal (add type A)") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -271,6 +271,119 @@ class updatePrograms extends OdbSuite {
                         {
                           "partner" : "US",
                           "percent" : 100
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          """)
+      )
+    }
+  }
+
+  test("edit proposal (add type B)") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    title: "new title"
+                    proposalClass: {
+                      largeProgram: {
+                        minPercentTime: 50
+                        minPercentTotalTime: 60
+                        totalTime: {
+                          hours: 0.5
+                        }
+                      }
+                    }
+                    category: GASEOUS_ASTROPHYSICS
+                    toOActivation: NONE
+                    partnerSplits: [
+                      {
+                        partner: CL
+                        percent: 10
+                      },
+                      {
+                        partner: UH
+                        percent: 80
+                      },
+                      {
+                        partner: BR
+                        percent: 10
+                      }
+                    ]
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposal {
+                  title
+                  proposalClass {
+                    ... on LargeProgram {
+                      minPercentTime
+                      minPercentTotalTime
+                      totalTime {
+                        hours
+                        iso
+                      }
+                    }
+                  }
+                  category
+                  toOActivation
+                  partnerSplits {
+                    partner
+                    percent
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected =
+          Right(json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid,
+                    "proposal" : {
+                      "title" : "new title",
+                      "proposalClass" : {
+                        "minPercentTime" : 50,
+                        "minPercentTotalTime" : 60,
+                        "totalTime" : {
+                          "hours" : 0.500000,
+                          "iso" : "PT30M"
+                        }
+                      },
+                      "category" : "GASEOUS_ASTROPHYSICS",
+                      "toOActivation" : "NONE",
+                      "partnerSplits" : [
+                        {
+                          "partner" : "UH",
+                          "percent" : 80
+                        },
+                        {
+                          "partner" : "BR",
+                          "percent" : 10
+                        },
+                        {
+                          "partner" : "CL",
+                          "percent" : 10
                         }
                       ]
                     }
@@ -631,6 +744,7 @@ class updatePrograms extends OdbSuite {
               input: {
                 SET: {
                   proposal: {
+                    category: EXOPLANET_ATMOSPHERES_ACTIVITY
                     proposalClass: {
                       queue: {
                         minPercentTime: 50
@@ -701,6 +815,7 @@ class updatePrograms extends OdbSuite {
               programs {
                 id
                 proposal {
+                  category
                   proposalClass {
                     ... on Intensive {
                       minPercentTime
@@ -724,6 +839,7 @@ class updatePrograms extends OdbSuite {
                   {
                     "id" : $pid,
                     "proposal" : {
+                      "category" : "EXOPLANET_ATMOSPHERES_ACTIVITY",
                       "proposalClass" : {
                         "minPercentTime" : 40,
                         "minPercentTotalTime" : 10,

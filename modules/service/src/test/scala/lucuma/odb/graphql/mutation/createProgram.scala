@@ -254,12 +254,12 @@ class createProgram extends OdbSuite {
                     "toOActivation" : "NONE",
                     "partnerSplits" : [
                       {
-                        "partner" : "CA",
-                        "percent" : 30
-                      },
-                      {
                         "partner" : "US",
                         "percent" : 70
+                      },
+                      {
+                        "partner" : "CA",
+                        "percent" : 30
                       }
                     ]
                   }
