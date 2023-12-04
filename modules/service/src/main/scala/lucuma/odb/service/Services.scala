@@ -143,6 +143,9 @@ trait Services[F[_]]:
   /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
   def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode): Generator[F]
 
+  /** The `TimeAccounting` service. */
+  def timeAccountingService: TimeAccountingService[F]
+
   /** Construct a `TimeEstimateService`, given a `CommitHash` and an `ItcClient`.*/
   def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode): TimeEstimateService[F]
 
@@ -197,8 +200,9 @@ object Services:
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val sequenceService = SequenceService.instantiate
       lazy val targetService = TargetService.instantiate
-      lazy val visitService = VisitService.instantiate
+      lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
+      lazy val visitService = VisitService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
@@ -243,6 +247,7 @@ object Services:
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
+    def timeAccountingService[F[_]](using Services[F]): TimeAccountingService[F] = summon[Services[F]].timeAccountingService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)

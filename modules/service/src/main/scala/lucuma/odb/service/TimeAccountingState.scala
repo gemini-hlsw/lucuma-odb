@@ -6,31 +6,24 @@ package lucuma.odb.service
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.State
 import cats.syntax.functor.*
-import lucuma.core.enums.ChargeClass
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 
 import scala.collection.immutable.SortedMap
 
-opaque type TimeAccountingState = SortedMap[TimestampInterval, TimeAccountingState.Value]
+opaque type TimeAccountingState = SortedMap[TimestampInterval, TimeAccounting.Context]
 
 object TimeAccountingState {
 
   val Empty: TimeAccountingState =
     SortedMap.empty
 
-  case class Value(
-    atomId:      Atom.Id,
-    chargeClass: ChargeClass
-  )
-
   extension (self: TimeAccountingState) {
 
-    def categorizedTime: CategorizedTime =
-      self.foldLeft(CategorizedTime.Zero) { case (t, (n, v)) =>
-        t.sumCharge(v.chargeClass, n.boundedTimeSpan)
+    def charge: TimeAccounting.Charge =
+      self.foldLeft(TimeAccounting.Charge.Zero) { case (c, (n, x)) =>
+        c.sumCharge(x.step.map(_.chargeClass), n.boundedTimeSpan)
       }
 
     def stateUntil(t: Timestamp): TimeAccountingState =
@@ -57,44 +50,44 @@ object TimeAccountingState {
       self.stateUntil(interval.start).stateFrom(interval.end)
 
     def atomsIn(interval: TimestampInterval): Set[Atom.Id] =
-      stateBetween(interval).foldLeft(Set.empty[Atom.Id])(_ + _._2.atomId)
+      stateBetween(interval).foldLeft(Set.empty[Atom.Id]) { case (atoms, (_, ctx)) =>
+        ctx.step.fold(atoms) { stepContext => atoms + stepContext.atomId }
+      }
   }
 
   /**
-   * Creates a `CategorizedTime` value with the amount of time in each category
-   * that exists in intervals intersecting with `interval`. Updates the current
-   * state to remove these intervals.
+   * Creates a `Charge` value with the amount of time in each category that
+   * exists in intervals intersecting with `interval`. Updates the current state
+   * to remove these intervals.
    */
-  def discountBetween(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
-    State[TimeAccountingState, CategorizedTime] { tas => (
+  def discountBetween(interval: TimestampInterval): State[TimeAccountingState, TimeAccounting.Charge] =
+    State[TimeAccountingState, TimeAccounting.Charge] { tas => (
       tas.stateExcluding(interval),
-      tas.stateBetween(interval).categorizedTime
+      tas.stateBetween(interval).charge
     )}
 
-  def discountExcluding(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
-    State[TimeAccountingState, CategorizedTime] { tas => (
+  def discountExcluding(interval: TimestampInterval): State[TimeAccountingState, TimeAccounting.Charge] =
+    State[TimeAccountingState, TimeAccounting.Charge] { tas => (
       tas.stateBetween(interval),
-      tas.stateExcluding(interval).categorizedTime
+      tas.stateExcluding(interval).charge
     )}
 
-  def discountAtom(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
-    State[TimeAccountingState, CategorizedTime] { tas =>
+  def discountAtom(interval: TimestampInterval): State[TimeAccountingState, TimeAccounting.Charge] =
+    State[TimeAccountingState, TimeAccounting.Charge] { tas =>
 
       val atoms = tas.atomsIn(interval)
 
       // Compute the discount for all intervals associated with these atoms.
-      tas.foldLeft((Empty, CategorizedTime.Zero)) { case ((state, disc), (curInt, curVal)) =>
-        if (atoms(curVal.atomId)) (state, disc.sumCharge(curVal.chargeClass, curInt.boundedTimeSpan))
-        else (state + (curInt -> curVal), disc)
+      tas.foldLeft((Empty, TimeAccounting.Charge.Zero)) { case ((state, disc), (curInt, curCtx)) =>
+        if (curCtx.step.map(_.atomId).exists(atoms)) (state, disc.sumCharge(curCtx, curInt.boundedTimeSpan))
+        else (state + (curInt -> curCtx), disc)
       }
 
     }
 
-//  def fromEvents[F[_]](s: Stream[F, ExecutionEvent]): F[TimeAccountingState] =
-//    s.zip(s.tail)
-//     .map { (e0, e1) =>
-//       val interval = TimestampInterval.between(e0.received, e1.received)
-//       val atomId   = e0.
-//       e1.received
-//     }
+  private[service] def fromSortedContiguousEntries(
+    entries: List[(TimestampInterval, TimeAccounting.Context)]
+  ): TimeAccountingState =
+    SortedMap.from(entries)
+
 }
