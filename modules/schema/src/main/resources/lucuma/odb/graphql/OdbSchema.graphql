@@ -64,7 +64,7 @@ that will be corrected and describes the correction itself.
 """
 input AddTimeChargeCorrectionInput {
   observation: VisitId!
-  correction:  TimeChargeCorrection!
+  correction:  TimeChargeCorrectionInput!
 }
 
 """
@@ -9552,6 +9552,24 @@ type TimeChargeCorrection {
 
   "The user responsible for the change."
   user:        User!
+
+  "Optional justification for the correction."
+  comment:     String
+}
+
+"""
+Describes a manual correction to time accounting calculations.
+"""
+input TimeChargeCorrectionInput {
+
+  "The charge class to be corrected."
+  chargeClass: ChargeClass!
+
+  "The operation (add or subtract) to perform."
+  op:          TimeChargeCorrectionOp!
+
+  "The amount of time to add or subtract (respecting the min and max time span)."
+  amount:      TimeSpanInput!
 
   "Optional justification for the correction."
   comment:     String
