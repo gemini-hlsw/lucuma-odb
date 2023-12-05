@@ -5,7 +5,6 @@ package lucuma.odb.service
 
 import cats.Eq
 import cats.kernel.CommutativeMonoid
-
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
@@ -13,6 +12,8 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import monocle.Focus
+import monocle.Lens
 
 object TimeAccounting {
 
@@ -20,6 +21,17 @@ object TimeAccounting {
     timestamp: Timestamp,
     context:   Context
   )
+
+  object Event {
+    given Eq[Event] =
+      Eq.by { a => (a.timestamp, a.context) }
+
+    val timestamp: Lens[Event, Timestamp] =
+      Focus[Event](_.timestamp)
+
+    val context: Lens[Event, Context] =
+      Focus[Event](_.context)
+  }
 
   case class Context(
     visitId: Visit.Id,
@@ -29,6 +41,12 @@ object TimeAccounting {
   object Context {
     given Eq[Context] =
       Eq.by { a => (a.visitId, a.step) }
+
+    val visitId: Lens[Context, Visit.Id] =
+      Focus[Context](_.visitId)
+
+    val step: Lens[Context, Option[StepContext]] =
+      Focus[Context](_.step)
   }
 
   case class StepContext(
@@ -40,6 +58,15 @@ object TimeAccounting {
   object StepContext {
     given Eq[StepContext] =
       Eq.by { a => (a.atomId, a.stepId, a.chargeClass) }
+
+    val atomId: Lens[StepContext, Atom.Id] =
+      Focus[StepContext](_.atomId)
+
+    val stepId: Lens[StepContext, Step.Id] =
+      Focus[StepContext](_.stepId)
+
+    val chargeClass: Lens[StepContext, ChargeClass] =
+      Focus[StepContext](_.chargeClass)
   }
 
   case class Charge(

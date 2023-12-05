@@ -12,6 +12,7 @@ import io.circe.syntax.*
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ObservingModeType
 
 class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
@@ -303,12 +304,15 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
       """
 
       val matches = on.visits.map { v =>
+        val first = v.allEvents.head.received
+        val last  = v.allEvents.last.received
+        val time  = TimeSpan.between(first, last).get
         json"""
         {
           "timeChargeInvoice": {
             "executionTime": {
               "program": {
-                "seconds": 0.000000
+                "seconds": ${time.toSeconds}
               },
               "partner": {
                 "seconds": 0.000000
@@ -317,13 +321,13 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
                 "seconds": 0.000000
               },
               "total": {
-                "seconds": 0.000000
+                "seconds": ${time.toSeconds}
               }
             },
             "corrections": [],
             "finalCharge": {
               "program": {
-                "seconds": 0.000000
+                "seconds": ${time.toSeconds}
               },
               "partner": {
                 "seconds": 0.000000
@@ -332,7 +336,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
                 "seconds": 0.000000
               },
               "total": {
-                "seconds": 0.000000
+                "seconds": ${time.toSeconds}
               }
             }
           }
