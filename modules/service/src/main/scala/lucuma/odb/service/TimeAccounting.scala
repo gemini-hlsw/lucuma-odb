@@ -15,8 +15,18 @@ import lucuma.core.util.Timestamp
 import monocle.Focus
 import monocle.Lens
 
+/**
+ * TimeAccounting data, used only in the implementation of the
+ * TimeAccountingService.
+ */
 object TimeAccounting {
 
+  /**
+   * Information of interest (for time accounting) in execution events. A series
+   * of events may share the same context (several events for a dataset, and
+   * several datasets for a step, etc.).  We will group these to form a
+   * (TimestampInterval -> Context) pair in the TimeAccountingState.
+   */
   case class Event(
     timestamp: Timestamp,
     context:   Context
@@ -49,6 +59,10 @@ object TimeAccounting {
       Focus[Context](_.step)
   }
 
+  /**
+   * Step context, describing which charge class will receive the time required
+   * to execute the step.
+   */
   case class StepContext(
     atomId:      Atom.Id,
     stepId:      Step.Id,
@@ -69,6 +83,12 @@ object TimeAccounting {
       Focus[StepContext](_.chargeClass)
   }
 
+  /**
+   * A time accounting charge includes time which we have a definite charge
+   * class (e.g., all steps) and time not associated with any charge class
+   * (e.g., time between steps and atoms).  The uncategorized time is ultimately
+   * charged according to the observation's obseve class.
+   */
   case class Charge(
     categorized:   CategorizedTime,
     uncategorized: TimeSpan

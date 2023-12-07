@@ -19,6 +19,7 @@ import Services.Syntax.*
 trait TimeAccountingService[F[_]] {
 
   /**
+   * Extracts the initial time accounting state for the given visit.
    */
   def initialState(
     visitId: Visit.Id
