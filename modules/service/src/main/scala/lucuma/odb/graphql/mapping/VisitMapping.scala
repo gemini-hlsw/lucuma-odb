@@ -130,12 +130,17 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
 
+  // WIP.  At the moment the `invoiceHandler` calls the time accounting service
+  // on demand and returns an "invoice" with just the whole execution time.
   private lazy val invoiceHandler: EffectHandler[F] =
     new EffectHandler[F] {
 
       def calculateInvoice(vid: Visit.Id): F[Result[Json]] =
         services.useTransactionally {
           timeAccountingService.initialState(vid).map { tas =>
+            // Assume uncategorized time goes to the program for now.
+            // Ultimately this will come from the observation class computed
+            // from executed steps and recorded in the step records.
             val ct = tas.charge.uncategorizedAs(ChargeClass.Program).asJson
             Json.obj(
               "executionTime" -> ct,
