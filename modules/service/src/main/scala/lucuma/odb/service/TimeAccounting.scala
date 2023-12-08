@@ -23,9 +23,10 @@ object TimeAccounting {
 
   /**
    * Information of interest (for time accounting) in execution events. A series
-   * of events may share the same context (several events for a dataset, and
-   * several datasets for a step, etc.).  We will group these to form a
-   * (TimestampInterval -> Context) pair in the TimeAccountingState.
+   * of events may share the same context. For example, a dataset has several
+   * stages each resulting in a separate event being stored in the database.  We
+   * will group contiguous events with the same context to form a
+   * (TimestampInterval -> Context) entry in the TimeAccountingState.
    */
   case class Event(
     timestamp: Timestamp,
@@ -43,6 +44,11 @@ object TimeAccounting {
       Focus[Event](_.context)
   }
 
+  /**
+   * The context for an event or a period of time accounting time.  Time
+   * accounting is performed for each visit so there's always a `Visit.Id`, and
+   * for time spent executing steps there will be a `StepContext` as well.
+   */
   case class Context(
     visitId: Visit.Id,
     step:    Option[StepContext]
@@ -61,7 +67,8 @@ object TimeAccounting {
 
   /**
    * Step context, describing which charge class will receive the time required
-   * to execute the step.
+   * to execute the step.  We keep up with the atom so that we can discount time
+   * for an entire atom when necessary.
    */
   case class StepContext(
     atomId:      Atom.Id,
@@ -84,10 +91,10 @@ object TimeAccounting {
   }
 
   /**
-   * A time accounting charge includes time which we have a definite charge
+   * A time accounting charge includes time for which we have a definite charge
    * class (e.g., all steps) and time not associated with any charge class
    * (e.g., time between steps and atoms).  The uncategorized time is ultimately
-   * charged according to the observation's obseve class.
+   * charged according to the observation's observe class.
    */
   case class Charge(
     categorized:   CategorizedTime,

@@ -18,8 +18,10 @@ import lucuma.core.util.TimestampInterval
 
 import scala.collection.immutable.SortedMap
 
-// A TimeAccountingState consists of contiguous, non-abutting intervals
-// optionally associated with a charge class.
+/**
+ * TimeAccountingState tracks time intervals associated with a visit and
+ * potentially a step.  Intervals are not overlapping.
+ */
 sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval, TimeAccounting.Context]) {
 
   import TimeAccountingState.Empty
@@ -85,7 +87,7 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
 
   /**
    * Extracts the portion of the state that intersects with the given interval
-   * (if any).  If `interval`` partially overlaps one or more intervals in the
+   * (if any).  If `interval` partially overlaps one or more intervals in the
    * state, they will be split as appropriate leaving only the portion that
    * falls within `interval` bounds.
    */
