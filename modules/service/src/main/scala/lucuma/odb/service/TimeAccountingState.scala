@@ -5,9 +5,9 @@ package lucuma.odb.service
 
 import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
-import cats.data.State
 import cats.syntax.apply.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.order.*
 import fs2.Pipe
 import fs2.Stream
@@ -19,6 +19,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 
 import scala.collection.immutable.SortedMap
+import scala.collection.immutable.SortedSet
 
 /**
  * TimeAccountingState tracks time intervals associated with a visit and
@@ -28,8 +29,32 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
 
   import TimeAccountingState.Empty
 
+  /**
+   * Timestamp of the start of the first interval in the state, if any.
+   */
+  def start: Option[Timestamp] =
+    toMap.headOption.map(_._1.start)
+
+  /**
+   * Timestamp of the end of the last interval in the state, if any.
+   */
+  def end: Option[Timestamp] =
+    toMap.lastOption.map(_._1.end)
+
   def toList: List[(TimestampInterval, TimeAccounting.Context)] =
     toMap.toList
+
+  def isEmpty: Boolean =
+    toMap.isEmpty
+
+  def nonEmpty: Boolean =
+    toMap.nonEmpty
+
+  def contains(t: Timestamp): Boolean = {
+    val i = TimestampInterval.empty(t)
+    toMap.maxBefore(i).exists(_._1.contains(t)) ||
+      toMap.minAfter(i).exists(_._1.contains(t))
+  }
 
   /**
    * Calculates the time accounting charge associated with this state.
@@ -43,17 +68,24 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    * Looks up the context at this given `Timestamp`, assuming it is covered by
    * the state.
    */
-  def contextAt(t: Timestamp): Option[TimeAccounting.Context] =
+  def entryAt(t: Timestamp): Option[(TimestampInterval, TimeAccounting.Context)] =
     toMap
       .maxBefore(TimestampInterval.empty(t))
-      .collect { case (interval, ctx) if interval.contains(t) => ctx }
+      .filter { case (interval, _) => interval.contains(t) }
       .orElse(
         // if t happens to be the start of an interval, `[t, t)` will
         // sort before it and min "after" will start at `t`.
         toMap
           .minAfter(TimestampInterval.empty(t))
-          .collect { case (interval, ctx) if interval.contains(t) => ctx }
+          .filter { case (interval, _) => interval.contains(t) }
       )
+
+  /**
+   * Looks up the context at this given `Timestamp`, assuming it is covered by
+   * the state.
+   */
+  def contextAt(t: Timestamp): Option[TimeAccounting.Context] =
+    entryAt(t).map(_._2)
 
   private def mod(f: SortedMap[TimestampInterval, TimeAccounting.Context] => SortedMap[TimestampInterval, TimeAccounting.Context]): TimeAccountingState =
     new TimeAccountingState(f(toMap))
@@ -107,19 +139,43 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
     else new TimeAccountingState(until(interval.start).toMap ++ from(interval.end).toMap)
 
   /**
-   * Returns the set of `Atom.Id` that are associated with state intervals which
-   * intersect with `interval`.
+   * Calculates the set of `Atom.Id` associated with intervals in this state.
    */
-  def atomsIn(interval: TimestampInterval): Set[Atom.Id] =
-    between(interval).toMap.foldLeft(Set.empty[Atom.Id]) { case (atoms, (_, ctx)) =>
+  def allAtoms: SortedSet[Atom.Id] =
+    toMap.foldLeft(SortedSet.empty[Atom.Id]) { case (atoms, (_, ctx)) =>
       ctx.step.fold(atoms) { stepContext => atoms + stepContext.atomId }
     }
 
-  def isEmpty: Boolean =
-    toMap.isEmpty
+  /**
+   * Returns the set of `Atom.Id` that are associated with state intervals which
+   * intersect with `interval`.
+   */
+  def atomsIn(interval: TimestampInterval): SortedSet[Atom.Id] =
+    between(interval).allAtoms
 
-  def nonEmpty: Boolean =
-    toMap.nonEmpty
+  /**
+   * The minimal interval containing all the given atoms, if any.
+   */
+  def intervalContaining(atoms: SortedSet[Atom.Id]): Option[TimestampInterval] =
+    toMap.foldLeft(none[TimestampInterval]) { case (result, (interval, ctx)) =>
+      if (!ctx.step.map(_.atomId).exists(atoms)) result
+      else result.fold(interval.some)(_.span(interval).some)
+    }
+
+  /**
+   * Partitions the state into two based on whether the interval intersects
+   * with `interval`, but avoiding the spliting of intervals associated with
+   * atoms.  That is, if an interval is associated with an atom and intersects
+   * `interval`, it is included in its entirety.  Essentially `interval` is
+   * stretched to include any intervals with atoms it intersects.
+   *
+   * @return the portion of state that intersects with interval (keeping atoms
+   *         together) and the portion that does not
+   */
+  def partitionAtomsIn(interval: TimestampInterval): (TimeAccountingState, TimeAccountingState) = {
+    val intervalʹ = intervalContaining(atomsIn(interval)).getOrElse(interval).span(interval)
+    (between(intervalʹ), excluding(intervalʹ))
+  }
 
   override def equals(that: Any): Boolean =
     that match {
@@ -141,53 +197,6 @@ object TimeAccountingState {
 
   given Eq[TimeAccountingState] =
     Eq.by(_.toMap)
-
-  /**
-   * Creates a `CategorizedTime` value with the amount of time in each category
-   * that overlaps with `interval`. Updates the current state to remove the time
-   * in `interval`.
-   *
-   * For example, this can be used to subtract weather loss where `interval` is
-   * the bad weather time that should not be charged.
-   */
-  def discountBetween(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
-    State[TimeAccountingState, CategorizedTime] { tas =>
-      (tas.excluding(interval), tas.between(interval).charge)
-    }
-
-  /**
-   * Creates a `CategorizedTime` value with the amount of time in each category
-   * that does not overlap with `interval`.  Updates the current state to only
-   * the time that occurs during `interval`.
-   *
-   * For example, this can be used to subtract daylight where `interval` is the
-   * night time between twilight boundaries.
-   */
-  def discountExcluding(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
-    State[TimeAccountingState, CategorizedTime] { tas =>
-     (tas.between(interval), tas.excluding(interval).charge)
-    }
-
-  /**
-   * Creates a `CategorizedTime` value with the amount of time associated with
-   * any atom whose execution overlaps `interval`.  Updates the current state to
-   * remove this time.
-   *
-   * For example, this can be used to remove an atom that produced a dataset
-   * with a failing QA state.
-   */
-  def discountAtoms(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
-    State[TimeAccountingState, CategorizedTime] { tas =>
-
-      val atoms = tas.atomsIn(interval)
-
-      // Compute the discount for all intervals associated with these atoms.
-      tas.toMap.foldLeft((Empty, CategorizedTime.Zero)) { case ((state, disc), (curInt, curCtx)) =>
-        if (curCtx.step.map(_.atomId).exists(atoms)) (state, disc.sumCharge(curCtx.chargeClass, curInt.boundedTimeSpan))
-        else (state.mod(_ + (curInt -> curCtx)), disc)
-      }
-
-    }
 
   /**
    * Creates a TimeAccountingState from a sequence of events, assuming they are
@@ -228,14 +237,14 @@ object TimeAccountingState {
     val entriesPipe: Pipe[F, TimeAccounting.Event, (TimestampInterval, TimeAccounting.Context)] =
       _.groupAdjacentBy(_.context)
        .map { case (ctx, events) =>
-          val head     = events.head.map(_.timestamp)
-          val last     = events.last.map(_.timestamp)
-          val interval =
-            (head, last).mapN(TimestampInterval.between)
-                        .getOrElse(sys.error("Stream.groupAdjacentBy produced an empty Chunk!"))
+         val head     = events.head.map(_.timestamp)
+         val last     = events.last.map(_.timestamp)
+         val interval =
+           (head, last).mapN(TimestampInterval.between)
+                       .getOrElse(sys.error("Stream.groupAdjacentBy produced an empty Chunk!"))
 
-          interval -> ctx
-       }
+         interval -> ctx
+       }.filter { case (interval, _) => interval.nonEmpty }
 
     // Pipe that fills in the gaps between steps with an interval -> context
     // pair (albeit with a None step context).

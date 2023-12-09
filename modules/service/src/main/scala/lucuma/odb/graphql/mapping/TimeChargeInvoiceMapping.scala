@@ -6,9 +6,12 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.TimeAccountingTable
+import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.VisitTable
 
-trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F] with TimeAccountingTable[F] {
+trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
+                                        with TimeAccountingTable[F]
+                                        with TimeChargeDiscountTable[F] {
 
   lazy val TimeChargeInvoiceMapping: ObjectMapping =
     ObjectMapping(
@@ -16,6 +19,7 @@ trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F] with TimeAccountingTa
       fieldMappings = List(
         SqlField("id", VisitTable.Id, key = true, hidden = true),
         SqlObject("executionTime", Join(VisitTable.Id, TimeAccountingTable.VisitId)),
+        SqlObject("discounts",     Join(VisitTable.Id, TimeChargeDiscountTable.VisitId)),
         SqlObject("finalCharge",   Join(VisitTable.Id, TimeAccountingTable.VisitId))
       )
     )

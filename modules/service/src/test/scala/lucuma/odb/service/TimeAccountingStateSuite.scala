@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.syntax.order.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
@@ -15,6 +16,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Prop.*
 
+import scala.collection.immutable.SortedSet
 
 final class TimeAccountingStateSuite extends ScalaCheckSuite {
 
@@ -173,7 +175,7 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     forAll { (d: TestData) =>
       assertEquals(
         d.state.atomsIn(d.interval),
-        d.state.toList.foldLeft(Set.empty[Atom.Id]) { case (s, (interval, ctx)) =>
+        d.state.toList.foldLeft(SortedSet.empty[Atom.Id]) { case (s, (interval, ctx)) =>
           ctx.step.fold(s) { step =>
             if (interval.intersects(d.interval)) s + step.atomId else s
           }
@@ -182,32 +184,44 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     }
   }
 
-  test("discountBetween") {
+  test("entryAt contains timestamp") {
     forAll { (d: TestData) =>
-      val (tas, charge) = TimeAccountingState.discountBetween(d.interval).run(d.state).value
-      assertEquals(tas.charge +| charge, d.state.charge)
-      assertEquals(tas, d.state.excluding(d.interval))
+      val s = d.state
+      val t = d.timestamp
+      assertEquals(
+        s.entryAt(t).exists(_._1.contains(t)),
+        s.contains(t)
+      )
     }
   }
 
-  test("discountExcluding") {
+  test("intervalContaining is superset") {
     forAll { (d: TestData) =>
-      val (tas, charge) = TimeAccountingState.discountExcluding(d.interval).run(d.state).value
-      assertEquals(tas.charge +| charge, d.state.charge)
-      assertEquals(tas, d.state.between(d.interval))
+      val s  = d.state
+      val i  = d.interval
+      val as = s.atomsIn(i)
+      val iʹ = s.intervalContaining(as).getOrElse(i)
+      as.subsetOf(s.between(iʹ).allAtoms)
     }
   }
 
-  test("discountAtom") {
+  test("partitionAtomsIn separates on atom boundaries") {
     forAll { (d: TestData) =>
-      val (tas, charge) = TimeAccountingState.discountAtoms(d.interval).run(d.state).value
-      assertEquals(tas.charge +| charge, d.state.charge)
+      val (in, out) = d.state.partitionAtomsIn(d.interval)
 
-      val remain   = tas.atomsIn(TimestampInterval.All)
-      val exclude  = d.state.atomsIn(d.interval)
+      val inAtoms  = in.allAtoms
+      val outAtoms = out.allAtoms
+      assert(inAtoms.intersect(outAtoms).isEmpty)
+    }
+  }
 
-      assertEquals(remain.intersect(exclude), Set.empty)
-      assertEquals(remain.union(exclude), d.state.atomsIn(TimestampInterval.All))
+  test("partitionAtomsIn is complete") {
+    forAll { (d: TestData) =>
+      val (in, out) = d.state.partitionAtomsIn(d.interval)
+
+      val inAtoms  = in.allAtoms
+      val outAtoms = out.allAtoms
+      assertEquals(inAtoms.union(outAtoms), d.state.allAtoms)
     }
   }
 }

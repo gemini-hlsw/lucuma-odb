@@ -125,6 +125,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SequenceType](SequenceTypeType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
+      LeafMapping[Site](SiteType),
       LeafMapping[SkyBackground](SkyBackgroundType),
       LeafMapping[SmartGcalType](SmartGcalTypeType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),

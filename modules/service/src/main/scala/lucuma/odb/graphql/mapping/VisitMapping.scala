@@ -12,6 +12,7 @@ import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Query
 import grackle.Query.Binding
+import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
@@ -19,12 +20,14 @@ import grackle.TypeRef
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
+import lucuma.core.model.Visit
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 
 import table.ExecutionEventTable
 import table.GmosStaticTables
@@ -120,42 +123,5 @@ trait VisitMapping[F[_]] extends VisitTable[F]
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Visit.Id]("id", services, executionEventService.visitRange)
-
-  // WIP.  At the moment the `invoiceHandler` calls the time accounting service
-  // on demand and returns an "invoice" with just the whole execution time.
-  private lazy val invoiceHandler: EffectHandler[F] =
-    new EffectHandler[F] {
-
-      def calculateInvoice(vid: Visit.Id): F[Result[Json]] =
-        services.useTransactionally {
-          timeAccountingService.initialState(vid).map { tas =>
-            val ct = tas.charge.asJson
-            Json.obj(
-              "executionTime" -> ct,
-              "discounts"     -> Json.arr(),
-              "corrections"   -> Json.arr(),
-              "finalCharge"   -> ct
-            ).success
-          }
-        }
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          vids <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Visit.Id]("id") }.pure[F])
-          invs <- vids.distinct.traverse { case vid =>
-                    ResultT(calculateInvoice(vid)).tupleLeft(vid)
-                  }
-          res <- ResultT(
-                   vids
-                     .flatMap { vid => invs.find(r => r._1 === vid).map(_._2).toList }
-                     .zip(queries)
-                     .traverse { case (result, (query, parentCursor)) =>
-                       Query.childContext(parentCursor.context, query).map { childContext =>
-                         CirceCursor(childContext, result, Some(parentCursor), parentCursor.fullEnv)
-                       }
-                     }.pure[F]
-                 )
-        } yield res).value
-    }
 
 }

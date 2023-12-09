@@ -12,11 +12,17 @@ import lucuma.core.util.Timestamp
 import monocle.Focus
 import monocle.Lens
 
+
 /**
  * TimeAccounting data, used only in the implementation of the
  * TimeAccountingService.
  */
 object TimeAccounting {
+
+  object comment {
+    val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
+    val PostDawn: String = "Time spent observing post-dawn (nautical twilight)."
+  }
 
   /**
    * Information of interest (for time accounting) in execution events. A series
