@@ -51,6 +51,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
+import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import monocle.Prism
@@ -156,6 +157,13 @@ trait Codecs {
 
   val atom_id: Codec[Atom.Id] =
     uid[Atom.Id]
+
+  val _atom_id: Codec[Arr[Atom.Id]] =
+    Codec.array(
+      Uid[Atom.Id].fromString.reverseGet,
+      s => Uid[Atom.Id].fromString.getOption(s).toRight(s"Invaid Atom.Id: $s"),
+      Type("_d_atom_id", List(Type("d_atom_id")))
+  )
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
@@ -394,6 +402,9 @@ trait Codecs {
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
+
+  val time_charge_discount_type: Codec[DiscountDiscriminator] =
+    enumerated(Type("e_time_charge_discount_type"))
 
   val time_span: Codec[TimeSpan] =
     interval.eimap(

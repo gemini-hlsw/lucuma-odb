@@ -3,33 +3,41 @@
 
 package lucuma.odb.service
 
+import cats.Order.catsKernelOrderingForOrder
+import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.Site
+import lucuma.core.enums.TwilightType
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.TimeCharge
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.text.text
+import skunk.data.Arr
 import skunk.implicits.*
+
+import scala.collection.immutable.SortedSet
 
 import Services.Syntax.*
 
 
 trait TimeAccountingService[F[_]] {
-
-  /**
-   * Extracts the initial time accounting state for the given visit.
-   */
-  def initialState(
-    visitId: Visit.Id
-  )(using Transaction[F]): F[TimeAccountingState]
 
   /**
    * Initializes the time accounting data when a new visit is created.
@@ -48,24 +56,44 @@ trait TimeAccountingService[F[_]] {
 
 object TimeAccountingService {
 
+  extension (night: ObservingNight) {
+
+    /** Nautical twilight bounds cooresponding to an ObservingNight. */
+    def nauticalTwilight: TimestampInterval = {
+      // Twilight bounded night -- this is unsafe if the sun doesn't rise or
+      // doesn't set on that observing night, but not an issue for GN or GS.
+      val tbn = night.twilightBoundedUnsafe(TwilightType.Nautical)
+
+      // Convert to a `TimeStampInterval`.  This is safe for dates between
+      // [-4712 BC, 294,276 AD).
+      TimestampInterval.between(
+        Timestamp.unsafeFromInstantTruncated(tbn.start),
+        Timestamp.unsafeFromInstantTruncated(tbn.end)
+      )
+    }
+
+  }
+
+  private def toDiscount(
+    tas:     TimeAccountingState,
+    comment: String
+  ): Option[TimeCharge.Discount] =
+    for {
+      s <- tas.start
+      e <- tas.end
+      c  = tas.charge
+    } yield TimeCharge.Discount(
+      TimestampInterval.between(s, e),
+      c.partnerTime,
+      c.programTime,
+      tas.allAtoms,
+      comment
+    )
+
   def instantiate[F[_]: Concurrent](using Services[F]): TimeAccountingService[F] =
     new TimeAccountingService[F] {
 
       import Statements.*
-
-      override def initialState(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[TimeAccountingState] =
-
-        for {
-          o <- session.unique(SelectObservationId)(visitId)
-          c <- session.unique(SelectObserveClass)(o)
-          s <- session
-                 .stream(SelectEvents)((c, visitId), 1024)
-                 .through(TimeAccountingState.eventStreamPipe(c.chargeClass, visitId))
-                 .compile
-                 .onlyOrError
-        } yield s
 
       override def initialize(
         visitId: Visit.Id
@@ -75,15 +103,120 @@ object TimeAccountingService {
       override def update(
         visitId: Visit.Id
       )(using Transaction[F]): F[Unit] =
-        for {
-          s <- initialState(visitId)
-          _ <- session.execute(UpdateTimeAccounting)((visitId, s.charge, s.charge))
-        } yield ()
+        Update(visitId).run
+
+      case class Update(visitId: Visit.Id)(using Transaction[F]) {
+        lazy val run: F[Unit] =
+          computeInvoice.flatMap(updateInvoice)
+
+        private val initialState: F[TimeAccountingState] =
+          for {
+            o <- session.unique(SelectObservationId)(visitId)
+            c <- session.unique(SelectObserveClass)(o)
+            s <- session
+                   .stream(SelectEvents)((c, visitId), 1024)
+                   .through(TimeAccountingState.eventStreamPipe(c.chargeClass, visitId))
+                   .compile
+                   .onlyOrError
+          } yield s
+
+        private val daylightDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+          StateT { tas =>
+            session.unique(SelectObservingNight)(visitId).map { optionNight =>
+              optionNight.fold((tas, List.empty[TimeCharge.DiscountEntry])) { night =>
+                val interval  = night.nauticalTwilight
+                val preDusk   = toDiscount(tas.until(interval.start), TimeAccounting.comment.PreDusk)
+                val postDawn  = toDiscount(tas.from(interval.end),    TimeAccounting.comment.PostDawn)
+                val discounts = preDusk.toList ++ postDawn.toList
+                (tas.between(interval), discounts.map(TimeCharge.DiscountEntry.Daylight(_, night.site)))
+              }
+            }
+          }
+
+        private val computeInvoice: F[TimeCharge.Invoice] = {
+          val invoice = for {
+            ini <- StateT.get[F, TimeAccountingState]
+            day <- daylightDiscounts
+            // ... other discounts here ...
+            fin <- StateT.get[F, TimeAccountingState]
+          } yield TimeCharge.Invoice(ini.charge, day, fin.charge)
+
+          initialState.flatMap(invoice.runA)
+        }
+
+        private def updateInvoice(
+          inv: TimeCharge.Invoice
+        ): F[Unit] =
+          for {
+            _   <- updateDiscounts(inv.discounts)
+            _   <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge))
+          } yield ()
+
+        private def updateDiscounts(
+          discounts: List[TimeCharge.DiscountEntry]
+        ): F[Unit] =
+          for {
+            _ <- session.execute(DeleteDiscountEntries)(visitId)
+            _ <- discounts.traverse_(session.execute(StoreDiscountEntry)(visitId, _))
+          } yield ()
+
+      }
 
     }
 
 
   object Statements {
+
+    private object codec {
+
+      val step_context: Decoder[TimeAccounting.StepContext] =
+        (atom_id *: step_id).to[TimeAccounting.StepContext]
+
+      val context: Decoder[TimeAccounting.Context] =
+        (
+          visit_id                     *:
+          obs_class.map(_.chargeClass) *:
+          step_context.opt
+        ).to[TimeAccounting.Context]
+
+      val event: Decoder[TimeAccounting.Event] =
+        (core_timestamp *: context).to[TimeAccounting.Event]
+
+      val atom_id_set: Codec[SortedSet[Atom.Id]] =
+        _atom_id.imap(arr => SortedSet.from(arr.toList))(s => Arr.fromFoldable(s))
+
+      val discount: Codec[TimeCharge.Discount] =
+        (
+          timestamp_interval *:
+          time_span          *:
+          time_span          *:
+          atom_id_set        *:
+          text
+        ).to[TimeCharge.Discount]
+
+      val discount_entry: Codec[TimeCharge.DiscountEntry] =
+        (
+          discount                  *:
+          time_charge_discount_type *:
+          site.opt
+        ).eimap { case (d, t, s) =>
+          t match {
+            case TimeCharge.DiscountDiscriminator.Daylight =>
+              s.toRight(s"Daylight discount missing site definition.").map { site =>
+                TimeCharge.DiscountEntry.Daylight(d, site)
+              }
+            case _ =>
+              Left(s"Unrecognized time charge discount type: ${t.dbTag}")
+          }
+        } { entry => (
+          entry.discount,
+          entry.discriminator,
+          entry match {
+            case TimeCharge.DiscountEntry.Daylight(_, s) => s.some
+            case _                                       => none
+          }
+        )}
+    }
 
     val SetTimeAccounting: Command[(Visit.Id, CategorizedTime, CategorizedTime)] =
       sql"""
@@ -137,6 +270,22 @@ object TimeAccountingService {
           c_visit_id = $visit_id
       """.query(observation_id)
 
+    val SelectObservingNight: Query[Visit.Id, Option[ObservingNight]] =
+      sql"""
+        SELECT
+          c_instrument,
+          c_created
+        FROM
+          t_visit
+        WHERE
+          c_visit_id = $visit_id
+      """.query(instrument *: core_timestamp)
+         .map {
+            case (Instrument.GmosNorth, ts) => ObservingNight.fromSiteAndInstant(Site.GN, ts.toInstant).some
+            case (Instrument.GmosSouth, ts) => ObservingNight.fromSiteAndInstant(Site.GS, ts.toInstant).some
+            case _                          => none
+         }
+
     val SelectObserveClass: Query[Observation.Id, ObserveClass] =
       sql"""
         SELECT
@@ -148,21 +297,6 @@ object TimeAccountingService {
         WHERE
           a.c_observation_id = $observation_id
       """.query(obs_class)
-
-    private object codec {
-      val step_context: Decoder[TimeAccounting.StepContext] =
-        (atom_id *: step_id).to[TimeAccounting.StepContext]
-
-      val context: Decoder[TimeAccounting.Context] =
-        (
-          visit_id                     *:
-          obs_class.map(_.chargeClass) *:
-          step_context.opt
-        ).to[TimeAccounting.Context]
-
-      val event: Decoder[TimeAccounting.Event] =
-        (core_timestamp *: context).to[TimeAccounting.Event]
-    }
 
     val SelectEvents: Query[(ObserveClass, Visit.Id), TimeAccounting.Event] =
       sql"""
@@ -181,6 +315,33 @@ object TimeAccountingService {
           e.c_received
       """.query(codec.event)
 
-  }
+    val DeleteDiscountEntries: Command[Visit.Id] =
+      sql"""
+        DELETE FROM
+          t_time_charge_discount
+        WHERE
+          c_visit_id = $visit_id
+      """.command
 
+    val StoreDiscountEntry: Command[(Visit.Id, TimeCharge.DiscountEntry)] =
+      sql"""
+        INSERT INTO
+          t_time_charge_discount (
+            c_visit_id,
+            c_start,
+            c_end,
+            c_partner_discount,
+            c_program_discount,
+            c_atom_ids,
+            c_comment,
+            c_type,
+            c_site
+          )
+        VALUES (
+          $visit_id,
+          ${codec.discount_entry}
+        )
+      """.command
+
+  }
 }

@@ -179,6 +179,7 @@ object OdbMapping {
           with TargetGroupMapping[F]
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
+          with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
           with TimingWindowMappings[F]
@@ -324,6 +325,8 @@ object OdbMapping {
               TargetGroupSelectResultMapping,
               TargetMapping,
               TargetSelectResultMapping,
+              TimeChargeDaylightDiscountMapping,
+              TimeChargeDiscountMapping,
               TimeChargeInvoiceMapping,
               TimingWindowEndAfterMapping,
               TimingWindowEndAtMapping,
