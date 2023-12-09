@@ -8362,6 +8362,19 @@ type SignalToNoiseMode {
 }
 
 """
+Telescope Sites
+"""
+enum Site {
+
+  "Gemini North"
+  GN
+
+  "Gemini South"
+  GS
+
+}
+
+"""
 Sky background
 """
 enum SkyBackground {
@@ -9427,53 +9440,54 @@ uncharged.
 """
 interface TimeChargeDiscount {
 
-  "Time amount to discount from the program."
-  program: TimeSpan!
+  "The start time (inclusive) of the discount occurrence."
+  start: Timestamp!
+
+  "The end time (exclusive) of the discount occurrence."
+  end: Timestamp!
 
   "Time amount to discount from the partner."
   partner: TimeSpan!
 
-  """
-  The atoms that are impacted (i.e., whose execution time is discounted) by this
-  discount.
-  """
-  atoms: [AtomRecord!]!
+  "Time amount to discount from the program."
+  program: TimeSpan!
 
-  "Optional additional detail."
-  comment: String
+  "Additional detail."
+  comment: String!
+
+}
+
+"""
+A time charge discount that is applied when part of the observation is executed
+outside of nautical twilight boundaries.  The portion that occurs during day
+time is not charged.
+"""
+type TimeChargeDaylightDiscount implements TimeChargeDiscount {
+
+  "The start time (inclusive) of the discount occurrence."
+  start: Timestamp!
+
+  "The end time (exclusive) of the discount occurrence."
+  end: Timestamp!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+
+  "The site where the observation was executed."
+  site: Site!
 
 }
 
 # TBD
 #type TimeChargeFaultDiscount implements TimeChargeDiscount
-#type TimeChargeOverlapDiscount implements TimeChargeDiscount
+#type TimeChargeQaDiscount implements TimeChargeDiscount
 #type TimeChargeWeatherDiscount implements TimeChargeDiscount
-
-"""
-A time charge discount that is applied when one or more datasets are marked
-usable (as opposed to pas) or fail.
-"""
-type TimeChargeQaDiscount implements TimeChargeDiscount {
-
-  "Time amount to discount from the program."
-  program: TimeSpan!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
-
-  """
-  The atoms that are impacted (i.e., whose execution time is discounted) by this
-  discount.
-  """
-  atoms: [AtomRecord!]!
-
-  "Optional additional detail."
-  comment: String
-
-  "Datasets with non-passing QA states."
-  datasets: [Dataset!]!
-
-}
 
 """
 Detailed time accounting information for a visit, showing the raw execution
