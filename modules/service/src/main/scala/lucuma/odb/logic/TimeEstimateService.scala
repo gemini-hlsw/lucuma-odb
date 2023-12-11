@@ -65,7 +65,7 @@ object TimeEstimateService {
       itcClient: ItcClient[F]
     )(using Services[F], Transaction[F]): F[Map[Observation.Id, ObservationData]] =
       for {
-        p <- generatorParamsService.selectAll(pid, ObsStatus.Approved)
+        p <- generatorParamsService.selectAll(pid, ObsStatus.Included)
         pʹ = p.collect { case (oid, Right(gp)) => (oid, gp) }
         i <- itcService(itcClient).selectAll(pid, pʹ)
         d <- executionDigestService.selectAll(pid)
