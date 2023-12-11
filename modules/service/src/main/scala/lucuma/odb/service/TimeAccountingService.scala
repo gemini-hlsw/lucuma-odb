@@ -36,15 +36,6 @@ object TimeAccountingService {
   def instantiate[F[_]: Concurrent](using Services[F]): TimeAccountingService[F] =
     new TimeAccountingService[F] {
 
-//      private def lookupFutureObsClass(visitId: Visit.Id): F[ObserveClass] =
-//        for {
-//          p <- session.unique(Statements.selectProgramAndObs)(visitId)
-//          (pid, oid) = p
-//          d <- EitherT(generator(commitHash, itcClient, timeEstimateCalculator).digest(pid, oid))
-//                 .leftMap(_ => new RuntimeException(s"Could not obtain execution digest for observation $oid"))
-//                 .rethrowT
-//        } yield d.observeClass
-
       import Statements.*
 
       override def initialState(

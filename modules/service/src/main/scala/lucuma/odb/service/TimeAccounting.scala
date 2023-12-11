@@ -43,8 +43,10 @@ object TimeAccounting {
 
   /**
    * The context for an event or a period of time accounting time.  Time
-   * accounting is performed for each visit so there's always a `Visit.Id`, and
-   * for time spent executing steps there will be a `StepContext` as well.
+   * accounting is performed for each visit so there's always a `Visit.Id`.
+   * The `ChargeClass` will come either from the associated step (if any) or
+   * else the default charge class for the visit. For time spent executing steps
+   * there will be a `StepContext` as well.
    */
   case class Context(
     visitId:     Visit.Id,
