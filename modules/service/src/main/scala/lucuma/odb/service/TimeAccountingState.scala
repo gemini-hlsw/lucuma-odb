@@ -11,8 +11,10 @@ import cats.syntax.functor.*
 import cats.syntax.order.*
 import fs2.Pipe
 import fs2.Stream
+import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 
@@ -32,9 +34,9 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
   /**
    * Calculates the time accounting charge associated with this state.
    */
-  def charge: TimeAccounting.Charge =
-    toMap.foldLeft(TimeAccounting.Charge.Zero) { case (c, (n, x)) =>
-      c.sumCharge(x.step.map(_.chargeClass), n.boundedTimeSpan)
+  def charge: CategorizedTime =
+    toMap.foldLeft(CategorizedTime.Zero) { case (c, (n, x)) =>
+      c.sumCharge(x.chargeClass, n.boundedTimeSpan)
     }
 
   /**
@@ -141,47 +143,47 @@ object TimeAccountingState {
     Eq.by(_.toMap)
 
   /**
-   * Creates a `Charge` value with the amount of time in each category that
-   * overlaps with `interval`. Updates the current state to remove the time in
-   * `interval`.
+   * Creates a `CategorizedTime` value with the amount of time in each category
+   * that overlaps with `interval`. Updates the current state to remove the time
+   * in `interval`.
    *
    * For example, this can be used to subtract weather loss where `interval` is
    * the bad weather time that should not be charged.
    */
-  def discountBetween(interval: TimestampInterval): State[TimeAccountingState, TimeAccounting.Charge] =
-    State[TimeAccountingState, TimeAccounting.Charge] { tas =>
+  def discountBetween(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
+    State[TimeAccountingState, CategorizedTime] { tas =>
       (tas.excluding(interval), tas.between(interval).charge)
     }
 
   /**
-   * Creates a `Charge` value with the amount of time in each category that does
-   * not overlap with `interval`.  Updates the current state to only the time
-   * that occurs during `interval`.
+   * Creates a `CategorizedTime` value with the amount of time in each category
+   * that does not overlap with `interval`.  Updates the current state to only
+   * the time that occurs during `interval`.
    *
    * For example, this can be used to subtract daylight where `interval` is the
    * night time between twilight boundaries.
    */
-  def discountExcluding(interval: TimestampInterval): State[TimeAccountingState, TimeAccounting.Charge] =
-    State[TimeAccountingState, TimeAccounting.Charge] { tas =>
+  def discountExcluding(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
+    State[TimeAccountingState, CategorizedTime] { tas =>
      (tas.between(interval), tas.excluding(interval).charge)
     }
 
   /**
-   * Creates a `Charge` value with the amount of time associated with any atom
-   * whose execution overlaps `interval`.  Updates the current state to remove
-   * this time.
+   * Creates a `CategorizedTime` value with the amount of time associated with
+   * any atom whose execution overlaps `interval`.  Updates the current state to
+   * remove this time.
    *
    * For example, this can be used to remove an atom that produced a dataset
    * with a failing QA state.
    */
-  def discountAtoms(interval: TimestampInterval): State[TimeAccountingState, TimeAccounting.Charge] =
-    State[TimeAccountingState, TimeAccounting.Charge] { tas =>
+  def discountAtoms(interval: TimestampInterval): State[TimeAccountingState, CategorizedTime] =
+    State[TimeAccountingState, CategorizedTime] { tas =>
 
       val atoms = tas.atomsIn(interval)
 
       // Compute the discount for all intervals associated with these atoms.
-      tas.toMap.foldLeft((Empty, TimeAccounting.Charge.Zero)) { case ((state, disc), (curInt, curCtx)) =>
-        if (curCtx.step.map(_.atomId).exists(atoms)) (state, disc.sumCharge(curCtx, curInt.boundedTimeSpan))
+      tas.toMap.foldLeft((Empty, CategorizedTime.Zero)) { case ((state, disc), (curInt, curCtx)) =>
+        if (curCtx.step.map(_.atomId).exists(atoms)) (state, disc.sumCharge(curCtx.chargeClass, curInt.boundedTimeSpan))
         else (state.mod(_ + (curInt -> curCtx)), disc)
       }
 
@@ -192,12 +194,13 @@ object TimeAccountingState {
    * sorted.
    */
   def unsafeFromEvents(
-    visitId: Visit.Id,
-    events:  Seq[TimeAccounting.Event]
+    chargeClass: ChargeClass,
+    visitId:     Visit.Id,
+    events:      Seq[TimeAccounting.Event]
   ): TimeAccountingState =
     Stream
       .emits(events)
-      .through(eventStreamPipe(visitId))
+      .through(eventStreamPipe(chargeClass, visitId))
       .toList
       .head
 
@@ -206,6 +209,7 @@ object TimeAccountingState {
    * containing the corresponding `TimeAccountingState`.
    */
   def eventStreamPipe[F[_]](
+    chargeClass: ChargeClass,
     visitId: Visit.Id
   ): Pipe[F, TimeAccounting.Event, TimeAccountingState] = {
 
@@ -244,7 +248,7 @@ object TimeAccountingState {
            if (interval0.abuts(interval1)) Stream.emit(interval0 -> ctx0)
            else Stream(
              interval0 -> ctx0,
-             TimestampInterval.between(interval0.end, interval1.start) -> TimeAccounting.Context(visitId, None)
+             TimestampInterval.between(interval0.end, interval1.start) -> TimeAccounting.Context(visitId, chargeClass, None)
            )
        }
 

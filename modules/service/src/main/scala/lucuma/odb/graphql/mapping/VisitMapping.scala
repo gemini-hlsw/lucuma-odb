@@ -25,7 +25,6 @@ import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
@@ -138,10 +137,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       def calculateInvoice(vid: Visit.Id): F[Result[Json]] =
         services.useTransactionally {
           timeAccountingService.initialState(vid).map { tas =>
-            // Assume uncategorized time goes to the program for now.
-            // Ultimately this will come from the observation class computed
-            // from executed steps and recorded in the step records.
-            val ct = tas.charge.uncategorizedAs(ChargeClass.Program).asJson
+            val ct = tas.charge.asJson
             Json.obj(
               "executionTime" -> ct,
               "discounts"     -> Json.arr(),
