@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.syntax.order.*
+import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
@@ -21,14 +22,14 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
 
   test("unsorted fails") {
     val v = Visit.Id.fromLong(1L).get
-    val c = TimeAccounting.Context(v, None)
+    val c = TimeAccounting.Context(v, ChargeClass.Program, None)
     val s = List(
       TimeAccounting.Event(Timestamp.ofEpochMilli(100).get, c),
       TimeAccounting.Event(Timestamp.ofEpochMilli(50).get,  c)
     )
 
     intercept[RuntimeException] {
-      TimeAccountingState.unsafeFromEvents(v, s)
+      TimeAccountingState.unsafeFromEvents(ChargeClass.Program, v, s)
     }
   }
 

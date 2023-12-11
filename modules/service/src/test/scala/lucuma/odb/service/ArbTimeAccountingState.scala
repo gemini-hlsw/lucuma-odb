@@ -5,10 +5,12 @@ package lucuma.odb.service
 
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
 import lucuma.core.util.arb.ArbTimestampInterval
 import lucuma.core.util.arb.ArbUid
@@ -20,6 +22,7 @@ import org.scalacheck.cats.implicits.*
 
 trait ArbTimeAccountingState {
 
+  import ArbEnumerated.*
   import ArbGid.*
   import ArbTimeAccounting.given
   import ArbTimestampInterval.given
@@ -41,18 +44,20 @@ trait ArbTimeAccountingState {
 
   def genVisit(min: Timestamp, vid: Visit.Id): Gen[List[Event]] =
     for {
+      c  <- arbitrary[ChargeClass]
       n  <- Gen.chooseNum(0, 10)
       ss <- Gen.listOfN(n, genAtom).map(_.flatten)
       es <- Gen.listOfN(ss.size, Gen.chooseNum(0L, 1000L))
                .map(_.scanLeft(min)((t, inc) => t.plusMillisOption(inc).get))
-               .map(_.drop(1).zip(ss).map { case (t, s) => Event(t, Context(vid, s)) })
+               .map(_.drop(1).zip(ss).map { case (t, s) => Event(t, Context(vid, c, s)) })
     } yield es
 
   given Arbitrary[TimeAccountingState] =
     Arbitrary {
       for {
         v <- arbitrary[Visit.Id]
-        t <- genVisit(Timestamp.Min, v).map(events => TimeAccountingState.unsafeFromEvents(v, events))
+        c <- arbitrary[ChargeClass]
+        t <- genVisit(Timestamp.Min, v).map(events => TimeAccountingState.unsafeFromEvents(c, v, events))
       } yield t
     }
 
