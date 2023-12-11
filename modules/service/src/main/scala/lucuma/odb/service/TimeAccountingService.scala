@@ -69,7 +69,7 @@ object TimeAccountingService {
     val SelectObserveClass: Query[Observation.Id, ObserveClass] =
       sql"""
         SELECT
-          MIN(s.c_observe_class)
+          COALESCE(MIN(s.c_observe_class), 'science'::e_obs_class)
         FROM
           t_step_record s
         INNER JOIN t_atom_record a ON
