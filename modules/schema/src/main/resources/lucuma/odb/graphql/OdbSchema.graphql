@@ -9639,7 +9639,7 @@ type TimeChargeQaDiscount implements TimeChargeDiscount {
 """
 Detailed time accounting information for a visit, showing the raw execution
 time along with any automatically applied discounts (e.g., for bad weather)
-and manual adjusts made by staff.
+and manual adjustments made by staff.
 """
 type TimeChargeInvoice {
 
