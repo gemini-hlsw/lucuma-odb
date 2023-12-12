@@ -9,9 +9,11 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ObservingModeType
 
 class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
@@ -269,78 +271,83 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     )
   }
 
-  test("observation -> execution -> visits -> timeChargeInvoice") {
-    recordAll(pi, mode, offset = 600, visitCount = 2, atomCount = 2).flatMap { on =>
-      val q = s"""
-        query {
-          observation(observationId: "${on.id}") {
-            execution {
-              visits {
-                matches {
-                  timeChargeInvoice {
-                    executionTime {
-                      program { seconds }
-                      partner { seconds }
-                      nonCharged { seconds }
-                      total { seconds }
-                    }
-                    corrections {
-                      op
-                      amount { seconds }
-                    }
-                    finalCharge {
-                      program { seconds }
-                      partner { seconds }
-                      nonCharged { seconds }
-                      total { seconds }
-                    }
+  def invoiceQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          execution {
+            visits {
+              matches {
+                timeChargeInvoice {
+                  executionTime {
+                    program { seconds }
+                    partner { seconds }
+                    nonCharged { seconds }
+                    total { seconds }
+                  }
+                  corrections {
+                    op
+                    amount { seconds }
+                  }
+                  finalCharge {
+                    program { seconds }
+                    partner { seconds }
+                    nonCharged { seconds }
+                    total { seconds }
                   }
                 }
               }
             }
           }
         }
-      """
+      }
+    """
 
-      val matches = on.visits.map { v =>
-        json"""
-        {
-          "timeChargeInvoice": {
-            "executionTime": {
-              "program": {
-                "seconds": 0.000000
-              },
-              "partner": {
-                "seconds": 0.000000
-              },
-              "nonCharged": {
-                "seconds": 0.000000
-              },
-              "total": {
-                "seconds": 0.000000
-              }
+  import ExecutionQuerySetupOperations.ObservationNode
+
+  def invoiceExected(on: ObservationNode): Either[List[String], Json] = {
+    val matches = on.visits.map { v =>
+      val first = v.allEvents.head.received
+      val last  = v.allEvents.last.received
+      val time  = TimeSpan.between(first, last).get
+      json"""
+      {
+        "timeChargeInvoice": {
+          "executionTime": {
+            "program": {
+              "seconds": ${time.toSeconds}
             },
-            "corrections": [],
-            "finalCharge": {
-              "program": {
-                "seconds": 0.000000
-              },
-              "partner": {
-                "seconds": 0.000000
-              },
-              "nonCharged": {
-                "seconds": 0.000000
-              },
-              "total": {
-                "seconds": 0.000000
-              }
+            "partner": {
+              "seconds": 0.000000
+            },
+            "nonCharged": {
+              "seconds": 0.000000
+            },
+            "total": {
+              "seconds": ${time.toSeconds}
+            }
+          },
+          "corrections": [],
+          "finalCharge": {
+            "program": {
+              "seconds": ${time.toSeconds}
+            },
+            "partner": {
+              "seconds": 0.000000
+            },
+            "nonCharged": {
+              "seconds": 0.000000
+            },
+            "total": {
+              "seconds": ${time.toSeconds}
             }
           }
         }
-        """
       }
+      """
+    }
 
-      val e = json"""
+    json"""
       {
         "observation": {
           "execution": {
@@ -351,9 +358,17 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       }
       """.asRight
+  }
 
-      expect(pi, q, e)
+  test("observation -> execution -> visits -> timeChargeInvoice") {
+    recordAll(pi, mode, offset = 600, visitCount = 2, atomCount = 2).flatMap { on =>
+      expect(pi, invoiceQuery(on.id), invoiceExected(on))
     }
   }
 
+  test("observation -> execution -> visits -> timeChargeInvoice -- no steps") {
+    recordAll(pi, mode, offset = 700, visitCount = 2, atomCount = 0, stepCount = 0).flatMap { on =>
+      expect(pi, invoiceQuery(on.id), invoiceExected(on))
+    }
+  }
 }
