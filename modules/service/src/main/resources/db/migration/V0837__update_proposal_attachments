@@ -1,0 +1,5 @@
+-- Remove description and checked columns from proposal attachments
+
+alter table t_proposal_attachment
+drop column c_description,
+drop column c_checked;

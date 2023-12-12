@@ -15,8 +15,6 @@ trait ProposalAttachmentTable[F[_]] extends BaseMapping[F] {
     val ProgramId      = col("c_program_id", program_id)
     val AttachmentType = col("c_attachment_type", tag)
     val FileName       = col("c_file_name", text_nonempty)
-    val Description    = col("c_description", text_nonempty.opt)
-    val Checked        = col("c_checked", bool)
     val FileSize       = col("c_file_size", int8)
     val UpdatedAt      = col("c_updated_at", core_timestamp)
   }

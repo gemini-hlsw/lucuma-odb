@@ -16,6 +16,16 @@ import org.http4s.*
 
 abstract class ObsAttachmentsSuite extends AttachmentsSuite {
   
+  case class TestAttachment(
+    fileName:       String,
+    attachmentType: String,
+    description:    Option[String],
+    content:        String,
+    checked:        Boolean = false
+  ) {
+    val upperType: String = attachmentType.toUpperCase
+  }
+
   def insertAttachment(
     user:      User,
     programId: Program.Id,
