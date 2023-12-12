@@ -186,7 +186,6 @@ object OdbMapping {
           with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
-          with UpdateProposalAttachmentsResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
           with VisitMapping[F]
@@ -334,7 +333,6 @@ object OdbMapping {
               UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
-              UpdateProposalAttachmentsResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
               VisitMapping,

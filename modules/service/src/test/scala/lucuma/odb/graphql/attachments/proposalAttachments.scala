@@ -23,6 +23,14 @@ import skunk.syntax.all.*
 
 class proposalAttachments extends AttachmentsSuite {
 
+  case class TestAttachment(
+    fileName:       String,
+    attachmentType: String,
+    content:        String
+  ) {
+    val upperType: String = attachmentType.toUpperCase
+  }
+
   def assertAttachmentsGql(
     user:        User,
     programId:   Program.Id,
@@ -36,8 +44,6 @@ class proposalAttachments extends AttachmentsSuite {
               proposalAttachments {
                 attachmentType
                 fileName
-                description
-                checked
                 fileSize
               }
             }
@@ -92,8 +98,6 @@ class proposalAttachments extends AttachmentsSuite {
           Json.obj(
             "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
             "fileName"       -> ta.fileName.asJson,
-            "description"    -> ta.description.asJson,
-            "checked"        -> ta.checked.asJson,
             "fileSize"       -> ta.content.length.asJson
           )
         )
@@ -109,7 +113,6 @@ class proposalAttachments extends AttachmentsSuite {
       val uri =
         (svr.baseUri / "attachment" / "proposal" / programId.toString / ta.attachmentType)
           .withQueryParam("fileName", ta.fileName)
-          .withOptionQueryParam("description", ta.description)
 
       val request = Request[IO](
         method = Method.POST,
@@ -129,7 +132,6 @@ class proposalAttachments extends AttachmentsSuite {
       val uri =
         (svr.baseUri / "attachment" / "proposal" / programId.toString / ta.attachmentType)
           .withQueryParam("fileName", ta.fileName)
-          .withOptionQueryParam("description", ta.description)
 
       val request = Request[IO](
         method = Method.PUT,
@@ -199,19 +201,19 @@ class proposalAttachments extends AttachmentsSuite {
     )
   }
 
-  private val file1A           = TestAttachment("file1.pdf", "science", "A description".some, "Hopeful")
-  private val file1B           = TestAttachment("file1.pdf", "science", none, "New contents")
-  private val file1C           = TestAttachment("file1.pdf", "team", none, "Same name, different type")
-  private val file1Empty       = TestAttachment("file1.pdf", "science", "Thing".some, "")
-  private val file1InvalidType = TestAttachment("file1.pdf", "NotAType", none, "It'll never make it")
-  private val file2            = TestAttachment("file2.pdf", "team", "Masked".some, "Zorro")
-  private val fileWithPath     = TestAttachment("this/file.pdf", "science", none, "Doesn't matter")
-  private val missingFileName  = TestAttachment("", "science", none, "Doesn't matter")
+  private val file1A           = TestAttachment("file1.pdf", "science", "Hopeful")
+  private val file1B           = TestAttachment("file1.pdf", "science", "New contents")
+  private val file1C           = TestAttachment("file1.pdf", "team", "Same name, different type")
+  private val file1Empty       = TestAttachment("file1.pdf", "science", "")
+  private val file1InvalidType = TestAttachment("file1.pdf", "NotAType", "It'll never make it")
+  private val file2            = TestAttachment("file2.pdf", "team", "Zorro")
+  private val fileWithPath     = TestAttachment("this/file.pdf", "science", "Doesn't matter")
+  private val missingFileName  = TestAttachment("", "science", "Doesn't matter")
   // same attachment type as file1A, but different name, etc.
-  private val file3            = TestAttachment("different.pdf", "science", "Unmatching file name".some, "Something different")
-  private val missingExtension = TestAttachment("file1", "science", "Missing extension".some, "Doesn't matter")
-  private val emptyExtension   = TestAttachment("file1.", "team", "Empty extension".some, "Doesn't matter")
-  private val invalidExtension = TestAttachment("file1.pif", "science", "Invalid extension".some, "Doesn't matter")
+  private val file3            = TestAttachment("different.pdf", "science", "Something different")
+  private val missingExtension = TestAttachment("file1", "science", "Doesn't matter")
+  private val emptyExtension   = TestAttachment("file1.", "team", "Doesn't matter")
+  private val invalidExtension = TestAttachment("file1.pif", "science", "Doesn't matter")
 
   val invalidExtensionMsg = "Invalid file. Must be a PDF file."
 
@@ -549,152 +551,6 @@ class proposalAttachments extends AttachmentsSuite {
       _      <- deleteAttachment(service, pid, file3).expectOk
       _      <- assertS3NotThere(fk2)
       _      <- assertAttachmentsGql(service, pid)
-    } yield ()
-  }
-
-  test("update single attachment metadata: description") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1A).expectOk
-      newDesc = "New description"
-      newTa   = file1A.copy(description = newDesc.some)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ attachmentType: { EQ: ${file1A.upperType} }}""",
-                                     SET = s"""{ description: "$newDesc" }""",
-                                     newTa
-                )
-    } yield ()
-  }
-
-  test("update single attachment metadata: unset description") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1A).expectOk
-      newTa   = file1A.copy(description = none)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ attachmentType: { EQ: ${file1A.upperType} }}""",
-                                     SET = s"""{ description: null }""",
-                                     newTa
-                )
-    } yield ()
-  }
-
-  test("update single attachment metadata: checked") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1A).expectOk
-      newTa   = file1A.copy(checked = true)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ attachmentType: { EQ: ${file1A.upperType} }}""",
-                                     SET = s"""{ checked: true }""",
-                                     newTa
-                )
-    } yield ()
-  }
-
-  test("bulk update attachments metadata: by name") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1A).expectOk
-      _      <- insertAttachment(service, pid, file2).expectOk
-      newDesc = "updated"
-      newTa1  = file1A.copy(description = newDesc.some, checked = true)
-      newTa2  = file2.copy(description = newDesc.some, checked = true)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ fileName: { LIKE: "file%"}}""",
-                                     SET = s"""{ checked: true, description: "$newDesc" }""",
-                                     newTa1,
-                                     newTa2
-                )
-    } yield ()
-  }
-
-  test("update attachments metadata: by checked") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1A).expectOk
-      _      <- insertAttachment(service, pid, file2).expectOk
-      ta2c    = file2.copy(checked = true)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ attachmentType: { EQ: ${file2.upperType} }}""",
-                                     SET = s"""{ checked: true }""",
-                                     ta2c
-                )
-      newDesc = "Verified"
-      newTa2  = ta2c.copy(description = newDesc.some)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ checked: true }""",
-                                     SET = s"""{ description: "$newDesc" }""",
-                                     newTa2
-                )
-    } yield ()
-  }
-
-  test("update attachments metadata: by description") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1A).expectOk
-      _      <- insertAttachment(service, pid, file2).expectOk
-      newDesc = "updated"
-      newTa2  = file2.copy(description = newDesc.some, checked = true)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ description: { NLIKE: "%script%" }}""",
-                                     SET = s"""{ checked: true, description: "$newDesc" }""",
-                                     newTa2
-                )
-    } yield ()
-  }
-
-  test("update attachments metadata: by null description") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1B).expectOk
-      _      <- insertAttachment(service, pid, file2).expectOk
-      newDesc = "No longer null!"
-      newTa1  = file1B.copy(description = newDesc.some)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ description: { IS_NULL: true }}""",
-                                     SET = s"""{ description: "$newDesc" }""",
-                                     newTa1
-                )
-    } yield ()
-  }
-
-  test("update attachments metadata: by attachment type") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1B).expectOk
-      _      <- insertAttachment(service, pid, file2).expectOk
-      newDesc = "Found"
-      newTa1  = file1B.copy(description = newDesc.some)
-      newTa2  = file2.copy(description = newDesc.some)
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ attachmentType: { IN: [SCIENCE, TEAM] }}""",
-                                     SET = s"""{ description: "$newDesc" }""",
-                                     newTa1,
-                                     newTa2
-                )
-    } yield ()
-  }
-
-  test("update attachments metadata: no matches") {
-    for {
-      pid    <- createProgramAs(pi)
-      _      <- insertAttachment(service, pid, file1B).expectOk
-      _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ description: { IS_NULL: false }}""",
-                                     SET = s"""{ description: "FOUND" }""",
-                )
     } yield ()
   }
 }

@@ -59,7 +59,6 @@ import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
-import lucuma.odb.graphql.input.UpdateProposalAttachmentsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ExecutionEventPredicates
@@ -114,7 +113,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateObsAttachments,
       UpdateObservations,
       UpdatePrograms,
-      UpdateProposalAttachments,
       UpdateTargets,
     )
 
@@ -706,31 +704,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         }
       }
     }
-
-  private lazy val UpdateProposalAttachments =
-      MutationField("updateProposalAttachments", UpdateProposalAttachmentsInput.binding(Path.from(ProposalAttachmentType))) { (input, child) =>
-        services.useTransactionally {
-
-          val filterPredicate = and(List(
-            Predicates.proposalAttachment.program.id.eql(input.programId),
-            Predicates.proposalAttachment.program.isWritableBy(user),
-            input.WHERE.getOrElse(True)
-          ))
-
-          val typeSelect: Result[AppliedFragment] =
-            MappedQuery(
-              Filter(filterPredicate, Select("attachmentType", None, Empty)),
-              Context(QueryType, List("proposalAttachments"), List("proposalAttachments"), List(ProposalAttachmentType))
-            ).flatMap(_.fragment)
-
-          typeSelect.flatTraverse { which =>
-            proposalAttachmentMetadataService
-              .updateProposalAttachments(input.SET, which)
-              .map(proposalAttachmentResultSubquery(input.programId, _, input.LIMIT, child))
-          }
-
-        }
-      }
 
   def targetResultSubquery(pids: List[Target.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
