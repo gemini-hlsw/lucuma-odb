@@ -5,39 +5,26 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.applicative.*
-import cats.syntax.eq.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Query
 import grackle.Query.Binding
-import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
-import grackle.ResultT
 import grackle.Type
 import grackle.TypeRef
-import grackle.syntax.*
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
-import lucuma.core.model.Visit
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.json.time.query.given
-import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 
 import table.ExecutionEventTable
 import table.GmosStaticTables
@@ -68,7 +55,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events"),
-        EffectField("timeChargeInvoice", invoiceHandler, List("id"))
+        SqlObject("timeChargeInvoice")
       )
     )
 
