@@ -30,6 +30,7 @@ import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.Group
 import lucuma.core.model.*
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
@@ -456,6 +457,18 @@ trait Codecs {
       am.orElse(ha).toRight("Undefined elevation range")
     } { e =>
       (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
+    }
+
+  val categorized_time: Codec[CategorizedTime] =
+    (time_span *: time_span *: time_span).imap {
+      case (non_charged, partner_time, program_time) =>
+        CategorizedTime(
+          ChargeClass.NonCharged -> non_charged,
+          ChargeClass.Partner    -> partner_time,
+          ChargeClass.Program    -> program_time
+        )
+    } { ct =>
+      (ct(ChargeClass.NonCharged), ct(ChargeClass.Partner), ct(ChargeClass.Program))
     }
 
   val constraint_set: Codec[ConstraintSet] =

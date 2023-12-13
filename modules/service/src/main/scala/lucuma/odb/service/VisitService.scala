@@ -52,7 +52,15 @@ object VisitService {
     created:       Timestamp
   )
 
-  sealed trait InsertVisitResponse extends Product with Serializable
+  sealed trait InsertVisitResponse extends Product with Serializable {
+
+    def visitId: Option[Visit.Id] =
+      this match {
+        case InsertVisitResponse.Success(vid) => vid.some
+        case _                                => none
+      }
+
+  }
 
   object InsertVisitResponse {
 

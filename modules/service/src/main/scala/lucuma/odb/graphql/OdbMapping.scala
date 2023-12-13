@@ -95,6 +95,7 @@ object OdbMapping {
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
           with CatalogInfoMapping[F]
+          with CategorizedTimeMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
           with ConditionsEntryMapping[F]
@@ -178,6 +179,7 @@ object OdbMapping {
           with TargetGroupMapping[F]
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
+          with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
@@ -221,6 +223,7 @@ object OdbMapping {
               AtomRecordMapping,
               AtomRecordSelectResultMapping,
               CatalogInfoMapping,
+              CategorizedTimeMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
               ConditionsEntryMapping,
@@ -321,6 +324,7 @@ object OdbMapping {
               TargetGroupSelectResultMapping,
               TargetMapping,
               TargetSelectResultMapping,
+              TimeChargeInvoiceMapping,
               TimingWindowEndAfterMapping,
               TimingWindowEndAtMapping,
               TimingWindowEndMapping,
