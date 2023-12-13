@@ -41,6 +41,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
+import lucuma.odb.data.UserInvitation
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -144,6 +145,9 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[ToOActivation](ToOActivationType),
       LeafMapping[User.Id](UserIdType),
+      LeafMapping[String](UserInvitationKeyType),
+      LeafMapping[UserInvitation.Id](UserInvitationIdType),
+      LeafMapping[UserInvitation.Status](UserInvitationStatusType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType),

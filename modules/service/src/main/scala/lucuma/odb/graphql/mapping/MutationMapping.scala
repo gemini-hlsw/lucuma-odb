@@ -82,8 +82,10 @@ import lucuma.odb.service.VisitService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
+import eu.timepit.refined.cats.*
 
 import scala.reflect.ClassTag
+import lucuma.odb.graphql.input.CreateUserInvitationInput
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -100,6 +102,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateObservation,
       CreateProgram,
       CreateTarget,
+      CreateUserInvitation,
       LinkUser,
       RecordAtom,
       RecordDataset,
@@ -349,6 +352,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         }
       }
     }
+
+  private lazy val CreateUserInvitation =
+    MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        userInvitationService.createUserInvitation(input).map: rInv =>
+          rInv.map: inv =>
+            Environment(
+              Env("inv" -> inv), 
+              Unique(Filter(Predicates.userInvitation.id.eql(inv.id), child))
+            )
 
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>

@@ -47,6 +47,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val target                  = TargetPredicates(Path.from(TargetType))
     val targetEdit              = TargetEditPredicates(Path.from(TargetEditType))
     val targetGroup             = TargetGroupPredicates(Path.from(TargetGroupType))
+    val userInvitation          = UserInvitationPredicates(Path.from(UserInvitationType))
     val visit                   = VisitPredicates(Path.from(VisitType))
   }
 
