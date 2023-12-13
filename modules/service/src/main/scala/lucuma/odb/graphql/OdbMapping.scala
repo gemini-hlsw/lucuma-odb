@@ -111,6 +111,7 @@ object OdbMapping {
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
+          with CreateUserInvitationResultMapping[F]
           with DeclinationMapping[F]
           with DatasetMapping[F]
           with DatasetSelectResultMapping[F]
@@ -194,6 +195,7 @@ object OdbMapping {
           with UpdateProgramsResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
+          with UserInvitationMapping[F]
           with VisitMapping[F]
           with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
@@ -243,6 +245,7 @@ object OdbMapping {
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
+              CreateUserInvitationResultMapping,
               DatasetMapping,
               DatasetEventMapping,
               DatasetSelectResultMapping,
@@ -350,6 +353,7 @@ object OdbMapping {
               UpdateProgramsResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
+              UserInvitationMapping,
               VisitMapping,
               VisitSelectResultMapping,
               WavelengthMapping
