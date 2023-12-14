@@ -411,7 +411,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         for {
           r <- insert(input)
-          _ <- r.asSuccess.fold(().pure[F])(s => timeAccountingService.update(s.event.visitId))
+          _ <- r.asSuccess.traverse_(s => timeAccountingService.update(s.event.visitId))
         } yield executionEventResponseToResult(child, pred)(r)
       }
     }
@@ -504,7 +504,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import VisitService.InsertVisitResponse.*
     for {
       r <- response
-      _ <- r.visitId.fold(().pure[F])(timeAccountingService.initialize)
+      _ <- r.visitId.traverse_(timeAccountingService.initialize)
     } yield r match {
       case NotAuthorized(user)                 =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
