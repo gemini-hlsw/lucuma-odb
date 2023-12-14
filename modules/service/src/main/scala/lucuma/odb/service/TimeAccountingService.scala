@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.enums.ChargeClass
@@ -18,7 +17,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.util.Codecs.*
 import skunk.*
-import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -33,18 +31,16 @@ trait TimeAccountingService[F[_]] {
     visitId: Visit.Id
   )(using Transaction[F]): F[TimeAccountingState]
 
+  /**
+   * Initializes the time accounting data when a new visit is created.
+   */
   def initialize(
     visitId: Visit.Id
   )(using Transaction[F]): F[Unit]
 
-  def setIfNecessary(
-    visitId: Visit.Id
-  )(using Transaction[F]): F[Unit]
-
-  def delete(
-    visitId: Visit.Id
-  )(using Transaction[F]): F[Unit]
-
+  /**
+   * Updates the time accounting data.
+   */
   def update(
     visitId: Visit.Id
   )(using Transaction[F]): F[Unit]
@@ -84,66 +80,10 @@ object TimeAccountingService {
           _ <- session.execute(UpdateTimeAccounting)((visitId, s.charge, s.charge))
         } yield ()
 
-
-//      def lookup(
-//        visitId: Visit.Id
-//      )(using Transaction[F]): F[Option[(CategorizedTime, CategorizedTime)]] =
-//        session
-//          .execute(LookupTimeAccounting)(visitId)
-//          .flatMap {
-//            case List(ini, fin) => (ini, fin).some.pure[F]
-//            case Nil            => none.pure[F]
-//            case lst            => MonadError[F, Throwable].raiseError(new RuntimeException(s"Found ${lst.size} time accounting entries for visit $visitId"))
-//          }
-
-      private def calculateAndStore(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[Unit] =
-        for {
-          s <- initialState(visitId)
-          _ <- session.execute(SetTimeAccounting)((visitId, s.charge, s.charge))
-        } yield ()
-
-      def setIfNecessary(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[Unit] =
-        for {
-          e <- session.unique(ExistsTimeAccounting)(visitId)
-          _ <- calculateAndStore(visitId).unlessA(e)
-        } yield ()
-
-      def delete(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[Unit] =
-        session.execute(DeleteTimeAccounting)(visitId).void
-
     }
 
 
   object Statements {
-
-//    val LookupTimeAccounting: Query[Visit.Id, CategorizedTime] =
-//      sql"""
-//        SELECT
-//          c_non_charged_time,
-//          c_partner_time,
-//          c_program_time
-//        FROM
-//          t_time_accounting
-//        WHERE
-//          c_visit_id = $visit_id
-//        ORDER BY
-//          c_stage
-//      """.query(categorized_time)
-
-    val ExistsTimeAccounting: Query[Visit.Id, Boolean] =
-      sql"""
-        SELECT EXISTS (
-          SELECT 1
-          FROM t_time_accounting
-          WHERE c_visit_id = $visit_id
-        )
-      """.query(bool)
 
     val SetTimeAccounting: Command[(Visit.Id, CategorizedTime, CategorizedTime)] =
       sql"""
@@ -186,11 +126,6 @@ object TimeAccountingService {
            f.programTime,
            v
          )}
-
-    val DeleteTimeAccounting: Command[Visit.Id] =
-      sql"""
-        DELETE FROM t_time_accounting WHERE c_visit_id = $visit_id
-      """.command
 
     val SelectObservationId: Query[Visit.Id, Observation.Id] =
       sql"""

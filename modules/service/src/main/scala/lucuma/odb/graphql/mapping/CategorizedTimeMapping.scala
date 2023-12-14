@@ -7,6 +7,8 @@ import lucuma.odb.graphql.table.TimeAccountingTable
 
 trait CategorizedTimeMapping[F[_]] extends TimeAccountingTable[F] {
 
+  // Using a `SwitchMapping` here because I expect categorized times to appear
+  // elsewhere.
   lazy val CategorizedTimeMapping: TypeMapping =
     SwitchMapping(
       CategorizedTimeType,
@@ -16,19 +18,15 @@ trait CategorizedTimeMapping[F[_]] extends TimeAccountingTable[F] {
       )
     )
 
-  private def categorizedTimeMapping(keys: ColumnRef*): ObjectMapping =
+  private def categorizedTimeMapping(key: ColumnRef): ObjectMapping =
     ObjectMapping(
       tpe = CategorizedTimeType,
-      fieldMappings =
-        keyFields(keys: _*) ++ List(
-          SqlObject("nonCharged"),
-          SqlObject("partner"),
-          SqlObject("program")
-        )
+      fieldMappings = List(
+        SqlField(s"key", key, key = true, hidden = true),
+        SqlObject("nonCharged"),
+        SqlObject("partner"),
+        SqlObject("program")
+      )
     )
 
-  private def keyFields(keys: ColumnRef*): List[FieldMapping] =
-    keys.toList.zipWithIndex.map { (col, n) =>
-      SqlField(s"key_$n", col, key = true, hidden = true)
-    }
 }
