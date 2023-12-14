@@ -181,6 +181,7 @@ trait BaseMapping[F[_]]
   lazy val ProgramSelectResultType             = schema.ref("ProgramSelectResult")
   lazy val ProgramType                         = schema.ref("Program")
   lazy val ProgramUserRoleType                 = schema.ref("ProgramUserRole")
+  lazy val ProgramUserSupportRoleTypeType      = schema.ref("ProgramUserSupportRoleType")
   lazy val ProperMotionDeclinationType         = schema.ref("ProperMotionDeclination")
   lazy val ProperMotionRaType                  = schema.ref("ProperMotionRA")
   lazy val ProperMotionType                    = schema.ref("ProperMotion")

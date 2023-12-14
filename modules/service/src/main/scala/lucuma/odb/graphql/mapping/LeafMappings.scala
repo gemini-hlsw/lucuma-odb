@@ -42,6 +42,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 import lucuma.odb.data.UserInvitation
+import lucuma.odb.data.ProgramUserSupportType
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -122,6 +123,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosShort](PosShortType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
+      LeafMapping[ProgramUserSupportType](ProgramUserSupportRoleTypeType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[Tag](ProposalStatusType),
       LeafMapping[ScienceMode](ScienceModeType),
