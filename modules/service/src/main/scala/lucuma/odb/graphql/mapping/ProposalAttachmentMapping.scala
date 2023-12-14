@@ -17,8 +17,6 @@ trait ProposalAttachmentMapping[F[_]] extends ProposalAttachmentTable[F] with Pr
         SqlField("program_id", ProposalAttachmentTable.ProgramId, key = true, hidden = true),
         SqlField("attachmentType", ProposalAttachmentTable.AttachmentType, key = true),
         SqlField("fileName", ProposalAttachmentTable.FileName),
-        SqlField("description", ProposalAttachmentTable.Description),
-        SqlField("checked", ProposalAttachmentTable.Checked),
         SqlField("fileSize", ProposalAttachmentTable.FileSize),
         SqlField("updatedAt", ProposalAttachmentTable.UpdatedAt),
         SqlObject("program", Join(ProposalAttachmentTable.ProgramId, ProgramTable.Id))

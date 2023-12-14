@@ -7,7 +7,6 @@ package attachments
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -36,7 +35,6 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
       programId: Program.Id,
       attachmentType: Tag,
       fileName: String,
-      description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
     )(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)
@@ -46,7 +44,6 @@ class proposalAttachmentRoutes extends AttachmentRoutesSuite {
       programId: Program.Id,
       attachmentType: Tag,
       fileName: String,
-      description: Option[NonEmptyString],
       data: Stream[cats.effect.IO, Byte]
     )(using NoTransaction[IO]): IO[Unit] =
       getError(user).fold(IO.unit)(IO.raiseError)

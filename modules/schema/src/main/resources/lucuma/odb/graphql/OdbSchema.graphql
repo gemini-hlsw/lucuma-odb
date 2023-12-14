@@ -2718,13 +2718,6 @@ type Mutation {
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
 
-  updateProposalAttachments(
-    """
-    Parameters for updating existing proposal attachments.
-    """
-    input: UpdateProposalAttachmentsInput!
-  ): UpdateProposalAttachmentsResult!
-
   """
   Updates existing targets
   """
@@ -4098,46 +4091,6 @@ type UpdateProgramsResult {
   The edited programs, up to the specified LIMIT or the default maximum of 1000.
   """
   programs: [Program!]!
-
-  """
-  `true` when there were additional edits that were not returned.
-  """
-  hasMore: Boolean!
-}
-
-"""
-Proposal Attachment selection and update description.  Use `SET` to specify the changes, `WHERE` to select the proposal attachments to update, and `LIMIT` to control the size of the return value.
-"""
-input UpdateProposalAttachmentsInput {
-  """
-  Program ID for the program whose proposal attachments are to be edited.
-  """
-  programId: ProgramId!
-
-  """
-  Describes the proposal attachment values to modify.
-  """
-  SET: ProposalAttachmentPropertiesInput!
-
-  """
-  Filters the proposal attachments to be updated according to those that match the given constraints.
-  """
-  WHERE: WhereProposalAttachment
-
-  """
-  Caps the number of results returned to the given value (if additional proposal attachments match the WHERE clause they will be updated but not returned).
-  """
-  LIMIT: NonNegInt
-}
-
-"""
-The result of updating the selected proposal attachments, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional obs attachments were modified and not included here.
-"""
-type UpdateProposalAttachmentsResult {
-  """
-  The edited proposal attachments, up to the specified LIMIT or the default maximum of 1000.
-  """
-  proposalAttachments: [ProposalAttachment!]!
 
   """
   `true` when there were additional edits that were not returned.
@@ -7723,23 +7676,9 @@ Program Proposal Attachment
 type ProposalAttachment {
   attachmentType: ProposalAttachmentType!
   fileName:       NonEmptyString!
-  description:    NonEmptyString
-  checked:        Boolean!
   fileSize:       Long!
   updatedAt:      Timestamp!
   program:        Program!
-}
-
-input ProposalAttachmentPropertiesInput {
-  """
-  The description field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  description: NonEmptyString
-
-  """
-  The checked status can be set, or ignored by skipping it altogether
-  """
-  checked: Boolean
 }
 
 """
@@ -11206,73 +11145,6 @@ input WhereProposal {
   Matches proposal partners.
   """
   partners: WhereProposalPartners
-}
-
-"""
-ProposalAttachment filter options. All specified items must match.
-"""
-input WhereProposalAttachment {
-  """
-  A list of nested attachment filters that all must match in order for the AND group as a whole to match.
-  """
-  AND: [WhereProposalAttachment!]
-
-  """
-  A list of nested attachment filters where any one match causes the entire OR group as a whole to match.
-  """
-  OR: [WhereProposalAttachment!]
-
-  """
-  A nested attachment filter that must not match in order for the NOT itself to match.
-  """
-  NOT: WhereProposalAttachment
-
-  """
-  Matches the attachment file name.
-  """
-  fileName: WhereString
-
-  """
-  Matches the description.
-  """
-  description: WhereOptionString
-
-  """
-  Matches the attachment type
-  """
-  attachmentType: WhereProposalAttachmentType
-
-  """
-  Matches whether the attachment has been checked or not
-  """
-  checked: Boolean
-}
-
-"""
-Filters on equality of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'EQ: SCIENCE'
-
-"""
-input WhereProposalAttachmentType {
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: ProposalAttachmentType
-
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: ProposalAttachmentType
-
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [ProposalAttachmentType!]
-
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [ProposalAttachmentType!]
 }
 
 """

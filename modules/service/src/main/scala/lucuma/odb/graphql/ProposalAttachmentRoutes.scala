@@ -74,7 +74,6 @@ object ProposalAttachmentRoutes {
 
     object FileNameMatcher    extends QueryParamDecoderMatcher[String]("fileName")
     object TagMatcher         extends QueryParamDecoderMatcher[Tag]("attachmentType")
-    object DescriptionMatcher extends OptionalQueryParamDecoderMatcher[String]("description")
 
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType) =>
@@ -88,12 +87,11 @@ object ProposalAttachmentRoutes {
         }
 
       case req @ POST -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
-          :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
+          :? FileNameMatcher(fileName) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
-            val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
-              .insertAttachment(user, programId, attachmentType, fileName, description, req.body)
+              .insertAttachment(user, programId, attachmentType, fileName, req.body)
               .flatMap(_ => Ok())
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
@@ -104,12 +102,11 @@ object ProposalAttachmentRoutes {
         }
 
       case req @ PUT -> Root / "attachment" / "proposal" / ProgramId(programId) / TagPath(attachmentType)
-          :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
+          :? FileNameMatcher(fileName) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
-            val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
-              .updateAttachment(user, programId, attachmentType, fileName, description, req.body)
+              .updateAttachment(user, programId, attachmentType, fileName,  req.body)
               .flatMap(_ => Ok())
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>

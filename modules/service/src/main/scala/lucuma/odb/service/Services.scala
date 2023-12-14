@@ -116,9 +116,6 @@ trait Services[F[_]]:
   /** Construct a `ProposalAttachmentFileService`, given an `S3FileService`. */
   def proposalAttachmentFileService(s3: S3FileService[F]): ProposalAttachmentFileService[F]
   
-  /** The `ProposalAttachmentMetadataService`. */
-  def proposalAttachmentMetadataService: ProposalAttachmentMetadataService[F]
-  
   /** The `ProposalService`. */
   def proposalService: ProposalService[F]
   
@@ -195,7 +192,6 @@ object Services:
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programService = ProgramService.instantiate
-      lazy val proposalAttachmentMetadataService = ProposalAttachmentMetadataService.instantiate
       lazy val proposalService = ProposalService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val sequenceService = SequenceService.instantiate
@@ -242,7 +238,6 @@ object Services:
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
     def proposalAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ProposalAttachmentFileService[F] = summon[Services[F]].proposalAttachmentFileService(s3)
-    def proposalAttachmentMetadataService[F[_]](using Services[F]): ProposalAttachmentMetadataService[F] = summon[Services[F]].proposalAttachmentMetadataService
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
