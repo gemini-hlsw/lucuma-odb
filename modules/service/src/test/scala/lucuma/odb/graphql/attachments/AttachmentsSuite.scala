@@ -7,7 +7,6 @@ package attachments
 
 import cats.effect.IO
 import cats.effect.Resource
-import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.text.utf8
 import lucuma.core.model.ObsAttachment
@@ -25,16 +24,6 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     Slf4jLogger.getLoggerFromName("lucuma-odb-test-attachments")
 
   val client: Client[IO] = JavaNetClientBuilder[IO].create
-
-  case class TestAttachment(
-    fileName:       String,
-    attachmentType: String,
-    description:    Option[String],
-    content:        String,
-    checked:        Boolean = false
-  ) {
-    val upperType: String = attachmentType.toUpperCase
-  }
 
   extension (response: Response[IO])
     def getBody: IO[String] = response.body.through(utf8.decode).compile.string

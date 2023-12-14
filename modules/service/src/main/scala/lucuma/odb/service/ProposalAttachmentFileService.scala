@@ -38,7 +38,6 @@ trait ProposalAttachmentFileService[F[_]] {
     programId:      Program.Id,
     attachmentType: Tag,
     fileName:       String,
-    description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
   )(using NoTransaction[F]): F[Unit]
 
@@ -47,7 +46,6 @@ trait ProposalAttachmentFileService[F[_]] {
     programId:      Program.Id,
     attachmentType: Tag,
     fileName:       String,
-    description:    Option[NonEmptyString],
     data:           Stream[F, Byte]
   )(using NoTransaction[F]): F[Unit]
 
@@ -86,13 +84,12 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       programId:      Program.Id,
       attachmentType: Tag,
       fileName:       FileName,
-      description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("insertProposalAttachment") {
         val af   =
-          Statements.insertAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
+          Statements.insertAttachment(user, programId, attachmentType, fileName.value, fileSize, remotePath)
         val stmt = af.fragment.command
         session
           .prepareR(stmt)
@@ -116,13 +113,12 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       programId:      Program.Id,
       attachmentType: Tag,
       fileName:       FileName,
-      description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
     ): F[Unit] =
       Trace[F].span("updateProposalAttachment") {
         val af   =
-          Statements.updateAttachment(user, programId, attachmentType, fileName.value, description, fileSize, remotePath)
+          Statements.updateAttachment(user, programId, attachmentType, fileName.value, fileSize, remotePath)
         val stmt = af.fragment.query(bool)
         session
           .prepareR(stmt)
@@ -249,7 +245,6 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         programId:      Program.Id,
         attachmentType: Tag,
         fileName: String,
-        description: Option[NonEmptyString],
         data: Stream[F, Byte])(using NoTransaction[F]): F[Unit] =
         FileName
           .fromString(fileName)
@@ -268,7 +263,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 path    = filePath(programId, uuid, fn.value)
                 size   <- s3FileSvc.upload(path, data)
                 _      <- checkForEmptyFile(size)
-                _      <- insertAttachmentInDB(user, programId, attachmentType, fn, description, size, path)
+                _      <- insertAttachmentInDB(user, programId, attachmentType, fn, size, path)
               } yield ()
           )
 
@@ -277,7 +272,6 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         programId:      Program.Id,
         attachmentType: Tag,
         fileName: String,
-        description: Option[NonEmptyString],
         data: Stream[F, Byte]
       )(using NoTransaction[F]): F[Unit] =
         FileName
@@ -297,7 +291,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
                 newPath = filePath(programId, uuid, fn.value)
                 size    <- s3FileSvc.upload(newPath, data)
                 _       <- checkForEmptyFile(size)
-                _       <- updateAttachmentInDB(user, programId, attachmentType, fn, description, size, newPath)
+                _       <- updateAttachmentInDB(user, programId, attachmentType, fn, size, newPath)
                 _       <- s3FileSvc.delete(oldPath)
               } yield ()
           )
@@ -335,7 +329,6 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       programId:      Program.Id,
       attachmentType: Tag,
       fileName:       NonEmptyString,
-      description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
     ): AppliedFragment =
@@ -344,7 +337,6 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           c_program_id,
           c_attachment_type,
           c_file_name,
-          c_description,
           c_file_size,
           c_remote_path
         )
@@ -352,10 +344,9 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           $program_id,
           $tag,
           $text_nonempty,
-          ${text_nonempty.opt},
           $int8,
           $text_nonempty
-      """.apply(programId, attachmentType, fileName, description, fileSize, remotePath) |+|
+      """.apply(programId, attachmentType, fileName, fileSize, remotePath) |+|
         ProgramService.Statements.whereUserAccess(user, programId)
 
     def updateAttachment(
@@ -363,19 +354,16 @@ object ProposalAttachmentFileService extends AttachmentFileService {
       programId:      Program.Id,
       attachmentType: Tag,
       fileName:       NonEmptyString,
-      description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
     ): AppliedFragment =
       sql"""
         UPDATE t_proposal_attachment
         SET c_file_name   = $text_nonempty,
-            c_description = ${text_nonempty.opt},
-            c_checked     = false,
             c_file_size   = $int8,
             c_remote_path = $text_nonempty
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
-      """.apply(fileName, description, fileSize, remotePath, programId, attachmentType) |+|
+      """.apply(fileName, fileSize, remotePath, programId, attachmentType) |+|
         ProgramService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
