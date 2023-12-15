@@ -283,11 +283,13 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
                     program { seconds }
                     partner { seconds }
                     nonCharged { seconds }
+                    total { seconds }
                   }
                   finalCharge {
                     program { seconds }
                     partner { seconds }
                     nonCharged { seconds }
+                    total { seconds }
                   }
                 }
               }
@@ -316,6 +318,9 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
             },
             "nonCharged": {
               "seconds": 0.000000
+            },
+            "total": {
+              "seconds": ${time.toSeconds}
             }
           },
           "finalCharge": {
@@ -327,6 +332,9 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
             },
             "nonCharged": {
               "seconds": 0.000000
+            },
+            "total": {
+              "seconds": ${time.toSeconds}
             }
           }
         }
