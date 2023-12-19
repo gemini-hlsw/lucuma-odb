@@ -9,6 +9,8 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.UserInvitation
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.core.model.Program
+import cats.syntax.all.*
 
 class createUserInvitation extends OdbSuite {
 
@@ -17,28 +19,10 @@ class createUserInvitation extends OdbSuite {
 
   val validUsers = List(pi, pi2).toList
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Observer).foreach { pur =>
-    test(s"invite ${pur.toString.toLowerCase} (key)") {
+  List(ProgramUserRole.Coi, ProgramUserRole.Observer).foreach { role =>
+    test(s"invite ${role.toString.toLowerCase} (key)") {
       createProgramAs(pi).flatMap { pid =>
-        query(
-          user = pi,
-          query = s"""
-          mutation {
-            createUserInvitation(
-              input: {
-                programId: "$pid"
-                role: ${pur.tag.toUpperCase}
-              }
-            ) {
-              key
-            }
-          }
-          """
-        ).map { js =>
-          js.hcursor
-            .downField("key")
-            .as[UserInvitation] // just be sure we can decode
-        }
+        createUserInvitationAs(pi, pid, role)
       }
     }
   }

@@ -12,6 +12,7 @@ import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.UserInvitation
 
 class program extends OdbSuite {
 
@@ -33,6 +34,9 @@ class program extends OdbSuite {
                 program(programId: "$id") {
                   id
                   name
+                  userInvitations {
+                    status
+                  }
                   proposal {
                     title
                     category
@@ -67,6 +71,7 @@ class program extends OdbSuite {
                 "program": {
                   "id": $id,
                   "name": $name,
+                  "userInvitations": [],
                   "proposal": null
                 }
               }
@@ -74,6 +79,58 @@ class program extends OdbSuite {
           )
         )
       }
+    }
+  }
+
+  test("invitations are visible") {
+    List(pi, service).traverse { user =>
+      val name = s"${user.displayName}'s Science Program"
+      createProgramAs(user, name).flatMap { id =>
+        createUserInvitationAs(user, id) >> {
+        expect(
+          user = user,
+          query =
+            s"""
+              query {
+                program(programId: "$id") {
+                  id
+                  name
+                  userInvitations {
+                    status
+                    issuer {
+                      id
+                    }
+                    program {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(
+            json"""
+              {
+                "program": {
+                  "id": $id,
+                  "name": $name,
+                  "userInvitations": [
+                    {
+                      "status": ${UserInvitation.Status.Pending},
+                      "issuer": {
+                        "id": ${user.id}
+                      },
+                      "program": {
+                        "id": $id
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
     }
   }
 
