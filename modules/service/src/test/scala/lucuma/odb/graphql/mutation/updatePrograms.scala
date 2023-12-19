@@ -23,6 +23,58 @@ class updatePrograms extends OdbSuite {
 
   val validUsers = List(pi, ngo, staff, admin, guest, service).toList
 
+  // For proposalStatus tests where it doesn't matter what the proposal is, just that there is one.
+  def addProposal(pid: Program.Id): IO[Unit] =
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposal: {
+                  proposalClass: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                  category: COSMOLOGY
+                  toOActivation: NONE
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 100
+                    }
+                  ]
+                }
+              }
+              WHERE: {
+                id: {
+                  EQ: "$pid"
+                }
+              }
+            }
+          ) {
+            programs {
+              id
+            }
+          }
+        }
+      """,
+      expected =
+        Right(json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          }
+        """)
+    )
+
   test("edit name") {
     createProgramAs(pi).flatMap { pid =>
       expect(
@@ -68,25 +120,27 @@ class updatePrograms extends OdbSuite {
         List(
           json"""
           {
-            "c_user"              : ${pi.id},
-            "c_mod_name"          : true,
-            "c_new_name"          : "new name",
-            "c_operation"         : "UPDATE",
-            "c_mod_pts_pi"        : false,
-            "c_new_pts_pi"        : null,
-            "c_program_id"        : $pid,
-            "c_mod_existence"     : false,
-            "c_new_existence"     : null,
-            "c_mod_pi_user_id"    : false,
-            "c_mod_program_id"    : false,
-            "c_new_pi_user_id"    : null,
-            "c_new_program_id"    : null,
-            "c_mod_pi_user_type"  : false,
-            "c_new_pi_user_type"  : null,
-            "c_mod_pts_execution" : false,
-            "c_mod_pts_uncharged" : false,
-            "c_new_pts_execution" : null,
-            "c_new_pts_uncharged" : null
+            "c_user"                : ${pi.id},
+            "c_mod_name"            : true,
+            "c_new_name"            : "new name",
+            "c_operation"           : "UPDATE",
+            "c_mod_pts_pi"          : false,
+            "c_new_pts_pi"          : null,
+            "c_program_id"          : $pid,
+            "c_mod_existence"       : false,
+            "c_new_existence"       : null,
+            "c_mod_pi_user_id"      : false,
+            "c_mod_program_id"      : false,
+            "c_new_pi_user_id"      : null,
+            "c_new_program_id"      : null,
+            "c_mod_pi_user_type"    : false,
+            "c_new_pi_user_type"    : null,
+            "c_mod_pts_execution"   : false,
+            "c_mod_pts_uncharged"   : false,
+            "c_new_pts_execution"   : null,
+            "c_new_pts_uncharged"   : null,
+            "c_mod_proposal_status" : false,
+            "c_new_proposal_status" : null
           }
           """
         )
@@ -138,25 +192,27 @@ class updatePrograms extends OdbSuite {
         List(
           json"""
           {
-            "c_user"              : ${pi.id},
-            "c_mod_name"          : false,
-            "c_new_name"          : null,
-            "c_operation"         : "UPDATE",
-            "c_mod_pts_pi"        : false,
-            "c_new_pts_pi"        : null,
-            "c_program_id"        : $pid,
-            "c_mod_existence"     : true,
-            "c_new_existence"     : "deleted",
-            "c_mod_pi_user_id"    : false,
-            "c_mod_program_id"    : false,
-            "c_new_pi_user_id"    : null,
-            "c_new_program_id"    : null,
-            "c_mod_pi_user_type"  : false,
-            "c_new_pi_user_type"  : null,
-            "c_mod_pts_execution" : false,
-            "c_mod_pts_uncharged" : false,
-            "c_new_pts_execution" : null,
-            "c_new_pts_uncharged" : null
+            "c_user"                : ${pi.id},
+            "c_mod_name"            : false,
+            "c_new_name"            : null,
+            "c_operation"           : "UPDATE",
+            "c_mod_pts_pi"          : false,
+            "c_new_pts_pi"          : null,
+            "c_program_id"          : $pid,
+            "c_mod_existence"       : true,
+            "c_new_existence"       : "deleted",
+            "c_mod_pi_user_id"      : false,
+            "c_mod_program_id"      : false,
+            "c_new_pi_user_id"      : null,
+            "c_new_program_id"      : null,
+            "c_mod_pi_user_type"    : false,
+            "c_new_pi_user_type"    : null,
+            "c_mod_pts_execution"   : false,
+            "c_mod_pts_uncharged"   : false,
+            "c_new_pts_execution"   : null,
+            "c_new_pts_uncharged"   : null,
+            "c_mod_proposal_status" : false,
+            "c_new_proposal_status" : null
           }
           """
         )
@@ -925,6 +981,7 @@ class updatePrograms extends OdbSuite {
               input: {
                 SET: {
                   proposal: {
+                    title: "my proposal"
                     proposalClass: {
                       queue: {
                         minPercentTime: 50
@@ -965,7 +1022,7 @@ class updatePrograms extends OdbSuite {
             }
           """
         )
-      )
+      ) >>
       // Now update both of them
       expect(
         user = pi,
@@ -999,11 +1056,13 @@ class updatePrograms extends OdbSuite {
               programs {
                 id
                 proposal {
+                  title
                   proposalClass {
                     ... on Classical {
                       minPercentTime
                     }
                   }
+                  toOActivation
                   partnerSplits {
                     partner
                     percent
@@ -1021,9 +1080,11 @@ class updatePrograms extends OdbSuite {
                   {
                     "id" : $pid1,
                     "proposal" : {
+                      "title": "my proposal",
                       "proposalClass" : {
                         "minPercentTime" : 30
                       },
+                      "toOActivation": "RAPID",
                       "partnerSplits" : [
                         {
                           "partner" : "KECK",
@@ -1035,9 +1096,11 @@ class updatePrograms extends OdbSuite {
                   {
                     "id" : $pid2,
                     "proposal" : {
+                      "title": null,
                       "proposalClass" : {
                         "minPercentTime" : 30
                       },
+                      "toOActivation": "RAPID",
                       "partnerSplits" : [
                         {
                           "partner" : "KECK",
@@ -1045,6 +1108,477 @@ class updatePrograms extends OdbSuite {
                         }
                       ]
                     }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("edit proposal status (attempt update proposalStatus with no proposal)") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: SUBMITTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected =
+          Left(List(s"Proposal status in program $pid cannot be changed because it has no proposal."))
+      )
+    }
+  }
+
+  test("edit proposal status (pi attempts update proposalStatus to unauthorized status)") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: ACCEPTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected =
+          Left(List(s"User ${pi.id} not authorized to set proposal status to ACCEPTED."))
+      )
+    }
+  }
+
+  test("edit proposal status (guests cannot submit proposals)") {
+    createProgramAs(guest).flatMap { pid =>
+      expect(
+        user = guest,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: SUBMITTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected =
+          Left(List(s"User ${guest.id} not authorized to set proposal status to SUBMITTED."))
+      )
+    }
+  }
+
+  test("edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pid) >>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: SUBMITTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid,
+                    "proposalStatus": "SUBMITTED"
+                  }
+                ]
+              }
+            }
+          """
+        )
+      ) >>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: NOT_SUBMITTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid,
+                    "proposalStatus": "NOT_SUBMITTED"
+                  }
+                ]
+              }
+            }
+          """
+        )
+      ) >>
+      chronProgramUpdates(pid).map(_.drop(1)).assertEquals(
+        List(
+          json"""
+          {
+            "c_user"                : ${pi.id},
+            "c_mod_name"            : false,
+            "c_new_name"            : null,
+            "c_operation"           : "UPDATE",
+            "c_mod_pts_pi"          : false,
+            "c_new_pts_pi"          : null,
+            "c_program_id"          : $pid,
+            "c_mod_existence"       : false,
+            "c_new_existence"       : null,
+            "c_mod_pi_user_id"      : false,
+            "c_mod_program_id"      : false,
+            "c_new_pi_user_id"      : null,
+            "c_new_program_id"      : null,
+            "c_mod_pi_user_type"    : false,
+            "c_new_pi_user_type"    : null,
+            "c_mod_pts_execution"   : false,
+            "c_mod_pts_uncharged"   : false,
+            "c_new_pts_execution"   : null,
+            "c_new_pts_uncharged"   : null,
+            "c_mod_proposal_status" : true,
+            "c_new_proposal_status" : "submitted"
+          }
+          """,
+          json"""
+          {
+            "c_user"                : ${pi.id},
+            "c_mod_name"            : false,
+            "c_new_name"            : null,
+            "c_operation"           : "UPDATE",
+            "c_mod_pts_pi"          : false,
+            "c_new_pts_pi"          : null,
+            "c_program_id"          : $pid,
+            "c_mod_existence"       : false,
+            "c_new_existence"       : null,
+            "c_mod_pi_user_id"      : false,
+            "c_mod_program_id"      : false,
+            "c_new_pi_user_id"      : null,
+            "c_new_program_id"      : null,
+            "c_mod_pi_user_type"    : false,
+            "c_new_pi_user_type"    : null,
+            "c_mod_pts_execution"   : false,
+            "c_mod_pts_uncharged"   : false,
+            "c_new_pts_execution"   : null,
+            "c_new_pts_uncharged"   : null,
+            "c_mod_proposal_status" : true,
+            "c_new_proposal_status" : "not_submitted"
+          }
+          """
+        )
+      )
+    }
+  }
+
+  test("edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pid) >>
+      expect(
+        user = staff,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: ACCEPTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid,
+                    "proposalStatus": "ACCEPTED"
+                  }
+                ]
+              }
+            }
+          """
+        )
+      ) >>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: NOT_SUBMITTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected =
+          Left(List(s"User ${pi.id} not authorized to change proposal status from ACCEPTED in program $pid."))
+      )
+    }
+  }
+
+  test("edit proposal status (multiple errors)") {
+    (createProgramAs(pi), createProgramAs(pi), createProgramAs(pi)).tupled.flatMap { (pid1, pid2, pid3) =>
+      addProposal(pid1) >>
+      addProposal(pid2) >>
+      // have admin set one to NOT_ACCEPTED
+      expect(
+        user = admin,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: NOT_ACCEPTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid1"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid1,
+                    "proposalStatus": "NOT_ACCEPTED"
+                  }
+                ]
+              }
+            }
+          """
+        )
+      ) >>
+      // now try to change them all
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: NOT_SUBMITTED
+                }
+                WHERE: {
+                  id: {
+                    IN: ["$pid1", "$pid2", "$pid3"]
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected =
+          Left(
+            List(
+              s"User ${pi.id} not authorized to change proposal status from NOT_ACCEPTED in program $pid1.",
+              s"Proposal status in program $pid3 cannot be changed because it has no proposal."
+            )
+          )
+      )
+    }
+  }
+
+  test("edit proposal status (bulk update by current status)") {
+    (createProgramAs(pi), createProgramAs(pi), createProgramAs(pi)).tupled.flatMap { (pid1, pid2, pid3) =>
+      addProposal(pid1) >>
+      addProposal(pid2) >>
+      addProposal(pid3) >>
+      // have admin set one to ACCEPTED
+      expect(
+        user = admin,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: ACCEPTED
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid2"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid2,
+                    "proposalStatus": "ACCEPTED"
+                  }
+                ]
+              }
+            }
+          """
+        )
+      ) >>
+      // now set all the NOT_SUBMITTED to NOT_ACCEPTED
+      // (have to also limit program ids because there are programs from other tests)
+      expect(
+        user = admin,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposalStatus: NOT_ACCEPTED
+                }
+                WHERE: {
+                  proposalStatus: {
+                    EQ: NOT_SUBMITTED
+                  }
+                  id: {
+                    IN: ["$pid1", "$pid2", "$pid3"]
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                proposalStatus
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms" : {
+                "programs": [
+                  {
+                    "id" : $pid1,
+                    "proposalStatus": "NOT_ACCEPTED"
+                  },
+                  {
+                    "id" : $pid3,
+                    "proposalStatus": "NOT_ACCEPTED"
                   }
                 ]
               }

@@ -39,6 +39,7 @@ final class Enums(
   // reason they must be explicitly "used" in the construction of `Enums`. Add
   // any new enums to the list below.
   Enumerated[TimeEstimate]
+  Enumerated[ProposalStatus]
 
   /**
    * Time estimates for config changes, etc.  Because this is internal to the
@@ -86,10 +87,33 @@ final class Enums(
 
   }
 
+  enum ProposalStatus(val tag: String, ordinal: Short) {
+    private val meta = enumMeta.proposalStatus.getOrElse((tag, ordinal), sys.error(s"t_proposal_status missing tag `$tag`, ordinal `$ordinal`"))
+
+    def name: String = meta.name
+
+    // Note: The order here controls the Order of the Enumerated in the ODB, so keep them in order. 
+    case NotSubmitted   extends ProposalStatus("not_submitted", 0)
+    case Submitted      extends ProposalStatus("submitted", 1)
+    case Accepted       extends ProposalStatus("accepted", 2)
+    case NotAccepted    extends ProposalStatus("not_accepted", 3)
+
+    // Used to test that undefined values in the database produce immediate failure on startup.
+    // case NotGood     extends ProposalStatus("not_submitted", 1)
+    // case UhOh        extends ProposalStatus("uh_oh", 0)
+  }
+
+  object ProposalStatus {
+    given Enumerated[ProposalStatus] =
+      Enumerated.fromNEL(NonEmptyList.fromListUnsafe(values.toList)).withTag(_.tag)
+  }
+
   val schema: Schema =
     new Schema {
       def pos: SourcePos = SourcePos.instance
-      def baseTypes: List[NamedType] = enumMeta.unreferencedTypes
+      def baseTypes: List[NamedType] = 
+        Enumerated[ProposalStatus].toEnumType("ProposalStatus", "Enumerated type of ProposalStatus")(_.name) ::
+          enumMeta.unreferencedTypes
       def directives: List[DirectiveDef] = Nil
       def schemaExtensions: List[SchemaExtension] = Nil
       def typeExtensions: List[TypeExtension] = Nil
@@ -101,12 +125,14 @@ object Enums {
 
   case class Meta(
     timeEstimate:      Map[String, TimeEstimateMeta],
+    proposalStatus:    Map[(String, Short), ProposalStatusMeta],
     unreferencedTypes: List[EnumType]
   )
 
   def load[F[_]: Monad: Logger](s: Session[F]): F[Enums] =
     for {
       te  <- TimeEstimateMeta.select(s)
+      ps  <- ProposalStatusMeta.select(s)
       un  <- List(
                // "Unreferenced" types -- those for which we do not need to refer
                // to individual instance in ODB code.
@@ -118,6 +144,6 @@ object Enums {
                ConditionsMeasurementSourceEnumType.fetch(s),
                SeeingTrendEnumType.fetch(s),
              ).sequence
-    } yield Enums(Meta(te, un))
+    } yield Enums(Meta(te, ps, un))
 
 }

@@ -33,6 +33,7 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.GuideService.AvailabilityPeriod
@@ -97,9 +98,12 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
           )
         )
       )
-    val services                 = Services.forUser(pi /* doesn't matter*/ )(s)
-    services.transactionally {
-      services.smartGcalService.insertGmosNorth(1, tableRow)
+    
+    Enums.load(s).flatMap{ e =>
+      val services = Services.forUser(pi /* doesn't matter*/, e )(s)
+      services.transactionally {
+        services.smartGcalService.insertGmosNorth(1, tableRow)
+      }
     }
   }
 

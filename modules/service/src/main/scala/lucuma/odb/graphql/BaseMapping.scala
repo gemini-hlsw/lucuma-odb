@@ -187,6 +187,8 @@ trait BaseMapping[F[_]]
   lazy val ProposalAttachmentTypeMetaType      = schema.ref("ProposalAttachmentTypeMeta")
   lazy val ProposalAttachmentTypeType          = schema.ref("ProposalAttachmentType")
   lazy val ProposalClassType                   = schema.ref("ProposalClass")
+  lazy val ProposalStatusMetaType              = schema.ref("ProposalStatusMeta")
+  lazy val ProposalStatusType                  = schema.ref("ProposalStatus")
   lazy val ProposalType                        = schema.ref("Proposal")
   lazy val QueryType                           = schema.ref("Query")
   lazy val QueueType                           = schema.ref("Queue")

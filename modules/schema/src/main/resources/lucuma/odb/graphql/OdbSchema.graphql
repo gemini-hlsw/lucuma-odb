@@ -10,6 +10,7 @@ enum ConditionsExpectationType { DUMMY }
 enum ObsAttachmentType { DUMMY }
 enum FilterType { DUMMY }
 enum ProposalAttachmentType { DUMMY }
+enum ProposalStatus { DUMMY }
 
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
@@ -2955,6 +2956,12 @@ input ProgramPropertiesInput {
   The program name, which is both optional and nullable
   """
   name: NonEmptyString
+
+  """
+  The proposal status, which is both optional and nullable. 
+  This cannot be specified on create.
+  """
+  proposalStatus: ProposalStatus
 
   """
   The program proposal is both optional and nullable
@@ -7454,6 +7461,11 @@ type Program {
   """
   proposal: Proposal
 
+  """
+  Proposal status of the program
+  """
+  proposalStatus: ProposalStatus!
+
   "Principal Investigator"
   pi: User
 
@@ -7694,6 +7706,14 @@ enum ProposalClassEnum {
 }
 
 """
+Metadata for `enum ProposalStatus`
+"""
+type ProposalStatusMeta {
+  tag:   ProposalStatus!
+  name:  String!
+}
+
+"""
 Quasar spectrum
 """
 enum QuasarSpectrum {
@@ -7906,6 +7926,11 @@ type Query {
   Metadata for `enum ProposalAttachmentType`
   """
   proposalAttachmentTypeMeta: [ProposalAttachmentTypeMeta!]!
+
+  """
+  Metadata for `enum ProposalStatus
+  """
+  proposalStatusMeta: [ProposalStatusMeta!]!
 
   # Observations grouped by commonly held science mode
   # observingModeGroup(
@@ -10084,6 +10109,33 @@ input WhereEqProposalClassType {
 }
 
 """
+Filters on equality of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'EQ: "SUBMITTED'
+
+"""
+input WhereEqProposalStatus {
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: ProposalStatus
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: ProposalStatus
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [ProposalStatus!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [ProposalStatus!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -11110,6 +11162,11 @@ input WhereProgram {
   Matches the program name.
   """
   name: WhereOptionString
+
+  """
+  Matches the proposalStatus.
+  """
+  proposalStatus: WhereEqProposalStatus
 
   """
   Matches the proposal.

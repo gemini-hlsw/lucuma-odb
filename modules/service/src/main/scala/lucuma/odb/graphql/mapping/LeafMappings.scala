@@ -122,6 +122,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
+      LeafMapping[Tag](ProposalStatusType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[Tag](SeeingTrendType),
       LeafMapping[SequenceCommand](SequenceCommandType),

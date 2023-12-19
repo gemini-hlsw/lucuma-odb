@@ -17,6 +17,7 @@ object WhereProgram {
   def binding(path: Path): Matcher[Predicate] = {
     val WhereNameBinding = WhereOptionString.binding(path / "name")
     val WhereOrderProgramId = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
+    val WhereEqProposalStatus = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
     lazy val WhereProgramBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
@@ -25,15 +26,17 @@ object WhereProgram {
         WhereProgramBinding.Option("NOT", rNOT),
         WhereOrderProgramId.Option("id", rId),
         WhereNameBinding.Option("name", rName),
+        WhereEqProposalStatus.Option("proposalStatus", rPs),
         ("proposal", _), // ignore for now
       ) =>
-        (rAND, rOR, rNOT, rId, rName).parMapN { (AND, OR, NOT, id, name) =>
+          (rAND, rOR, rNOT, rId, rName, rPs).parMapN { (AND, OR, NOT, id, name, ps) =>
           and(List(
             AND.map(and),
             OR.map(or),
             NOT.map(Not(_)),
             id,
-            name
+            name,
+            ps
           ).flatten)
         }
     }
