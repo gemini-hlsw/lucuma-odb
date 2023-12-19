@@ -68,6 +68,7 @@ trait ProgramMapping[F[_]]
         SqlField("existence", ProgramTable.Existence, hidden = true),
         SqlField("name", ProgramTable.Name),
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
+        SqlField("proposalStatus", ProgramTable.ProposalStatus),
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
         SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
         SqlObject("observations"),

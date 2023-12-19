@@ -158,6 +158,7 @@ object OdbMapping {
           with ProposalClassMapping[F]
           with ProposalAttachmentMapping[F]
           with ProposalAttachmentTypeMetaMapping[F]
+          with ProposalStatusMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
@@ -207,7 +208,7 @@ object OdbMapping {
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
-          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user))
+          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums))
           override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
 
@@ -298,6 +299,7 @@ object OdbMapping {
               ProposalAttachmentMapping,
               ProposalAttachmentTypeMetaMapping,
               ProposalMapping,
+              ProposalStatusMetaMapping,
               QueryMapping,
               RadialVelocityMapping,
               RecordAtomResultMapping,
@@ -422,6 +424,7 @@ object OdbMapping {
       with ObsAttachmentFileExtMapping[F]
       with PartnerMetaMapping[F]
       with ProposalAttachmentTypeMetaMapping[F]
+      with ProposalStatusMetaMapping[F]
       with QueryMapping[F]
     {
 
@@ -441,8 +444,12 @@ object OdbMapping {
           ObsAttachmentFileExtMapping,
           PartnerMetaMapping,
           ProposalAttachmentTypeMetaMapping,
+          ProposalStatusMetaMapping,
           QueryMapping,
         ) ++ LeafMappings
+
+      override val selectElaborator: SelectElaborator =
+        SelectElaborator(QueryElaborator)
     
     }
         

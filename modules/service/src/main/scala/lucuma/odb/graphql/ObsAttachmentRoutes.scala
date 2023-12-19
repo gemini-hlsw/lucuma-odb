@@ -11,6 +11,7 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.ObsAttachmentFileService
 import lucuma.odb.service.S3FileService
@@ -36,10 +37,11 @@ object ObsAttachmentRoutes {
     pool:                  Resource[F, Session[F]],
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
+    enums:                 Enums,
     maxUploadMb:           Int,
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u)).map(_.obsAttachmentFileService(s3)).use(fa),
+      [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums)).map(_.obsAttachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )

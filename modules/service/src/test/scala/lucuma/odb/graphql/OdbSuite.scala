@@ -434,7 +434,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   import lucuma.odb.service.Services
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use { s =>
-      f(Services.forUser(u)(s))
+      Enums.load(s).flatMap(e =>
+        f(Services.forUser(u, e)(s))
+      )
     }
 
 }

@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.data.Nested
+import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.kernel.Order
@@ -15,6 +16,7 @@ import grackle.Env
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import grackle.Problem
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
@@ -71,7 +73,6 @@ import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
 import lucuma.odb.service.ProgramService
-import lucuma.odb.service.ProposalService
 import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -710,14 +711,33 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         val idSelect: Result[AppliedFragment] =
           MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
 
+        import ProgramService.UpdateProgramsError.*
+        def toFailure(fs: NonEmptyList[ProgramService.UpdateProgramsError]): Result[Nothing] =
+          Result.Failure {
+            NonEmptyChain.fromNonEmptyList(
+              fs.map {
+                case ProposalCreationFailed => 
+                  Problem("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
+                case ProposalInconsistentUpdate => 
+                  Problem("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+                case InvalidProposalStatus(ps) => 
+                  Problem(s"Invalid proposal status: ${ps.value}") // We 'shouldn't` ever get this one...
+                case NotAuthorizedNewProposalStatus(user, ps) => 
+                  Problem(s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase}.")
+                case NotAuthorizedOldProposalStatus(pid, user, ps) => 
+                  Problem(s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid.")
+                case NoProposalForStatusChange(pid) => 
+                  Problem(s"Proposal status in program $pid cannot be changed because it has no proposal.")
+              }
+            )
+          }
+
         // Update the specified programs and then return a query for the affected programs.
         idSelect.flatTraverse { which =>
-          programService.updatePrograms(input.SET, which).map(programResultSubquery(_, input.LIMIT, child)).recover {
-            case ProposalService.ProposalUpdateException.CreationFailed =>
-              Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
-            case ProposalService.ProposalUpdateException.InconsistentUpdate =>
-              Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
-          }
+          programService.updatePrograms(input.SET, which)
+           .map(
+              _.fold(toFailure, programResultSubquery(_, input.LIMIT, child))
+            )
         }
       }
     }
