@@ -63,6 +63,7 @@ import skunk.circe.codec.json.{json => jsonCodec}
 import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap
+import lucuma.odb.data.UserInvitation
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -949,5 +950,35 @@ trait DatabaseOperations { this: OdbSuite =>
         """
       )
     )
+
+  def createUserInvitationAs(
+    user: User, 
+    pid: Program.Id, 
+    role: ProgramUserRole = ProgramUserRole.Coi,
+    supportType: Option[ProgramUserSupportType] = None,
+    supportPartner: Option[Tag] = None
+  ): IO[UserInvitation] =
+    query(
+      user = user,
+      query = s"""
+      mutation {
+        createUserInvitation(
+          input: {
+            programId: "$pid"
+            role: ${role.tag.toUpperCase}
+            ${supportType.map(_.tag.toUpperCase).foldMap(s => s"supportType: $s")}
+            ${supportPartner.map(_.value).foldMap(s => s"supportPartner: $s")}
+          }
+        ) {
+          key
+        }
+      }
+      """
+    ).map { js =>
+      js.hcursor
+        .downFields("createUserInvitation", "key")
+        .require[UserInvitation]
+    }
+
 
 }

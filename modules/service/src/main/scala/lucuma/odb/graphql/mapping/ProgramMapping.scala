@@ -52,7 +52,8 @@ trait ProgramMapping[F[_]]
      with Predicates[F]
      with ProposalAttachmentTable[F]
      with ResultMapping[F]
-     with GroupElementView[F] {
+     with GroupElementView[F]
+     with UserInvitationTable[F] {
 
   def user: User
   def itcClient: ItcClient[F]
@@ -80,6 +81,7 @@ trait ProgramMapping[F[_]]
         EffectField("plannedTimeRange", plannedTimeHandler, List("id")),  // deprecated
         EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
         EffectField("timeCharge", timeChargeHandler, List("id"))
+        SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
       )
     )
 
