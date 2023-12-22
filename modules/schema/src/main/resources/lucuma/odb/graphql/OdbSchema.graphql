@@ -4889,11 +4889,8 @@ type Dataset {
   "Dataset QA state, if any has been set."
   qaState: DatasetQaState
 
-  "Start time, if the dataset collection has started."
-  start: Timestamp
-
-  "End time, if the dataset collection has finished."
-  end: Timestamp
+  "Dataset time interval, if the dataset collection has started."
+  interval: TimestampInterval
 
 }
 
