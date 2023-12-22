@@ -5038,76 +5038,6 @@ Target declination coordinate in format '[+/-]DD:MM:SS.sss'
 scalar DmsString
 
 """
-Equivalent time amount in several unit options (e.g., 120 seconds or 2 minutes)
-"""
-type TimeSpan {
-  """
-  TimeSpan in µs
-  """
-  microseconds: Long!
-
-  """
-  TimeSpan in ms
-  """
-  milliseconds: BigDecimal!
-
-  """
-  TimeSpan in seconds
-  """
-  seconds: BigDecimal!
-
-  """
-  TimeSpan in minutes
-  """
-  minutes: BigDecimal!
-
-  """
-  TimeSpan in hours
-  """
-  hours: BigDecimal!
-
-  """
-  TimeSpan as an ISO-8601 string
-  """
-  iso: String!
-}
-
-"""
-Equivalent time amount in several unit options (exactly one must be specified)
-"""
-input TimeSpanInput {
-  """
-  TimeSpan in µs
-  """
-  microseconds: Long
-
-  """
-  TimeSpan in ms
-  """
-  milliseconds: BigDecimal
-
-  """
-  TimeSpan in seconds
-  """
-  seconds: BigDecimal
-
-  """
-  TimeSpan in minutes
-  """
-  minutes: BigDecimal
-
-  """
-  TimeSpan in hours
-  """
-  hours: BigDecimal
-
-  """
-  TimeSpan as an ISO-8601 string
-  """
-  iso: String
-}
-
-"""
 Either air mass range or elevation range
 """
 type ElevationRange {
@@ -9596,6 +9526,93 @@ type TimeChargeInvoice {
   initial 'executionTime'.
   """
   finalCharge: CategorizedTime!
+
+}
+
+"""
+Equivalent time amount in several unit options (e.g., 120 seconds or 2 minutes)
+"""
+type TimeSpan {
+  """
+  TimeSpan in µs
+  """
+  microseconds: Long!
+
+  """
+  TimeSpan in ms
+  """
+  milliseconds: BigDecimal!
+
+  """
+  TimeSpan in seconds
+  """
+  seconds: BigDecimal!
+
+  """
+  TimeSpan in minutes
+  """
+  minutes: BigDecimal!
+
+  """
+  TimeSpan in hours
+  """
+  hours: BigDecimal!
+
+  """
+  TimeSpan as an ISO-8601 string
+  """
+  iso: String!
+}
+
+"""
+Equivalent time amount in several unit options (exactly one must be specified)
+"""
+input TimeSpanInput {
+  """
+  TimeSpan in µs
+  """
+  microseconds: Long
+
+  """
+  TimeSpan in ms
+  """
+  milliseconds: BigDecimal
+
+  """
+  TimeSpan in seconds
+  """
+  seconds: BigDecimal
+
+  """
+  TimeSpan in minutes
+  """
+  minutes: BigDecimal
+
+  """
+  TimeSpan in hours
+  """
+  hours: BigDecimal
+
+  """
+  TimeSpan as an ISO-8601 string
+  """
+  iso: String
+}
+
+"""
+Time interval marked by a start 'Timestamp' (inclusive) and an end 'Timestamp'
+(exclusive).
+"""
+type TimestampInterval {
+
+  "Start time of the interval (inclusive)."
+  start: Timestamp!
+
+  "End time of the interval (exclusive)."
+  end: Timestamp!
+
+  "Duration of the interval."
+  duration: TimeSpan!
 
 }
 

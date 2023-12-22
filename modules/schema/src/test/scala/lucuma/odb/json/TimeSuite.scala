@@ -7,20 +7,30 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.TimestampInterval
 import lucuma.core.util.arb.ArbTimeSpan
+import lucuma.core.util.arb.ArbTimestampInterval
 import munit.DisciplineSuite
 
-abstract class TimeSuite(using Encoder[TimeSpan]) extends DisciplineSuite with ArbitraryInstances {
+abstract class TimeSuite(using Encoder[TimeSpan], Encoder[TimestampInterval]) extends DisciplineSuite with ArbitraryInstances {
 
   import ArbTimeSpan.given
+  import ArbTimestampInterval.given
   import time.decoder.given
 
   checkAll("TimeSpanCodec", CodecTests[TimeSpan].codec)
+  checkAll("TimestampInterval", CodecTests[TimestampInterval].codec)
 }
 
-class TimeQuerySuite extends TimeSuite(using time.query.Encoder_TimeSpan)
+class TimeQuerySuite extends TimeSuite(using
+  time.query.Encoder_TimeSpan,
+  time.query.Encoder_TimestampInterval
+)
 
-class TimeTransportSuite extends TimeSuite(using time.transport.Encoder_TimeSpan)
+class TimeTransportSuite extends TimeSuite(using
+  time.transport.Encoder_TimeSpan,
+  time.transport.Encoder_TimestampInterval
+)
 
 class TimeSpec extends munit.ScalaCheckSuite {
   import org.scalacheck.Prop.forAll
