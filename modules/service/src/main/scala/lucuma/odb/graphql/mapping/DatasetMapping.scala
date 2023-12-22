@@ -4,11 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.syntax.apply.*
 import grackle.Query.Binding
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import io.circe.syntax.*
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
+import lucuma.odb.json.time.query.given
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
@@ -42,8 +47,17 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
         SqlField("filename", DatasetTable.File.Name),
         SqlField("qaState",  DatasetTable.QaState),
 
-        SqlField("start", DatasetTable.Time.Start),
-        SqlField("end", DatasetTable.Time.End)
+        SqlField("start", DatasetTable.Time.Start, hidden = true),
+        SqlField("end", DatasetTable.Time.End, hidden = true),
+
+        CursorFieldJson("interval",
+           cursor =>
+             for {
+               s <- cursor.fieldAs[Option[Timestamp]]("start")
+               e <- cursor.fieldAs[Option[Timestamp]]("end")
+             } yield (s, e).mapN { (ts, te) => TimestampInterval.between(ts, te) }.asJson,
+           List("start", "end")
+        )
       )
     )
 
