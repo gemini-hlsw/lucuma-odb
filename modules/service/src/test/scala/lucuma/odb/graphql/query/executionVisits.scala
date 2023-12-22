@@ -14,6 +14,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.ObservingModeType
 
 class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
@@ -269,6 +270,61 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
     )
+  }
+
+  test("observation -> excution -> visits -> interval") {
+    recordAll(pi, mode, offset = 550, visitCount = 2, atomCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              visits {
+                matches {
+                  interval {
+                    start
+                    end
+                    duration { seconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.map { v =>
+        val inv = for {
+          s <- v.allEvents.headOption.map(_.received)
+          e <- v.allEvents.lastOption.map(_.received)
+        } yield TimestampInterval.between(s, e)
+
+        inv.fold(Json.Null) { i =>
+          Json.obj(
+            "interval" -> Json.obj(
+              "start"    -> i.start.asJson,
+              "end"      -> i.end.asJson,
+              "duration" -> Json.obj(
+                "seconds" -> i.boundedTimeSpan.toSeconds.asJson
+              )
+            )
+          )
+        }
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "visits": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
   }
 
   def invoiceQuery(oid: Observation.Id): String =

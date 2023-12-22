@@ -1772,14 +1772,8 @@ type GmosNorthVisit implements Visit {
   "Created by Observe at time."
   created: Timestamp!
 
-  "Started at time."
-  startTime: Timestamp
-
-  "Ended at time."
-  endTime: Timestamp
-
-  "Visit duration."
-  duration: TimeSpan!
+  "Time interval during which this visit occurred."
+  interval: TimestampInterval!
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -2308,14 +2302,8 @@ type GmosSouthVisit implements Visit {
   "Created by Observe at time."
   created: Timestamp!
 
-  "Started at time."
-  startTime: Timestamp
-
-  "Ended at time."
-  endTime: Timestamp
-
-  "Visit duration."
-  duration: TimeSpan!
+  "Time interval during which this visit occurred."
+  interval: TimestampInterval!
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -9707,14 +9695,8 @@ interface Visit {
   "Created by Observe at time."
   created: Timestamp!
 
-  "Started at time."
-  startTime: Timestamp
-
-  "Ended at time."
-  endTime: Timestamp
-
-  "Visit duration."
-  duration: TimeSpan!
+  "Time interval during which this visit occurred."
+  interval: TimestampInterval!
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(

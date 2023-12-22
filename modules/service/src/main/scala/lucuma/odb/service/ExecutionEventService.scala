@@ -7,6 +7,7 @@ import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -23,6 +24,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -31,6 +33,10 @@ import Services.Syntax.*
 
 
 trait ExecutionEventService[F[_]] {
+
+  def visitRange(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
@@ -77,6 +83,11 @@ object ExecutionEventService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F] with ExecutionUserCheck {
+
+      override def visitRange(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Option[TimestampInterval]] =
+        session.unique(Statements.SelectVisitRange)(visitId)
 
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
@@ -175,6 +186,18 @@ object ExecutionEventService {
     }
 
   object Statements {
+
+    val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(c_received),
+          MAX(c_received)
+        FROM
+          t_execution_event
+        WHERE
+          c_visit_id = $visit_id
+      """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
+
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
       sql"""
