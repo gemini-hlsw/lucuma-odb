@@ -38,6 +38,10 @@ trait ExecutionEventService[F[_]] {
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
+  def stepRange(
+    visitId: Step.Id
+  )(using Transaction[F]): F[Option[TimestampInterval]]
+
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
     datasetStage: DatasetStage
@@ -88,6 +92,11 @@ object ExecutionEventService {
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[TimestampInterval]] =
         session.unique(Statements.SelectVisitRange)(visitId)
+
+      override def stepRange(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[TimestampInterval]] =
+        session.unique(Statements.SelectStepRange)(stepId)
 
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
@@ -198,6 +207,16 @@ object ExecutionEventService {
           c_visit_id = $visit_id
       """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
 
+    val SelectStepRange: Query[Step.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(c_received),
+          MAX(c_received)
+        FROM
+          t_execution_event
+        WHERE
+          c_step_id = $step_id
+      """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
       sql"""
