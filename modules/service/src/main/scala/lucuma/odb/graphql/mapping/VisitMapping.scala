@@ -45,6 +45,7 @@ import table.ObservationView
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
+                            with EventRangeEffectHandler[F]
                             with ExecutionEventTable[F]
                             with GmosStaticTables[F]
                             with ObservationView[F]
@@ -131,29 +132,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
   }
 
   private lazy val intervalHandler: EffectHandler[F] =
-    new EffectHandler[F] {
-
-      def calculateInterval(vid: Visit.Id): F[Result[Json]] =
-        services.useTransactionally {
-          executionEventService.visitRange(vid).map(_.asJson.success)
-        }
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          vids <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Visit.Id]("id") }.pure[F])
-          invs <- vids.distinct.traverse(vid => ResultT(calculateInterval(vid)).tupleLeft(vid))
-          res  <- ResultT(
-                    vids
-                      .flatMap { vid => invs.find(r => r._1 === vid).map(_._2).toList }
-                      .zip(queries)
-                      .traverse { case (result, (query, parentCursor)) =>
-                        Query.childContext(parentCursor.context, query).map { childContext =>
-                          CirceCursor(childContext, result, Some(parentCursor), parentCursor.fullEnv)
-                        }
-                      }.pure[F]
-                  )
-        } yield res).value
-    }
+    eventRangeEffectHandler[Visit.Id]("id", services, executionEventService.visitRange)
 
   // WIP.  At the moment the `invoiceHandler` calls the time accounting service
   // on demand and returns an "invoice" with just the whole execution time.

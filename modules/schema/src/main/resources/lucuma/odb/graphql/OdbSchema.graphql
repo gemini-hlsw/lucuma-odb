@@ -1714,14 +1714,8 @@ type GmosNorthStepRecord implements StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time of the first associated step event, if any."
-  startTime: Timestamp
-
-  "Time of the last associated step event, if any."
-  endTime: Timestamp
-
-  "Step duration, the difference between 'endTime' and 'startTime'."
-  duration: TimeSpan!
+  "Time interval during which this visit occurred."
+  interval: TimestampInterval!
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
@@ -2244,14 +2238,8 @@ type GmosSouthStepRecord implements StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time of the first associated step event, if any."
-  startTime: Timestamp
-
-  "Time of the last associated step event, if any."
-  endTime: Timestamp
-
-  "Step duration, the difference between 'endTime' and 'startTime'."
-  duration: TimeSpan!
+  "Time interval during which this visit occurred."
+  interval: TimestampInterval!
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
@@ -9001,14 +8989,8 @@ interface StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time of the first associated step event, if any."
-  startTime: Timestamp
-
-  "Time of the last associated step event, if any."
-  endTime: Timestamp
-
-  "Step duration, the difference between 'endTime' and 'startTime'."
-  duration: TimeSpan!
+  "Time interval during which this visit occurred."
+  interval: TimestampInterval!
 
   """
   The step configuration, apart from instrument details found in the
