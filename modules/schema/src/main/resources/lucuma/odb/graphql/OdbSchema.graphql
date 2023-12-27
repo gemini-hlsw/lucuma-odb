@@ -9440,11 +9440,8 @@ uncharged.
 """
 interface TimeChargeDiscount {
 
-  "The start time (inclusive) of the discount occurrence."
-  start: Timestamp!
-
-  "The end time (exclusive) of the discount occurrence."
-  end: Timestamp!
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
 
   "Time amount to discount from the partner."
   partner: TimeSpan!
@@ -9464,11 +9461,8 @@ time is not charged.
 """
 type TimeChargeDaylightDiscount implements TimeChargeDiscount {
 
-  "The start time (inclusive) of the discount occurrence."
-  start: Timestamp!
-
-  "The end time (exclusive) of the discount occurrence."
-  end: Timestamp!
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
 
   "Time amount to discount from the partner."
   partner: TimeSpan!

@@ -11,9 +11,13 @@ import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
+import io.circe.syntax.*
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.VisitTable
+import lucuma.odb.json.time.query.given
 
 trait TimeChargeDiscountMapping[F[_]] extends TimeChargeDiscountTable[F]
                                          with VisitTable[F] {
@@ -25,8 +29,19 @@ trait TimeChargeDiscountMapping[F[_]] extends TimeChargeDiscountTable[F]
       fieldMappings = List(
         SqlField("id",     TimeChargeDiscountTable.Id, key = true, hidden = true),
         SqlField("type",   TimeChargeDiscountTable.DiscountType, discriminator = true, hidden = true),
-        SqlField("start",  TimeChargeDiscountTable.Start),
-        SqlField("end",    TimeChargeDiscountTable.End),
+
+        SqlField("start",  TimeChargeDiscountTable.Start, hidden = true),
+        SqlField("end",    TimeChargeDiscountTable.End,   hidden = true),
+
+        CursorFieldJson("interval",
+          cursor =>
+            for {
+              s <- cursor.fieldAs[Timestamp]("start")
+              e <- cursor.fieldAs[Timestamp]("end")
+            } yield TimestampInterval.between(s, e).asJson,
+          List("start", "end")
+        ),
+
         SqlObject("partner"),
         SqlObject("program"),
         SqlField("comment", TimeChargeDiscountTable.Comment)
