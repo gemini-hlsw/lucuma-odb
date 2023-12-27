@@ -25,7 +25,7 @@ trait DatasetSelectResultMapping[F[_]]
       nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
 
     val fromStepRecord: ObjectMapping =
-      nestedSelectResultMapping(DatasetSelectResultType, StepRecordView.Id, Join(StepRecordView.Id, DatasetTable.StepId))
+      nestedSelectResultMapping(DatasetSelectResultType, StepRecordView.Id,  Join(StepRecordView.Id, DatasetTable.StepId))
 
     val fromVisit: ObjectMapping =
       nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id,      Join(VisitTable.Id, DatasetTable.VisitId))
@@ -39,6 +39,6 @@ trait DatasetSelectResultMapping[F[_]]
       lookupFromStepRecord(fromStepRecord, "datasets") ++
       lookupFromVisit(fromVisit, "datasets")
     )
-}
+  }
 
 }

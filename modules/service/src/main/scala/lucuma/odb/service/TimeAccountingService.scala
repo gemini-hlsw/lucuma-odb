@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.flatMap.*
@@ -20,12 +21,14 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.numeric.int8
 import skunk.codec.text.text
 import skunk.implicits.*
 
@@ -127,13 +130,27 @@ object TimeAccountingService {
             }
           }
 
+        private val qaDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+          StateT { tas =>
+            datasetService.selectDatasetsWithQaFailures(visitId).map { failures =>
+              failures.toList.foldLeft((tas, List.empty[TimeCharge.DiscountEntry])) { case ((state, discounts), (atomId, datasets)) =>
+                val (in, out) = state.partitionOnAtom(atomId)
+                val discount  = toDiscount(in, TimeAccounting.comment.Qa).map { d =>
+                  TimeCharge.DiscountEntry.Qa(d, datasets.toSet)
+                }
+                (out, discount.fold(discounts)(_ :: discounts))
+              }
+            }
+          }
+
         private val computeInvoice: F[TimeCharge.Invoice] = {
           val invoice = for {
             ini <- StateT.get[F, TimeAccountingState]
             day <- daylightDiscounts
+            qa  <- qaDiscounts
             // ... other discounts here ...
             fin <- StateT.get[F, TimeAccountingState]
-          } yield TimeCharge.Invoice(ini.charge, day, fin.charge)
+          } yield TimeCharge.Invoice(ini.charge, day ++ qa, fin.charge)
 
           initialState.flatMap(invoice.runA)
         }
@@ -146,12 +163,21 @@ object TimeAccountingService {
             _ <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge))
           } yield ()
 
+        private def storeDiscount(d: TimeCharge.DiscountEntry): F[Unit] =
+          for {
+            id <- session.unique(StoreDiscountEntry)(visitId, d)
+            _  <- d match {
+              case TimeCharge.DiscountEntry.Qa(_, datasets) => datasets.toList.traverse_(session.execute(StoreQaDiscountDataset)(id, _))
+              case _                                        => Applicative[F].unit
+            }
+          } yield ()
+
         private def updateDiscounts(
           discounts: List[TimeCharge.DiscountEntry]
         ): F[Unit] =
           for {
             _ <- session.execute(DeleteDiscountEntries)(visitId)
-            _ <- discounts.traverse_(session.execute(StoreDiscountEntry)(visitId, _))
+            _ <- discounts.traverse_(storeDiscount)
           } yield ()
 
       }
@@ -184,21 +210,12 @@ object TimeAccountingService {
           text
         ).to[TimeCharge.Discount]
 
-      val discount_entry: Codec[TimeCharge.DiscountEntry] =
+      val discount_entry: Encoder[TimeCharge.DiscountEntry] =
         (
           discount                  *:
           time_charge_discount_type *:
           site.opt
-        ).eimap { case (d, t, s) =>
-          t match {
-            case TimeCharge.DiscountDiscriminator.Daylight =>
-              s.toRight(s"Daylight discount missing site definition.").map { site =>
-                TimeCharge.DiscountEntry.Daylight(d, site)
-              }
-            case _ =>
-              Left(s"Unrecognized time charge discount type: ${t.dbTag}")
-          }
-        } { entry => (
+        ).contramap { entry => (
           entry.discount,
           entry.discriminator,
           entry match {
@@ -313,7 +330,7 @@ object TimeAccountingService {
           c_visit_id = $visit_id
       """.command
 
-    val StoreDiscountEntry: Command[(Visit.Id, TimeCharge.DiscountEntry)] =
+    val StoreDiscountEntry: Query[(Visit.Id, TimeCharge.DiscountEntry), Long] =
       sql"""
         INSERT INTO
           t_time_charge_discount (
@@ -329,8 +346,21 @@ object TimeAccountingService {
         VALUES (
           $visit_id,
           ${codec.discount_entry}
-        )
-      """.command
+        ) RETURNING
+          c_id
+      """.query(int8)
 
+     val StoreQaDiscountDataset: Command[(Long, Dataset.Id)] =
+       sql"""
+         INSERT INTO
+           t_time_charge_discount_dataset (
+             c_discount_id,
+             c_dataset_id
+           )
+         VALUES (
+           $int8,
+           $dataset_id
+         )
+       """.command
   }
 }

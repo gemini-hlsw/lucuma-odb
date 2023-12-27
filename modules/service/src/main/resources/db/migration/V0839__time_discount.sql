@@ -33,9 +33,17 @@ CREATE TABLE t_time_charge_discount (
     CHECK (c_type != 'daylight' OR c_site IS NOT NULL)
 
   -- TBD: fault report reference?
-  -- TBD: datasets with bad QA state?
   -- TBD: weather issue?
 
 );
 
 CREATE INDEX time_charge_discount_visit_index ON t_time_charge_discount (c_visit_id);
+
+CREATE TABLE t_time_charge_discount_dataset (
+
+  c_discount_id int8         NOT NULL REFERENCES t_time_charge_discount(c_id) ON DELETE CASCADE,
+  c_dataset_id  d_dataset_id NOT NULL REFERENCES t_dataset(c_dataset_id)      ON DELETE CASCADE,
+
+  PRIMARY KEY (c_discount_id, c_dataset_id)
+
+);

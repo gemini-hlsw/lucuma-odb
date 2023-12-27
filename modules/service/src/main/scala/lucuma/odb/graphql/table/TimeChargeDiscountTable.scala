@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.time_charge_discount_type
 import lucuma.odb.util.Codecs.time_span
@@ -29,6 +30,11 @@ trait TimeChargeDiscountTable[F[_]] extends BaseMapping[F] {
     object Daylight {
       val Site       = col("c_site",             site)
     }
+  }
+
+  object TimeChargeDiscountDatasetTable extends TableDef("t_time_charge_discount_dataset") {
+    val DiscountId   = col("c_discount_id",      int8)
+    val DatasetId    = col("c_dataset_id",       dataset_id)
   }
 
 }

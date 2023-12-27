@@ -9478,9 +9478,27 @@ type TimeChargeDaylightDiscount implements TimeChargeDiscount {
 
 }
 
+type TimeChargeQaDiscount implements TimeChargeDiscount {
+
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+
+  "Datasets associated with the discount."
+  datasets: [Dataset!]!
+
+}
+
 # TBD
 #type TimeChargeFaultDiscount implements TimeChargeDiscount
-#type TimeChargeQaDiscount implements TimeChargeDiscount
 #type TimeChargeWeatherDiscount implements TimeChargeDiscount
 
 """

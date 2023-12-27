@@ -231,6 +231,7 @@ trait BaseMapping[F[_]]
   lazy val TimeChargeDaylightDiscountType      = schema.ref("TimeChargeDaylightDiscount")
   lazy val TimeChargeDiscountType              = schema.ref("TimeChargeDiscount")
   lazy val TimeChargeInvoiceType               = schema.ref("TimeChargeInvoice")
+  lazy val TimeChargeQaDiscountType            = schema.ref("TimeChargeQaDiscount")
   lazy val TimeSpanType                        = schema.ref("TimeSpan")
   lazy val TimestampType                       = schema.ref("Timestamp")
   lazy val TimestampIntervalType               = schema.ref("TimestampInterval")
