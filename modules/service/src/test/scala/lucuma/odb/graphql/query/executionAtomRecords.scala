@@ -62,6 +62,61 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
+  test("observation -> execution -> atomRecords -> interval") {
+    recordAll(pi, mode, offset = 50, visitCount = 2, stepCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  interval {
+                    start
+                    end
+                    duration { seconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.flatMap(_.atoms).map { atom =>
+        val inv = for {
+          s <- atom.allEvents.headOption.map(_.received)
+          e <- atom.allEvents.lastOption.map(_.received)
+        } yield TimestampInterval.between(s, e)
+
+        inv.fold(Json.Null) { i =>
+          Json.obj(
+            "interval" -> Json.obj(
+              "start"    -> i.start.asJson,
+              "end"      -> i.end.asJson,
+              "duration" -> Json.obj(
+                "seconds" -> i.boundedTimeSpan.toSeconds.asJson
+              )
+            )
+          )
+        }
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
   test("observation -> execution -> atomRecords -> steps") {
     recordAll(pi, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""

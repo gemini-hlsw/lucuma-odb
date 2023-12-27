@@ -21,6 +21,7 @@ import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
@@ -34,12 +35,16 @@ import Services.Syntax.*
 
 trait ExecutionEventService[F[_]] {
 
-  def visitRange(
-    visitId: Visit.Id
+  def atomRange(
+    atomId: Atom.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def stepRange(
     visitId: Step.Id
+  )(using Transaction[F]): F[Option[TimestampInterval]]
+
+  def visitRange(
+    visitId: Visit.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def insertDatasetEvent(
@@ -88,15 +93,20 @@ object ExecutionEventService {
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F] with ExecutionUserCheck {
 
-      override def visitRange(
-        visitId: Visit.Id
+      override def atomRange(
+        atomId: Atom.Id
       )(using Transaction[F]): F[Option[TimestampInterval]] =
-        session.unique(Statements.SelectVisitRange)(visitId)
+        session.unique(Statements.SelectAtomRange)(atomId)
 
       override def stepRange(
         stepId: Step.Id
       )(using Transaction[F]): F[Option[TimestampInterval]] =
         session.unique(Statements.SelectStepRange)(stepId)
+
+      override def visitRange(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Option[TimestampInterval]] =
+        session.unique(Statements.SelectVisitRange)(visitId)
 
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
@@ -205,6 +215,19 @@ object ExecutionEventService {
           t_execution_event
         WHERE
           c_visit_id = $visit_id
+      """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
+
+    val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(e.c_received),
+          MAX(e.c_received)
+        FROM
+          t_execution_event e
+        INNER JOIN t_step_record s ON
+          s.c_step_id = e.c_step_id
+        WHERE
+          s.c_atom_id = $atom_id
       """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
 
     val SelectStepRange: Query[Step.Id, Option[TimestampInterval]] =

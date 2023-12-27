@@ -50,9 +50,9 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
         SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
         SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
         SqlField("created",      StepRecordView.Created),
+        EffectField("interval",  intervalHandler, List("id")),
         SqlObject("stepConfig"),
         SqlField("observeClass", StepRecordView.ObserveClass),
-        EffectField("interval", intervalHandler, List("id")),
 
         // TBD: stepQaState
 
@@ -97,7 +97,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
 
   }
 
-    private lazy val intervalHandler: EffectHandler[F] =
+  private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
 
   lazy val GmosNorthStepRecordMapping: ObjectMapping =

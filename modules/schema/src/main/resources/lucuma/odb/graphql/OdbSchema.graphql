@@ -152,6 +152,9 @@ type AtomRecord {
   "Created by Observe at this time."
   created: Timestamp!
 
+  "Time interval during which this atom occurred."
+  interval: TimestampInterval!
+
   "Sequence type."
   sequenceType: SequenceType!
 
@@ -1714,7 +1717,7 @@ type GmosNorthStepRecord implements StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this visit occurred."
+  "Time interval during which this step occurred."
   interval: TimestampInterval!
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
@@ -2238,7 +2241,7 @@ type GmosSouthStepRecord implements StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this visit occurred."
+  "Time interval during which this step occurred."
   interval: TimestampInterval!
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
@@ -8989,7 +8992,7 @@ interface StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this visit occurred."
+  "Time interval during which this step occurred."
   interval: TimestampInterval!
 
   """

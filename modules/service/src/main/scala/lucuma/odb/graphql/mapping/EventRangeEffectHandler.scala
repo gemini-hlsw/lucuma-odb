@@ -23,7 +23,6 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-
 import skunk.Transaction
 
 import scala.reflect.ClassTag
