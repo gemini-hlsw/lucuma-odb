@@ -13,10 +13,10 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.json.time.query.given
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.json.time.query.given
 
 import table.AtomRecordTable
 import table.DatasetTable
