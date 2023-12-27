@@ -37,7 +37,8 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
 
   case class TestData(
     state:    TimeAccountingState,
-    interval: TimestampInterval
+    interval: TimestampInterval,
+    atoms:    Set[Atom.Id]
   ) {
     def timestamp: Timestamp = interval.start
   }
@@ -51,7 +52,10 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
         max     = entries.lastOption.flatMap((interval, _) => interval.end.plusMillisOption(1000L)).getOrElse(Timestamp.Max)
         s <- Gen.choose(min.toEpochMilli, max.toEpochMilli).map(ms => Timestamp.ofEpochMilli(ms).get)
         e <- Gen.choose(s.toEpochMilli, max.toEpochMilli).map(ms => Timestamp.ofEpochMilli(ms).get)
-      } yield TestData(t, TimestampInterval.between(s, e))
+        atoms   = t.allAtoms.toList
+        n <- Gen.choose(0, atoms.length)
+        a <- Gen.pick(n, atoms).map(_.toSet)
+      } yield TestData(t, TimestampInterval.between(s, e), a)
     }
 
   extension (t: Timestamp) {
@@ -205,9 +209,19 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     }
   }
 
-  test("partitionAtomsIn separates on atom boundaries") {
+  test("partitionOnInterval is (between, excluding)") {
     forAll { (d: TestData) =>
-      val (in, out) = d.state.partitionAtomsIn(d.interval)
+      val (in, out) = d.state.partitionOnInterval(d.interval)
+
+      assertEquals(in,  d.state.between(d.interval))
+      assertEquals(out, d.state.excluding(d.interval))
+    }
+
+  }
+
+  test("partitionOnAtomBoundary separates on atom boundaries") {
+    forAll { (d: TestData) =>
+      val (in, out) = d.state.partitionOnAtomBoundary(d.interval)
 
       val inAtoms  = in.allAtoms
       val outAtoms = out.allAtoms
@@ -215,9 +229,31 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     }
   }
 
-  test("partitionAtomsIn is complete") {
+  test("partitionOnAtomBoundary is complete") {
     forAll { (d: TestData) =>
-      val (in, out) = d.state.partitionAtomsIn(d.interval)
+      val (in, out) = d.state.partitionOnAtomBoundary(d.interval)
+
+      val inAtoms  = in.allAtoms
+      val outAtoms = out.allAtoms
+      assertEquals(inAtoms.union(outAtoms), d.state.allAtoms)
+    }
+  }
+
+  test("partitionOnAtom separates on atom boundaries") {
+    forAll { (d: TestData) =>
+      val a = d.atoms.headOption
+      val (in, out) = a.fold((TimeAccountingState.Empty, d.state))(d.state.partitionOnAtom)
+
+      val inAtoms = in.allAtoms
+      val outAtoms = out.allAtoms
+      assert(inAtoms.intersect(outAtoms).isEmpty)
+    }
+  }
+
+  test("partitionAtoms is complete") {
+    forAll { (d: TestData) =>
+      val a = d.atoms.headOption
+      val (in, out) = a.fold((TimeAccountingState.Empty, d.state))(d.state.partitionOnAtom)
 
       val inAtoms  = in.allAtoms
       val outAtoms = out.allAtoms

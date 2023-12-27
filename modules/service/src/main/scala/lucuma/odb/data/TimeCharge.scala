@@ -5,16 +5,12 @@ package lucuma.odb.data
 
 import cats.Eq
 import cats.syntax.eq.*
-import io.circe.Encoder
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.enums.Site
 import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.json.time.query.given
-import lucuma.odb.json.timeaccounting.given
 
 /**
  * Collection of data related to time accounting.
@@ -58,16 +54,6 @@ object TimeCharge {
     given Eq[Discount] =
       Eq.by { a => (a.interval, a.partner, a.program, a.comment) }
 
-    given Encoder[Discount] =
-      Encoder.instance { a =>
-        Json.obj(
-          "start"   -> a.interval.start.asJson,
-          "end"     -> a.interval.end.asJson,
-          "partner" -> a.partner.asJson,
-          "program" -> a.program.asJson,
-          "comment" -> a.comment.asJson
-        )
-      }
   }
 
   /**
@@ -95,15 +81,26 @@ object TimeCharge {
 
     }
 
+    case class Qa(
+      discount: Discount,
+      datasets: Set[Dataset.Id]
+    ) extends DiscountEntry {
+      override def discriminator: DiscountDiscriminator =
+        DiscountDiscriminator.Qa
+    }
+
+    object Qa {
+
+      given Eq[Qa] =
+        Eq.by { a => (a.discount, a.datasets) }
+
+    }
+
     given Eq[DiscountEntry] =
       Eq.instance {
         case (a@Daylight(_, _), b@Daylight(_, _)) => a === b
+        case (a@Qa(_, _),       b@Qa(_, _))       => a === b
         case _                                    => false
-      }
-
-    given Encoder[DiscountEntry] =
-      Encoder.instance {
-        case Daylight(discount, site) => discount.asJson.deepMerge(Json.obj("site" -> site.asJson))
       }
 
   }
@@ -125,15 +122,6 @@ object TimeCharge {
 
     given Eq[Invoice] =
       Eq.by { a => (a.executionTime, a.discounts, a.finalCharge) }
-
-    given Encoder[Invoice] =
-      Encoder.instance { a =>
-        Json.obj(
-          "executionTime" -> a.executionTime.asJson,
-          "discounts"     -> a.discounts.asJson,
-          "finalCharge"   -> a.finalCharge.asJson
-        )
-      }
 
   }
 

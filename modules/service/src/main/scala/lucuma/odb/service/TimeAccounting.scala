@@ -22,6 +22,7 @@ object TimeAccounting {
   object comment {
     val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
     val PostDawn: String = "Time spent observing post-dawn (nautical twilight)."
+    val Qa: String       = "Time spent observing atoms with one or more datasets that don't pass QA."
   }
 
   /**

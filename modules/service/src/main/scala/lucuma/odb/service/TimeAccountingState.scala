@@ -156,25 +156,50 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
   /**
    * The minimal interval containing all the given atoms, if any.
    */
-  def intervalContaining(atoms: SortedSet[Atom.Id]): Option[TimestampInterval] =
+  def intervalContaining(atoms: Set[Atom.Id]): Option[TimestampInterval] =
     toMap.foldLeft(none[TimestampInterval]) { case (result, (interval, ctx)) =>
       if (!ctx.step.map(_.atomId).exists(atoms)) result
       else result.fold(interval.some)(_.span(interval).some)
     }
 
   /**
-   * Partitions the state into two based on whether the interval intersects
-   * with `interval`, but avoiding the spliting of intervals associated with
-   * atoms.  That is, if an interval is associated with an atom and intersects
-   * `interval`, it is included in its entirety.  Essentially `interval` is
-   * stretched to include any intervals with atoms it intersects.
+   * Partitions the state into two, the part included in `interval` and the
+   * part excluding `interval`.
    *
-   * @return the portion of state that intersects with interval (keeping atoms
-   *         together) and the portion that does not
+   * @return a tuple containing the portion of state that intersects with
+   *         interval and the portion that does not
    */
-  def partitionAtomsIn(interval: TimestampInterval): (TimeAccountingState, TimeAccountingState) = {
+  def partitionOnInterval(interval: TimestampInterval): (TimeAccountingState, TimeAccountingState) =
+    (between(interval), excluding(interval))
+
+  /**
+   * Partitions the state into two but avoiding the spliting of intervals
+   * associated with atoms.  That is, if an interval is associated with an atom
+   * and intersects `interval`, it is included in its entirety.  Essentially
+   * `interval` is stretched to include any intervals with atoms it intersects.
+   *
+   * @return a tuple containing the portion of state that intersects with
+   *         `interval` (keeping atoms together) and the portion that does
+   *         intersect
+   */
+  def partitionOnAtomBoundary(interval: TimestampInterval): (TimeAccountingState, TimeAccountingState) = {
     val intervalʹ = intervalContaining(atomsIn(interval)).getOrElse(interval).span(interval)
     (between(intervalʹ), excluding(intervalʹ))
+  }
+
+  /**
+   * Partitions the state into two based on whether interval is associated with
+   * the provided `atom`.
+   *
+   * @return a tuple containing the portion of the state associated with `atom`
+   *         and the portion not associated with `atom`
+   */
+  def partitionOnAtom(atom: Atom.Id): (TimeAccountingState, TimeAccountingState) = {
+    val (in, out) = toMap.foldLeft((Empty.toMap, Empty.toMap)) { case ((in, out), (interval, ctx)) =>
+      if (ctx.step.exists(_.atomId === atom)) (in + (interval -> ctx), out)
+      else (in, out + (interval -> ctx))
+    }
+    (new TimeAccountingState(in), new TimeAccountingState(out))
   }
 
   override def equals(that: Any): Boolean =

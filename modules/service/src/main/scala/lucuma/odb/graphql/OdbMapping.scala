@@ -326,6 +326,7 @@ object OdbMapping {
               TargetMapping,
               TargetSelectResultMapping,
               TimeChargeDaylightDiscountMapping,
+              TimeChargeQaDiscountMapping,
               TimeChargeDiscountMapping,
               TimeChargeInvoiceMapping,
               TimingWindowEndAfterMapping,
