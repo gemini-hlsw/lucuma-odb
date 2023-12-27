@@ -19,8 +19,14 @@ import lucuma.odb.json.timeaccounting.given
 
 import scala.collection.immutable.SortedSet
 
+/**
+ * Collection of data related to time accounting.
+ */
 object TimeCharge {
 
+  /**
+   * Enumeration of time charge discount types.
+   */
   enum DiscountDiscriminator(val dbTag: String) {
     case Daylight extends DiscountDiscriminator("daylight")
     case Fault    extends DiscountDiscriminator("fault")
@@ -40,6 +46,9 @@ object TimeCharge {
 
   }
 
+  /**
+   * Time accounting discount that will be subtracted from raw execution time.
+   */
   case class Discount(
     interval: TimestampInterval,
     partner:  TimeSpan,
@@ -65,6 +74,9 @@ object TimeCharge {
       }
   }
 
+  /**
+   * ADT of time charge discount types.
+   */
   sealed trait DiscountEntry extends Product with Serializable {
     def discount:      Discount
     def discriminator: DiscountDiscriminator
@@ -100,9 +112,14 @@ object TimeCharge {
 
   }
 
+  /**
+   * The result of a time accounting calculation.  Execution time, minus
+   * discounts, produces the final charge.
+   */
   case class Invoice(
     executionTime: CategorizedTime,
     discounts:     List[DiscountEntry],
+    // TBD: manual corrections
     finalCharge:   CategorizedTime
   )
 
