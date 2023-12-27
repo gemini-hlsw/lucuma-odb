@@ -13,6 +13,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.ObservingModeType
 
 class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
@@ -61,6 +62,61 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
+  test("observation -> execution -> atomRecords -> interval") {
+    recordAll(pi, mode, offset = 50, visitCount = 2, stepCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  interval {
+                    start
+                    end
+                    duration { seconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.flatMap(_.atoms).map { atom =>
+        val inv = for {
+          s <- atom.allEvents.headOption.map(_.received)
+          e <- atom.allEvents.lastOption.map(_.received)
+        } yield TimestampInterval.between(s, e)
+
+        inv.fold(Json.Null) { i =>
+          Json.obj(
+            "interval" -> Json.obj(
+              "start"    -> i.start.asJson,
+              "end"      -> i.end.asJson,
+              "duration" -> Json.obj(
+                "seconds" -> i.boundedTimeSpan.toSeconds.asJson
+              )
+            )
+          )
+        }
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
   test("observation -> execution -> atomRecords -> steps") {
     recordAll(pi, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""
@@ -85,6 +141,73 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
         Json.obj(
           "steps" -> Json.obj(
             "matches" -> a.steps.map(s => Json.obj("id" -> s.id.asJson)).asJson
+          )
+        )
+      }
+
+      val e = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": $matches
+            }
+          }
+        }
+      }
+      """.asRight
+
+      expect(pi, q, e)
+    }
+  }
+
+  test("observation -> execution -> atomRecords -> steps -> interval") {
+    recordAll(pi, mode, offset = 150, visitCount = 2, stepCount = 2).flatMap { on =>
+      val q = s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      interval {
+                        start
+                        end
+                        duration { seconds }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      val matches = on.visits.flatMap(_.atoms).map { atom =>
+        val stepMatches = atom.steps.map { step =>
+          val inv = for {
+            s <- step.allEvents.headOption.map(_.received)
+            e <- step.allEvents.lastOption.map(_.received)
+          } yield TimestampInterval.between(s, e)
+
+          inv.fold(Json.Null) { i =>
+            Json.obj(
+              "interval" -> Json.obj(
+                "start"    -> i.start.asJson,
+                "end"      -> i.end.asJson,
+                "duration" -> Json.obj(
+                  "seconds" -> i.boundedTimeSpan.toSeconds.asJson
+                )
+              )
+            )
+          }
+        }
+
+        Json.obj(
+          "steps" -> Json.obj(
+            "matches" -> stepMatches.asJson
           )
         )
       }
