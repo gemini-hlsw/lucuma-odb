@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -206,16 +205,10 @@ object ExecutionEventService {
 
   object Statements {
 
-    val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
-      sql"""
-        SELECT
-          MIN(c_received),
-          MAX(c_received)
-        FROM
-          t_execution_event
-        WHERE
-          c_visit_id = $visit_id
-      """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
+    private val timestamp_interval: Decoder[TimestampInterval] =
+      (core_timestamp *: core_timestamp).map { (min, max) =>
+        TimestampInterval.between(min, max)
+      }
 
     val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
       sql"""
@@ -228,7 +221,7 @@ object ExecutionEventService {
           s.c_step_id = e.c_step_id
         WHERE
           s.c_atom_id = $atom_id
-      """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
+      """.query(timestamp_interval.opt)
 
     val SelectStepRange: Query[Step.Id, Option[TimestampInterval]] =
       sql"""
@@ -239,7 +232,18 @@ object ExecutionEventService {
           t_execution_event
         WHERE
           c_step_id = $step_id
-      """.query(core_timestamp.opt *: core_timestamp.opt).map(_.mapN { (min, max) => TimestampInterval.between(min, max) })
+      """.query(timestamp_interval.opt)
+
+    val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(c_received),
+          MAX(c_received)
+        FROM
+          t_execution_event
+        WHERE
+          c_visit_id = $visit_id
+      """.query(timestamp_interval.opt)
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
       sql"""

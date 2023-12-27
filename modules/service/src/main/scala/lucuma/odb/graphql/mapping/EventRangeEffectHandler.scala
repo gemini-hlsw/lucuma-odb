@@ -27,6 +27,11 @@ import skunk.Transaction
 
 import scala.reflect.ClassTag
 
+/**
+ * An `EffectHandler` implementation for computing the `TimestampInterval` for
+ * a series of execution events (see `ExecutionEventServices` `atomRange`,
+ * `stepRange` and `visitRange`).
+ */
 trait EventRangeEffectHandler[F[_]: MonadCancelThrow] extends CirceMappingLike[F] {
 
   def eventRangeEffectHandler[T : ClassTag : Eq](
