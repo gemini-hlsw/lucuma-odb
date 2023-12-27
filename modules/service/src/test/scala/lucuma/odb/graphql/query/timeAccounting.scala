@@ -69,8 +69,10 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                     total { seconds }
                   }
                   discounts {
-                    start
-                    end
+                    interval {
+                      start
+                      end
+                    }
                     program { seconds }
                     partner { seconds }
                     comment
@@ -117,8 +119,10 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   ): Json =
     json"""
       {
-        "start": ${d.discount.interval.start.asJson},
-        "end": ${d.discount.interval.end.asJson},
+        "interval": {
+          "start": ${d.discount.interval.start.asJson},
+          "end": ${d.discount.interval.end.asJson}
+        },
         "program": {
           "seconds": ${d.discount.program.toSeconds}
         },
