@@ -10,6 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -805,6 +806,31 @@ trait DatabaseOperations { this: OdbSuite =>
       } yield DatasetEvent(i, r, o, v, s, did, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
+  }
+
+  def updateDatasets(
+    user: User,
+    qa:   DatasetQaState,
+    dids: List[Dataset.Id]
+  ): IO[Unit] = {
+    val q = s"""
+      mutation {
+        updateDatasets(input: {
+          SET: {
+            qaState: ${qa.tag.toScreamingSnakeCase}
+          },
+          WHERE: {
+            id: { IN: [ ${dids.map(_.show).mkString("\"", "\",\"", "\"")} ] }
+          }
+        }) {
+          datasets {
+            id
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).void
   }
 
   def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {

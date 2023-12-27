@@ -13,8 +13,11 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
+import lucuma.core.enums.StepStage
 import lucuma.core.enums.TwilightType.Nautical
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
@@ -85,6 +88,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                     ... on TimeChargeDaylightDiscount {
                       site
                     }
+                    ... on TimeChargeQaDiscount {
+                      datasets {
+                        id
+                      }
+                    }
                   }
                   finalCharge {
                     program { seconds }
@@ -139,8 +147,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       }
     """.withObject { obj =>
       d match {
-        case TimeCharge.DiscountEntry.Daylight(_, s) => obj.add("site", s.asJson).toJson
-        case _ => obj.toJson
+        case TimeCharge.DiscountEntry.Daylight(_, s) => obj.add("site",     s.asJson).toJson
+        case TimeCharge.DiscountEntry.Qa(_, ds)      => obj.add("datasets", ds.toList.map(id => Json.obj("id" -> id.asJson)).asJson).toJson
       }
     }
 
@@ -170,7 +178,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           }
         }
       }
-      """.asRight
+    """.asRight
   }
 
   case class StepNode(
@@ -268,18 +276,66 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       s.execute(cmd)((e.received, e.observationId, e.visitId, e.command))
     }.void
 
-  def insertEvents(
-    events: List[SequenceEvent]
-  ): IO[Unit] =
-    events.traverse(insertSequenceEvent).void
+  def insertStepEvent(e: StepEvent): IO[Unit] =
+    withSession { s =>
+      val cmd = sql"""
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_received,
+          c_observation_id,
+          c_visit_id,
+          c_step_id,
+          c_step_stage
+        )
+        SELECT
+          'step' :: e_execution_event_type,
+          $core_timestamp,
+          $observation_id,
+          $visit_id,
+          $step_id,
+          $step_stage
+      """.command
 
-  test("observation -> execution -> visits -> timeChargeInvoice (no events)") {
+      s.execute(cmd)((e.received, e.observationId, e.visitId, e.stepId, e.stage))
+    }.void
+
+  def insertDatasetEvent(e: DatasetEvent): IO[Unit] =
+    withSession { s =>
+      val cmd = sql"""
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_received,
+          c_observation_id,
+          c_visit_id,
+          c_step_id,
+          c_dataset_id,
+          c_dataset_stage
+        )
+        SELECT
+          'dataset' :: e_execution_event_type,
+          $core_timestamp,
+          $observation_id,
+          $visit_id,
+          $step_id,
+          $dataset_id,
+          $dataset_stage
+      """.command
+
+      s.execute(cmd)((e.received, e.observationId, e.visitId, e.stepId, e.datasetId, e.stage))
+    }.void
+
+  def insertEvents(
+    events: List[ExecutionEvent]
+  ): IO[Unit] =
+    events.traverse(_.fold(insertSequenceEvent, insertStepEvent, insertDatasetEvent)).void
+
+  test("timeChargeInvoice (no events)") {
     recordVisit(pi, mode, visitTime, 1, 1, 1, 0).flatMap { v =>
       expect(pi, invoiceQuery(v.oid), invoiceExected(List(TimeCharge.Invoice.Empty)))
     }
   }
 
-  test("observation -> execution -> visits -> timeChargeInvoice (sequence events)") {
+  test("timeChargeInvoice (daylight discount)") {
 
     val t0 = -1.nightStart
     val t1 =  1.nightStart
@@ -301,11 +357,56 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, List(daylightEntry), expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 10)
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 100)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(List(invoice)))
+    } yield ()
+
+  }
+
+  test("timeChargeInvoice (qa discount)") {
+
+    val ts = (0 until 8).map(_.nightStart)
+
+    def events(v: VisitNode): List[ExecutionEvent] = {
+      val sid0 = v.atoms.head.steps.head.sid
+      val did0 = v.atoms.head.steps.head.dids.head
+      val sid1 = v.atoms.last.steps.head.sid
+      val did1 = v.atoms.last.steps.head.dids.head
+
+      List(
+        StepEvent(   EventId, ts(0), v.oid, v.vid, sid0,       StepStage.StartStep),
+        DatasetEvent(EventId, ts(1), v.oid, v.vid, sid0, did0, DatasetStage.StartObserve),
+        DatasetEvent(EventId, ts(2), v.oid, v.vid, sid0, did0, DatasetStage.EndWrite),
+        StepEvent(   EventId, ts(3), v.oid, v.vid, sid0,       StepStage.EndStep),
+
+        StepEvent(   EventId, ts(4), v.oid, v.vid, sid1,       StepStage.StartStep),
+        DatasetEvent(EventId, ts(5), v.oid, v.vid, sid1, did1, DatasetStage.StartObserve),
+        DatasetEvent(EventId, ts(6), v.oid, v.vid, sid1, did1, DatasetStage.EndWrite),
+        StepEvent(   EventId, ts(7), v.oid, v.vid, sid1,       StepStage.EndStep)
+      )
+    }
+
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 7.sec)
+    val discount       = TimeCharge.Discount(
+      TimestampInterval.between(ts(4), ts(7)),
+      TimeSpan.Zero,
+      3.sec,
+      TimeAccounting.comment.Qa
+    )
+    def qaEntry(v: VisitNode) = TimeCharge.DiscountEntry.Qa(discount, v.atoms.last.steps.head.dids.toSet)
+    val expFinalCharge        = CategorizedTime(ChargeClass.Program -> 4.sec)
+    def invoice(v: VisitNode) = TimeCharge.Invoice(expExecution, List(qaEntry(v)), expFinalCharge)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 2, 1, 1, 200)
+      es = events(v)
+      _ <- insertEvents(es)
+      _ <- updateDatasets(pi, DatasetQaState.Fail, v.atoms.last.steps.head.dids)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(List(invoice(v))))
     } yield ()
 
   }
