@@ -68,8 +68,7 @@ class recordDataset extends OdbSuite {
               }
               filename
               qaState
-              start
-              end
+              interval { start }
             }
           }
         }
@@ -87,8 +86,7 @@ class recordDataset extends OdbSuite {
               },
               "filename": "N18630101S0001.fits",
               "qaState": null,
-              "start": null,
-              "end": null
+              "interval": null
             }
           }
         }
@@ -117,8 +115,7 @@ class recordDataset extends OdbSuite {
               }
               filename
               qaState
-              start
-              end
+              interval { start }
             }
           }
         }
@@ -136,8 +133,7 @@ class recordDataset extends OdbSuite {
               },
               "filename": "N18630101S0002.fits",
               "qaState": "USABLE",
-              "start": null,
-              "end": null
+              "interval": null
             }
           }
         }
