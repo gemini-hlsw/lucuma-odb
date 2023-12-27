@@ -152,7 +152,7 @@ type AtomRecord {
   "Created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this atom occurred."
+  "Time interval during which this atom executed."
   interval: TimestampInterval!
 
   "Sequence type."
@@ -1717,7 +1717,7 @@ type GmosNorthStepRecord implements StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this step occurred."
+  "Time interval during which this step executed."
   interval: TimestampInterval!
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
@@ -1769,7 +1769,7 @@ type GmosNorthVisit implements Visit {
   "Created by Observe at time."
   created: Timestamp!
 
-  "Time interval during which this visit occurred."
+  "Time interval during which this visit executed."
   interval: TimestampInterval!
 
   "Executed (or at least partially executed) atom records for this visit."
@@ -2241,7 +2241,7 @@ type GmosSouthStepRecord implements StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this step occurred."
+  "Time interval during which this step executed."
   interval: TimestampInterval!
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
@@ -2293,7 +2293,7 @@ type GmosSouthVisit implements Visit {
   "Created by Observe at time."
   created: Timestamp!
 
-  "Time interval during which this visit occurred."
+  "Time interval during which this visit executed."
   interval: TimestampInterval!
 
   "Executed (or at least partially executed) atom records for this visit."
@@ -8992,7 +8992,7 @@ interface StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this step occurred."
+  "Time interval during which this step executed."
   interval: TimestampInterval!
 
   """
@@ -9677,7 +9677,7 @@ interface Visit {
   "Created by Observe at time."
   created: Timestamp!
 
-  "Time interval during which this visit occurred."
+  "Time interval during which this visit executed."
   interval: TimestampInterval!
 
   "Executed (or at least partially executed) atom records for this visit."
