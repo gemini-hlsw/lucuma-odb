@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
@@ -16,6 +17,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.ObservingModeType
 
 
@@ -46,13 +48,12 @@ class addDatasetEvent extends OdbSuite {
     file:     String,
     query:    Dataset.Id => String,
     expected: (Observation.Id, Dataset.Id) => Either[String, Json]
-  ): IO[Unit] = {
+  ): IO[Unit] =
     for {
       ids <- recordDataset(mode, user, file)
       (oid, did) = ids
       _   <- expect(user, query(did), expected(oid, did).leftMap(s => List(s)))
     } yield ()
-}
 
   test("addDatasetEvent") {
     def query(did: Dataset.Id): String =
@@ -190,22 +191,24 @@ class addDatasetEvent extends OdbSuite {
       json.hcursor.downFields("addDatasetEvent", "event", "received").require[Timestamp]
     }
 
-  private def timestamps(did: Dataset.Id): IO[(Option[Timestamp], Option[Timestamp])] =
+  private def timestamps(did: Dataset.Id): IO[Option[TimestampInterval]] =
     query(
       staff,
       s"""
         query {
           dataset(datasetId: "$did") {
-            start
-            end
+            interval {
+              start
+              end
+            }
           }
         }
       """
     ).map { json =>
-      val d = json.hcursor.downField("dataset")
-      val s = d.downField("start").require[Option[Timestamp]]
-      val e = d.downField("end").require[Option[Timestamp]]
-      (s, e)
+      val d = json.hcursor.downFields("dataset", "interval").success.filter(!_.value.isNull)
+      val s = d.flatMap(_.downField("start").require[Option[Timestamp]])
+      val e = d.flatMap(_.downField("end").require[Option[Timestamp]])
+      (s, e).mapN { (start, end) => TimestampInterval.between(start, end) }
     }
 
   private def timeTest(file: String, stages: DatasetStage*): IO[Unit] = {
@@ -220,7 +223,7 @@ class addDatasetEvent extends OdbSuite {
       ids <- recordDataset(mode, staff, file)
       (oid, did) = ids
       es  <- stages.toList.traverse(addEvent(did, _))
-      ex   = expected(es)
+      ex   = expected(es).mapN { (s, e) => TimestampInterval.between(s, e) }
       ts  <- timestamps(did)
     } yield assertEquals(ts, ex)
   }

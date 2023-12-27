@@ -4,22 +4,27 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.effect.Resource
 import cats.syntax.option.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Query.Binding
+import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
 import grackle.TypeRef
 import lucuma.core.enums.Instrument
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 
 import table.AtomRecordTable
 import table.GmosDynamicTables
@@ -28,11 +33,13 @@ import table.VisitTable
 
 trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with AtomRecordTable[F]
+                                 with EventRangeEffectHandler[F]
                                  with GmosDynamicTables[F]
                                  with Predicates[F]
                                  with SelectSubquery
                                  with VisitTable[F] {
   def user: User
+  def services: Resource[F, Services[F]]
 
   lazy val StepRecordMapping: ObjectMapping =
     SqlInterfaceMapping(
@@ -43,10 +50,11 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
         SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
         SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
         SqlField("created",      StepRecordView.Created),
+        EffectField("interval",  intervalHandler, List("id")),
         SqlObject("stepConfig"),
         SqlField("observeClass", StepRecordView.ObserveClass),
 
-        // TBD: startTime, endTime, duration, stepQaState
+        // TBD: stepQaState
 
         SqlObject("datasets"),
         SqlObject("events")
@@ -88,6 +96,9 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
 
   }
+
+  private lazy val intervalHandler: EffectHandler[F] =
+    eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
 
   lazy val GmosNorthStepRecordMapping: ObjectMapping =
     ObjectMapping(

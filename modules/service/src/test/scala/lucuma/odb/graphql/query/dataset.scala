@@ -6,10 +6,13 @@ package query
 
 import cats.syntax.either.*
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.enums.DatasetStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.ObservingModeType
 
 class dataset extends OdbSuite with DatasetSetupOperations {
@@ -46,8 +49,75 @@ class dataset extends OdbSuite with DatasetSetupOperations {
     }
   }
 
+  test("empty interval when not complete") {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 100, 1, 1).flatMap {
+      case (oid, List((_, List(did)))) =>
+        val q = s"""
+          query {
+            dataset(datasetId: "$did") {
+              interval {
+                start
+              }
+            }
+          }
+        """
+
+        val e = json"""
+        {
+          "dataset": {
+            "interval": null
+          }
+        }
+        """.asRight
+
+        expect(pi, q, e)
+
+      case _ =>
+        fail("expected a single step and single dataset")
+    }
+  }
+
+  test("dataset interval") {
+    val f = for {
+      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 200, 1, 1)
+      (_, List((_, List(did)))) = ds
+      s  <- addDatasetEventAs(pi, did, DatasetStage.StartObserve)
+      e  <- addDatasetEventAs(pi, did, DatasetStage.EndWrite)
+    } yield (did, TimestampInterval.between(s.received, e.received))
+
+    f.flatMap { (did, inv) =>
+        val q = s"""
+          query {
+            dataset(datasetId: "$did") {
+              interval {
+                start
+                end
+                duration { seconds }
+              }
+            }
+          }
+        """
+
+        val e = json"""
+        {
+          "dataset": {
+            "interval": {
+              "start": ${inv.start.asJson},
+              "end": ${inv.end.asJson},
+              "duration": {
+                "seconds": ${inv.boundedTimeSpan.toSeconds.asJson}
+              }
+            }
+          }
+        }
+        """.asRight
+
+        expect(pi, q, e)
+    }
+  }
+
   test("pi cannot select someone else's dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 1, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 300, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {

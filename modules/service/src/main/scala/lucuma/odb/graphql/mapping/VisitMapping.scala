@@ -45,6 +45,7 @@ import table.ObservationView
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
+                            with EventRangeEffectHandler[F]
                             with ExecutionEventTable[F]
                             with GmosStaticTables[F]
                             with ObservationView[F]
@@ -63,6 +64,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlField("instrument",   VisitTable.Instrument, discriminator = true),
         SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
         SqlField("created",      VisitTable.Created),
+        EffectField("interval", intervalHandler, List("id")),
         SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events"),
@@ -128,6 +130,9 @@ trait VisitMapping[F[_]] extends VisitTable[F]
     )) =>
       selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
+
+  private lazy val intervalHandler: EffectHandler[F] =
+    eventRangeEffectHandler[Visit.Id]("id", services, executionEventService.visitRange)
 
   // WIP.  At the moment the `invoiceHandler` calls the time accounting service
   // on demand and returns an "invoice" with just the whole execution time.

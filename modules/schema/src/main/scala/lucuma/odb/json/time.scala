@@ -4,6 +4,7 @@
 package lucuma.odb.json
 
 import cats.syntax.either.*
+import cats.syntax.order.*
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
@@ -11,10 +12,12 @@ import io.circe.Json
 import io.circe.syntax._
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 
 object time {
 
-  trait DecoderTimeSpan {
+  trait TimeDecoders {
 
     given Decoder[TimeSpan] =
       Decoder.instance { c =>
@@ -39,11 +42,20 @@ object time {
           DecodingFailure(s"Could not parse duration value ${c.value.spaces2}", c.history).asLeft
       }
 
+    given Decoder[TimestampInterval] =
+      Decoder.instance { c =>
+        for {
+          s <- c.downField("start").as[Timestamp]
+          e <- c.downField("end").as[Timestamp]
+          _ <- Either.raiseWhen(s > e)(DecodingFailure(s"'start' ($s) after 'end' ($e)", c.history))
+        } yield TimestampInterval.between(s, e)
+      }
+
   }
 
-  object decoder extends DecoderTimeSpan
+  object decoder extends TimeDecoders
 
-  trait QueryCodec extends DecoderTimeSpan {
+  trait QueryCodec extends TimeDecoders {
     given Encoder_TimeSpan: Encoder[TimeSpan] =
       Encoder { (ts: TimeSpan) =>
         Json.obj(
@@ -55,17 +67,35 @@ object time {
           "iso"          -> TimeSpan.FromString.reverseGet(ts).asJson
         )
       }
+
+    given Encoder_TimestampInterval: Encoder[TimestampInterval] =
+      Encoder { (a: TimestampInterval) =>
+        Json.obj(
+          "start"    -> a.start.asJson,
+          "end"      -> a.end.asJson,
+          "duration" -> TimeSpan.between(a.start, a.end).asJson
+        )
+      }
   }
 
   object query extends QueryCodec
 
-  trait TransportCodec extends DecoderTimeSpan {
+  trait TransportCodec extends TimeDecoders {
     given Encoder_TimeSpan: Encoder[TimeSpan] =
       Encoder.instance { (ts: TimeSpan) =>
         Json.obj(
           "microseconds" -> TimeSpan.FromMicroseconds.reverseGet(ts).asJson
         )
       }
+
+    given Encoder_TimestampInterval: Encoder[TimestampInterval] =
+      Encoder { (a: TimestampInterval) =>
+        Json.obj(
+          "start"    -> a.start.asJson,
+          "end"      -> a.end.asJson
+        )
+      }
+
   }
 
   object transport extends TransportCodec

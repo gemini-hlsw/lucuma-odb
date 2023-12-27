@@ -20,9 +20,11 @@ import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -31,6 +33,18 @@ import Services.Syntax.*
 
 
 trait ExecutionEventService[F[_]] {
+
+  def atomRange(
+    atomId: Atom.Id
+  )(using Transaction[F]): F[Option[TimestampInterval]]
+
+  def stepRange(
+    visitId: Step.Id
+  )(using Transaction[F]): F[Option[TimestampInterval]]
+
+  def visitRange(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
@@ -77,6 +91,21 @@ object ExecutionEventService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F] with ExecutionUserCheck {
+
+      override def atomRange(
+        atomId: Atom.Id
+      )(using Transaction[F]): F[Option[TimestampInterval]] =
+        session.unique(Statements.SelectAtomRange)(atomId)
+
+      override def stepRange(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[TimestampInterval]] =
+        session.unique(Statements.SelectStepRange)(stepId)
+
+      override def visitRange(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Option[TimestampInterval]] =
+        session.unique(Statements.SelectVisitRange)(visitId)
 
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
@@ -175,6 +204,46 @@ object ExecutionEventService {
     }
 
   object Statements {
+
+    private val timestamp_interval: Decoder[TimestampInterval] =
+      (core_timestamp *: core_timestamp).map { (min, max) =>
+        TimestampInterval.between(min, max)
+      }
+
+    val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(e.c_received),
+          MAX(e.c_received)
+        FROM
+          t_execution_event e
+        INNER JOIN t_step_record s ON
+          s.c_step_id = e.c_step_id
+        WHERE
+          s.c_atom_id = $atom_id
+      """.query(timestamp_interval.opt)
+
+    val SelectStepRange: Query[Step.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(c_received),
+          MAX(c_received)
+        FROM
+          t_execution_event
+        WHERE
+          c_step_id = $step_id
+      """.query(timestamp_interval.opt)
+
+    val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
+      sql"""
+        SELECT
+          MIN(c_received),
+          MAX(c_received)
+        FROM
+          t_execution_event
+        WHERE
+          c_visit_id = $visit_id
+      """.query(timestamp_interval.opt)
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
       sql"""
