@@ -23,8 +23,6 @@ CREATE TABLE t_time_charge_discount (
   c_program_discount interval    NOT NULL DEFAULT '0'::interval
     CHECK (c_program_discount >= '0'::interval),
 
-  c_atom_ids         d_atom_id[] NOT NULL DEFAULT '{}',
-
   c_comment          text        NOT NULL,
 
   -- Discount type specific columns below

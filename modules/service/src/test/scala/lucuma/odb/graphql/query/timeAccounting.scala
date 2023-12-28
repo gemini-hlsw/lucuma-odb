@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package query
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -38,7 +37,6 @@ import skunk.syntax.all.*
 
 import java.time.LocalDateTime
 import java.time.Month
-import scala.collection.immutable.SortedSet
 
 class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =>
 
@@ -51,6 +49,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   val night      = ObservingNight.fromSiteAndLocalDateTime(Site.GS, visitLdt)
   val tbn        = night.twilightBoundedUnsafe(Nautical)
   val tbnStart   = Timestamp.unsafeFromInstantTruncated(tbn.start)
+
+  extension (i: Int) {
+    def sec: TimeSpan =
+      TimeSpan.FromMicroseconds.getOption(i * 1_000_000L).get
+
+    def nightStart: Timestamp =
+      Timestamp.unsafeFromInstantTruncated(tbn.start).plusMillisOption(i * 1000L).get
+  }
 
   val validUsers = List(pi).toList
 
@@ -273,29 +279,25 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     }
   }
 
-  val oneSecond: TimeSpan = TimeSpan.FromMicroseconds.getOption(1_000_000L).get
-  val twoSecond: TimeSpan = TimeSpan.FromMicroseconds.getOption(2_000_000L).get
-
   test("observation -> execution -> visits -> timeChargeInvoice (sequence events)") {
 
-    val t0 = Timestamp.unsafeFromInstantTruncated(tbn.start).plusMillisOption(-1000).get
-    val t1 = Timestamp.unsafeFromInstantTruncated(tbn.start).plusMillisOption( 1000).get
+    val t0 = -1.nightStart
+    val t1 =  1.nightStart
 
     val events = List(
       (SequenceCommand.Start, t0),
       (SequenceCommand.Stop,  t1)
     )
 
-    val expExecution   = CategorizedTime(ChargeClass.Program -> twoSecond)
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 2.sec)
     val discount       = TimeCharge.Discount(
       TimestampInterval.between(t0, tbnStart),
       TimeSpan.Zero,
-      oneSecond,
-      SortedSet.empty,
+      1.sec,
       TimeAccounting.comment.PreDusk
     )
     val daylightEntry  = TimeCharge.DiscountEntry.Daylight(discount, Site.GS)
-    val expFinalCharge = CategorizedTime(ChargeClass.Program -> oneSecond)
+    val expFinalCharge = CategorizedTime(ChargeClass.Program -> 1.sec)
     val invoice        = TimeCharge.Invoice(expExecution, List(daylightEntry), expFinalCharge)
 
     for {
