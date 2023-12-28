@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package table
 
-import lucuma.odb.util.Codecs._atom_id
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.time_charge_discount_type
@@ -24,7 +23,6 @@ trait TimeChargeDiscountTable[F[_]] extends BaseMapping[F] {
     val Partner      = col("c_partner_discount", time_span)
     val Program      = col("c_program_discount", time_span)
     val Comment      = col("c_comment",          text)
-    val Atoms        = col("c_atom_ids",         _atom_id)
 
     val DiscountType = col("c_type",             time_charge_discount_type)
 

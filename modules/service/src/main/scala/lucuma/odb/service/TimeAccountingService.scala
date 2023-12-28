@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.flatMap.*
@@ -20,7 +19,6 @@ import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -29,10 +27,7 @@ import lucuma.odb.data.TimeCharge
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.text.text
-import skunk.data.Arr
 import skunk.implicits.*
-
-import scala.collection.immutable.SortedSet
 
 import Services.Syntax.*
 
@@ -86,7 +81,6 @@ object TimeAccountingService {
       TimestampInterval.between(s, e),
       c.partnerTime,
       c.programTime,
-      tas.allAtoms,
       comment
     )
 
@@ -182,15 +176,11 @@ object TimeAccountingService {
       val event: Decoder[TimeAccounting.Event] =
         (core_timestamp *: context).to[TimeAccounting.Event]
 
-      val atom_id_set: Codec[SortedSet[Atom.Id]] =
-        _atom_id.imap(arr => SortedSet.from(arr.toList))(s => Arr.fromFoldable(s))
-
       val discount: Codec[TimeCharge.Discount] =
         (
           timestamp_interval *:
           time_span          *:
           time_span          *:
-          atom_id_set        *:
           text
         ).to[TimeCharge.Discount]
 
@@ -332,7 +322,6 @@ object TimeAccountingService {
             c_end,
             c_partner_discount,
             c_program_discount,
-            c_atom_ids,
             c_comment,
             c_type,
             c_site

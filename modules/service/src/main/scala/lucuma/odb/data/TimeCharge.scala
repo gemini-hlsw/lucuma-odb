@@ -9,15 +9,12 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Site
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
-
-import scala.collection.immutable.SortedSet
 
 /**
  * Collection of data related to time accounting.
@@ -53,14 +50,13 @@ object TimeCharge {
     interval: TimestampInterval,
     partner:  TimeSpan,
     program:  TimeSpan,
-    atoms:    SortedSet[Atom.Id],
     comment:  String
   )
 
   object Discount {
 
     given Eq[Discount] =
-      Eq.by { a => (a.interval, a.partner, a.program, a.atoms, a.comment) }
+      Eq.by { a => (a.interval, a.partner, a.program, a.comment) }
 
     given Encoder[Discount] =
       Encoder.instance { a =>

@@ -158,13 +158,6 @@ trait Codecs {
   val atom_id: Codec[Atom.Id] =
     uid[Atom.Id]
 
-  val _atom_id: Codec[Arr[Atom.Id]] =
-    Codec.array(
-      Uid[Atom.Id].fromString.reverseGet,
-      s => Uid[Atom.Id].fromString.getOption(s).toRight(s"Invaid Atom.Id: $s"),
-      Type("_d_atom_id", List(Type("d_atom_id")))
-  )
-
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
