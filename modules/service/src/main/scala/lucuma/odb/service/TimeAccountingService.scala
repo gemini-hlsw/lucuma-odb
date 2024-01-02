@@ -22,6 +22,7 @@ import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -50,6 +51,15 @@ trait TimeAccountingService[F[_]] {
   def update(
     visitId: Visit.Id
   )(using Transaction[F]): F[Unit]
+
+  /**
+   * Adds a manual time charge correction.
+   */
+  def addCorrection(
+    visitId:    Visit.Id,
+    correction: TimeChargeCorrection
+  )(using Transaction[F]): F[Long]
+
 }
 
 object TimeAccountingService {
@@ -72,10 +82,22 @@ object TimeAccountingService {
 
   }
 
-  private def toDiscount(
-    tas:     TimeAccountingState,
-    comment: String
-  ): Option[TimeCharge.Discount] =
+  extension (time: CategorizedTime) {
+
+    /** CategorizedTime after applying corrections. */
+    def corrected(
+      corrections: List[(ChargeClass, TimeChargeCorrection.Op, TimeSpan)]
+    ): CategorizedTime =
+      corrections.foldLeft(time) { case (res, (cClass, op, amount)) =>
+        op match {
+          case TimeChargeCorrection.Op.Add      => res.modify(cClass, _ +| amount)
+          case TimeChargeCorrection.Op.Subtract => res.modify(cClass, _ -| amount)
+        }
+      }
+
+  }
+
+  private def toDiscount(tas: TimeAccountingState, comment: String): Option[TimeCharge.Discount] =
     for {
       s <- tas.start
       e <- tas.end
@@ -144,15 +166,22 @@ object TimeAccountingService {
           }
 
         private val computeInvoice: F[TimeCharge.Invoice] = {
-          val invoice = for {
-            ini <- StateT.get[F, TimeAccountingState]
-            day <- daylightDiscounts
-            qa  <- qaDiscounts
-            // ... other discounts here ...
-            fin <- StateT.get[F, TimeAccountingState]
-          } yield TimeCharge.Invoice(ini.charge, day ++ qa, fin.charge)
+          def invoice(
+            corrections: List[(ChargeClass, TimeChargeCorrection.Op, TimeSpan)]
+          ): StateT[F, TimeAccountingState, TimeCharge.Invoice] =
+            for {
+              ini <- StateT.get[F, TimeAccountingState]
+              day <- daylightDiscounts
+              qa  <- qaDiscounts
+              // ... other discounts here ...
+              fin <- StateT.get[F, TimeAccountingState]
+            } yield TimeCharge.Invoice(ini.charge, day ++ qa, fin.charge.corrected(corrections))
 
-          initialState.flatMap(invoice.runA)
+          for {
+            s <- initialState
+            c <- session.execute(SelectCorrection)(visitId)
+            i <- invoice(c).runA(s)
+          } yield i
         }
 
         private def updateInvoice(
@@ -163,24 +192,34 @@ object TimeAccountingService {
             _ <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge))
           } yield ()
 
-        private def storeDiscount(d: TimeCharge.DiscountEntry): F[Unit] =
-          for {
-            id <- session.unique(StoreDiscountEntry)(visitId, d)
-            _  <- d match {
-              case TimeCharge.DiscountEntry.Qa(_, datasets) => datasets.toList.traverse_(session.execute(StoreQaDiscountDataset)(id, _))
-              case _                                        => Applicative[F].unit
-            }
-          } yield ()
-
-        private def updateDiscounts(
-          discounts: List[TimeCharge.DiscountEntry]
-        ): F[Unit] =
+        // Delete existing discounts (if any) and write the new ones.
+        private def updateDiscounts(discounts: List[TimeCharge.DiscountEntry]): F[Unit] =
           for {
             _ <- session.execute(DeleteDiscountEntries)(visitId)
             _ <- discounts.traverse_(storeDiscount)
           } yield ()
 
+        // Stores the discount entry.
+        private def storeDiscount(d: TimeCharge.DiscountEntry): F[Unit] =
+          for {
+            id <- session.unique(StoreDiscountEntry)(visitId, d)
+            _  <- storeDiscountDetail(id)(d)
+          } yield ()
+
+        // Stores any information specific to particular discount entry types.
+        private def storeDiscountDetail(id: Long): TimeCharge.DiscountEntry => F[Unit] = {
+          case TimeCharge.DiscountEntry.Qa(_, datasets) =>
+            datasets.toList.traverse_(session.execute(StoreQaDiscountDataset)(id, _))
+          case _                                        =>
+            Applicative[F].unit
+        }
       }
+
+      override def addCorrection(
+        visitId:    Visit.Id,
+        correction: TimeChargeCorrection
+      )(using Transaction[F]): F[Long] =
+        session.unique(StoreCorrection)(visitId, correction)
 
     }
 
@@ -222,6 +261,23 @@ object TimeAccountingService {
             case TimeCharge.DiscountEntry.Daylight(_, s) => s.some
             case _                                       => none
           }
+        )}
+
+      val time_charge_correction: Encoder[TimeChargeCorrection] =
+        (
+          core_timestamp            *:
+          charge_class              *:
+          time_charge_correction_op *:
+          time_span                 *:
+          user_id                   *:
+          text.opt
+        ).contramap { entry => (
+          entry.timestamp,
+          entry.chargeClass,
+          entry.op,
+          entry.amount,
+          entry.user.id,
+          entry.comment.filter(_.nonEmpty)
         )}
     }
 
@@ -362,5 +418,37 @@ object TimeAccountingService {
            $dataset_id
          )
        """.command
+
+    val StoreCorrection: Query[(Visit.Id, TimeChargeCorrection), Long] =
+      sql"""
+        INSERT INTO
+          t_time_charge_correction (
+            c_visit_id,
+            c_created,
+            c_charge_class,
+            c_op,
+            c_amount,
+            c_user_id,
+            c_comment
+          )
+        VALUES(
+          $visit_id,
+          ${codec.time_charge_correction}
+        ) RETURNING
+          c_id
+      """.query(int8)
+
+    val SelectCorrection: Query[Visit.Id, (ChargeClass, TimeChargeCorrection.Op, TimeSpan)] =
+      sql"""
+        SELECT
+          c_charge_class,
+          c_op,
+          c_amount
+        FROM
+          t_time_charge_correction
+        WHERE
+          c_visit_id = $visit_id
+        ORDER BY c_created
+      """.query(charge_class *: time_charge_correction_op *: time_span)
   }
 }
