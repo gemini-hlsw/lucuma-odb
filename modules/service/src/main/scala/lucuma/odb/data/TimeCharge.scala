@@ -112,7 +112,6 @@ object TimeCharge {
   case class Invoice(
     executionTime: CategorizedTime,
     discounts:     List[DiscountEntry],
-    // TBD: manual corrections
     finalCharge:   CategorizedTime
   )
 

@@ -34,6 +34,7 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
@@ -160,6 +161,9 @@ trait Codecs {
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
+
+  val charge_class: Codec[ChargeClass] =
+    enumerated(Type("e_charge_class"))
 
   val cloud_extinction: Codec[CloudExtinction] =
     enumerated[CloudExtinction](Type.varchar)
@@ -395,6 +399,9 @@ trait Codecs {
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
+
+  val time_charge_correction_op: Codec[TimeChargeCorrection.Op] =
+    enumerated(Type("e_time_charge_correction_op"))
 
   val time_charge_discount_type: Codec[DiscountDiscriminator] =
     enumerated(Type("e_time_charge_discount_type"))
