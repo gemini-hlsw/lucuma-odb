@@ -87,6 +87,7 @@ object OdbMapping {
           with AddDatasetEventResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddStepEventResultMapping[F]
+          with AddTimeChargeCorrectionResultMapping[F]
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
@@ -216,6 +217,7 @@ object OdbMapping {
               AddDatasetEventResultMapping,
               AddSequenceEventResultMapping,
               AddStepEventResultMapping,
+              AddTimeChargeCorrectionResultMapping,
               AirMassRangeMapping,
               AllocationMapping,
               AngleMapping,

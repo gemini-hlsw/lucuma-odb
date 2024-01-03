@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.data.StateT
 import cats.effect.Concurrent
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -19,6 +20,7 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
+import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
@@ -27,13 +29,17 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.TimeCharge
+import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.numeric.int8
 import skunk.codec.text.text
+import skunk.codec.temporal.interval
 import skunk.implicits.*
 
 import Services.Syntax.*
+
+import java.time.Duration
 
 
 trait TimeAccountingService[F[_]] {
@@ -57,7 +63,7 @@ trait TimeAccountingService[F[_]] {
    */
   def addCorrection(
     visitId:    Visit.Id,
-    correction: TimeChargeCorrection
+    correction: TimeChargeCorrectionInput
   )(using Transaction[F]): F[Long]
 
 }
@@ -215,14 +221,16 @@ object TimeAccountingService {
         }
       }
 
-      override def addCorrection(
-        visitId:    Visit.Id,
-        correction: TimeChargeCorrection
+      def addCorrection(
+        visitId: Visit.Id,
+        input:   TimeChargeCorrectionInput
       )(using Transaction[F]): F[Long] =
-        session.unique(StoreCorrection)(visitId, correction)
+        for {
+          id <- session.unique(StoreCorrection)(visitId, input, user.id)
+          _  <- session.execute(PerformCorrection)(visitId, input).void
+        } yield id
 
     }
-
 
   object Statements {
 
@@ -263,22 +271,22 @@ object TimeAccountingService {
           }
         )}
 
-      val time_charge_correction: Encoder[TimeChargeCorrection] =
-        (
-          core_timestamp            *:
-          charge_class              *:
-          time_charge_correction_op *:
-          time_span                 *:
-          user_id                   *:
-          text.opt
-        ).contramap { entry => (
-          entry.timestamp,
-          entry.chargeClass,
-          entry.op,
-          entry.amount,
-          entry.user.id,
-          entry.comment.filter(_.nonEmpty)
-        )}
+//      val time_charge_correction: Encoder[TimeChargeCorrection] =
+//        (
+//          core_timestamp            *:
+//          charge_class              *:
+//          time_charge_correction_op *:
+//          time_span                 *:
+//          user_id                   *:
+//          text.opt
+//        ).contramap { entry => (
+//          entry.timestamp,
+//          entry.chargeClass,
+//          entry.op,
+//          entry.amount,
+//          entry.user.id,
+//          entry.comment.filter(_.nonEmpty)
+//        )}
     }
 
     val SetTimeAccounting: Command[(Visit.Id, CategorizedTime, CategorizedTime)] =
@@ -419,24 +427,35 @@ object TimeAccountingService {
          )
        """.command
 
-    val StoreCorrection: Query[(Visit.Id, TimeChargeCorrection), Long] =
+    val StoreCorrection: Query[(Visit.Id, TimeChargeCorrectionInput, User.Id), Long] =
       sql"""
         INSERT INTO
           t_time_charge_correction (
             c_visit_id,
-            c_created,
             c_charge_class,
             c_op,
             c_amount,
-            c_user_id,
-            c_comment
+            c_comment,
+            c_user_id
           )
         VALUES(
           $visit_id,
-          ${codec.time_charge_correction}
+          $charge_class,
+          $time_charge_correction_op,
+          $time_span,
+          ${text_nonempty.opt},
+          $user_id
         ) RETURNING
           c_id
       """.query(int8)
+         .contramap { (vid, tcc, uid) => (
+           vid,
+           tcc.chargeClass,
+           tcc.op,
+           tcc.amount,
+           tcc.comment,
+           uid
+         )}
 
     val SelectCorrection: Query[Visit.Id, (ChargeClass, TimeChargeCorrection.Op, TimeSpan)] =
       sql"""
@@ -450,5 +469,28 @@ object TimeAccountingService {
           c_visit_id = $visit_id
         ORDER BY c_created
       """.query(charge_class *: time_charge_correction_op *: time_span)
+
+    val PerformCorrection: Command[(Visit.Id, TimeChargeCorrectionInput)] = {
+      def amount(input: TimeChargeCorrectionInput): Duration =
+        input.op match {
+          case TimeChargeCorrection.Op.Add      => input.amount.toDuration
+          case TimeChargeCorrection.Op.Subtract => input.amount.toDuration.negated
+        }
+
+      def toDuration(chargeClass: ChargeClass, input: TimeChargeCorrectionInput): Duration =
+        if (input.chargeClass =!= chargeClass) Duration.ZERO
+        else amount(input)
+
+      sql"""
+        UPDATE t_time_accounting
+           SET c_final_partner_time = SELECT(c_final_partner_time, $interval),
+               c_final_program_time = SELECT(c_final_program_time, $interval)
+         WHERE c_visit_id = $visit_id
+      """.command.contramap { case (vid, input) => (
+        toDuration(ChargeClass.Partner, input),
+        toDuration(ChargeClass.Program, input),
+        vid
+      )}
+    }
   }
 }
