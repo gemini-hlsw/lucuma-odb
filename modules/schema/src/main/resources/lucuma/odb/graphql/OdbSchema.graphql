@@ -9391,7 +9391,7 @@ maximum time span.
 type TimeChargeCorrection {
 
   "When the correction was made."
-  timestamp:   Timestamp!
+  created:     Timestamp!
 
   "The charge class to be corrected."
   chargeClass: ChargeClass!

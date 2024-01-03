@@ -31,6 +31,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
 import lucuma.odb.data.Existence
@@ -52,6 +53,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](ChronicleIdType),
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[CatalogName](CatalogNameType),
+      LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
@@ -136,6 +138,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[TimeChargeCorrection.Op](TimeChargeCorrectionOpType),
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[ToOActivation](ToOActivationType),
