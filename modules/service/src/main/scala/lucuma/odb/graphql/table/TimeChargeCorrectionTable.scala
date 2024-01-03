@@ -24,7 +24,7 @@ trait TimeChargeCorrectionTable[F[_]] extends BaseMapping[F] {
     val Op          = col("c_op",           time_charge_correction_op)
     val Amount      = col("c_amount",       time_span)
     val UserId      = col("c_user_id",      user_id)
-    val Comment     = col("c_comment",      text_nonempty)
+    val Comment     = col("c_comment",      text_nonempty.opt)
 
   }
 
