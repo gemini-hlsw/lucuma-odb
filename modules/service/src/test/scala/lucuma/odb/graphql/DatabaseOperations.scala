@@ -967,7 +967,7 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: "$pid"
             role: ${role.tag.toUpperCase}
             ${supportType.map(_.tag.toUpperCase).foldMap(s => s"supportType: $s")}
-            ${supportPartner.map(_.value).foldMap(s => s"supportPartner: $s")}
+            ${supportPartner.map(_.value.toUpperCase).foldMap(s => s"supportPartner: $s")}
           }
         ) {
           key

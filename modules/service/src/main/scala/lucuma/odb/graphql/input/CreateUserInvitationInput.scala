@@ -18,14 +18,17 @@ import grackle.Result
 import ProgramUserRole.*
 import ProgramUserSupportType.*
 
-final case class CreateUserInvitationInput(
-  programId: Program.Id,
-  role: ProgramUserRole,
-  supportType: Option[ProgramUserSupportType],
-  supportPartner: Option[Tag]
-)
+sealed abstract class CreateUserInvitationInput(val role: ProgramUserRole):
+  def programId: Program.Id
 
 object CreateUserInvitationInput:
+
+  sealed abstract class Support(val supportType: ProgramUserSupportType) extends CreateUserInvitationInput(ProgramUserRole.Support)
+
+  final case class Coi(programId: Program.Id) extends CreateUserInvitationInput(ProgramUserRole.Coi)
+  final case class Observer(programId: Program.Id) extends CreateUserInvitationInput(ProgramUserRole.Observer)
+  final case class StaffSupport(programId: Program.Id) extends Support(ProgramUserSupportType.Staff)
+  final case class NgoSupportSupport(programId: Program.Id, supportPartner: Tag) extends Support(ProgramUserSupportType.Partner)
 
   val Binding: Matcher[CreateUserInvitationInput] =
     ObjectFieldsBinding.rmap:
@@ -36,7 +39,8 @@ object CreateUserInvitationInput:
         TagBinding.Option("supportPartner", rPartner)
       ) =>
         (rProgramId, rRole, rSupport, rPartner).parTupled.flatMap:
-          case (pid, role@(Coi | Observer), None, None) => Result(CreateUserInvitationInput(pid, role, None, None))
-          case (pid, Support, Some(Staff), None)        => Result(CreateUserInvitationInput(pid, Support, Some(Staff), None))
-          case (pid, Support, Some(Partner), Some(tag)) => Result(CreateUserInvitationInput(pid, Support, Some(Partner), Some(tag)))
-          case _                                        => Result.failure("Invalid combination of role, support type, and partner.")
+          case (pid, ProgramUserRole.Coi, None, None)                   => Result(Coi(pid))
+          case (pid, ProgramUserRole.Observer, None, None)              => Result(Observer(pid))
+          case (pid, ProgramUserRole.Support, Some(Staff), None)        => Result(StaffSupport(pid))
+          case (pid, ProgramUserRole.Support, Some(Partner), Some(tag)) => Result(NgoSupportSupport(pid, tag))
+          case _                                                        => Result.failure("Invalid combination of role, support type, and partner.")
