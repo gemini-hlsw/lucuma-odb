@@ -13,6 +13,7 @@ import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
 import lucuma.odb.graphql.table.TimeAccountingTable
+import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
 
@@ -23,6 +24,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ObservationView[F]
                                with GroupView[F]
                                with TimeAccountingTable[F]
+                               with TimeChargeCorrectionTable[F]
                                with TimeChargeDiscountTable[F]
                                with TimingWindowView[F]
                                with ChronConditionsEntryView[F] {
@@ -39,6 +41,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
         GroupType / "minimumInterval"                             -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
         IntensiveType / "totalTime"                               -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         LargeProgramType / "totalTime"                            -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        TimeChargeCorrectionType / "amount"                       -> timeSpanMapping(TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
         TimeChargeDiscountType / "partner"                        -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
         TimeChargeDiscountType / "program"                        -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
         TimeChargeDaylightDiscountType / "partner"                -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
