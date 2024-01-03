@@ -17,6 +17,7 @@ trait BaseMapping[F[_]]
   lazy val AddDatasetEventResultType           = schema.ref("AddDatasetEventResult")
   lazy val AddSequenceEventResultType          = schema.ref("AddSequenceEventResult")
   lazy val AddStepEventResultType              = schema.ref("AddStepEventResult")
+  lazy val AddTimeChargeCorrectionResultType   = schema.ref("AddTimeChargeCorrectionResult")
   lazy val AirMassRangeType                    = schema.ref("AirMassRange")
   lazy val AllocationType                      = schema.ref("Allocation")
   lazy val AsterismGroupType                   = schema.ref("AsterismGroup")

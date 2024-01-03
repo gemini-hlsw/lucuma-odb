@@ -63,7 +63,7 @@ Input to the 'addTimeChargeCorrection' mutation. Identifies the visit
 that will be corrected and describes the correction itself.
 """
 input AddTimeChargeCorrectionInput {
-  observation: VisitId!
+  visitId:     VisitId!
   correction:  TimeChargeCorrectionInput!
 }
 
