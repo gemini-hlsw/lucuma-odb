@@ -39,6 +39,7 @@ import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddDatasetEventInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
+import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
@@ -93,6 +94,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddDatasetEvent,
       AddSequenceEvent,
       AddStepEvent,
+      AddTimeChargeCorrection,
       CloneObservation,
       CloneTarget,
       CreateGroup,
@@ -224,6 +226,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             )
           }
         }  
+      }
+    }
+
+  private lazy val AddTimeChargeCorrection: MutationField =
+    MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        timeAccountingService.addCorrection(input.visitId, input.correction).as {
+          Result(
+            Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
+          )
+        }
       }
     }
 

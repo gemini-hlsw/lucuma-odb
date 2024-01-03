@@ -26,3 +26,13 @@ CREATE TABLE t_time_charge_correction (
 );
 
 CREATE INDEX time_charge_correction_visit_index ON t_time_charge_correction (c_visit_id);
+
+CREATE OR REPLACE FUNCTION update_time_span(
+    INOUT col interval,
+       amount interval
+)
+AS $$
+BEGIN
+    col := GREATEST('0'::interval, LEAST('9223372036854775807'::interval, col + amount));
+END;
+$$ LANGUAGE plpgsql;
