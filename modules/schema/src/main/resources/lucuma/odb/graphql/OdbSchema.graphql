@@ -9403,7 +9403,7 @@ type TimeChargeCorrection {
   amount:      TimeSpan!
 
   "The user responsible for the change."
-  user:        User!
+  user:        User
 
   "Optional justification for the correction."
   comment:     String

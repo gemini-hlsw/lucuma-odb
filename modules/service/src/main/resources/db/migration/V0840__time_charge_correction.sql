@@ -33,6 +33,6 @@ CREATE OR REPLACE FUNCTION update_time_span(
 )
 AS $$
 BEGIN
-    col := GREATEST('0'::interval, LEAST('9223372036854775807'::interval, col + amount));
+    col := GREATEST('0'::interval, LEAST('9223372036854775807 microseconds'::interval, col + amount));
 END;
 $$ LANGUAGE plpgsql;
