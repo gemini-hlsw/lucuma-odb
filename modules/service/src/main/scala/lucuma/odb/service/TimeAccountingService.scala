@@ -483,8 +483,8 @@ object TimeAccountingService {
 
       sql"""
         UPDATE t_time_accounting
-           SET c_final_partner_time = SELECT(c_final_partner_time, $interval),
-               c_final_program_time = SELECT(c_final_program_time, $interval)
+           SET c_final_partner_time = update_time_span(c_final_partner_time, $interval),
+               c_final_program_time = update_time_span(c_final_program_time, $interval)
          WHERE c_visit_id = $visit_id
       """.command.contramap { case (vid, input) => (
         toDuration(ChargeClass.Partner, input),

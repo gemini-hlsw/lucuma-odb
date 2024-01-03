@@ -29,6 +29,8 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -94,6 +96,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                       }
                     }
                   }
+                  corrections {
+                    chargeClass
+                    op
+                    amount { seconds }
+                    user { id }
+                    comment
+                  }
                   finalCharge {
                     program { seconds }
                     partner { seconds }
@@ -128,6 +137,23 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       }
     """
 
+  def expectedCorrection(
+    c: TimeChargeCorrection
+  ): Json =
+    json"""
+      {
+        "chargeClass": ${c.chargeClass.tag.toScreamingSnakeCase},
+        "op": ${c.op.tag.toScreamingSnakeCase},
+        "amount": {
+          "seconds": ${c.amount.toSeconds}
+        },
+        "user": {
+          "id": ${c.user.id.toString}
+        },
+        "comment": ${c.comment}
+      }
+    """
+
   def expectedDiscount(
     d: TimeCharge.DiscountEntry
   ): Json =
@@ -153,20 +179,22 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     }
 
   def invoiceExected(
-    invoices: List[TimeCharge.Invoice]
+    invoice:     TimeCharge.Invoice,
+    corrections: List[TimeChargeCorrection]
   ): Either[List[String], Json] = {
 
-    val matches = invoices.map { inv =>
+    val matches = List(
       json"""
       {
         "timeChargeInvoice": {
-          "executionTime": ${expectedCategorizedTime(inv.executionTime)},
-          "discounts": ${inv.discounts.map(expectedDiscount).asJson},
-          "finalCharge": ${expectedCategorizedTime(inv.finalCharge)}
+          "executionTime": ${expectedCategorizedTime(invoice.executionTime)},
+          "discounts": ${invoice.discounts.map(expectedDiscount).asJson},
+          "corrections": ${corrections.map(expectedCorrection).asJson},
+          "finalCharge": ${expectedCategorizedTime(invoice.finalCharge)}
         }
       }
       """
-    }.asJson
+    ).asJson
 
     json"""
       {
@@ -331,8 +359,32 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (no events)") {
     recordVisit(pi, mode, visitTime, 1, 1, 1, 0).flatMap { v =>
-      expect(pi, invoiceQuery(v.oid), invoiceExected(List(TimeCharge.Invoice.Empty)))
+      expect(pi, invoiceQuery(v.oid), invoiceExected(TimeCharge.Invoice.Empty, Nil))
     }
+  }
+
+  test("timeChargeInvoice (no discounts)") {
+
+    val t0 =  0.nightStart
+    val t1 = 10.nightStart
+
+    val events = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 10.sec)
+    val expFinalCharge = CategorizedTime(ChargeClass.Program -> 10.sec)
+    val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 100)
+      es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
+      _ <- insertEvents(es)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
+    } yield ()
+
   }
 
   test("timeChargeInvoice (daylight discount)") {
@@ -357,11 +409,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, List(daylightEntry), expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 100)
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
-      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(List(invoice)))
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
     } yield ()
 
   }
@@ -401,14 +453,41 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     def invoice(v: VisitNode) = TimeCharge.Invoice(expExecution, List(qaEntry(v)), expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 2, 1, 1, 200)
+      v <- recordVisit(pi, mode, visitTime, 2, 1, 1, 300)
       es = events(v)
       _ <- insertEvents(es)
       _ <- updateDatasets(pi, DatasetQaState.Fail, v.atoms.last.steps.head.dids)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
-      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(List(invoice(v))))
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
     } yield ()
 
   }
+
+  test("timeChargeInvoice (simple correction)") {
+
+    val t0 =  0.nightStart
+    val t1 = 10.nightStart
+
+    val events = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 10.sec)
+    val expFinalCharge = CategorizedTime(ChargeClass.Program ->  5.sec)
+    val correction     = TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, TimeSpan.FromSeconds.unsafeGet(BigDecimal(5)), "Just because".some)
+    val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 400)
+      es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
+      _ <- insertEvents(es)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- addTimeChargeCorrection(pi, v.vid, correction.chargeClass, correction.op, correction.amount, correction.comment)
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
+    } yield ()
+
+  }
+
 
 }

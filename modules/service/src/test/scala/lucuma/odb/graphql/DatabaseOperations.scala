@@ -10,6 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
@@ -39,6 +40,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -554,6 +556,32 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
+  def addTimeChargeCorrection(user: User, vid: Visit.Id, chargeClass: ChargeClass, op: TimeChargeCorrection.Op, amount: TimeSpan, comment: Option[String]): IO[Unit] =
+    query(
+      user  = user,
+      query =
+        s"""
+          mutation {
+            addTimeChargeCorrection(input: {
+              visitId: "$vid",
+              correction: {
+                chargeClass: ${chargeClass.tag.toScreamingSnakeCase},
+                op: ${op.tag.toScreamingSnakeCase},
+                amount: {
+                  seconds: ${amount.toSeconds}
+                }
+                ${comment.fold("")(c => s", comment: \"$c\"")}
+              }
+            }) {
+              timeChargeInvoice {
+                corrections {
+                  created
+                }
+              }
+            }
+          }
+        """
+      ).void
 
   def recordVisitAs(user: User, instrument: Instrument, oid: Observation.Id): IO[Visit.Id] = {
     val name = s"record${instrument.tag}Visit"
