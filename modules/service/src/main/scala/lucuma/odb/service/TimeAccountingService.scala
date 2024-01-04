@@ -33,13 +33,13 @@ import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.numeric.int8
-import skunk.codec.text.text
 import skunk.codec.temporal.interval
+import skunk.codec.text.text
 import skunk.implicits.*
 
-import Services.Syntax.*
-
 import java.time.Duration
+
+import Services.Syntax.*
 
 
 trait TimeAccountingService[F[_]] {
@@ -271,22 +271,6 @@ object TimeAccountingService {
           }
         )}
 
-//      val time_charge_correction: Encoder[TimeChargeCorrection] =
-//        (
-//          core_timestamp            *:
-//          charge_class              *:
-//          time_charge_correction_op *:
-//          time_span                 *:
-//          user_id                   *:
-//          text.opt
-//        ).contramap { entry => (
-//          entry.timestamp,
-//          entry.chargeClass,
-//          entry.op,
-//          entry.amount,
-//          entry.user.id,
-//          entry.comment.filter(_.nonEmpty)
-//        )}
     }
 
     val SetTimeAccounting: Command[(Visit.Id, CategorizedTime, CategorizedTime)] =
