@@ -525,14 +525,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 // clue.ResponseException: NonEmptyList(GraphQLError(Parse error at line 8 column 40
 //                  seconds: 9223372036854.775807
 //                                        ^,None,None,None))
-
-//  test("timeChargeInvoice (over add)") {
-//    correctionTest(
-//      TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, TimeSpan.Max, "over add".comment),
-//      TimeSpan.Max,
-//      700
-//    )
-//  }
+  test("timeChargeInvoice (over add)") {
+    correctionTest(
+      List(TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, TimeSpan.Max, "over add".comment)),
+      TimeSpan.Max,
+      700
+    )
+  }
 
   test("timeChargeInvoice (multi-correction)") {
     correctionTest(
