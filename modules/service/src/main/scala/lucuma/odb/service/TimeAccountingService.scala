@@ -180,9 +180,7 @@ object TimeAccountingService {
           } yield i
         }
 
-        private def updateInvoice(
-          inv: TimeCharge.Invoice
-        ): F[Unit] =
+        private def updateInvoice(inv: TimeCharge.Invoice): F[Unit] =
           for {
             _ <- updateDiscounts(inv.discounts)
             _ <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge))

@@ -10,7 +10,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
@@ -40,7 +39,6 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -51,6 +49,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
+import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.sourceprofile.given
@@ -556,7 +555,7 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-  def addTimeChargeCorrection(user: User, vid: Visit.Id, chargeClass: ChargeClass, op: TimeChargeCorrection.Op, amount: TimeSpan, comment: Option[String]): IO[Unit] =
+  def addTimeChargeCorrection(user: User, vid: Visit.Id, correction: TimeChargeCorrectionInput): IO[Unit] =
     query(
       user  = user,
       query =
@@ -565,12 +564,12 @@ trait DatabaseOperations { this: OdbSuite =>
             addTimeChargeCorrection(input: {
               visitId: "$vid",
               correction: {
-                chargeClass: ${chargeClass.tag.toScreamingSnakeCase},
-                op: ${op.tag.toScreamingSnakeCase},
+                chargeClass: ${correction.chargeClass.tag.toScreamingSnakeCase},
+                op: ${correction.op.tag.toScreamingSnakeCase},
                 amount: {
-                  seconds: ${amount.toSeconds}
+                  seconds: ${correction.amount.toSeconds}
                 }
-                ${comment.fold("")(c => s", comment: \"$c\"")}
+                ${correction.comment.fold("")(c => s", comment: \"${c.value}\"")}
               }
             }) {
               timeChargeInvoice {
