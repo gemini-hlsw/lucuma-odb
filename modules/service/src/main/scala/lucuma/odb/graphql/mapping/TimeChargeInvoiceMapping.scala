@@ -4,7 +4,14 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Query.Binding
+import grackle.Query.OrderBy
+import grackle.Query.OrderSelection
+import grackle.Query.OrderSelections
+import grackle.QueryCompiler.Elab
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.table.TimeAccountingTable
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
@@ -19,11 +26,17 @@ trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
     ObjectMapping(
       tpe = TimeChargeInvoiceType,
       fieldMappings = List(
-        SqlField("id", VisitTable.Id, key = true, hidden = true),
-        SqlObject("executionTime", Join(VisitTable.Id, TimeAccountingTable.VisitId)),
-        SqlObject("discounts",     Join(VisitTable.Id, TimeChargeDiscountTable.VisitId)),
-        SqlObject("corrections",   Join(VisitTable.Id, TimeChargeCorrectionTable.VisitId)),
-        SqlObject("finalCharge",   Join(VisitTable.Id, TimeAccountingTable.VisitId))
+        SqlField("id", TimeAccountingTable.VisitId, key = true, hidden = true),
+        SqlObject("executionTime"),
+        SqlObject("discounts",     Join(TimeAccountingTable.VisitId, TimeChargeDiscountTable.VisitId)),
+        SqlObject("corrections",   Join(TimeAccountingTable.VisitId, TimeChargeCorrectionTable.VisitId)),
+        SqlObject("finalCharge")
       )
     )
+
+  lazy val TimeChargeInvoiceElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (TimeChargeInvoiceType, "corrections", Nil) =>
+      Elab.transformChild { child =>
+        OrderBy(OrderSelections(List(OrderSelection[Timestamp](TimeChargeCorrectionType / "created"))), child)
+      }
 }

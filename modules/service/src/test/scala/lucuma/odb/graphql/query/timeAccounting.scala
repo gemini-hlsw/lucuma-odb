@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import io.circe.Encoder
@@ -463,8 +464,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   }
 
-  test("timeChargeInvoice (simple correction)") {
-
+  private def correctionTest(
+    corrections:  List[TimeChargeCorrection],
+    finalCharge: TimeSpan,
+    index:       Int
+  ): IO[Unit] = {
     val t0 =  0.nightStart
     val t1 = 10.nightStart
 
@@ -474,20 +478,89 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     )
 
     val expExecution   = CategorizedTime(ChargeClass.Program -> 10.sec)
-    val expFinalCharge = CategorizedTime(ChargeClass.Program ->  5.sec)
-    val correction     = TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, TimeSpan.FromSeconds.unsafeGet(BigDecimal(5)), "Just because".some)
+    val expFinalCharge = CategorizedTime(ChargeClass.Program -> finalCharge)
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 400)
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, index)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- corrections.traverse_ { c => addTimeChargeCorrection(pi, v.vid, c.chargeClass, c.op, c.amount, c.comment) }
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, corrections))
+    } yield ()
+  }
+
+  test("timeChargeInvoice (simple add correction)") {
+    correctionTest(
+      List(TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".some)),
+      15.sec,
+      400
+    )
+  }
+
+  test("timeChargeInvoice (simple subtract correction)") {
+    correctionTest(
+      List(TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "subtract".some)),
+      5.sec,
+      500
+    )
+  }
+
+  test("timeChargeInvoice (over subtract)") {
+    correctionTest(
+      List(TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 11.sec, "over subtract".some)),
+      0.sec,
+      600
+    )
+  }
+
+// clue.ResponseException: NonEmptyList(GraphQLError(Parse error at line 8 column 40
+//                  seconds: 9223372036854.775807
+//                                        ^,None,None,None))
+
+//  test("timeChargeInvoice (over add)") {
+//    correctionTest(
+//      TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, TimeSpan.Max, "over add".some),
+//      TimeSpan.Max,
+//      700
+//    )
+//  }
+
+  test("timeChargeInvoice (multi-correction)") {
+    correctionTest(
+      List(
+        TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Add, 1.sec, "add 1".some),
+        TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 2.sec, "subtract 2".some)
+      ),
+      9.sec,
+      800
+    )
+  }
+
+  test("timeChargeInvoice (pre correction add)") {
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 0.sec)
+    val expFinalCharge = CategorizedTime(ChargeClass.Program -> 5.sec)
+    val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
+    val correction     = TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".some)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 900)
       _ <- addTimeChargeCorrection(pi, v.vid, correction.chargeClass, correction.op, correction.amount, correction.comment)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
-
   }
 
+  test("timeChargeInvoice (pre correction subtract)") {
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 0.sec)
+    val expFinalCharge = CategorizedTime(ChargeClass.Program -> 0.sec)
+    val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
+    val correction     = TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "add".some)
 
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1000)
+      _ <- addTimeChargeCorrection(pi, v.vid, correction.chargeClass, correction.op, correction.amount, correction.comment)
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
+    } yield ()
+  }
 }

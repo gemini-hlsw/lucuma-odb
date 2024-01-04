@@ -370,6 +370,7 @@ object OdbMapping {
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
                 TargetGroupElaborator,
+                TimeChargeInvoiceElaborator,
                 QueryElaborator,
                 VisitElaborator
               ).combineAll
