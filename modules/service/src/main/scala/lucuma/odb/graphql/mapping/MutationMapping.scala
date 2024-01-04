@@ -515,10 +515,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     child:     Query
   )(using Services[F], Transaction[F]): F[Result[Query]] = {
     import VisitService.InsertVisitResponse.*
-    for {
-      r <- response
-      _ <- r.visitId.traverse_(timeAccountingService.initialize)
-    } yield r match {
+    response.map {
       case NotAuthorized(user)                 =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
       case ObservationNotFound(id, instrument) =>

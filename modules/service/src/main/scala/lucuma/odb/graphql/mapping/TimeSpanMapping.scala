@@ -12,10 +12,10 @@ import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
-import lucuma.odb.graphql.table.TimeAccountingTable
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
+import lucuma.odb.graphql.table.VisitTable
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with GmosDynamicTables[F]
@@ -23,10 +23,10 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ProposalTable[F]
                                with ObservationView[F]
                                with GroupView[F]
-                               with TimeAccountingTable[F]
                                with TimeChargeCorrectionTable[F]
                                with TimeChargeDiscountTable[F]
                                with TimingWindowView[F]
+                               with VisitTable[F]
                                with ChronConditionsEntryView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
@@ -48,12 +48,12 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
         TimeChargeDaylightDiscountType / "program"                -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
         TimeChargeQaDiscountType / "partner"                      -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
         TimeChargeQaDiscountType / "program"                      -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
-        TimeChargeInvoiceType / "executionTime" / "nonCharged"    -> timeSpanMapping(TimeAccountingTable.Raw.NonChargedTime)(TimeAccountingTable.VisitId),
-        TimeChargeInvoiceType / "executionTime" / "partner"       -> timeSpanMapping(TimeAccountingTable.Raw.PartnerTime)(TimeAccountingTable.VisitId),
-        TimeChargeInvoiceType / "executionTime" / "program"       -> timeSpanMapping(TimeAccountingTable.Raw.ProgramTime)(TimeAccountingTable.VisitId),
-        TimeChargeInvoiceType / "finalCharge" / "nonCharged"      -> timeSpanMapping(TimeAccountingTable.Final.NonChargedTime)(TimeAccountingTable.VisitId),
-        TimeChargeInvoiceType / "finalCharge" / "partner"         -> timeSpanMapping(TimeAccountingTable.Final.PartnerTime)(TimeAccountingTable.VisitId),
-        TimeChargeInvoiceType / "finalCharge" / "program"         -> timeSpanMapping(TimeAccountingTable.Final.ProgramTime)(TimeAccountingTable.VisitId),
+        TimeChargeInvoiceType / "executionTime" / "nonCharged"    -> timeSpanMapping(VisitTable.Raw.NonChargedTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "executionTime" / "partner"       -> timeSpanMapping(VisitTable.Raw.PartnerTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "executionTime" / "program"       -> timeSpanMapping(VisitTable.Raw.ProgramTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "finalCharge" / "nonCharged"      -> timeSpanMapping(VisitTable.Final.NonChargedTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "finalCharge" / "partner"         -> timeSpanMapping(VisitTable.Final.PartnerTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "finalCharge" / "program"         -> timeSpanMapping(VisitTable.Final.ProgramTime)(VisitTable.Id),
         TimingWindowEndAfterType / "after"                        -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
         TimingWindowRepeatType / "period"                         -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )

@@ -4,15 +4,15 @@
 package lucuma.odb.graphql.mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.TimeAccountingTable
+import lucuma.odb.graphql.table.VisitTable
 
-trait AddTimeChargeCorrectionResultMapping[F[_]] extends TimeAccountingTable[F] {
+trait AddTimeChargeCorrectionResultMapping[F[_]] extends VisitTable[F] {
 
   lazy val AddTimeChargeCorrectionResultMapping: ObjectMapping =
     ObjectMapping(
       tpe = AddTimeChargeCorrectionResultType,
       fieldMappings = List(
-        SqlField("id", TimeAccountingTable.VisitId, key = true, hidden = true),
+        SqlField("id", VisitTable.Id, key = true, hidden = true),
         SqlObject("timeChargeInvoice")
       )
     )
