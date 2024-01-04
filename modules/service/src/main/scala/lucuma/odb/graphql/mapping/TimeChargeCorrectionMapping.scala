@@ -4,14 +4,10 @@
 package lucuma.odb.graphql.mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.TimeAccountingTable
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.UserTable
-import lucuma.odb.graphql.table.VisitTable
 
-trait TimeChargeCorrectionMapping[F[_]] extends VisitTable[F]
-                                        with UserTable[F]
-                                        with TimeAccountingTable[F]
+trait TimeChargeCorrectionMapping[F[_]] extends UserTable[F]
                                         with TimeChargeCorrectionTable[F] {
 
   lazy val TimeChargeCorrectionMapping: ObjectMapping =

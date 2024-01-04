@@ -45,13 +45,6 @@ import Services.Syntax.*
 trait TimeAccountingService[F[_]] {
 
   /**
-   * Initializes the time accounting data when a new visit is created.
-   */
-  def initialize(
-    visitId: Visit.Id
-  )(using Transaction[F]): F[Unit]
-
-  /**
    * Updates the time accounting data.
    */
   def update(
@@ -123,11 +116,6 @@ object TimeAccountingService {
     new TimeAccountingService[F] {
 
       import Statements.*
-
-      override def initialize(
-        visitId: Visit.Id
-      )(using Transaction[F]): F[Unit] =
-        session.execute(SetTimeAccounting)((visitId, CategorizedTime.Zero, CategorizedTime.Zero)).void
 
       override def update(
         visitId: Visit.Id
@@ -280,30 +268,13 @@ object TimeAccountingService {
         ).to[Correction]
     }
 
-    val SetTimeAccounting: Command[(Visit.Id, CategorizedTime, CategorizedTime)] =
-      sql"""
-        INSERT INTO t_time_accounting (
-          c_visit_id,
-          c_raw_non_charged_time,
-          c_raw_partner_time,
-          c_raw_program_time,
-          c_final_non_charged_time,
-          c_final_partner_time,
-          c_final_program_time
-        ) VALUES (
-          $visit_id,
-          $categorized_time,
-          $categorized_time
-        )
-      """.command
-
     val UpdateTimeAccounting: Command[(
       Visit.Id,
       CategorizedTime,
       CategorizedTime
     )] =
       sql"""
-        UPDATE t_time_accounting
+        UPDATE t_visit
            SET c_raw_non_charged_time   = $time_span,
                c_raw_partner_time       = $time_span,
                c_raw_program_time       = $time_span,
@@ -473,7 +444,7 @@ object TimeAccountingService {
         else amount(input)
 
       sql"""
-        UPDATE t_time_accounting
+        UPDATE t_visit
            SET c_final_partner_time = update_time_span(c_final_partner_time, $interval),
                c_final_program_time = update_time_span(c_final_program_time, $interval)
          WHERE c_visit_id = $visit_id

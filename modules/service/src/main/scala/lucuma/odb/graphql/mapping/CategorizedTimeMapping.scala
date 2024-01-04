@@ -5,10 +5,10 @@ package lucuma.odb.graphql.mapping
 
 import io.circe.syntax.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.table.TimeAccountingTable
+import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
-trait CategorizedTimeMapping[F[_]] extends TimeAccountingTable[F] {
+trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
 
   lazy val CategorizedTimeMapping: TypeMapping =
     SwitchMapping(
@@ -16,18 +16,18 @@ trait CategorizedTimeMapping[F[_]] extends TimeAccountingTable[F] {
       List(
         TimeChargeInvoiceType / "executionTime" ->
           categorizedTimeMapping(
-            TimeAccountingTable.VisitId,
-            TimeAccountingTable.Raw.NonChargedTime,
-            TimeAccountingTable.Raw.PartnerTime,
-            TimeAccountingTable.Raw.ProgramTime
+            VisitTable.Id,
+            VisitTable.Raw.NonChargedTime,
+            VisitTable.Raw.PartnerTime,
+            VisitTable.Raw.ProgramTime
           ),
 
         TimeChargeInvoiceType / "finalCharge"   ->
           categorizedTimeMapping(
-            TimeAccountingTable.VisitId,
-            TimeAccountingTable.Final.NonChargedTime,
-            TimeAccountingTable.Final.PartnerTime,
-            TimeAccountingTable.Final.ProgramTime
+            VisitTable.Id,
+            VisitTable.Final.NonChargedTime,
+            VisitTable.Final.PartnerTime,
+            VisitTable.Final.ProgramTime
           )
       )
     )
