@@ -91,13 +91,11 @@ object TimeAccountingService {
   extension (time: CategorizedTime) {
 
     /** CategorizedTime after applying corrections. */
-    def corrected(
-      corrections: List[(ChargeClass, TimeChargeCorrection.Op, TimeSpan)]
-    ): CategorizedTime =
-      corrections.foldLeft(time) { case (res, (cClass, op, amount)) =>
-        op match {
-          case TimeChargeCorrection.Op.Add      => res.modify(cClass, _ +| amount)
-          case TimeChargeCorrection.Op.Subtract => res.modify(cClass, _ -| amount)
+    def corrected(corrections: List[Correction]): CategorizedTime =
+      corrections.foldLeft(time) { case (res, correction) =>
+        correction.op match {
+          case TimeChargeCorrection.Op.Add      => res.modify(correction.chargeClass, _ +| correction.amount)
+          case TimeChargeCorrection.Op.Subtract => res.modify(correction.chargeClass, _ -| correction.amount)
         }
       }
 
@@ -114,6 +112,12 @@ object TimeAccountingService {
       c.programTime,
       comment
     )
+
+  case class Correction(
+    chargeClass: ChargeClass,
+    op:          TimeChargeCorrection.Op,
+    amount:      TimeSpan
+  )
 
   def instantiate[F[_]: Concurrent](using Services[F]): TimeAccountingService[F] =
     new TimeAccountingService[F] {
@@ -172,9 +176,7 @@ object TimeAccountingService {
           }
 
         private val computeInvoice: F[TimeCharge.Invoice] = {
-          def invoice(
-            corrections: List[(ChargeClass, TimeChargeCorrection.Op, TimeSpan)]
-          ): StateT[F, TimeAccountingState, TimeCharge.Invoice] =
+          def invoice(corrections: List[Correction]): StateT[F, TimeAccountingState, TimeCharge.Invoice] =
             for {
               ini <- StateT.get[F, TimeAccountingState]
               day <- daylightDiscounts
@@ -271,6 +273,11 @@ object TimeAccountingService {
           }
         )}
 
+      val correction: Codec[Correction] =
+        (charge_class              *:
+         time_charge_correction_op *:
+         time_span
+        ).to[Correction]
     }
 
     val SetTimeAccounting: Command[(Visit.Id, CategorizedTime, CategorizedTime)] =
@@ -441,7 +448,7 @@ object TimeAccountingService {
            uid
          )}
 
-    val SelectCorrection: Query[Visit.Id, (ChargeClass, TimeChargeCorrection.Op, TimeSpan)] =
+    val SelectCorrection: Query[Visit.Id, Correction] =
       sql"""
         SELECT
           c_charge_class,
@@ -452,7 +459,7 @@ object TimeAccountingService {
         WHERE
           c_visit_id = $visit_id
         ORDER BY c_created
-      """.query(charge_class *: time_charge_correction_op *: time_span)
+      """.query(codec.correction)
 
     val PerformCorrection: Command[(Visit.Id, TimeChargeCorrectionInput)] = {
       def amount(input: TimeChargeCorrectionInput): Duration =
