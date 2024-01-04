@@ -32,7 +32,6 @@ import lucuma.odb.service.Services.Syntax.*
 import table.ExecutionEventTable
 import table.GmosStaticTables
 import table.ObservationView
-import table.TimeAccountingTable
 import table.VisitTable
 
 trait VisitMapping[F[_]] extends VisitTable[F]
@@ -41,8 +40,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
                             with GmosStaticTables[F]
                             with ObservationView[F]
                             with Predicates[F]
-                            with SelectSubquery
-                            with TimeAccountingTable[F] {
+                            with SelectSubquery {
 
   def user: User
   def services: Resource[F, Services[F]]
@@ -60,7 +58,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events"),
-        SqlObject("timeChargeInvoice", Join(VisitTable.Id, TimeAccountingTable.VisitId))
+        SqlObject("timeChargeInvoice")
       )
     )
 
