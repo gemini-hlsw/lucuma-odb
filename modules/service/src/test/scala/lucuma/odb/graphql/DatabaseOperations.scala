@@ -567,7 +567,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 chargeClass: ${correction.chargeClass.tag.toScreamingSnakeCase},
                 op: ${correction.op.tag.toScreamingSnakeCase},
                 amount: {
-                  seconds: ${correction.amount.toSeconds}
+                  seconds: "${correction.amount.toSeconds}"
                 }
                 ${correction.comment.fold("")(c => s", comment: \"${c.value}\"")}
               }
