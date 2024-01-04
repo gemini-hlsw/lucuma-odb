@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.literal.*
@@ -37,6 +38,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.TimeCharge
+import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
 import skunk.syntax.all.*
@@ -62,6 +64,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     def nightStart: Timestamp =
       Timestamp.unsafeFromInstantTruncated(tbn.start).plusMillisOption(i * 1000L).get
+  }
+
+  extension (s: String) {
+    def comment: Option[NonEmptyString] =
+      NonEmptyString.from(s).toOption
   }
 
   val validUsers = List(pi).toList
@@ -139,7 +146,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     """
 
   def expectedCorrection(
-    c: TimeChargeCorrection
+    c: TimeChargeCorrectionInput
   ): Json =
     json"""
       {
@@ -149,9 +156,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           "seconds": ${c.amount.toSeconds}
         },
         "user": {
-          "id": ${c.user.id.toString}
+          "id": ${pi.id.toString}
         },
-        "comment": ${c.comment}
+        "comment": ${c.comment.map(_.value).asJson}
       }
     """
 
@@ -181,7 +188,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   def invoiceExected(
     invoice:     TimeCharge.Invoice,
-    corrections: List[TimeChargeCorrection]
+    corrections: List[TimeChargeCorrectionInput]
   ): Either[List[String], Json] = {
 
     val matches = List(
@@ -465,7 +472,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   }
 
   private def correctionTest(
-    corrections:  List[TimeChargeCorrection],
+    corrections:  List[TimeChargeCorrectionInput],
     finalCharge: TimeSpan,
     index:       Int
   ): IO[Unit] = {
@@ -486,14 +493,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
-      _ <- corrections.traverse_ { c => addTimeChargeCorrection(pi, v.vid, c.chargeClass, c.op, c.amount, c.comment) }
+      _ <- corrections.traverse_ { c => addTimeChargeCorrection(pi, v.vid, c) }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, corrections))
     } yield ()
   }
 
   test("timeChargeInvoice (simple add correction)") {
     correctionTest(
-      List(TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".some)),
+      List(TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".comment)),
       15.sec,
       400
     )
@@ -501,7 +508,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (simple subtract correction)") {
     correctionTest(
-      List(TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "subtract".some)),
+      List(TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "subtract".comment)),
       5.sec,
       500
     )
@@ -509,7 +516,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (over subtract)") {
     correctionTest(
-      List(TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 11.sec, "over subtract".some)),
+      List(TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 11.sec, "over subtract".comment)),
       0.sec,
       600
     )
@@ -521,7 +528,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
 //  test("timeChargeInvoice (over add)") {
 //    correctionTest(
-//      TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, TimeSpan.Max, "over add".some),
+//      TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, TimeSpan.Max, "over add".comment),
 //      TimeSpan.Max,
 //      700
 //    )
@@ -530,8 +537,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   test("timeChargeInvoice (multi-correction)") {
     correctionTest(
       List(
-        TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Add, 1.sec, "add 1".some),
-        TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 2.sec, "subtract 2".some)
+        TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 1.sec, "add 1".comment),
+        TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 2.sec, "subtract 2".comment)
       ),
       9.sec,
       800
@@ -542,11 +549,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expExecution   = CategorizedTime(ChargeClass.Program -> 0.sec)
     val expFinalCharge = CategorizedTime(ChargeClass.Program -> 5.sec)
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
-    val correction     = TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".some)
+    val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".comment)
 
     for {
       v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 900)
-      _ <- addTimeChargeCorrection(pi, v.vid, correction.chargeClass, correction.op, correction.amount, correction.comment)
+      _ <- addTimeChargeCorrection(pi, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
   }
@@ -555,11 +562,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expExecution   = CategorizedTime(ChargeClass.Program -> 0.sec)
     val expFinalCharge = CategorizedTime(ChargeClass.Program -> 0.sec)
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
-    val correction     = TimeChargeCorrection(Timestamp.Min, pi, ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "add".some)
+    val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "add".comment)
 
     for {
       v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1000)
-      _ <- addTimeChargeCorrection(pi, v.vid, correction.chargeClass, correction.op, correction.amount, correction.comment)
+      _ <- addTimeChargeCorrection(pi, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
   }
