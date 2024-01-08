@@ -166,6 +166,18 @@ object TimeAccountingService {
             }
           }
 
+        private val noDataDiscount: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+          StateT { tas =>
+            datasetService.hasDatasets(visitId).map {
+              case false => (TimeAccountingState.Empty,
+                             toDiscount(tas, TimeAccounting.comment.NoData)
+                               .map(TimeCharge.DiscountEntry.NoData.apply)
+                               .toList
+                            )
+              case _     => (tas, Nil)
+            }
+          }
+
         private val qaDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT { tas =>
             datasetService.selectDatasetsWithQaFailures(visitId).map { failures =>
@@ -183,11 +195,12 @@ object TimeAccountingService {
           def invoice(corrections: List[Correction]): StateT[F, TimeAccountingState, TimeCharge.Invoice] =
             for {
               ini <- StateT.get[F, TimeAccountingState]
+              nod <- noDataDiscount
               day <- daylightDiscounts
               qa  <- qaDiscounts
               // ... other discounts here ...
               fin <- StateT.get[F, TimeAccountingState]
-            } yield TimeCharge.Invoice(ini.charge, day ++ qa, fin.charge.corrected(corrections))
+            } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ qa, fin.charge.corrected(corrections))
 
           for {
             s <- initialState

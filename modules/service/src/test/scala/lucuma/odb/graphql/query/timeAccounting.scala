@@ -183,6 +183,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     """.withObject { obj =>
       d match {
         case TimeCharge.DiscountEntry.Daylight(_, s) => obj.add("site",     s.asJson).toJson
+        case TimeCharge.DiscountEntry.NoData(_)      => obj.toJson
         case TimeCharge.DiscountEntry.Qa(_, ds)      => obj.add("datasets", ds.toList.map(id => Json.obj("id" -> id.asJson)).asJson).toJson
       }
     }
@@ -436,6 +437,36 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     for {
       v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 200)
+      es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
+      _ <- insertEvents(es)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
+    } yield ()
+
+  }
+
+  test("timeChargeInvoice (no data discount)") {
+
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
+
+    val events = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+
+    val expExecution = CategorizedTime(ChargeClass.Program -> 10.sec)
+    val discount     = TimeCharge.Discount(
+      TimestampInterval.between(t0, t1),
+      TimeSpan.Zero,
+      10.sec,
+      TimeAccounting.comment.NoData
+    )
+    val noDataEntry  = TimeCharge.DiscountEntry.NoData(discount)
+    val invoice      = TimeCharge.Invoice(expExecution, List(noDataEntry), CategorizedTime.Zero)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 0, 0, 250)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }

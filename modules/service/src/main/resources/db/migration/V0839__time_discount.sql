@@ -2,6 +2,7 @@
 CREATE TYPE e_time_charge_discount_type AS ENUM (
   'daylight',
   'fault',
+  'nodata',
   'qa',
   'weather'
 );
