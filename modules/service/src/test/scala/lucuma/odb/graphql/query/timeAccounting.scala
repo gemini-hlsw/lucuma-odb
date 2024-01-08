@@ -25,6 +25,7 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
@@ -62,7 +63,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     def sec: TimeSpan =
       TimeSpan.FromMicroseconds.getOption(i * 1_000_000L).get
 
-    def nightStart: Timestamp =
+    def fromNightStart: Timestamp =
       Timestamp.unsafeFromInstantTruncated(tbn.start).plusMillisOption(i * 1000L).get
   }
 
@@ -228,6 +229,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   )
 
   case class VisitNode(
+    pid:   Program.Id,
     oid:   Observation.Id,
     vid:   Visit.Id,
     atoms: List[AtomNode]
@@ -284,12 +286,28 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   ): IO[VisitNode] =
 
     for {
-      pid   <- createProgramAs(user)
-      oid   <- createObservationAs(user, pid, mode.some)
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid, mode.some)
+      v   <- recordVisitForObs(pid, oid, user, mode, when, atomCount, stepCount, datasetCount, idx)
+    } yield v
+
+  def recordVisitForObs(
+    pid:          Program.Id,
+    oid:          Observation.Id,
+    user:         User,
+    mode:         ObservingModeType,
+    when:         Timestamp,
+    atomCount:    Int,
+    stepCount:    Int,
+    datasetCount: Int,
+    idx:          Int
+  ): IO[VisitNode] =
+
+    for {
       vid   <- recordVisitAs(user, mode.instrument, oid)
       _     <- setVisitTime(vid, when)
       atoms <- (0 until atomCount).toList.traverse { a => recordAtom(user, mode, vid, stepCount, datasetCount, idx + a * stepCount * datasetCount) }
-    } yield VisitNode(oid, vid, atoms)
+    } yield VisitNode(pid, oid, vid, atoms)
 
   def insertSequenceEvent(e: SequenceEvent): IO[Unit] =
     withSession { s =>
@@ -373,8 +391,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (no discounts)") {
 
-    val t0 =  0.nightStart
-    val t1 = 10.nightStart
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
 
     val events = List(
       (SequenceCommand.Start, t0),
@@ -397,8 +415,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (daylight discount)") {
 
-    val t0 = -1.nightStart
-    val t1 =  1.nightStart
+    val t0 = -1.fromNightStart
+    val t1 =  1.fromNightStart
 
     val events = List(
       (SequenceCommand.Start, t0),
@@ -428,7 +446,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (qa discount)") {
 
-    val ts = (0 until 8).map(_.nightStart)
+    val ts = (0 until 8).map(_.fromNightStart)
 
     def events(v: VisitNode): List[ExecutionEvent] = {
       val sid0 = v.atoms.head.steps.head.sid
@@ -476,8 +494,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     finalCharge: TimeSpan,
     index:       Int
   ): IO[Unit] = {
-    val t0 =  0.nightStart
-    val t1 = 10.nightStart
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
 
     val events = List(
       (SequenceCommand.Start, t0),
@@ -564,6 +582,223 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1000)
       _ <- addTimeChargeCorrection(pi, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
+    } yield ()
+  }
+
+  def observationQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          execution {
+            timeCharge {
+              program { seconds }
+              partner { seconds }
+              nonCharged { seconds }
+              total { seconds }
+            }
+          }
+        }
+      }
+    """
+
+  def observationExpectedCharge(ct: CategorizedTime): Either[List[String], Json] =
+    json"""
+      {
+        "observation": {
+          "execution": {
+            "timeCharge": ${expectedCategorizedTime(ct)}
+          }
+        }
+      }
+    """.asRight
+
+  test("observation timeCharge, empty observation") {
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1100)
+      _ <- expect(pi, observationQuery(v.oid), observationExpectedCharge(CategorizedTime.Zero))
+    } yield ()
+  }
+
+  test("observation timeCharge, one visit") {
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
+
+    val events = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+
+    val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1200)
+      es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
+      _ <- insertEvents(es)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, observationQuery(v.oid), observationExpectedCharge(expected))
+    } yield ()
+
+  }
+
+  test("observation timeCharge, two visits") {
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
+    val t2 = 20.fromNightStart
+    val t3 = 30.fromNightStart
+    val t4 = 40.fromNightStart
+
+    val events0 = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+    val events1 = List(
+      (SequenceCommand.Start, t3),
+      (SequenceCommand.Stop,  t4)
+    )
+
+    val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
+
+    for {
+      v0 <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1300)
+      pid = v0.pid
+      oid = v0.oid
+      es0 = events0.map { (c, t) => SequenceEvent(EventId, t, oid, v0.vid, c) }
+      _ <- insertEvents(es0)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+
+      v1 <- recordVisitForObs(pid, oid, pi, mode, t2, 1, 1, 1, 1301)
+      es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
+      _ <- insertEvents(es1)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+
+      _ <- expect(pi, observationQuery(oid), observationExpectedCharge(expected))
+    } yield ()
+
+  }
+
+  test("observation timeCharge, overflow") {
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
+    val t2 = 20.fromNightStart
+    val t3 = 30.fromNightStart
+    val t4 = 40.fromNightStart
+
+    val events0 = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+    val events1 = List(
+      (SequenceCommand.Start, t3),
+      (SequenceCommand.Stop,  t4)
+    )
+
+    val expected   = TimeAccounting.CategorizedTimeMax
+    val correction = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, TimeSpan.Max, "add max".comment)
+
+    for {
+      v0 <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1400)
+      pid = v0.pid
+      oid = v0.oid
+      es0 = events0.map { (c, t) => SequenceEvent(EventId, t, oid, v0.vid, c) }
+      _ <- insertEvents(es0)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+
+      v1 <- recordVisitForObs(pid, oid, pi, mode, t2, 1, 1, 1, 1401)
+      es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
+      _ <- insertEvents(es1)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- addTimeChargeCorrection(pi, v1.vid, correction)
+
+      _ <- expect(pi, observationQuery(oid), observationExpectedCharge(expected))
+    } yield ()
+
+  }
+
+    def programQuery(pid: Program.Id): String =
+    s"""
+      query {
+        program(programId: "$pid") {
+          timeCharge {
+            program { seconds }
+            partner { seconds }
+            nonCharged { seconds }
+            total { seconds }
+          }
+        }
+      }
+    """
+
+  def programExpectedCharge(ct: CategorizedTime): Either[List[String], Json] =
+    json"""
+      {
+        "program": {
+          "timeCharge": ${expectedCategorizedTime(ct)}
+        }
+      }
+    """.asRight
+
+  test("program timeCharge, no observations") {
+    for {
+      p <- createProgramAs(pi)
+      _ <- expect(pi, programQuery(p), programExpectedCharge(CategorizedTime.Zero))
+    } yield ()
+  }
+
+  test("program timeCharge, one observation") {
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
+
+    val events = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+
+    val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
+
+    for {
+      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1500)
+      es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
+      _ <- insertEvents(es)
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, programQuery(v.pid), programExpectedCharge(expected))
+    } yield ()
+  }
+
+  test("program timeCharge, two observations") {
+    val t0 =  0.fromNightStart
+    val t1 = 10.fromNightStart
+    val t2 = 20.fromNightStart
+    val t3 = 30.fromNightStart
+    val t4 = 40.fromNightStart
+
+    val events0 = List(
+      (SequenceCommand.Start, t0),
+      (SequenceCommand.Stop,  t1)
+    )
+    val events1 = List(
+      (SequenceCommand.Start, t3),
+      (SequenceCommand.Stop,  t4)
+    )
+
+    val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
+
+    for {
+      // Obs0
+      v0  <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1600)
+      pid  = v0.pid
+      oid0 = v0.oid
+      es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
+      _   <- insertEvents(es0)
+      _   <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+
+      // Obs1
+      oid1 <- createObservationAs(pi, pid, mode.some)
+      v1   <- recordVisitForObs(pid, oid1, pi, mode, t2, 1, 1, 1, 1601)
+      es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
+      _    <- insertEvents(es1)
+      _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+
+      _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
   }
 }
