@@ -23,6 +23,7 @@ object TimeCharge {
   enum DiscountDiscriminator(val dbTag: String) {
     case Daylight extends DiscountDiscriminator("daylight")
     case Fault    extends DiscountDiscriminator("fault")
+    case NoData   extends DiscountDiscriminator("nodata")
     case Qa       extends DiscountDiscriminator("qa")
     case Weather  extends DiscountDiscriminator("weather")
   }
@@ -33,6 +34,7 @@ object TimeCharge {
       Enumerated.from(
         Daylight,
         Fault,
+        NoData,
         Qa,
         Weather
       ).withTag(_.dbTag)
@@ -81,6 +83,18 @@ object TimeCharge {
 
     }
 
+    case class NoData(
+      discount: Discount
+    ) extends DiscountEntry {
+      override def discriminator: DiscountDiscriminator =
+        DiscountDiscriminator.NoData
+    }
+
+    object NoData {
+      given Eq[NoData] =
+        Eq.by(_.discount)
+    }
+
     case class Qa(
       discount: Discount,
       datasets: Set[Dataset.Id]
@@ -99,6 +113,7 @@ object TimeCharge {
     given Eq[DiscountEntry] =
       Eq.instance {
         case (a@Daylight(_, _), b@Daylight(_, _)) => a === b
+        case (a@NoData(_),      b@NoData(_))      => a === b
         case (a@Qa(_, _),       b@Qa(_, _))       => a === b
         case _                                    => false
       }

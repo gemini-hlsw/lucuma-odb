@@ -56,6 +56,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
       override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[DiscountDiscriminator]("type").flatMap {
           case DiscountDiscriminator.Daylight => Result(TimeChargeDaylightDiscountType)
+          case DiscountDiscriminator.NoData   => Result(TimeChargeNoDataDiscountType)
           case DiscountDiscriminator.Qa       => Result(TimeChargeQaDiscountType)
           case d                              => Result.failure(s"No TimeChargeDiscount implementation for ${d.dbTag}")
         }
@@ -66,6 +67,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
           case TimeChargeDaylightDiscountType => mkPredicate(DiscountDiscriminator.Daylight)
+          case TimeChargeNoDataDiscountType   => mkPredicate(DiscountDiscriminator.NoData)
           case TimeChargeQaDiscountType       => mkPredicate(DiscountDiscriminator.Qa)
           case _                              => none
         }
@@ -77,6 +79,14 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
       fieldMappings = List(
         SqlField("id",   TimeChargeDiscountTable.Id, key = true),
         SqlField("site", TimeChargeDiscountTable.Daylight.Site)
+      )
+    )
+
+  lazy val TimeChargeNoDataDiscountMapping: ObjectMapping =
+    ObjectMapping(
+      tpe = TimeChargeNoDataDiscountType,
+      fieldMappings = List(
+        SqlField("id", TimeChargeDiscountTable.Id, key = true)
       )
     )
 

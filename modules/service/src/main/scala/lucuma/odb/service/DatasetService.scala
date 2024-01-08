@@ -22,6 +22,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.DatasetPropertiesInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -48,6 +49,10 @@ sealed trait DatasetService[F[_]] {
     datasetId: Dataset.Id,
     time:      Timestamp
   )(using Transaction[F]): F[Unit]
+
+  def hasDatasets(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Boolean]
 
   def selectDatasetsWithQaFailures(
     visitId: Visit.Id
@@ -132,6 +137,11 @@ object DatasetService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.SetEndTime)(time, datasetId).void
 
+      override def hasDatasets(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.HasDatasets)(visitId)
+
       override def selectDatasetsWithQaFailures(
         visitId: Visit.Id
       )(using Transaction[F]): F[List[(Atom.Id, List[Dataset.Id])]] =
@@ -195,6 +205,15 @@ object DatasetService {
            SET c_end_time   = $core_timestamp
          WHERE c_dataset_id = $dataset_id
       """.command
+
+    val HasDatasets: Query[Visit.Id, Boolean] =
+      sql"""
+        SELECT EXISTS (
+            SELECT 1
+            FROM t_dataset
+            WHERE c_visit_id = $visit_id
+        )
+      """.query(bool)
 
     val SelectQaFailures: Query[Visit.Id, (Atom.Id, Dataset.Id)] =
       sql"""

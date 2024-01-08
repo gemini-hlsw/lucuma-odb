@@ -9478,6 +9478,24 @@ type TimeChargeDaylightDiscount implements TimeChargeDiscount {
 
 }
 
+"""
+A time charge discount that is applied when no data is collected during the
+entirety of the visit.
+"""
+type TimeChargeNoDataDiscount implements TimeChargeDiscount {
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+}
+
 type TimeChargeQaDiscount implements TimeChargeDiscount {
 
   "The interval during which this discount applies."
