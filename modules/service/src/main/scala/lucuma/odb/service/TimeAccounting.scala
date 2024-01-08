@@ -7,7 +7,9 @@ import cats.Eq
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import monocle.Focus
 import monocle.Lens
@@ -18,6 +20,13 @@ import monocle.Lens
  * TimeAccountingService.
  */
 object TimeAccounting {
+
+  val CategorizedTimeMax: CategorizedTime =
+    CategorizedTime(
+      ChargeClass.NonCharged -> TimeSpan.Max,
+      ChargeClass.Partner    -> TimeSpan.Max,
+      ChargeClass.Program    -> TimeSpan.Max
+    )
 
   object comment {
     val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
