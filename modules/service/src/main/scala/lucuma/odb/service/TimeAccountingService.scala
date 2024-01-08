@@ -6,6 +6,8 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.data.StateT
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -20,6 +22,7 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
@@ -59,6 +62,19 @@ trait TimeAccountingService[F[_]] {
     correction: TimeChargeCorrectionInput
   )(using Transaction[F]): F[Long]
 
+  /**
+   * Sums the final time accounting result for all visits of an observation.
+   */
+  def selectObservation(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[CategorizedTime]
+
+  /**
+   * Sums the final time accounting result for all observations of a program.
+   */
+  def selectProgram(
+    programId: Program.Id
+  )(using Transaction[F]): F[CategorizedTime]
 }
 
 object TimeAccountingService {
@@ -217,6 +233,24 @@ object TimeAccountingService {
           id <- session.unique(StoreCorrection)(visitId, input, user.id)
           _  <- session.execute(PerformCorrection)(visitId, input).void
         } yield id
+
+      def selectObservation(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[CategorizedTime] =
+        session
+          .unique(SelectObservation)(observationId)
+          .recoverWith { case SqlState.DatetimeFieldOverflow(_) =>
+            TimeAccounting.CategorizedTimeMax.pure[F]
+          }
+
+      def selectProgram(
+        programId: Program.Id
+      )(using Transaction[F]): F[CategorizedTime] =
+        session
+          .unique(SelectProgram)(programId)
+          .recoverWith { case SqlState.DatetimeFieldOverflow(_) =>
+            TimeAccounting.CategorizedTimeMax.pure[F]
+          }
 
     }
 
@@ -452,5 +486,26 @@ object TimeAccountingService {
         vid
       )}
     }
+
+    val SelectObservation: Query[Observation.Id, CategorizedTime] =
+      sql"""
+        SELECT
+          COALESCE(SUM(c_final_non_charged_time), '0'::interval),
+          COALESCE(SUM(c_final_partner_time), '0'::interval),
+          COALESCE(SUM(c_final_program_time), '0'::interval)
+        FROM t_visit
+        WHERE c_observation_id = $observation_id
+      """.query(categorized_time)
+
+    val SelectProgram: Query[Program.Id, CategorizedTime] =
+      sql"""
+        SELECT
+          COALESCE(SUM(v.c_final_non_charged_time), '0'::interval),
+          COALESCE(SUM(v.c_final_partner_time), '0'::interval),
+          COALESCE(SUM(v.c_final_program_time), '0'::interval)
+        FROM t_visit v
+        INNER JOIN t_observation o ON v.c_observation_id = o.c_observation_id
+        WHERE o.c_program_id = $program_id
+      """.query(categorized_time)
   }
 }

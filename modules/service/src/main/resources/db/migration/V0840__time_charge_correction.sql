@@ -32,12 +32,14 @@ CREATE OR REPLACE FUNCTION update_time_span(
        amount interval
 )
 AS $$
+DECLARE
+    max_time_span interval := '9223372036854775807 microseconds';
 BEGIN
     col := GREATEST('0'::interval, col + amount);
 EXCEPTION WHEN others THEN
     -- When col + amount is too large, we store the maximum interval.
     -- This corresponds to TimeSpan.Max and is analogous to the
     -- TimeSpan +| operation.
-    col := '9223372036854775807 microseconds':: interval;
+    col := max_time_span;
 END;
 $$ LANGUAGE plpgsql;
