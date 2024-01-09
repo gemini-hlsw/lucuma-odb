@@ -7,12 +7,14 @@ import cats.Order
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosLong
+import io.circe.Decoder
+import io.circe.DecodingFailure
+import io.circe.Encoder
+import io.circe.Json
+import lucuma.core.util.Enumerated
 import monocle.Prism
 
 import scala.util.matching.Regex
-import lucuma.core.util.Enumerated
-import io.circe.Encoder
-import io.circe.Decoder
 
 /**
  * An invitation consists of an id (a positive Long) and a cleartext body (a 96-char lowercase hex 
@@ -33,18 +35,23 @@ object UserInvitation:
 
   given Enumerated[Status] = Enumerated.derived
 
-  type Id = PosLong
+  final case class Id(value: PosLong)
   object Id {
 
     /** Id from hex string. */
     val fromString: Prism[String, Id] =
       Prism[String, Id] { sid =>
         Either.catchOnly[NumberFormatException](java.lang.Long.parseLong(sid, 16)).flatMap { n =>
-          PosLong.from(n)
+          PosLong.from(n).map(apply)
         } .toOption
       } { id =>
-        id.value.toHexString
+        id.value.value.toHexString
       }
+
+    given Order[Id] = Order.by(_.value)
+    given Encoder[Id] = id => Json.fromString(Id.fromString.reverseGet(id))
+    given Decoder[Id] = hc => hc.as[String].flatMap: s => 
+      Id.fromString.getOption(s).toRight(DecodingFailure("Invalid invitation id: $s", hc.history))
 
   }
 
@@ -56,7 +63,7 @@ object UserInvitation:
       case R(sid, body) => Id.fromString.getOption(sid).map(UserInvitation(_, body))
       case _            => None
      } { k =>
-      s"${k.id.value.toHexString}.${k.body}"
+      s"${k.id.value.value.toHexString}.${k.body}"
     }
 
   given OrderUserInvitation: Order[UserInvitation] =

@@ -7,18 +7,24 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.GuestRole
+import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
+import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.input.CreateUserInvitationInput
+import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.util.Codecs.*
 import skunk.Query
+import skunk.SqlState
 import skunk.Transaction
+import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
@@ -28,7 +34,9 @@ trait UserInvitationService[F[_]]:
   /** Create an invitation to join a program in a specified role. This current user must be the program's PI. */
   def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]]
 
-
+  /** Redeem an invitation. */
+  def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]]
+  
 object UserInvitationService:
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): UserInvitationService[F] =
@@ -78,7 +86,31 @@ object UserInvitationService:
               case CreateUserInvitationInput.Coi(pid)      => createPiInvitation(pid, ProgramUserRole.Coi)
               case CreateUserInvitationInput.Observer(pid) => createPiInvitation(pid, ProgramUserRole.Observer)
               case _                                       => Result.failure("Science users can only create co-investigator and observer invitations.").pure[F]
-      
+
+      def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
+        user match
+          case GuestUser(_)                      => Result.failure("Guest users cannot redeemed user invitations.").pure[F]
+          case ServiceUser(_, _)                 => Result.failure("Service users cannot redeemed user invitations.").pure[F]
+          case StandardUser(_, _, _, c_duration) =>                  
+            val status = if input.accept then UserInvitation.Status.Redeemed else UserInvitation.Status.Declined
+            session
+              .prepareR(Statements.redeemUserInvitation)
+              .use(_.option(user, status, input.key))
+              .flatMap:
+                case None => Result.failure("Invitation is invalid, or has already been accepted, declined, or revoked.").pure[F]
+                case Some(r, ot, op, pid) =>
+                  val xa = transaction
+                  xa.savepoint.flatMap: sp =>
+                    session
+                      .prepareR(ProgramService.Statements.LinkUser.command)
+                      .use(_.execute(pid, user.id, r, ot, op))
+                      .as(Result(input.key.id))
+                      .recoverWith:
+                        case SqlState.UniqueViolation(_) => 
+                          xa.rollback(sp).as:
+                            Result.warning("You are already in the specified role; no action taken.", input.key.id)
+                    
+
   object Statements:
 
     val createSuperUserInvitation: Query[(User, CreateUserInvitationInput), UserInvitation] =
@@ -129,3 +161,16 @@ object UserInvitationService:
       """
         .query(user_invitation)
         .contramap((u, pid, p) => (u.id, pid, ProgramUserRole.Support, ProgramUserSupportType.Partner, p, pid, p, pid))
+
+    val redeemUserInvitation: Query[(User, UserInvitation.Status, UserInvitation), (ProgramUserRole, Option[ProgramUserSupportType], Option[Tag], Program.Id)] =
+      sql"""
+        update t_invitation
+        set c_status = $user_invitation_status, c_redeemer_id = $user_id
+        where c_status = 'pending'
+        and c_invitation_id = $varchar
+        and c_key_hash = md5($varchar)
+        and c_issuer_id <> $user_id -- can't redeem your own invitation
+        returning c_role, c_support_type, c_support_partner, c_program_id
+      """.query(program_user_role *: program_user_support_type.opt *: tag.opt *: program_id)
+        .contramap((u, s, i) => (s, u.id, UserInvitation.Id.fromString.reverseGet(i.id), i.body, u.id))
+

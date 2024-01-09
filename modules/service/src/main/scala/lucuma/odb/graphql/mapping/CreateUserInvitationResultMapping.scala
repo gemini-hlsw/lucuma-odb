@@ -6,9 +6,9 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
+import lucuma.odb.data.UserInvitation
 
 import table.UserInvitationTable
-import lucuma.odb.data.UserInvitation
 
 trait CreateUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
 

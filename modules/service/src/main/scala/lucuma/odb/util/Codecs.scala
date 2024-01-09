@@ -54,6 +54,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
+import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType
 import monocle.Prism
 import skunk.*
@@ -66,7 +67,6 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import lucuma.odb.data.UserInvitation
 
 
 // Codecs for some atomic types.
