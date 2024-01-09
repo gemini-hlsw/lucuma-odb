@@ -18,6 +18,8 @@ CREATE TABLE t_time_charge_discount (
 
   c_end              timestamp   NOT NULL,
 
+  CHECK (c_start <= c_end),
+
   c_partner_discount interval    NOT NULL DEFAULT '0'::interval
     CHECK (c_partner_discount >= '0'::interval),
 
