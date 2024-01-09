@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -327,104 +326,4 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  def invoiceQuery(oid: Observation.Id): String =
-    s"""
-      query {
-        observation(observationId: "$oid") {
-          execution {
-            visits {
-              matches {
-                timeChargeInvoice {
-                  executionTime {
-                    program { seconds }
-                    partner { seconds }
-                    nonCharged { seconds }
-                    total { seconds }
-                  }
-                  corrections {
-                    op
-                    amount { seconds }
-                  }
-                  finalCharge {
-                    program { seconds }
-                    partner { seconds }
-                    nonCharged { seconds }
-                    total { seconds }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    """
-
-  import ExecutionQuerySetupOperations.ObservationNode
-
-  def invoiceExected(on: ObservationNode): Either[List[String], Json] = {
-    val matches = on.visits.map { v =>
-      val first = v.allEvents.head.received
-      val last  = v.allEvents.last.received
-      val time  = TimeSpan.between(first, last).get
-      json"""
-      {
-        "timeChargeInvoice": {
-          "executionTime": {
-            "program": {
-              "seconds": ${time.toSeconds}
-            },
-            "partner": {
-              "seconds": 0.000000
-            },
-            "nonCharged": {
-              "seconds": 0.000000
-            },
-            "total": {
-              "seconds": ${time.toSeconds}
-            }
-          },
-          "corrections": [],
-          "finalCharge": {
-            "program": {
-              "seconds": ${time.toSeconds}
-            },
-            "partner": {
-              "seconds": 0.000000
-            },
-            "nonCharged": {
-              "seconds": 0.000000
-            },
-            "total": {
-              "seconds": ${time.toSeconds}
-            }
-          }
-        }
-      }
-      """
-    }
-
-    json"""
-      {
-        "observation": {
-          "execution": {
-            "visits": {
-              "matches": $matches
-            }
-          }
-        }
-      }
-      """.asRight
-  }
-
-  test("observation -> execution -> visits -> timeChargeInvoice") {
-    recordAll(pi, mode, offset = 600, visitCount = 2, atomCount = 2).flatMap { on =>
-      expect(pi, invoiceQuery(on.id), invoiceExected(on))
-    }
-  }
-
-  test("observation -> execution -> visits -> timeChargeInvoice -- no steps") {
-    recordAll(pi, mode, offset = 700, visitCount = 2, atomCount = 0, stepCount = 0).flatMap { on =>
-      expect(pi, invoiceQuery(on.id), invoiceExected(on))
-    }
-  }
 }

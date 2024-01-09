@@ -10,6 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -48,6 +49,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
+import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.sourceprofile.given
@@ -553,6 +555,32 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
+  def addTimeChargeCorrection(user: User, vid: Visit.Id, correction: TimeChargeCorrectionInput): IO[Unit] =
+    query(
+      user  = user,
+      query =
+        s"""
+          mutation {
+            addTimeChargeCorrection(input: {
+              visitId: "$vid",
+              correction: {
+                chargeClass: ${correction.chargeClass.tag.toScreamingSnakeCase},
+                op: ${correction.op.tag.toScreamingSnakeCase},
+                amount: {
+                  seconds: "${correction.amount.toSeconds}"
+                }
+                ${correction.comment.fold("")(c => s", comment: \"${c.value}\"")}
+              }
+            }) {
+              timeChargeInvoice {
+                corrections {
+                  created
+                }
+              }
+            }
+          }
+        """
+      ).void
 
   def recordVisitAs(user: User, instrument: Instrument, oid: Observation.Id): IO[Visit.Id] = {
     val name = s"record${instrument.tag}Visit"
@@ -805,6 +833,31 @@ trait DatabaseOperations { this: OdbSuite =>
       } yield DatasetEvent(i, r, o, v, s, did, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
+  }
+
+  def updateDatasets(
+    user: User,
+    qa:   DatasetQaState,
+    dids: List[Dataset.Id]
+  ): IO[Unit] = {
+    val q = s"""
+      mutation {
+        updateDatasets(input: {
+          SET: {
+            qaState: ${qa.tag.toScreamingSnakeCase}
+          },
+          WHERE: {
+            id: { IN: [ ${dids.map(_.show).mkString("\"", "\",\"", "\"")} ] }
+          }
+        }) {
+          datasets {
+            id
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).void
   }
 
   def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {

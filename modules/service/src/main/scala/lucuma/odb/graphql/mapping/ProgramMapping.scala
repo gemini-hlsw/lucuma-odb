@@ -18,7 +18,6 @@ import grackle.Result
 import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import grackle.syntax.*
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -79,7 +78,7 @@ trait ProgramMapping[F[_]]
         SqlObject("proposalAttachments", Join(ProgramTable.Id, ProposalAttachmentTable.ProgramId)),
         EffectField("plannedTimeRange", plannedTimeHandler, List("id")),  // deprecated
         EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
-        CursorFieldJson("timeCharge", _ => CategorizedTime.Zero.asJson.success, List("id"))  // placeholder
+        EffectField("timeCharge", timeChargeHandler, List("id"))
       )
     )
 
@@ -142,17 +141,10 @@ trait ProgramMapping[F[_]]
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
       }
-
   }
 
-  private abstract class TimeRangeEffectHandler[T: io.circe.Encoder] extends EffectHandler[F] {
-    def calculate(pid: Program.Id): F[Option[T]]
-
-    protected def estimate(pid: Program.Id): F[Option[CategorizedTimeRange]] =
-      services.useNonTransactionally {
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
-          .estimateProgram(pid)
-      }
+  private abstract class ProgramEffectHandler[T: io.circe.Encoder] extends EffectHandler[F] {
+    def calculate(pid: Program.Id): F[T]
 
     override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
       (for {
@@ -169,6 +161,17 @@ trait ProgramMapping[F[_]]
                )
         } yield res
       ).value
+    }
+
+
+  private abstract class TimeRangeEffectHandler[T: io.circe.Encoder] extends ProgramEffectHandler[Option[T]] {
+
+    protected def estimate(pid: Program.Id): F[Option[CategorizedTimeRange]] =
+      services.useNonTransactionally {
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+          .estimateProgram(pid)
+      }
+
   }
 
   lazy val plannedTimeHandler: EffectHandler[F] =
@@ -182,5 +185,12 @@ trait ProgramMapping[F[_]]
       override def calculate(pid: Program.Id): F[Option[CategorizedTimeRange]] =
         estimate(pid)
     }
-}
 
+  private val timeChargeHandler: EffectHandler[F] =
+    new ProgramEffectHandler[CategorizedTime] {
+      def calculate(pid: Program.Id): F[CategorizedTime] =
+        services.useTransactionally {
+          timeAccountingService.selectProgram(pid)
+        }
+    }
+}

@@ -5,11 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.applicative.*
-import cats.syntax.eq.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
@@ -19,12 +15,8 @@ import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
-import grackle.ResultT
 import grackle.Type
 import grackle.TypeRef
-import grackle.syntax.*
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
@@ -34,8 +26,6 @@ import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.json.time.query.given
-import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
@@ -68,7 +58,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         SqlObject("atomRecords"),
         SqlObject("datasets"),
         SqlObject("events"),
-        EffectField("timeChargeInvoice", invoiceHandler, List("id"))
+        SqlObject("timeChargeInvoice")
       )
     )
 
@@ -133,42 +123,5 @@ trait VisitMapping[F[_]] extends VisitTable[F]
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Visit.Id]("id", services, executionEventService.visitRange)
-
-  // WIP.  At the moment the `invoiceHandler` calls the time accounting service
-  // on demand and returns an "invoice" with just the whole execution time.
-  private lazy val invoiceHandler: EffectHandler[F] =
-    new EffectHandler[F] {
-
-      def calculateInvoice(vid: Visit.Id): F[Result[Json]] =
-        services.useTransactionally {
-          timeAccountingService.initialState(vid).map { tas =>
-            val ct = tas.charge.asJson
-            Json.obj(
-              "executionTime" -> ct,
-              "discounts"     -> Json.arr(),
-              "corrections"   -> Json.arr(),
-              "finalCharge"   -> ct
-            ).success
-          }
-        }
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          vids <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Visit.Id]("id") }.pure[F])
-          invs <- vids.distinct.traverse { case vid =>
-                    ResultT(calculateInvoice(vid)).tupleLeft(vid)
-                  }
-          res <- ResultT(
-                   vids
-                     .flatMap { vid => invs.find(r => r._1 === vid).map(_._2).toList }
-                     .zip(queries)
-                     .traverse { case (result, (query, parentCursor)) =>
-                       Query.childContext(parentCursor.context, query).map { childContext =>
-                         CirceCursor(childContext, result, Some(parentCursor), parentCursor.fullEnv)
-                       }
-                     }.pure[F]
-                 )
-        } yield res).value
-    }
 
 }

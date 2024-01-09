@@ -39,6 +39,7 @@ import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddDatasetEventInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
+import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
@@ -93,6 +94,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddDatasetEvent,
       AddSequenceEvent,
       AddStepEvent,
+      AddTimeChargeCorrection,
       CloneObservation,
       CloneTarget,
       CreateGroup,
@@ -224,6 +226,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             )
           }
         }  
+      }
+    }
+
+  private lazy val AddTimeChargeCorrection: MutationField =
+    MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        timeAccountingService.addCorrection(input.visitId, input.correction).as {
+          Result(
+            Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
+          )
+        }
       }
     }
 
@@ -400,31 +413,35 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
   }
 
-  private lazy val AddDatasetEvent: MutationField =
-    MutationField("addDatasetEvent", AddDatasetEventInput.Binding) { (input, child) =>
+  private def addEvent[I: ClassTag: TypeName](
+    fieldName: String,
+    matcher:   Matcher[I],
+    pred:      ExecutionEventPredicates
+  )(
+    insert:    I => (Transaction[F], Services[F]) ?=> F[ExecutionEventService.InsertEventResponse]
+  ): MutationField =
+    MutationField(fieldName, matcher) { (input, child) =>
       services.useTransactionally {
-        executionEventService
-          .insertDatasetEvent(input.datasetId, input.datasetStage)
-          .map(executionEventResponseToResult(child, Predicates.datasetEvent))
+        for {
+          r <- insert(input)
+          _ <- r.asSuccess.traverse_(s => timeAccountingService.update(s.event.visitId))
+        } yield executionEventResponseToResult(child, pred)(r)
       }
+    }
+
+  private lazy val AddDatasetEvent: MutationField =
+    addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>
+      executionEventService.insertDatasetEvent(input.datasetId, input.datasetStage)
     }
 
   private lazy val AddSequenceEvent: MutationField =
-    MutationField("addSequenceEvent", AddSequenceEventInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        executionEventService
-          .insertSequenceEvent(input.visitId, input.command)
-          .map(executionEventResponseToResult(child, Predicates.sequenceEvent))
-      }
+    addEvent("addSequenceEvent", AddSequenceEventInput.Binding, Predicates.sequenceEvent) { input =>
+      executionEventService.insertSequenceEvent(input.visitId, input.command)
     }
 
   private lazy val AddStepEvent: MutationField =
-    MutationField("addStepEvent", AddStepEventInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        executionEventService
-          .insertStepEvent(input.stepId, input.stepStage)
-          .map(executionEventResponseToResult(child, Predicates.stepEvent))
-      }
+    addEvent("addStepEvent", AddStepEventInput.Binding, Predicates.stepEvent) { input =>
+      executionEventService.insertStepEvent(input.stepId, input.stepStage)
     }
 
   private def recordAtom(
@@ -496,9 +513,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     response:  F[VisitService.InsertVisitResponse],
     predicate: LeafPredicates[Visit.Id],
     child:     Query
-  ): F[Result[Query]] = {
+  )(using Services[F], Transaction[F]): F[Result[Query]] = {
     import VisitService.InsertVisitResponse.*
-    response.map[Result[Query]] {
+    response.map {
       case NotAuthorized(user)                 =>
         Result.failure(s"User '${user.id}' is not authorized to perform this action")
       case ObservationNotFound(id, instrument) =>

@@ -24,7 +24,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
@@ -39,6 +38,7 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with Predicates[F]
@@ -64,7 +64,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         SqlObject("datasets"),
         SqlObject("events"),
         SqlObject("visits"),
-        CursorFieldJson("timeCharge", _ => CategorizedTime.Zero.asJson.success, List("id")) // placeholder
+        EffectField("timeCharge", timeChargeHandler, List("id", "programId"))
       )
     )
 
@@ -131,6 +131,17 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
           s.generator(commitHash, itcClient, timeEstimateCalculator)
            .digest(pid, oid)
            .map(_.bimap(_.toResult, _.asJson.success).merge)
+        }
+      }
+
+    effectHandler(_ => ().success, calculate)
+  }
+
+  private lazy val timeChargeHandler: EffectHandler[F] = {
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
+      (_, oid, _) => {
+        services.useTransactionally {
+          timeAccountingService.selectObservation(oid).map(_.asJson.success)
         }
       }
 

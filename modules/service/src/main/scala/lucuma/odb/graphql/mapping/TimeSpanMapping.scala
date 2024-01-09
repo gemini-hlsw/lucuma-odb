@@ -12,24 +12,50 @@ import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
+import lucuma.odb.graphql.table.TimeChargeCorrectionTable
+import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
+import lucuma.odb.graphql.table.VisitTable
 
-trait TimeSpanMapping[F[_]] extends AllocationTable[F] with GmosDynamicTables[F] with ProgramTable[F] with ProposalTable[F] with ObservationView[F] with GroupView[F] with TimingWindowView[F] with ChronConditionsEntryView[F] {
+trait TimeSpanMapping[F[_]] extends AllocationTable[F]
+                               with GmosDynamicTables[F]
+                               with ProgramTable[F]
+                               with ProposalTable[F]
+                               with ObservationView[F]
+                               with GroupView[F]
+                               with TimeChargeCorrectionTable[F]
+                               with TimeChargeDiscountTable[F]
+                               with TimingWindowView[F]
+                               with VisitTable[F]
+                               with ChronConditionsEntryView[F] {
 
   lazy val TimeSpanMapping: TypeMapping =
     SwitchMapping(
       TimeSpanType,
       List(
-        AllocationType / "duration"                   -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
-        ConditionsExpectationType / "timeframe"       -> timeSpanMapping(ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
+        AllocationType / "duration"                               -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
+        ConditionsExpectationType / "timeframe"                   -> timeSpanMapping(ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
         GmosNorthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
         GmosSouthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
-        GroupType / "maximumInterval"                 -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
-        GroupType / "minimumInterval"                 -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
-        IntensiveType / "totalTime"                   -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        LargeProgramType / "totalTime"                -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        TimingWindowEndAfterType / "after"            -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
-        TimingWindowRepeatType / "period"             -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
+        GroupType / "maximumInterval"                             -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
+        GroupType / "minimumInterval"                             -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
+        IntensiveType / "totalTime"                               -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        LargeProgramType / "totalTime"                            -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        TimeChargeCorrectionType / "amount"                       -> timeSpanMapping(TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
+        TimeChargeDiscountType / "partner"                        -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
+        TimeChargeDiscountType / "program"                        -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+        TimeChargeDaylightDiscountType / "partner"                -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
+        TimeChargeDaylightDiscountType / "program"                -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+        TimeChargeQaDiscountType / "partner"                      -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
+        TimeChargeQaDiscountType / "program"                      -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+        TimeChargeInvoiceType / "executionTime" / "nonCharged"    -> timeSpanMapping(VisitTable.Raw.NonChargedTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "executionTime" / "partner"       -> timeSpanMapping(VisitTable.Raw.PartnerTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "executionTime" / "program"       -> timeSpanMapping(VisitTable.Raw.ProgramTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "finalCharge" / "nonCharged"      -> timeSpanMapping(VisitTable.Final.NonChargedTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "finalCharge" / "partner"         -> timeSpanMapping(VisitTable.Final.PartnerTime)(VisitTable.Id),
+        TimeChargeInvoiceType / "finalCharge" / "program"         -> timeSpanMapping(VisitTable.Final.ProgramTime)(VisitTable.Id),
+        TimingWindowEndAfterType / "after"                        -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
+        TimingWindowRepeatType / "period"                         -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
       )
     )
 

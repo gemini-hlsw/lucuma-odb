@@ -13,6 +13,8 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
+import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
@@ -20,6 +22,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.DatasetPropertiesInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -46,6 +49,14 @@ sealed trait DatasetService[F[_]] {
     datasetId: Dataset.Id,
     time:      Timestamp
   )(using Transaction[F]): F[Unit]
+
+  def hasDatasets(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Boolean]
+
+  def selectDatasetsWithQaFailures(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[List[(Atom.Id, List[Dataset.Id])]]
 }
 
 object DatasetService {
@@ -114,17 +125,29 @@ object DatasetService {
           }
         }
 
-      def setStartTime(
+      override def setStartTime(
         datasetId: Dataset.Id,
         time:      Timestamp
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.SetStartTime)(time, datasetId).void
 
-      def setEndTime(
+      override def setEndTime(
         datasetId: Dataset.Id,
         time:      Timestamp
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.SetEndTime)(time, datasetId).void
+
+      override def hasDatasets(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.HasDatasets)(visitId)
+
+      override def selectDatasetsWithQaFailures(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[List[(Atom.Id, List[Dataset.Id])]] =
+        session.execute(Statements.SelectQaFailures)(visitId).map {
+          _.groupBy(_._1).view.mapValues(_.unzip._2).toList
+        }
 
   }
 
@@ -182,5 +205,25 @@ object DatasetService {
            SET c_end_time   = $core_timestamp
          WHERE c_dataset_id = $dataset_id
       """.command
+
+    val HasDatasets: Query[Visit.Id, Boolean] =
+      sql"""
+        SELECT EXISTS (
+            SELECT 1
+            FROM t_dataset
+            WHERE c_visit_id = $visit_id
+        )
+      """.query(bool)
+
+    val SelectQaFailures: Query[Visit.Id, (Atom.Id, Dataset.Id)] =
+      sql"""
+        SELECT s.c_atom_id,
+               d.c_dataset_id
+          FROM t_dataset d
+    INNER JOIN t_step_record s
+            ON s.c_step_id = d.c_step_id
+         WHERE (d.c_qa_state = 'Fail' OR d.c_qa_state = 'Usable')
+           AND d.c_visit_id = $visit_id
+      """.query(atom_id *: dataset_id)
   }
 }
