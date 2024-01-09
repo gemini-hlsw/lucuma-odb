@@ -16,7 +16,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
@@ -120,18 +119,6 @@ object ExecutionDigestService {
 
     private val setup_time: Codec[SetupTime] =
       (time_span *: time_span).to[SetupTime]
-
-    private val categorized_time: Codec[CategorizedTime] =
-      (time_span *: time_span *: time_span).imap {
-        case (non_charged, partner_time, program_time) =>
-          CategorizedTime(
-            ChargeClass.NonCharged -> non_charged,
-            ChargeClass.Partner    -> partner_time,
-            ChargeClass.Program    -> program_time
-          )
-      } { ct =>
-        (ct(ChargeClass.NonCharged), ct(ChargeClass.Partner), ct(ChargeClass.Program))
-      }
 
     private val offset_array: Codec[List[Offset]] =
       _int8.eimap { arr =>

@@ -7,16 +7,33 @@ import cats.Eq
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import monocle.Focus
 import monocle.Lens
+
 
 /**
  * TimeAccounting data, used only in the implementation of the
  * TimeAccountingService.
  */
 object TimeAccounting {
+
+  val CategorizedTimeMax: CategorizedTime =
+    CategorizedTime(
+      ChargeClass.NonCharged -> TimeSpan.Max,
+      ChargeClass.Partner    -> TimeSpan.Max,
+      ChargeClass.Program    -> TimeSpan.Max
+    )
+
+  object comment {
+    val NoData: String   = "Time spent during a visit in which no dataset sets were collected."
+    val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
+    val PostDawn: String = "Time spent observing post-dawn (nautical twilight)."
+    val Qa: String       = "Time spent observing atoms with one or more datasets that don't pass QA."
+  }
 
   /**
    * Information of interest (for time accounting) in execution events. A series

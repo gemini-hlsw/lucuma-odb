@@ -12,6 +12,7 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -65,7 +66,15 @@ trait ExecutionEventService[F[_]] {
 
 object ExecutionEventService {
 
-  sealed trait InsertEventResponse extends Product with Serializable
+  sealed trait InsertEventResponse extends Product with Serializable {
+
+    def asSuccess: Option[InsertEventResponse.Success] =
+      this match {
+        case s@InsertEventResponse.Success(_) => s.some
+        case _                                => none
+      }
+
+  }
 
   object InsertEventResponse {
     case class NotAuthorized(

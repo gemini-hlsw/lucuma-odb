@@ -14,6 +14,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
    */
   object Predicates {
     val addConditionsEntyResult = AddConditionsEntryResultPredicates(Path.from(AddConditionsEntryResultType))
+    val addTimeChargeCorrectionResult = AddTimeChargeCorrectionResultPredicates(Path.from(AddTimeChargeCorrectionResultType))
     val asterismGroup           = AsterismGroupPredicates(Path.from(AsterismGroupType))
     val atomRecord              = AtomRecordPredicates(Path.from(AtomRecordType))
     val cloneObservationResult  = CloneObservationResultPredicates(Path.from(CloneObservationResultType))

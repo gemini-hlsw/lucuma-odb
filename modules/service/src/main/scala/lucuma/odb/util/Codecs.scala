@@ -30,9 +30,11 @@ import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.Group
 import lucuma.core.model.*
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
@@ -50,6 +52,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
+import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import monocle.Prism
@@ -158,6 +161,9 @@ trait Codecs {
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
+
+  val charge_class: Codec[ChargeClass] =
+    enumerated(Type("e_charge_class"))
 
   val cloud_extinction: Codec[CloudExtinction] =
     enumerated[CloudExtinction](Type.varchar)
@@ -394,6 +400,12 @@ trait Codecs {
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
 
+  val time_charge_correction_op: Codec[TimeChargeCorrection.Op] =
+    enumerated(Type("e_time_charge_correction_op"))
+
+  val time_charge_discount_type: Codec[DiscountDiscriminator] =
+    enumerated(Type("e_time_charge_discount_type"))
+
   val time_span: Codec[TimeSpan] =
     interval.eimap(
       µs => TimeSpan.FromDuration.getOption(µs).toRight(s"Invalid TimeSpan, must be non-negative µs <  9,223,372,036,854,775,807 µs: $µs"))(
@@ -456,6 +468,18 @@ trait Codecs {
       am.orElse(ha).toRight("Undefined elevation range")
     } { e =>
       (ElevationRange.airMass.getOption(e), ElevationRange.hourAngle.getOption(e))
+    }
+
+  val categorized_time: Codec[CategorizedTime] =
+    (time_span *: time_span *: time_span).imap {
+      case (non_charged, partner_time, program_time) =>
+        CategorizedTime(
+          ChargeClass.NonCharged -> non_charged,
+          ChargeClass.Partner    -> partner_time,
+          ChargeClass.Program    -> program_time
+        )
+    } { ct =>
+      (ct(ChargeClass.NonCharged), ct(ChargeClass.Partner), ct(ChargeClass.Program))
     }
 
   val constraint_set: Codec[ConstraintSet] =

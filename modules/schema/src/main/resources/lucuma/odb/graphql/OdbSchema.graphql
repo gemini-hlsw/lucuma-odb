@@ -63,7 +63,7 @@ Input to the 'addTimeChargeCorrection' mutation. Identifies the visit
 that will be corrected and describes the correction itself.
 """
 input AddTimeChargeCorrectionInput {
-  observation: VisitId!
+  visitId:     VisitId!
   correction:  TimeChargeCorrectionInput!
 }
 
@@ -8362,6 +8362,19 @@ type SignalToNoiseMode {
 }
 
 """
+Telescope Sites
+"""
+enum Site {
+
+  "Gemini North"
+  GN
+
+  "Gemini South"
+  GS
+
+}
+
+"""
 Sky background
 """
 enum SkyBackground {
@@ -9378,7 +9391,7 @@ maximum time span.
 type TimeChargeCorrection {
 
   "When the correction was made."
-  timestamp:   Timestamp!
+  created:     Timestamp!
 
   "The charge class to be corrected."
   chargeClass: ChargeClass!
@@ -9390,7 +9403,7 @@ type TimeChargeCorrection {
   amount:      TimeSpan!
 
   "The user responsible for the change."
-  user:        User!
+  user:        User
 
   "Optional justification for the correction."
   comment:     String
@@ -9427,53 +9440,84 @@ uncharged.
 """
 interface TimeChargeDiscount {
 
-  "Time amount to discount from the program."
-  program: TimeSpan!
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
 
   "Time amount to discount from the partner."
   partner: TimeSpan!
 
-  """
-  The atoms that are impacted (i.e., whose execution time is discounted) by this
-  discount.
-  """
-  atoms: [AtomRecord!]!
+  "Time amount to discount from the program."
+  program: TimeSpan!
 
-  "Optional additional detail."
-  comment: String
+  "Additional detail."
+  comment: String!
+
+}
+
+"""
+A time charge discount that is applied when part of the observation is executed
+outside of nautical twilight boundaries.  The portion that occurs during day
+time is not charged.
+"""
+type TimeChargeDaylightDiscount implements TimeChargeDiscount {
+
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+
+  "The site where the observation was executed."
+  site: Site!
+
+}
+
+"""
+A time charge discount that is applied when no data is collected during the
+entirety of the visit.
+"""
+type TimeChargeNoDataDiscount implements TimeChargeDiscount {
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+}
+
+type TimeChargeQaDiscount implements TimeChargeDiscount {
+
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
+
+  "Time amount to discount from the partner."
+  partner: TimeSpan!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+
+  "Datasets associated with the discount."
+  datasets: [Dataset!]!
 
 }
 
 # TBD
 #type TimeChargeFaultDiscount implements TimeChargeDiscount
-#type TimeChargeOverlapDiscount implements TimeChargeDiscount
 #type TimeChargeWeatherDiscount implements TimeChargeDiscount
-
-"""
-A time charge discount that is applied when one or more datasets are marked
-usable (as opposed to pas) or fail.
-"""
-type TimeChargeQaDiscount implements TimeChargeDiscount {
-
-  "Time amount to discount from the program."
-  program: TimeSpan!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
-
-  """
-  The atoms that are impacted (i.e., whose execution time is discounted) by this
-  discount.
-  """
-  atoms: [AtomRecord!]!
-
-  "Optional additional detail."
-  comment: String
-
-  "Datasets with non-passing QA states."
-  datasets: [Dataset!]!
-
-}
 
 """
 Detailed time accounting information for a visit, showing the raw execution

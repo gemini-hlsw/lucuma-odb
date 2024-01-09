@@ -87,6 +87,7 @@ object OdbMapping {
           with AddDatasetEventResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddStepEventResultMapping[F]
+          with AddTimeChargeCorrectionResultMapping[F]
           with AirMassRangeMapping[F]
           with AllocationMapping[F]
           with AngleMapping[F]
@@ -95,6 +96,7 @@ object OdbMapping {
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
           with CatalogInfoMapping[F]
+          with CategorizedTimeMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
           with ConditionsEntryMapping[F]
@@ -178,6 +180,9 @@ object OdbMapping {
           with TargetGroupMapping[F]
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
+          with TimeChargeCorrectionMapping[F]
+          with TimeChargeDiscountMapping[F]
+          with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
@@ -213,6 +218,7 @@ object OdbMapping {
               AddDatasetEventResultMapping,
               AddSequenceEventResultMapping,
               AddStepEventResultMapping,
+              AddTimeChargeCorrectionResultMapping,
               AirMassRangeMapping,
               AllocationMapping,
               AngleMapping,
@@ -221,6 +227,7 @@ object OdbMapping {
               AtomRecordMapping,
               AtomRecordSelectResultMapping,
               CatalogInfoMapping,
+              CategorizedTimeMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
               ConditionsEntryMapping,
@@ -321,6 +328,12 @@ object OdbMapping {
               TargetGroupSelectResultMapping,
               TargetMapping,
               TargetSelectResultMapping,
+              TimeChargeCorrectionMapping,
+              TimeChargeDaylightDiscountMapping,
+              TimeChargeNoDataDiscountMapping,
+              TimeChargeQaDiscountMapping,
+              TimeChargeDiscountMapping,
+              TimeChargeInvoiceMapping,
               TimingWindowEndAfterMapping,
               TimingWindowEndAtMapping,
               TimingWindowEndMapping,
@@ -358,6 +371,7 @@ object OdbMapping {
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
                 TargetGroupElaborator,
+                TimeChargeInvoiceElaborator,
                 QueryElaborator,
                 VisitElaborator
               ).combineAll
