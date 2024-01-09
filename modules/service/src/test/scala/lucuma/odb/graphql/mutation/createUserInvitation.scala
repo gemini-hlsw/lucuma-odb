@@ -4,28 +4,28 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.syntax.all.*
 import io.circe.literal._
-import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.UserInvitation
+import lucuma.core.model.Partner
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.core.model.Program
-import cats.syntax.all.*
-import lucuma.core.model.Partner
 import lucuma.odb.data.Tag
+import lucuma.odb.data.UserInvitation
 
 class createUserInvitation extends OdbSuite {
 
   val partner = Partner.Ca
 
-  val pi  = TestUsers.Standard.pi(1, 101)
-  val pi2 = TestUsers.Standard.pi(2, 201)
-  val guest = TestUsers.guest(3)
-  val staff = TestUsers.Standard.staff(4, 401)
-  val admin = TestUsers.Standard.admin(5, 501)
+  val pi      = TestUsers.Standard.pi(1, 101)
+  val pi2     = TestUsers.Standard.pi(2, 201)
+  val guest   = TestUsers.guest(3)
+  val staff   = TestUsers.Standard.staff(4, 401)
+  val admin   = TestUsers.Standard.admin(5, 501)
   val service = TestUsers.service(6)
-  val ngo = TestUsers.Standard.ngo(7, 701, partner)
+  val ngo     = TestUsers.Standard.ngo(7, 701, partner)
 
   val validUsers = List(pi, pi2, guest, staff, admin, service, ngo).toList
 

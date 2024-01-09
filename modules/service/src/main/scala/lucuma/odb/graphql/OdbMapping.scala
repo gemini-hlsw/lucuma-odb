@@ -167,6 +167,7 @@ object OdbMapping {
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
+          with RedeemUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
@@ -311,6 +312,7 @@ object OdbMapping {
               RecordGmosNorthVisitResultMapping,
               RecordGmosSouthStepResultMapping,
               RecordGmosSouthVisitResultMapping,
+              RedeemUserInvitationResultMapping,
               RightAscensionMapping,
               ScienceRequirementsMapping,
               SequenceEventMapping,

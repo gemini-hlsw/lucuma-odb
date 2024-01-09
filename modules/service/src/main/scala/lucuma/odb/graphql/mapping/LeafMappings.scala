@@ -39,10 +39,10 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.Tag
-import lucuma.odb.data.UserType
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.Tag
+import lucuma.odb.data.UserInvitation
+import lucuma.odb.data.UserType
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 

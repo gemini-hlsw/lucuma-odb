@@ -50,6 +50,7 @@ import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
+import lucuma.odb.data.UserInvitation
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.sourceprofile.given
@@ -63,7 +64,6 @@ import skunk.circe.codec.json.{json => jsonCodec}
 import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap
-import lucuma.odb.data.UserInvitation
 
 trait DatabaseOperations { this: OdbSuite =>
 

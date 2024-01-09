@@ -4,17 +4,18 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.model.Program
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.ProgramIdBinding
 import lucuma.odb.graphql.binding.ProgramUserRoleBinding
 import lucuma.odb.graphql.binding.ProgramUserSupportRoleTypeBinding
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.TagBinding
-import grackle.Result
+
 import ProgramUserRole.*
 import ProgramUserSupportType.*
 

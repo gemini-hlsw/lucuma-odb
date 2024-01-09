@@ -47,12 +47,14 @@ import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
+import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.RecordAtomInput
 import lucuma.odb.graphql.input.RecordDatasetInput
 import lucuma.odb.graphql.input.RecordGmosStepInput
 import lucuma.odb.graphql.input.RecordGmosVisitInput
+import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
@@ -82,10 +84,8 @@ import lucuma.odb.service.VisitService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
-import eu.timepit.refined.cats.*
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.input.CreateUserInvitationInput
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -110,6 +110,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RecordGmosNorthVisit,
       RecordGmosSouthStep,
       RecordGmosSouthVisit,
+      RedeemUserInvitation,
       SetAllocation,
       UpdateAsterisms,
       UpdateDatasets,
@@ -559,6 +560,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         )
       }
     }
+
+  private lazy val RedeemUserInvitation =
+    MutationField("redeemUserInvitation", RedeemUserInvitationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        userInvitationService.redeemUserInvitation(input).map: rId =>
+          rId.map: id =>
+            Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
 
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
