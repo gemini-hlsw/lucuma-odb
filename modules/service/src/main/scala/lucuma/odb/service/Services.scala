@@ -11,6 +11,7 @@ import cats.syntax.all.*
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.logic.TimeEstimateService
@@ -38,6 +39,9 @@ trait Services[F[_]]:
 
   /** The associated `User`. */
   def user: User
+
+  /** The dynamic enums loaded from the DB. */
+  val enums: Enums
 
   /** 
    * Define an interaction with the database that will execute a block `fa` within a transaction,
@@ -156,10 +160,11 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]: Concurrent: Trace: UUIDGen](u: User)(s: Session[F]): Services[F[_]] =
+  def forUser[F[_]: Concurrent: Trace: UUIDGen](u: User, e: Enums)(s: Session[F]): Services[F[_]] =
     new Services[F]:
       val user = u
       val session = s
+      val enums = e
 
       given Services[F] = this // need is for `instantiate` calls below
 
@@ -249,6 +254,19 @@ object Services:
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
     def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
+
+    // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
+    // the service in which you want to use it. Like:
+    //   'val enumVal = services.enums' or `val enumVal = enums`.
+    // This is because you need a stable identifier in order to do anything like
+    //   `Enumerated[enumVal.ProposalStatus]`
+    // Alternatively, you could assign a variable to the implicit Services in the service instantiation
+    // method, like 
+    //   `(using theSvcs: Services[F])`
+    // and then use
+    //   `Enumerated[theSvcs.enums.ProposalStatus]`
+    // You just need to be consistent within a service.
+    def enums[F[_]](using Services[F]): Enums = summon[Services[F]].enums
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 

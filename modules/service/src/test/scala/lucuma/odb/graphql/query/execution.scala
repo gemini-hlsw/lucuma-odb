@@ -53,6 +53,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.data.CompletedAtomMap
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
@@ -133,10 +134,13 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           )
         )
       )
-    val services = Services.forUser(pi /* doesn't matter*/)(s)
-    services.transactionally {
-      services.smartGcalService.insertGmosNorth(1, tableRow1) *>
-      services.smartGcalService.insertGmosNorth(2, tableRow2)
+
+    Enums.load(s).flatMap { e =>
+      val services = Services.forUser(pi /* doesn't matter*/, e)(s)
+      services.transactionally {
+        services.smartGcalService.insertGmosNorth(1, tableRow1) *>
+        services.smartGcalService.insertGmosNorth(2, tableRow2)
+      }
     }
   }
 

@@ -173,6 +173,10 @@ object GraphQLRoutes {
           shortName
           longName
         }
+        proposalStatusMeta {
+          tag
+          name
+        }
       }
     """)
 

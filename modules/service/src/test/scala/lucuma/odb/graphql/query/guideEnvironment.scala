@@ -30,6 +30,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.util.TimeSpan
+import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -79,9 +80,12 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
           )
         )
       )
-    val services                 = Services.forUser(pi /* doesn't matter*/ )(s)
-    services.transactionally {
-      services.smartGcalService.insertGmosNorth(1, tableRow)
+
+    Enums.load(s).flatMap { e =>
+      val services = Services.forUser(pi /* doesn't matter*/, e)(s)
+      services.transactionally {
+        services.smartGcalService.insertGmosNorth(1, tableRow)
+      }
     }
   }
 

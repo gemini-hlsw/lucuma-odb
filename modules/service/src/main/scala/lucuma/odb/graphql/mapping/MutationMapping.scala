@@ -71,7 +71,6 @@ import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
 import lucuma.odb.service.ProgramService
-import lucuma.odb.service.ProposalService
 import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -712,12 +711,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         // Update the specified programs and then return a query for the affected programs.
         idSelect.flatTraverse { which =>
-          programService.updatePrograms(input.SET, which).map(programResultSubquery(_, input.LIMIT, child)).recover {
-            case ProposalService.ProposalUpdateException.CreationFailed =>
-              Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
-            case ProposalService.ProposalUpdateException.InconsistentUpdate =>
-              Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
-          }
+          programService.updatePrograms(input.SET, which)
+           .map(
+              _.flatMap(programResultSubquery(_, input.LIMIT, child))
+            )
         }
       }
     }
