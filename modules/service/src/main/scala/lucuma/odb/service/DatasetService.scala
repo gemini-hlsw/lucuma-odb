@@ -57,6 +57,10 @@ sealed trait DatasetService[F[_]] {
   def selectDatasetsWithQaFailures(
     visitId: Visit.Id
   )(using Transaction[F]): F[List[(Atom.Id, List[Dataset.Id])]]
+
+  def selectStepQaState(
+    stepId: Step.Id
+  )(using Transaction[F]): F[Option[DatasetQaState]]
 }
 
 object DatasetService {
@@ -149,6 +153,11 @@ object DatasetService {
           _.groupBy(_._1).view.mapValues(_.unzip._2).toList
         }
 
+      override def selectStepQaState(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[DatasetQaState]] =
+        session.unique(Statements.SelectStepQaState)(stepId)
+
   }
 
   object Statements {
@@ -225,5 +234,12 @@ object DatasetService {
          WHERE (d.c_qa_state = 'Fail' OR d.c_qa_state = 'Usable')
            AND d.c_visit_id = $visit_id
       """.query(atom_id *: dataset_id)
+
+    val SelectStepQaState: Query[Step.Id, Option[DatasetQaState]] =
+      sql"""
+        SELECT MAX(c_qa_state)
+          FROM t_dataset
+         WHERE c_step_id = $step_id
+      """.query(dataset_qa_state.opt)
   }
 }

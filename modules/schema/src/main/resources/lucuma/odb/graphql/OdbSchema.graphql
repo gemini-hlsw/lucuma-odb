@@ -1726,8 +1726,13 @@ type GmosNorthStepRecord implements StepRecord {
   "The observe class of this step."
   observeClass: ObserveClass!
 
-  "Step QA state based on a combination of dataset QA states."
-  stepQaState: StepQaState
+  """
+  QA state based on a combination of dataset QA states.  The worst QA state is
+  taken as the overall step QA state.  For example, one FAIL dataset will
+  result in the step having a FAIL QA state.  Unset QA states are ignored, but
+  if none are set the result will be null.
+  """
+  qaState: DatasetQaState
 
   "Datasets associated with this step."
   datasets(
@@ -2250,8 +2255,13 @@ type GmosSouthStepRecord implements StepRecord {
   "The observe class of this step."
   observeClass: ObserveClass!
 
-  "Step QA state based on a combination of dataset QA states."
-  stepQaState: StepQaState
+  """
+  QA state based on a combination of dataset QA states.  The worst QA state is
+  taken as the overall step QA state.  For example, one FAIL dataset will
+  result in the step having a FAIL QA state.  Unset QA states are ignored, but
+  if none are set the result will be null.
+  """
+  qaState: DatasetQaState
 
   "Datasets associated with this step."
   datasets(
@@ -3565,21 +3575,6 @@ input StepConfigSmartGcalInput {
   Smart Gcal type
   """
   smartGcalType: SmartGcalType!
-}
-
-"""
-Step QA State
-"""
-enum StepQaState {
-  """
-  StepQaState Pass
-  """
-  PASS
-
-  """
-  StepQaState Fail
-  """
-  FAIL
 }
 
 """
@@ -9017,8 +9012,13 @@ interface StepRecord {
   "The observe class of this step."
   observeClass: ObserveClass!
 
-  "Step QA state based on a combination of dataset QA states."
-  stepQaState: StepQaState
+  """
+  QA state based on a combination of dataset QA states.  The worst QA state is
+  taken as the overall step QA state.  For example, one FAIL dataset will
+  result in the step having a FAIL QA state.  Unset QA states are ignored, but
+  if none are set the result will be null.
+  """
+  qaState: DatasetQaState
 
   "Datasets associated with this step."
   datasets(
