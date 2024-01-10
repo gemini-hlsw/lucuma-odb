@@ -45,7 +45,6 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
-import lucuma.odb.service.ProposalService
 import lucuma.odb.service.S3FileService
 import lucuma.refined.*
 import munit.CatsEffectSuite
@@ -76,7 +75,6 @@ import scala.concurrent.duration.*
 object OdbSuite:
   def reportFailure: Throwable => Unit =
     case e: IllegalArgumentException if e.getMessage == "statusCode" => () // swallow annoying error ... not sure where it comes from though ... :-\
-    case _: ProposalService.ProposalUpdateException => ()
     case _: AttachmentException => ()
     case _: S3Exception => ()
     case e: SocketException if e.getMessage == "Connection reset" => ()
