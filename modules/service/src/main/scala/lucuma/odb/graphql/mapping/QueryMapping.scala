@@ -49,6 +49,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("program"),
         SqlObject("programs"),
         SqlObject("proposalAttachmentTypeMeta"),
+        SqlObject("proposalStatusMeta"),
         SqlObject("target"),
         SqlObject("targetGroup"),
         SqlObject("targets"),
@@ -69,6 +70,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Program,
       Programs,
       ProposalAttachmentTypeMeta,
+      ProposalStatusMeta,
       Target,
       TargetGroup,
       Targets,
@@ -118,6 +120,12 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     case (QueryType, "proposalAttachmentTypeMeta", Nil) =>
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentTypeMetaType / "tag"))), child)
+      }
+
+  private lazy val ProposalStatusMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "proposalStatusMeta", Nil) =>
+      Elab.transformChild { child =>
+        OrderBy(OrderSelections(List(OrderSelection[Short](ProposalStatusMetaType / "ordinal"))), child)
       }
 
   private lazy val Dataset: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
