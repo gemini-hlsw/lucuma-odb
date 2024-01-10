@@ -105,6 +105,29 @@ object ProgramService {
     case class InvalidUser(user: User.Id)                    extends LinkUserResponse
   }
 
+  sealed trait UpdateProgramsError extends Product with Serializable {
+    import UpdateProgramsError.*
+    def message: String = this match
+      case InvalidProposalStatus(ps)                     =>
+        s"Invalid proposal status: ${ps.value}"
+      case NotAuthorizedNewProposalStatus(user, ps)      =>
+        s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase}."
+      case NotAuthorizedOldProposalStatus(pid, user, ps) =>
+        s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid."
+      case NoProposalForStatusChange(pid)                =>
+        s"Proposal status in program $pid cannot be changed because it has no proposal."
+
+    def failure = Result.failure(message)
+  }
+
+  object UpdateProgramsError {
+    // we should never get this one, but we are converting between a Tag and a dynamic enum...
+    case class InvalidProposalStatus(ps: Tag) extends UpdateProgramsError
+    case class NotAuthorizedNewProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
+    case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
+    case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
+  }
+
   /**
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
@@ -176,9 +199,9 @@ object ProgramService {
         val enumsVal = enums
 
         def tagToProposalStatus(tag: Tag): Result[enumsVal.ProposalStatus] =
-          Enumerated[enumsVal.ProposalStatus].fromTag(tag.value).fold(
-            Result.failure(s"Invalid proposal status: ${tag.value}") // We `shouldn't ever get this...
-          )(Result.apply)
+          Enumerated[enumsVal.ProposalStatus]
+            .fromTag(tag.value)
+            .fold(UpdateProgramsError.InvalidProposalStatus(tag).failure)(Result.apply)
 
         def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
           user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
@@ -191,9 +214,9 @@ object ProgramService {
                   for {
                     ps <- tagToProposalStatus(psTag)
                     _  <- if (hasProposal) Result.unit
-                          else Result.failure(s"Proposal status in program $pid cannot be changed because it has no proposal.")
+                          else UpdateProgramsError.NoProposalForStatusChange(pid).failure
                     _  <- if (userCanChangeProposalStatus(ps)) Result.unit
-                          else Result.failure(s"User ${user.id} not authorized to change proposal status from ${psTag.value.toUpperCase} in program $pid.")
+                          else UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, psTag).failure
                   } yield ()
                 (acc, check).parMapN((_, _) => ())
               }
@@ -208,7 +231,7 @@ object ProgramService {
               ps   <- ResultT(tagToProposalStatus(psTag).pure[F])
               _    <- ResultT(
                         if (userCanChangeProposalStatus(ps)) Result.unit.pure[F]
-                        else Result.failure(s"User ${user.id} not authorized to set proposal status to ${psTag.value.toUpperCase}.").pure[F]
+                        else UpdateProgramsError.NotAuthorizedNewProposalStatus(user, psTag).failure.pure[F]
                       )
               _    <- ResultT(checkCurrentProposalStatus)
             } yield(())).value

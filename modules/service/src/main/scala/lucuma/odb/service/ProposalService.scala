@@ -44,6 +44,22 @@ private[service] trait ProposalService[F[_]] {
 
 object ProposalService {
 
+  sealed trait UpdateProposalsError extends Product with Serializable {
+    import UpdateProposalsError.*
+    def message: String = this match
+      case CreationFailed => 
+        "One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified."
+      case InconsistentUpdate =>
+        "The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class."
+
+    def failure = Result.failure(message)
+  }
+  
+  object UpdateProposalsError {
+    case object CreationFailed     extends UpdateProposalsError
+    case object InconsistentUpdate extends UpdateProposalsError
+  }
+
   /** Construct a `ProposalService` using the specified `Session`. */
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProposalService[F] =
     new ProposalService[F] {
@@ -65,7 +81,7 @@ object ProposalService {
             }
             .recover {
               case SqlState.NotNullViolation(e) if e.columnName == Some("c_class") =>
-                Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
+                UpdateProposalsError.InconsistentUpdate.failure
             }
           }
 
@@ -79,7 +95,7 @@ object ProposalService {
           }
           .recover {
             case SqlState.NotNullViolation(ex) =>
-              Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
+              UpdateProposalsError.CreationFailed.failure
           }
 
         // Replace the splits
