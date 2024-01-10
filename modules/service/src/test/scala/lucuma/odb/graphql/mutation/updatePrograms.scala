@@ -11,6 +11,9 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Tag
+import lucuma.odb.service.ProgramService.UpdateProgramsError
+import lucuma.odb.service.ProposalService.UpdateProposalsError
 
 class updatePrograms extends OdbSuite {
 
@@ -251,7 +254,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified."))
+          Left(List(UpdateProposalsError.CreationFailed.message))
       )
     }
   }
@@ -780,9 +783,7 @@ class updatePrograms extends OdbSuite {
             }
           }
         """,
-        expected = Left(List(
-          "The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class."
-        ))
+        expected = Left(List(UpdateProposalsError.InconsistentUpdate.message))
       )
 
     }
@@ -1144,7 +1145,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(s"Proposal status in program $pid cannot be changed because it has no proposal."))
+          Left(List(UpdateProgramsError.NoProposalForStatusChange(pid).message))
       )
     }
   }
@@ -1175,7 +1176,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(s"User ${pi.id} not authorized to set proposal status to ACCEPTED."))
+          Left(List(UpdateProgramsError.NotAuthorizedNewProposalStatus(pi, Tag("accepted")).message))
       )
     }
   }
@@ -1206,7 +1207,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(s"User ${guest.id} not authorized to set proposal status to SUBMITTED."))
+          Left(List(UpdateProgramsError.NotAuthorizedNewProposalStatus(guest, Tag("submitted")).message))
       )
     }
   }
@@ -1412,7 +1413,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(s"User ${pi.id} not authorized to change proposal status from ACCEPTED in program $pid."))
+          Left(List(UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, pi, Tag("accepted")).message))
       )
     }
   }
@@ -1487,8 +1488,8 @@ class updatePrograms extends OdbSuite {
         expected =
           Left(
             List(
-              s"User ${pi.id} not authorized to change proposal status from NOT_ACCEPTED in program $pid1.",
-              s"Proposal status in program $pid3 cannot be changed because it has no proposal."
+              UpdateProgramsError.NotAuthorizedOldProposalStatus(pid1, pi, Tag("not_accepted")).message,
+              UpdateProgramsError.NoProposalForStatusChange(pid3).message
             )
           )
       )
