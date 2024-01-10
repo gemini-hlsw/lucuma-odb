@@ -5,17 +5,27 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
+import cats.syntax.applicative.*
+import cats.syntax.eq.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
+import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.ResultT
 import grackle.Type
 import grackle.TypeRef
+import grackle.syntax.*
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
@@ -53,9 +63,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
         EffectField("interval",  intervalHandler, List("id")),
         SqlObject("stepConfig"),
         SqlField("observeClass", StepRecordView.ObserveClass),
-
-        // TBD: stepQaState
-
+        EffectField("qaState", qaStateHandler, List("id")),
         SqlObject("datasets"),
         SqlObject("events")
       )
@@ -99,6 +107,30 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
+
+  private lazy val qaStateHandler: EffectHandler[F] =
+    new EffectHandler[F] {
+      def calculateQaState(id: Step.Id): F[Result[Json]] =
+        services.useTransactionally {
+          datasetService.selectStepQaState(id).map(_.asJson.success)
+        }
+
+      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (for {
+          ids  <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Step.Id]("id")}.pure[F])
+          jsns <- ids.distinct.traverse(id => ResultT(calculateQaState(id)).tupleLeft(id))
+          res  <- ResultT(
+                    ids
+                      .flatMap { id => jsns.find(r => r._1 === id).map(_._2).toList }
+                      .zip(queries)
+                      .traverse { case (result, (query, parentCursor)) =>
+                        Query.childContext(parentCursor.context, query).map { childContext =>
+                          CirceCursor(childContext, result, Some(parentCursor), parentCursor.fullEnv)
+                        }
+                      }.pure[F]
+                  )
+        } yield res).value
+    }
 
   lazy val GmosNorthStepRecordMapping: ObjectMapping =
     ObjectMapping(

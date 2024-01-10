@@ -8,6 +8,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -18,11 +19,15 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.ObservingModeType
 
 trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite =>
 
   import ExecutionQuerySetupOperations.*
+
+  val DatasetFilenamePrefix: String =
+    "N18630101S"
 
   def recordDataset(
     setup:   Setup,
@@ -51,7 +56,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     )
 
     for {
-      did <- recordDatasetAs(user, sid, f"N18630101S$idx%04d.fits")
+      did <- recordDatasetAs(user, sid, f"$DatasetFilenamePrefix$idx%04d.fits")
       es  <- stages.traverse { stage => addDatasetEventAs(user, did, stage) }
     } yield DatasetNode(did, es)
   }
@@ -127,6 +132,34 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
       oid   <- createObservationAs(user, pid, mode.some)
       vs    <- (0 until setup.visitCount).toList.traverse { v => recordVisit(mode, setup, user, oid, v) }
     } yield ObservationNode(oid, vs)
+  }
+
+  def setQaState(
+    user:    User,
+    qaState: DatasetQaState,
+    like:    String
+  ): IO[Unit] = {
+
+    val q = s"""
+      mutation {
+        updateDatasets(input: {
+          SET: {
+            qaState: ${qaState.tag.toScreamingSnakeCase}
+          },
+          WHERE: {
+            filename: {
+              LIKE: "$like"
+            }
+          }
+        }) {
+          datasets {
+            id
+          }
+        }
+      }
+    """
+
+    query(user, q).void
   }
 
 }
