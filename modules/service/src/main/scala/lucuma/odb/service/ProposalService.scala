@@ -8,6 +8,8 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
+import grackle.ResultT
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
@@ -36,17 +38,11 @@ private[service] trait ProposalService[F[_]] {
    * where the class matches what `SET` specifies. This action also assumes the
    * presence of the `t_program_update` table.
    */
-  def updateProposals(SET: ProposalInput.Edit)(using Transaction[F]): F[List[Program.Id]]
+  def updateProposals(SET: ProposalInput.Edit)(using Transaction[F]): F[Result[List[Program.Id]]]
 
 }
 
 object ProposalService {
-
-  sealed trait ProposalUpdateException extends Exception
-  object ProposalUpdateException {
-    case object CreationFailed     extends ProposalUpdateException
-    case object InconsistentUpdate extends ProposalUpdateException
-  }
 
   /** Construct a `ProposalService` using the specified `Session`. */
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProposalService[F] =
@@ -56,30 +52,34 @@ object ProposalService {
         session.prepareR(Statements.InsertProposal).use(_.execute(pid, SET)) >>
         partnerSplitsService.insertSplits(SET.partnerSplits, pid)
 
-      def updateProposals(SET: ProposalInput.Edit)(using Transaction[F]): F[List[Program.Id]] = {
+      def updateProposals(SET: ProposalInput.Edit)(using Transaction[F]): F[Result[List[Program.Id]]] = {
 
         // Update existing proposals. This will fail if SET.asCreate.isEmpty and there is a class mismatch.
-        val update: F[List[Program.Id]] =
-          Statements.updateProposals(SET).fold(Nil.pure[F]) { af =>
+        val update: F[Result[List[Program.Id]]] =
+          Statements.updateProposals(SET).fold(Result(Nil).pure[F]) { af =>
             session.prepareR(af.fragment.query(program_id)).use { ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
-            } .recoverWith {
+                .map(Result.apply)
+            }
+            .recover {
               case SqlState.NotNullViolation(e) if e.columnName == Some("c_class") =>
-                ProposalUpdateException.InconsistentUpdate.raiseError
+                Result.failure("The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class.")
             }
           }
 
         // Insert new proposals. This will fail if there's not enough information.
-        val insert: F[List[Program.Id]] =
+        val insert: F[Result[List[Program.Id]]] =
           session.prepareR(Statements.InsertProposals).use { ps =>
             ps.stream(SET, 1024)
               .compile
               .toList
-          } recoverWith {
+              .map(Result.apply)
+          }
+          .recover {
             case SqlState.NotNullViolation(ex) =>
-              ProposalUpdateException.CreationFailed.raiseError
+              Result.failure("One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified.")
           }
 
         // Replace the splits
@@ -89,7 +89,11 @@ object ProposalService {
           }
 
         // Done!
-        (update, insert, replaceSplits).mapN(_ |+| _ |+| _)
+        (for {
+          u <- ResultT(update)
+          i <- ResultT(insert)
+          s <- ResultT(replaceSplits.map(Result.apply))
+        } yield (u |+| i |+| s)).value
 
       }
 

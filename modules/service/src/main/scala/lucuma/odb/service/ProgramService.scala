@@ -5,12 +5,12 @@ package lucuma.odb.service
 
 import cats.Monad
 import cats.Semigroup
-import cats.data.EitherNel
-import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
+import grackle.Result
+import grackle.ResultT
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Program
@@ -48,7 +48,7 @@ trait ProgramService[F[_]] {
   def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[ProgramService.LinkUserResponse]
 
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
-  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[EitherNel[ProgramService.UpdateProgramsError, List[Program.Id]]]
+  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[Result[List[Program.Id]]]
 
   /** Check to see if the user has access to the given program. */
   def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean]
@@ -105,18 +105,6 @@ object ProgramService {
     case class InvalidUser(user: User.Id)                    extends LinkUserResponse
   }
 
-  sealed trait UpdateProgramsError extends Product with Serializable
-
-  object UpdateProgramsError {
-    case object ProposalCreationFailed                                               extends UpdateProgramsError
-    case object ProposalInconsistentUpdate                                           extends UpdateProgramsError
-    // we should never get this one, but we are converting between a Tag and a dynamic enum...
-    case class  InvalidProposalStatus(ps: Tag)                                       extends UpdateProgramsError
-    case class  NotAuthorizedNewProposalStatus(user: User, ps: Tag)                  extends UpdateProgramsError
-    case class  NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
-    case class  NoProposalForStatusChange(pid: Program.Id)                           extends UpdateProgramsError
-  }
-
   /**
    * Construct a `ProgramService` using the specified `Session`, for the specified `User`. All
    * operations will be performed on behalf of `user`.
@@ -159,7 +147,7 @@ object ProgramService {
       }
 
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
-        F[EitherNel[UpdateProgramsError, List[Program.Id]]] = {
+        F[Result[List[Program.Id]]] = {
 
         // Create the temp table with the programs we're updating. We will join with this
         // several times later on in the transaction.
@@ -179,59 +167,58 @@ object ProgramService {
           }
 
         // Update proposals. This can fail in a few ways.
-        val updateProposals: F[Either[UpdateProgramsError, List[Program.Id]]] =
-          SET.proposal.fold(Nil.asRight.pure[F]) {
-            proposalService.updateProposals(_).map(_.asRight).recover {
-              case ProposalService.ProposalUpdateException.CreationFailed => 
-                UpdateProgramsError.ProposalCreationFailed.asLeft
-              case ProposalService.ProposalUpdateException.InconsistentUpdate =>
-                UpdateProgramsError.ProposalInconsistentUpdate.asLeft
-            }
+        val updateProposals: F[Result[List[Program.Id]]] =
+          SET.proposal.fold(Result(Nil).pure[F]) {
+            proposalService.updateProposals(_)
           }
 
         // A stable identifier (ie. a `val`) is needed for the enums.
         val enumsVal = enums
 
-        def tagToProposalStatus(tag: Tag): Either[UpdateProgramsError, enumsVal.ProposalStatus] =
-          Enumerated[enumsVal.ProposalStatus].fromTag(tag.value).toRight(UpdateProgramsError.InvalidProposalStatus(tag))
+        def tagToProposalStatus(tag: Tag): Result[enumsVal.ProposalStatus] =
+          Enumerated[enumsVal.ProposalStatus].fromTag(tag.value).fold(
+            Result.failure(s"Invalid proposal status: ${tag.value}") // We `shouldn't ever get this...
+          )(Result.apply)
 
-        def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Option[Unit] =
-          if (user.role.access === Access.Guest || 
-              (ps > enumsVal.ProposalStatus.Submitted && user.role.access < Access.Ngo)) none else ().some
+        def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
+          user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
         
-        val checkCurrentProposalStatus: F[EitherNel[UpdateProgramsError, Unit]] =
+        val checkCurrentProposalStatus: F[Result[Unit]] =
           session.prepareR(Statements.getTempTableData).use(
             _.stream(Void, chunkSize = 1024)
-              .fold(().rightNel[UpdateProgramsError]){ case (acc, (pid, psTag, hasProposal)) => 
-                val check: Either[UpdateProgramsError, Unit] =
+              .fold(Result.unit){ case (acc, (pid, psTag, hasProposal)) => 
+                val check: Result[Unit] =
                   for {
                     ps <- tagToProposalStatus(psTag)
-                    _  <- if (hasProposal) ().asRight else UpdateProgramsError.NoProposalForStatusChange(pid).asLeft
-                    _  <- userCanChangeProposalStatus(ps).toRight(UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, psTag))
+                    _  <- if (hasProposal) Result.unit
+                          else Result.failure(s"Proposal status in program $pid cannot be changed because it has no proposal.")
+                    _  <- if (userCanChangeProposalStatus(ps)) Result.unit
+                          else Result.failure(s"User ${user.id} not authorized to change proposal status from ${psTag.value.toUpperCase} in program $pid.")
                   } yield ()
-                (acc, check.toEitherNel).parMapN((_, _) => ())
+                (acc, check).parMapN((_, _) => ())
               }
               .compile
               .toList
               .map(_.head)
           )
 
-        val validateProposalStatus: F[EitherNel[UpdateProgramsError, Unit]] =
-          SET.proposalStatus.fold(().rightNel.pure[F]){psTag =>
+        val validateProposalStatus: F[Result[Unit]] =
+          SET.proposalStatus.fold(Result.unit.pure[F]){psTag =>
             (for {
-              ps   <- EitherT.fromEither(tagToProposalStatus(psTag).toEitherNel)
-              _    <- EitherT.fromEither(
-                        userCanChangeProposalStatus(ps).toRightNel(UpdateProgramsError.NotAuthorizedNewProposalStatus(user, psTag))
+              ps   <- ResultT(tagToProposalStatus(psTag).pure[F])
+              _    <- ResultT(
+                        if (userCanChangeProposalStatus(ps)) Result.unit.pure[F]
+                        else Result.failure(s"User ${user.id} not authorized to set proposal status to ${psTag.value.toUpperCase}.").pure[F]
                       )
-              _    <- EitherT(checkCurrentProposalStatus)
+              _    <- ResultT(checkCurrentProposalStatus)
             } yield(())).value
           }
 
         (for {
-          _    <- EitherT.liftF(setup)
-          _    <- EitherT(validateProposalStatus)
-          ids1 <- EitherT.liftF(updatePrograms)
-          ids2 <- EitherT(updateProposals.map(_.toEitherNel)) 
+          _    <- ResultT(setup.map(Result.apply))
+          _    <- ResultT(validateProposalStatus)
+          ids1 <- ResultT(updatePrograms.map(Result.apply))
+          ids2 <- ResultT(updateProposals) 
         } yield (ids1 |+| ids2)).value
 
       }
