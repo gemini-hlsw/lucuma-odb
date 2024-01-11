@@ -32,8 +32,11 @@ create trigger reset_proposal_status_trigger
 
 -- Add the proposalStatus columns to t_chron_program_update
 alter table t_chron_program_update
-add column c_mod_proposal_status  bool not null,
+add column c_mod_proposal_status  bool not null default false,
 add column c_new_proposal_status d_tag;
+
+alter table t_chron_program_update
+alter column c_mod_proposal_status drop default;
 
 -- This function was copied and modified from V0361__chron_program_updates.sql
 
