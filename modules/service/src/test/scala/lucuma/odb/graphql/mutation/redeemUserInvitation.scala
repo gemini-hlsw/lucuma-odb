@@ -8,8 +8,8 @@ import cats.syntax.all.*
 import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.UserInvitation
 
 class redeemUserInvitation extends OdbSuite {
 

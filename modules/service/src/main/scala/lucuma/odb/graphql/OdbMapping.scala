@@ -37,6 +37,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
+
 import mapping.RedeemUserInvitationResultMapping
 
 object OdbMapping {
