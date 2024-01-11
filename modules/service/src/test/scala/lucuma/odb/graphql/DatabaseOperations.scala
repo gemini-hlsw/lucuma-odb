@@ -980,5 +980,55 @@ trait DatabaseOperations { this: OdbSuite =>
         .require[UserInvitation]
     }
 
+  def redeemUserInvitationAs(u: User, inv: UserInvitation, accept: Boolean = true): IO[UserInvitation.Id] =
+    query(
+      user = u,
+      query = s"""
+        mutation {
+          redeemUserInvitation(input: { 
+            key: "${UserInvitation.fromString.reverseGet(inv)}"
+            accept: $accept
+          }) {
+            invitation {
+              id
+              status
+              issuer {
+                id
+              }
+              redeemer {
+                id
+              }
+            }
+          }
+        }
+      """     
+    ).map { j =>
+      j.hcursor.downFields("redeemUserInvitation", "invitation", "id").require[UserInvitation.Id]
+    }
+
+  def revokeUserInvitationAs(u: User, id: UserInvitation.Id): IO[UserInvitation.Id] =
+    query(
+      user = u,
+      query = s"""
+        mutation {
+          revokeUserInvitation(input: { 
+            id: "${UserInvitation.Id.fromString.reverseGet(id)}"
+          }) {
+            invitation {
+              id
+              status
+              issuer {
+                id
+              }
+              redeemer {
+                id
+              }
+            }
+          }
+        }
+      """     
+    ).map { j =>
+      j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
+    }
 
 }

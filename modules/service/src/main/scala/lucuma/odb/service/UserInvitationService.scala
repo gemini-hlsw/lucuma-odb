@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -20,6 +21,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
+import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.util.Codecs.*
 import skunk.Query
 import skunk.SqlState
@@ -36,7 +38,10 @@ trait UserInvitationService[F[_]]:
 
   /** Redeem an invitation. */
   def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]]
-  
+
+  /** Revoke an invitation. */
+  def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]]
+
 object UserInvitationService:
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): UserInvitationService[F] =
@@ -110,6 +115,19 @@ object UserInvitationService:
                           xa.rollback(sp).as:
                             Result.warning("You are already in the specified role; no action taken.", input.key.id)
                     
+      def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
+        user.role.access match
+          case Access.Guest => Result.failure("Guest users cannot revoke invitations.").pure[F]
+          case Access.Admin | Access.Service | Access.Staff =>
+            session.prepareR(Statements.revokeUserInvitationUnconditionially).use: pq =>
+              pq.option(input.id).map:
+                case Some(id) => Result(id)
+                case None     => Result.failure(s"Invitation does not exist or is no longer pending.")
+          case Access.Ngo | Access.Pi =>
+            session.prepareR(Statements.revokeUserInvitation).use: pq =>
+              pq.option(input.id, user.id).map:
+                case Some(id) => Result(id)
+                case None     => Result.failure(s"Invitation does not exist, is no longer pending, or was issued by someone else.")
 
   object Statements:
 
@@ -167,10 +185,28 @@ object UserInvitationService:
         update t_invitation
         set c_status = $user_invitation_status, c_redeemer_id = $user_id
         where c_status = 'pending'
-        and c_invitation_id = $varchar
+        and c_invitation_id = $user_invitation_id
         and c_key_hash = md5($varchar)
         and c_issuer_id <> $user_id -- can't redeem your own invitation
         returning c_role, c_support_type, c_support_partner, c_program_id
       """.query(program_user_role *: program_user_support_type.opt *: tag.opt *: program_id)
-        .contramap((u, s, i) => (s, u.id, UserInvitation.Id.fromString.reverseGet(i.id), i.body, u.id))
+        .contramap((u, s, i) => (s, u.id, i.id, i.body, u.id))
 
+    val revokeUserInvitation: Query[(UserInvitation.Id, User.Id), UserInvitation.Id] =
+      sql"""
+        update t_invitation
+        set c_status = 'revoked'
+        where c_invitation_id = $user_invitation_id
+        and c_status = 'pending'
+        and c_issuer_id = $user_id
+        returning c_invitation_id
+      """.query(user_invitation_id)
+
+    val revokeUserInvitationUnconditionially: Query[UserInvitation.Id, UserInvitation.Id] =
+      sql"""
+        update t_invitation
+        set c_status = 'revoked'
+        where c_invitation_id = $user_invitation_id
+        and c_status = 'pending'
+        returning c_invitation_id
+      """.query(user_invitation_id)
