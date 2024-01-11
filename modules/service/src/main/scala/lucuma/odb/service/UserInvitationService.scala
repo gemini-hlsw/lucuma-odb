@@ -120,14 +120,12 @@ object UserInvitationService:
           case Access.Guest => Result.failure("Guest users cannot revoke invitations.").pure[F]
           case Access.Admin | Access.Service | Access.Staff =>
             session.prepareR(Statements.revokeUserInvitationUnconditionially).use: pq =>
-              pq.option(input.id).map:
-                case Some(id) => Result(id)
-                case None     => Result.failure(s"Invitation does not exist or is no longer pending.")
+              pq.option(input.id).map: op =>
+                Result.fromOption(op, s"Invitation does not exist or is no longer pending.")
           case Access.Ngo | Access.Pi =>
             session.prepareR(Statements.revokeUserInvitation).use: pq =>
-              pq.option(input.id, user.id).map:
-                case Some(id) => Result(id)
-                case None     => Result.failure(s"Invitation does not exist, is no longer pending, or was issued by someone else.")
+              pq.option(input.id, user.id).map: op =>
+                Result.fromOption(op, s"Invitation does not exist, is no longer pending, or was issued by someone else.")
 
   object Statements:
 

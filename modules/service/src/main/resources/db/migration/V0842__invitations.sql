@@ -32,7 +32,6 @@ CREATE OR REPLACE FUNCTION insert_invitation(
     invitation_key_id d_invitation_id := to_hex(nextval('s_invitation_id'::regclass));
     invitation_key text := md5(random()::text) || md5(random()::text) ||  md5(random()::text);
     invitation_key_hash text := md5(invitation_key);
-    rec record;
   BEGIN
     INSERT INTO t_invitation (
       c_invitation_id,
