@@ -55,6 +55,7 @@ import lucuma.odb.graphql.input.RecordDatasetInput
 import lucuma.odb.graphql.input.RecordGmosStepInput
 import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
+import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
@@ -111,6 +112,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RecordGmosSouthStep,
       RecordGmosSouthVisit,
       RedeemUserInvitation,
+      RevokeUserInvitation,
       SetAllocation,
       UpdateAsterisms,
       UpdateDatasets,
@@ -565,6 +567,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("redeemUserInvitation", RedeemUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
         userInvitationService.redeemUserInvitation(input).map: rId =>
+          rId.map: id =>
+            Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
+
+  private lazy val RevokeUserInvitation =
+    MutationField("revokeUserInvitation", RevokeUserInvitationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        userInvitationService.revokeUserInvitation(input).map: rId =>
           rId.map: id =>
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
 

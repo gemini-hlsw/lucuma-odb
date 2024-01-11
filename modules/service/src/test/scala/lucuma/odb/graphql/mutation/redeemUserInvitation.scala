@@ -4,13 +4,12 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
-import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.UserInvitation
+import lucuma.odb.data.ProgramUserRole
 
 class redeemUserInvitation extends OdbSuite {
 
@@ -53,32 +52,6 @@ class redeemUserInvitation extends OdbSuite {
       }
     """
 
-  def redeemUserInvitationAs(u: User, inv: UserInvitation, accept: Boolean = true): IO[UserInvitation.Id] =
-    query(
-      user = u,
-      query = s"""
-        mutation {
-          redeemUserInvitation(input: { 
-            key: "${UserInvitation.fromString.reverseGet(inv)}"
-            accept: $accept
-          }) {
-            invitation {
-              id
-              status
-              issuer {
-                id
-              }
-              redeemer {
-                id
-              }
-            }
-          }
-        }
-      """     
-    ).map { j =>
-      j.hcursor.downFields("redeemUserInvitation", "invitation", "id").require[UserInvitation.Id]
-    }
-
   test("redeem an invitation") {
     createProgramAs(pi).flatMap { pid =>
       createUserInvitationAs(pi, pid).flatMap { inv =>
@@ -109,6 +82,19 @@ class redeemUserInvitation extends OdbSuite {
               }
             }
           """)
+        )
+      }
+    }
+  }
+
+  test("can't redeem an invitation that has been revoked") {
+    createProgramAs(pi).flatMap { pid =>
+      createUserInvitationAs(pi, pid).flatMap { inv =>
+        revokeUserInvitationAs(pi, inv.id) >>
+        expect(
+          user = pi2,
+          query = redeem(inv),
+          expected = Left(List("Invitation is invalid, or has already been accepted, declined, or revoked."))
         )
       }
     }

@@ -37,6 +37,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
+import mapping.RedeemUserInvitationResultMapping
 
 object OdbMapping {
 
@@ -168,6 +169,7 @@ object OdbMapping {
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
+          with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
@@ -313,6 +315,7 @@ object OdbMapping {
               RecordGmosSouthStepResultMapping,
               RecordGmosSouthVisitResultMapping,
               RedeemUserInvitationResultMapping,
+              RevokeUserInvitationResultMapping,
               RightAscensionMapping,
               ScienceRequirementsMapping,
               SequenceEventMapping,
