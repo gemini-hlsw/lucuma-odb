@@ -54,6 +54,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
+import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType
 import monocle.Prism
 import skunk.*
@@ -555,6 +556,23 @@ trait Codecs {
 
   val extinction: Codec[Extinction] =
     int2_nonneg.imap(Extinction.apply)(_.underlying)
+
+  val user_invitation: Codec[UserInvitation] =
+    import UserInvitation.fromString
+    text.eimap(
+      fromString.getOption(_).toRight("Invalid invitatation"))(
+      fromString.reverseGet
+    )
+
+  val user_invitation_id: Codec[UserInvitation.Id] =
+    import UserInvitation.Id.fromString
+    varchar.eimap(
+      s => fromString.getOption(s).toRight("Invalid invitation id: $s"))(
+      fromString.reverseGet
+    )
+
+  val user_invitation_status: Codec[UserInvitation.Status] =
+    enumerated(Type("e_invitation_status"))
 
 }
 

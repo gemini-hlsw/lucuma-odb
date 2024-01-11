@@ -47,12 +47,15 @@ import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
+import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.RecordAtomInput
 import lucuma.odb.graphql.input.RecordDatasetInput
 import lucuma.odb.graphql.input.RecordGmosStepInput
 import lucuma.odb.graphql.input.RecordGmosVisitInput
+import lucuma.odb.graphql.input.RedeemUserInvitationInput
+import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
@@ -100,6 +103,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateObservation,
       CreateProgram,
       CreateTarget,
+      CreateUserInvitation,
       LinkUser,
       RecordAtom,
       RecordDataset,
@@ -107,6 +111,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RecordGmosNorthVisit,
       RecordGmosSouthStep,
       RecordGmosSouthVisit,
+      RedeemUserInvitation,
+      RevokeUserInvitation,
       SetAllocation,
       UpdateAsterisms,
       UpdateDatasets,
@@ -350,6 +356,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private lazy val CreateUserInvitation =
+    MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        userInvitationService.createUserInvitation(input).map: rInv =>
+          rInv.map: inv =>
+            Environment(
+              Env("inv" -> inv), 
+              Unique(Filter(Predicates.userInvitation.id.eql(inv.id), child))
+            )
+
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>
       services.useTransactionally {
@@ -546,6 +562,20 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         )
       }
     }
+
+  private lazy val RedeemUserInvitation =
+    MutationField("redeemUserInvitation", RedeemUserInvitationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        userInvitationService.redeemUserInvitation(input).map: rId =>
+          rId.map: id =>
+            Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
+
+  private lazy val RevokeUserInvitation =
+    MutationField("revokeUserInvitation", RevokeUserInvitationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        userInvitationService.revokeUserInvitation(input).map: rId =>
+          rId.map: id =>
+            Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
 
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>

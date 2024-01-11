@@ -49,6 +49,7 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
+import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
@@ -949,5 +950,85 @@ trait DatabaseOperations { this: OdbSuite =>
         """
       )
     )
+
+  def createUserInvitationAs(
+    user: User, 
+    pid: Program.Id, 
+    role: ProgramUserRole = ProgramUserRole.Coi,
+    supportType: Option[ProgramUserSupportType] = None,
+    supportPartner: Option[Tag] = None
+  ): IO[UserInvitation] =
+    query(
+      user = user,
+      query = s"""
+      mutation {
+        createUserInvitation(
+          input: {
+            programId: "$pid"
+            role: ${role.tag.toUpperCase}
+            ${supportType.map(_.tag.toUpperCase).foldMap(s => s"supportType: $s")}
+            ${supportPartner.map(_.value.toUpperCase).foldMap(s => s"supportPartner: $s")}
+          }
+        ) {
+          key
+        }
+      }
+      """
+    ).map { js =>
+      js.hcursor
+        .downFields("createUserInvitation", "key")
+        .require[UserInvitation]
+    }
+
+  def redeemUserInvitationAs(u: User, inv: UserInvitation, accept: Boolean = true): IO[UserInvitation.Id] =
+    query(
+      user = u,
+      query = s"""
+        mutation {
+          redeemUserInvitation(input: { 
+            key: "${UserInvitation.fromString.reverseGet(inv)}"
+            accept: $accept
+          }) {
+            invitation {
+              id
+              status
+              issuer {
+                id
+              }
+              redeemer {
+                id
+              }
+            }
+          }
+        }
+      """     
+    ).map { j =>
+      j.hcursor.downFields("redeemUserInvitation", "invitation", "id").require[UserInvitation.Id]
+    }
+
+  def revokeUserInvitationAs(u: User, id: UserInvitation.Id): IO[UserInvitation.Id] =
+    query(
+      user = u,
+      query = s"""
+        mutation {
+          revokeUserInvitation(input: { 
+            id: "${UserInvitation.Id.fromString.reverseGet(id)}"
+          }) {
+            invitation {
+              id
+              status
+              issuer {
+                id
+              }
+              redeemer {
+                id
+              }
+            }
+          }
+        }
+      """     
+    ).map { j =>
+      j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
+    }
 
 }

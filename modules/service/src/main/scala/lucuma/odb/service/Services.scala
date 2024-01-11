@@ -152,6 +152,9 @@ trait Services[F[_]]:
 
   /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
   def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode): GuideService[F]
+  
+  /** The `UserInvitationService` */
+  def userInvitationService: UserInvitationService[F]
 
 
 object Services:
@@ -204,6 +207,7 @@ object Services:
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       lazy val visitService = VisitService.instantiate
+      lazy val userInvitationService = UserInvitationService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
@@ -254,6 +258,7 @@ object Services:
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
     def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
+    def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
 
     // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
     // the service in which you want to use it. Like:

@@ -38,6 +38,8 @@ import org.typelevel.log4cats.Logger
 import scala.io.AnsiColor
 import scala.io.Source
 
+import mapping.RedeemUserInvitationResultMapping
+
 object OdbMapping {
 
   case class Topics[F[_]](
@@ -111,6 +113,7 @@ object OdbMapping {
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
+          with CreateUserInvitationResultMapping[F]
           with DeclinationMapping[F]
           with DatasetMapping[F]
           with DatasetSelectResultMapping[F]
@@ -166,6 +169,8 @@ object OdbMapping {
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
+          with RedeemUserInvitationResultMapping[F]
+          with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
@@ -194,6 +199,7 @@ object OdbMapping {
           with UpdateProgramsResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
+          with UserInvitationMapping[F]
           with VisitMapping[F]
           with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
@@ -243,6 +249,7 @@ object OdbMapping {
               CreateObservationResultMapping,
               CreateProgramResultMapping,
               CreateTargetResultMapping,
+              CreateUserInvitationResultMapping,
               DatasetMapping,
               DatasetEventMapping,
               DatasetSelectResultMapping,
@@ -308,6 +315,8 @@ object OdbMapping {
               RecordGmosNorthVisitResultMapping,
               RecordGmosSouthStepResultMapping,
               RecordGmosSouthVisitResultMapping,
+              RedeemUserInvitationResultMapping,
+              RevokeUserInvitationResultMapping,
               RightAscensionMapping,
               ScienceRequirementsMapping,
               SequenceEventMapping,
@@ -350,6 +359,7 @@ object OdbMapping {
               UpdateProgramsResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
+              UserInvitationMapping,
               VisitMapping,
               VisitSelectResultMapping,
               WavelengthMapping
