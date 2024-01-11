@@ -152,9 +152,6 @@ trait Services[F[_]]:
 
   /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
   def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode): GuideService[F]
-
-  /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `PlannedTimeCalculator`. */
-  def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: PlannedTimeCalculator.ForInstrumentMode): GuideService[F]
   
   /** The `UserInvitationService` */
   def userInvitationService: UserInvitationService[F]
