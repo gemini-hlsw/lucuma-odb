@@ -2443,6 +2443,112 @@ input LinkUserInput {
 
 }
 
+
+scalar UserInvitationId
+scalar UserInvitationKey
+
+"Create an invitation."
+input CreateUserInvitationInput {
+
+  "The program to add a user to."
+  programId: ProgramId!
+
+  "The role this user will play in the program."
+  role: ProgramUserRole!
+
+  "Must be specified if and only if 'role' is SUPPORT"
+  supportType: ProgramUserSupportRoleType
+
+  "Must be specified if and only if 'supportType' is PARTNER"
+  supportPartner: Partner
+
+}
+
+enum UserInvitationStatus {
+
+  "This invitation has not been used."
+  PENDING, 
+  
+  "This invitation was redeemed."
+  REDEEMED,
+  
+  "This invitation was declined."
+  DECLINED,
+  
+  "This invitation was revoked, and can no longer be redeemed."
+  REVOKED
+
+}
+
+"Invitation"
+type UserInvitation {
+
+  "Id"
+  id: UserInvitationId!
+
+  "Invitation status."
+  status: UserInvitationStatus!
+
+  "User who issued the invitation."
+  issuer: User!
+
+  "User who redeemed the invitation, if any."
+  redeemer: User
+
+  "The program the redeemer will be added to."
+  program: Program!
+
+  "The role the redeemer will play in the program."
+  role: ProgramUserRole!
+
+  "Null unless 'role' is SUPPORT"
+  supportType: ProgramUserSupportRoleType
+
+  "Null unless 'supportType' is PARTNER"
+  supportPartner: Partner
+
+}
+
+type CreateUserInvitationResult {
+
+  "The created invitation."
+  invitation: UserInvitation!
+
+  "Give this key to the person you wish to invite. They can later redeem the invitation."
+  key: UserInvitationKey!
+
+}
+
+input RedeemUserInvitationInput {
+
+  key: UserInvitationKey!
+
+  "Pass false here to decline the invitation."
+  accept: Boolean = true
+
+}
+
+type RedeemUserInvitationResult {
+
+  "The redeemed invitation."
+  invitation: UserInvitation!
+
+}
+
+input RevokeUserInvitationInput {
+  id: UserInvitationId!
+}
+
+type RevokeUserInvitationResult {
+
+  "The revoked invitation."
+  invitation: UserInvitation!
+
+}
+
+
+
+
 type LinkUserResult {
   user: ProgramUser!
 }
@@ -2717,6 +2823,29 @@ type Mutation {
     """
     input: UpdateTargetsInput!
   ): UpdateTargetsResult!
+
+  """
+  Create a user invitation.
+  """
+  createUserInvitation(
+    input: CreateUserInvitationInput!
+  ): CreateUserInvitationResult!
+
+
+  """
+  Redeem a user invitation.
+  """
+  redeemUserInvitation(
+    input: RedeemUserInvitationInput!
+  ): RedeemUserInvitationResult!
+
+  """
+  Revoke a user invitation.
+  """
+  revokeUserInvitation(
+    input: RevokeUserInvitationInput!
+  ): RevokeUserInvitationResult!
+
 }
 
 """
@@ -7525,6 +7654,11 @@ type Program {
   Program-wide time charge, summing all corrected observation time charges.
   """
   timeCharge: CategorizedTime!
+  """
+  All user invitations associated with this program.
+  """
+  userInvitations: [UserInvitation!]!
+
 }
 
 """
@@ -8037,6 +8171,7 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): TargetSelectResult!
+
 }
 
 """
