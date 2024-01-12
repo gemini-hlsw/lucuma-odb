@@ -34,7 +34,17 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
         SqlObject("visit",       Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
         SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
         SqlField("received",     ExecutionEventTable.Received),
-        SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true)
+        SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true),
+
+        // Hidden fields used in the WhereExecutionEvent predicate.  There
+        // appears to be no good way to create a predicate that matches on a
+        // particular interface implementation so this is the best we can do.
+        // We can match on fields that appear in the ExecutionEventTable.
+        SqlField("_sequenceCommand", ExecutionEventTable.SequenceCommand, hidden = true),
+        SqlField("_stepId",          ExecutionEventTable.StepId,          hidden = true),
+        SqlField("_stepStage",       ExecutionEventTable.StepStage,       hidden = true),
+        SqlField("_datasetId",       ExecutionEventTable.DatasetId,       hidden = true),
+        SqlField("_datasetStage",    ExecutionEventTable.DatasetStage,    hidden = true)
       )
     )
 
