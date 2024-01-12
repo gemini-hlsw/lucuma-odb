@@ -34,6 +34,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
+import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
@@ -68,7 +69,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
-      LeafMapping[Tag](ExecutionEventTypeType),
+      LeafMapping[ExecutionEventType](ExecutionEventTypeType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
