@@ -135,8 +135,8 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         query     = subtitleSubscription(None, Some(oid1)),
         mutations =
           Right(
-            updateObservation(pi, "obs 0 - edit", pid, oid0) >>
-              updateObservation(pi, "obs 1 - edit", pid, oid1)
+            updateObservation(pi, "obs 0 - edit", oid0) >>
+              updateObservation(pi, "obs 1 - edit", oid1)
           ),
         expected  = List(updated("obs 1 - edit"))
       )

@@ -45,14 +45,13 @@ class timingWindows extends OdbSuite {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  def updateObservation(user: User,  pid: Program.Id, oid: Observation.Id, twisOpt: Option[String]): IO[Json] = 
+  def updateObservation(user: User,  oid: Observation.Id, twisOpt: Option[String]): IO[Json] =
     query(
       user = user,
       query =
         s"""
           mutation {
             updateObservations(input: {
-              programId: ${pid.asJson},
               WHERE: {
                 id: {
                   EQ: "$oid"
@@ -278,7 +277,7 @@ class timingWindows extends OdbSuite {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         createObservation(user, pid, TimingWindowsInput.some).flatMap{ obsId =>
-          updateObservation(user, pid, obsId, TimingWindowsInput2.some).assertEquals(TimingWindowsOutput2)
+          updateObservation(user, obsId, TimingWindowsInput2.some).assertEquals(TimingWindowsOutput2)
         }
       }
     }
@@ -288,7 +287,7 @@ class timingWindows extends OdbSuite {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         createObservation(user, pid, TimingWindowsInput.some).flatMap{ obsId =>
-          updateObservation(user, pid, obsId, "null".some).assertEquals(json"""{ "observations": [{ "timingWindows": [] }]}""")
+          updateObservation(user, obsId, "null".some).assertEquals(json"""{ "observations": [{ "timingWindows": [] }]}""")
         }
       }
     }
@@ -298,7 +297,7 @@ class timingWindows extends OdbSuite {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         createObservation(user, pid, TimingWindowsInput2.some).flatMap{ obsId =>
-          updateObservation(user, pid, obsId, none).assertEquals(TimingWindowsOutput2)
+          updateObservation(user, obsId, none).assertEquals(TimingWindowsOutput2)
         }
       }
     }

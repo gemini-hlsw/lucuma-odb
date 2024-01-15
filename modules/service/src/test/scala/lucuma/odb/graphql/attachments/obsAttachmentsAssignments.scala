@@ -83,7 +83,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
 
   def deleteObservation(
     user: User,
-    pid:  Program.Id,
     oid:  Observation.Id
   ): IO[Unit] =
     expect(
@@ -92,7 +91,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
         mutation {
           updateObservations(
             input: {
-              programId: ${pid.asJson}
               WHERE: {
                 id: {
                   EQ: ${oid.asJson}
@@ -122,7 +120,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
 
   def updateObservation(
     user:  User,
-    pid:   Program.Id,
     oid:   Observation.Id,
     input: UpdateInput
   ): IO[Unit] =
@@ -132,7 +129,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
         mutation {
           updateObservations(
             input: {
-              programId: ${pid.asJson}
               WHERE: {
                 id: {
                   EQ: ${oid.asJson}
@@ -232,7 +228,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
-      _   <- updateObservation(pi, pid, oid, updateFile1(aid))
+      _   <- updateObservation(pi, oid, updateFile1(aid))
     } yield ()
   }
 
@@ -242,7 +238,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       oid <- createObservation(pi, pid, (aid, file1))
       _   <- assertObservation(pi, pid, oid, (aid, file1))
-      _   <- updateObservation(pi, pid, oid, UpdateInput.Null)
+      _   <- updateObservation(pi, oid, UpdateInput.Null)
     } yield ()
   }
 
@@ -252,7 +248,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
       oid <- createObservation(pi, pid, (aid, file1))
       _   <- assertObservation(pi, pid, oid, (aid, file1))
-      _   <- updateObservation(pi, pid, oid, updateEmpty)
+      _   <- updateObservation(pi, oid, updateEmpty)
     } yield ()
   }
 
@@ -261,8 +257,8 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
       aid <- insertAttachment(pi, pid, file1).toAttachmentId
-      _   <- updateObservation(pi, pid, oid, updateFile1(aid))
-      _   <- updateObservation(pi, pid, oid, skipFile1(aid))
+      _   <- updateObservation(pi, oid, updateFile1(aid))
+      _   <- updateObservation(pi, oid, skipFile1(aid))
     } yield ()
   }
 
@@ -272,7 +268,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid  <- createObservationAs(pi, pid)
       aid1 <- insertAttachment(pi, pid, file1).toAttachmentId
       aid2 <- insertAttachment(pi, pid, file2).toAttachmentId
-      _    <- updateObservation(pi, pid, oid, updateBothFiles(aid1, aid2))
+      _    <- updateObservation(pi, oid, updateBothFiles(aid1, aid2))
     } yield ()
   }
 
@@ -297,7 +293,7 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       oid2 <- createObservation(pi, pid, (aid2, file2))
       _    <- assertObservation(pi, pid, oid1, (aid1, file1), (aid2, file2))
       _    <- assertObservation(pi, pid, oid2, (aid2, file2))
-      _    <- deleteObservation(pi, pid, oid1)
+      _    <- deleteObservation(pi, oid1)
     } yield ()
   }
 
