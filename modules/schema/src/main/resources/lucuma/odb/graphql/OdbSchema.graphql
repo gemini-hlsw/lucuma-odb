@@ -10429,6 +10429,11 @@ input WhereObservation {
   id: WhereOrderObservationId
 
   """
+  Matches the id of the associated program.
+  """
+  programId: WhereOrderProgramId
+
+  """
   Matches the subtitle of the observation.
   """
   subtitle: WhereOptionString
