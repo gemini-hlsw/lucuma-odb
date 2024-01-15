@@ -21,8 +21,9 @@ class updateObservations extends OdbSuite
                             with UpdateConstraintSetOps {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
 
-  override lazy val validUsers: List[User] = List(pi)
+  override lazy val validUsers: List[User] = List(pi, pi2)
 
   private def oneUpdateTest(
     user:     User,
@@ -34,7 +35,7 @@ class updateObservations extends OdbSuite
     for
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid)
-      _   <- updateObservation(user, pid, oid, update, query, expected)
+      _   <- updateObservation(user, oid, update, query, expected)
     yield ()
 
   private def multiUpdateTest(
@@ -46,7 +47,7 @@ class updateObservations extends OdbSuite
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid)
       _   <- updates.traverse_ { case (update, query, expected) =>
-        updateObservation(user, pid, oid, update, query, expected)
+        updateObservation(user, oid, update, query, expected)
       }
     yield ()
 
@@ -88,6 +89,107 @@ class updateObservations extends OdbSuite
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
       _   <- emptyUpdate(pi)
+    yield ()
+  }
+
+  private def expectedSubtitleUpdate(oids: Observation.Id*): Json =
+    Json.obj(
+      "updateObservations" -> Json.obj(
+        "observations" ->
+          oids.map { oid =>
+            Json.obj(
+              "id" -> oid.asJson,
+              "subtitle" -> "Charles Guiteau".asJson
+            )
+          }.asJson
+      )
+    )
+
+  test("cross program update") {
+    def mutation(oid0: Observation.Id, oid1: Observation.Id) =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              subtitle: "Charles Guiteau"
+            },
+            WHERE: {
+              id: { IN: [ ${oid0.asJson}, ${oid1.asJson} ] }
+            }
+          }) {
+            observations {
+              id
+              subtitle
+            }
+          }
+        }
+      """
+
+    for
+      pid0 <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid0)
+      pid1 <- createProgramAs(pi)
+      oid1 <- createObservationAs(pi, pid1)
+      _    <- expect(pi, mutation(oid0, oid1), expectedSubtitleUpdate(oid0, oid1).asRight)
+    yield ()
+  }
+
+  test("using programId") {
+    def mutation(pid: Program.Id) =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              subtitle: "Charles Guiteau"
+            },
+            WHERE: {
+              programId: {
+                EQ: ${pid.asJson}
+              }
+            }
+          }) {
+            observations {
+              id
+              subtitle
+            }
+          }
+        }
+      """
+
+    for
+      pid <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid)
+      oid1 <- createObservationAs(pi, pid)
+      _    <- expect(pi, mutation(pid), expectedSubtitleUpdate(oid0, oid1).asRight)
+    yield ()
+  }
+
+  test("illegal cross program update") {
+    def mutation(oid0: Observation.Id, oid1: Observation.Id) =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              subtitle: "Charles Guiteau"
+            },
+            WHERE: {
+              id: { IN: [ ${oid0.asJson}, ${oid1.asJson} ] }
+            }
+          }) {
+            observations {
+              id
+              subtitle
+            }
+          }
+        }
+      """
+
+    for
+      pid0 <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid0)
+      pid1 <- createProgramAs(pi2)
+      oid1 <- createObservationAs(pi2, pid1)
+      _    <- expect(pi, mutation(oid0, oid1), expectedSubtitleUpdate(oid0).asRight)
     yield ()
   }
 
@@ -373,7 +475,7 @@ class updateObservations extends OdbSuite
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
       tid <- createTargetAs(pi, pid, "Biff")
-      _   <- updateObservation(pi, pid, oid, update(tid), query, expected(tid))
+      _   <- updateObservation(pi, oid, update(tid), query, expected(tid))
     } yield ()
 
   }
@@ -417,8 +519,8 @@ class updateObservations extends OdbSuite
       t0  <- createTargetAs(pi, pid, "Larry")
       t1  <- createTargetAs(pi, pid, "Curly")
       t2  <- createTargetAs(pi, pid, "Moe")
-      _   <- updateObservation(pi, pid, oid, update(t0, t1), query, expected(t0, t1))
-      _   <- updateObservation(pi, pid, oid, update(t1, t2), query, expected(t1, t2))
+      _   <- updateObservation(pi, oid, update(t0, t1), query, expected(t0, t1))
+      _   <- updateObservation(pi, oid, update(t1, t2), query, expected(t1, t2))
     } yield ()
 
   }
@@ -498,8 +600,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
-      _   <- updateObservation(pi, pid, oid, update2, query, expected2)
+      _   <- updateObservation(pi, oid, update1, query, expected1)
+      _   <- updateObservation(pi, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -570,8 +672,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
-      _   <- updateObservation(pi, pid, oid, update2, query, expected2)
+      _   <- updateObservation(pi, oid, update1, query, expected1)
+      _   <- updateObservation(pi, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -602,7 +704,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, pid, oid, update, query, expected)
+      _   <- updateObservation(pi, oid, update, query, expected)
     } yield ()
 
   }
@@ -840,7 +942,6 @@ class updateObservations extends OdbSuite
       _   <- query(pi, updateObservationsMutation(oid, scienceRequirements.update, scienceRequirements.query))
       _   <- updateObservation(
         user   = pi,
-        pid    = pid,
         oid    = oid,
         update = """
           scienceRequirements: {
@@ -1656,7 +1757,6 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
 
   def updateObservation(
     user:     User,
-    pid:      Program.Id,
     oid:      Observation.Id,
     update:   String,
     query:    String,
