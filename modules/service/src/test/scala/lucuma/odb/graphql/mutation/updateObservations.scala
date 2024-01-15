@@ -52,13 +52,12 @@ class updateObservations extends OdbSuite
 
 
   test("general: update that selects nothing") {
-    def emptyUpdate(user: User, pid: Program.Id): IO[Unit] =
+    def emptyUpdate(user: User): IO[Unit] =
       expect(
         user = user,
         query = s"""
           mutation {
             updateObservations(input: {
-              programId: ${pid.asJson}
               SET: {
                 constraintSet: {
                   cloudExtinction: ONE_POINT_ZERO
@@ -88,7 +87,7 @@ class updateObservations extends OdbSuite
     for
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
-      _   <- emptyUpdate(pi, pid)
+      _   <- emptyUpdate(pi)
     yield ()
   }
 
@@ -838,7 +837,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- query(pi, updateObservationsMutation(pid, oid, scienceRequirements.update, scienceRequirements.query))
+      _   <- query(pi, updateObservationsMutation(oid, scienceRequirements.update, scienceRequirements.query))
       _   <- updateObservation(
         user   = pi,
         pid    = pid,
@@ -1491,13 +1490,12 @@ class updateObservations extends OdbSuite
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
-  def moveObservationsAs(user: User, pid: Program.Id, oids: List[Observation.Id], gid: Option[Group.Id], index: Option[NonNegShort]): IO[Unit] =
+  def moveObservationsAs(user: User, oids: List[Observation.Id], gid: Option[Group.Id], index: Option[NonNegShort]): IO[Unit] =
     query(
       user = user,
       query = s"""
         mutation {
           updateObservations(input: {
-            programId: ${pid.asJson}
             SET: {
               groupId: ${gid.asJson}
               ${index.map(_.value.asJson).foldMap(j => s"groupIndex: $j")}
@@ -1521,7 +1519,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, None, None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), None)
+      _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), None)
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
@@ -1536,7 +1534,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, None, None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(0)))
+      _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(0)))
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
@@ -1552,7 +1550,7 @@ class updateObservations extends OdbSuite
       o2  <- createObservationInGroupAs(pi, pid, None, None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o4  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(1)))
+      _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(1)))
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3), Right(o4)))
@@ -1567,7 +1565,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, None)
+      _   <- moveObservationsAs(pi, List(o2, o3), None, None)
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es.take(2), List(Left(gid), Right(o1)))
@@ -1582,7 +1580,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, Some(NonNegShort.unsafeFrom(0)))
+      _   <- moveObservationsAs(pi, List(o2, o3), None, Some(NonNegShort.unsafeFrom(0)))
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es.take(2).toSet, Set(Right(o2), Right(o3)))
@@ -1597,7 +1595,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, Some(NonNegShort.unsafeFrom(1)))
+      _   <- moveObservationsAs(pi, List(o2, o3), None, Some(NonNegShort.unsafeFrom(1)))
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es(0), Left(gid))
@@ -1614,7 +1612,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, Some(g1), None)
       o2  <- createObservationInGroupAs(pi, pid, Some(g1), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(g1), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), Some(g2), None)
+      _   <- moveObservationsAs(pi, List(o2, o3), Some(g2), None)
       e1  <- groupElementsAs(pi, pid, Some(g1))
       e2  <- groupElementsAs(pi, pid, Some(g2))
     } yield {
@@ -1629,7 +1627,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationAs(pi, pid)
       o2  <- createObservationAs(pi, pid)
       g   <- createGroupAs(pi, pid)
-      _   <- moveObservationsAs(pi, pid, List(o1), Some(g), None)
+      _   <- moveObservationsAs(pi, List(o1), Some(g), None)
     } yield ()
   }
 
@@ -1638,14 +1636,12 @@ class updateObservations extends OdbSuite
 trait UpdateConstraintSetOps { this: OdbSuite =>
 
   def updateObservationsMutation(
-    pid:    Program.Id,
     oid:    Observation.Id,
     update: String,
     query:  String
   ): String = s"""
     mutation {
       updateObservations(input: {
-        programId: ${pid.asJson}
         SET: {
           $update
         },
@@ -1668,7 +1664,7 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
   ): IO[Unit] =
     expect(
       user     = user,
-      query    = updateObservationsMutation(pid, oid, update, query),
+      query    = updateObservationsMutation(oid, update, query),
       expected = expected.leftMap(msg => List(msg))
     )
 

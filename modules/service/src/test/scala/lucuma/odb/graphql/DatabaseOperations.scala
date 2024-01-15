@@ -912,13 +912,12 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
   }
 
-  def moveObservationAs(user: User, pid: Program.Id, oid: Observation.Id, gid: Option[Group.Id]): IO[Unit] =
+  def moveObservationAs(user: User, oid: Observation.Id, gid: Option[Group.Id]): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
           updateObservations(input: {
-            programId: ${pid.asJson}
             SET: {
               groupId: ${gid.asJson}
             }

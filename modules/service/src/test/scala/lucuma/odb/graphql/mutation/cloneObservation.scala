@@ -12,7 +12,6 @@ import io.circe.syntax.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -225,13 +224,12 @@ class cloneObservation extends OdbSuite {
 
   test("cloned observation should always be present/new/active") {
 
-    def updateFields(pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    def updateFields(oid: Observation.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
           mutation {
             updateObservations(input: {
-              programId: ${pid.asJson}
               SET: {
                 existence: ${Existence.Deleted.tag.toUpperCase}
                 status: ${ObsStatus.Observed.tag.toUpperCase}
@@ -272,7 +270,7 @@ class cloneObservation extends OdbSuite {
       for
         pid <- createProgramAs(pi)
         oid <- createObservationAs(pi, pid)
-        _   <- updateFields(pid, oid)
+        _   <- updateFields(oid)
       yield oid
 
     setup.flatMap { oid =>

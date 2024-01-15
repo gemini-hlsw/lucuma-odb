@@ -4128,11 +4128,6 @@ Observation selection and update description.  Use `SET` to specify the changes,
 input UpdateObservationsInput {
 
   """
-  The program whose observations will be updated.
-  """
-  programId: ProgramId!
-
-  """
   Describes the observation values to modify.
   """
   SET: ObservationPropertiesInput!
