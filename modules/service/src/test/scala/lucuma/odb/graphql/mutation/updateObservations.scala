@@ -525,6 +525,55 @@ class updateObservations extends OdbSuite
 
   }
 
+  test("target environment: fail to set an asterism across programs") {
+
+    def updateObservationsMutation(
+      oid0: Observation.Id,
+      oid1: Observation.Id,
+      tids: Target.Id*
+    ): String = s"""
+      mutation {
+        updateObservations(input: {
+          SET: {
+            targetEnvironment: {
+              asterism: [ "${tids.map(_.show).intercalate("\", \"")}" ]
+            }
+          },
+          WHERE: {
+            id: { IN: [ ${oid0.asJson}, ${oid1.asJson} ] }
+          }
+        }) {
+          observations {
+            id
+            targetEnvironment {
+              asterism {
+                id
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(pid: Program.Id, tids: Target.Id*) =
+      List(s"Target(s) ${tids.mkString(", ")} must exist and be associated with Program $pid.").asLeft
+
+    for {
+      pid0 <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid0)
+      pid1 <- createProgramAs(pi)
+      oid1 <- createObservationAs(pi, pid1)
+
+      t0  <- createTargetAs(pi, pid0, "Larry")
+      t1  <- createTargetAs(pi, pid0, "Curly")
+      t2  <- createTargetAs(pi, pid0, "Moe")
+
+      _   <- expect(pi, updateObservationsMutation(oid0, oid1, t0, t1), expected(pid1, t0, t1))
+      _   <- expect(pi, updateObservationsMutation(oid0, oid1, t1, t2), expected(pid1, t1, t2))
+    } yield ()
+
+  }
+
   test("target environment: update explicit ra in observation with existing explicit base") {
 
     val update1 = """
