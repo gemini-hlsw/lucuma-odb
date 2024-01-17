@@ -65,6 +65,7 @@ import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
 
+import java.time.Year
 import scala.util.control.Exception
 import scala.util.matching.Regex
 
@@ -351,14 +352,27 @@ trait Codecs {
       RightAscension.fromAngleExact.reverseGet
     )
 
+  val science_mode: Codec[ScienceMode] =
+    enumerated[ScienceMode](Type.varchar)
+
+  lazy val semester_half: Codec[Half] =
+    enumerated[Half](Type("e_semester_half"))
+
+  lazy val semester_year: Codec[Year] =
+    year.eimap(yr =>
+      Option(yr)
+        .filter(yr => yr.getValue >= 1)
+        .toRight(s"Years prior to year 1 or after ${Year.MAX_VALUE} are not supported.")
+    )(identity)
+
+  lazy val semester: Codec[Semester] =
+    (semester_year *: semester_half).to[Semester]
+
   val sequence_command: Codec[SequenceCommand] =
     enumerated[SequenceCommand](Type("e_sequence_command"))
 
   val sequence_type: Codec[SequenceType] =
     enumerated[SequenceType](Type("e_sequence_type"))
-
-  val science_mode: Codec[ScienceMode] =
-    enumerated[ScienceMode](Type.varchar)
 
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
@@ -461,6 +475,13 @@ trait Codecs {
     )
   }
 
+  val year: Codec[Year] =
+    int4.eimap(yr =>
+      Exception
+        .nonFatalCatch
+        .opt(Year.of(yr))
+        .toRight(s"Year out of range: $yr")
+    )(_.getValue)
 
   // Not so atomic ...
 
