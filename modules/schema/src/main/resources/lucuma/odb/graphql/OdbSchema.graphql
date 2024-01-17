@@ -3097,6 +3097,13 @@ input ProgramPropertiesInput {
   name: NonEmptyString
 
   """
+  The semester associated with the program, if any. If this value is
+  subsequently edited it will result in a new reference, with (likely) a
+  different index.
+  """
+  semester: Semester
+
+  """
   The proposal status, which is both optional and nullable. 
   This cannot be specified on create.
   """
@@ -8369,6 +8376,13 @@ type ScienceRequirementsGroupSelectResult {
   """
   hasMore: Boolean!
 }
+
+"""
+Semester string (from 2000A on) in the format YYYY[AB].  An abbreviated format,
+which assumes the millennium 2000, is also permitted.  For example, 24A is read
+as 2024A.
+"""
+scalar Semester
 
 """
 Sequence-level command

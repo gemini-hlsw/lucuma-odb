@@ -1222,7 +1222,8 @@ class updatePrograms extends OdbSuite {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: SUBMITTED
+                  proposalStatus: SUBMITTED,
+                  semester: "2024B"
                 }
                 WHERE: {
                   id: {
@@ -1358,7 +1359,8 @@ class updatePrograms extends OdbSuite {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: ACCEPTED
+                  proposalStatus: ACCEPTED,
+                  semester: "2024B"
                 }
                 WHERE: {
                   id: {
@@ -1430,7 +1432,8 @@ class updatePrograms extends OdbSuite {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: NOT_ACCEPTED
+                  proposalStatus: NOT_ACCEPTED,
+                  semester: "2024B"
                 }
                 WHERE: {
                   id: {
@@ -1509,7 +1512,8 @@ class updatePrograms extends OdbSuite {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: ACCEPTED
+                  proposalStatus: ACCEPTED,
+                  semester: "2024B"
                 }
                 WHERE: {
                   id: {
@@ -1549,7 +1553,8 @@ class updatePrograms extends OdbSuite {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: NOT_ACCEPTED
+                  proposalStatus: NOT_ACCEPTED,
+                  semester: "2024B"
                 }
                 WHERE: {
                   proposalStatus: {

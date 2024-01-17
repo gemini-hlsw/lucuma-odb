@@ -21,6 +21,10 @@ trait ProgramTable[F[_]] extends BaseMapping[F] {
       val Uncharged = col("c_pts_uncharged", time_span)
       val Execution = col("c_pts_execution", time_span)
     }
+    object ProposalId {
+      val SemesterYear = col("c_semester_year", semester_year)
+      val SemesterHalf = col("c_semester_half", semester_half)
+    }
   }
 
 }
