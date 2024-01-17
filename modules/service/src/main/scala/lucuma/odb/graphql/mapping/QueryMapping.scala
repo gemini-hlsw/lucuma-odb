@@ -19,6 +19,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.WhereDataset
+import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTargetInput
@@ -41,6 +42,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("constraintSetGroup"),
         SqlObject("dataset"),
         SqlObject("datasets"),
+        SqlObject("events"),
         SqlObject("filterTypeMeta"),
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
@@ -62,6 +64,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ConstraintSetGroup,
       Dataset,
       Datasets,
+      Events,
       FilterTypeMeta,
       ObsAttachmentTypeMeta,
       Observation,
@@ -211,6 +214,37 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           }
         }
       }
+
+  private lazy val Events: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    val WhereExecutionEventBinding = WhereExecutionEvent.binding(Path.from(ExecutionEventType))
+    {
+      case (QueryType, "events", List(
+        WhereExecutionEventBinding.Option("WHERE", rWHERE),
+        ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        Elab.transformChild { child =>
+          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
+                  Predicates.executionEvent.observation.program.isVisibleTo(user),
+                  WHERE.getOrElse(True)
+                ))),
+                oss = Some(List(
+                  OrderSelection[lucuma.core.model.ExecutionEvent.Id](ExecutionEventType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+            }
+          }
+        }
+      }
+  }
 
   private lazy val FilterTypeMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "filterTypeMeta", Nil) =>

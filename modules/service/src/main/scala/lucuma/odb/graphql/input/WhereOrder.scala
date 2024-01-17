@@ -13,9 +13,6 @@ import lucuma.odb.graphql.binding._
 
 object WhereOrder {
 
-  // def SimpleBinding[A: Order](name: String, binding: Matcher[A]): Matcher[Predicate] =
-  //   Binding[A](UniquePath[A](List(name)), binding)
-
   def binding[A: Order](path: Path, binding: Matcher[A]): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -42,23 +39,5 @@ object WhereOrder {
             ).flatten)
         }
     }
-
-  // val ObservationId: Matcher[Predicate] =
-  //   ObservationIdWithPath("id")
-
-  // def ObservationIdWithPath(head: String, tail: String*): Matcher[Predicate] =
-  //   Binding(UniquePath[Observation.Id](head :: tail.toList), ObservationIdBinding)
-
-  // val ProgramId: Matcher[Predicate] =
-  //   ProgramIdWithPath("id")
-
-  // def ProgramIdWithPath(head: String, tail: String*): Matcher[Predicate] =
-  //   Binding(UniquePath[Program.Id](head :: tail.toList), ProgramIdBinding)
-
-  // val TargetId: Matcher[Predicate] =
-  //   TargetIdWithPath("id")
-
-  // def TargetIdWithPath(head: String, tail: String*): Matcher[Predicate] =
-  //   Binding(UniquePath[Target.Id](head :: tail.toList), TargetIdBinding)
 
 }
