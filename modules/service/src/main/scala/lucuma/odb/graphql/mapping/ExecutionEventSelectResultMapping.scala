@@ -27,6 +27,9 @@ trait ExecutionEventSelectResultMapping[F[_]]
     val fromExecution: ObjectMapping =
       nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventTable.ObservationId))
 
+    val fromQuery: ObjectMapping =
+      topLevelSelectResultMapping(ExecutionEventSelectResultType)
+
     val fromStepRecord: ObjectMapping =
       nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordView.Id, Join(StepRecordView.Id, ExecutionEventTable.StepId))
 
@@ -37,7 +40,8 @@ trait ExecutionEventSelectResultMapping[F[_]]
       ExecutionEventSelectResultType,
       List(
         DatasetType   / "events" -> fromDataset,
-        ExecutionType / "events" -> fromExecution
+        ExecutionType / "events" -> fromExecution,
+        QueryType / "events" -> fromQuery
       ) ++
       lookupFromStepRecord(fromStepRecord, "events") ++
       lookupFromVisit(fromVisit, "events")
