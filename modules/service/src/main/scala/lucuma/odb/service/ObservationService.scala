@@ -22,6 +22,7 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import grackle.ResultT
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
@@ -89,10 +90,9 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
-    programId: Program.Id,
-    SET:       ObservationPropertiesInput.Edit,
-    which:     AppliedFragment
-  )(using Transaction[F]): F[Result[List[Observation.Id]]]
+    SET:   ObservationPropertiesInput.Edit,
+    which: AppliedFragment
+  )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def cloneObservation(
     input: CloneObservationInput
@@ -152,13 +152,14 @@ object ObservationService {
     new ObservationService[F] {
 
       private def setTimingWindows(
-        rObservationIds: Result[List[Observation.Id]],
+        oids:          List[Observation.Id],
         timingWindows: Option[List[TimingWindowInput]],
       )(using Transaction[F]): F[Result[Unit]] =
-        val rOptF = timingWindows.traverse(timingWindowService.createFunction)
-        (rObservationIds, rOptF).parMapN { (oids, optF) =>
-          optF.fold(().pure[F])( f => f(oids, transaction) )
-        }.sequence
+        timingWindows
+          .traverse(timingWindowService.createFunction)
+          .map { optF =>
+            optF.fold(().pure[F])( f => f(oids, transaction) )
+          }.sequence
 
       override def createObservation(
         programId: Program.Id,
@@ -183,8 +184,8 @@ object ObservationService {
                   }.sequence
 
                 }
-              }.flatTap{ rOid =>
-                setTimingWindows(rOid.map(List(_)), SET.timingWindows)
+              }.flatTap { rOid =>
+                rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
               }.flatMap { rOid =>
                 SET.obsAttachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
@@ -229,12 +230,11 @@ object ObservationService {
       }
 
       private def updateObservingModes(
-        nEdit:           Nullable[ObservingModeInput.Edit],
-        rObservationIds: Result[List[Observation.Id]],
-      )(using Transaction[F]): F[Result[List[Observation.Id]]] =
+        nEdit: Nullable[ObservingModeInput.Edit],
+        oids:  List[Observation.Id],
+      )(using Transaction[F]): F[Result[Unit]] =
 
-        (rObservationIds.toOption, nEdit.toOptionOption).mapN { (oids, oEdit) =>
-
+        nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
             m <- selectObservingModes(oids)
             _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
@@ -265,12 +265,9 @@ object ObservationService {
                   // do nothing
                   Result.unit.pure[F]
               }
-
             }.map(_.sequence.void)
-
           } yield r
-
-        }.fold(rObservationIds.pure[F]) { _.map(_ *> rObservationIds) }
+        }
 
       // Applying the same move to a list of observations will put them all together in the
       // destination group (or at the top level) in no particular order.
@@ -286,33 +283,34 @@ object ObservationService {
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
       override def updateObservations(
-        programId: Program.Id,
-        SET:       ObservationPropertiesInput.Edit,
-        which:     AppliedFragment
-      )(using Transaction[F]): F[Result[List[Observation.Id]]] =
+        SET:   ObservationPropertiesInput.Edit,
+        which: AppliedFragment
+      )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
         Trace[F].span("updateObservation") {
+          val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
+            for {
+              r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
+                      session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
+                        pq.stream(af.argument, chunkSize = 1024).compile.toList
+                      }
+                   })
+              g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
+              u  = g.values.reduceOption(_ ++ _).orEmpty  // ungrouped: List[Observation.Id]
+              _ <- ResultT(updateObservingModes(SET.observingMode, u))
+              _ <- ResultT(setTimingWindows(u, SET.timingWindows.foldPresent(_.orEmpty)))
+              _ <- ResultT(g.toList.traverse { case (pid, oids) =>
+                     obsAttachmentAssignmentService.setAssignments(pid, oids, SET.obsAttachments)
+                   }.map(_.sequence))
+          } yield g
+
           for {
             _ <- session.execute(sql"set constraints all deferred".command)
             _ <- moveObservations(SET.group, SET.groupIndex, which)
-            r <- Statements.updateObservations(SET, which).traverse { af =>
-                    session.prepareR(af.fragment.query(observation_id)).use { pq =>
-                      pq.stream(af.argument, chunkSize = 1024).compile.toList
-                    }
-                  }.flatMap { rObservationIds =>
-                    updateObservingModes(SET.observingMode, rObservationIds)
-                  }.flatTap { rObservationIds =>
-                    setTimingWindows(rObservationIds, SET.timingWindows.foldPresent(_.orEmpty))
-                  }.flatMap { rObservationIds =>
-                    rObservationIds.flatTraverse { oids =>
-                      obsAttachmentAssignmentService
-                        .setAssignments(programId, oids, SET.obsAttachments)
-                        .map(_.map(_ => oids))
-                    }
-                  }.recoverWith {
-                    case SqlState.CheckViolation(ex) =>
-                      Result.failure(constraintViolationMessage(ex)).pure[F]
-                  }
-            _ <- transaction.rollback.unlessA(r.hasValue) // barf if something failed
+            r <- updates.value.recoverWith {
+                   case SqlState.CheckViolation(ex) =>
+                     Result.failure(constraintViolationMessage(ex)).pure[F]
+                 }
+            _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
         }
 
@@ -362,12 +360,12 @@ object ObservationService {
                   input.SET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
                     case Some(s) =>
-                      updateObservations(pid, s, sql"select $observation_id".apply(oid2))
+                      updateObservations(s, sql"select $observation_id".apply(oid2))
                         .map { r =>
                           // We probably don't need to check this return value, but I feel bad not doing it.
-                          r.flatMap {
-                            case List(`oid2`) => Result((pid, oid2))
-                            case other        => Result.failure(s"Observation update: expected [$oid2], found ${other.mkString("[", ",", "]")}")
+                          r.map(_.toList).flatMap {
+                            case List((`pid`, List(`oid2`))) => Result((pid, oid2))
+                            case other                       => Result.failure(s"Observation update: expected ($pid, [$oid2]), found ${other.mkString("[", ",", "]")}")
                           }
                         }
                         .flatTap {
@@ -750,9 +748,14 @@ object ObservationService {
         void"UPDATE t_observation "                                              |+|
           void"SET " |+| us.intercalate(void", ") |+| void" "                    |+|
           void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") " |+|
-          void"RETURNING t_observation.c_observation_id"
+          void"RETURNING t_observation.c_program_id, t_observation.c_observation_id"
 
-      updates(SET).map(_.fold(which)(update))
+      def selectOnly: AppliedFragment =
+        void"SELECT o.c_program_id, o.c_observation_id "             |+|
+          void"FROM t_observation o "                                |+|
+          void"WHERE o.c_observation_id IN (" |+| which |+| void")"
+
+      updates(SET).map(_.fold(selectOnly)(update))
 
     }
 

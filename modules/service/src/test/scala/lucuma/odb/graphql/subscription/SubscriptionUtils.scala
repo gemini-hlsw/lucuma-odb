@@ -55,7 +55,7 @@ trait SubscriptionUtils { self: OdbSuite =>
         json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
       }
 
-  def updateObservation(user: User, subtitle: String, pid: Program.Id, oid: Observation.Id): IO[Unit] =
+  def updateObservation(user: User, subtitle: String, oid: Observation.Id): IO[Unit] =
     sleep >>
       query(
         user    = user,
@@ -63,7 +63,6 @@ trait SubscriptionUtils { self: OdbSuite =>
           s"""
             mutation {
               updateObservations(input: {
-                programId: "${pid.show}",
                 SET: {
                   subtitle: "${subtitle}"
                 },

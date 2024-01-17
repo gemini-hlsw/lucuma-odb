@@ -21,8 +21,9 @@ class updateObservations extends OdbSuite
                             with UpdateConstraintSetOps {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
 
-  override lazy val validUsers: List[User] = List(pi)
+  override lazy val validUsers: List[User] = List(pi, pi2)
 
   private def oneUpdateTest(
     user:     User,
@@ -34,7 +35,7 @@ class updateObservations extends OdbSuite
     for
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid)
-      _   <- updateObservation(user, pid, oid, update, query, expected)
+      _   <- updateObservation(user, oid, update, query, expected)
     yield ()
 
   private def multiUpdateTest(
@@ -46,19 +47,18 @@ class updateObservations extends OdbSuite
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid)
       _   <- updates.traverse_ { case (update, query, expected) =>
-        updateObservation(user, pid, oid, update, query, expected)
+        updateObservation(user, oid, update, query, expected)
       }
     yield ()
 
 
   test("general: update that selects nothing") {
-    def emptyUpdate(user: User, pid: Program.Id): IO[Unit] =
+    def emptyUpdate(user: User): IO[Unit] =
       expect(
         user = user,
         query = s"""
           mutation {
             updateObservations(input: {
-              programId: ${pid.asJson}
               SET: {
                 constraintSet: {
                   cloudExtinction: ONE_POINT_ZERO
@@ -88,7 +88,108 @@ class updateObservations extends OdbSuite
     for
       pid <- createProgramAs(pi)
       _   <- createObservationAs(pi, pid)
-      _   <- emptyUpdate(pi, pid)
+      _   <- emptyUpdate(pi)
+    yield ()
+  }
+
+  private def expectedSubtitleUpdate(oids: Observation.Id*): Json =
+    Json.obj(
+      "updateObservations" -> Json.obj(
+        "observations" ->
+          oids.map { oid =>
+            Json.obj(
+              "id" -> oid.asJson,
+              "subtitle" -> "Charles Guiteau".asJson
+            )
+          }.asJson
+      )
+    )
+
+  test("cross program update") {
+    def mutation(oid0: Observation.Id, oid1: Observation.Id) =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              subtitle: "Charles Guiteau"
+            },
+            WHERE: {
+              id: { IN: [ ${oid0.asJson}, ${oid1.asJson} ] }
+            }
+          }) {
+            observations {
+              id
+              subtitle
+            }
+          }
+        }
+      """
+
+    for
+      pid0 <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid0)
+      pid1 <- createProgramAs(pi)
+      oid1 <- createObservationAs(pi, pid1)
+      _    <- expect(pi, mutation(oid0, oid1), expectedSubtitleUpdate(oid0, oid1).asRight)
+    yield ()
+  }
+
+  test("using programId") {
+    def mutation(pid: Program.Id) =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              subtitle: "Charles Guiteau"
+            },
+            WHERE: {
+              programId: {
+                EQ: ${pid.asJson}
+              }
+            }
+          }) {
+            observations {
+              id
+              subtitle
+            }
+          }
+        }
+      """
+
+    for
+      pid <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid)
+      oid1 <- createObservationAs(pi, pid)
+      _    <- expect(pi, mutation(pid), expectedSubtitleUpdate(oid0, oid1).asRight)
+    yield ()
+  }
+
+  test("illegal cross program update") {
+    def mutation(oid0: Observation.Id, oid1: Observation.Id) =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              subtitle: "Charles Guiteau"
+            },
+            WHERE: {
+              id: { IN: [ ${oid0.asJson}, ${oid1.asJson} ] }
+            }
+          }) {
+            observations {
+              id
+              subtitle
+            }
+          }
+        }
+      """
+
+    for
+      pid0 <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid0)
+      pid1 <- createProgramAs(pi2)
+      oid1 <- createObservationAs(pi2, pid1)
+      _    <- expect(pi, mutation(oid0, oid1), expectedSubtitleUpdate(oid0).asRight)
     yield ()
   }
 
@@ -374,7 +475,7 @@ class updateObservations extends OdbSuite
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
       tid <- createTargetAs(pi, pid, "Biff")
-      _   <- updateObservation(pi, pid, oid, update(tid), query, expected(tid))
+      _   <- updateObservation(pi, oid, update(tid), query, expected(tid))
     } yield ()
 
   }
@@ -418,8 +519,57 @@ class updateObservations extends OdbSuite
       t0  <- createTargetAs(pi, pid, "Larry")
       t1  <- createTargetAs(pi, pid, "Curly")
       t2  <- createTargetAs(pi, pid, "Moe")
-      _   <- updateObservation(pi, pid, oid, update(t0, t1), query, expected(t0, t1))
-      _   <- updateObservation(pi, pid, oid, update(t1, t2), query, expected(t1, t2))
+      _   <- updateObservation(pi, oid, update(t0, t1), query, expected(t0, t1))
+      _   <- updateObservation(pi, oid, update(t1, t2), query, expected(t1, t2))
+    } yield ()
+
+  }
+
+  test("target environment: fail to set an asterism across programs") {
+
+    def updateObservationsMutation(
+      oid0: Observation.Id,
+      oid1: Observation.Id,
+      tids: Target.Id*
+    ): String = s"""
+      mutation {
+        updateObservations(input: {
+          SET: {
+            targetEnvironment: {
+              asterism: [ "${tids.map(_.show).intercalate("\", \"")}" ]
+            }
+          },
+          WHERE: {
+            id: { IN: [ ${oid0.asJson}, ${oid1.asJson} ] }
+          }
+        }) {
+          observations {
+            id
+            targetEnvironment {
+              asterism {
+                id
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(pid: Program.Id, tids: Target.Id*) =
+      List(s"Target(s) ${tids.mkString(", ")} must exist and be associated with Program $pid.").asLeft
+
+    for {
+      pid0 <- createProgramAs(pi)
+      oid0 <- createObservationAs(pi, pid0)
+      pid1 <- createProgramAs(pi)
+      oid1 <- createObservationAs(pi, pid1)
+
+      t0  <- createTargetAs(pi, pid0, "Larry")
+      t1  <- createTargetAs(pi, pid0, "Curly")
+      t2  <- createTargetAs(pi, pid0, "Moe")
+
+      _   <- expect(pi, updateObservationsMutation(oid0, oid1, t0, t1), expected(pid1, t0, t1))
+      _   <- expect(pi, updateObservationsMutation(oid0, oid1, t1, t2), expected(pid1, t1, t2))
     } yield ()
 
   }
@@ -499,8 +649,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
-      _   <- updateObservation(pi, pid, oid, update2, query, expected2)
+      _   <- updateObservation(pi, oid, update1, query, expected1)
+      _   <- updateObservation(pi, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -571,8 +721,8 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, pid, oid, update1, query, expected1)
-      _   <- updateObservation(pi, pid, oid, update2, query, expected2)
+      _   <- updateObservation(pi, oid, update1, query, expected1)
+      _   <- updateObservation(pi, oid, update2, query, expected2)
     } yield ()
 
   }
@@ -603,7 +753,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, pid, oid, update, query, expected)
+      _   <- updateObservation(pi, oid, update, query, expected)
     } yield ()
 
   }
@@ -838,10 +988,9 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- query(pi, updateObservationsMutation(pid, oid, scienceRequirements.update, scienceRequirements.query))
+      _   <- query(pi, updateObservationsMutation(oid, scienceRequirements.update, scienceRequirements.query))
       _   <- updateObservation(
         user   = pi,
-        pid    = pid,
         oid    = oid,
         update = """
           scienceRequirements: {
@@ -1491,13 +1640,12 @@ class updateObservations extends OdbSuite
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
-  def moveObservationsAs(user: User, pid: Program.Id, oids: List[Observation.Id], gid: Option[Group.Id], index: Option[NonNegShort]): IO[Unit] =
+  def moveObservationsAs(user: User, oids: List[Observation.Id], gid: Option[Group.Id], index: Option[NonNegShort]): IO[Unit] =
     query(
       user = user,
       query = s"""
         mutation {
           updateObservations(input: {
-            programId: ${pid.asJson}
             SET: {
               groupId: ${gid.asJson}
               ${index.map(_.value.asJson).foldMap(j => s"groupIndex: $j")}
@@ -1521,7 +1669,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, None, None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), None)
+      _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), None)
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
@@ -1536,7 +1684,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, None, None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(0)))
+      _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(0)))
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
@@ -1552,7 +1700,7 @@ class updateObservations extends OdbSuite
       o2  <- createObservationInGroupAs(pi, pid, None, None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o4  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(1)))
+      _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(1)))
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
       assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3), Right(o4)))
@@ -1567,7 +1715,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, None)
+      _   <- moveObservationsAs(pi, List(o2, o3), None, None)
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es.take(2), List(Left(gid), Right(o1)))
@@ -1582,7 +1730,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, Some(NonNegShort.unsafeFrom(0)))
+      _   <- moveObservationsAs(pi, List(o2, o3), None, Some(NonNegShort.unsafeFrom(0)))
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es.take(2).toSet, Set(Right(o2), Right(o3)))
@@ -1597,7 +1745,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, None, None)
       o2  <- createObservationInGroupAs(pi, pid, Some(gid), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(gid), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), None, Some(NonNegShort.unsafeFrom(1)))
+      _   <- moveObservationsAs(pi, List(o2, o3), None, Some(NonNegShort.unsafeFrom(1)))
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es(0), Left(gid))
@@ -1614,7 +1762,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationInGroupAs(pi, pid, Some(g1), None)
       o2  <- createObservationInGroupAs(pi, pid, Some(g1), None)
       o3  <- createObservationInGroupAs(pi, pid, Some(g1), None)
-      _   <- moveObservationsAs(pi, pid, List(o2, o3), Some(g2), None)
+      _   <- moveObservationsAs(pi, List(o2, o3), Some(g2), None)
       e1  <- groupElementsAs(pi, pid, Some(g1))
       e2  <- groupElementsAs(pi, pid, Some(g2))
     } yield {
@@ -1629,7 +1777,7 @@ class updateObservations extends OdbSuite
       o1  <- createObservationAs(pi, pid)
       o2  <- createObservationAs(pi, pid)
       g   <- createGroupAs(pi, pid)
-      _   <- moveObservationsAs(pi, pid, List(o1), Some(g), None)
+      _   <- moveObservationsAs(pi, List(o1), Some(g), None)
     } yield ()
   }
 
@@ -1638,14 +1786,12 @@ class updateObservations extends OdbSuite
 trait UpdateConstraintSetOps { this: OdbSuite =>
 
   def updateObservationsMutation(
-    pid:    Program.Id,
     oid:    Observation.Id,
     update: String,
     query:  String
   ): String = s"""
     mutation {
       updateObservations(input: {
-        programId: ${pid.asJson}
         SET: {
           $update
         },
@@ -1660,7 +1806,6 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
 
   def updateObservation(
     user:     User,
-    pid:      Program.Id,
     oid:      Observation.Id,
     update:   String,
     query:    String,
@@ -1668,7 +1813,7 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
   ): IO[Unit] =
     expect(
       user     = user,
-      query    = updateObservationsMutation(pid, oid, update, query),
+      query    = updateObservationsMutation(oid, update, query),
       expected = expected.leftMap(msg => List(msg))
     )
 

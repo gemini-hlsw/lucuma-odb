@@ -597,13 +597,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
   private def observationIdSelect(
-    programId:      Program.Id,
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
   ): Result[AppliedFragment] = {
     val whereObservation: Predicate =
       and(List(
-        Predicates.observation.program.id.eql(programId),
         Predicates.observation.program.isWritableBy(user),
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
         WHERE.getOrElse(True)
@@ -619,7 +617,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
 
         val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+          observationIdSelect(input.includeDeleted, input.WHERE)
 
         val selectObservations: F[Result[(List[Observation.Id], Query)]] =
           idSelect.traverse { which =>
@@ -695,33 +693,33 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
 
         val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.programId, input.includeDeleted, input.WHERE)
+          observationIdSelect(input.includeDeleted, input.WHERE)
 
-        val updateObservations: F[Result[(List[Observation.Id], Query)]] =
+        val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
           idSelect.flatTraverse { which =>
             observationService
-              .updateObservations(input.programId, input.SET, which)
+              .updateObservations(input.SET, which)
               .map { r =>
-                r.flatMap { oids =>
-                  observationResultSubquery(oids, input.LIMIT, child)
-                    .tupleLeft(oids)
+                r.flatMap { m =>
+                  val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
+                  observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
                 }
               }
           }
 
-        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-          NonEmptyList.fromList(oids).traverse { os =>
-            asterismService.setAsterism(input.programId, os, input.asterism)
-          }.map(_.getOrElse(Result.unit))
+        def setAsterisms(m: Map[Program.Id, List[Observation.Id]]): F[Result[Unit]] =
+          m.toList.traverse { case (pid, oids) =>
+            NonEmptyList.fromList(oids).fold(Result.unit.pure[F]) { os =>
+              asterismService.setAsterism(pid, os, input.asterism)
+            }
+          }.map(_.sequence.void)
 
-        for {
-          rTup  <- updateObservations
-          oids   = rTup.toList.flatMap(_._1)
-          rUnit <- setAsterisms(oids)
-          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-          _     <- transaction.rollback.unlessA(query.hasValue)
-        } yield query
+        val r = for {
+          tup <- ResultT(updateObservations)
+          _   <- ResultT(setAsterisms(tup._1))
+        } yield tup._2
 
+        r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
       }
     }
 
