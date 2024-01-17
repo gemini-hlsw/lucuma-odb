@@ -14,6 +14,7 @@ import grackle.ResultT
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
@@ -116,6 +117,8 @@ object ProgramService {
         s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid."
       case NoProposalForStatusChange(pid)                =>
         s"Proposal status in program $pid cannot be changed because it has no proposal."
+      case NoSemesterForSubmittedProposal(pid)           =>
+        s"Program $pid is submitted but not associated with any semester."
 
     def failure = Result.failure(message)
   }
@@ -126,6 +129,7 @@ object ProgramService {
     case class NotAuthorizedNewProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
     case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
+    case class NoSemesterForSubmittedProposal(pid: Program.Id) extends UpdateProgramsError
   }
 
   /**
@@ -137,7 +141,8 @@ object ProgramService {
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None))
+          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
+
           session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
             SETʹ.proposal.traverse { proposalInput =>
               proposalService.insertProposal(proposalInput, pid)
@@ -209,10 +214,12 @@ object ProgramService {
         val checkCurrentProposalStatus: F[Result[Unit]] =
           session.prepareR(Statements.getTempTableData).use(
             _.stream(Void, chunkSize = 1024)
-              .fold(Result.unit){ case (acc, (pid, psTag, hasProposal)) => 
+              .fold(Result.unit){ case (acc, (pid, semester, psTag, hasProposal)) =>
                 val check: Result[Unit] =
                   for {
                     ps <- tagToProposalStatus(psTag)
+                    _  <- if (ps === enumsVal.ProposalStatus.NotSubmitted || semester.isDefined) Result.unit
+                          else UpdateProgramsError.NoSemesterForSubmittedProposal(pid).failure
                     _  <- if (hasProposal) Result.unit
                           else UpdateProgramsError.NoProposalForStatusChange(pid).failure
                     _  <- if (userCanChangeProposalStatus(ps)) Result.unit
@@ -261,29 +268,47 @@ object ProgramService {
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""
-        CREATE TEMPORARY TABLE t_program_update (c_program_id, c_proposal_status, c_has_proposal)
+        CREATE TEMPORARY TABLE t_program_update (
+          c_program_id,
+          c_semester_year,
+          c_semester_half,
+          c_proposal_status,
+          c_has_proposal
+        )
         ON COMMIT DROP
-          AS SELECT which.pid, prog.c_proposal_status, prop.c_program_id IS NOT NULL
-        FROM (""" |+| whichProgramIds |+| void""") as which (pid)
+          AS SELECT
+            which.pid,
+            prog.c_semester_year,
+            prog.c_semester_half,
+            prog.c_proposal_status,
+            prop.c_program_id IS NOT NULL
+        FROM (""" |+| whichProgramIds |+| void""") AS which (pid)
         INNER JOIN t_program prog
           ON prog.c_program_id = which.pid
         LEFT JOIN t_proposal prop
           ON prop.c_program_id = which.pid
       """
 
-    def getTempTableData: Query[Void, (Program.Id, Tag, Boolean)] =
+    def getTempTableData: Query[Void, (Program.Id, Option[Semester], Tag, Boolean)] =
       sql"""
-        SELECT c_program_id, c_proposal_status, c_has_proposal
+        SELECT
+           c_program_id,
+           c_semester_year,
+           c_semester_half,
+           c_proposal_status,
+           c_has_proposal
         FROM t_program_update
         ORDER BY c_program_id
-      """.query(program_id *: tag *: bool)
+      """.query(program_id *: semester.opt *: tag *: bool)
 
     def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
           SET.name.map(sql"c_name = $text_nonempty"),
-          SET.proposalStatus.map(sql"c_proposal_status = $tag")
+          SET.proposalStatus.map(sql"c_proposal_status = $tag"),
+          SET.semester.fold(void"c_semester_year = null".some, none, s => sql"c_semester_year = $semester_year"(s.year).some),
+          SET.semester.fold(void"c_semester_half = null".some, none, s => sql"c_semester_half = $semester_half"(s.half).some)
         ).flatten
       )
 
