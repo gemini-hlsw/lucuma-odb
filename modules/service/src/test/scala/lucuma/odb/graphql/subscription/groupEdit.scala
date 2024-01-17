@@ -431,7 +431,7 @@ class groupEdit extends OdbSuite {
               pid <- createProgramAs(pi)
               gid <- createGroupAs(pi, pid, None, None, None)
               oid <- createObservationAs(pi, pid)
-              _   <- moveObservationAs(pi, pid, oid, Some(gid))
+              _   <- moveObservationAs(pi, oid, Some(gid))
               _   <- d.complete((pid, gid))
             } yield ()
           ),
@@ -507,7 +507,7 @@ class groupEdit extends OdbSuite {
               pid <- createProgramAs(pi)
               gid <- createGroupAs(pi, pid, None, None, None)
               oid <- createObservationAs(pi, pid)
-              _   <- moveObservationAs(pi, pid, oid, Some(gid))
+              _   <- moveObservationAs(pi, oid, Some(gid))
               _   <- d.complete((pid, gid))
             } yield ()
           ),

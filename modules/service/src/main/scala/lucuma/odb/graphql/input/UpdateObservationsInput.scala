@@ -10,13 +10,11 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Path
 import grackle.Predicate
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding._
 
 final case class UpdateObservationsInput(
-  programId:      Program.Id,
   SET:            ObservationPropertiesInput.Edit,
   WHERE:          Option[Predicate],
   LIMIT:          Option[NonNegInt],
@@ -34,13 +32,12 @@ object UpdateObservationsInput {
     val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rPid),
         ObservationPropertiesInput.Edit.Binding("SET", rSET),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
-        (rPid, rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
+        (rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
     }
   }
 
