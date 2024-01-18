@@ -14,9 +14,9 @@ import lucuma.odb.data.ObservingModeType
 
 class recordVisit extends OdbSuite {
 
-  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(staff)
+  override lazy val validUsers: List[User] = List(service)
 
   private def recordVisitTest(
     mode:     ObservingModeType,
@@ -35,7 +35,7 @@ class recordVisit extends OdbSuite {
 
     recordVisitTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       oid => s"""
         mutation {
           recordGmosNorthVisit(input: {
@@ -75,7 +75,7 @@ class recordVisit extends OdbSuite {
 
     recordVisitTest(
       ObservingModeType.GmosSouthLongSlit,
-      staff,
+      service,
       oid => s"""
         mutation {
           recordGmosSouthVisit(input: {
@@ -115,7 +115,7 @@ class recordVisit extends OdbSuite {
 
     recordVisitTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       oid => s"""
         mutation {
           recordGmosSouthVisit(input: {

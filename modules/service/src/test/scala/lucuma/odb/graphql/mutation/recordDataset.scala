@@ -20,9 +20,9 @@ import lucuma.odb.data.ObservingModeType
 
 class recordDataset extends OdbSuite {
 
-  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(staff)
+  override lazy val validUsers: List[User] = List(service)
 
   private def setup(
     mode: ObservingModeType,
@@ -51,7 +51,7 @@ class recordDataset extends OdbSuite {
   test("recordDataset") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       sid => s"""
         mutation {
           recordDataset(input: {
@@ -97,7 +97,7 @@ class recordDataset extends OdbSuite {
   test("recordDataset - init QA state") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       sid => s"""
         mutation {
           recordDataset(input: {
@@ -144,7 +144,7 @@ class recordDataset extends OdbSuite {
   test("recordDataset - reused filename") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       sid => s"""
         mutation {
           recordDataset(input: {
@@ -165,7 +165,7 @@ class recordDataset extends OdbSuite {
   test("recordDataset - unkown step id") {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       sid => s"""
         mutation {
           recordDataset(input: {

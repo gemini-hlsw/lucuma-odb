@@ -4,9 +4,7 @@
 package lucuma.odb.service
 
 import cats.syntax.either.*
-import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Service
-import lucuma.core.model.Access.Staff
 import lucuma.core.model.User
 
 import Services.Syntax.*
@@ -15,8 +13,8 @@ trait ExecutionUserCheck {
 
   def checkUser[F[_], A](f: User => A)(using Services[F]): Either[A, Unit] =
     user.role.access match {
-      case Admin | Service | Staff => ().asRight
-      case _                       => /*f(user).asLeft*/ ().asRight // for now
+      case Service => ().asRight // TODO: should specifically be the observe service user, whose name should be passed in the app config
+      case _       => f(user).asLeft
     }
 
 }

@@ -119,6 +119,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
 
   def recordAll(
     user: User,
+    serviceUser: User, // user who actually creates the observing events
     mode: ObservingModeType,
     offset: Int       = 0,
     visitCount: Int   = 1,
@@ -130,7 +131,7 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
     for {
       pid   <- createProgramAs(user)
       oid   <- createObservationAs(user, pid, mode.some)
-      vs    <- (0 until setup.visitCount).toList.traverse { v => recordVisit(mode, setup, user, oid, v) }
+      vs    <- (0 until setup.visitCount).toList.traverse { v => recordVisit(mode, setup, serviceUser, oid, v) }
     } yield ObservationNode(oid, vs)
   }
 
