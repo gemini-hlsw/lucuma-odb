@@ -19,6 +19,7 @@ trait DatasetSetupOperations extends DatabaseOperations { this: OdbSuite =>
   def recordDatasets(
     mode: ObservingModeType,
     user: User,
+    service: User,
     offset: Int = 0,
     stepCount: Int = 3,
     datasetsPerStep: Int = 2
@@ -26,12 +27,12 @@ trait DatasetSetupOperations extends DatabaseOperations { this: OdbSuite =>
     for {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid)
       ids <- (0 until stepCount).toList.traverse { x =>
-        recordStepAs(user, mode.instrument, aid).flatMap { sid =>
+        recordStepAs(service, mode.instrument, aid).flatMap { sid =>
           (0 until datasetsPerStep).toList.traverse { y =>
-            recordDatasetAs(user, sid, f"N18630101S${offset + x * datasetsPerStep + y + 1}%04d.fits")
+            recordDatasetAs(service, sid, f"N18630101S${offset + x * datasetsPerStep + y + 1}%04d.fits")
           }.tupleLeft(sid)
         }
       }

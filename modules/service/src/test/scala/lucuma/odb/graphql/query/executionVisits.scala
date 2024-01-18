@@ -27,7 +27,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("observation -> execution -> visits") {
-    recordAll(pi, mode, offset = 0, visitCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 0, visitCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -61,7 +61,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> datasets") {
-    recordAll(pi, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -105,7 +105,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> events") {
-    recordAll(pi, mode, offset = 200, visitCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 200, visitCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -149,7 +149,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> atomRecords") {
-    recordAll(pi, mode, offset = 300, visitCount = 2, atomCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 300, visitCount = 2, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -196,7 +196,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
     offset:       Int,
     matchesQuery: String
   ): IO[Unit] =
-    recordAll(pi, mode, offset = offset).flatMap { on =>
+    recordAll(pi, service, mode, offset = offset).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -272,7 +272,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> excution -> visits -> interval") {
-    recordAll(pi, mode, offset = 550, visitCount = 2, atomCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 550, visitCount = 2, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {

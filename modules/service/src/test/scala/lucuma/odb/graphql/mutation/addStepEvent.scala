@@ -17,9 +17,9 @@ import lucuma.odb.data.ObservingModeType
 
 class addStepEvent extends OdbSuite {
 
-  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(staff)
+  override lazy val validUsers: List[User] = List(service)
 
   private def recordStep(
     mode: ObservingModeType,
@@ -69,7 +69,7 @@ class addStepEvent extends OdbSuite {
 
     addStepEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       sid => query(sid),
       (oid, sid) => json"""
       {
@@ -109,7 +109,7 @@ class addStepEvent extends OdbSuite {
 
     addStepEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       _ => query,
       (_, _) => s"Step 's-cfebc981-db7e-4c35-964d-6b19aa5ed2d7' not found".asLeft
     )

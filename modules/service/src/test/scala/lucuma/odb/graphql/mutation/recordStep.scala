@@ -21,9 +21,9 @@ import lucuma.odb.data.ObservingModeType
 
 class recordStep extends OdbSuite {
 
-  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(staff)
+  override lazy val validUsers: List[User] = List(service)
 
   private def recordVisitAndAtom(
     mode: ObservingModeType,
@@ -51,7 +51,7 @@ class recordStep extends OdbSuite {
   test("recordStep - GmosNorth") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -136,7 +136,7 @@ class recordStep extends OdbSuite {
   test("recordStep - GmosSouth") {
     recordStepTest(
       ObservingModeType.GmosSouthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosSouthStep(input: {
@@ -221,7 +221,7 @@ class recordStep extends OdbSuite {
   test("recordStep - mix up") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosSouthStep(input: {
@@ -268,7 +268,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -332,7 +332,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -398,7 +398,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -457,7 +457,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -498,7 +498,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -544,7 +544,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -588,7 +588,7 @@ class recordStep extends OdbSuite {
   test("recordStep - stepConfig Science") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
@@ -651,7 +651,7 @@ class recordStep extends OdbSuite {
 
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       aid => s"""
         mutation {
           recordGmosNorthStep(input: {
