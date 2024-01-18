@@ -24,9 +24,9 @@ import lucuma.odb.data.ObservingModeType
 class addDatasetEvent extends OdbSuite {
 
   val mode: ObservingModeType = ObservingModeType.GmosNorthLongSlit
-  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(staff)
+  override lazy val validUsers: List[User] = List(service)
 
   private def recordDataset(
     mode: ObservingModeType,
@@ -78,7 +78,7 @@ class addDatasetEvent extends OdbSuite {
 
     addDatasetEventTest(
       mode,
-      staff,
+      service,
       "N18630101S0001.fits",
       did => query(did),
       (oid, did) => json"""
@@ -123,7 +123,7 @@ class addDatasetEvent extends OdbSuite {
 
     addDatasetEventTest(
       mode,
-      staff,
+      service,
       "N18630101S0002.fits",
       did => query(did),
       (oid, did) => json"""
@@ -164,7 +164,7 @@ class addDatasetEvent extends OdbSuite {
 
     addDatasetEventTest(
       mode,
-      staff,
+      service,
       "N18630101S0003.fits",
       _ => query,
       (_, _) => s"Dataset 'd-1863' not found".asLeft
@@ -174,7 +174,7 @@ class addDatasetEvent extends OdbSuite {
 
   private def addEvent(did: Dataset.Id, stage: DatasetStage): IO[Timestamp] =
     query(
-      staff,
+      service,
       s"""
         mutation {
           addDatasetEvent(input: {
@@ -193,7 +193,7 @@ class addDatasetEvent extends OdbSuite {
 
   private def timestamps(did: Dataset.Id): IO[Option[TimestampInterval]] =
     query(
-      staff,
+      service,
       s"""
         query {
           dataset(datasetId: "$did") {
@@ -220,7 +220,7 @@ class addDatasetEvent extends OdbSuite {
       }
 
     for {
-      ids <- recordDataset(mode, staff, file)
+      ids <- recordDataset(mode, service, file)
       (oid, did) = ids
       es  <- stages.toList.traverse(addEvent(did, _))
       ex   = expected(es).mapN { (s, e) => TimestampInterval.between(s, e) }

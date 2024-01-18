@@ -18,8 +18,6 @@ import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.graphql.mapping.CreateGroupResultMapping
-import lucuma.odb.graphql.mapping.UpdateObservationsResultMapping
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
@@ -37,8 +35,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.io.AnsiColor
 import scala.io.Source
-
-import mapping.RedeemUserInvitationResultMapping
 
 object OdbMapping {
 

@@ -68,14 +68,14 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
 
   test("qaState - unset") {
-    recordAll(pi, mode, offset = 0, datasetCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 0, datasetCount = 2).flatMap { on =>
       expect(pi, qaQuery(on), qaExpected(none))
     }
   }
 
   test("qaState - one set") {
     for {
-      on <- recordAll(pi, mode, offset = 10, datasetCount = 2)
+      on <- recordAll(pi, service, mode, offset = 10, datasetCount = 2)
       _  <- setQaState(pi, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0011.fits")
       _  <- expect(pi, qaQuery(on), qaExpected(DatasetQaState.Usable.some))
     } yield ()
@@ -83,7 +83,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
   test("qaState - two set") {
     for {
-      on <- recordAll(pi, mode, offset = 20, datasetCount = 2)
+      on <- recordAll(pi, service, mode, offset = 20, datasetCount = 2)
       _  <- setQaState(pi, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0021.fits")
       _  <- setQaState(pi, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0022.fits")
       _  <- expect(pi, qaQuery(on), qaExpected(DatasetQaState.Usable.some))
@@ -117,7 +117,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
       """.asRight
 
     for {
-      on <- recordAll(pi, mode, offset = 30, stepCount = 2, datasetCount = 2)
+      on <- recordAll(pi, service, mode, offset = 30, stepCount = 2, datasetCount = 2)
       _  <- setQaState(pi, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0031.fits")
       _  <- setQaState(pi, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0032.fits")
       _  <- setQaState(pi, DatasetQaState.Fail,   s"${DatasetFilenamePrefix}0033.fits")

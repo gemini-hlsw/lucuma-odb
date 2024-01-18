@@ -23,7 +23,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("simple datasets selection") {
-    recordDatasets(mode, pi, 0, 2, 3).flatMap {
+    recordDatasets(mode, pi, service, 0, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           query {
@@ -55,7 +55,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("OFFSET, LIMIT, hasMore") {
-    recordDatasets(mode, pi, 6, 2, 3).flatMap {
+    recordDatasets(mode, pi, service, 6, 2, 3).flatMap {
       case (_, steps) =>
         val q = s"""
           query {
@@ -90,7 +90,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("dataset selection") {
-    recordDatasets(mode, pi, 12, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 12, 1, 3).flatMap {
       case (oid, List((_, List(_, did, _)))) =>
         val q = s"""
           query {
@@ -122,7 +122,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("observation selection") {
-    recordDatasets(mode, pi, 15, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 15, 1, 3).flatMap {
       case (oid, _) =>
         val q = s"""
           query {
@@ -151,7 +151,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("step selection") {
-    recordDatasets(mode, pi, 18, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 18, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -184,7 +184,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("step and index selection") {
-    recordDatasets(mode, pi, 21, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 21, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -217,7 +217,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("filename") {
-    recordDatasets(mode, pi, 24, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 24, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -255,7 +255,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("qaState") {
-    recordDatasets(mode, pi, 27, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 27, 1, 3).flatMap {
       case (oid, List((sid, _))) =>
         val q = s"""
           query {
@@ -290,7 +290,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("pi cannot select someone else's dataset") {
-    recordDatasets(mode, pi, 30, 1, 1).flatMap {
+    recordDatasets(mode, pi, service, 30, 1, 1).flatMap {
       case _ =>
         val q = s"""
           query {
@@ -316,7 +316,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
   }
 
   test("query via `observation` -> `execution` -> `datasets`") {
-    recordDatasets(mode, pi, 31, 1, 3).flatMap {
+    recordDatasets(mode, pi, service, 31, 1, 3).flatMap {
       case (oid, _) =>
         val q = s"""
           query {
