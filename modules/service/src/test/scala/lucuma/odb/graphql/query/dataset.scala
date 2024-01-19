@@ -24,7 +24,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("pi can select thier own dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 0, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 0, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
@@ -50,7 +50,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
   }
 
   test("empty interval when not complete") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 100, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 100, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {
@@ -79,10 +79,10 @@ class dataset extends OdbSuite with DatasetSetupOperations {
 
   test("dataset interval") {
     val f = for {
-      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 200, 1, 1)
+      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 200, 1, 1)
       (_, List((_, List(did)))) = ds
-      s  <- addDatasetEventAs(pi, did, DatasetStage.StartObserve)
-      e  <- addDatasetEventAs(pi, did, DatasetStage.EndWrite)
+      s  <- addDatasetEventAs(service, did, DatasetStage.StartObserve)
+      e  <- addDatasetEventAs(service, did, DatasetStage.EndWrite)
     } yield (did, TimestampInterval.between(s.received, e.received))
 
     f.flatMap { (did, inv) =>
@@ -117,7 +117,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
   }
 
   test("pi cannot select someone else's dataset") {
-    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, 300, 1, 1).flatMap {
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 300, 1, 1).flatMap {
       case (oid, List((_, List(did)))) =>
         val q = s"""
           query {

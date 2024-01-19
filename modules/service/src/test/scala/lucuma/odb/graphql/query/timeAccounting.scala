@@ -50,6 +50,7 @@ import java.time.Month
 class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =>
 
   val pi         = TestUsers.Standard.pi(1, 30)
+  val service    = TestUsers.service(2)
   val mode       = ObservingModeType.GmosSouthLongSlit
 
   val EventId    = ExecutionEvent.Id.fromLong(1).get  // we'll just share one
@@ -72,7 +73,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       NonEmptyString.from(s).toOption
   }
 
-  val validUsers = List(pi).toList
+  val validUsers = List(pi, service)
 
   def invoiceQuery(oid: Observation.Id): String =
     s"""
@@ -278,6 +279,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   def recordVisit(
     user:         User,
+    serviceUser:  User,
     mode:         ObservingModeType,
     when:         Timestamp,
     atomCount:    Int,
@@ -289,7 +291,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     for {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
-      v   <- recordVisitForObs(pid, oid, user, mode, when, atomCount, stepCount, datasetCount, idx)
+      v   <- recordVisitForObs(pid, oid, serviceUser, mode, when, atomCount, stepCount, datasetCount, idx)
     } yield v
 
   def recordVisitForObs(
@@ -385,7 +387,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     events.traverse(_.fold(insertSequenceEvent, insertStepEvent, insertDatasetEvent)).void
 
   test("timeChargeInvoice (no events)") {
-    recordVisit(pi, mode, visitTime, 1, 1, 1, 0).flatMap { v =>
+    recordVisit(pi, service, mode, visitTime, 1, 1, 1, 0).flatMap { v =>
       expect(pi, invoiceQuery(v.oid), invoiceExected(TimeCharge.Invoice.Empty, Nil))
     }
   }
@@ -405,7 +407,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 100)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 100)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
@@ -436,7 +438,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, List(daylightEntry), expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 200)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
@@ -466,7 +468,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice      = TimeCharge.Invoice(expExecution, List(noDataEntry), CategorizedTime.Zero)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 0, 0, 250)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 0, 0, 250)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
@@ -510,7 +512,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     def invoice(v: VisitNode) = TimeCharge.Invoice(expExecution, List(qaEntry(v)), expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 2, 1, 1, 300)
+      v <- recordVisit(pi, service, mode, visitTime, 2, 1, 1, 300)
       es = events(v)
       _ <- insertEvents(es)
       _ <- updateDatasets(pi, DatasetQaState.Fail, v.atoms.last.steps.head.dids)
@@ -538,7 +540,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, index)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, index)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
@@ -597,7 +599,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".comment)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 900)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 900)
       _ <- addTimeChargeCorrection(pi, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
@@ -610,7 +612,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "add".comment)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1000)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1000)
       _ <- addTimeChargeCorrection(pi, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
@@ -645,7 +647,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("observation timeCharge, empty observation") {
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1100)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1100)
       _ <- expect(pi, observationQuery(v.oid), observationExpectedCharge(CategorizedTime.Zero))
     } yield ()
   }
@@ -662,7 +664,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1200)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
@@ -690,14 +692,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
 
     for {
-      v0 <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1300)
+      v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1300)
       pid = v0.pid
       oid = v0.oid
       es0 = events0.map { (c, t) => SequenceEvent(EventId, t, oid, v0.vid, c) }
       _ <- insertEvents(es0)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
-      v1 <- recordVisitForObs(pid, oid, pi, mode, t2, 1, 1, 1, 1301)
+      v1 <- recordVisitForObs(pid, oid, service, mode, t2, 1, 1, 1, 1301)
       es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
       _ <- insertEvents(es1)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
@@ -727,14 +729,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, TimeSpan.Max, "add max".comment)
 
     for {
-      v0 <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1400)
+      v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1400)
       pid = v0.pid
       oid = v0.oid
       es0 = events0.map { (c, t) => SequenceEvent(EventId, t, oid, v0.vid, c) }
       _ <- insertEvents(es0)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
-      v1 <- recordVisitForObs(pid, oid, pi, mode, t2, 1, 1, 1, 1401)
+      v1 <- recordVisitForObs(pid, oid, service, mode, t2, 1, 1, 1, 1401)
       es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
       _ <- insertEvents(es1)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
@@ -787,7 +789,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
 
     for {
-      v <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1500)
+      v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1500)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
@@ -815,7 +817,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     for {
       // Obs0
-      v0  <- recordVisit(pi, mode, visitTime, 1, 1, 1, 1600)
+      v0  <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1600)
       pid  = v0.pid
       oid0 = v0.oid
       es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
@@ -824,7 +826,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
       // Obs1
       oid1 <- createObservationAs(pi, pid, mode.some)
-      v1   <- recordVisitForObs(pid, oid1, pi, mode, t2, 1, 1, 1, 1601)
+      v1   <- recordVisitForObs(pid, oid1, service, mode, t2, 1, 1, 1, 1601)
       es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
       _    <- insertEvents(es1)
       _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
