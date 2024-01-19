@@ -22,7 +22,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("updateDatasets") {
-    recordDatasets(mode, pi, 0, 2, 3).flatMap {
+    recordDatasets(mode, pi, service, 0, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           mutation {
@@ -97,7 +97,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
   }
 
   test("updateDatasets - subset select") {
-    recordDatasets(mode, pi, 6, 2, 3).flatMap {
+    recordDatasets(mode, pi, service, 6, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           mutation {

@@ -16,9 +16,9 @@ import lucuma.odb.data.ObservingModeType
 
 class addSequenceEvent extends OdbSuite {
 
-  val staff: User = TestUsers.Standard.staff(nextId, nextId)
+  val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(staff)
+  override lazy val validUsers: List[User] = List(service)
 
   private def recordVisit(
     mode: ObservingModeType,
@@ -65,7 +65,7 @@ class addSequenceEvent extends OdbSuite {
 
     addSequenceEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       vid => query(vid),
       (oid, vid) => json"""
       {
@@ -107,7 +107,7 @@ class addSequenceEvent extends OdbSuite {
 
     addSequenceEventTest(
       ObservingModeType.GmosNorthLongSlit,
-      staff,
+      service,
       _ => query,
       (_, _) => s"Visit 'v-42' not found".asLeft
     )
