@@ -111,7 +111,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (no WHERE, only visible to pi2)") {
-    recordAll(pi2, mode, offset = 200, stepCount = 2).flatMap { on =>
+    recordAll(pi2, service, mode, offset = 200, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events {
@@ -137,7 +137,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId)") {
-    recordAll(pi, mode, offset = 300, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 300, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -169,7 +169,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId + eventType)") {
-    recordAll(pi, mode, offset = 400, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 400, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -205,7 +205,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId + received)") {
-    recordAll(pi, mode, offset = 500).flatMap { on =>
+    recordAll(pi, service, mode, offset = 500).flatMap { on =>
       val start: Timestamp = on.allEvents.head.received
       val end: Timestamp   = on.allEvents.last.received
 
@@ -245,7 +245,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE visitId)") {
-    recordAll(pi, mode, offset = 600, visitCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 600, visitCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -278,7 +278,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE id)") {
-    recordAll(pi, mode, offset = 700).flatMap { on =>
+    recordAll(pi, service, mode, offset = 700).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -311,7 +311,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId + sequenceEvent command)") {
-    recordAll(pi, mode, offset = 800, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 800, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -347,7 +347,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId + stepEvent stepId)") {
-    recordAll(pi, mode, offset = 900, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 900, stepCount = 2).flatMap { on =>
       val sid = on.visits.head.atoms.head.steps.head.id
 
       val q = s"""
@@ -400,7 +400,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId + stepEvent stepStage)") {
-    recordAll(pi, mode, offset = 1000, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 1000, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
@@ -436,7 +436,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE datasetId)") {
-    recordAll(pi, mode, offset = 1100, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 1100, stepCount = 2).flatMap { on =>
       val dids = on.visits.head.atoms.head.steps.head.allDatasets
       val q = s"""
         query {
@@ -471,7 +471,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("query -> events (WHERE observationId + datasetStage)") {
-    recordAll(pi, mode, offset = 1200, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 1200, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
