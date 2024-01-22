@@ -11,6 +11,7 @@ enum ObsAttachmentType { DUMMY }
 enum FilterType { DUMMY }
 enum ProposalAttachmentType { DUMMY }
 enum ProposalStatus { DUMMY }
+enum ToOActivation { DUMMY }
 
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
@@ -9785,25 +9786,25 @@ type TimestampInterval {
 
 }
 
-"""
-ToO Activation
-"""
-enum ToOActivation {
-  """
-  ToOActivation None
-  """
-  NONE
+# """
+# ToO Activation
+# """
+# enum ToOActivation {
+#   """
+#   ToOActivation None
+#   """
+#   NONE
 
-  """
-  ToOActivation Standard
-  """
-  STANDARD
+#   """
+#   ToOActivation Standard
+#   """
+#   STANDARD
 
-  """
-  ToOActivation Rapid
-  """
-  RAPID
-}
+#   """
+#   ToOActivation Rapid
+#   """
+#   RAPID
+# }
 
 input UnlinkUserInput {
 
