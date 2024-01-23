@@ -12,14 +12,9 @@ import lucuma.core.parser.TimeParsers.*
 
 import java.time.Year
 
+// TODO: reuse the parser in ProposalReference
 
 private [binding] object semesterBinding {
-  val MinSemester: Semester =
-    Semester.unsafeFromString("2000A")
-
-  // Support for semesters specified as 24A etc.  There's a Y2100 problem here
-  // that we can deal with in 2099.
-
   private val year2: Parser[Year] =
     intN(2).mapFilter(yr => catchDTE(Year.of)(2000 + yr)).withContext("year2")
 
@@ -38,7 +33,6 @@ val SemesterBinding: Matcher[Semester] = {
     Semester
       .fromString(s)
       .orElse(fromShortString(s))
-      .filter(_ >= MinSemester)
-      .toRight(s"`$s` cannot be parsed as a valid Semester.")
+      .toRight(s"'$s' cannot be parsed as a valid Semester.")
     }
 }
