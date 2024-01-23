@@ -83,6 +83,8 @@ trait ProgramMapping[F[_]]
             } yield (oy, oh).mapN { (y, h) => Semester(y, h).format }.asJson,
           List("semesterYear", "semesterHalf")
         ),
+        SqlField("semesterIndex", ProgramTable.Reference.SemesterIndex),
+        SqlField("proposalReference", ProgramTable.Reference.ProposalReference),
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
         SqlField("proposalStatus", ProgramTable.ProposalStatus),
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
