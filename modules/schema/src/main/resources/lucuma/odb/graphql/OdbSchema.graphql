@@ -7582,8 +7582,17 @@ type Program {
   """
   name: NonEmptyString
 
-  "Semester with which the program has been associated."
+  "Semester associated with the program, if any."
   semester: Semester
+
+  "Index, relative to the semester, if any."
+  semesterIndex: PosInt
+
+  """
+  Formatted proposal reference, if any.  Only submitted proposals obtain a
+  proposal reference.
+  """
+  proposalReference: ProposalReference
 
   """
   Program proposal
@@ -7838,6 +7847,12 @@ enum ProposalClassEnum {
   """
   SYSTEM_VERIFICATION
 }
+
+"""
+Proposal reference in the format G-YYYY[AB]-NNNN+ For example, G-2024B-1234
+where 2024B refers to the associated semester.
+"""
+scalar ProposalReference
 
 """
 Metadata for `enum ProposalStatus`

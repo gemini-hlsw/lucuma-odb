@@ -57,21 +57,48 @@ $$ LANGUAGE plpgsql;
 
 -- Add a proposal index column
 ALTER TABLE t_program
-  ADD COLUMN c_proposal_index int4;
+  ADD COLUMN c_semester_index int4 CHECK (c_semester_index > 0);
 
 -- Set the proposal index for existing programs that have a semester (i.e., have
 -- been submitted).
 UPDATE t_program
-  SET c_proposal_index = next_proposal_index(c_semester_year, c_semester_half)
+  SET c_semester_index = next_proposal_index(c_semester_year, c_semester_half)
   WHERE c_semester_year IS NOT NULL AND c_semester_half IS NOT NULL;
 
 -- Every submitted proposal has an index.
 ALTER TABLE t_program
   ADD CONSTRAINT submitted_proposal_has_index
-  CHECK (c_proposal_status = 'not_submitted' OR c_proposal_index IS NOT NULL);
+  CHECK (c_proposal_status = 'not_submitted' OR c_semester_index IS NOT NULL);
 
--- Add a generated column that formats the proposal id from the year and
--- semester half.
+-- Add a trigger that (re)sets the proposal index when submitted or when the
+-- semester changes.
+CREATE OR REPLACE FUNCTION update_proposal_index()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.c_proposal_status <> 'not_submitted' AND (
+        (NEW.c_semester_year IS NOT NULL AND NEW.c_semester_half IS NOT NULL AND NEW.c_semester_index IS NULL) OR
+        (NEW.c_semester_year IS DISTINCT FROM OLD.c_semester_year OR NEW.c_semester_half IS DISTINCT FROM OLD.c_semester_half)
+    ) THEN
+        NEW.c_semester_index := next_proposal_index(NEW.c_semester_year, NEW.c_semester_half);
+
+    ELSIF NEW.c_proposal_status = 'not_submitted' AND (
+        NEW.c_semester_year IS NULL OR NEW.c_semester_half IS NULL
+    ) THEN
+        NEW.c_semester_index := NULL;
+
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_proposal_index_trigger
+BEFORE UPDATE ON t_program
+FOR EACH ROW
+EXECUTE FUNCTION update_proposal_index();
+
+-- Add a generated column that formats the proposal reference from the semester
+-- and index.
 CREATE DOMAIN d_proposal_reference AS varchar
   CHECK (VALUE ~ '^G-[0-9][0-9][0-9][0-9]+[AB]-[0-9][0-9][0-9][0-9]+$');
 COMMENT ON DOMAIN d_proposal_reference IS 'Formatted Proposal Reference';
@@ -88,25 +115,4 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 ALTER TABLE t_program
-  ADD COLUMN c_proposal_reference d_proposal_reference GENERATED ALWAYS AS (format_proposal_reference(c_semester_year, c_semester_half, c_proposal_index)) STORED;
-
--- Add a trigger that (re)sets the proposal index when submitted or when the
--- semester changes.
-CREATE OR REPLACE FUNCTION update_proposal_index()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.c_proposal_status <> 'not_submitted' AND (
-        (NEW.c_semester_year IS NOT NULL AND NEW.c_semester_half IS NOT NULL AND NEW.c_proposal_index IS NULL) OR
-        (NEW.c_semester_year IS DISTINCT FROM OLD.c_semester_year OR NEW.c_semester_half IS DISTINCT FROM OLD.c_semester_half)
-    ) THEN
-        NEW.c_proposal_index := next_proposal_index(NEW.c_semester_year, NEW.c_semester_half);
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_proposal_index_trigger
-BEFORE UPDATE ON t_program
-FOR EACH ROW
-EXECUTE FUNCTION update_proposal_index();
+  ADD COLUMN c_proposal_reference d_proposal_reference GENERATED ALWAYS AS (format_proposal_reference(c_semester_year, c_semester_half, c_semester_index)) STORED;

@@ -1236,6 +1236,8 @@ class updatePrograms extends OdbSuite {
                 id
                 proposalStatus
                 semester
+                semesterIndex
+                proposalReference
               }
             }
           }
@@ -1248,7 +1250,9 @@ class updatePrograms extends OdbSuite {
                   {
                     "id" : $pid,
                     "proposalStatus": "SUBMITTED",
-                    "semester": "2024B"
+                    "semester": "2024B",
+                    "semesterIndex": 1,
+                    "proposalReference": "G-2024B-0001"
                   }
                 ]
               }
