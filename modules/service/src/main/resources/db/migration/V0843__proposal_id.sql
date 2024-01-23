@@ -116,3 +116,6 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 ALTER TABLE t_program
   ADD COLUMN c_proposal_reference d_proposal_reference GENERATED ALWAYS AS (format_proposal_reference(c_semester_year, c_semester_half, c_semester_index)) STORED;
+
+-- An index on the proposal reference to facilitate lookup
+CREATE INDEX proposal_reference_index ON t_program (c_proposal_reference);
