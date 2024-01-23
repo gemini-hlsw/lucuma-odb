@@ -19,10 +19,12 @@ import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
+import lucuma.core.enums.Half
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
@@ -37,6 +39,8 @@ import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+
+import java.time.Year
 
 import Services.Syntax.*
 import binding._
@@ -68,6 +72,17 @@ trait ProgramMapping[F[_]]
         SqlField("id", ProgramTable.Id, key = true),
         SqlField("existence", ProgramTable.Existence, hidden = true),
         SqlField("name", ProgramTable.Name),
+        SqlField("semesterYear", ProgramTable.Reference.SemesterYear, hidden = true),
+        SqlField("semesterHalf", ProgramTable.Reference.SemesterHalf, hidden = true),
+        CursorFieldJson(
+          "semester",
+          cursor =>
+            for {
+              oy <- cursor.fieldAs[Option[Year]]("semesterYear")
+              oh <- cursor.fieldAs[Option[Half]]("semesterHalf")
+            } yield (oy, oh).mapN { (y, h) => Semester(y, h).format }.asJson,
+          List("semesterYear", "semesterHalf")
+        ),
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
         SqlField("proposalStatus", ProgramTable.ProposalStatus),
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),

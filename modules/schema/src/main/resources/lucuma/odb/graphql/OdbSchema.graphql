@@ -7586,6 +7586,9 @@ type Program {
   """
   name: NonEmptyString
 
+  "Semester with which the program has been associated."
+  semester: Semester
+
   """
   Program proposal
   """
