@@ -10874,7 +10874,6 @@ input WhereOrderTimestamp {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderInt {
   """
@@ -10922,7 +10921,6 @@ input WhereOrderInt {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderObsActiveStatus {
   """
@@ -11066,7 +11064,6 @@ input WhereOrderObservationId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderProgramId {
   """
@@ -11114,7 +11111,148 @@ input WhereOrderProgramId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
+"""
+input WhereOrderPosInt {
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: PosInt
 
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: PosInt
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [PosInt!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [PosInt!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: PosInt
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: PosInt
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosInt
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosInt
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
+"""
+input WhereOrderProposalReference {
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: ProposalReference
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: ProposalReference
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [ProposalReference!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [ProposalReference!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: ProposalReference
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: ProposalReference
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ProposalReference
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ProposalReference
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
+"""
+input WhereOrderSemester {
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: Semester
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: Semester
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [Semester!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [Semester!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: Semester
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: Semester
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Semester
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Semester
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
 """
 input WhereOrderSequenceCommand {
   """
@@ -11330,6 +11468,21 @@ input WhereProgram {
   Matches the program name.
   """
   name: WhereOptionString
+
+  """
+  Matches the semester associated with the program.
+  """
+  semester: WhereOrderSemester
+
+  """
+  Matches the semester index associated with the program (if any).
+  """
+  semesterIndex: WhereOrderPosInt
+
+  """
+  Matches on the proposal reference associated with the program (if any).
+  """
+  proposalReference: WhereOrderProposalReference
 
   """
   Matches the proposalStatus.
