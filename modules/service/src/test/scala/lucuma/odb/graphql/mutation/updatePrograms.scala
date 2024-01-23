@@ -1235,6 +1235,7 @@ class updatePrograms extends OdbSuite {
               programs {
                 id
                 proposalStatus
+                semester
               }
             }
           }
@@ -1246,7 +1247,8 @@ class updatePrograms extends OdbSuite {
                 "programs": [
                   {
                     "id" : $pid,
-                    "proposalStatus": "SUBMITTED"
+                    "proposalStatus": "SUBMITTED",
+                    "semester": "2024B"
                   }
                 ]
               }
