@@ -8037,13 +8037,16 @@ type Query {
   partnerMeta: [PartnerMeta!]!
 
   """
-  Returns the program with the given id, if any.
+  Returns the program with the given id or reference, if any.  Specify one of
+  programId or proposalReference.  If both are set, both must match.  If neither
+  are set, nothing will match.
   """
   program(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+    "Program ID"
+    programId: ProgramId
+
+    "Proposal Reference"
+    proposalReference: ProposalReference
   ): Program
 
   """
