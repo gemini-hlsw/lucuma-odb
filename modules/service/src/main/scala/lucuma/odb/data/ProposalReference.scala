@@ -12,10 +12,10 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.syntax.*
 import lucuma.core.enums.Half
-import lucuma.core.parser.MiscParsers.intN
-import lucuma.core.parser.MiscParsers.posInt
 import lucuma.core.model.Semester
 import lucuma.core.optics.Format
+import lucuma.core.parser.MiscParsers.intN
+import lucuma.core.parser.MiscParsers.posInt
 
 import java.time.DateTimeException
 import java.time.Year
