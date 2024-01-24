@@ -143,7 +143,7 @@ object ProgramService {
         Trace[F].span("insertProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
 
-          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
+          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, SETʹ.semester, user)).flatTap { pid =>
             SETʹ.proposal.traverse { proposalInput =>
               proposalService.insertProposal(proposalInput, pid)
             }
@@ -372,15 +372,15 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[(Option[NonEmptyString], User), Program.Id] =
+    val InsertProgram: Query[(Option[NonEmptyString], Option[Semester], User), Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
-        VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
+        INSERT INTO t_program (c_name, c_semester, c_pi_user_id, c_pi_user_type)
+        VALUES (${text_nonempty.opt}, ${semester.opt}, ${(user_id ~ user_type).opt})
         RETURNING c_program_id
       """.query(program_id)
          .contramap {
-            case (oNes, ServiceUser(_, _)) => (oNes, None)
-            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
+            case (oNes, oSem, ServiceUser(_, _)) => (oNes, oSem, None)
+            case (oNes, oSem, nonServiceUser   ) => (oNes, oSem, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
          }
 
     /** Link a user to a program, without any access checking. */

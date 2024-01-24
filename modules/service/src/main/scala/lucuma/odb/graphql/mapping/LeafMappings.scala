@@ -15,6 +15,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
+import io.circe.syntax.*
 import lucuma.ags.GuideProbe
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
@@ -25,6 +26,7 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
@@ -50,6 +52,10 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   private given io.circe.Encoder[Epoch] =
     e => Json.fromString(Epoch.fromString.reverseGet(e))
+
+  // TODO: move
+  private given io.circe.Encoder[Semester] =
+    _.format.asJson
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
@@ -131,6 +137,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](ProposalStatusType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[Tag](SeeingTrendType),
+      LeafMapping[Semester](SemesterType),
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SequenceType](SequenceTypeType),
       LeafMapping[SignalToNoise](SignalToNoiseType),

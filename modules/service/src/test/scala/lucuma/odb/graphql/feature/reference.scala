@@ -196,4 +196,35 @@ class reference extends OdbSuite {
       )
     }
   }
+
+  test("set semester on create") {
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          createProgram(
+            input: {
+               SET: {
+                  semester: "2025A"
+               }
+            }
+          ) {
+            program { semester }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "semester": "2025A"
+              }
+            }
+          }
+        """
+      )
+    )
+  }
+
 }
