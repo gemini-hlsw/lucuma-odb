@@ -26,58 +26,6 @@ class updatePrograms extends OdbSuite {
 
   val validUsers = List(pi, ngo, staff, admin, guest, service).toList
 
-  // For proposalStatus tests where it doesn't matter what the proposal is, just that there is one.
-  def addProposal(pid: Program.Id): IO[Unit] =
-    expect(
-      user = pi,
-      query = s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET: {
-                proposal: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 50
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-              WHERE: {
-                id: {
-                  EQ: "$pid"
-                }
-              }
-            }
-          ) {
-            programs {
-              id
-            }
-          }
-        }
-      """,
-      expected =
-        Right(json"""
-          {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "id" : $pid
-                }
-              ]
-            }
-          }
-        """)
-    )
-
   test("edit name") {
     createProgramAs(pi).flatMap { pid =>
       expect(
@@ -1214,7 +1162,7 @@ class updatePrograms extends OdbSuite {
 
   test("edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pid) >>
+      addProposal(pi, pid) >>
       expect(
         user = pi,
         query = s"""
@@ -1357,7 +1305,7 @@ class updatePrograms extends OdbSuite {
 
   test("edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pid) >>
+      addProposal(pi, pid) >>
       expect(
         user = staff,
         query = s"""
@@ -1428,8 +1376,8 @@ class updatePrograms extends OdbSuite {
 
   test("edit proposal status (multiple errors)") {
     (createProgramAs(pi), createProgramAs(pi), createProgramAs(pi)).tupled.flatMap { (pid1, pid2, pid3) =>
-      addProposal(pid1) >>
-      addProposal(pid2) >>
+      addProposal(pi, pid1) >>
+      addProposal(pi, pid2) >>
       // have admin set one to NOT_ACCEPTED
       expect(
         user = admin,
@@ -1507,9 +1455,9 @@ class updatePrograms extends OdbSuite {
 
   test("edit proposal status (bulk update by current status)") {
     (createProgramAs(pi), createProgramAs(pi), createProgramAs(pi)).tupled.flatMap { (pid1, pid2, pid3) =>
-      addProposal(pid1) >>
-      addProposal(pid2) >>
-      addProposal(pid3) >>
+      addProposal(pi, pid1) >>
+      addProposal(pi, pid2) >>
+      addProposal(pi, pid3) >>
       // have admin set one to ACCEPTED
       expect(
         user = admin,

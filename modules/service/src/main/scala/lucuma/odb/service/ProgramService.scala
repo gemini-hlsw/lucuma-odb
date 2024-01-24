@@ -270,16 +270,14 @@ object ProgramService {
       void"""
         CREATE TEMPORARY TABLE t_program_update (
           c_program_id,
-          c_semester_year,
-          c_semester_half,
+          c_semester,
           c_proposal_status,
           c_has_proposal
         )
         ON COMMIT DROP
           AS SELECT
             which.pid,
-            prog.c_semester_year,
-            prog.c_semester_half,
+            prog.c_semester,
             prog.c_proposal_status,
             prop.c_program_id IS NOT NULL
         FROM (""" |+| whichProgramIds |+| void""") AS which (pid)
@@ -293,8 +291,7 @@ object ProgramService {
       sql"""
         SELECT
            c_program_id,
-           c_semester_year,
-           c_semester_half,
+           c_semester,
            c_proposal_status,
            c_has_proposal
         FROM t_program_update
@@ -307,8 +304,7 @@ object ProgramService {
           SET.existence.map(sql"c_existence = $existence"),
           SET.name.map(sql"c_name = $text_nonempty"),
           SET.proposalStatus.map(sql"c_proposal_status = $tag"),
-          SET.semester.fold(void"c_semester_year = null".some, none, s => sql"c_semester_year = $semester_year"(s.year).some),
-          SET.semester.fold(void"c_semester_half = null".some, none, s => sql"c_semester_half = $semester_half"(s.half).some)
+          SET.semester.fold(void"c_semester = null".some, none, s => sql"c_semester = $semester"(s).some),
         ).flatten
       )
 

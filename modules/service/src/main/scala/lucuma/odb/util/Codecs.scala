@@ -66,7 +66,6 @@ import spire.math.interval.Closed
 import spire.math.interval.Open
 import spire.math.interval.ValueBound
 
-import java.time.Year
 import scala.util.control.Exception
 import scala.util.matching.Regex
 
@@ -365,18 +364,11 @@ trait Codecs {
   val science_mode: Codec[ScienceMode] =
     enumerated[ScienceMode](Type.varchar)
 
-  lazy val semester_half: Codec[Half] =
-    enumerated[Half](Type("e_semester_half"))
-
-  lazy val semester_year: Codec[Year] =
-    year.eimap(yr =>
-      Option(yr)
-        .filter(yr => yr.getValue >= 1)
-        .toRight(s"Years prior to year 1 or after ${Year.MAX_VALUE} are not supported.")
-    )(identity)
-
-  lazy val semester: Codec[Semester] =
-    (semester_year *: semester_half).to[Semester]
+  val semester: Codec[Semester] =
+    varchar.eimap(
+      s => Semester.fromString(s).toRight(s"Invalid semester: $s"))(
+      _.format
+    )
 
   val sequence_command: Codec[SequenceCommand] =
     enumerated[SequenceCommand](Type("e_sequence_command"))
@@ -484,14 +476,6 @@ trait Codecs {
       BoundedInterval.unsafeFromBounds(from(bw.lowerBound), from(bw.upperBound))
     )
   }
-
-  val year: Codec[Year] =
-    int4.eimap(yr =>
-      Exception
-        .nonFatalCatch
-        .opt(Year.of(yr))
-        .toRight(s"Year out of range: $yr")
-    )(_.getValue)
 
   // Not so atomic ...
 

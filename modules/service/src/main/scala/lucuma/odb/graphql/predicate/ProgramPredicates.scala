@@ -15,7 +15,7 @@ class ProgramPredicates(path: Path) {
 
   lazy val existence         = ExistencePredicates(path / "existence")
   lazy val id                = LeafPredicates[Program.Id](path / "id")
-  lazy val proposalReference = LeafPredicates[ProposalReference](path / "proposalReference")
+  lazy val proposalReference = LeafPredicates[Option[ProposalReference]](path / "proposalReference")
   lazy val piUserId          = LeafPredicates[User.Id](path / "piUserId")
 
   def isVisibleTo(user: User): Predicate =

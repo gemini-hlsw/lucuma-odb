@@ -11209,7 +11209,10 @@ Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 """
-input WhereOrderSemester {
+input WhereOptionOrderSemester {
+
+  "Matches if Semester is not defined."
+  IS_NULL: Boolean
 
   """
   Matches if the property is exactly the supplied value.
@@ -11475,7 +11478,7 @@ input WhereProgram {
   """
   Matches the semester associated with the program.
   """
-  semester: WhereOrderSemester
+  semester: WhereOptionOrderSemester
 
   """
   Matches the semester index associated with the program (if any).
