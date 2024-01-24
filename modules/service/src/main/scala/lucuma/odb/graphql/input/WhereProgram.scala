@@ -21,7 +21,7 @@ object WhereProgram {
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderProgramId = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
     val WhereNameBinding = WhereOptionString.binding(path / "name")
-    val WhereOrderSemester = WhereOrder.binding[Semester](path / "semester", SemesterBinding)
+    val WhereOptionOrderSemester = WhereOptionOrder.binding[Semester](path / "semester", SemesterBinding)
     val WhereOrderSemesterIndex = WhereOrder.binding[PosInt](path / "semesterIndex", PosIntBinding)
     val WhereOrderProposalReference = WhereOrder.binding[ProposalReference](path / "proposalReference", ProposalReferenceBinding)
     val WhereEqProposalStatus = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
@@ -33,7 +33,7 @@ object WhereProgram {
         WhereProgramBinding.Option("NOT", rNOT),
         WhereOrderProgramId.Option("id", rId),
         WhereNameBinding.Option("name", rName),
-        WhereOrderSemester.Option("semester", rSemester),
+        WhereOptionOrderSemester.Option("semester", rSemester),
         WhereOrderSemesterIndex.Option("semesterIndex", rSemesterIndex),
         WhereOrderProposalReference.Option("proposalReference", rProposalReference),
         WhereEqProposalStatus.Option("proposalStatus", rPs),

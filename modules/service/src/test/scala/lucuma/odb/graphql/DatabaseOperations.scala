@@ -78,6 +78,59 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  // For proposal tests where it doesn't matter what the proposal is, just that
+  // there is one.
+  def addProposal(user: User, pid: Program.Id): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposal: {
+                  proposalClass: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                  category: COSMOLOGY
+                  toOActivation: NONE
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 100
+                    }
+                  ]
+                }
+              }
+              WHERE: {
+                id: {
+                  EQ: "$pid"
+                }
+              }
+            }
+          ) {
+            programs {
+              id
+            }
+          }
+        }
+      """,
+      expected =
+        Right(json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          }
+        """)
+    )
+
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids: _*)
 
