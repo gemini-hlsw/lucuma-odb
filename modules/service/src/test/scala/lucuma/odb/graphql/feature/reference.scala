@@ -29,14 +29,17 @@ class reference extends OdbSuite {
   val sem2025A   = Semester.unsafeFromString("2025A")
   val ref2025A1  = ProposalReference.FromString.unsafeGet("G-2025A-0001")
 
-  def submitProposal(pid: Program.Id, s: Semester): IO[ProposalReference] =
+  val sem2025B   = Semester.unsafeFromString("2025B")
+  val ref2025B1  = ProposalReference.FromString.unsafeGet("G-2025B-0001")
+
+  def submitProposal(pid: Program.Id, s: Option[Semester]): IO[ProposalReference] =
       query(pi, s"""
           mutation {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: SUBMITTED,
-                  semester: "${s.format}"
+                  proposalStatus: SUBMITTED
+                  ${s.map(semster => s""",\nsemester: "${semster.format}"""").getOrElse("")}
                 }
                 WHERE: {
                   id: {
@@ -66,15 +69,15 @@ class reference extends OdbSuite {
     for {
       pid0 <- createProgramAs(pi)
       _    <- addProposal(pi, pid0)
-      ref0 <- submitProposal(pid0, sem2024B)
+      ref0 <- submitProposal(pid0, sem2024B.some)
 
       pid1 <- createProgramAs(pi)
       _    <- addProposal(pi, pid1)
-      ref1 <- submitProposal(pid1, sem2024B)
+      ref1 <- submitProposal(pid1, sem2024B.some)
 
       pid2 <- createProgramAs(pi)
       _    <- addProposal(pi, pid2)
-      ref2 <- submitProposal(pid2, sem2025A)
+      ref2 <- submitProposal(pid2, sem2025A.some)
     } yield {
       assertEquals(ref0, ref2024B1)
       assertEquals(ref1, ref2024B2)
@@ -225,6 +228,77 @@ class reference extends OdbSuite {
         """
       )
     )
+  }
+
+  test("set semester on create, then submit") {
+    val createWithSemester = query(pi, s"""
+        mutation {
+          createProgram(
+            input: {
+               SET: {
+                  semester: "2025B"
+               }
+            }
+          ) {
+            program { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("createProgram", "program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+    val res = for {
+      pid <- createWithSemester
+      _   <- addProposal(pi, pid)
+      ref <- submitProposal(pid, none) // no semester
+    } yield ref
+
+    assertIO(res, ref2025B1)
+  }
+
+  test("cannot unset semester after submit") {
+    fetchPid(pi, ref2025B1).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+            mutation {
+              updatePrograms(
+                input: {
+                  SET: {
+                    semester: null
+                  }
+                  WHERE: {
+                    semester: {
+                      EQ: "2025B"
+                    }
+                  }
+                }
+              ) {
+                programs {
+                  proposalReference
+                }
+              }
+            }
+        """,
+        expected = Left(List(
+          s"Submitted program $pid must be associated a semester."
+        ))
+      )
+    }
+  }
+
+  test("unset semester") {
+  }
+
+  test("unsubmit, resubmit, same reference") {
+  }
+
+  test("change semester, changes reference") {
   }
 
 }
