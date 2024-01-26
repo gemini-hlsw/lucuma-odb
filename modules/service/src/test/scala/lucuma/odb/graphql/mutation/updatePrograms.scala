@@ -1100,6 +1100,7 @@ class updatePrograms extends OdbSuite {
 
   test("edit proposal status (pi attempts update proposalStatus to unauthorized status)") {
     createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) >>
       expect(
         user = pi,
         query = s"""
@@ -1131,6 +1132,7 @@ class updatePrograms extends OdbSuite {
 
   test("edit proposal status (guests cannot submit proposals)") {
     createProgramAs(guest).flatMap { pid =>
+      addProposal(guest, pid) >>
       expect(
         user = guest,
         query = s"""
@@ -1426,7 +1428,7 @@ class updatePrograms extends OdbSuite {
             updatePrograms(
               input: {
                 SET: {
-                  proposalStatus: NOT_SUBMITTED
+                  proposalStatus: SUBMITTED
                 }
                 WHERE: {
                   id: {
@@ -1446,6 +1448,7 @@ class updatePrograms extends OdbSuite {
           Left(
             List(
               UpdateProgramsError.NotAuthorizedOldProposalStatus(pid1, pi, Tag("not_accepted")).message,
+              UpdateProgramsError.NoSemesterForSubmittedProposal(pid2).message,
               UpdateProgramsError.NoProposalForStatusChange(pid3).message
             )
           )

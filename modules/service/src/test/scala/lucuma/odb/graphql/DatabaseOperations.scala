@@ -47,6 +47,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.UserInvitation
@@ -77,6 +78,29 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def fetchPid(user: User, ref: ProposalReference): IO[Program.Id] =
+    query(user, s"""
+      query { program(proposalReference: "${ref.format}") { id } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+/*
+  def fetchReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
+    query(user, s"""
+      query { program(programId: "$pid") { proposalReference } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "proposalReference")
+        .as[Option[ProposalReference]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+*/
 
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.

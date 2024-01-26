@@ -118,7 +118,7 @@ object ProgramService {
       case NoProposalForStatusChange(pid)                =>
         s"Proposal status in program $pid cannot be changed because it has no proposal."
       case NoSemesterForSubmittedProposal(pid)           =>
-        s"Program $pid is submitted but not associated with any semester."
+        s"Submitted program $pid must be associated a semester."
 
     def failure = Result.failure(message)
   }
@@ -210,43 +210,53 @@ object ProgramService {
 
         def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
           user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
-        
-        val checkCurrentProposalStatus: F[Result[Unit]] =
+
+        def validateStatusUpdate(
+          pid:             Program.Id,
+          oldStatus:       enumsVal.ProposalStatus,
+          newStatusUpdate: Option[enumsVal.ProposalStatus],
+          hasProposal:     Boolean
+        ): Result[Unit] =
+          newStatusUpdate
+            .filter(_ =!= oldStatus) // if they match we're not really trying to update
+            .fold(Result.unit) { newStatus =>
+              (
+                UpdateProgramsError.NoProposalForStatusChange(pid)
+                  .failure.whenA(!hasProposal),
+
+                UpdateProgramsError.NotAuthorizedNewProposalStatus(user, Tag(newStatus.tag))
+                  .failure.whenA(!userCanChangeProposalStatus(newStatus)),
+
+                UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, Tag(oldStatus.tag))
+                  .failure.whenA(!userCanChangeProposalStatus(oldStatus))
+
+              ).tupled.void  // do we want all of the errors or would it be annoying?
+            }
+
+        def validateUpdate(newStatusUpdate: Option[enumsVal.ProposalStatus]): F[Result[Unit]] =
           session.prepareR(Statements.getTempTableData).use(
             _.stream(Void, chunkSize = 1024)
-              .fold(Result.unit){ case (acc, (pid, semester, psTag, hasProposal)) =>
-                val check: Result[Unit] =
-                  for {
-                    ps <- tagToProposalStatus(psTag)
-                    _  <- if (ps === enumsVal.ProposalStatus.NotSubmitted || semester.isDefined) Result.unit
-                          else UpdateProgramsError.NoSemesterForSubmittedProposal(pid).failure
-                    _  <- if (hasProposal) Result.unit
-                          else UpdateProgramsError.NoProposalForStatusChange(pid).failure
-                    _  <- if (userCanChangeProposalStatus(ps)) Result.unit
-                          else UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, psTag).failure
-                  } yield ()
-                (acc, check).parMapN((_, _) => ())
-              }
-              .compile
-              .toList
-              .map(_.head)
-          )
+             .fold(Result.unit) { case (acc, (pid, oldSemester, psTag, hasProposal)) =>
+               val check: Result[Unit] =
+                 for {
+                   oldStatus <- tagToProposalStatus(psTag)
+                   _         <- validateStatusUpdate(pid, oldStatus, newStatusUpdate, hasProposal)
+                   finalStatus   = newStatusUpdate.getOrElse(oldStatus)
+                   finalSemester = SET.semester.fold(none, oldSemester, _.some)
+                   _         <- if (finalStatus === enumsVal.ProposalStatus.NotSubmitted || finalSemester.isDefined) Result.unit
+                                else UpdateProgramsError.NoSemesterForSubmittedProposal(pid).failure
+                 } yield ()
 
-        val validateProposalStatus: F[Result[Unit]] =
-          SET.proposalStatus.fold(Result.unit.pure[F]){psTag =>
-            (for {
-              ps   <- ResultT(tagToProposalStatus(psTag).pure[F])
-              _    <- ResultT(
-                        if (userCanChangeProposalStatus(ps)) Result.unit.pure[F]
-                        else UpdateProgramsError.NotAuthorizedNewProposalStatus(user, psTag).failure.pure[F]
-                      )
-              _    <- ResultT(checkCurrentProposalStatus)
-            } yield(())).value
-          }
+               (acc, check).parTupled.void
+             }
+             .compile
+             .onlyOrError
+          )
 
         (for {
           _    <- ResultT(setup.map(Result.apply))
-          _    <- ResultT(validateProposalStatus)
+          n    <- ResultT(SET.proposalStatus.traverse(tagToProposalStatus).pure[F])
+          _    <- ResultT(validateUpdate(n))
           ids1 <- ResultT(updatePrograms.map(Result.apply))
           ids2 <- ResultT(updateProposals) 
         } yield (ids1 |+| ids2)).value
