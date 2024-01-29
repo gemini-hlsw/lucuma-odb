@@ -7672,6 +7672,7 @@ type Program {
   Program-wide time charge, summing all corrected observation time charges.
   """
   timeCharge: CategorizedTime!
+
   """
   All user invitations associated with this program.
   """
@@ -11115,7 +11116,11 @@ Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 """
-input WhereOrderPosInt {
+input WhereOptionOrderPosInt {
+
+  "Matches if the property is not defined."
+  IS_NULL: Boolean
+
   """
   Matches if the property is exactly the supplied value.
   """
@@ -11162,44 +11167,48 @@ Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 """
-input WhereOrderProgramReference {
+input WhereOptionOrderProgramReference {
+
+  "Matches if the ProgramReference is not defined."
+  IS_NULL: Boolean
+
   """
-  Matches if the property is exactly the supplied value.
+  Matches if the ProgramReference is exactly the supplied value.
   """
   EQ: ProgramReference
 
   """
-  Matches if the property is not the supplied value.
+  Matches if the ProgramReference is not the supplied value.
   """
   NEQ: ProgramReference
 
   """
-  Matches if the property value is any of the supplied options.
+  Matches if the ProgramReference is any of the supplied options.
   """
   IN: [ProgramReference!]
 
   """
-  Matches if the property value is none of the supplied values.
+  Matches if the ProgramReference is none of the supplied values.
   """
   NIN: [ProgramReference!]
 
   """
-  Matches if the property is ordered after (>) the supplied value.
+  Matches if the ProgramReference is ordered after (>) the supplied value.
   """
   GT: ProgramReference
 
   """
-  Matches if the property is ordered before (<) the supplied value.
+  Matches if the ProgramReference is ordered before (<) the supplied value.
   """
   LT: ProgramReference
 
   """
-  Matches if the property is ordered after or equal (>=) the supplied value.
+  Matches if the ProgramReference is ordered after or equal (>=) the supplied value.
   """
   GTE: ProgramReference
 
   """
-  Matches if the property is ordered before or equal (<=) the supplied value.
+  Matches if the ProgramReference is ordered before or equal (<=) the supplied value.
   """
   LTE: ProgramReference
 }
@@ -11483,12 +11492,12 @@ input WhereProgram {
   """
   Matches the semester index associated with the program (if any).
   """
-  semesterIndex: WhereOrderPosInt
+  semesterIndex: WhereOptionOrderPosInt
 
   """
   Matches on the proposal reference associated with the program (if any).
   """
-  programReference: WhereOrderProgramReference
+  programReference: WhereOptionOrderProgramReference
 
   """
   Matches the proposalStatus.

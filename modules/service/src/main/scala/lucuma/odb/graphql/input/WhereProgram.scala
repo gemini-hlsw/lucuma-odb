@@ -22,8 +22,8 @@ object WhereProgram {
     val WhereOrderProgramId = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
     val WhereNameBinding = WhereOptionString.binding(path / "name")
     val WhereOptionOrderSemester = WhereOptionOrder.binding[Semester](path / "semester", SemesterBinding)
-    val WhereOrderSemesterIndex = WhereOrder.binding[PosInt](path / "semesterIndex", PosIntBinding)
-    val WhereOrderProgramReference = WhereOrder.binding[ProgramReference](path / "programReference", ProgramReferenceBinding)
+    val WhereOptionOrderSemesterIndex = WhereOptionOrder.binding[PosInt](path / "semesterIndex", PosIntBinding)
+    val WhereOptionOrderProgramReference = WhereOptionOrder.binding[ProgramReference](path / "programReference", ProgramReferenceBinding)
     val WhereEqProposalStatus = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
     lazy val WhereProgramBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -34,8 +34,8 @@ object WhereProgram {
         WhereOrderProgramId.Option("id", rId),
         WhereNameBinding.Option("name", rName),
         WhereOptionOrderSemester.Option("semester", rSemester),
-        WhereOrderSemesterIndex.Option("semesterIndex", rSemesterIndex),
-        WhereOrderProgramReference.Option("programReference", rProgramReference),
+        WhereOptionOrderSemesterIndex.Option("semesterIndex", rSemesterIndex),
+        WhereOptionOrderProgramReference.Option("programReference", rProgramReference),
         WhereEqProposalStatus.Option("proposalStatus", rPs),
         ("proposal", _), // ignore for now
       ) =>

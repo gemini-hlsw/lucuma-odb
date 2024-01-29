@@ -22,8 +22,8 @@ trait ProgramTable[F[_]] extends BaseMapping[F] {
       val Execution = col("c_pts_execution", time_span)
     }
     object Reference {
-      val Semester         = col("c_semester",           semester.opt)
-      val SemesterIndex    = col("c_semester_index",     int4_pos.opt)
+      val Semester         = col("c_semester",          semester.opt)
+      val SemesterIndex    = col("c_semester_index",    int4_pos.opt)
       val ProgramReference = col("c_program_reference", program_reference.opt)
     }
   }

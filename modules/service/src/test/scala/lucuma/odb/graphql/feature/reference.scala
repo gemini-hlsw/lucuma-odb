@@ -25,12 +25,14 @@ class reference extends OdbSuite {
   val sem2024B   = Semester.unsafeFromString("2024B")
   val ref2024B1  = ProgramReference.FromString.unsafeGet("G-2024B-0001")
   val ref2024B2  = ProgramReference.FromString.unsafeGet("G-2024B-0002")
+  val ref2024B3  = ProgramReference.FromString.unsafeGet("G-2024B-0003")
 
   val sem2025A   = Semester.unsafeFromString("2025A")
   val ref2025A1  = ProgramReference.FromString.unsafeGet("G-2025A-0001")
 
   val sem2025B   = Semester.unsafeFromString("2025B")
   val ref2025B1  = ProgramReference.FromString.unsafeGet("G-2025B-0001")
+  val ref2025B2  = ProgramReference.FromString.unsafeGet("G-2025B-0002")
 
   def submitProposal(pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
       query(pi, s"""
@@ -99,7 +101,7 @@ class reference extends OdbSuite {
         json"""
           {
             "program": {
-              "programReference": $ref2024B1
+              "programReference": ${ref2024B1.format}
             }
           }
         """
@@ -292,13 +294,219 @@ class reference extends OdbSuite {
     }
   }
 
-  test("unset semester") {
+  test("unset semester in unsubmitted program") {
+    val createWithSemester = query(pi, s"""
+        mutation {
+          createProgram(
+            input: {
+               SET: {
+                  semester: "2025B"
+               }
+            }
+          ) {
+            program { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("createProgram", "program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+    createWithSemester.flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  semester: null
+                }
+                WHERE: {
+                  id: { EQ: "$pid" }
+                }
+              }
+            ) {
+              programs {
+                semester
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms": {
+                "programs": [
+                  {
+                    "semester": null
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+    }
   }
 
   test("unsubmit, resubmit, same reference") {
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposalStatus: NOT_SUBMITTED
+              }
+              WHERE: {
+                programReference: {
+                  EQ: "${ref2024B2.format}"
+                }
+              }
+            }
+          ) {
+            programs {
+              proposalStatus
+            }
+          }
+        }
+        """,
+      expected = Right(
+        json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "proposalStatus": "NOT_SUBMITTED"
+                }
+              ]
+            }
+          }
+        """
+      )
+    ) >>
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposalStatus: SUBMITTED
+              }
+              WHERE: {
+                programReference: {
+                  EQ: "${ref2024B2.format}"
+                }
+              }
+            }
+          ) {
+            programs {
+              programReference
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "programReference": ${ref2024B2.format}
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
   }
 
   test("change semester, changes reference") {
+    // G-2025A-0001 -> assign semester 2024B
+    // G-2024B-0001 and 00002 already taken, so we get G-2024B-0003
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                semester: "2024B"
+              }
+              WHERE: {
+                programReference: {
+                  EQ: "${ref2025A1.format}"
+                }
+              }
+            }
+          ) {
+            programs {
+              programReference
+            }
+          }
+        }
+        """,
+      expected = Right(
+        json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "programReference": ${ref2024B3.format}
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
   }
 
+  test("where semesterIndex") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          programs(
+            WHERE: {
+              semester: {
+                EQ: "2024B"
+              }
+              semesterIndex: {
+                GT: 1
+              }
+            }
+          ) {
+            matches {
+              programReference
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "programs" : {
+              "matches": [
+                {
+                  "programReference": ${ref2024B2.format}
+                },
+                {
+                  "programReference": ${ref2024B3.format}
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
+  }
 }
