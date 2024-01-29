@@ -21,7 +21,7 @@ import java.time.DateTimeException
 import java.time.Year
 import scala.util.control.Exception
 
-case class ProposalReference(semester: Semester, index: PosInt) {
+case class ProgramReference(semester: Semester, index: PosInt) {
 
   def format: String =
     f"G-${semester.format}-$index%04d"
@@ -31,15 +31,16 @@ case class ProposalReference(semester: Semester, index: PosInt) {
 
 }
 
-object ProposalReference {
+object ProgramReference {
 
-  given Order[ProposalReference] =
+  given Order[ProgramReference] =
     Order.by { a => (
       a.semester,
       a.index
     )}
 
-  private object parser {
+  object parse {
+
     val semesterYear: Parser[Year] =
       posInt.mapFilter { yr =>
         Exception.catching(classOf[DateTimeException]).opt {
@@ -66,24 +67,24 @@ object ProposalReference {
     val index: Parser[PosInt] =
       char('0').rep.void *> posInt
 
-    val fullFormat: Parser[ProposalReference] =
+    val fullFormat: Parser[ProgramReference] =
       ((char('G').void *> semester.surroundedBy(char('-'))) ~ index).map { (semester, index) =>
-        ProposalReference(semester, index)
+        ProgramReference(semester, index)
       }
 
-    val shortFormat: Parser[ProposalReference] =
+    val shortFormat: Parser[ProgramReference] =
       (shortSemester ~ index).map { (semester, index) =>
-        ProposalReference(semester, index)
+        ProgramReference(semester, index)
       }
   }
 
-  val FromString: Format[String, ProposalReference] =
-    Format(s => parser.fullFormat.parseAll(s).toOption, _.format)
-    
-  val FromShortString: Format[String, ProposalReference] =
-    Format(s => parser.shortFormat.parseAll(s).toOption, _.formatShort)
+  val FromString: Format[String, ProgramReference] =
+    Format(s => parse.fullFormat.parseAll(s).toOption, _.format)
 
-  given Decoder[ProposalReference] =
+  val FromShortString: Format[String, ProgramReference] =
+    Format(s => parse.shortFormat.parseAll(s).toOption, _.formatShort)
+
+  given Decoder[ProgramReference] =
     Decoder.decodeString.emap { s =>
       FromString
         .getOption(s)
@@ -91,7 +92,7 @@ object ProposalReference {
         .toRight(s"Could not parse '$s' as a proposal reference.")
     }
 
-  given Encoder[ProposalReference] =
+  given Encoder[ProgramReference] =
     Encoder.instance(_.format.asJson)
 
 }
