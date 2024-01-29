@@ -81,11 +81,11 @@ EXECUTE FUNCTION update_proposal_index();
 
 -- Add a generated column that formats the proposal reference from the semester
 -- and index.
-CREATE DOMAIN d_proposal_reference AS varchar
-  CHECK (VALUE ~ '^G-[0-9][0-9][0-9][0-9]+[AB]-[0-9][0-9][0-9][0-9]+$');
-COMMENT ON DOMAIN d_proposal_reference IS 'Formatted Proposal Reference';
+CREATE DOMAIN d_program_reference AS varchar
+  CHECK (VALUE ~ '^G-[0-9][0-9][0-9][0-9]+[AB]-[0-9][0-9][0-9][0-9]+(-[CDFLQSV])?$');
+COMMENT ON DOMAIN d_program_reference IS 'Formatted Program Reference';
 
-CREATE OR REPLACE FUNCTION format_proposal_reference(semester d_semester, index_value int4)
+CREATE OR REPLACE FUNCTION format_program_reference(semester d_semester, index_value int4)
 RETURNS VARCHAR
 AS $$
 BEGIN
@@ -97,7 +97,7 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 ALTER TABLE t_program
-  ADD COLUMN c_proposal_reference d_proposal_reference GENERATED ALWAYS AS (format_proposal_reference(c_semester, c_semester_index)) STORED UNIQUE;
+  ADD COLUMN c_program_reference d_program_reference GENERATED ALWAYS AS (format_program_reference(c_semester, c_semester_index)) STORED UNIQUE;
 
 -- An index on the proposal reference to facilitate lookup
---CREATE INDEX proposal_reference_index ON t_program (c_proposal_reference);
+--CREATE INDEX program_reference_index ON t_program (c_program_reference);

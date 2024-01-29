@@ -314,13 +314,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   private lazy val Program: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "program", List(
       ProgramIdBinding.Option("programId", rPid),
-      ProposalReferenceBinding.Option("proposalReference", rRef)
+      ProgramReferenceBinding.Option("programReference", rRef)
     )) =>
       Elab.transformChild { child =>
         (rPid, rRef).parTupled.map { (pid, ref) =>
           val predicate = and(List(
             pid.map(Predicates.program.id.eql).toList,
-            ref.map(r => Predicates.program.proposalReference.eql(r.some)).toList
+            ref.map(r => Predicates.program.programReference.eql(r.some)).toList
           ).flatten)
 
           Unique(
