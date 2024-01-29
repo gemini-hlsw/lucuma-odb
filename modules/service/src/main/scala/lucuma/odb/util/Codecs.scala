@@ -50,7 +50,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.ProposalReference
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -334,20 +334,17 @@ trait Codecs {
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
 
+  val program_reference: Codec[ProgramReference] =
+    varchar.eimap(
+      s => ProgramReference.FromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
+      ProgramReference.FromString.reverseGet
+    )
+
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
 
   val program_user_support_type: Codec[ProgramUserSupportType] =
     enumerated(Type("e_program_user_support_type"))
-
-  val proposal_reference: Codec[ProposalReference] = {
-    import ProposalReference.FromString
-
-    varchar.eimap(
-      s => FromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
-      FromString.reverseGet
-    )
-  }
 
   val radial_velocity: Codec[RadialVelocity] =
     numeric.eimap(

@@ -11,7 +11,7 @@ import io.circe.literal._
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.odb.data.ProposalReference
+import lucuma.odb.data.ProgramReference
 
 
 class reference extends OdbSuite {
@@ -23,16 +23,16 @@ class reference extends OdbSuite {
   val validUsers = List(pi, guest, service)
 
   val sem2024B   = Semester.unsafeFromString("2024B")
-  val ref2024B1  = ProposalReference.FromString.unsafeGet("G-2024B-0001")
-  val ref2024B2  = ProposalReference.FromString.unsafeGet("G-2024B-0002")
+  val ref2024B1  = ProgramReference.FromString.unsafeGet("G-2024B-0001")
+  val ref2024B2  = ProgramReference.FromString.unsafeGet("G-2024B-0002")
 
   val sem2025A   = Semester.unsafeFromString("2025A")
-  val ref2025A1  = ProposalReference.FromString.unsafeGet("G-2025A-0001")
+  val ref2025A1  = ProgramReference.FromString.unsafeGet("G-2025A-0001")
 
   val sem2025B   = Semester.unsafeFromString("2025B")
-  val ref2025B1  = ProposalReference.FromString.unsafeGet("G-2025B-0001")
+  val ref2025B1  = ProgramReference.FromString.unsafeGet("G-2025B-0001")
 
-  def submitProposal(pid: Program.Id, s: Option[Semester]): IO[ProposalReference] =
+  def submitProposal(pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
       query(pi, s"""
           mutation {
             updatePrograms(
@@ -49,7 +49,7 @@ class reference extends OdbSuite {
               }
             ) {
               programs {
-                proposalReference
+                programReference
               }
             }
           }
@@ -59,8 +59,8 @@ class reference extends OdbSuite {
           .downField("updatePrograms")
           .downField("programs")
           .downArray
-          .downField("proposalReference")
-          .as[ProposalReference]
+          .downField("programReference")
+          .as[ProgramReference]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
       }
@@ -90,8 +90,8 @@ class reference extends OdbSuite {
       user  = pi,
       query = s"""
         query {
-          program(proposalReference: "G-2024B-001") {
-            proposalReference
+          program(programReference: "G-2024B-001") {
+            programReference
           }
         }
       """,
@@ -99,7 +99,7 @@ class reference extends OdbSuite {
         json"""
           {
             "program": {
-              "proposalReference": $ref2024B1
+              "programReference": $ref2024B1
             }
           }
         """
@@ -113,7 +113,7 @@ class reference extends OdbSuite {
       query = s"""
         query {
           program {
-            proposalReference
+            programReference
           }
         }
       """,
@@ -140,7 +140,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              proposalReference
+              programReference
             }
           }
         }
@@ -151,10 +151,10 @@ class reference extends OdbSuite {
             "programs": {
               "matches": [
                  {
-                   "proposalReference": $ref2024B1
+                   "programReference": $ref2024B1
                  },
                  {
-                   "proposalReference": $ref2024B2
+                   "programReference": $ref2024B2
                  }
               ]
             }
@@ -280,7 +280,7 @@ class reference extends OdbSuite {
                 }
               ) {
                 programs {
-                  proposalReference
+                  programReference
                 }
               }
             }

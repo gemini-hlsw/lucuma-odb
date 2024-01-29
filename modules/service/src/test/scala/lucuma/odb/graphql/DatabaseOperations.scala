@@ -47,7 +47,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.ProposalReference
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.UserInvitation
@@ -79,9 +79,9 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def fetchPid(user: User, ref: ProposalReference): IO[Program.Id] =
+  def fetchPid(user: User, ref: ProgramReference): IO[Program.Id] =
     query(user, s"""
-      query { program(proposalReference: "${ref.format}") { id } }
+      query { program(programReference: "${ref.format}") { id } }
     """).flatMap { js =>
       js.hcursor
         .downFields("program", "id")
@@ -90,13 +90,13 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 /*
-  def fetchReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
+  def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     query(user, s"""
-      query { program(programId: "$pid") { proposalReference } }
+      query { program(programId: "$pid") { programReference } }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "proposalReference")
-        .as[Option[ProposalReference]]
+        .downFields("program", "programReference")
+        .as[Option[ProgramReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }

@@ -12,7 +12,7 @@ import lucuma.core.parser.TimeParsers.*
 
 import java.time.Year
 
-// TODO: reuse the parser in ProposalReference
+// TODO: reuse the parser in ProgramReference
 
 private [binding] object semesterBinding {
   private val year2: Parser[Year] =
