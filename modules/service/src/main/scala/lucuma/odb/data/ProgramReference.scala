@@ -4,6 +4,7 @@
 package lucuma.odb.data
 
 import cats.Order
+import cats.parse.Numbers.digit
 import cats.parse.Parser
 import cats.parse.Parser.*
 import eu.timepit.refined.cats.given
@@ -42,9 +43,9 @@ object ProgramReference {
   object parse {
 
     val semesterYear: Parser[Year] =
-      posInt.mapFilter { yr =>
-        Exception.catching(classOf[DateTimeException]).opt {
-          Year.of(yr.value)
+      digit.rep(4).mapFilter { digits =>
+        Exception.allCatch.opt {
+          Year.of(digits.toList.mkString.toInt)
         }
       }
 

@@ -509,4 +509,44 @@ class reference extends OdbSuite {
       )
     )
   }
+
+  test("where semester (short)") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          programs(
+            WHERE: {
+              semester: {
+                EQ: "24B"
+              }
+            }
+          ) {
+            matches {
+              programReference
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "programs" : {
+              "matches": [
+                {
+                  "programReference": ${ref2024B1.format}
+                },
+                {
+                  "programReference": ${ref2024B2.format}
+                },
+                {
+                  "programReference": ${ref2024B3.format}
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
+  }
 }
