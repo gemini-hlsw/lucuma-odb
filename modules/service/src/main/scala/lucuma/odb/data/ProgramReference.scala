@@ -66,7 +66,7 @@ object ProgramReference {
       (shortSemesterYear ~ half).map(Semester.apply)
 
     val index: Parser[PosInt] =
-      char('0').rep.void *> posInt
+      char('0').rep0.with1 *> posInt
 
     val fullFormat: Parser[ProgramReference] =
       ((char('G').void *> semester.surroundedBy(char('-'))) ~ index).map { (semester, index) =>
