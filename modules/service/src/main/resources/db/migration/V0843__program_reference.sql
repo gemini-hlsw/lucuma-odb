@@ -1,9 +1,13 @@
 -- Add a semester column to program.  It is nullable but there will be a
--- constraint that checks that it is set when the proposal status is not
+-- trigger that checks that it is set when the proposal status is not
 -- 'not_submitted'.
 
 CREATE DOMAIN d_semester AS varchar
-  CHECK (VALUE ~ '^[0-9][0-9][0-9][0-9]+[AB]$');
+  CHECK (
+    VALUE ~ '^\d{4}[AB]$' AND
+    CAST(SUBSTRING(VALUE FROM 1 FOR 4) AS INTEGER) >= 2000 AND
+    CAST(SUBSTRING(VALUE FROM 1 FOR 4) AS INTEGER) <= EXTRACT(YEAR FROM CURRENT_DATE) + 1 -- Ensure the year is not greater than the current year + 1
+  );
 COMMENT ON DOMAIN d_semester IS 'Formatted Semester';
 
 ALTER TABLE t_program
