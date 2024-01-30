@@ -222,13 +222,13 @@ object ProgramService {
             .fold(Result.unit) { newStatus =>
               (
                 UpdateProgramsError.NoProposalForStatusChange(pid)
-                  .failure.whenA(!hasProposal),
+                  .failure.unlessA(hasProposal),
 
                 UpdateProgramsError.NotAuthorizedNewProposalStatus(user, Tag(newStatus.tag))
-                  .failure.whenA(!userCanChangeProposalStatus(newStatus)),
+                  .failure.unlessA(userCanChangeProposalStatus(newStatus)),
 
                 UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, Tag(oldStatus.tag))
-                  .failure.whenA(!userCanChangeProposalStatus(oldStatus))
+                  .failure.unlessA(userCanChangeProposalStatus(oldStatus))
 
               ).tupled.void  // do we want all of the errors or would it be annoying?
             }
@@ -243,8 +243,8 @@ object ProgramService {
                    _         <- validateStatusUpdate(pid, oldStatus, newStatusUpdate, hasProposal)
                    finalStatus   = newStatusUpdate.getOrElse(oldStatus)
                    finalSemester = SET.semester.fold(none, oldSemester, _.some)
-                   _         <- if (finalStatus === enumsVal.ProposalStatus.NotSubmitted || finalSemester.isDefined) Result.unit
-                                else UpdateProgramsError.NoSemesterForSubmittedProposal(pid).failure
+                   _         <- UpdateProgramsError.NoSemesterForSubmittedProposal(pid)
+                                  .failure.unlessA(finalStatus === enumsVal.ProposalStatus.NotSubmitted || finalSemester.isDefined)
                  } yield ()
 
                (acc, check).parTupled.void
