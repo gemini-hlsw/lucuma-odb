@@ -310,7 +310,7 @@ class reference extends OdbSuite {
             }
         """,
         expected = Left(List(
-          s"Submitted program $pid must be associated a semester."
+          s"Submitted program $pid must be associated with a semester."
         ))
       )
     }
