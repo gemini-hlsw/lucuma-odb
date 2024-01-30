@@ -92,7 +92,29 @@ class reference extends OdbSuite {
       user  = pi,
       query = s"""
         query {
-          program(programReference: "G-2024B-001") {
+          program(programReference: "G-2024B-0001") {
+            programReference
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "program": {
+              "programReference": ${ref2024B1.format}
+            }
+          }
+        """
+      )
+    )
+  }
+
+  test("lookup via (short) proposal ref") {
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          program(programReference: "24B1") {
             programReference
           }
         }
