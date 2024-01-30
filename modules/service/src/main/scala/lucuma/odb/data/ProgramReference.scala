@@ -79,17 +79,17 @@ object ProgramReference {
       }
   }
 
-  val FromString: Format[String, ProgramReference] =
+  val fromString: Format[String, ProgramReference] =
     Format(s => parse.fullFormat.parseAll(s).toOption, _.format)
 
-  val FromShortString: Format[String, ProgramReference] =
+  val fromShortString: Format[String, ProgramReference] =
     Format(s => parse.shortFormat.parseAll(s).toOption, _.formatShort)
 
   given Decoder[ProgramReference] =
     Decoder.decodeString.emap { s =>
-      FromString
+      fromString
         .getOption(s)
-        .orElse(FromShortString.getOption(s))
+        .orElse(fromShortString.getOption(s))
         .toRight(s"Could not parse '$s' as a proposal reference.")
     }
 

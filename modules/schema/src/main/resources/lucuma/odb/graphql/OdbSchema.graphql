@@ -8404,9 +8404,9 @@ type ScienceRequirementsGroupSelectResult {
 }
 
 """
-Semester string (from 2000A on) in the format YYYY[AB].  An abbreviated format,
-which assumes the millennium 2000, is also permitted.  For example, 24A is read
-as 2024A.
+Semester string (from 0001A to 999999999B) in the format YYYY[AB].  An
+abbreviated format, which assumes the millennium 2000, is also permitted.  For
+example, 24A is read as 2024A.
 """
 scalar Semester
 

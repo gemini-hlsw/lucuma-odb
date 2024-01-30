@@ -8,8 +8,8 @@ import lucuma.odb.data.ProgramReference
 val ProgramReferenceBinding: Matcher[ProgramReference] =
   StringBinding.emap { s =>
     ProgramReference
-      .FromString
+      .fromString
       .getOption(s)
-      .orElse(ProgramReference.FromShortString.getOption(s))
+      .orElse(ProgramReference.fromShortString.getOption(s))
       .toRight(s"'$s' cannot be parsed as a valid ProgramReference.")
   }

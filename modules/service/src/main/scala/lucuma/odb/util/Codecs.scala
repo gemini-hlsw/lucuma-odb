@@ -336,8 +336,8 @@ trait Codecs {
 
   val program_reference: Codec[ProgramReference] =
     varchar.eimap(
-      s => ProgramReference.FromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
-      ProgramReference.FromString.reverseGet
+      s => ProgramReference.fromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
+      ProgramReference.fromString.reverseGet
     )
 
   val program_user_role: Codec[ProgramUserRole] =
