@@ -11,5 +11,5 @@ val SemesterBinding: Matcher[Semester] =
   StringBinding.emap { s =>
     semester.parseAll(s).toOption
       .orElse(shortSemester.parseAll(s).toOption)
-      .toRight(s"'$s' cannot be parsed as a valid Semester.")
+      .toRight(s"'$s' is not a valid semester.")
   }

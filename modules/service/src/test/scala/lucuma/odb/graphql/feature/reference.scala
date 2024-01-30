@@ -571,4 +571,36 @@ class reference extends OdbSuite {
       )
     )
   }
+
+  test("set semester in the distant future") {
+    // G-2025A-0001 -> assign semester 2024B
+    // G-2024B-0001 and 00002 already taken, so we get G-2024B-0003
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                semester: "9999B"
+              }
+              WHERE: {
+                programReference: {
+                  EQ: "${ref2024B3.format}"
+                }
+              }
+            }
+          ) {
+            programs {
+              programReference
+            }
+          }
+        }
+        """,
+      expected = Left(List(
+        "The maximum semester is capped at the current year +1 (9999B specified)."
+      ))
+    )
+  }
+
 }

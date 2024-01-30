@@ -11,6 +11,7 @@ import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Program
@@ -119,7 +120,8 @@ object ProgramService {
         s"Proposal status in program $pid cannot be changed because it has no proposal."
       case NoSemesterForSubmittedProposal(pid)           =>
         s"Submitted program $pid must be associated with a semester."
-
+      case InvalidSemester(s: Option[Semester])          =>
+        s"The maximum semester is capped at the current year +1${s.fold(".")(" ("+ _.format + " specified).")}"
     def failure = Result.failure(message)
   }
 
@@ -130,6 +132,7 @@ object ProgramService {
     case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
     case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
     case class NoSemesterForSubmittedProposal(pid: Program.Id) extends UpdateProgramsError
+    case class InvalidSemester(s: Option[Semester]) extends UpdateProgramsError
   }
 
   /**
@@ -185,13 +188,17 @@ object ProgramService {
         }
 
         // Update programs
-        val updatePrograms: F[List[Program.Id]] =
-          Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
+        val updatePrograms: F[Result[List[Program.Id]]] =
+          Statements.updatePrograms(SET).fold(Nil.success.pure[F]) { af =>
             session.prepareR(af.fragment.query(program_id)).use { ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
+                .map(_.success)
             }
+          }.recover {
+            case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
+              UpdateProgramsError.InvalidSemester(SET.semester.toOption).failure
           }
 
         // Update proposals. This can fail in a few ways.
@@ -257,7 +264,7 @@ object ProgramService {
           _    <- ResultT(setup.map(Result.apply))
           n    <- ResultT(SET.proposalStatus.traverse(tagToProposalStatus).pure[F])
           _    <- ResultT(validateUpdate(n))
-          ids1 <- ResultT(updatePrograms.map(Result.apply))
+          ids1 <- ResultT(updatePrograms)
           ids2 <- ResultT(updateProposals) 
         } yield (ids1 |+| ids2)).value
 
