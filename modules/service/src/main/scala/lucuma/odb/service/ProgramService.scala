@@ -118,7 +118,7 @@ object ProgramService {
       case NoProposalForStatusChange(pid)                =>
         s"Proposal status in program $pid cannot be changed because it has no proposal."
       case NoSemesterForSubmittedProposal(pid)           =>
-        s"Submitted program $pid must be associated a semester."
+        s"Submitted program $pid must be associated with a semester."
 
     def failure = Result.failure(message)
   }

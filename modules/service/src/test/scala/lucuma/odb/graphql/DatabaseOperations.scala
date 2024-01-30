@@ -89,7 +89,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
-/*
+
   def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     query(user, s"""
       query { program(programId: "$pid") { programReference } }
@@ -100,7 +100,6 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
-*/
 
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.
