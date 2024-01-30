@@ -23,16 +23,16 @@ class reference extends OdbSuite {
   val validUsers = List(pi, guest, service)
 
   val sem2024B   = Semester.unsafeFromString("2024B")
-  val ref2024B1  = ProgramReference.FromString.unsafeGet("G-2024B-0001")
-  val ref2024B2  = ProgramReference.FromString.unsafeGet("G-2024B-0002")
-  val ref2024B3  = ProgramReference.FromString.unsafeGet("G-2024B-0003")
+  val ref2024B1  = ProgramReference.fromString.unsafeGet("G-2024B-0001")
+  val ref2024B2  = ProgramReference.fromString.unsafeGet("G-2024B-0002")
+  val ref2024B3  = ProgramReference.fromString.unsafeGet("G-2024B-0003")
 
   val sem2025A   = Semester.unsafeFromString("2025A")
-  val ref2025A1  = ProgramReference.FromString.unsafeGet("G-2025A-0001")
+  val ref2025A1  = ProgramReference.fromString.unsafeGet("G-2025A-0001")
 
   val sem2025B   = Semester.unsafeFromString("2025B")
-  val ref2025B1  = ProgramReference.FromString.unsafeGet("G-2025B-0001")
-  val ref2025B2  = ProgramReference.FromString.unsafeGet("G-2025B-0002")
+  val ref2025B1  = ProgramReference.fromString.unsafeGet("G-2025B-0001")
+  val ref2025B2  = ProgramReference.fromString.unsafeGet("G-2025B-0002")
 
   def submitProposal(pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
       query(pi, s"""

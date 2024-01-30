@@ -23,13 +23,8 @@ UPDATE t_program
   WHERE
     c_proposal_status <> 'not_submitted';
 
--- Every submitted proposal has been assigned a semester.
---ALTER TABLE t_program
---  ADD CONSTRAINT submitted_proposal_has_semester
---  CHECK (c_proposal_status = 'not_submitted' OR c_semester IS NOT NULL);
-
--- A function that obtains the next proposal index for a semester
-CREATE OR REPLACE FUNCTION next_proposal_index(semester d_semester)
+-- A function that obtains the next index for a semester
+CREATE OR REPLACE FUNCTION next_semester_index(semester d_semester)
 RETURNS INT
 AS $$
 DECLARE
@@ -40,31 +35,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Add a proposal index column
+-- Add a semester index column
 ALTER TABLE t_program
   ADD COLUMN c_semester_index int4 CHECK (c_semester_index > 0);
 
--- Set the proposal index for existing programs that have a semester (i.e., have
+-- Set the semester index for existing programs that have a semester (i.e., have
 -- been submitted).
 UPDATE t_program
-  SET c_semester_index = next_proposal_index(c_semester)
+  SET c_semester_index = next_semester_index(c_semester)
   WHERE c_semester IS NOT NULL;
 
--- Every submitted proposal has an index.
---ALTER TABLE t_program
---  ADD CONSTRAINT submitted_proposal_has_index
---  CHECK (c_proposal_status = 'not_submitted' OR c_semester_index IS NOT NULL);
-
--- Add a trigger that (re)sets the proposal index when submitted or when the
+-- Add a trigger that (re)sets the semester index when submitted or when the
 -- semester changes.
-CREATE OR REPLACE FUNCTION update_proposal_index()
+CREATE OR REPLACE FUNCTION update_semester_index()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.c_proposal_status <> 'not_submitted'::d_tag THEN
         IF NEW.c_semester IS NULL THEN
             RAISE EXCEPTION 'Submitted proposals must have a semester';
         ELSEIF NEW.c_semester_index IS NULL OR NEW.c_semester IS DISTINCT FROM OLD.c_semester THEN
-            NEW.c_semester_index := next_proposal_index(NEW.c_semester);
+            NEW.c_semester_index := next_semester_index(NEW.c_semester);
         END IF;
     ELSEIF NEW.c_proposal_status = 'not_submitted'::d_tag AND NEW.c_semester IS NULL THEN
         NEW.c_semester_index := NULL;
@@ -74,10 +64,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_proposal_index_trigger
+CREATE TRIGGER update_semester_index_trigger
 BEFORE UPDATE ON t_program
 FOR EACH ROW
-EXECUTE FUNCTION update_proposal_index();
+EXECUTE FUNCTION update_semester_index();
 
 -- Add a generated column that formats the proposal reference from the semester
 -- and index.
@@ -98,6 +88,3 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 ALTER TABLE t_program
   ADD COLUMN c_program_reference d_program_reference GENERATED ALWAYS AS (format_program_reference(c_semester, c_semester_index)) STORED UNIQUE;
-
--- An index on the proposal reference to facilitate lookup
---CREATE INDEX program_reference_index ON t_program (c_program_reference);
