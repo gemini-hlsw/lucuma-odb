@@ -274,19 +274,17 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
     {
       case (QueryType, "observations", List(
-        ProgramIdBinding.Option("programId", rPid),
         WhereObservationBinding.Option("WHERE", rWHERE),
         ObservationIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rPid, rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, OFFSET, LIMIT, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
-                  pid.map(Predicates.observation.program.id.eql).getOrElse(True),
                   OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
                   Predicates.observation.existence.includeDeleted(includeDeleted),
                   Predicates.observation.program.isVisibleTo(user),
