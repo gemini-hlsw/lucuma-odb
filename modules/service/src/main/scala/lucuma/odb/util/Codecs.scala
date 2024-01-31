@@ -48,6 +48,7 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -333,6 +334,12 @@ trait Codecs {
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
 
+  val program_reference: Codec[ProgramReference] =
+    varchar.eimap(
+      s => ProgramReference.fromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
+      ProgramReference.fromString.reverseGet
+    )
+
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
 
@@ -351,14 +358,20 @@ trait Codecs {
       RightAscension.fromAngleExact.reverseGet
     )
 
+  val science_mode: Codec[ScienceMode] =
+    enumerated[ScienceMode](Type.varchar)
+
+  val semester: Codec[Semester] =
+    varchar.eimap(
+      s => Semester.fromString(s).toRight(s"Invalid semester: $s"))(
+      _.format
+    )
+
   val sequence_command: Codec[SequenceCommand] =
     enumerated[SequenceCommand](Type("e_sequence_command"))
 
   val sequence_type: Codec[SequenceType] =
     enumerated[SequenceType](Type("e_sequence_type"))
-
-  val science_mode: Codec[ScienceMode] =
-    enumerated[ScienceMode](Type.varchar)
 
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
@@ -460,7 +473,6 @@ trait Codecs {
       BoundedInterval.unsafeFromBounds(from(bw.lowerBound), from(bw.upperBound))
     )
   }
-
 
   // Not so atomic ...
 
