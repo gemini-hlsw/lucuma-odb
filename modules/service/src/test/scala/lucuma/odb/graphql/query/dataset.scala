@@ -81,7 +81,7 @@ class dataset extends OdbSuite with DatasetSetupOperations {
     val f = for {
       ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 200, 1, 1)
       (_, List((_, List(did)))) = ds
-      s  <- addDatasetEventAs(service, did, DatasetStage.StartObserve)
+      s  <- addDatasetEventAs(service, did, DatasetStage.StartExpose)
       e  <- addDatasetEventAs(service, did, DatasetStage.EndWrite)
     } yield (did, TimestampInterval.between(s.received, e.received))
 
