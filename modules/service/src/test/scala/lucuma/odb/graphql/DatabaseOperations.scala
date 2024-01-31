@@ -45,6 +45,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -77,6 +78,81 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def fetchPid(user: User, ref: ProgramReference): IO[Program.Id] =
+    query(user, s"""
+      query { program(programReference: "${ref.format}") { id } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+    query(user, s"""
+      query { program(programId: "$pid") { programReference } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "programReference")
+        .as[Option[ProgramReference]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  // For proposal tests where it doesn't matter what the proposal is, just that
+  // there is one.
+  def addProposal(user: User, pid: Program.Id): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposal: {
+                  proposalClass: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                  category: COSMOLOGY
+                  toOActivation: NONE
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 100
+                    }
+                  ]
+                }
+              }
+              WHERE: {
+                id: {
+                  EQ: "$pid"
+                }
+              }
+            }
+          ) {
+            programs {
+              id
+            }
+          }
+        }
+      """,
+      expected =
+        Right(json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          }
+        """)
+    )
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids: _*)
