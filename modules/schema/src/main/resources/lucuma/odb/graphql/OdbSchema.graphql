@@ -8012,9 +8012,6 @@ type Query {
   Selects the first `LIMIT` matching observations based on the provided `WHERE` parameter, if any.
   """
   observations(
-
-    programId: ProgramId
-
     """
     Filters the selection of observations.
     """
@@ -10466,9 +10463,9 @@ input WhereObservation {
   id: WhereOrderObservationId
 
   """
-  Matches the id of the associated program.
+  Matches the associated program.
   """
-  programId: WhereOrderProgramId
+  program: WhereProgram
 
   """
   Matches the subtitle of the observation.

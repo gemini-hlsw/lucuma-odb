@@ -191,7 +191,11 @@ class observations extends OdbSuite {
             user = pi,
             query = s"""
               query {
-                observations(programId: "$pid") {
+                observations(WHERE: {
+                  program: {
+                    id: { EQ: "$pid" }
+                  }
+                }) {
                   matches {
                     id
                     scienceRequirements {

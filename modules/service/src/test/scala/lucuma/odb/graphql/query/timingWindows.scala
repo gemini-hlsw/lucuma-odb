@@ -313,7 +313,11 @@ class timingWindows extends OdbSuite {
             query =
               s"""
               query {
-                observations(programId: ${pid.asJson}) {
+                observations(WHERE: {
+                  program: {
+                    id: { EQ: "$pid" }
+                  }
+                }) {
                   matches {
                     constraintSet {
                       elevationRange {

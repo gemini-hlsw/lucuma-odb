@@ -12,7 +12,6 @@ import grackle.Predicate._
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
 
 object WhereObservation {
@@ -20,7 +19,7 @@ object WhereObservation {
   def binding(path: Path): Matcher[Predicate] = {
     val SubtitleBinding = WhereOptionString.binding(path / "subtitle")
     val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "id", ObservationIdBinding)
-    val WhereOrderProgramIdBinding = WhereOrder.binding[Program.Id](path / "program" / "id", ProgramIdBinding)
+    val WhereProgramBinding = WhereProgram.binding(path / "program")
     val StatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ObsStatus])
     val ActiveStatusBinding = WhereOrder.binding(path / "activeStatus", enumeratedBinding[ObsActiveStatus])
     lazy val WhereObservationBinding = binding(path)
@@ -30,18 +29,18 @@ object WhereObservation {
         WhereObservationBinding.List.Option("OR", rOR),
         WhereObservationBinding.Option("NOT", rNOT),
         WhereOrderObservationIdBinding.Option("id", rId),
-        WhereOrderProgramIdBinding.Option("programId", rPid),
+        WhereProgramBinding.Option("program", rProgram),
         SubtitleBinding.Option("subtitle", rSubtitle),
         StatusBinding.Option("status", rStatus),
         ActiveStatusBinding.Option("activeStatus", rActiveStatus)
       ) =>
-        (rAND, rOR, rNOT, rId, rPid, rSubtitle, rStatus, rActiveStatus).parMapN { (AND, OR, NOT, id, pid, subtitle, status, activeStatus) =>
+        (rAND, rOR, rNOT, rId, rProgram, rSubtitle, rStatus, rActiveStatus).parMapN { (AND, OR, NOT, id, program, subtitle, status, activeStatus) =>
           and(List(
             AND.map(and),
             OR.map(or),
             NOT.map(Not(_)),
             id,
-            pid,
+            program,
             subtitle,
             status,
             activeStatus
