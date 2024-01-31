@@ -5099,13 +5099,13 @@ type DatasetSelectResult {
 "Execution stage or phase of an individual dataset."
 enum DatasetStage {
 
-  END_OBSERVE
+  END_EXPOSE
 
   END_READOUT
 
   END_WRITE
 
-  START_OBSERVE
+  START_EXPOSE
 
   START_READOUT
 
