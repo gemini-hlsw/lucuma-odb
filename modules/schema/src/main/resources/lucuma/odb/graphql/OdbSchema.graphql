@@ -11677,9 +11677,9 @@ input WhereTarget {
   id: WhereOrderTargetId
 
   """
-  Matches the id of the associated program.
+  Matches the associated program.
   """
-  programId: WhereOrderProgramId
+  program: WhereProgram
 
   """
   Matches the target name.
