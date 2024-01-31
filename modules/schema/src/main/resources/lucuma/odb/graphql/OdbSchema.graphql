@@ -10179,7 +10179,7 @@ input WhereDataset {
   id: WhereOrderDatasetId
 
   "Matches all datasets associated with the observation."
-  observationId: WhereOrderObservationId
+  observation: WhereObservation
 
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
