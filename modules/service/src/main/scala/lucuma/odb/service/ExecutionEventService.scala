@@ -145,9 +145,9 @@ object ExecutionEventService {
 
           // StartObserve signals the start of the dataset, EndWrite the end.
           datasetStage match {
-            case DatasetStage.StartObserve => setWith(services.datasetService.setStartTime)
-            case DatasetStage.EndWrite     => setWith(services.datasetService.setEndTime)
-            case _                         => ().pure
+            case DatasetStage.StartExpose => setWith(services.datasetService.setStartTime)
+            case DatasetStage.EndWrite    => setWith(services.datasetService.setEndTime)
+            case _                        => ().pure
           }
         }
 
