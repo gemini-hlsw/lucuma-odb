@@ -13,10 +13,10 @@ import lucuma.odb.data.ProgramReference
 
 class ProgramPredicates(path: Path) {
 
-  lazy val existence        = ExistencePredicates(path / "existence")
-  lazy val id               = LeafPredicates[Program.Id](path / "id")
-  lazy val programReference = LeafPredicates[Option[ProgramReference]](path / "programReference")
-  lazy val piUserId         = LeafPredicates[User.Id](path / "piUserId")
+  lazy val existence = ExistencePredicates(path / "existence")
+  lazy val id        = LeafPredicates[Program.Id](path / "id")
+  lazy val reference = LeafPredicates[Option[ProgramReference]](path / "reference")
+  lazy val piUserId  = LeafPredicates[User.Id](path / "piUserId")
 
   def isVisibleTo(user: User): Predicate =
     user.role.access match {

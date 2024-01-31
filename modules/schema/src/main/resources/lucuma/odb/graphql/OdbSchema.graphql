@@ -7596,7 +7596,7 @@ type Program {
   Formatted program reference, if any.  Only submitted proposals obtain a
   program reference.
   """
-  programReference: ProgramReference
+  reference: ProgramReference
 
   """
   Program proposal
@@ -11492,9 +11492,9 @@ input WhereProgram {
   semesterIndex: WhereOptionOrderPosInt
 
   """
-  Matches on the proposal reference associated with the program (if any).
+  Matches on the program reference (if any).
   """
-  programReference: WhereOptionOrderProgramReference
+  reference: WhereOptionOrderProgramReference
 
   """
   Matches the proposalStatus.
