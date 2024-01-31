@@ -22,7 +22,7 @@ import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
-import lucuma.odb.graphql.input.WhereTargetInput
+import lucuma.odb.graphql.input.WhereTarget
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.Services
@@ -423,10 +423,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   }
 
   private lazy val Targets: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    val WhereTargetInputBinding = WhereTargetInput.binding(Path.from(TargetType))
+    val WhereTargetBinding = WhereTarget.binding(Path.from(TargetType))
     {
       case (QueryType, "targets", List(
-        WhereTargetInputBinding.Option("WHERE", rWHERE),
+        WhereTargetBinding.Option("WHERE", rWHERE),
         TargetIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
