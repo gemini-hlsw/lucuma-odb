@@ -70,7 +70,7 @@ trait ProgramMapping[F[_]]
         SqlField("name", ProgramTable.Name),
         SqlField("semester", ProgramTable.Reference.Semester),
         SqlField("semesterIndex", ProgramTable.Reference.SemesterIndex),
-        SqlField("programReference", ProgramTable.Reference.ProgramReference),
+        SqlField("reference", ProgramTable.Reference.ProgramReference),
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
         SqlField("proposalStatus", ProgramTable.ProposalStatus),
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),

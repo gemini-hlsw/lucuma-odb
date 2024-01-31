@@ -51,7 +51,7 @@ class reference extends OdbSuite {
               }
             ) {
               programs {
-                programReference
+                reference
               }
             }
           }
@@ -61,7 +61,7 @@ class reference extends OdbSuite {
           .downField("updatePrograms")
           .downField("programs")
           .downArray
-          .downField("programReference")
+          .downField("reference")
           .as[ProgramReference]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
@@ -93,7 +93,7 @@ class reference extends OdbSuite {
       query = s"""
         query {
           program(programReference: "G-2024B-0001") {
-            programReference
+            reference
           }
         }
       """,
@@ -101,7 +101,7 @@ class reference extends OdbSuite {
         json"""
           {
             "program": {
-              "programReference": ${ref2024B1.format}
+              "reference": ${ref2024B1.format}
             }
           }
         """
@@ -115,7 +115,7 @@ class reference extends OdbSuite {
       query = s"""
         query {
           program(programReference: "24B1") {
-            programReference
+            reference
           }
         }
       """,
@@ -123,7 +123,7 @@ class reference extends OdbSuite {
         json"""
           {
             "program": {
-              "programReference": ${ref2024B1.format}
+              "reference": ${ref2024B1.format}
             }
           }
         """
@@ -137,7 +137,7 @@ class reference extends OdbSuite {
       query = s"""
         query {
           program {
-            programReference
+            reference
           }
         }
       """,
@@ -164,7 +164,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              programReference
+              reference
             }
           }
         }
@@ -175,10 +175,10 @@ class reference extends OdbSuite {
             "programs": {
               "matches": [
                  {
-                   "programReference": $ref2024B1
+                   "reference": $ref2024B1
                  },
                  {
-                   "programReference": $ref2024B2
+                   "reference": $ref2024B2
                  }
               ]
             }
@@ -304,7 +304,7 @@ class reference extends OdbSuite {
                 }
               ) {
                 programs {
-                  programReference
+                  reference
                 }
               }
             }
@@ -387,7 +387,7 @@ class reference extends OdbSuite {
                 proposalStatus: NOT_SUBMITTED
               }
               WHERE: {
-                programReference: {
+                reference: {
                   EQ: "${ref2024B2.format}"
                 }
               }
@@ -423,14 +423,14 @@ class reference extends OdbSuite {
                 proposalStatus: SUBMITTED
               }
               WHERE: {
-                programReference: {
+                reference: {
                   EQ: "${ref2024B2.format}"
                 }
               }
             }
           ) {
             programs {
-              programReference
+              reference
             }
           }
         }
@@ -441,7 +441,7 @@ class reference extends OdbSuite {
             "updatePrograms" : {
               "programs": [
                 {
-                  "programReference": ${ref2024B2.format}
+                  "reference": ${ref2024B2.format}
                 }
               ]
             }
@@ -464,14 +464,14 @@ class reference extends OdbSuite {
                 semester: "2024B"
               }
               WHERE: {
-                programReference: {
+                reference: {
                   EQ: "${ref2025A1.format}"
                 }
               }
             }
           ) {
             programs {
-              programReference
+              reference
             }
           }
         }
@@ -482,7 +482,7 @@ class reference extends OdbSuite {
             "updatePrograms" : {
               "programs": [
                 {
-                  "programReference": ${ref2024B3.format}
+                  "reference": ${ref2024B3.format}
                 }
               ]
             }
@@ -508,7 +508,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              programReference
+              reference
             }
           }
         }
@@ -519,10 +519,10 @@ class reference extends OdbSuite {
             "programs" : {
               "matches": [
                 {
-                  "programReference": ${ref2024B2.format}
+                  "reference": ${ref2024B2.format}
                 },
                 {
-                  "programReference": ${ref2024B3.format}
+                  "reference": ${ref2024B3.format}
                 }
               ]
             }
@@ -545,7 +545,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              programReference
+              reference
             }
           }
         }
@@ -556,13 +556,13 @@ class reference extends OdbSuite {
             "programs" : {
               "matches": [
                 {
-                  "programReference": ${ref2024B1.format}
+                  "reference": ${ref2024B1.format}
                 },
                 {
-                  "programReference": ${ref2024B2.format}
+                  "reference": ${ref2024B2.format}
                 },
                 {
-                  "programReference": ${ref2024B3.format}
+                  "reference": ${ref2024B3.format}
                 }
               ]
             }
@@ -585,14 +585,14 @@ class reference extends OdbSuite {
                 semester: "9999B"
               }
               WHERE: {
-                programReference: {
+                reference: {
                   EQ: "${ref2024B3.format}"
                 }
               }
             }
           ) {
             programs {
-              programReference
+              reference
             }
           }
         }

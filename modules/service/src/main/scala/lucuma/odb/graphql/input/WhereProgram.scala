@@ -23,7 +23,7 @@ object WhereProgram {
     val WhereNameBinding = WhereOptionString.binding(path / "name")
     val WhereOptionOrderSemester = WhereOptionOrder.binding[Semester](path / "semester", SemesterBinding)
     val WhereOptionOrderSemesterIndex = WhereOptionOrder.binding[PosInt](path / "semesterIndex", PosIntBinding)
-    val WhereOptionOrderProgramReference = WhereOptionOrder.binding[ProgramReference](path / "programReference", ProgramReferenceBinding)
+    val WhereOptionOrderProgramReference = WhereOptionOrder.binding[ProgramReference](path / "reference", ProgramReferenceBinding)
     val WhereEqProposalStatus = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
     lazy val WhereProgramBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -35,11 +35,11 @@ object WhereProgram {
         WhereNameBinding.Option("name", rName),
         WhereOptionOrderSemester.Option("semester", rSemester),
         WhereOptionOrderSemesterIndex.Option("semesterIndex", rSemesterIndex),
-        WhereOptionOrderProgramReference.Option("programReference", rProgramReference),
+        WhereOptionOrderProgramReference.Option("reference", rReference),
         WhereEqProposalStatus.Option("proposalStatus", rPs),
         ("proposal", _), // ignore for now
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rSemester, rSemesterIndex, rProgramReference, rPs).parMapN { (AND, OR, NOT, id, name, semester, semesterIndex, programReference, ps) =>
+          (rAND, rOR, rNOT, rId, rName, rSemester, rSemesterIndex, rReference, rPs).parMapN { (AND, OR, NOT, id, name, semester, semesterIndex, reference, ps) =>
           and(List(
             AND.map(and),
             OR.map(or),
@@ -48,7 +48,7 @@ object WhereProgram {
             name,
             semester,
             semesterIndex,
-            programReference,
+            reference,
             ps
           ).flatten)
         }
