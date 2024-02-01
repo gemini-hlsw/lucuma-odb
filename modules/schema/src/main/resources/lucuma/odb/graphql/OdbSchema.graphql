@@ -4874,6 +4874,11 @@ type ConstraintSetGroup {
   Commonly held value across the observations
   """
   constraintSet: ConstraintSet!
+
+  """
+  Link back to program.
+  """
+  program: Program!
 }
 
 """
@@ -7896,10 +7901,12 @@ type Query {
   Observations grouped by commonly held science asterisms
   """
   asterismGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.
@@ -7923,13 +7930,17 @@ type Query {
   obsAttachmentTypeMeta: [ObsAttachmentTypeMeta!]!
 
   """
-  Observations grouped by commonly held constraints
+  Observations grouped by commonly held constraints. Specify one of programId or
+  programReference.  If both are set, both must match.  If neither are set,
+  nothing will match.
   """
   constraintSetGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.
@@ -8148,13 +8159,17 @@ type Query {
   # ): TargetEnvironmentGroupSelectResult!
 
   """
-  Observations grouped by commonly held targets
+  Observations grouped by commonly held targets.  Specify one of programId or
+  programReference.  If both are set, both must match.  If neither are set,
+  nothing will match.
   """
   targetGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program Reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.
@@ -9533,10 +9548,9 @@ type TargetGroup {
   target: Target!
 
   """
-  Link back to program, temporary, to avoid some mapping issues.
-  Please don't use this in API calls.
+  Link back to program.
   """
-  program: Program! @deprecated
+  program: Program!
 
 }
 
