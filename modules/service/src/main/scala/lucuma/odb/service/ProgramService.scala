@@ -38,6 +38,11 @@ import Services.Syntax.*
 trait ProgramService[F[_]] {
 
   /**
+   * Find the program id matching the given reference, if any.
+   */
+  def selectPid(ref: ProgramReference): F[Option[Program.Id]]
+
+  /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
@@ -141,6 +146,9 @@ object ProgramService {
    */
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramService[F] =
     new ProgramService[F] {
+
+      def selectPid(ref: ProgramReference): F[Option[Program.Id]] =
+        session.option(Statements.selectPid)(ref)
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
@@ -282,6 +290,16 @@ object ProgramService {
 
 
   object Statements {
+
+    val selectPid: Query[ProgramReference, Program.Id] =
+      sql"""
+        SELECT
+          c_program_id
+        FROM
+          t_program
+        WHERE
+          c_program_reference = $program_reference
+      """.query(program_id)
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""
