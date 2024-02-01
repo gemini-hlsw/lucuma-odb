@@ -7901,10 +7901,12 @@ type Query {
   Observations grouped by commonly held science asterisms
   """
   asterismGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.

@@ -89,20 +89,21 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches")
     {
       case (QueryType, "asterismGroup", List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProgramReferenceBinding.Option("programReference", rRef),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          (programPredicate(rPid, rRef, Predicates.asterismGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(
                   and(List(
                     WHERE.getOrElse(True),
-                    Predicates.asterismGroup.program.id.eql(pid),
+                    program,
                     Predicates.asterismGroup.program.existence.includeDeleted(includeDeleted),
                     Predicates.asterismGroup.program.isVisibleTo(user),
                   ))
