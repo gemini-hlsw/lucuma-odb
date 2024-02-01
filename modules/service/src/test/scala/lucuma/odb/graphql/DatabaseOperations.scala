@@ -29,6 +29,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.*
 import lucuma.core.model.Target
@@ -153,6 +154,40 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         """)
     )
+
+  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
+    query(user, s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposalStatus: SUBMITTED
+                ${s.map(semster => s""",\nsemester: "${semster.format}"""").getOrElse("")}
+              }
+              WHERE: {
+                id: {
+                  EQ: "$pid"
+                }
+              }
+            }
+          ) {
+            programs {
+              reference
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("updatePrograms")
+        .downField("programs")
+        .downArray
+        .downField("reference")
+        .as[ProgramReference]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids: _*)
