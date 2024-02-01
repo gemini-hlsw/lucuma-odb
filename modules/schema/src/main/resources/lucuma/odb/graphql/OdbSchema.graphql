@@ -8148,13 +8148,17 @@ type Query {
   # ): TargetEnvironmentGroupSelectResult!
 
   """
-  Observations grouped by commonly held targets
+  Observations grouped by commonly held targets.  Specify one of programId or
+  programReference.  If both are set, both must match.  If neither are set,
+  nothing will match.
   """
   targetGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program Reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.

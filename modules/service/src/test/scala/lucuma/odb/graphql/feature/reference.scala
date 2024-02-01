@@ -34,52 +34,19 @@ class reference extends OdbSuite {
   val ref2025B1  = ProgramReference.fromString.unsafeGet("G-2025B-0001")
   val ref2025B2  = ProgramReference.fromString.unsafeGet("G-2025B-0002")
 
-  def submitProposal(pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
-      query(pi, s"""
-          mutation {
-            updatePrograms(
-              input: {
-                SET: {
-                  proposalStatus: SUBMITTED
-                  ${s.map(semster => s""",\nsemester: "${semster.format}"""").getOrElse("")}
-                }
-                WHERE: {
-                  id: {
-                    EQ: "$pid"
-                  }
-                }
-              }
-            ) {
-              programs {
-                reference
-              }
-            }
-          }
-        """
-      ).flatMap { js =>
-        js.hcursor
-          .downField("updatePrograms")
-          .downField("programs")
-          .downArray
-          .downField("reference")
-          .as[ProgramReference]
-          .leftMap(f => new RuntimeException(f.message))
-          .liftTo[IO]
-      }
-
   test("submit proposals") {
     for {
       pid0 <- createProgramAs(pi)
       _    <- addProposal(pi, pid0)
-      ref0 <- submitProposal(pid0, sem2024B.some)
+      ref0 <- submitProposal(pi, pid0, sem2024B.some)
 
       pid1 <- createProgramAs(pi)
       _    <- addProposal(pi, pid1)
-      ref1 <- submitProposal(pid1, sem2024B.some)
+      ref1 <- submitProposal(pi, pid1, sem2024B.some)
 
       pid2 <- createProgramAs(pi)
       _    <- addProposal(pi, pid2)
-      ref2 <- submitProposal(pid2, sem2025A.some)
+      ref2 <- submitProposal(pi, pid2, sem2025A.some)
     } yield {
       assertEquals(ref0, ref2024B1)
       assertEquals(ref1, ref2024B2)
@@ -279,7 +246,7 @@ class reference extends OdbSuite {
     val res = for {
       pid <- createWithSemester
       _   <- addProposal(pi, pid)
-      ref <- submitProposal(pid, none) // no semester
+      ref <- submitProposal(pi, pid, none) // no semester
     } yield ref
 
     assertIO(res, ref2025B1)
