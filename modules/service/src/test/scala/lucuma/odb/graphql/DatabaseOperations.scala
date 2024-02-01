@@ -92,10 +92,10 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     query(user, s"""
-      query { program(programId: "$pid") { programReference } }
+      query { program(programId: "$pid") { reference } }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "programReference")
+        .downFields("program", "reference")
         .as[Option[ProgramReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]

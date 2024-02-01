@@ -22,7 +22,7 @@ import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
-import lucuma.odb.graphql.input.WhereTargetInput
+import lucuma.odb.graphql.input.WhereTarget
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.Services
@@ -274,19 +274,17 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
     {
       case (QueryType, "observations", List(
-        ProgramIdBinding.Option("programId", rPid),
         WhereObservationBinding.Option("WHERE", rWHERE),
         ObservationIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rPid, rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, OFFSET, LIMIT, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
-                  pid.map(Predicates.observation.program.id.eql).getOrElse(True),
                   OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
                   Predicates.observation.existence.includeDeleted(includeDeleted),
                   Predicates.observation.program.isVisibleTo(user),
@@ -320,7 +318,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         (rPid, rRef).parTupled.map { (pid, ref) =>
           val predicate = and(List(
             pid.map(Predicates.program.id.eql).toList,
-            ref.map(r => Predicates.program.programReference.eql(r.some)).toList
+            ref.map(r => Predicates.program.reference.eql(r.some)).toList
           ).flatten)
 
           Unique(
@@ -425,10 +423,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   }
 
   private lazy val Targets: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    val WhereTargetInputBinding = WhereTargetInput.binding(Path.from(TargetType))
+    val WhereTargetBinding = WhereTarget.binding(Path.from(TargetType))
     {
       case (QueryType, "targets", List(
-        WhereTargetInputBinding.Option("WHERE", rWHERE),
+        WhereTargetBinding.Option("WHERE", rWHERE),
         TargetIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)

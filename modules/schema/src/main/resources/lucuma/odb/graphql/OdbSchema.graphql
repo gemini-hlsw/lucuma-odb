@@ -7596,7 +7596,7 @@ type Program {
   Formatted program reference, if any.  Only submitted proposals obtain a
   program reference.
   """
-  programReference: ProgramReference
+  reference: ProgramReference
 
   """
   Program proposal
@@ -8012,9 +8012,6 @@ type Query {
   Selects the first `LIMIT` matching observations based on the provided `WHERE` parameter, if any.
   """
   observations(
-
-    programId: ProgramId
-
     """
     Filters the selection of observations.
     """
@@ -10182,7 +10179,7 @@ input WhereDataset {
   id: WhereOrderDatasetId
 
   "Matches all datasets associated with the observation."
-  observationId: WhereOrderObservationId
+  observation: WhereObservation
 
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
@@ -10466,9 +10463,9 @@ input WhereObservation {
   id: WhereOrderObservationId
 
   """
-  Matches the id of the associated program.
+  Matches the associated program.
   """
-  programId: WhereOrderProgramId
+  program: WhereProgram
 
   """
   Matches the subtitle of the observation.
@@ -11495,9 +11492,9 @@ input WhereProgram {
   semesterIndex: WhereOptionOrderPosInt
 
   """
-  Matches on the proposal reference associated with the program (if any).
+  Matches on the program reference (if any).
   """
-  programReference: WhereOptionOrderProgramReference
+  reference: WhereOptionOrderProgramReference
 
   """
   Matches the proposalStatus.
@@ -11680,9 +11677,9 @@ input WhereTarget {
   id: WhereOrderTargetId
 
   """
-  Matches the id of the associated program.
+  Matches the associated program.
   """
-  programId: WhereOrderProgramId
+  program: WhereProgram
 
   """
   Matches the target name.
