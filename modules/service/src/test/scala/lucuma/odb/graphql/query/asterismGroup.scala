@@ -11,6 +11,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.Target
 
 class asterismGroup extends OdbSuite {
@@ -185,4 +186,63 @@ class asterismGroup extends OdbSuite {
     }
   }
 
+  test("lookup by program reference should work") {
+    List(pi).traverse { user =>
+      for {
+        pid  <- createProgramAs(user)
+        _    <- addProposal(user, pid)
+        _    <- submitProposal(user, pid, Semester.unsafeFromString("2025A").some)
+        tids <- createTargetAs(user, pid).replicateA(5)
+        oid0 <- createObservationAs(user, pid, tids(3))
+        oid1 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid2 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid3 <- createObservationAs(user, pid, tids(0), tids(1), tids(2))
+        oid4 <- createObservationAs(user, pid)
+        _  <- expect(
+          user = user,
+          query =
+            s"""
+              query {
+                asterismGroup(programReference: "G-2025A-0001", WHERE: { id: { EQ: "$oid0"} }) {
+                  matches {
+                    observations {
+                      matches {
+                        id
+                      }
+                    }
+                    asterism {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(
+            json"""
+              {
+                "asterismGroup" : {
+                  "matches" : [
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid0
+                          }
+                        ]
+                      },
+                      "asterism" : [
+                        {
+                          "id" : ${tids(3)}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      } yield true
+    }
+  }
 }
