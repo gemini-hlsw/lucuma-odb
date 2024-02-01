@@ -4874,6 +4874,11 @@ type ConstraintSetGroup {
   Commonly held value across the observations
   """
   constraintSet: ConstraintSet!
+
+  """
+  Link back to program.
+  """
+  program: Program!
 }
 
 """
@@ -7923,13 +7928,17 @@ type Query {
   obsAttachmentTypeMeta: [ObsAttachmentTypeMeta!]!
 
   """
-  Observations grouped by commonly held constraints
+  Observations grouped by commonly held constraints. Specify one of programId or
+  programReference.  If both are set, both must match.  If neither are set,
+  nothing will match.
   """
   constraintSetGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.

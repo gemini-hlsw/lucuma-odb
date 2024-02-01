@@ -188,20 +188,21 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
     {
       case (QueryType, "constraintSetGroup", List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProgramReferenceBinding.Option("programReference", rRef),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          (programPredicate(rPid, rRef, Predicates.constraintSetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(
                   and(List(
                     WHERE.getOrElse(True),
-                    Predicates.constraintSetGroup.programId.eql(pid),
+                    program,
                     Predicates.constraintSetGroup.observations.matches.existence.includeDeleted(includeDeleted),
                     Predicates.constraintSetGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
                     Predicates.constraintSetGroup.observations.matches.program.isVisibleTo(user),
@@ -334,9 +335,9 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ProgramReferenceBinding.Option("programReference", rRef)
     )) =>
       Elab.transformChild { child =>
-        programPredicate(rPid, rRef, Predicates.program).map { p =>
+        programPredicate(rPid, rRef, Predicates.program).map { program =>
           Unique(
-            Filter(And(p, Predicates.program.isVisibleTo(user)), child)
+            Filter(And(program, Predicates.program.isVisibleTo(user)), child)
           )
         }
       }
