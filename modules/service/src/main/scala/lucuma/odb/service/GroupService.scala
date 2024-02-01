@@ -40,7 +40,6 @@ object GroupService {
       def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Group.Id] =
         for {
           _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
-          p <- programService.selectPid()
           i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex)
           g <- session.prepareR(Statements.InsertGroup).use(_.unique(input, i))
         } yield g

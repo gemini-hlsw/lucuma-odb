@@ -504,10 +504,12 @@ input CoordinatesInput {
 }
 
 """
-Observation creation parameters
+Observation creation parameters.  One of programId or programReference is
+required.  If both are provided, they must refer to the same program.
 """
 input CreateObservationInput {
-  programId: ProgramId!
+  programId: ProgramId
+  programReference: ProgramReference
   SET: ObservationPropertiesInput
 }
 
@@ -2767,7 +2769,6 @@ type Mutation {
   """
   Update asterisms, adding or deleting targets, in (potentially) multiple
   observations at once.
-  
   """
   updateAsterisms(
     """
@@ -6652,13 +6653,8 @@ input GroupPropertiesInput {
 
 }
 
-"""
-Specify the programId or the programReference.  If both are specified, both must
-match.  If neither is specified, the group will not be created.
-"""
 input CreateGroupInput {
-  programId: ProgramId
-  programReference: ProgramReference
+  programId: ProgramId!
   SET: GroupPropertiesInput
 }
 

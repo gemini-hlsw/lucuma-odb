@@ -23,6 +23,7 @@ import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -34,6 +35,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddDatasetEventInput
@@ -170,6 +172,25 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         limit = Some(limitʹ + 1), // Select one extra row here.
         child = q
       )
+    }
+
+  private def selectPid(
+    pid: Option[Program.Id],
+    ref: Option[ProgramReference]
+  )(using Services[F]): F[Result[Program.Id]] =
+    (pid, ref) match {
+      case (None, None)    => Result.failure("One of programId or programReference must be provided.").pure[F]
+      case (Some(p), None) => p.success.pure[F]
+      case (_, Some(r))    => programService.selectPid(r).map { op =>
+        op.fold(Result.failure(s"Program reference '${r.format}' was not found.")) { selectedPid =>
+          pid.fold(selectedPid.success) { givenPid =>
+            Result
+              .failure(s"Program reference ${r.format} (id $selectedPid) doesn't correspond to specified program id $givenPid")
+              .unlessA(selectedPid === givenPid)
+              .as(selectedPid)
+          }
+        }
+      }
     }
 
   def datasetResultSubquery(dids: List[Dataset.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
@@ -311,27 +332,27 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
       services.useTransactionally {
 
-        val createObservation: F[Result[(Observation.Id, Query)]] =
-          observationService.createObservation(input.programId, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
+        def createObservation(pid: Program.Id): F[Result[(Observation.Id, Query)]] =
+          observationService.createObservation(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
             _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
           )
 
-        def insertAsterism(oid: Option[Observation.Id]): F[Result[Unit]] =
-          oid.flatTraverse { o =>
-            input.asterism.toOption.traverse { a =>
-              asterismService.insertAsterism(input.programId, NonEmptyList.one(o), a)
-            }
+        def insertAsterism(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
+          input.asterism.toOption.traverse { a =>
+            asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
           }.map(_.getOrElse(Result.unit))
 
-        for {
-          rTup  <- createObservation
-          oid    = rTup.toOption.map(_._1)
-          rUnit <- insertAsterism(oid)
-          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-          // Fail altogether if there was an issue, say, creating the asterism
-          _     <- transaction.rollback.unlessA(query.hasValue)
+        val query = for {
+          pid <- ResultT(selectPid(input.programId, input.programReference))
+          tup <- ResultT(createObservation(pid))
+          (oid, query) = tup
+          _   <- ResultT(insertAsterism(pid, oid))
         } yield query
 
+        for {
+          rQuery <- query.value
+          _      <- transaction.rollback.unlessA(rQuery.hasValue)
+        } yield rQuery
       }
     }
 

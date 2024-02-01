@@ -6,12 +6,10 @@ package input
 
 import cats.syntax.all.*
 import lucuma.core.model.Program
-import lucuma.odb.data.ProgramReference
 import lucuma.odb.graphql.binding._
 
 case class CreateGroupInput(
-  programId: Option[Program.Id],
-  programReference: Option[ProgramReference],
+  programId: Program.Id,
   SET: GroupPropertiesInput.Create
 )
 
@@ -19,11 +17,10 @@ object CreateGroupInput {
   val Binding: Matcher[CreateGroupInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding.Option("programId", rPid),
-        ProgramReferenceBinding.Option("programReference", rRef),
+        ProgramIdBinding("programId", rProgramId),
         GroupPropertiesInput.CreateBinding.Option("SET", rInput)
-      ) => (rPid, rRef, rInput).mapN { (pid, ref, oset) =>
-        CreateGroupInput(pid, ref, oset.getOrElse(GroupPropertiesInput.Empty))
+      ) => (rProgramId, rInput).mapN { (pid, oset) =>
+        CreateGroupInput(pid, oset.getOrElse(GroupPropertiesInput.Empty))
       }
     }
 }
