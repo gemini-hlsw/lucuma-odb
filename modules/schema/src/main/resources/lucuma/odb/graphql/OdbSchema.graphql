@@ -541,10 +541,12 @@ type CreateProgramResult {
 }
 
 """
-Target creation parameters
+Target creation parameters.  One of programId or programReference is required.
+If both are provided, they must refer to the same program.
 """
 input CreateTargetInput {
-  programId: ProgramId!
+  programId: ProgramId
+  programReference: ProgramReference
   SET: TargetPropertiesInput!
 }
 

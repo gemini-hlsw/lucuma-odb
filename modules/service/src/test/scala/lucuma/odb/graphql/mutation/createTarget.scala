@@ -9,6 +9,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Partner
+import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.TargetRole
@@ -238,6 +239,44 @@ class createTarget extends OdbSuite {
     }
   }
 
+  test("[general] can create a target with a program reference") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      query(pi,
+        s"""
+          mutation {
+            createTarget(
+              input: {
+                programReference: "G-2025A-0001"
+                SET: {
+                  name: "Crunchy Planet"
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                  nonsidereal: {
+                    des: "foo"
+                    keyType: COMET
+                  }
+                }
+              }
+            ) {
+              targetId: target { id }
+            }
+          }
+        """
+      ).map { js =>
+        assert(js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.isDefined)
+      }
+    }
+  }
 }
 
 
