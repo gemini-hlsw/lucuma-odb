@@ -6655,8 +6655,13 @@ input GroupPropertiesInput {
 
 }
 
+"""
+Group creation parameters.  One of programId or programReference is required.
+If both are provided, they must refer to the same program.
+"""
 input CreateGroupInput {
-  programId: ProgramId!
+  programId: ProgramId
+  programReference: ProgramReference
   SET: GroupPropertiesInput
 }
 
