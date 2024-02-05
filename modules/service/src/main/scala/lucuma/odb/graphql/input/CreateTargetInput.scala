@@ -7,11 +7,13 @@ package input
 
 import cats.syntax.all._
 import lucuma.core.model.Program
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.graphql.binding._
 
 case class CreateTargetInput(
-  programId: Program.Id,
-  SET: TargetPropertiesInput.Create,
+  programId:        Option[Program.Id],
+  programReference: Option[ProgramReference],
+  SET:              TargetPropertiesInput.Create,
 )
 
 object CreateTargetInput {
@@ -19,10 +21,11 @@ object CreateTargetInput {
   val Binding: Matcher[CreateTargetInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProgramReferenceBinding.Option("programReference", rRef),
         TargetPropertiesInput.Binding("SET", rSET),
       ) =>
-        (rProgramId, rSET).parMapN(CreateTargetInput(_, _))
+        (rPid, rRef, rSET).parMapN(apply)
     }
 
 }

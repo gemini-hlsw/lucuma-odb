@@ -369,11 +369,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
       services.useTransactionally {
         import TargetService.CreateTargetResponse._
-        targetService.createTarget(input.programId, input.SET).map {
-          case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
-          case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
-          case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
-        }
+        ResultT(selectPid(input.programId, input.programReference)).flatMap { pid =>
+          ResultT(targetService.createTarget(pid, input.SET).map {
+            case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
+            case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
+            case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
+          })
+        }.value
       }
     }
 
