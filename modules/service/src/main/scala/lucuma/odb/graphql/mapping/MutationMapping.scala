@@ -322,9 +322,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
       services.useTransactionally {
-        groupService.createGroup(input).map { gid =>
-          Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
-        }
+        ResultT(selectPid(input.programId, input.programReference)).flatMap { pid =>
+          ResultT(groupService.createGroup(pid, input.SET).map { gid =>
+            Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
+          })
+        }.value
       }
     }
 

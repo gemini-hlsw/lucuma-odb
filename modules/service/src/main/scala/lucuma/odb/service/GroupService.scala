@@ -11,7 +11,6 @@ import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk._
@@ -21,7 +20,7 @@ import skunk.implicits._
 import Services.Syntax.*
 
 trait GroupService[F[_]] {
-  def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Group.Id]
+  def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[GroupService.UpdateGroupsResponse]
   def selectGroups(programId: Program.Id): F[GroupTree]
 }
@@ -37,11 +36,11 @@ object GroupService {
   def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
 
-      def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Group.Id] =
+      def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id] =
         for {
           _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
-          i <- openHole(input.programId, input.SET.parentGroupId, input.SET.parentGroupIndex)
-          g <- session.prepareR(Statements.InsertGroup).use(_.unique(input, i))
+          i <- openHole(pid, SET.parentGroupId, SET.parentGroupIndex)
+          g <- session.prepareR(Statements.InsertGroup).use(_.unique((pid, SET), i))
         } yield g
 
       // Applying the same move to a list of groups will put them all together in the
@@ -95,7 +94,7 @@ object GroupService {
 
   object Statements {
 
-    val InsertGroup: Query[CreateGroupInput ~ NonNegShort, Group.Id] =
+    val InsertGroup: Query[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort, Group.Id] =
       sql"""
       insert into t_group (
         c_program_id,
@@ -119,16 +118,16 @@ object GroupService {
         ${time_span.opt}
       ) returning c_group_id
       """.query(group_id)
-         .contramap[CreateGroupInput ~ NonNegShort] { case (c, index) => (
-          c.programId,
-          c.SET.parentGroupId,
+         .contramap[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort] { case ((pid, c), index) => (
+          pid,
+          c.parentGroupId,
           index,
-          c.SET.name,
-          c.SET.description,
-          c.SET.minimumRequired,
-          c.SET.ordered,
-          c.SET.minimumInterval,
-          c.SET.maximumInterval
+          c.name,
+          c.description,
+          c.minimumRequired,
+          c.ordered,
+          c.minimumInterval,
+          c.maximumInterval
         )}
 
     val OpenHole: Query[(Program.Id, Option[Group.Id], Option[NonNegShort]), NonNegShort] =
