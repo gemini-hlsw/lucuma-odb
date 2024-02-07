@@ -71,6 +71,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
 import scala.concurrent.duration.*
+import lucuma.odb.service.OdbError
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
@@ -343,6 +344,27 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .assertEquals(success.spaces2) // by comparing strings we get more useful errors
     })
   }
+
+  def expect2(
+    user:      User,
+    query:     String,
+    expected:  Either[List[OdbError.Category], Json],
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Http,
+  ): IO[Unit] = {
+    val op = this.query(user, query, variables, client)
+    expected.fold(expectedCats => {
+      op
+      .intercept[ResponseException[Any]]
+      .map: e =>
+        val cats = e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList).map(_.code)
+        if cats =!= expectedCats then fail(s"Expected error categories ${expectedCats.mkString("[",",","]")}; found ${cats.mkString("[",",","]")}")
+    }, success => {
+      op.map(_.spaces2)
+        .assertEquals(success.spaces2) // by comparing strings we get more useful errors
+    })
+  }
+
 
   def expectIor(
     user:      User,
