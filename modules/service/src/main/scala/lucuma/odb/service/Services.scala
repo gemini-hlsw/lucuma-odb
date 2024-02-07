@@ -24,6 +24,10 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import scala.util.NotGiven
+import lucuma.odb.data.UserInvitation
+import scala.collection.immutable.SortedMap
+import lucuma.core.model.Program
+import lucuma.core.model.Observation
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -284,3 +288,14 @@ object Services:
         using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =
           s.use(s => fa(using summon, s))
+
+    // Module of constructors for server errors.
+    object error:
+      import OdbError.Category.*
+      import io.circe.syntax.*
+
+      def notAuthorized[F[_]](using Services[F]): OdbError = OdbError(NotAuthorized, user)
+      def invalidInvitation[F[_]](id: UserInvitation.Id)(using Services[F]): OdbError = OdbError(InvitationError, user, None, SortedMap("invitationId" -> id.asJson))
+      def noAction[F[_]: Services]: OdbError = OdbError(NoAction, user)
+      def invalidProgram[F[_]: Services](pid: Program.Id): OdbError = OdbError(InvalidProgram, user, None, SortedMap("programId" -> pid.asJson))
+      def invalidObservation[F[_]: Services](oid: Observation.Id): OdbError = OdbError(InvalidObservation, user, None, SortedMap("observationId" -> oid.asJson))
