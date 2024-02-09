@@ -60,7 +60,7 @@ INSERT INTO t_science_type VALUES ('system_verification', 'V', 'System Verificat
 
 -- Add a program class and science type to the t_program table
 ALTER TABLE t_program
-  ADD COLUMN c_program_class e_program_class NOT NUll DEFAULT 'science',
+  ADD COLUMN c_program_class e_program_class NOT NULL DEFAULT 'science',
   ADD COLUMN c_library_desc  text            NULL CHECK (c_library_desc ~ '^[A-Z0-9]+$'), -- LIB
   ADD COLUMN c_instrument    d_tag           NULL REFERENCES t_instrument(c_tag),         -- CAL, ENG, LIB, XPL
   ADD COLUMN c_science_type  e_science_type  NULL DEFAULT 'queue',                        -- SCI
@@ -156,20 +156,22 @@ BEGIN
 
     -- Was there a relevant update?
     was_relevant_update :=
-      (NEW.c_semester IS DISTINCT FROM OLD.c_semester)           OR
+      (NEW.c_semester      IS DISTINCT FROM OLD.c_semester)      OR
       (NEW.c_program_class IS DISTINCT FROM OLD.c_program_class) OR
-      (NEW.c_instrument IS DISTINCT FROM OLD.c_instrument)       OR
-      (NEW.c_proposal_status <> 'not_submitted' AND OLD.c_proposal_status = 'not_submitted');
+      (NEW.c_instrument    IS DISTINCT FROM OLD.c_instrument)    OR
+      (NEW.c_proposal_status <> 'not_submitted' AND OLD.c_proposal_status = 'not_submitted' AND NEW.c_semester_index IS NULL);
 
     -- Update the semester index if necessary.
     IF NOT semesterly THEN
         NEW.c_semester_index := NULL;
-    ELSEIF requires_semester AND NEW.c_semester IS NULL THEN
-        RAISE EXCEPTION 'Submitted science proposals, calibrations and engineering programs must define a semester';
+    ELSEIF requires_semester THEN
+        IF NEW.c_semester IS NULL THEN
+            RAISE EXCEPTION 'Submitted science proposals, calibrations and engineering programs must define a semester';
+        ELSEIF was_relevant_update THEN
+            NEW.c_semester_index := next_semester_index(NEW.c_program_class, NEW.c_semester, NEW.c_instrument);
+        END IF;
     ELSEIF NEW.c_semester IS NULL THEN
         NEW.c_semester_index := NULL;
-    ELSEIF was_relevant_update THEN
-        NEW.c_semester_index := next_semester_index(c_program_class, c_semester, c_instrument);
     END IF;
 
     RETURN NEW;
@@ -244,12 +246,13 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION format_program_reference(
-  class        e_program_class,
-  semester     d_semester,
-  index        int4,
-  science_type e_science_type,
-  instrument   d_tag,
-  description  text
+  class           e_program_class,
+  semester        d_semester,
+  index           int4,
+  proposal_status d_tag,
+  science_type    e_science_type,
+  instrument      d_tag,
+  description     text
 )
 RETURNS text AS $$
 BEGIN
@@ -262,15 +265,18 @@ BEGIN
            class = 'library' THEN
           format_lib_or_xpl_reference(class, instrument, description)
 
-      WHEN class = 'science' THEN
+      WHEN class = 'science' AND proposal_status = 'accepted' THEN
           format_science_reference(semester, index, science_type)
+
+      ELSE
+          null
     END;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 ALTER TABLE t_program
   ADD COLUMN c_proposal_reference text GENERATED ALWAYS AS (format_proposal_reference(c_program_class, c_semester, c_semester_index)) STORED UNIQUE,
-  ADD COLUMN c_program_reference  text GENERATED ALWAYS AS (format_program_reference(c_program_class, c_semester, c_semester_index, c_science_type, c_instrument, c_library_desc)) STORED UNIQUE;
+  ADD COLUMN c_program_reference  text GENERATED ALWAYS AS (format_program_reference(c_program_class, c_semester, c_semester_index, c_proposal_status, c_science_type, c_instrument, c_library_desc)) STORED UNIQUE;
 
 
 -- Add a trigger such that when a proposal class is updated the science type is
@@ -279,7 +285,7 @@ ALTER TABLE t_program
 CREATE OR REPLACE FUNCTION update_science_type()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.c_proposal_class != OLD.c_proposal_class THEN
+    IF NEW.c_class != OLD.c_class THEN
         UPDATE t_program AS p
             SET c_science_type = CASE
                                      WHEN p.c_program_class = 'science' THEN COALESCE(s.c_type, 'queue')
@@ -295,6 +301,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_science_type_trigger
-BEFORE UPDATE ON t_program
+BEFORE UPDATE ON t_proposal
 FOR EACH ROW
 EXECUTE FUNCTION update_science_type();

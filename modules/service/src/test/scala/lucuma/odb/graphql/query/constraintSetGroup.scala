@@ -135,7 +135,7 @@ class constraintSetGroup extends OdbSuite {
             query =
               s"""
               query {
-                constraintSetGroup(programReference: "G-2025A-0001") {
+                constraintSetGroup(proposalReference: "G-2025A-0001") {
                   matches {
                     constraintSet {
                       imageQuality

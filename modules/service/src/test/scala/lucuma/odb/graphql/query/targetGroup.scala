@@ -194,7 +194,7 @@ class targetGroup extends OdbSuite {
           query =
             s"""
               query {
-                targetGroup(programReference: "G-2025A-0001") {
+                targetGroup(proposalReference: "G-2025A-0001") {
                   matches {
                     observations {
                       matches {

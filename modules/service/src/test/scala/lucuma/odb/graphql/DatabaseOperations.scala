@@ -46,9 +46,9 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.UserInvitation
@@ -80,9 +80,9 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def fetchPid(user: User, ref: ProgramReference): IO[Program.Id] =
+  def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""
-      query { program(programReference: "${ref.format}") { id } }
+      query { program(proposalReference: "${pro.format}") { id } }
     """).flatMap { js =>
       js.hcursor
         .downFields("program", "id")
@@ -91,13 +91,13 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+  def fetchProposalReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
     query(user, s"""
-      query { program(programId: "$pid") { reference } }
+      query { program(programId: "$pid") { proposalReference } }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "reference")
-        .as[Option[ProgramReference]]
+        .downFields("program", "proposalReference")
+        .as[Option[ProposalReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
@@ -155,7 +155,7 @@ trait DatabaseOperations { this: OdbSuite =>
         """)
     )
 
-  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
+  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProposalReference] =
     query(user, s"""
         mutation {
           updatePrograms(
@@ -172,7 +172,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           ) {
             programs {
-              reference
+              proposalReference
             }
           }
         }
@@ -182,8 +182,8 @@ trait DatabaseOperations { this: OdbSuite =>
         .downField("updatePrograms")
         .downField("programs")
         .downArray
-        .downField("reference")
-        .as[ProgramReference]
+        .downField("proposalReference")
+        .as[ProposalReference]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
