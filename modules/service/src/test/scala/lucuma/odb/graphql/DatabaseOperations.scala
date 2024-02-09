@@ -46,6 +46,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.ProposalReference
@@ -98,6 +99,17 @@ trait DatabaseOperations { this: OdbSuite =>
       js.hcursor
         .downFields("program", "proposalReference")
         .as[Option[ProposalReference]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def fetchProgramReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+    query(user, s"""
+      query { program(programId: "$pid") { programReference } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "programReference")
+        .as[Option[ProgramReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
@@ -188,6 +200,29 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def acceptProposal(user: User, pid: Program.Id): IO[ProgramReference] =
+    query(user, s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET:   { proposalStatus: ACCEPTED }
+              WHERE: { id: { EQ: "$pid" } }
+            }
+          ) {
+            programs { programReference }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("updatePrograms")
+        .downField("programs")
+        .downArray
+        .downField("programReference")
+        .as[ProgramReference]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)
