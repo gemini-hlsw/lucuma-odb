@@ -127,11 +127,6 @@ trait ArbProgramReference extends ArbReference {
 
   val programReferenceStrings: Gen[String] =
     referenceStrings[ProgramReference](_.format)
-//    Gen.oneOf(
-//      calibrationStrings,
-//      engineeringStrings,
-//      arbitrary
-//    )
 
 }
 

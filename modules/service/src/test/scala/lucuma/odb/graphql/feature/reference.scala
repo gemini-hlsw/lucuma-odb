@@ -11,16 +11,23 @@ import io.circe.literal._
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProposalReference
 
 
 class reference extends OdbSuite {
 
-  val pi       = TestUsers.Standard.pi(1, 30)
+  val pi       = TestUsers.Standard.pi(1, 101)
   val guest    = TestUsers.guest(2)
   val service  = TestUsers.service(3)
+  val staff    = TestUsers.Standard.staff(4, 104)
 
-  val validUsers = List(pi, guest, service)
+  val validUsers = List(pi, guest, service, staff)
+
+  val sem2024A   = Semester.unsafeFromString("2024A")
+  val ref2024A1  = ProposalReference.fromString.unsafeGet("G-2024A-0001")
+  val ref2024A1Q = ProgramReference.fromString.unsafeGet("G-2024A-0001-Q")
+  val ref2024A1C = ProgramReference.fromString.unsafeGet("G-2024A-0001-C")
 
   val sem2024B   = Semester.unsafeFromString("2024B")
   val ref2024B1  = ProposalReference.fromString.unsafeGet("G-2024B-0001")
@@ -550,4 +557,45 @@ class reference extends OdbSuite {
     )
   }
 
+  test("accept proposal") {
+    for {
+      pid  <- createProgramAs(pi)
+      _    <- addProposal(pi, pid)
+      _    <- submitProposal(pi, pid, sem2024A.some)
+      o    <- fetchProgramReference(pi, pid)
+      prog <- acceptProposal(staff, pid)
+    } yield {
+      assert(o.isEmpty)
+      assertEquals(prog, ref2024A1Q)
+    }
+  }
+
+  test("change propsal class in accepted proposal") {
+    def toClassical(pid: Program.Id): IO[Json] =
+      query(
+        pi,
+        s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  proposal: {
+                    proposalClass: {
+                      classical: { minPercentTime: 50 }
+                    }
+                  }
+                }
+                WHERE: { id: { EQ: "$pid" } }
+              }
+            ) { programs { id } }
+          }
+        """
+      )
+
+    for {
+      pid  <- fetchPid(pi, ref2024A1)
+      _    <- toClassical(pid)
+      prog <- fetchProgramReference(pi, pid)
+    } yield assertEquals(prog, ref2024A1C.some)
+  }
 }
