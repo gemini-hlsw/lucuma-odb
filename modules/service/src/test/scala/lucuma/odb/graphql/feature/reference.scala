@@ -11,7 +11,7 @@ import io.circe.literal._
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.odb.data.ProgramReference
+import lucuma.odb.data.ProposalReference
 
 
 class reference extends OdbSuite {
@@ -23,16 +23,16 @@ class reference extends OdbSuite {
   val validUsers = List(pi, guest, service)
 
   val sem2024B   = Semester.unsafeFromString("2024B")
-  val ref2024B1  = ProgramReference.fromString.unsafeGet("G-2024B-0001")
-  val ref2024B2  = ProgramReference.fromString.unsafeGet("G-2024B-0002")
-  val ref2024B3  = ProgramReference.fromString.unsafeGet("G-2024B-0003")
+  val ref2024B1  = ProposalReference.fromString.unsafeGet("G-2024B-0001")
+  val ref2024B2  = ProposalReference.fromString.unsafeGet("G-2024B-0002")
+  val ref2024B3  = ProposalReference.fromString.unsafeGet("G-2024B-0003")
 
   val sem2025A   = Semester.unsafeFromString("2025A")
-  val ref2025A1  = ProgramReference.fromString.unsafeGet("G-2025A-0001")
+  val ref2025A1  = ProposalReference.fromString.unsafeGet("G-2025A-0001")
 
   val sem2025B   = Semester.unsafeFromString("2025B")
-  val ref2025B1  = ProgramReference.fromString.unsafeGet("G-2025B-0001")
-  val ref2025B2  = ProgramReference.fromString.unsafeGet("G-2025B-0002")
+  val ref2025B1  = ProposalReference.fromString.unsafeGet("G-2025B-0001")
+  val ref2025B2  = ProposalReference.fromString.unsafeGet("G-2025B-0002")
 
   test("submit proposals") {
     for {
@@ -59,8 +59,9 @@ class reference extends OdbSuite {
       user  = pi,
       query = s"""
         query {
-          program(programReference: "G-2024B-0001") {
-            reference
+          program(proposalReference: "G-2024B-0001") {
+            programReference
+            proposalReference
           }
         }
       """,
@@ -68,29 +69,8 @@ class reference extends OdbSuite {
         json"""
           {
             "program": {
-              "reference": ${ref2024B1.format}
-            }
-          }
-        """
-      )
-    )
-  }
-
-  test("lookup via (short) proposal ref") {
-    expect(
-      user  = pi,
-      query = s"""
-        query {
-          program(programReference: "24B1") {
-            reference
-          }
-        }
-      """,
-      expected = Right(
-        json"""
-          {
-            "program": {
-              "reference": ${ref2024B1.format}
+              "programReference": null,
+              "proposalReference": ${ref2024B1.format}
             }
           }
         """
@@ -104,7 +84,7 @@ class reference extends OdbSuite {
       query = s"""
         query {
           program {
-            reference
+            proposalReference
           }
         }
       """,
@@ -131,7 +111,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              reference
+              proposalReference
             }
           }
         }
@@ -142,10 +122,10 @@ class reference extends OdbSuite {
             "programs": {
               "matches": [
                  {
-                   "reference": $ref2024B1
+                   "proposalReference": $ref2024B1
                  },
                  {
-                   "reference": $ref2024B2
+                   "proposalReference": $ref2024B2
                  }
               ]
             }
@@ -271,7 +251,7 @@ class reference extends OdbSuite {
                 }
               ) {
                 programs {
-                  reference
+                  proposalReference
                 }
               }
             }
@@ -354,7 +334,7 @@ class reference extends OdbSuite {
                 proposalStatus: NOT_SUBMITTED
               }
               WHERE: {
-                reference: {
+                proposalReference: {
                   EQ: "${ref2024B2.format}"
                 }
               }
@@ -390,14 +370,14 @@ class reference extends OdbSuite {
                 proposalStatus: SUBMITTED
               }
               WHERE: {
-                reference: {
+                proposalReference: {
                   EQ: "${ref2024B2.format}"
                 }
               }
             }
           ) {
             programs {
-              reference
+              proposalReference
             }
           }
         }
@@ -408,7 +388,7 @@ class reference extends OdbSuite {
             "updatePrograms" : {
               "programs": [
                 {
-                  "reference": ${ref2024B2.format}
+                  "proposalReference": ${ref2024B2.format}
                 }
               ]
             }
@@ -431,14 +411,14 @@ class reference extends OdbSuite {
                 semester: "2024B"
               }
               WHERE: {
-                reference: {
+                proposalReference: {
                   EQ: "${ref2025A1.format}"
                 }
               }
             }
           ) {
             programs {
-              reference
+              proposalReference
             }
           }
         }
@@ -449,7 +429,7 @@ class reference extends OdbSuite {
             "updatePrograms" : {
               "programs": [
                 {
-                  "reference": ${ref2024B3.format}
+                  "proposalReference": ${ref2024B3.format}
                 }
               ]
             }
@@ -475,7 +455,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              reference
+              proposalReference
             }
           }
         }
@@ -486,10 +466,10 @@ class reference extends OdbSuite {
             "programs" : {
               "matches": [
                 {
-                  "reference": ${ref2024B2.format}
+                  "proposalReference": ${ref2024B2.format}
                 },
                 {
-                  "reference": ${ref2024B3.format}
+                  "proposalReference": ${ref2024B3.format}
                 }
               ]
             }
@@ -499,7 +479,7 @@ class reference extends OdbSuite {
     )
   }
 
-  test("where semester (short)") {
+  test("where semester") {
     expect(
       user = pi,
       query = s"""
@@ -507,12 +487,12 @@ class reference extends OdbSuite {
           programs(
             WHERE: {
               semester: {
-                EQ: "24B"
+                EQ: "2024B"
               }
             }
           ) {
             matches {
-              reference
+              proposalReference
             }
           }
         }
@@ -523,13 +503,13 @@ class reference extends OdbSuite {
             "programs" : {
               "matches": [
                 {
-                  "reference": ${ref2024B1.format}
+                  "proposalReference": ${ref2024B1.format}
                 },
                 {
-                  "reference": ${ref2024B2.format}
+                  "proposalReference": ${ref2024B2.format}
                 },
                 {
-                  "reference": ${ref2024B3.format}
+                  "proposalReference": ${ref2024B3.format}
                 }
               ]
             }
@@ -552,14 +532,14 @@ class reference extends OdbSuite {
                 semester: "9999B"
               }
               WHERE: {
-                reference: {
+                proposalReference: {
                   EQ: "${ref2024B3.format}"
                 }
               }
             }
           ) {
             programs {
-              reference
+              proposalReference
             }
           }
         }

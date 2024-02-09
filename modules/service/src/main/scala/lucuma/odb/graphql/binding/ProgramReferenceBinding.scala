@@ -3,12 +3,12 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ProposalReference
+import lucuma.odb.data.ProgramReference
 
-val ProposalReferenceBinding: Matcher[ProposalReference] =
+val ProgramReferenceBinding: Matcher[ProgramReference] =
   StringBinding.emap { s =>
-    ProposalReference
+    ProgramReference
       .fromString
       .getOption(s)
-      .toRight(s"'$s' cannot be parsed as a valid ProposalReference.")
+      .toRight(s"'$s' cannot be parsed as a valid ProgramReference.")
   }

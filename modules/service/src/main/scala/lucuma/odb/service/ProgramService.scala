@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.Monad
 import cats.Semigroup
+import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
@@ -41,7 +42,7 @@ trait ProgramService[F[_]] {
   /**
    * Find the program id matching the given reference, if any.
    */
-  def selectPid(ref: ProgramReference): F[Option[Program.Id]]
+  def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -155,8 +156,12 @@ object ProgramService {
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramService[F] =
     new ProgramService[F] {
 
-      def selectPid(ref: ProgramReference): F[Option[Program.Id]] =
-        session.option(Statements.selectPid)(ref)
+      def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]] = {
+        val af = Statements.selectPid(ref)
+        session.prepareR(af.fragment.query(program_id)).use { ps =>
+          ps.option(af.argument)
+        }
+      }
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
@@ -299,15 +304,18 @@ object ProgramService {
 
   object Statements {
 
-    val selectPid: Query[ProgramReference, Program.Id] =
-      sql"""
+    def selectPid(ref: Ior[ProposalReference, ProgramReference]): AppliedFragment =
+      void"""
         SELECT
           c_program_id
         FROM
           t_program
         WHERE
-          c_program_reference = $program_reference
-      """.query(program_id)
+      """ |+| ref.fold(
+        sql"c_proposal_reference = $proposal_reference",
+        sql"c_program_reference = $program_reference",
+        (prop, prog) => sql"c_proposal_reference = $proposal_reference AND c_program_reference = $program_reference".apply(prop, prog)
+      )
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""

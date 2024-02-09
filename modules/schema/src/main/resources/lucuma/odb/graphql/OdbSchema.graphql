@@ -509,6 +509,7 @@ required.  If both are provided, they must refer to the same program.
 """
 input CreateObservationInput {
   programId: ProgramId
+  proposalReference: ProposalReference
   programReference: ProgramReference
   SET: ObservationPropertiesInput
 }
@@ -546,6 +547,7 @@ If both are provided, they must refer to the same program.
 """
 input CreateTargetInput {
   programId: ProgramId
+  proposalReference: ProposalReference
   programReference: ProgramReference
   SET: TargetPropertiesInput!
 }
@@ -6665,11 +6667,13 @@ input GroupPropertiesInput {
 }
 
 """
-Group creation parameters.  One of programId or programReference is required.
-If both are provided, they must refer to the same program.
+Group creation parameters.  One of programId, programReference or
+proposalReference is required. (If two or more are provided, they must refer to
+the same program.)
 """
 input CreateGroupInput {
   programId: ProgramId
+  proposalReference: ProposalReference
   programReference: ProgramReference
   SET: GroupPropertiesInput
 }
@@ -7566,16 +7570,19 @@ type Program {
   "Index, relative to the semester, if any."
   semesterIndex: PosInt
 
-  """
-  Formatted program reference, if any.  Only submitted proposals obtain a
-  program reference.
-  """
-  reference: ProgramReference
+  "Formatted program reference, if any."
+  programReference: ProgramReference
 
   """
   Program proposal
   """
   proposal: Proposal
+
+  """
+  Formatted proposal reference, if any.  Only submitted science programs have
+  a proposal reference.
+  """
+  proposalReference: ProposalReference
 
   """
   Proposal status of the program
@@ -7651,7 +7658,8 @@ ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
 scalar ProgramId
 
 """
-Program reference in the format G-YYYY[AB]-NNNN+[CDLFSV]? For example, G-2024B-1234
+Program reference, formatted according to the type.  For example, a Science
+Program has format G-YYYY[AB]-NNNN+-[CDLFSV]. For example, G-2024B-1234-Q
 where 2024B refers to the associated semester.
 """
 scalar ProgramReference
@@ -7825,6 +7833,12 @@ enum ProposalClassEnum {
 }
 
 """
+Proposal reference for science programs, formatted as G-YYYY[AB]-NNNN+. For
+example, G-2024B-1234 where 2024B refers to the associated semester.
+"""
+scalar ProposalReference
+
+"""
 Metadata for `enum ProposalStatus`
 """
 type ProposalStatusMeta {
@@ -7858,12 +7872,18 @@ type Query {
   # ): [Target!]!
 
   """
-  Observations grouped by commonly held science asterisms
+  Observations grouped by commonly held science asterisms. Identify the program
+  by specifying only one of programId, programReference, or proposalReference.
+  If more than one is provided, all must match.  If none are set, nothing will
+  match.
   """
   asterismGroup(
 
     "Program ID"
     programId: ProgramId
+
+    "Proposal Reference"
+    proposalReference: ProposalReference
 
     "Program reference"
     programReference: ProgramReference
@@ -7890,14 +7910,18 @@ type Query {
   obsAttachmentTypeMeta: [ObsAttachmentTypeMeta!]!
 
   """
-  Observations grouped by commonly held constraints. Specify one of programId or
-  programReference.  If both are set, both must match.  If neither are set,
-  nothing will match.
+  Observations grouped by commonly held constraints. Identify the program by
+  specifying only one of programId, programReference, or proposalReference.  If
+  more than one is provided, all must match.  If none are set, nothing will
+  match.
   """
   constraintSetGroup(
 
     "Program ID"
     programId: ProgramId
+
+    "Proposal Reference"
+    proposalReference: ProposalReference
 
     "Program reference"
     programReference: ProgramReference
@@ -8010,16 +8034,21 @@ type Query {
   partnerMeta: [PartnerMeta!]!
 
   """
-  Returns the program with the given id or reference, if any.  Specify one of
-  programId or programReference.  If both are set, both must match.  If neither
-  are set, nothing will match.
+  Returns the program with the given id or reference, if any. Identify the
+  program by specifying only one of programId, programReference, or
+  proposalReference. If more than one is provided, all must match.  If none are
+  set, nothing will match.
   """
   program(
     "Program ID"
     programId: ProgramId
 
+    "Proposal Reference"
+    proposalReference: ProposalReference
+
     "Program Reference"
     programReference: ProgramReference
+
   ): Program
 
   """
@@ -8119,14 +8148,18 @@ type Query {
   # ): TargetEnvironmentGroupSelectResult!
 
   """
-  Observations grouped by commonly held targets.  Specify one of programId or
-  programReference.  If both are set, both must match.  If neither are set,
-  nothing will match.
+  Observations grouped by commonly held targets. Identify the program by
+  specifying only one of programId, programReference, or proposalReference. If
+  more than one is provided, all must match.  If none are set, nothing will
+  match.
   """
   targetGroup(
 
     "Program ID"
     programId: ProgramId
+
+    "Proposal Reference"
+    proposalReference: ProposalReference
 
     "Program Reference"
     programReference: ProgramReference
@@ -11186,6 +11219,57 @@ Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 """
+input WhereOptionOrderProposalReference {
+
+  "Matches if the ProposalReference is not defined."
+  IS_NULL: Boolean
+
+  """
+  Matches if the ProposalReference is exactly the supplied value.
+  """
+  EQ: ProposalReference
+
+  """
+  Matches if the ProposalReference is not the supplied value.
+  """
+  NEQ: ProposalReference
+
+  """
+  Matches if the ProposalReference is any of the supplied options.
+  """
+  IN: [ProposalReference!]
+
+  """
+  Matches if the ProposalReference is none of the supplied values.
+  """
+  NIN: [ProposalReference!]
+
+  """
+  Matches if the ProposalReference is ordered after (>) the supplied value.
+  """
+  GT: ProposalReference
+
+  """
+  Matches if the ProposalReference is ordered before (<) the supplied value.
+  """
+  LT: ProposalReference
+
+  """
+  Matches if the ProposalReference is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ProposalReference
+
+  """
+  Matches if the ProposalReference is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ProposalReference
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
+"""
 input WhereOptionOrderSemester {
 
   "Matches if Semester is not defined."
@@ -11465,7 +11549,12 @@ input WhereProgram {
   """
   Matches on the program reference (if any).
   """
-  reference: WhereOptionOrderProgramReference
+  programReference: WhereOptionOrderProgramReference
+
+  """
+  Matches on the proposal reference (if any).
+  """
+  proposalReference: WhereOptionOrderProposalReference
 
   """
   Matches the proposalStatus.

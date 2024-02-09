@@ -203,7 +203,7 @@ class asterismGroup extends OdbSuite {
           query =
             s"""
               query {
-                asterismGroup(programReference: "G-2025A-0001", WHERE: { id: { EQ: "$oid0"} }) {
+                asterismGroup(proposalReference: "G-2025A-0001", WHERE: { id: { EQ: "$oid0"} }) {
                   matches {
                     observations {
                       matches {

@@ -8,12 +8,14 @@ package input
 import cats.syntax.all._
 import lucuma.core.model.Program
 import lucuma.odb.data.ProgramReference
+import lucuma.odb.data.ProposalReference
 import lucuma.odb.graphql.binding._
 
 case class CreateTargetInput(
-  programId:        Option[Program.Id],
-  programReference: Option[ProgramReference],
-  SET:              TargetPropertiesInput.Create,
+  programId:         Option[Program.Id],
+  proposalReference: Option[ProposalReference],
+  programReference:  Option[ProgramReference],
+  SET:               TargetPropertiesInput.Create,
 )
 
 object CreateTargetInput {
@@ -22,10 +24,11 @@ object CreateTargetInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding.Option("programId", rPid),
-        ProgramReferenceBinding.Option("programReference", rRef),
+        ProposalReferenceBinding.Option("proposalReference", rProp),
+        ProgramReferenceBinding.Option("programReference", rProg),
         TargetPropertiesInput.Binding("SET", rSET),
       ) =>
-        (rPid, rRef, rSET).parMapN(apply)
+        (rPid, rProp, rProg, rSET).parMapN(apply)
     }
 
 }

@@ -11,12 +11,14 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ProgramReference
+import lucuma.odb.data.ProposalReference
 import lucuma.odb.graphql.binding._
 
 final case class CreateObservationInput(
-  programId:        Option[Program.Id],
-  programReference: Option[ProgramReference],
-  SET:              Option[ObservationPropertiesInput.Create]
+  programId:         Option[Program.Id],
+  proposalReference: Option[ProposalReference],
+  programReference:  Option[ProgramReference],
+  SET:               Option[ObservationPropertiesInput.Create]
 ) {
 
   def asterism: Nullable[NonEmptyList[Target.Id]] =
@@ -30,10 +32,11 @@ object CreateObservationInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding.Option("programId", rPid),
-        ProgramReferenceBinding.Option("programReference", rRef),
+        ProposalReferenceBinding.Option("proposalReference", rProp),
+        ProgramReferenceBinding.Option("programReference", rProg),
         ObservationPropertiesInput.Create.Binding.Option("SET", rSET),
       ) =>
-        (rPid, rRef, rSET).parMapN(apply)
+        (rPid, rProp, rProg, rSET).parMapN(apply)
     }
 
 }

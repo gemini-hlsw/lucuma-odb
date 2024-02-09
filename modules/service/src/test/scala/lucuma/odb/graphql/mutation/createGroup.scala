@@ -147,7 +147,7 @@ class createGroup extends OdbSuite {
     } yield assertEquals(ids, List(Left(g1), Left(g3), Left(g2)))
   }
 
-  test("create group with a program reference") {
+  test("create group with a proposal reference") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
       submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
@@ -157,7 +157,7 @@ class createGroup extends OdbSuite {
           mutation {
             createGroup(
               input: {
-                programReference: "G-2025A-0001"
+                proposalReference: "G-2025A-0001"
                 SET: {
                   name: "My Group"
                 }

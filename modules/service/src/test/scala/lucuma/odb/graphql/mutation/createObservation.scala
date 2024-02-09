@@ -162,7 +162,7 @@ class createObservation extends OdbSuite {
         s"""
           mutation {
             createObservation(input: {
-              programReference: "G-2025A-0001"
+              proposalReference: "G-2025A-0001"
               SET: {
                 subtitle: "crunchy frog"
               }
@@ -194,7 +194,7 @@ class createObservation extends OdbSuite {
           mutation {
             createObservation(input: {
               programId: "$pid"
-              programReference: "G-2025A-0002"
+              proposalReference: "G-2025A-0002"
               SET: {
                 subtitle: "crunchy frog"
               }
@@ -227,7 +227,7 @@ class createObservation extends OdbSuite {
           mutation {
             createObservation(input: {
               programId: "p-123"
-              programReference: "G-2025A-0003"
+              proposalReference: "G-2025A-0003"
               SET: {
                 subtitle: "crunchy frog"
               }
@@ -239,7 +239,7 @@ class createObservation extends OdbSuite {
           }
         """,
         Left(List(
-          "Program reference G-2025A-0003 (id p-105) doesn't correspond to specified program id p-123"
+          "Proposal 'G-2025A-0003' (id p-105) does not correspond to the specified program id p-123."
         ))
       )
     }
@@ -265,7 +265,7 @@ class createObservation extends OdbSuite {
           }
         """,
         Left(List(
-          "One of programId or programReference must be provided."
+          "One of programId, programReference or proposalReference must be provided."
         ))
       )
     }
