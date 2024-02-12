@@ -21,7 +21,7 @@ import monocle.Prism
 
 
 sealed trait ProgramReference extends Product with Serializable {
-  def programClass: ProgramClass
+  def programType: ProgramType
   def format: String
 }
 
@@ -31,11 +31,11 @@ object ProgramReference {
   object Description extends RefinedTypeOps[Description, String]
 
   case class Calibration(semester: Semester, instrument: Instrument, index: PosInt) extends ProgramReference {
-    override def programClass: ProgramClass =
-      ProgramClass.Calibration
+    override def programType: ProgramType =
+      ProgramType.Calibration
 
     override def format: String =
-      f"G-${semester.format}-${programClass.abbreviation}-${instrument.tag}-$index%02d"
+      f"G-${semester.format}-${programType.abbreviation}-${instrument.tag}-$index%02d"
   }
 
   object Calibration {
@@ -49,11 +49,11 @@ object ProgramReference {
   }
 
   case class Engineering(semester: Semester, instrument: Instrument, index: PosInt) extends ProgramReference {
-    override def programClass: ProgramClass =
-      ProgramClass.Engineering
+    override def programType: ProgramType =
+      ProgramType.Engineering
 
     override def format: String =
-      f"G-${semester.format}-${programClass.abbreviation}-${instrument.tag}-$index%02d"
+      f"G-${semester.format}-${programType.abbreviation}-${instrument.tag}-$index%02d"
   }
 
   object Engineering {
@@ -67,11 +67,11 @@ object ProgramReference {
   }
 
   case class Example(instrument: Instrument) extends ProgramReference {
-    override def programClass: ProgramClass =
-      ProgramClass.Example
+    override def programType: ProgramType =
+      ProgramType.Example
 
     override def format: String =
-      s"G-${programClass.abbreviation}-${instrument.tag}"
+      s"G-${programType.abbreviation}-${instrument.tag}"
   }
 
   object Example {
@@ -85,11 +85,11 @@ object ProgramReference {
   }
 
   case class Library(instrument: Instrument, description: Description) extends ProgramReference {
-    override def programClass: ProgramClass =
-      ProgramClass.Library
+    override def programType: ProgramType =
+      ProgramType.Library
 
     override def format: String =
-      s"G-${programClass.abbreviation}-${instrument.tag}-${description.value}"
+      s"G-${programType.abbreviation}-${instrument.tag}-${description.value}"
   }
 
   object Library {
@@ -102,18 +102,18 @@ object ProgramReference {
 
   }
 
-  case class Science(proposal: ProposalReference, scienceType: ScienceType) extends ProgramReference {
-    override def programClass: ProgramClass =
-      ProgramClass.Science
+  case class Science(proposal: ProposalReference, scienceSubtype: ScienceSubtype) extends ProgramReference {
+    override def programType: ProgramType =
+      ProgramType.Science
 
     override def format: String =
-      s"${proposal.format}-${scienceType.letter}"
+      s"${proposal.format}-${scienceSubtype.letter}"
   }
 
   object Science {
 
     given Order[Science] =
-      Order.by { a => (a.proposal, a.scienceType) }
+      Order.by { a => (a.proposal, a.scienceSubtype) }
 
     val fromString: Format[String, Science] =
       Format(s => parse.program.parseAll(s).toOption, _.format)
@@ -132,23 +132,23 @@ object ProgramReference {
         .map { case ((semester, instrument), index) => f(semester, instrument, index) }
 
     val calibration: Parser[Calibration] =
-      semesterInstruentIndex(ProgramClass.Calibration.abbreviation)(Calibration.apply)
+      semesterInstruentIndex(ProgramType.Calibration.abbreviation)(Calibration.apply)
 
     val engineering: Parser[Engineering] =
-      semesterInstruentIndex(ProgramClass.Engineering.abbreviation)(Engineering.apply)
+      semesterInstruentIndex(ProgramType.Engineering.abbreviation)(Engineering.apply)
 
     val example: Parser[Example] =
-      (string(s"G-${ProgramClass.Example.abbreviation}-") *> instrument).map { instrument =>
+      (string(s"G-${ProgramType.Example.abbreviation}-") *> instrument).map { instrument =>
         Example(instrument)
       }
 
     val library: Parser[Library] =
-      (instrument.between(string(s"G-${ProgramClass.Library.abbreviation}-"), dash) ~ description)
+      (instrument.between(string(s"G-${ProgramType.Library.abbreviation}-"), dash) ~ description)
         .map { case (instrument, description) => Library(instrument, description) }
 
     val program: Parser[Science] =
-      ((ProposalReference.parse.proposal <* dash) ~ scienceType).map { case (proposal, scienceType) =>
-        Science(proposal, scienceType)
+      ((ProposalReference.parse.proposal <* dash) ~ scienceSubtype).map { case (proposal, scienceSubtype) =>
+        Science(proposal, scienceSubtype)
       }
 
     val programReference: Parser[ProgramReference] =
@@ -182,7 +182,7 @@ object ProgramReference {
       case (a @ Example(_),           b @ Example(_))           => Order.compare(a, b)
       case (a @ Library(_, _),        b @ Library(_, _))        => Order.compare(a, b)
       case (a @ Science(_, _),        b @ Science(_, _))        => Order.compare(a, b)
-      case (a, b) => Order.compare(a.programClass, b.programClass)
+      case (a, b) => Order.compare(a.programType, b.programType)
     }
 }
 

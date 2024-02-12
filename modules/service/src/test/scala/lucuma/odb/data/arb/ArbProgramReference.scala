@@ -98,14 +98,14 @@ trait ArbProgramReference extends ArbReference {
     Arbitrary {
       for {
         p <- arbitrary[ProposalReference]
-        t <- arbitrary[ScienceType]
+        t <- arbitrary[ScienceSubtype]
       } yield ProgramReference.Science(p, t)
     }
 
   given Cogen[Science] =
-    Cogen[(ProposalReference, ScienceType)].contramap { a => (
+    Cogen[(ProposalReference, ScienceSubtype)].contramap { a => (
       a.proposal,
-      a.scienceType
+      a.scienceSubtype
     )}
 
   val scienceStrings: Gen[String] =
