@@ -2819,6 +2819,11 @@ type Mutation {
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
 
+  "Update the program reference."
+  updateProgramType(
+    input: UpdateProgramTypeInput!
+  ): UpdateProgramTypeResult!
+
   """
   Updates existing targets
   """
@@ -4173,6 +4178,19 @@ type UpdateObservationsResult {
   `true` when there were additional edits that were not returned.
   """
   hasMore: Boolean!
+}
+
+input UpdateProgramTypeInput {
+  calibration: ProgramTypeCalibrationInput
+  engineering: ProgramTypeEngineringInput
+  example:     ProgramTypeExampleInput
+  library:     ProgramTypeLibraryInput
+  science:     ProgramTypeScienceInput
+}
+
+type UpdateProgramTypeResult {
+  "The resulting program reference."
+  programReference: ProgramReference!
 }
 
 """
@@ -7564,10 +7582,31 @@ type Program {
   """
   name: NonEmptyString
 
-  "Semester associated with the program, if any."
+  "Program type"
+  programType: ProgramType!
+
+  """
+  Instrument associated with the program, if any.  This is relevant for
+  CALIBRATION, ENGINEERING, EXAMPLE, and LIBRARY programs only.
+  """
+  instrument: Instrument
+
+  """
+  Science subtype associated with the program, if any.  This is relevant for
+  SCIENCE programs only.
+  """
+  scienceSubtype: ScienceSubtype
+
+  """
+  Semester associated with the program, if any.  This is relevant for
+  CALIBRATION, ENGINEERING, and SCIENCE programs only.
+  """
   semester: Semester
 
-  "Index, relative to the semester, if any."
+  """
+  Index, relative to the semester, if any.  This is relevant for CALIBRATION,
+  ENGINEERING, and SCIENCE programs only.
+  """
   semesterIndex: PosInt
 
   "Formatted program reference, if any."
@@ -7665,6 +7704,45 @@ where 2024B refers to the associated semester.
 scalar ProgramReference
 
 """
+Inputs required when updating or switching to a calibration program.
+"""
+input ProgramTypeCalibrationInput {
+  semester:   Semester!
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to an engineering program.
+"""
+input ProgramTypeEngineeringInput {
+  semester:   Semester!
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to an example program.
+"""
+input ProgramTypeExampleInput {
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to a library program.
+"""
+input ProgramTypeLibraryInput {
+  instrument:  Instrument!
+  description: NonEmptyString!
+}
+
+"""
+Inputs required when updating or switching to a science program.
+"""
+input ProgramTypeScienceInput {
+  semester:       Semester!
+  scienceSubtype: ScienceSubtype!
+}
+
+"""
 The matching program results, limited to a maximum of 1000 entries.
 """
 type ProgramSelectResult {
@@ -7677,6 +7755,14 @@ type ProgramSelectResult {
   `true` when there were additional matches that were not returned.
   """
   hasMore: Boolean!
+}
+
+enum ProgramType {
+  CALIBRATION
+  ENGINEERING
+  EXAMPLE
+  LIBRARY
+  SCIENCE
 }
 
 type ProperMotion {
@@ -8348,6 +8434,27 @@ enum ScienceMode {
   """
   SPECTROSCOPY
 }
+
+"""
+Science program types, for science programs only (i.e., not calibration,
+engineering, library, etc.).
+"""
+enum ScienceSubtype {
+  CLASSICAL
+
+  DIRECTORS_TIME
+
+  FAST_TURNAROUND
+
+  LARGE_PROGRAM
+
+  QUEUE
+
+  DEMO_SCIENCE
+
+  SYSTEM_VERIFICATION
+}
+
 
 type ScienceRequirements {
   """
@@ -10251,6 +10358,33 @@ input WhereEqPartner {
 }
 
 """
+Filters on equality (or not) of the program type and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.  E.g.
+'EQ = "CALIBRATION"' will match when the type is "CALIBRATION".
+"""
+input WhereEqProgramType {
+  """
+  Matches if the program type is exactly the supplied value.
+  """
+  EQ: ProgramType
+
+  """
+  Matches if the program type is not the supplied value.
+  """
+  NEQ: ProgramType
+
+  """
+  Matches if the program type is any of the supplied options.
+  """
+  IN: [ProposalType!]
+
+  """
+  Matches if the program type is none of the supplied values.
+  """
+  NIN: [ProgramType!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -10555,6 +10689,40 @@ input WhereOrderGroupId {
   LTE: GroupId
 }
 
+"""
+Filters on equality (or not) of the instrument and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.  E.g.
+'EQ = "GMOS_SOUTH"' will match when the property value is "GMOS_SOUTH".
+Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
+"""
+input WhereOptionEqInstrument {
+
+  """
+  When `true`, matches if the instrument is not defined. When `false` matches
+  if the instrument is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the instrument is exactly the supplied value.
+  """
+  EQ: Instrument
+
+  """
+  Matches if the instrument is not the supplied value.
+  """
+  NEQ: Instrument
+
+  """
+  Matches if the instrument is any of the supplied options.
+  """
+  IN: [Instrument!]
+
+  """
+  Matches if the instrument is none of the supplied values.
+  """
+  NIN: [Instrument!]
+}
 
 
 """
@@ -10588,6 +10756,41 @@ input WhereOptionEqQaState {
   Matches if the property value is none of the supplied values.
   """
   NIN: [DatasetQaState!]
+}
+
+"""
+Filters on equality (or not) of the science subtype and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.  E.g.
+'EQ = "QUEUE"' will match when the property value is "QUEUE".
+Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
+"""
+input WhereOptionEqScienceSubtype {
+
+  """
+  When `true`, matches if the subtype is not defined. When `false` matches
+  if the instrument is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the subtype is exactly the supplied value.
+  """
+  EQ: ScienceSubtype
+
+  """
+  Matches if the subtype is not the supplied value.
+  """
+  NEQ: ScienceSubtype
+
+  """
+  Matches if the subtype is any of the supplied options.
+  """
+  IN: [ScienceSubtype!]
+
+  """
+  Matches if the subtype is none of the supplied values.
+  """
+  NIN: [ScienceSubtype!]
 }
 
 """
@@ -11535,6 +11738,21 @@ input WhereProgram {
   Matches the program name.
   """
   name: WhereOptionString
+
+  """
+  Mathces the program type.
+  """
+  programType: WhereEqProgramType
+
+  """
+  Matches the instrument associated with the program.
+  """
+  instrument: WhereOptionEqInstrument
+
+  """
+  Matches the science subtype associated with the program.
+  """
+  scienceSubtype: WhereOptionEqScienceSubtype
 
   """
   Matches the semester associated with the program.

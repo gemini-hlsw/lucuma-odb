@@ -48,8 +48,8 @@ trait ReferenceParsers {
   val index: Parser[PosInt] =
     char('0').rep0.with1 *> posInt
 
-  val scienceType: Parser[ScienceType] =
-    charIn(ScienceType.values.map(_.letter)).mapFilter(ScienceType.fromLetter)
+  val scienceSubtype: Parser[ScienceSubtype] =
+    charIn(ScienceSubtype.values.map(_.letter)).mapFilter(ScienceSubtype.fromLetter)
 
 }
 

@@ -52,6 +52,7 @@ import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.ProposalReference
+import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -347,6 +348,9 @@ trait Codecs {
       ProgramReference.fromString.reverseGet
     )
 
+  val program_type: Codec[ProgramType] =
+    enumerated(Type("e_program_type"))
+
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
 
@@ -367,6 +371,9 @@ trait Codecs {
 
   val science_mode: Codec[ScienceMode] =
     enumerated[ScienceMode](Type.varchar)
+
+  val science_subtype: Codec[ScienceSubtype] =
+    enumerated(Type("e_science_subtype"))
 
   val semester: Codec[Semester] =
     varchar.eimap(

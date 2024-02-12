@@ -63,9 +63,14 @@ trait ProgramMapping[F[_]]
         SqlField("id", ProgramTable.Id, key = true),
         SqlField("existence", ProgramTable.Existence, hidden = true),
         SqlField("name", ProgramTable.Name),
-        SqlField("semester", ProgramTable.Reference.Semester),
-        SqlField("semesterIndex", ProgramTable.Reference.SemesterIndex),
+
+        SqlField("programType",      ProgramTable.ProgramType),
+        SqlField("instrument",       ProgramTable.Reference.Instrument),
+        SqlField("scienceSubtype",   ProgramTable.Reference.ScienceSubtype),
+        SqlField("semester",         ProgramTable.Reference.Semester),
+        SqlField("semesterIndex",    ProgramTable.Reference.SemesterIndex),
         SqlField("programReference", ProgramTable.Reference.ProgramReference),
+
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
         SqlField("proposalReference", ProgramTable.Reference.ProposalReference),
         SqlField("proposalStatus", ProgramTable.ProposalStatus),
