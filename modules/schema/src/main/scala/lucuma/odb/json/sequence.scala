@@ -27,7 +27,6 @@ import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
-import lucuma.core.model.sequence.PlannedTime
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
@@ -43,7 +42,6 @@ trait SequenceCodec {
 
   import offset.decoder.given
   import stepconfig.given
-  import plannedtime.given_Encoder_PlannedTime  // deprecated
   import timeaccounting.given
 
   given Decoder[Dataset.Filename] =
@@ -112,7 +110,6 @@ trait SequenceCodec {
     Encoder.instance { (a: SequenceDigest) =>
       Json.obj(
         "observeClass" -> a.observeClass.asJson,
-        "plannedTime"  -> PlannedTime.ToCategorizedTime.reverseGet(a.timeEstimate).asJson,
         "timeEstimate" -> a.timeEstimate.asJson,
         "offsets"      -> a.offsets.toList.asJson,
         "atomCount"    -> a.atomCount.asJson
