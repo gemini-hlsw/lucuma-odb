@@ -136,7 +136,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
   val ShortTime = BigDecimal("1729.200000")
   val LongTime  = BigDecimal("1736.262500")
 
-  test("single complete observation") {
+  test("program level: single complete observation") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -183,7 +183,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
-  test("single complete, but 'New' observation") {
+  test("program level: single complete, but 'New' observation") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -230,7 +230,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
-  test("single complete, but 'Inactive' observation") {
+  test("program level: single complete, but 'Inactive' observation") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -277,7 +277,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
 
   }
 
-  test("two complete observations") {
+  test("program level: two complete observations") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -324,7 +324,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("one incomplete, one complete observation") {
+  test("program level: one incomplete, one complete observation") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -392,7 +392,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
       """
     ).void
 
-  test("one group with one observation") {
+  test("program level: one group with one observation") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -423,12 +423,12 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
                 "timeEstimateRange": {
                   "minimum": {
                     "total" : {
-                        "seconds" : $ShortTime
+                      "seconds" : $ShortTime
                     }
                   },
                   "maximum": {
                     "total" : {
-                        "seconds" : $ShortTime
+                      "seconds" : $ShortTime
                     }
                   }
                 }
@@ -440,7 +440,65 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("a group with observation and a top-level obs") {
+  test("group level..: one group with one observation") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        g <- createGroupAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- moveObsToGroup(g, o)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 groupElements {
+                   group {
+                     timeEstimateRange {
+                       minimum { total { seconds } }
+                       maximum { total { seconds } }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "groupElements": [
+                  {
+                    "group": {
+                      "timeEstimateRange": {
+                        "minimum": {
+                          "total" : {
+                            "seconds" : $ShortTime
+                          }
+                        },
+                        "maximum": {
+                          "total" : {
+                            "seconds" : $ShortTime
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("program level: a group with observation and a top-level obs") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -489,7 +547,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("a simple OR group") {
+  test("program level: a simple OR group") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -521,12 +579,12 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
                 "timeEstimateRange": {
                   "minimum": {
                     "total" : {
-                        "seconds" : $ShortTime
+                      "seconds" : $ShortTime
                     }
                   },
                   "maximum": {
                     "total" : {
-                        "seconds" : $LongTime
+                      "seconds" : $LongTime
                     }
                   }
                 }
@@ -538,7 +596,66 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("a group with explicit minRequired, missing required children") {
+  test("group level..: a simple OR group") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        g <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
+        oShort <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        oLong  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- moveObsToGroup(g, oShort, oLong)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 groupElements {
+                   group {
+                     timeEstimateRange {
+                       minimum { total { seconds } }
+                       maximum { total { seconds } }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "groupElements": [
+                  {
+                    "group": {
+                      "timeEstimateRange": {
+                        "minimum": {
+                          "total" : {
+                            "seconds" : $ShortTime
+                          }
+                        },
+                        "maximum": {
+                          "total" : {
+                            "seconds" : $LongTime
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("program level: a group with explicit minRequired, missing required children") {
     val setup: IO[Program.Id] =
       for {
         p  <- createProgram
@@ -587,7 +704,7 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("two groups") {
+  test("program level: two groups") {
     val setup: IO[Program.Id] =
       for {
         p <- createProgram
@@ -632,6 +749,85 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
                     }
                   }
                 }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("group level..: two groups") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        g0 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
+        oShort0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        oLong0  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- moveObsToGroup(g0, oShort0, oLong0)
+        g1 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
+        oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- moveObsToGroup(g1, oShort1, oLong1)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 groupElements {
+                   group {
+                     timeEstimateRange {
+                       minimum { total { seconds } }
+                       maximum { total { seconds } }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "groupElements": [
+                  {
+                    "group": {
+                      "timeEstimateRange": {
+                        "minimum": {
+                          "total" : {
+                              "seconds" : $ShortTime
+                          }
+                        },
+                        "maximum": {
+                          "total" : {
+                              "seconds" : $LongTime
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "group": {
+                      "timeEstimateRange": {
+                        "minimum": {
+                          "total" : {
+                              "seconds" : $ShortTime
+                          }
+                        },
+                        "maximum": {
+                          "total" : {
+                              "seconds" : $LongTime
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
               }
             }
           """

@@ -23,6 +23,7 @@ trait GroupService[F[_]] {
   def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[GroupService.UpdateGroupsResponse]
   def selectGroups(programId: Program.Id): F[GroupTree]
+  def selectPid(groupId: Group.Id): F[Option[Program.Id]]
 }
 
 object GroupService {
@@ -90,6 +91,10 @@ object GroupService {
         } yield mkTree((gs ++ os).groupBy(_._1).view.mapValues(_.sortBy(_._2.value).map(_._3)).toMap)
 
       }
+
+      def selectPid(groupId: Group.Id): F[Option[Program.Id]] =
+        session.option(Statements.SelectPid)(groupId)
+
     }
 
   object Statements {
@@ -198,6 +203,16 @@ object GroupService {
           c_program_id = $program_id AND c_existence = 'present'
       """.query(group_id.opt *: int2_nonneg *: observation_id)
          .map { case (gid, index, oid) => (gid, index, GroupTree.Leaf(oid)) }
+
+     val SelectPid: Query[Group.Id, Program.Id] =
+       sql"""
+         SELECT
+           c_program_id
+         FROM
+           t_group
+         WHERE
+           c_group_id = $group_id
+       """.query(program_id)
   }
 
 }
