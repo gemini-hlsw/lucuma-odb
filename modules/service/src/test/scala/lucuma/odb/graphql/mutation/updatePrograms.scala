@@ -1248,7 +1248,7 @@ class updatePrograms extends OdbSuite {
           """
         )
       ) >>
-      chronProgramUpdates(pid).map(_.drop(1)).assertEquals(
+      chronProgramUpdates(pid).map(_.drop(2)).assertEquals(
         List(
           json"""
           {

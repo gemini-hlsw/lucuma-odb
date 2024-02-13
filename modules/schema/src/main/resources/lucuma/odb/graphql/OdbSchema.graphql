@@ -2819,7 +2819,15 @@ type Mutation {
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
 
-  "Update the program reference."
+  """
+  TODO: This seems right because each program type has a specific set of
+  information that it needs. But currently there is a `semester` property in the
+  ProgramPropertiesInput.  It's used in the _proposal_ reference of course. So
+  if that is removed in favor of the `UpdateProgramTypeInput` do I need a
+  special `UpdateProposalStatus` mutation that requires a semester?
+
+  Update the program reference
+  """
   updateProgramType(
     input: UpdateProgramTypeInput!
   ): UpdateProgramTypeResult!
@@ -7585,7 +7593,23 @@ type Program {
   "Program type"
   programType: ProgramType!
 
+
   """
+  TODO: Think I'll gather up all the reference-related fields into a
+  `Reference` object.  Including the `programReference itself.`
+
+  "program": {
+    "programType": "CALIBRATION"
+    "reference": {
+      "instrument": "GMOS_SOUTH"
+      "scienceSubtype": NULL
+      "semester: "2026A"
+      "semesterIndex": 1
+
+      "program": "G-2026A-CAL-GMOS_SOUTH-01"
+    }
+  }
+
   Instrument associated with the program, if any.  This is relevant for
   CALIBRATION, ENGINEERING, EXAMPLE, and LIBRARY programs only.
   """
@@ -7704,6 +7728,29 @@ where 2024B refers to the associated semester.
 scalar ProgramReference
 
 """
+The matching program results, limited to a maximum of 1000 entries.
+"""
+type ProgramSelectResult {
+  """
+  Matching programs up to the return size limit of 1000
+  """
+  matches: [Program!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+}
+
+enum ProgramType {
+  CALIBRATION
+  ENGINEERING
+  EXAMPLE
+  LIBRARY
+  SCIENCE
+}
+
+"""
 Inputs required when updating or switching to a calibration program.
 """
 input ProgramTypeCalibrationInput {
@@ -7740,29 +7787,6 @@ Inputs required when updating or switching to a science program.
 input ProgramTypeScienceInput {
   semester:       Semester!
   scienceSubtype: ScienceSubtype!
-}
-
-"""
-The matching program results, limited to a maximum of 1000 entries.
-"""
-type ProgramSelectResult {
-  """
-  Matching programs up to the return size limit of 1000
-  """
-  matches: [Program!]!
-
-  """
-  `true` when there were additional matches that were not returned.
-  """
-  hasMore: Boolean!
-}
-
-enum ProgramType {
-  CALIBRATION
-  ENGINEERING
-  EXAMPLE
-  LIBRARY
-  SCIENCE
 }
 
 type ProperMotion {
