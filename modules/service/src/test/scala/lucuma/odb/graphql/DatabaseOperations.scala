@@ -200,7 +200,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def acceptProposal(user: User, pid: Program.Id): IO[ProgramReference] =
+  def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     query(user, s"""
         mutation {
           updatePrograms(
@@ -219,7 +219,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .downField("programs")
         .downArray
         .downField("programReference")
-        .as[ProgramReference]
+        .as[Option[ProgramReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }

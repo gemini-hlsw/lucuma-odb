@@ -63,7 +63,7 @@ ALTER TABLE t_program
   ADD COLUMN c_program_type    e_program_type    NOT NULL DEFAULT 'science',
   ADD COLUMN c_library_desc    text              NULL CHECK (c_library_desc ~ '^[A-Z0-9]+$'), -- LIB
   ADD COLUMN c_instrument      d_tag             NULL REFERENCES t_instrument(c_tag),         -- CAL, ENG, LIB, XPL
-  ADD COLUMN c_science_subtype e_science_subtype NULL DEFAULT 'queue',                        -- SCI
+  ADD COLUMN c_science_subtype e_science_subtype NULL,                                        -- SCI
 
   ADD CONSTRAINT reference_type_constraint CHECK (
       CASE
@@ -89,8 +89,7 @@ ALTER TABLE t_program
           WHEN c_program_type = 'science' THEN
             c_instrument   IS NULL     AND
             c_library_desc IS NULL     AND
-            (c_semester IS NOT NULL OR c_proposal_status = 'not_submitted') AND
-            c_science_subtype IS NOT NULL
+            (c_semester IS NOT NULL OR c_proposal_status = 'not_submitted')
       END
   );
 
@@ -143,31 +142,17 @@ RETURNS TRIGGER AS $$
 BEGIN
 
     CASE
-      WHEN NEW.c_program_type = 'calibration' THEN
+      WHEN NEW.c_program_type = 'calibration' OR
+           NEW.c_program_type = 'engineering' THEN
         BEGIN
           IF NEW.c_semester IS NULL THEN
-            RAISE EXCEPTION 'Calibration programs must define a semester';
+            RAISE EXCEPTION '% programs must define a semester', INITCAP(NEW.c_program_type);
           ELSEIF NEW.c_instrument IS NULL THEN
-            RAISE EXCEPTION 'Calibration programs must define an instrument';
+            RAISE EXCEPTION '% programs must define an instrument', INITCAP(NEW.c_program_type);
           ELSEIF (NEW.c_program_type != OLD.c_program_type)         OR
                  (NEW.c_semester   IS DISTINCT FROM OLD.c_semester)   OR
                  (NEW.c_instrument IS DISTINCT FROM OLD.c_instrument) THEN
-            NEW.c_semester_index := next_semester_index('calibration', NEW.c_semester, NEW.c_instrument);
-          END IF;
-          NEW.c_library_desc    := NULL;
-          NEW.c_science_subtype := NULL;
-        END;
-
-      WHEN NEW.c_program_type = 'engineering' THEN
-        BEGIN
-          IF NEW.c_semester IS NULL THEN
-            RAISE EXCEPTION 'Engineering programs must define a semester';
-          ELSEIF NEW.c_instrument IS NULL THEN
-            RAISE EXCEPTION 'Engineering programs must define an instrument';
-          ELSEIF (NEW.c_program_type != OLD.c_program_type)         OR
-                 (NEW.c_semester   IS DISTINCT FROM OLD.c_semester)   OR
-                 (NEW.c_instrument IS DISTINCT FROM OLD.c_instrument) THEN
-            NEW.c_semester_index := next_semester_index('engineering', NEW.c_semester, NEW.c_instrument);
+            NEW.c_semester_index := next_semester_index(NEW.c_program_type, NEW.c_semester, NEW.c_instrument);
           END IF;
           NEW.c_library_desc    := NULL;
           NEW.c_science_subtype := NULL;
@@ -189,7 +174,7 @@ BEGIN
           IF NEW.c_instrument IS NULL THEN
             RAISE EXCEPTION 'Library programs must define an instrument';
           ELSEIF NEW.c_library_desc IS NULL THEN
-            RAISE EXCEPTION 'Library programs must define a description.';
+            RAISE EXCEPTION 'Library programs must define a description';
           END IF;
           NEW.c_semester        := NULL;
           NEW.c_semester_index  := NULL;
@@ -198,10 +183,6 @@ BEGIN
 
       WHEN NEW.c_program_type = 'science' THEN
         BEGIN
-          IF NEW.c_science_subtype IS NULL THEN
-            RAISE EXCEPTION 'Science programs must define a science type';
-          END IF;
-
           IF (NEW.c_proposal_status <> 'not_submitted') THEN
             IF NEW.c_semester IS NULL THEN
               RAISE EXCEPTION 'Submitted science programs must define a semester';
@@ -211,7 +192,8 @@ BEGIN
               NEW.c_semester_index := next_semester_index('science', NEW.c_semester, NULL);
             END IF;
           END IF;
-          NEW.c_library_desc   := NULL;
+          NEW.c_instrument   := NULL;
+          NEW.c_library_desc := NULL;
         END;
     END CASE;
 
@@ -326,10 +308,10 @@ ALTER TABLE t_program
 CREATE OR REPLACE FUNCTION update_science_subtype()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.c_class != OLD.c_class THEN
+    IF NEW.c_class IS DISTINCT FROM OLD.c_class THEN
         UPDATE t_program AS p
             SET c_science_subtype = CASE
-                                        WHEN p.c_program_type = 'science' THEN COALESCE(s.c_type, 'queue')
+                                        WHEN p.c_program_type = 'science' THEN s.c_type
                                         ELSE NULL
                                     END
            FROM t_science_subtype s
@@ -342,6 +324,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_science_subtype_trigger
-BEFORE UPDATE ON t_proposal
+BEFORE INSERT OR UPDATE ON t_proposal
 FOR EACH ROW
 EXECUTE FUNCTION update_science_subtype();

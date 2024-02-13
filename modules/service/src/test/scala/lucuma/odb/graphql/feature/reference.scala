@@ -562,11 +562,11 @@ class reference extends OdbSuite {
       pid  <- createProgramAs(pi)
       _    <- addProposal(pi, pid)
       _    <- submitProposal(pi, pid, sem2024A.some)
-      o    <- fetchProgramReference(pi, pid)
-      prog <- acceptProposal(staff, pid)
+      ref0 <- fetchProgramReference(pi, pid)
+      ref1 <- acceptProposal(staff, pid)
     } yield {
-      assert(o.isEmpty)
-      assertEquals(prog, ref2024A1Q)
+      assert(ref0.isEmpty)
+      assertEquals(ref1, ref2024A1Q.some)
     }
   }
 
