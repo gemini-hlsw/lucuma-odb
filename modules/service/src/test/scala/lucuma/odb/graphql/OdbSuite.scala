@@ -45,6 +45,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
+import lucuma.odb.service.OdbError
 import lucuma.odb.service.S3FileService
 import lucuma.refined.*
 import munit.CatsEffectSuite
@@ -71,7 +72,6 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
 import scala.concurrent.duration.*
-import lucuma.odb.service.OdbError
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
@@ -102,6 +102,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     fa.attempt.flatMap {
       case Left(ResponseException(errors, _)) =>
         assertEquals(messages.toList, errors.toList.map(_.message)).pure[IO]
+      case Left(other) => IO.raiseError(other)
+      case Right(a) => fail(s"Expected failure, got $a")
+    }
+
+  /** Intercept a single OdbError */
+  def interceptOdbError(fa: IO[Any])(f: PartialFunction[OdbError, Unit]): IO[Unit] =
+    fa.attempt.flatMap {
+      case Left(e @ ResponseException(errors, _)) =>
+        errors.toList.flatMap(OdbError.fromGraphQLError) match
+          case List(odbe) =>
+            IO(f.applyOrElse(odbe, e => fail(s"OdbError predicate failed on $e")))
+          case _ => IO.raiseError(e)
       case Left(other) => IO.raiseError(other)
       case Right(a) => fail(s"Expected failure, got $a")
     }
@@ -345,26 +357,45 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     })
   }
 
-  def expect2(
+  /** Expect success. */
+  def expectSuccess(
     user:      User,
     query:     String,
-    expected:  Either[List[OdbError.Category], Json],
+    expected:  Json,
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Http,
-  ): IO[Unit] = {
-    val op = this.query(user, query, variables, client)
-    expected.fold(expectedCats => {
-      op
-      .intercept[ResponseException[Any]]
-      .map: e =>
-        val cats = e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList).map(_.code)
-        if cats =!= expectedCats then fail(s"Expected error categories ${expectedCats.mkString("[",",","]")}; found ${cats.mkString("[",",","]")}")
-    }, success => {
-      op.map(_.spaces2)
-        .assertEquals(success.spaces2) // by comparing strings we get more useful errors
-    })
-  }
+  ): IO[Unit] =
+    this.query(user, query, variables, client)
+      .map(_.spaces2)
+      .assertEquals(expected.spaces2) // by comparing strings we get more useful errors
 
+  /** Expect a single OdbError */
+  def expectOdbError(
+    user:      User,
+    query:     String,
+    expected:  PartialFunction[OdbError, Unit],
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Http,
+  ): IO[Unit] =
+    this.query(user, query, variables, client)
+      .intercept[ResponseException[Any]]
+      .flatMap: e =>
+        e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList) match
+          case List(odbe) =>
+            IO(expected.applyOrElse(odbe, e => fail(s"OdbError predicate failed on $e")))
+          case _ => IO.raiseError(e)
+
+  def expectSuccessOrOdbError(
+    user:      User,
+    query:     String,
+    expected:  Either[PartialFunction[OdbError, Unit], Json],
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Http,
+  ): IO[Unit] =
+    expected.fold(
+      expectOdbError(user, query, _, variables, client),
+      expectSuccess(user, query, _, variables, client)
+    )
 
   def expectIor(
     user:      User,
@@ -405,7 +436,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       .use { conn =>
         val req = conn.request(Operation(query))
         val op  = variables.fold(req.apply)(req.withInput)
-        op
+        op.onError:
+          case ResponseException(es, _) =>
+            es.traverse_ : e =>
+              OdbError.fromGraphQLError(e) match
+                case Some(_) => IO.unit
+                case None => IO.println(s"🐙 Not an OdbError: $e")              
+          case _ => IO.unit
       }
 
   def subscription(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], variables: Option[JsonObject] = None): IO[List[Json]] =

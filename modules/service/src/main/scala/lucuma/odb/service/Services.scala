@@ -8,9 +8,12 @@ import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -23,11 +26,8 @@ import skunk.Transaction
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
-import scala.util.NotGiven
-import lucuma.odb.data.UserInvitation
 import scala.collection.immutable.SortedMap
-import lucuma.core.model.Program
-import lucuma.core.model.Observation
+import scala.util.NotGiven
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
