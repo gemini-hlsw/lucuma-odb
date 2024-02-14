@@ -22,6 +22,7 @@ import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
+import lucuma.odb.service.Services.Syntax.error.invalidProgram
 import lucuma.odb.util.Codecs.*
 import skunk.Query
 import skunk.SqlState
@@ -30,7 +31,6 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.Syntax.error.invalidProgram
 
 trait UserInvitationService[F[_]]:
 
@@ -103,7 +103,7 @@ object UserInvitationService:
               .prepareR(Statements.redeemUserInvitation)
               .use(_.option(user, status, input.key))
               .flatMap:
-                case None => error.invalidInvitation(input.key.id).asFailureF
+                case None => error.invalidInvitation(input.key.id).withDetail("Invitation is invalid, or has already been accepted, declined, or revoked.").asFailureF
                 case Some(r, ot, op, pid) =>
                   val xa = transaction
                   xa.savepoint.flatMap: sp =>

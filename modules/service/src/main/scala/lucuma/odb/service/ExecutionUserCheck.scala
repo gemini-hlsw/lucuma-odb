@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.syntax.either.*
+import grackle.Result
 import lucuma.core.model.Access.Service
 import lucuma.core.model.User
 
@@ -15,6 +16,12 @@ trait ExecutionUserCheck {
     user.role.access match {
       case Service => ().asRight // TODO: should specifically be the observe service user, whose name should be passed in the app config
       case _       => f(user).asLeft
+    }
+
+  def checkUser2[F[_]](using Services[F]): Result[Unit] =
+    user.role.access match {
+      case Service => Result.unit // TODO: should specifically be the observe service user, whose name should be passed in the app config
+      case _       => error.notAuthorized.asFailure
     }
 
 }

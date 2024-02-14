@@ -37,8 +37,13 @@ import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.OdbError
+import lucuma.odb.service.OdbError.Category.SequenceUnavailable
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.asWarning
+
+import scala.collection.SortedMap
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with Predicates[F]
@@ -105,7 +110,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =
-      Result.warning(e.format, Json.Null)
+      OdbError(SequenceUnavailable, user, Some(e.format), SortedMap.empty).asWarning(Json.Null)
   }
 
   private lazy val configHandler: EffectHandler[F] = {

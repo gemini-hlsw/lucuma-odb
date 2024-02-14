@@ -33,19 +33,21 @@ object OdbError:
 
   /** Errors are grouped into categories that might correspond with different kinds of user dialogs on the client side. */
   enum Category(val tag: String, val text: String):
+    case InvalidArgument    extends Category("invalid_argument", "The provided argument is not valid.")
     case NoAction           extends Category("no_action", "No action was taken.")
     case NotAuthorized      extends Category("not_authorized", "User is not authorized to perform this operation.")
     case InvitationError    extends Category("invitation_error", "Invitation operation could not be completed.")
     case InvalidProgram     extends Category("invalid_program", "Specified program does not exist, is not visible, or is ineligible for the requested operation.")
     case InvalidObservation extends Category("invalid_observation", "Specified observation does not exist, is not visible, or is ineligible for the requested operation.")
+    case SequenceUnavailable extends Category("sequence_unavailable", "Could not generate the requested sequence.")
 
   given Enumerated[Category] = Enumerated.derived
   given Eq[OdbError] = Eq.by(e => (e.code, e.user, e.detail, e.data.toList)) // :-\
 
   // "private" fields we pack into the extensions for transport
-  private val FieldPrefix = "server_error."
+  private val FieldPrefix = "odb_error."
   object Field:
-    val Category = s"${FieldPrefix}code"
+    val Category = s"${FieldPrefix}category"
     val Detail   = s"${FieldPrefix}detail"
     val User     = s"${FieldPrefix}user"
 
@@ -55,7 +57,6 @@ object OdbError:
 
   /** If `e` contains the expected extensions we can turn it into a OdbError. */
   def fromGraphQLError(e: GraphQLError): Option[OdbError] =
-    println(e)
     for 
       code   <- e.ext[Category](Field.Category)
       detail <- e.ext[Option[String]](Field.Detail)
@@ -79,10 +80,11 @@ extension (e: OdbError)
   def withData(data: (String, Json)*): OdbError = e.copy(data = e.data ++ data)
 
   def asProblem: Problem =
-    Problem(e.code.text,  Nil, Nil, Some(JsonObject.fromFoldable(
-      ("code"   -> e.code.asJson)   :: 
-      ("detail" -> e.detail.asJson) ::
-      ("user"   -> e.user.asJson)   ::
+    import OdbError.Field
+    Problem(e.detail.getOrElse(e.code.text), Nil, Nil, Some(JsonObject.fromFoldable(
+      (Field.Category -> e.code.asJson)   :: 
+      (Field.Detail   -> e.detail.asJson) ::
+      (Field.User     -> e.user.asJson)   ::
       e.data.toList
     )))
 

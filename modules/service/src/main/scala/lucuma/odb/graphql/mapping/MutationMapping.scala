@@ -81,7 +81,6 @@ import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
-import lucuma.odb.service.VisitService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -525,21 +524,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private def recordVisit(
-    response:  F[VisitService.InsertVisitResponse],
+    response:  F[Result[Visit.Id]],
     predicate: LeafPredicates[Visit.Id],
     child:     Query
-  )(using Services[F], Transaction[F]): F[Result[Query]] = {
-    import VisitService.InsertVisitResponse.*
-    response.map {
-      case NotAuthorized(user)                 =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
-      case ObservationNotFound(id, instrument) =>
-        Result.failure(s"Observation '$id' not found or is not a ${instrument.longName} observation")
-      case Success(vid)                        =>
-        Result(Unique(Filter(predicate.eql(vid), child)))
-    }
-  }
-
+  )(using Services[F], Transaction[F]): F[Result[Query]] =
+    ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
 
   private lazy val RecordGmosNorthVisit: MutationField =
     MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding) { (input, child) =>
