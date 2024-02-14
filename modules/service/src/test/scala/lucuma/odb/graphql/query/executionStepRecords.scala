@@ -125,4 +125,127 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
       _  <- expect(pi, qaQuery(on), expected)
     } yield ()
   }
+
+  test("interval - in interface") {
+    def query(on: ObservationNode): String =
+      s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      interval {
+                        start
+                        end
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    def expected(on: ObservationNode): Either[List[String], Json] = {
+      val events = on.visits.head.atoms.head.steps.head.allEvents
+      val start  = events.head.received
+      val end    = events.last.received
+      json"""
+        {
+          "observation": {
+            "execution": {
+              "atomRecords": {
+                "matches": [
+                  {
+                    "steps": {
+                      "matches": [
+                        {
+                          "interval": {
+                            "start": ${start.asJson},
+                            "end": ${end.asJson}
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      """.asRight
+    }
+
+
+    for {
+      on <- recordAll(pi, service, mode, offset=40)
+      _  <- expect(pi, query(on), expected(on))
+    } yield ()
+  }
+
+  test("interval - in fragment") {
+    def query(on: ObservationNode): String =
+      s"""
+        query {
+          observation(observationId: "${on.id}") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      ... on GmosNorthStepRecord {
+                        interval {
+                          start
+                          end
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    def expected(on: ObservationNode): Either[List[String], Json] = {
+      val events = on.visits.head.atoms.head.steps.head.allEvents
+      val start  = events.head.received
+      val end    = events.last.received
+      json"""
+        {
+          "observation": {
+            "execution": {
+              "atomRecords": {
+                "matches": [
+                  {
+                    "steps": {
+                      "matches": [
+                        {
+                          "interval": {
+                            "start": ${start.asJson},
+                            "end": ${end.asJson}
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      """.asRight
+    }
+
+
+    for {
+      on <- recordAll(pi, service, mode, offset=50)
+      _  <- expect(pi, query(on), expected(on))
+    } yield ()
+  }
+
 }
