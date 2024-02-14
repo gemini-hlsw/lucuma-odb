@@ -10,6 +10,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetQaState
+import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.ObservingModeType
 
@@ -248,4 +249,59 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
     } yield ()
   }
 
+  test("empty interval in step") {
+    def query(oid: Observation.Id): String =
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      interval {
+                        start
+                        end
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    val expected = json"""
+      {
+        "observation": {
+          "execution": {
+            "atomRecords": {
+              "matches": [
+                {
+                  "steps": {
+                    "matches": [
+                      {
+                        "interval": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    """.asRight
+
+    // Set up visit and record the atom and steps, but no events
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, mode.some)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid)
+      sid <- recordStepAs(service, mode.instrument, aid)
+      _   <- expect(pi, query(oid), expected)
+    } yield ()
+  }
 }
