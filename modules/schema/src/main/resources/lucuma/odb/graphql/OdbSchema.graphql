@@ -154,7 +154,7 @@ type AtomRecord {
   created: Timestamp!
 
   "Time interval during which this atom executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Sequence type."
   sequenceType: SequenceType!
@@ -1723,7 +1723,7 @@ type GmosNorthStepRecord implements StepRecord {
   created: Timestamp!
 
   "Time interval during which this step executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
@@ -1780,7 +1780,7 @@ type GmosNorthVisit implements Visit {
   created: Timestamp!
 
   "Time interval during which this visit executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -2252,7 +2252,7 @@ type GmosSouthStepRecord implements StepRecord {
   created: Timestamp!
 
   "Time interval during which this step executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
@@ -2309,7 +2309,7 @@ type GmosSouthVisit implements Visit {
   created: Timestamp!
 
   "Time interval during which this visit executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -9156,7 +9156,7 @@ interface StepRecord {
   created: Timestamp!
 
   "Time interval during which this step executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   """
   The step configuration, apart from instrument details found in the
@@ -9876,7 +9876,7 @@ interface Visit {
   created: Timestamp!
 
   "Time interval during which this visit executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
