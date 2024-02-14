@@ -392,7 +392,6 @@ object ObservationService {
       groupIndex: NonNegShort,
     ): Result[AppliedFragment] =
       for {
-        eb <- SET.targetEnvironment.flatMap(_.explicitBase.toOption).flatTraverse(_.create)
         cs <- SET.constraintSet.traverse(_.create)
       } yield
         insertObservationAs(
@@ -407,7 +406,7 @@ object ObservationService {
           SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
-          eb,
+          SET.targetEnvironment.flatMap(_.explicitBase.toOption),
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
@@ -597,7 +596,7 @@ object ObservationService {
       in.mode.map(upMode).toList ++ in.angle.map(upAngle).toList
     }
 
-    def explicitBaseUpdates(in: TargetEnvironmentInput): Result[List[AppliedFragment]] = {
+    def explicitBaseUpdates(in: TargetEnvironmentInput.Edit): Result[List[AppliedFragment]] = {
 
       val upRa  = sql"c_explicit_ra = ${right_ascension.opt}"
       val upDec = sql"c_explicit_dec = ${declination.opt}"

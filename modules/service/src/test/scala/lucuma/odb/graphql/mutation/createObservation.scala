@@ -389,7 +389,7 @@ class createObservation extends OdbSuite {
 
   test("[general] both ra and dec are required to set an explicit base") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(CoordinatesInput.messages.BothRaAndDecNeeded) {
+      interceptGraphQL("Argument 'input.SET.targetEnvironment.explicitBase' is invalid: Both ra and dec are required in order to specify a coordinate.") {
         query(pi,
           s"""
             mutation {
