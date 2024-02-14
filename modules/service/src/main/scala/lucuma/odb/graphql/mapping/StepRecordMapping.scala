@@ -137,7 +137,9 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       tpe = GmosNorthStepRecordType,
       fieldMappings = List(
         SqlField("id", StepRecordView.Id, key = true),
-        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosNorthDynamicTable.Id))
+        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
+        EffectField("interval",  intervalHandler, List("id")),
+        EffectField("qaState", qaStateHandler, List("id")),
       )
     )
 
@@ -146,7 +148,9 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       tpe = GmosSouthStepRecordType,
       fieldMappings = List(
         SqlField("id", StepRecordView.Id, key = true),
-        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
+        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosSouthDynamicTable.Id)),
+        EffectField("interval",  intervalHandler, List("id")),
+        EffectField("qaState", qaStateHandler, List("id")),
       )
     )
 
