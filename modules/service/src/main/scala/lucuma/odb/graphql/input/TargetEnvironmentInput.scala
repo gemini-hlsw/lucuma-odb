@@ -10,26 +10,36 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.TargetIdBinding
 import lucuma.odb.graphql.binding.*
 
-//# Target environment editing and creation parameters
-//input TargetEnvironmentInput {
-//  # The explicitBase field may be unset by assigning a null value, or ignored by skipping it altogether
-//  explicitBase: CoordinatesInput
-//  asterism: [TargetId!]
-//}
+trait TargetEnvironmentInput:
+  def asterism: Nullable[List[Target.Id]]
 
-final case class TargetEnvironmentInput(
-  explicitBase: Nullable[CoordinatesInput],
-  asterism:     Nullable[List[Target.Id]]
-)
+object TargetEnvironmentInput:
 
-object TargetEnvironmentInput {
+  final case class Create(
+    explicitBase: Nullable[CoordinatesInput.Create],
+    asterism:     Nullable[List[Target.Id]]
+  ) extends TargetEnvironmentInput
+  object Create:
+    val Binding: Matcher[Create] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          CoordinatesInput.Create.Binding.Nullable("explicitBase", rBase),
+          TargetIdBinding.List.Nullable("asterism", rAsterism)
+        ) => (rBase, rAsterism).parMapN(Create(_, _))
+      }
 
-  val Binding: Matcher[TargetEnvironmentInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        CoordinatesInput.Binding.Nullable("explicitBase", rBase),
-        TargetIdBinding.List.Nullable("asterism", rAsterism)
-      ) => (rBase, rAsterism).parMapN(TargetEnvironmentInput(_, _))
-    }
 
-}
+  final case class Edit(
+    explicitBase: Nullable[CoordinatesInput.Edit],
+    asterism:     Nullable[List[Target.Id]]
+  ) extends TargetEnvironmentInput
+  object Edit:
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          CoordinatesInput.Edit.Binding.Nullable("explicitBase", rBase),
+          TargetIdBinding.List.Nullable("asterism", rAsterism)
+        ) => (rBase, rAsterism).parMapN(Edit(_, _))
+      }
+
+

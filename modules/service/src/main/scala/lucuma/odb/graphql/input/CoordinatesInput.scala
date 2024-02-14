@@ -13,38 +13,26 @@ import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
-//# Absolute coordinates relative base epoch
-//input CoordinatesInput {
-//  ra: RightAscensionInput
-//  dec: DeclinationInput
-//}
-
-final case class CoordinatesInput(
-  ra:  Option[RightAscension],
-  dec: Option[Declination]
-) {
-
-  def create: Result[Option[Coordinates]] =
-    (ra, dec) match {
-      case (Some(r), Some(d)) => Result(Coordinates(r, d).some)
-      case (None, None)       => Result(none)
-      case _                  => Result.failure(CoordinatesInput.messages.BothRaAndDecNeeded)
-    }
-
-}
-
 object CoordinatesInput {
 
-  object messages {
-    val BothRaAndDecNeeded: String =
-      "Both ra and dec are required in order to specify a coordinate."
-  }
+  type Create = Coordinates
+  object Create:
+    val Binding: Matcher[Create] =
+      Edit.Binding.emap:
+        case Edit(Some(ra), Some(dec)) => Right(Coordinates(ra, dec))
+        case _ => Left("Both ra and dec are required in order to specify a coordinate.")
+        
+  final case class Edit(
+    ra:  Option[RightAscension],
+    dec: Option[Declination]
+  )
+  object Edit:
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          RightAscensionInput.Binding.Option("ra", rRa),
+          DeclinationInput.Binding.Option("dec", rDec)
+        ) => (rRa, rDec).parMapN(Edit(_, _))
+      }
 
-  val Binding: Matcher[CoordinatesInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        RightAscensionInput.Binding.Option("ra", rRa),
-        DeclinationInput.Binding.Option("dec", rDec)
-      ) => (rRa, rDec).parMapN(CoordinatesInput(_, _))
-    }
 }
