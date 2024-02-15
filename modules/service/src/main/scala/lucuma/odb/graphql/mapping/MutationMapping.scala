@@ -69,7 +69,6 @@ import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.service.AllocationService
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
@@ -567,21 +566,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
 
   private lazy val SetAllocation =
-    MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
-      import AllocationService.SetAllocationResponse._
-      services.useTransactionally {
-        allocationService.setAllocation(input).map[Result[Query]] {
-          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
-          case PartnerNotFound(_)  => ???
-          case ProgramNotFound(_)  => ???
-          case Success             =>
-            Result(Unique(Filter(And(
+    MutationField("setAllocation", SetAllocationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        ResultT(allocationService.setAllocation(input))
+          .as:
+            Unique(Filter(And(
               Predicates.setAllocationResult.programId.eql(input.programId),
               Predicates.setAllocationResult.partner.eql(input.partner)
-            ), child)))
-        }
-      }
-    }
+            ), child))
+          .value
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`

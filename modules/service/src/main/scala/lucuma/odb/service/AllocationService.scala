@@ -3,14 +3,12 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SetAllocationInput
@@ -19,30 +17,23 @@ import skunk._
 import skunk.implicits._
 
 import Services.Syntax.*
+import grackle.Result
 
 trait AllocationService[F[_]] {
-  def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[AllocationService.SetAllocationResponse]
+  def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[Result[Unit]]
 }
 
 object AllocationService {
 
-  sealed trait SetAllocationResponse extends Product with Serializable
-  object SetAllocationResponse {
-    case class  NotAuthorized(user: User)        extends SetAllocationResponse
-    case class  ProgramNotFound(pid: Program.Id) extends SetAllocationResponse
-    case class  PartnerNotFound(partner: Tag)    extends SetAllocationResponse
-    case object Success                          extends SetAllocationResponse
-  }
-
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
-      def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[SetAllocationResponse] =
+      def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[Result[Unit]] =
         user.role.access match {
           case Staff | Admin | Service =>
             session.prepareR(Statements.SetAllocation.command).use { ps =>
-              ps.execute(input.programId, input.partner, input.duration).as(SetAllocationResponse.Success)
+              ps.execute(input.programId, input.partner, input.duration).as(Result.success(()))
             }
-          case _ => Applicative[F].pure(SetAllocationResponse.NotAuthorized(user))
+          case _ => error.notAuthorized.asFailureF
         }
     }
 
