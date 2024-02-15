@@ -28,6 +28,8 @@ import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap
 import scala.util.NotGiven
+import cats.data.NonEmptyList
+import lucuma.core.model.Target
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -294,8 +296,28 @@ object Services:
       import OdbError.Category.*
       import io.circe.syntax.*
 
-      def notAuthorized[F[_]](using Services[F]): OdbError = OdbError(NotAuthorized, user)
-      def invalidInvitation[F[_]](id: UserInvitation.Id)(using Services[F]): OdbError = OdbError(InvitationError, user, None, SortedMap("invitationId" -> id.asJson))
-      def noAction[F[_]: Services]: OdbError = OdbError(NoAction, user)
-      def invalidProgram[F[_]: Services](pid: Program.Id): OdbError = OdbError(InvalidProgram, user, None, SortedMap("programId" -> pid.asJson))
-      def invalidObservation[F[_]: Services](oid: Observation.Id): OdbError = OdbError(InvalidObservation, user, None, SortedMap("observationId" -> oid.asJson))
+      def notAuthorized[F[_]](using Services[F]): OdbError = 
+        OdbError(NotAuthorized, user, Some(s"User ${user.id} is not authorized to perform this operation."))
+
+      def invalidInvitation[F[_]](id: UserInvitation.Id)(using Services[F]): OdbError = 
+        OdbError(InvitationError, user, None, SortedMap("invitationId" -> id.asJson))
+
+      def noAction[F[_]: Services]: OdbError = 
+        OdbError(NoAction, user)
+
+      def invalidProgram[F[_]: Services](pid: Program.Id): OdbError = 
+        OdbError(InvalidProgram, user, None, SortedMap("programId" -> pid.asJson))
+
+      def invalidObservation[F[_]: Services](oid: Observation.Id): OdbError = 
+        OdbError(InvalidObservation, user, None, SortedMap("observationId" -> oid.asJson))
+
+      def invalidTargetList[F[_]: Services](programId: Program.Id, targetIds: NonEmptyList[Target.Id]): OdbError =
+        OdbError(
+          InvalidTargetList, 
+          user, 
+          Some(s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."),
+          SortedMap(
+            "programId" -> programId.asJson, 
+            "targetIds" -> targetIds.asJson
+          )
+        )

@@ -33,13 +33,14 @@ object OdbError:
 
   /** Errors are grouped into categories that might correspond with different kinds of user dialogs on the client side. */
   enum Category(val tag: String, val text: String):
-    case InvalidArgument    extends Category("invalid_argument", "The provided argument is not valid.")
-    case NoAction           extends Category("no_action", "No action was taken.")
-    case NotAuthorized      extends Category("not_authorized", "User is not authorized to perform this operation.")
-    case InvitationError    extends Category("invitation_error", "Invitation operation could not be completed.")
-    case InvalidProgram     extends Category("invalid_program", "Specified program does not exist, is not visible, or is ineligible for the requested operation.")
-    case InvalidObservation extends Category("invalid_observation", "Specified observation does not exist, is not visible, or is ineligible for the requested operation.")
+    case InvalidArgument     extends Category("invalid_argument", "The provided argument is not valid.")
+    case NoAction            extends Category("no_action", "No action was taken.")
+    case NotAuthorized       extends Category("not_authorized", "User is not authorized to perform this operation.")
+    case InvitationError     extends Category("invitation_error", "Invitation operation could not be completed.")
+    case InvalidProgram      extends Category("invalid_program", "Specified program does not exist, is not visible, or is ineligible for the requested operation.")
+    case InvalidObservation  extends Category("invalid_observation", "Specified observation does not exist, is not visible, or is ineligible for the requested operation.")
     case SequenceUnavailable extends Category("sequence_unavailable", "Could not generate the requested sequence.")
+    case InvalidTargetList   extends Category("invalid_target_list", "The provided target list is not valid for the requested operation.")
 
   given Enumerated[Category] = Enumerated.derived
   given Eq[OdbError] = Eq.by(e => (e.code, e.user, e.detail, e.data.toList)) // :-\

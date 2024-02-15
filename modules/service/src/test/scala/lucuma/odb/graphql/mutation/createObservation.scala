@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -45,8 +44,6 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.graphql.input.CoordinatesInput
-import lucuma.odb.service.AsterismService
 
 import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
@@ -605,7 +602,7 @@ class createObservation extends OdbSuite {
     val fakeTarget: Target.Id = Target.Id.fromLong(1).get
 
     def createObs(pid: Program.Id): IO[Unit] =
-      interceptGraphQL(AsterismService.ForeignKeyViolationMessage(pid, NonEmptyList.one(fakeTarget)))(
+      interceptGraphQL(show"Target(s) $fakeTarget must exist and be associated with Program $pid.")(
         query(
           pi,
           s"""
@@ -1263,7 +1260,7 @@ class createObservation extends OdbSuite {
 
   test("[pi] pi can't create an observation in someone else's program") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action.") {
+      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
         createObservationAs(pi2, pid)
       }
     }
