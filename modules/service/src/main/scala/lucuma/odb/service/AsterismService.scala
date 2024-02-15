@@ -11,7 +11,6 @@ import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.show.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.math.Coordinates
@@ -92,12 +91,6 @@ trait AsterismService[F[_]] {
 
 object AsterismService {
 
-  def ForeignKeyViolationMessage(
-    programId: Program.Id,
-    targetIds: NonEmptyList[Target.Id]
-  ): String =
-    s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."
-
   def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
@@ -113,7 +106,7 @@ object AsterismService {
             .as(Result.unit)
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) =>
-                Result.failure(ForeignKeyViolationMessage(programId, targetIds)).pure[F]
+                error.invalidTargetList(programId, targetIds).asFailureF
             }
         }
       }

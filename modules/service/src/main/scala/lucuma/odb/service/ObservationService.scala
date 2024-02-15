@@ -73,6 +73,7 @@ import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.service.Services.Syntax.error.notAuthorized
 
 sealed trait ObservationService[F[_]] {
 
@@ -174,7 +175,7 @@ object ObservationService {
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.option(af.argument).map {
                     case Some(oid) => Result(oid)
-                    case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                    case None      => notAuthorized.asFailure
                   }
                 }.flatMap { rOid =>
 
