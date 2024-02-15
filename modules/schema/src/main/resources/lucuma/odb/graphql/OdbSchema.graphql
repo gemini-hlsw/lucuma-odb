@@ -6615,6 +6615,15 @@ type Group {
   "Contained elements"
   elements: [GroupElement!]!
 
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have an estimate, it must be fully defined such
+  that a sequence can be generated for it.  If a group has observations that
+  are required and which are not fully defined, the remaining time estimate
+  cannot be calculated.
+  """
+  timeEstimateRange: CategorizedTimeRange
+
 }
 
 scalar GroupId

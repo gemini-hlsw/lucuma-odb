@@ -8,17 +8,13 @@ package mapping
 import cats.effect.Resource
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric.NonNegShort
-import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate._
 import grackle.Query
 import grackle.Query._
 import grackle.QueryCompiler.Elab
-import grackle.Result
-import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -51,7 +47,8 @@ trait ProgramMapping[F[_]]
      with ProposalAttachmentTable[F]
      with ResultMapping[F]
      with GroupElementView[F]
-     with UserInvitationTable[F] {
+     with UserInvitationTable[F]
+     with KeyValueEffectHandler[F] {
 
   def user: User
   def itcClient: ItcClient[F]
@@ -146,40 +143,19 @@ trait ProgramMapping[F[_]]
       }
   }
 
-  private abstract class ProgramEffectHandler[T: io.circe.Encoder] extends EffectHandler[F] {
-    def calculate(pid: Program.Id): F[T]
-
-    override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-      (for {
-        ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Program.Id]("id") }.pure[F])
-        prg <- ctx.distinct.traverse { pid => ResultT(calculate(pid).map(Result.success)).tupleLeft(pid) }
-        res <- ResultT(ctx
-                 .flatMap(pid => prg.find(r => r._1 === pid).map(_._2).toList)
-                 .zip(queries)
-                 .traverse { case (result, (query, parentCursor)) =>
-                   Query.childContext(parentCursor.context, query).map { childContext =>
-                     CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
-                   }
-                 }.pure[F]
-               )
-        } yield res
-      ).value
-    }
-
   private lazy val timeEstimateHandler: EffectHandler[F] =
-    new ProgramEffectHandler[Option[CategorizedTimeRange]] {
-      override def calculate(pid: Program.Id): F[Option[CategorizedTimeRange]] =
-        services.useNonTransactionally {
-          timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
-            .estimateProgram(pid)
-        }
+    keyValueEffectHandler[Program.Id, Option[CategorizedTimeRange]]("id") { pid =>
+      services.useNonTransactionally {
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+          .estimateProgram(pid)
+      }
     }
 
   private val timeChargeHandler: EffectHandler[F] =
-    new ProgramEffectHandler[CategorizedTime] {
-      def calculate(pid: Program.Id): F[CategorizedTime] =
-        services.useTransactionally {
-          timeAccountingService.selectProgram(pid)
-        }
+    keyValueEffectHandler[Program.Id, CategorizedTime]("id") { pid =>
+      services.useTransactionally {
+        timeAccountingService.selectProgram(pid)
+      }
     }
+
 }
