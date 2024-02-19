@@ -180,7 +180,7 @@ class targetGroup extends OdbSuite {
     }
   }
 
-  test("should work with a program reference") {
+  test("should work with a proposal reference") {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)

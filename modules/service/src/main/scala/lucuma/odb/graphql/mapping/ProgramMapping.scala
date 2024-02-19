@@ -72,7 +72,6 @@ trait ProgramMapping[F[_]]
         SqlField("programReference", ProgramTable.Reference.ProgramReference),
 
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
-        SqlField("proposalReference", ProgramTable.Reference.ProposalReference),
         SqlField("proposalStatus", ProgramTable.ProposalStatus),
         SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
         SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),

@@ -83,7 +83,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""
-      query { program(proposalReference: "${pro.format}") { id } }
+      query { program(proposalReference: "${pro.label}") { id } }
     """).flatMap { js =>
       js.hcursor
         .downFields("program", "id")
@@ -184,7 +184,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           ) {
             programs {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -194,7 +194,7 @@ trait DatabaseOperations { this: OdbSuite =>
         .downField("updatePrograms")
         .downField("programs")
         .downArray
-        .downField("proposalReference")
+        .downFields("proposal", "reference", "label")
         .as[ProposalReference]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]

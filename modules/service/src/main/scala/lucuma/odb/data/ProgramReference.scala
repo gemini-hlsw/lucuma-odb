@@ -22,7 +22,7 @@ import monocle.Prism
 
 sealed trait ProgramReference extends Product with Serializable {
   def programType: ProgramType
-  def format: String
+  def label: String
 }
 
 object ProgramReference {
@@ -34,7 +34,7 @@ object ProgramReference {
     override def programType: ProgramType =
       ProgramType.Calibration
 
-    override def format: String =
+    override def label: String =
       f"G-${semester.format}-${programType.abbreviation}-${instrument.tag}-$index%02d"
   }
 
@@ -44,7 +44,7 @@ object ProgramReference {
       Order.by { a => (a.semester, a.instrument, a.index) }
 
     val fromString: Format[String, Calibration] =
-      Format(s => parse.calibration.parseAll(s).toOption, _.format)
+      Format(s => parse.calibration.parseAll(s).toOption, _.label)
 
   }
 
@@ -52,7 +52,7 @@ object ProgramReference {
     override def programType: ProgramType =
       ProgramType.Engineering
 
-    override def format: String =
+    override def label: String =
       f"G-${semester.format}-${programType.abbreviation}-${instrument.tag}-$index%02d"
   }
 
@@ -62,7 +62,7 @@ object ProgramReference {
       Order.by { a => (a.semester, a.instrument, a.index) }
 
     val fromString: Format[String, Engineering] =
-      Format(s => parse.engineering.parseAll(s).toOption, _.format)
+      Format(s => parse.engineering.parseAll(s).toOption, _.label)
 
   }
 
@@ -70,7 +70,7 @@ object ProgramReference {
     override def programType: ProgramType =
       ProgramType.Example
 
-    override def format: String =
+    override def label: String =
       s"G-${programType.abbreviation}-${instrument.tag}"
   }
 
@@ -80,7 +80,7 @@ object ProgramReference {
       Order.by(_.instrument)
 
     val fromString: Prism[String, Example] =
-      Prism[String, Example](s => parse.example.parseAll(s).toOption)(_.format)
+      Prism[String, Example](s => parse.example.parseAll(s).toOption)(_.label)
 
   }
 
@@ -88,7 +88,7 @@ object ProgramReference {
     override def programType: ProgramType =
       ProgramType.Library
 
-    override def format: String =
+    override def label: String =
       s"G-${programType.abbreviation}-${instrument.tag}-${description.value}"
   }
 
@@ -98,7 +98,7 @@ object ProgramReference {
       Order.by { a => (a.instrument, a.description.value) }
 
     val fromString: Prism[String, Library] =
-      Prism[String, Library](s => parse.library.parseAll(s).toOption)(_.format)
+      Prism[String, Library](s => parse.library.parseAll(s).toOption)(_.label)
 
   }
 
@@ -106,8 +106,8 @@ object ProgramReference {
     override def programType: ProgramType =
       ProgramType.Science
 
-    override def format: String =
-      s"${proposal.format}-${scienceSubtype.letter}"
+    override def label: String =
+      s"${proposal.label}-${scienceSubtype.letter}"
   }
 
   object Science {
@@ -116,7 +116,7 @@ object ProgramReference {
       Order.by { a => (a.proposal, a.scienceSubtype) }
 
     val fromString: Format[String, Science] =
-      Format(s => parse.program.parseAll(s).toOption, _.format)
+      Format(s => parse.program.parseAll(s).toOption, _.label)
   }
 
   object parse {
@@ -163,7 +163,7 @@ object ProgramReference {
   }
 
   val fromString: Format[String, ProgramReference] =
-    Format(s => parse.programReference.parseAll(s).toOption, _.format)
+    Format(s => parse.programReference.parseAll(s).toOption, _.label)
 
   given Decoder[ProgramReference] =
     Decoder.decodeString.emap { s =>
@@ -173,7 +173,7 @@ object ProgramReference {
     }
 
   given Encoder[ProgramReference] =
-    Encoder.instance(_.format.asJson)
+    Encoder.instance(_.label.asJson)
 
   given Order[ProgramReference] =
     Order.from {

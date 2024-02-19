@@ -10,14 +10,13 @@ import lucuma.core.model.Access._
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProposalReference
 
 class ProgramPredicates(path: Path) {
 
   lazy val existence         = ExistencePredicates(path / "existence")
   lazy val id                = LeafPredicates[Program.Id](path / "id")
   lazy val programReference  = LeafPredicates[Option[ProgramReference]](path / "programReference")
-  lazy val proposalReference = LeafPredicates[Option[ProposalReference]](path / "proposalReference")
+  lazy val proposal          = new ProposalPredicates(path / "proposal")
   lazy val piUserId          = LeafPredicates[User.Id](path / "piUserId")
 
   def isVisibleTo(user: User): Predicate =

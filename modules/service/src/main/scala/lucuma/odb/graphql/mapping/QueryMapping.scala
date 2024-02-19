@@ -327,7 +327,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     (rPid, rProp, rProg).parTupled.map { (pid, op, og) =>
       and(List(
         pid.map(prog.id.eql).toList,
-        op.map(r => prog.proposalReference.eql(r.some)).toList,
+        op.map(r => prog.proposal.referenceLabel.eql(r)).toList,
         og.map(r => prog.programReference.eql(r.some)).toList
       ).flatten) match {
         case True => False // neither pid nor ref nor pro was supplied

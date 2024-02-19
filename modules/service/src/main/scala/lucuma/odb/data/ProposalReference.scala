@@ -16,7 +16,7 @@ import lucuma.core.optics.Format
 
 
 case class ProposalReference(semester: Semester, index: PosInt) {
-  def format: String =
+  def label: String =
     f"G-${semester.format}-$index%04d"
 }
 
@@ -37,7 +37,7 @@ object ProposalReference {
     Order.by { a => (a.semester, a.index.value) }
 
   val fromString: Format[String, ProposalReference] =
-    Format(s => parse.proposal.parseAll(s).toOption, _.format)
+    Format(s => parse.proposal.parseAll(s).toOption, _.label)
 
   given Decoder[ProposalReference] =
     Decoder.decodeString.emap { s =>
@@ -47,7 +47,7 @@ object ProposalReference {
     }
 
   given Encoder[ProposalReference] =
-    Encoder.instance(_.format.asJson)
+    Encoder.instance(_.label.asJson)
 
 }
 

@@ -509,7 +509,7 @@ required.  If both are provided, they must refer to the same program.
 """
 input CreateObservationInput {
   programId: ProgramId
-  proposalReference: ProposalReference
+  proposalReference: ProposalReferenceLabel
   programReference: ProgramReference
   SET: ObservationPropertiesInput
 }
@@ -547,7 +547,7 @@ If both are provided, they must refer to the same program.
 """
 input CreateTargetInput {
   programId: ProgramId
-  proposalReference: ProposalReference
+  proposalReference: ProposalReferenceLabel
   programReference: ProgramReference
   SET: TargetPropertiesInput!
 }
@@ -6699,7 +6699,7 @@ the same program.)
 """
 input CreateGroupInput {
   programId: ProgramId
-  proposalReference: ProposalReference
+  proposalReference: ProposalReferenceLabel
   programReference: ProgramReference
   SET: GroupPropertiesInput
 }
@@ -7642,12 +7642,6 @@ type Program {
   proposal: Proposal
 
   """
-  Formatted proposal reference, if any.  Only submitted science programs have
-  a proposal reference.
-  """
-  proposalReference: ProposalReference
-
-  """
   Proposal status of the program
   """
   proposalStatus: ProposalStatus!
@@ -7857,6 +7851,12 @@ type Proposal {
   proposalClass: ProposalClass!
 
   """
+  The proposal reference, assuming the proposal has been submitted and
+  assigned a semester.
+  """
+  reference: ProposalReference
+
+  """
   Proposal TAC category
   """
   category: TacCategory
@@ -7942,11 +7942,17 @@ enum ProposalClassEnum {
   SYSTEM_VERIFICATION
 }
 
+type ProposalReference {
+  label:         ProposalReferenceLabel!
+  semester:      Semester!
+  semesterIndex: PosInt!
+}
+
 """
 Proposal reference for science programs, formatted as G-YYYY[AB]-NNNN+. For
 example, G-2024B-1234 where 2024B refers to the associated semester.
 """
-scalar ProposalReference
+scalar ProposalReferenceLabel
 
 """
 Metadata for `enum ProposalStatus`
@@ -7993,7 +7999,7 @@ type Query {
     programId: ProgramId
 
     "Proposal Reference"
-    proposalReference: ProposalReference
+    proposalReference: ProposalReferenceLabel
 
     "Program reference"
     programReference: ProgramReference
@@ -8031,7 +8037,7 @@ type Query {
     programId: ProgramId
 
     "Proposal Reference"
-    proposalReference: ProposalReference
+    proposalReference: ProposalReferenceLabel
 
     "Program reference"
     programReference: ProgramReference
@@ -8154,7 +8160,7 @@ type Query {
     programId: ProgramId
 
     "Proposal Reference"
-    proposalReference: ProposalReference
+    proposalReference: ProposalReferenceLabel
 
     "Program Reference"
     programReference: ProgramReference
@@ -8269,7 +8275,7 @@ type Query {
     programId: ProgramId
 
     "Proposal Reference"
-    proposalReference: ProposalReference
+    proposalReference: ProposalReferenceLabel
 
     "Program Reference"
     programReference: ProgramReference
@@ -11441,40 +11447,50 @@ input WhereOptionOrderProgramReference {
   LTE: ProgramReference
 }
 
+input WhereProposalReference {
+
+  "Matches if the proposal reference is not defined."
+  IS_NULL: Boolean
+
+  "Matches the proposal reference label."
+  label: WhereOrderProposalReferenceLabel
+
+  # TODO: semester
+  # TODO: semesterIndex
+
+}
+
 """
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 """
-input WhereOptionOrderProposalReference {
-
-  "Matches if the ProposalReference is not defined."
-  IS_NULL: Boolean
+input WhereOrderProposalReferenceLabel {
 
   """
   Matches if the ProposalReference is exactly the supplied value.
   """
-  EQ: ProposalReference
+  EQ: ProposalReferenceLabel
 
   """
   Matches if the ProposalReference is not the supplied value.
   """
-  NEQ: ProposalReference
+  NEQ: ProposalReferenceLabel
 
   """
   Matches if the ProposalReference is any of the supplied options.
   """
-  IN: [ProposalReference!]
+  IN: [ProposalReferenceLabel!]
 
   """
   Matches if the ProposalReference is none of the supplied values.
   """
-  NIN: [ProposalReference!]
+  NIN: [ProposalReferenceLabel!]
 
   """
   Matches if the ProposalReference is ordered after (>) the supplied value.
   """
-  GT: ProposalReference
+  GT: ProposalReferenceLabel
 
   """
   Matches if the ProposalReference is ordered before (<) the supplied value.
@@ -11484,12 +11500,12 @@ input WhereOptionOrderProposalReference {
   """
   Matches if the ProposalReference is ordered after or equal (>=) the supplied value.
   """
-  GTE: ProposalReference
+  GTE: ProposalReferenceLabel
 
   """
   Matches if the ProposalReference is ordered before or equal (<=) the supplied value.
   """
-  LTE: ProposalReference
+  LTE: ProposalReferenceLabel
 }
 
 """
@@ -11794,11 +11810,6 @@ input WhereProgram {
   programReference: WhereOptionOrderProgramReference
 
   """
-  Matches on the proposal reference (if any).
-  """
-  proposalReference: WhereOptionOrderProposalReference
-
-  """
   Matches the proposalStatus.
   """
   proposalStatus: WhereEqProposalStatus
@@ -11813,6 +11824,7 @@ input WhereProgram {
 Proposal filter options.  All specified items must match.
 """
 input WhereProposal {
+
   """
   When `true`, matches if the proposal is not defined. When `false` matches if the proposal is defined.
   """
@@ -11839,29 +11851,34 @@ input WhereProposal {
   title: WhereOptionString
 
   """
-  Matches the proposal class.
+  Matches on the proposal reference (if any).
   """
-  class: WhereProposalClass
+  reference: WhereProposalReference
 
-  """
-  Matches the proposal TAC category.
-  """
-  category: WhereOptionEqTacCategory
-
-  """
-  Matches the Target of Opportunity setting.
-  """
-  toOActivation: WhereEqToOActivation
-
-  """
-  Matches the proposal abstract.
-  """
-  abstract: WhereOptionString
-
-  """
-  Matches proposal partners.
-  """
-  partners: WhereProposalPartners
+#  """
+#  Matches the proposal class.
+#  """
+#  class: WhereProposalClass
+#
+#  """
+#  Matches the proposal TAC category.
+#  """
+#  category: WhereOptionEqTacCategory
+#
+#  """
+#  Matches the Target of Opportunity setting.
+#  """
+#  toOActivation: WhereEqToOActivation
+#
+#  """
+#  Matches the proposal abstract.
+#  """
+#  abstract: WhereOptionString
+#
+#  """
+#  Matches proposal partners.
+#  """
+#  partners: WhereProposalPartners
 }
 
 """

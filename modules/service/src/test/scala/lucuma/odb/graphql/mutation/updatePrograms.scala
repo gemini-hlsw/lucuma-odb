@@ -1187,7 +1187,7 @@ class updatePrograms extends OdbSuite {
                 proposalStatus
                 semester
                 semesterIndex
-                proposalReference
+                proposal { reference { label } }
               }
             }
           }
@@ -1202,7 +1202,7 @@ class updatePrograms extends OdbSuite {
                     "proposalStatus": "SUBMITTED",
                     "semester": "2024B",
                     "semesterIndex": 1,
-                    "proposalReference": "G-2024B-0001"
+                    "proposal": { "reference": { "label": "G-2024B-0001" } }
                   }
                 ]
               }

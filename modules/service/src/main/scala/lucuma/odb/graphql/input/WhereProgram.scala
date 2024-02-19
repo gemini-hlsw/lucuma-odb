@@ -16,7 +16,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramType
-import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.graphql.binding._
 
@@ -31,8 +30,8 @@ object WhereProgram {
     val WhereOptionOrderSemester          = WhereOptionOrder.binding[Semester](path / "semester", SemesterBinding)
     val WhereOptionOrderSemesterIndex     = WhereOptionOrder.binding[PosInt](path / "semesterIndex", PosIntBinding)
     val WhereOptionOrderProgramReference  = WhereOptionOrder.binding[ProgramReference](path / "programReference", ProgramReferenceBinding)
-    val WhereOptionOrderProposalReference = WhereOptionOrder.binding[ProposalReference](path / "proposalReference", ProposalReferenceBinding)
     val WhereEqProposalStatus             = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
+    val WhereProposalBinding              = WhereProposal.binding(path / "proposal")
 
     lazy val WhereProgramBinding = binding(path)
 
@@ -49,12 +48,11 @@ object WhereProgram {
         WhereOptionOrderSemester.Option("semester", rSemester),
         WhereOptionOrderSemesterIndex.Option("semesterIndex", rSemesterIndex),
         WhereOptionOrderProgramReference.Option("programReference", rRef),
-        WhereOptionOrderProposalReference.Option("proposalReference", rPro),
         WhereEqProposalStatus.Option("proposalStatus", rPs),
-        ("proposal", _), // ignore for now
+        WhereProposalBinding.Option("proposal", rPro)
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rType, rInstrument, rScience, rSemester, rSemesterIndex, rRef, rPro, rPs).parMapN {
-            (AND, OR, NOT, id, name, ptype, instrument, science, semester, semesterIndex, ref, pro, ps) =>
+          (rAND, rOR, rNOT, rId, rName, rType, rInstrument, rScience, rSemester, rSemesterIndex, rRef, rPs, rPro).parMapN {
+            (AND, OR, NOT, id, name, ptype, instrument, science, semester, semesterIndex, ref, ps, pro) =>
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -67,8 +65,8 @@ object WhereProgram {
                 semester,
                 semesterIndex,
                 ref,
-                pro,
-                ps
+                ps,
+                pro
               ).flatten)
         }
     }
