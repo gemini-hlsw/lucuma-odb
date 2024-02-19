@@ -39,7 +39,7 @@ trait ArbProgramReference extends ArbReference {
     )}
 
   val calibrationStrings: Gen[String] =
-    referenceStrings[Calibration](_.format)
+    referenceStrings[Calibration](_.label)
 
   given Arbitrary[Engineering] =
     Arbitrary {
@@ -58,7 +58,7 @@ trait ArbProgramReference extends ArbReference {
     )}
 
   val engineeringStrings: Gen[String] =
-    referenceStrings[Engineering](_.format)
+    referenceStrings[Engineering](_.label)
 
   given Arbitrary[Example] =
     Arbitrary {
@@ -109,7 +109,7 @@ trait ArbProgramReference extends ArbReference {
     )}
 
   val scienceStrings: Gen[String] =
-    referenceStrings[Science](_.format)
+    referenceStrings[Science](_.label)
 
   given Arbitrary[ProgramReference] =
     Arbitrary {
@@ -123,10 +123,10 @@ trait ArbProgramReference extends ArbReference {
     }
 
   given Cogen[ProgramReference] =
-    Cogen[String].contramap(_.format)
+    Cogen[String].contramap(_.label)
 
   val programReferenceStrings: Gen[String] =
-    referenceStrings[ProgramReference](_.format)
+    referenceStrings[ProgramReference](_.label)
 
 }
 

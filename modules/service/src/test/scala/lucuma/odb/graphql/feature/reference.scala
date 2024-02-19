@@ -41,6 +41,29 @@ class reference extends OdbSuite {
   val ref2025B1  = ProposalReference.fromString.unsafeGet("G-2025B-0001")
   val ref2025B2  = ProposalReference.fromString.unsafeGet("G-2025B-0002")
 
+  def createProgramWithSemester(semester: String): IO[Program.Id] =
+    query(pi,
+      s"""
+        mutation {
+          createProgram(
+            input: {
+               SET: {
+                  semester: "$semester"
+               }
+            }
+          ) {
+            program { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("createProgram", "program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
   test("submit proposals") {
     for {
       pid0 <- createProgramAs(pi)
@@ -68,7 +91,13 @@ class reference extends OdbSuite {
         query {
           program(proposalReference: "G-2024B-0001") {
             programReference
-            proposalReference
+            proposal {
+              reference {
+                label
+                semester
+                semesterIndex
+              }
+            }
           }
         }
       """,
@@ -77,7 +106,13 @@ class reference extends OdbSuite {
           {
             "program": {
               "programReference": null,
-              "proposalReference": ${ref2024B1.format}
+              "proposal": {
+                "reference": {
+                  "label": ${ref2024B1.label},
+                  "semester": "2024B",
+                  "semesterIndex": 1
+                }
+              }
             }
           }
         """
@@ -91,7 +126,7 @@ class reference extends OdbSuite {
       query = s"""
         query {
           program {
-            proposalReference
+            proposal { reference { label } }
           }
         }
       """,
@@ -103,6 +138,113 @@ class reference extends OdbSuite {
         """
       )
     )
+  }
+
+  test("select via WHERE proposal IS_NULL = true") {
+    createProgramWithSemester("2020A").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          query {
+            programs(
+              WHERE: {
+                proposal: { IS_NULL: true }
+              }
+            ) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        expected =
+          json"""
+            {
+              "programs": {
+                "matches": [
+                   {
+                     "id": $pid
+                   }
+                ]
+              }
+            }
+          """.asRight
+      )
+    }
+  }
+
+  test("select via WHERE proposal IS_NULL = false") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          programs(
+            WHERE: {
+              proposal: { IS_NULL: false }
+            }
+          ) {
+            matches {
+              proposal { reference { label } }
+            }
+          }
+        }
+      """,
+      expected =
+        json"""
+          {
+            "programs": {
+              "matches": [
+                 {
+                    "proposal": { "reference": { "label": $ref2024B1 } }
+                 },
+                 {
+                    "proposal": { "reference": { "label": $ref2024B2 } }
+                 },
+                 {
+                    "proposal": { "reference": { "label": $ref2025A1 } }
+                 }
+              ]
+            }
+          }
+        """.asRight
+    )
+  }
+
+  test("select via WHERE proposal / reference IS_NULL") {
+    createProgramWithSemester("2020B").flatMap { pid =>
+      addProposal(pi, pid) >>
+      expect(
+        user = pi,
+        query = s"""
+          query {
+            programs(
+              WHERE: {
+                proposal: {
+                  reference: { IS_NULL: true }
+                }
+                semester: { EQ: "2020B" }
+              }
+            ) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        expected =
+          json"""
+            {
+              "programs": {
+                "matches": [
+                   {
+                     "id": $pid
+                   }
+                ]
+              }
+            }
+          """.asRight
+      )
+    }
   }
 
   test("select via WHERE semester") {
@@ -118,7 +260,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -129,10 +271,18 @@ class reference extends OdbSuite {
             "programs": {
               "matches": [
                  {
-                   "proposalReference": $ref2024B1
+                   "proposal": {
+                     "reference": {
+                       "label": ${ref2024B1.label}
+                     }
+                   }
                  },
                  {
-                   "proposalReference": $ref2024B2
+                   "proposal": {
+                     "reference": {
+                       "label": ${ref2024B2.label}
+                     }
+                   }
                  }
               ]
             }
@@ -209,29 +359,8 @@ class reference extends OdbSuite {
   }
 
   test("set semester on create, then submit") {
-    val createWithSemester = query(pi, s"""
-        mutation {
-          createProgram(
-            input: {
-               SET: {
-                  semester: "2025B"
-               }
-            }
-          ) {
-            program { id }
-          }
-        }
-      """
-    ).flatMap { js =>
-      js.hcursor
-        .downFields("createProgram", "program", "id")
-        .as[Program.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
     val res = for {
-      pid <- createWithSemester
+      pid <- createProgramWithSemester("2025B")
       _   <- addProposal(pi, pid)
       ref <- submitProposal(pi, pid, none) // no semester
     } yield ref
@@ -258,7 +387,11 @@ class reference extends OdbSuite {
                 }
               ) {
                 programs {
-                  proposalReference
+                  proposal {
+                    reference {
+                      label
+                    }
+                  }
                 }
               }
             }
@@ -271,28 +404,7 @@ class reference extends OdbSuite {
   }
 
   test("unset semester in unsubmitted program") {
-    val createWithSemester = query(pi, s"""
-        mutation {
-          createProgram(
-            input: {
-               SET: {
-                  semester: "2025B"
-               }
-            }
-          ) {
-            program { id }
-          }
-        }
-      """
-    ).flatMap { js =>
-      js.hcursor
-        .downFields("createProgram", "program", "id")
-        .as[Program.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
-    createWithSemester.flatMap { pid =>
+    createProgramWithSemester("2025B").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -341,8 +453,12 @@ class reference extends OdbSuite {
                 proposalStatus: NOT_SUBMITTED
               }
               WHERE: {
-                proposalReference: {
-                  EQ: "${ref2024B2.format}"
+                proposal: {
+                  reference: {
+                    label: {
+                      EQ: "${ref2024B2.label}"
+                    }
+                  }
                 }
               }
             }
@@ -377,14 +493,18 @@ class reference extends OdbSuite {
                 proposalStatus: SUBMITTED
               }
               WHERE: {
-                proposalReference: {
-                  EQ: "${ref2024B2.format}"
+                proposal: {
+                  reference: {
+                    label: {
+                      EQ: "${ref2024B2.label}"
+                    }
+                  }
                 }
               }
             }
           ) {
             programs {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -395,7 +515,11 @@ class reference extends OdbSuite {
             "updatePrograms" : {
               "programs": [
                 {
-                  "proposalReference": ${ref2024B2.format}
+                  "proposal": {
+                    "reference": {
+                      "label": ${ref2024B2.label}
+                    }
+                  }
                 }
               ]
             }
@@ -418,14 +542,18 @@ class reference extends OdbSuite {
                 semester: "2024B"
               }
               WHERE: {
-                proposalReference: {
-                  EQ: "${ref2025A1.format}"
+                proposal: {
+                  reference: {
+                    label: {
+                      EQ: "${ref2025A1.label}"
+                    }
+                  }
                 }
               }
             }
           ) {
             programs {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -436,7 +564,11 @@ class reference extends OdbSuite {
             "updatePrograms" : {
               "programs": [
                 {
-                  "proposalReference": ${ref2024B3.format}
+                  "proposal": {
+                    "reference": {
+                      "label": ${ref2024B3.label}
+                    }
+                  }
                 }
               ]
             }
@@ -462,7 +594,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -473,10 +605,18 @@ class reference extends OdbSuite {
             "programs" : {
               "matches": [
                 {
-                  "proposalReference": ${ref2024B2.format}
+                  "proposal": {
+                    "reference": {
+                      "label": ${ref2024B2.label}
+                    }
+                  }
                 },
                 {
-                  "proposalReference": ${ref2024B3.format}
+                  "proposal": {
+                    "reference": {
+                      "label": ${ref2024B3.label}
+                    }
+                  }
                 }
               ]
             }
@@ -499,7 +639,7 @@ class reference extends OdbSuite {
             }
           ) {
             matches {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -510,13 +650,13 @@ class reference extends OdbSuite {
             "programs" : {
               "matches": [
                 {
-                  "proposalReference": ${ref2024B1.format}
+                  "proposal": { "reference": { "label": ${ref2024B1.label} } }
                 },
                 {
-                  "proposalReference": ${ref2024B2.format}
+                  "proposal": { "reference": { "label": ${ref2024B2.label} } }
                 },
                 {
-                  "proposalReference": ${ref2024B3.format}
+                  "proposal": { "reference": { "label": ${ref2024B3.label} } }
                 }
               ]
             }
@@ -539,14 +679,18 @@ class reference extends OdbSuite {
                 semester: "9999B"
               }
               WHERE: {
-                proposalReference: {
-                  EQ: "${ref2024B3.format}"
+                proposal: {
+                  reference: {
+                    label: {
+                      EQ: "${ref2024B3.label}"
+                    }
+                  }
                 }
               }
             }
           ) {
             programs {
-              proposalReference
+              proposal { reference { label } }
             }
           }
         }
@@ -598,4 +742,5 @@ class reference extends OdbSuite {
       prog <- fetchProgramReference(pi, pid)
     } yield assertEquals(prog, ref2024A1C.some)
   }
+
 }

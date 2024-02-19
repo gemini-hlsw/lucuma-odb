@@ -119,7 +119,7 @@ class constraintSetGroup extends OdbSuite {
     }
   }
 
-  test("should be able to use a program reference") {
+  test("should be able to use a proposal reference") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)

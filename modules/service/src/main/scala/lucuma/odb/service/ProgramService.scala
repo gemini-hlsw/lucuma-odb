@@ -44,6 +44,8 @@ trait ProgramService[F[_]] {
    */
   def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
 
+  def selectProposalReference(id: Program.Id): F[Option[ProposalReference]]
+
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
@@ -161,6 +163,10 @@ object ProgramService {
         session.prepareR(af.fragment.query(program_id)).use { ps =>
           ps.option(af.argument)
         }
+      }
+
+      def selectProposalReference(id: Program.Id): F[Option[ProposalReference]] = {
+        session.option(Statements.SelectProposalReference)(id)
       }
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
@@ -316,6 +322,16 @@ object ProgramService {
         sql"c_program_reference = $program_reference",
         (prop, prog) => sql"c_proposal_reference = $proposal_reference AND c_program_reference = $program_reference".apply(prop, prog)
       )
+
+    val SelectProposalReference: Query[Program.Id, ProposalReference] =
+      sql"""
+        SELECT
+          c_proposal_reference
+        FROM
+          t_program
+        WHERE
+          c_program_id = $program_id
+      """.query(proposal_reference)
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""

@@ -327,3 +327,15 @@ CREATE TRIGGER update_science_subtype_trigger
 BEFORE INSERT OR UPDATE ON t_proposal
 FOR EACH ROW
 EXECUTE FUNCTION update_science_subtype();
+
+CREATE VIEW v_proposal_reference AS
+  SELECT
+    c_program_id,
+    c_semester,
+    c_semester_index,
+    c_proposal_reference
+  FROM
+    t_program
+  WHERE
+    c_proposal_reference IS NOT NULL
+  ORDER BY c_program_id;

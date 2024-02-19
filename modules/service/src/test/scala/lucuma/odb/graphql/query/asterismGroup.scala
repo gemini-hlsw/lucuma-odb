@@ -186,7 +186,7 @@ class asterismGroup extends OdbSuite {
     }
   }
 
-  test("lookup by program reference should work") {
+  test("lookup by proposal reference should work") {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)

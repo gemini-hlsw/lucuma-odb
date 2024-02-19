@@ -183,9 +183,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   )(using Services[F]): F[Result[Program.Id]] = {
     def notFound(ref: Ior[ProposalReference, ProgramReference]): String =
       ref.fold(
-        r => s"Proposal '${r.format}' was not found.",
-        r => s"Program '${r.format}' was not found.",
-        (r0, r1) => s"Proposal '${r0.format}' and program '${r1.format}' were not found or do not correspond to the same program."
+        r => s"Proposal '${r.label}' was not found.",
+        r => s"Program '${r.label}' was not found.",
+        (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' were not found or do not correspond to the same program."
       )
 
     def notCorresponding(
@@ -194,9 +194,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       givenPid: Program.Id
     ): String =
       ref.fold(
-        r => s"Proposal '${r.format}' (id $pid) does not correspond to the specified program id $givenPid.",
-        r => s"Program '${r.format}' (id $pid) does not correspond to the specified program id $givenPid.",
-        (r0, r1) => s"Proposal '${r0.format}' and program '${r1.format}' (id $pid) do not correspond to the specified program id $givenPid."
+        r => s"Proposal '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+        r => s"Program '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+        (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' (id $pid) do not correspond to the specified program id $givenPid."
       )
 
     (pid, Ior.fromOptions(prop, prog)) match {

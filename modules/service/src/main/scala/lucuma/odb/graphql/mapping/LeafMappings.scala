@@ -137,7 +137,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ProgramUserSupportType](ProgramUserSupportRoleTypeType),
       LeafMapping[ProgramReference](ProgramReferenceType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
-      LeafMapping[ProposalReference](ProposalReferenceType),
+      LeafMapping[ProposalReference](ProposalReferenceLabelType),
       LeafMapping[Tag](ProposalStatusType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[Tag](SeeingTrendType),

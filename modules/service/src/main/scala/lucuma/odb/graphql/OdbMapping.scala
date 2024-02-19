@@ -154,9 +154,10 @@ object OdbMapping {
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
-          with ProposalClassMapping[F]
           with ProposalAttachmentMapping[F]
           with ProposalAttachmentTypeMetaMapping[F]
+          with ProposalClassMapping[F]
+          with ProposalReferenceMapping[F]
           with ProposalStatusMetaMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
@@ -309,6 +310,7 @@ object OdbMapping {
               ProposalAttachmentMapping,
               ProposalAttachmentTypeMetaMapping,
               ProposalMapping,
+              ProposalReferenceMapping,
               ProposalStatusMetaMapping,
               QueryMapping,
               RadialVelocityMapping,

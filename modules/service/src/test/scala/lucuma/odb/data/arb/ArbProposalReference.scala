@@ -31,7 +31,7 @@ trait ArbProposalReference extends ArbReference {
     )}
 
   val proposalReferenceStrings: Gen[String] =
-    referenceStrings[ProposalReference](_.format)
+    referenceStrings[ProposalReference](_.label)
 
 }
 
