@@ -15,7 +15,6 @@ object WhereProposal {
 
     val WhereTitleBinding             = WhereOptionString.binding(path / "title")
     val WhereProposalReferenceBinding = WhereProposalReference.binding(path / "reference")
-    //val WhereEqProposalStatus         = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
 
     lazy val WhereProposalBinding = binding(path)
 
@@ -27,7 +26,6 @@ object WhereProposal {
         WhereProposalBinding.Option("NOT", rNOT),
         WhereTitleBinding.Option("title", rTitle),
         WhereProposalReferenceBinding.Option("reference", rRef),
-//        WhereEqProposalStatus.Option("proposalStatus", rPs),
       ) =>
           (rIsNull, rAND, rOR, rNOT, rTitle, rRef).parMapN {
             (isNull, AND, OR, NOT, title, ref) =>

@@ -46,6 +46,7 @@ import lucuma.odb.data.ProgramType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.ProposalReference
+import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType
@@ -135,11 +136,12 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ProgramType](ProgramTypeType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[ProgramUserSupportType](ProgramUserSupportRoleTypeType),
-      LeafMapping[ProgramReference](ProgramReferenceType),
+      LeafMapping[ProgramReference](ProgramReferenceLabelType),
       LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ProposalReference](ProposalReferenceLabelType),
       LeafMapping[Tag](ProposalStatusType),
       LeafMapping[ScienceMode](ScienceModeType),
+      LeafMapping[ScienceSubtype](ScienceSubtypeType),
       LeafMapping[Tag](SeeingTrendType),
       LeafMapping[Semester](SemesterType),
       LeafMapping[SequenceCommand](SequenceCommandType),

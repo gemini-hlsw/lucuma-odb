@@ -63,6 +63,7 @@ import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
+import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
@@ -118,6 +119,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RedeemUserInvitation,
       RevokeUserInvitation,
       SetAllocation,
+      SetProgramReference,
       UpdateAsterisms,
       UpdateDatasets,
       UpdateGroups,
@@ -619,6 +621,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               Predicates.setAllocationResult.partner.eql(input.partner)
             ), child))
           .value
+
+  private lazy val SetProgramReference =
+    MutationField("setProgramReference", SetProgramReferenceInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        (for {
+          pid <- ResultT(selectPid(input.programId, input.proposalReference, input.programReference))
+          _   <- ResultT(programService.setProgramReference(pid, input.SET))
+        } yield Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+        ).value
+      }
+    }
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`

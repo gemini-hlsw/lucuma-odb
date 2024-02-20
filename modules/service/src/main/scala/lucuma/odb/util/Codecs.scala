@@ -348,7 +348,7 @@ trait Codecs {
       ProgramReference.fromString.reverseGet
     )
 
-  val program_type: Codec[ProgramType] =
+  val program_type: Codec[lucuma.odb.data.ProgramType] =
     enumerated(Type("e_program_type"))
 
   val program_user_role: Codec[ProgramUserRole] =
