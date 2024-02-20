@@ -510,7 +510,7 @@ required.  If both are provided, they must refer to the same program.
 input CreateObservationInput {
   programId: ProgramId
   proposalReference: ProposalReferenceLabel
-  programReference: ProgramReference
+  programReference: ProgramReferenceLabel
   SET: ObservationPropertiesInput
 }
 
@@ -548,7 +548,7 @@ If both are provided, they must refer to the same program.
 input CreateTargetInput {
   programId: ProgramId
   proposalReference: ProposalReferenceLabel
-  programReference: ProgramReference
+  programReference: ProgramReferenceLabel
   SET: TargetPropertiesInput!
 }
 
@@ -2756,6 +2756,9 @@ type Mutation {
   "Set the allocation for a program from the specified partner."
   setAllocation(input: SetAllocationInput!): SetAllocationResult!
 
+  "Set the program reference."
+  setProgramReference(input: SetProgramReferenceInput!): SetProgramReferenceResult!
+
   """
   Unlink a user from a program.
   This operation is available only to Admin and Service users.
@@ -2818,19 +2821,6 @@ type Mutation {
     """
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
-
-  """
-  TODO: This seems right because each program type has a specific set of
-  information that it needs. But currently there is a `semester` property in the
-  ProgramPropertiesInput.  It's used in the _proposal_ reference of course. So
-  if that is removed in favor of the `UpdateProgramTypeInput` do I need a
-  special `UpdateProposalStatus` mutation that requires a semester?
-
-  Update the program reference
-  """
-  updateProgramType(
-    input: UpdateProgramTypeInput!
-  ): UpdateProgramTypeResult!
 
   """
   Updates existing targets
@@ -3506,6 +3496,75 @@ type SetupTime {
   A reduced setup time contemplating reacquiring a previously acquired target
   """
   reacquisition: TimeSpan!
+}
+
+"""
+Input for setting the program reference.  Identify the program to update with one
+of `programId`, `proposalReference` or `programReference`.  If more than one of
+these is specified, all must match.  Use `SET` to specify the new program
+reference properties.
+"""
+input SetProgramReferenceInput {
+  programId:         ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference:  ProgramReferenceLabel
+  SET:               ProgramReferencePropertiesInput!
+}
+
+"""
+Properties for the chosen program reference type.  Supply the value for exactly
+one of the inputs.
+"""
+input ProgramReferencePropertiesInput {
+  calibration: ProgramReferencePropertiesCalibrationInput
+  engineering: ProgramReferencePropertiesEngineeringInput
+  example:     ProgramReferencePropertiesExampleInput
+  library:     ProgramReferencePropertiesLibraryInput
+  science:     ProgramReferencePropertiesScienceInput
+}
+
+type SetProgramReferenceResult {
+  "The resulting program reference, if any."
+  reference: ProgramReference
+}
+
+"""
+Inputs required when updating or switching to a calibration program.
+"""
+input ProgramReferencePropertiesCalibrationInput {
+  semester:   Semester!
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to an engineering program.
+"""
+input ProgramReferencePropertiesEngineeringInput {
+  semester:   Semester!
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to an example program.
+"""
+input ProgramReferencePropertiesExampleInput {
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to a library program.
+"""
+input ProgramReferencePropertiesLibraryInput {
+  instrument:  Instrument!
+  description: NonEmptyString!
+}
+
+"""
+Inputs required when updating or switching to a science program.
+"""
+input ProgramReferencePropertiesScienceInput {
+  semester:       Semester!
+  scienceSubtype: ScienceSubtype!
 }
 
 """
@@ -4186,19 +4245,6 @@ type UpdateObservationsResult {
   `true` when there were additional edits that were not returned.
   """
   hasMore: Boolean!
-}
-
-input UpdateProgramTypeInput {
-  calibration: ProgramTypeCalibrationInput
-  engineering: ProgramTypeEngineringInput
-  example:     ProgramTypeExampleInput
-  library:     ProgramTypeLibraryInput
-  science:     ProgramTypeScienceInput
-}
-
-type UpdateProgramTypeResult {
-  "The resulting program reference."
-  programReference: ProgramReference!
 }
 
 """
@@ -6700,7 +6746,7 @@ the same program.)
 input CreateGroupInput {
   programId: ProgramId
   proposalReference: ProposalReferenceLabel
-  programReference: ProgramReference
+  programReference: ProgramReferenceLabel
   SET: GroupPropertiesInput
 }
 
@@ -7591,50 +7637,10 @@ type Program {
   name: NonEmptyString
 
   "Program type"
-  programType: ProgramType!
+  type: ProgramType!
 
-
-  """
-  TODO: Think I'll gather up all the reference-related fields into a
-  `Reference` object.  Including the `programReference itself.`
-
-  "program": {
-    "programType": "CALIBRATION"
-    "reference": {
-      "instrument": "GMOS_SOUTH"
-      "scienceSubtype": NULL
-      "semester: "2026A"
-      "semesterIndex": 1
-
-      "program": "G-2026A-CAL-GMOS_SOUTH-01"
-    }
-  }
-
-  Instrument associated with the program, if any.  This is relevant for
-  CALIBRATION, ENGINEERING, EXAMPLE, and LIBRARY programs only.
-  """
-  instrument: Instrument
-
-  """
-  Science subtype associated with the program, if any.  This is relevant for
-  SCIENCE programs only.
-  """
-  scienceSubtype: ScienceSubtype
-
-  """
-  Semester associated with the program, if any.  This is relevant for
-  CALIBRATION, ENGINEERING, and SCIENCE programs only.
-  """
-  semester: Semester
-
-  """
-  Index, relative to the semester, if any.  This is relevant for CALIBRATION,
-  ENGINEERING, and SCIENCE programs only.
-  """
-  semesterIndex: PosInt
-
-  "Formatted program reference, if any."
-  programReference: ProgramReference
+  "Program reference, if any."
+  reference: ProgramReference
 
   """
   Program proposal
@@ -7715,11 +7721,57 @@ ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
 scalar ProgramId
 
 """
+Defines the category of program references, where specific implementations exist
+for calibration, engineering, etc.
+"""
+interface ProgramReference {
+  label: ProgramReferenceLabel!
+  type:  ProgramType!
+}
+
+type CalibrationProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+  instrument:    Instrument!
+  semester:      Semester!
+  semesterIndex: PosInt!
+}
+
+type EngineeringProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+  instrument:    Instrument!
+  semester:      Semester!
+  semesterIndex: PosInt!
+}
+
+type ExampleProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+  instrument:    Instrument!
+}
+
+type LibraryProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+  description:   NonEmptyString!
+  instrument:    Instrument!
+}
+
+type ScienceProgramReference implements ProgramReference {
+  label:          ProgramReferenceLabel!
+  type:           ProgramType!
+  scienceSubtype: ScienceSubtype!
+  semester:       Semester!
+  semesterIndex:  PosInt!
+}
+
+"""
 Program reference, formatted according to the type.  For example, a Science
 Program has format G-YYYY[AB]-NNNN+-[CDLFSV]. For example, G-2024B-1234-Q
 where 2024B refers to the associated semester.
 """
-scalar ProgramReference
+scalar ProgramReferenceLabel
 
 """
 The matching program results, limited to a maximum of 1000 entries.
@@ -7744,44 +7796,6 @@ enum ProgramType {
   SCIENCE
 }
 
-"""
-Inputs required when updating or switching to a calibration program.
-"""
-input ProgramTypeCalibrationInput {
-  semester:   Semester!
-  instrument: Instrument!
-}
-
-"""
-Inputs required when updating or switching to an engineering program.
-"""
-input ProgramTypeEngineeringInput {
-  semester:   Semester!
-  instrument: Instrument!
-}
-
-"""
-Inputs required when updating or switching to an example program.
-"""
-input ProgramTypeExampleInput {
-  instrument: Instrument!
-}
-
-"""
-Inputs required when updating or switching to a library program.
-"""
-input ProgramTypeLibraryInput {
-  instrument:  Instrument!
-  description: NonEmptyString!
-}
-
-"""
-Inputs required when updating or switching to a science program.
-"""
-input ProgramTypeScienceInput {
-  semester:       Semester!
-  scienceSubtype: ScienceSubtype!
-}
 
 type ProperMotion {
   """
@@ -8002,7 +8016,7 @@ type Query {
     proposalReference: ProposalReferenceLabel
 
     "Program reference"
-    programReference: ProgramReference
+    programReference: ProgramReferenceLabel
 
     """
     Filters the selection of observations.
@@ -8040,7 +8054,7 @@ type Query {
     proposalReference: ProposalReferenceLabel
 
     "Program reference"
-    programReference: ProgramReference
+    programReference: ProgramReferenceLabel
 
     """
     Filters the selection of observations.
@@ -8163,7 +8177,7 @@ type Query {
     proposalReference: ProposalReferenceLabel
 
     "Program Reference"
-    programReference: ProgramReference
+    programReference: ProgramReferenceLabel
 
   ): Program
 
@@ -8278,7 +8292,7 @@ type Query {
     proposalReference: ProposalReferenceLabel
 
     "Program Reference"
-    programReference: ProgramReference
+    programReference: ProgramReferenceLabel
 
     """
     Filters the selection of observations.
@@ -10725,13 +10739,7 @@ All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "GMOS_SOUTH"' will match when the property value is "GMOS_SOUTH".
 Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
 """
-input WhereOptionEqInstrument {
-
-  """
-  When `true`, matches if the instrument is not defined. When `false` matches
-  if the instrument is defined.
-  """
-  IS_NULL: Boolean
+input WhereEqInstrument {
 
   """
   Matches if the instrument is exactly the supplied value.
@@ -10794,13 +10802,7 @@ All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "QUEUE"' will match when the property value is "QUEUE".
 Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
 """
-input WhereOptionEqScienceSubtype {
-
-  """
-  When `true`, matches if the subtype is not defined. When `false` matches
-  if the instrument is defined.
-  """
-  IS_NULL: Boolean
+input WhereEqScienceSubtype {
 
   """
   Matches if the subtype is exactly the supplied value.
@@ -11350,10 +11352,7 @@ Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 """
-input WhereOptionOrderPosInt {
-
-  "Matches if the property is not defined."
-  IS_NULL: Boolean
+input WhereOrderPosInt {
 
   """
   Matches if the property is exactly the supplied value.
@@ -11453,70 +11452,22 @@ input WhereProposalReference {
   IS_NULL: Boolean
 
   "Matches the proposal reference label."
-  label: WhereOrderProposalReferenceLabel
+  label: WhereString
 
-  # TODO: semester
-  # TODO: semesterIndex
+  "Matches the semester in the proposal reference."
+  semester: WhereOrderSemester
+
+  "Matches the index in the proposal reference."
+  semesterIndex: WhereOrderPosInt
 
 }
 
 """
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
+Filters on equality or order comparisons of Semester.  All supplied
+criteria must match, but usually only one is selected.  E.g.,
+'GT = "2024A"' will match when the value is "2024B" or later.
 """
-input WhereOrderProposalReferenceLabel {
-
-  """
-  Matches if the ProposalReference is exactly the supplied value.
-  """
-  EQ: ProposalReferenceLabel
-
-  """
-  Matches if the ProposalReference is not the supplied value.
-  """
-  NEQ: ProposalReferenceLabel
-
-  """
-  Matches if the ProposalReference is any of the supplied options.
-  """
-  IN: [ProposalReferenceLabel!]
-
-  """
-  Matches if the ProposalReference is none of the supplied values.
-  """
-  NIN: [ProposalReferenceLabel!]
-
-  """
-  Matches if the ProposalReference is ordered after (>) the supplied value.
-  """
-  GT: ProposalReferenceLabel
-
-  """
-  Matches if the ProposalReference is ordered before (<) the supplied value.
-  """
-  LT: ProposalReference
-
-  """
-  Matches if the ProposalReference is ordered after or equal (>=) the supplied value.
-  """
-  GTE: ProposalReferenceLabel
-
-  """
-  Matches if the ProposalReference is ordered before or equal (<=) the supplied value.
-  """
-  LTE: ProposalReferenceLabel
-}
-
-"""
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
-"""
-input WhereOptionOrderSemester {
-
-  "Matches if Semester is not defined."
-  IS_NULL: Boolean
+input WhereOrderSemester {
 
   """
   Matches if the property is exactly the supplied value.
@@ -11782,32 +11733,12 @@ input WhereProgram {
   """
   Mathces the program type.
   """
-  programType: WhereEqProgramType
+  type: WhereEqProgramType
 
   """
-  Matches the instrument associated with the program.
+  Matches the program reference (if any).
   """
-  instrument: WhereOptionEqInstrument
-
-  """
-  Matches the science subtype associated with the program.
-  """
-  scienceSubtype: WhereOptionEqScienceSubtype
-
-  """
-  Matches the semester associated with the program.
-  """
-  semester: WhereOptionOrderSemester
-
-  """
-  Matches the semester index associated with the program (if any).
-  """
-  semesterIndex: WhereOptionOrderPosInt
-
-  """
-  Matches on the program reference (if any).
-  """
-  programReference: WhereOptionOrderProgramReference
+  reference: WhereProgramReference
 
   """
   Matches the proposalStatus.
@@ -11818,6 +11749,30 @@ input WhereProgram {
   Matches the proposal.
   """
   proposal: WhereProposal
+}
+
+input WhereProgramReference {
+
+  "Matches if the program reference is not defined."
+  IS_NULL: Boolean
+
+  "Matches the program reference label."
+  label: WhereString
+
+  "Matches the semester in the proposal reference, if any."
+  semester: WhereOrderSemester
+
+  "Matches the index in the program reference, if any."
+  semesterIndex: WhereOrderPosInt
+
+  "Matches the instrument in the program reference, if any."
+  instrument: WhereEqInstrument
+
+  "Matches the (library) description in the program reference, if any."
+  description: WhereString
+
+  "Matches the science subtype in the program reference, if any."
+  scienceSubtype: WhereEqScienceSubtype
 }
 
 """
@@ -11956,12 +11911,16 @@ input WhereString {
   NIN: [NonEmptyString!]
 
   """
-  Performs string matching with wildcard patterns.  The entire string must be matched.  Use % to match a sequence of any characters and _ to match any single character.
+  Performs string matching with wildcard patterns.  The entire string must be
+  matched.  Use % to match a sequence of any characters and _ to match any
+  single character.
   """
   LIKE: NonEmptyString
 
   """
-  Performs string matching with wildcard patterns.  The entire string must not match.  Use % to match a sequence of any characters and _ to match any single character.
+  Performs string matching with wildcard patterns.  The entire string must not
+  match.  Use % to match a sequence of any characters and _ to match any single
+  character.
   """
   NLIKE: NonEmptyString
 

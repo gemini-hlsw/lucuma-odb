@@ -60,7 +60,7 @@ INSERT INTO t_science_subtype VALUES ('system_verification', 'V', 'System Verifi
 
 -- Add a program type and science type to the t_program table
 ALTER TABLE t_program
-  ADD COLUMN c_program_type    e_program_type    NOT NULL DEFAULT 'science',
+  ADD COLUMN c_program_type    e_program_type    NOT NULL DEFAULT 'science' :: e_program_type,
   ADD COLUMN c_library_desc    text              NULL CHECK (c_library_desc ~ '^[A-Z0-9]+$'), -- LIB
   ADD COLUMN c_instrument      d_tag             NULL REFERENCES t_instrument(c_tag),         -- CAL, ENG, LIB, XPL
   ADD COLUMN c_science_subtype e_science_subtype NULL,                                        -- SCI
@@ -72,24 +72,31 @@ ALTER TABLE t_program
             c_instrument      IS NOT NULL AND
             c_library_desc    IS NULL     AND
             c_semester        IS NOT NULL AND
+            c_semester_index  IS NOT NULL AND
             c_science_subtype IS NULL
 
           WHEN c_program_type = 'example' THEN
             c_instrument      IS NOT NULL AND
             c_library_desc    IS NULL     AND
             c_semester        IS NULL     AND
+            c_semester_index  IS NULL     AND
             c_science_subtype IS NULL
 
           WHEN c_program_type = 'library' THEN
             c_instrument      IS NOT NULL AND
             c_library_desc    IS NOT NULL AND
             c_semester        IS NULL     AND
+            c_semester_index  IS NULL     AND
             c_science_subtype IS NULL
 
           WHEN c_program_type = 'science' THEN
             c_instrument   IS NULL     AND
             c_library_desc IS NULL     AND
-            (c_semester IS NOT NULL OR c_proposal_status = 'not_submitted')
+            (c_proposal_status = 'not_submitted' OR (
+              c_semester        IS NOT NULL AND
+              c_semester_index  IS NOT NULL AND
+              c_science_subtype IS NOT NULL
+            ))
       END
   );
 
@@ -115,8 +122,8 @@ CREATE OR REPLACE FUNCTION next_semester_index(
 )
 RETURNS INT AS $$
 DECLARE
-    abbr VARCHAR;
-    prefix VARCHAR;
+    abbr text;
+    prefix text;
     sequence_name VARCHAR;
 BEGIN
     SELECT c_abbr INTO abbr FROM t_program_type WHERE c_type = program_type;
@@ -183,9 +190,11 @@ BEGIN
 
       WHEN NEW.c_program_type = 'science' THEN
         BEGIN
-          IF (NEW.c_proposal_status <> 'not_submitted') THEN
+          IF NEW.c_proposal_status <> 'not_submitted' THEN
             IF NEW.c_semester IS NULL THEN
               RAISE EXCEPTION 'Submitted science programs must define a semester';
+            ELSEIF NEW.c_science_subtype IS NULL THEN
+              RAISE EXCEPTION 'Submitted science programs must define a science subtype.';
             ELSEIF (NEW.c_program_type != OLD.c_program_type) OR
                    (NEW.c_semester IS DISTINCT FROM OLD.c_semester) OR
                    (OLD.c_proposal_status = 'not_submitted' AND NEW.c_semester_index IS NULL) THEN
@@ -245,7 +254,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE FUNCTION format_cal_or_eng_reference(ptype e_program_type, semester d_semester, index int4, instrument d_tag)
 RETURNS text AS $$
 DECLARE
-  abbr char;
+  abbr text;
 BEGIN
     SELECT c_abbr INTO abbr FROM t_program_type WHERE c_type = ptype;
     RETURN CONCAT('G-', semester, '-', abbr, '-', instrument, '-', LPAD(index::text, 2, '0'));
@@ -255,14 +264,14 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE FUNCTION format_lib_or_xpl_reference(ptype e_program_type, instrument d_tag, description text)
 RETURNS text AS $$
 DECLARE
-  abbr char;
+  abbr text;
   prefix text;
 BEGIN
     SELECT c_abbr INTO abbr FROM t_program_type WHERE c_type = ptype;
     prefix := CONCAT('G-', abbr, '-', instrument);
 
     RETURN  CASE
-      WHEN ptype = 'library' THEN CONCAT(prefix, '_', description)
+      WHEN ptype = 'library' THEN CONCAT(prefix, '-', description)
       ELSE prefix
     END;
 END;
@@ -328,6 +337,10 @@ BEFORE INSERT OR UPDATE ON t_proposal
 FOR EACH ROW
 EXECUTE FUNCTION update_science_subtype();
 
+-- Create views for the proposal and program references such that we remove
+-- entries without a reference.  This makes mapping the reference as
+-- optional in Proposal and Program possible.
+
 CREATE VIEW v_proposal_reference AS
   SELECT
     c_program_id,
@@ -338,4 +351,20 @@ CREATE VIEW v_proposal_reference AS
     t_program
   WHERE
     c_proposal_reference IS NOT NULL
+  ORDER BY c_program_id;
+
+CREATE VIEW v_program_reference AS
+  SELECT
+    c_program_id,
+    c_program_type,
+    c_library_desc,
+    c_instrument,
+    c_science_subtype,
+    c_semester,
+    c_semester_index,
+    c_program_reference
+  FROM
+    t_program
+  WHERE
+    c_program_reference IS NOT NULL
   ORDER BY c_program_id;

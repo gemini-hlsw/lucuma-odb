@@ -27,6 +27,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.util.Codecs._
@@ -44,7 +45,7 @@ trait ProgramService[F[_]] {
    */
   def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
 
-  def selectProposalReference(id: Program.Id): F[Option[ProposalReference]]
+  def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -129,8 +130,11 @@ object ProgramService {
         s"Proposal status in program $pid cannot be changed because it has no proposal."
       case NoSemesterForSubmittedProposal(pid)           =>
         s"Submitted program $pid must be associated with a semester."
-      case InvalidSemester(s: Option[Semester])          =>
+      case InvalidSemester(s)                            =>
         s"The maximum semester is capped at the current year +1${s.fold(".")(" ("+ _.format + " specified).")}"
+      case DuplicateReference(r)                         =>
+        s"""Program reference${r.fold("")(s => s" '$s'")} already exists."""
+
     def failure = this match
       case InvalidProposalStatus(user, ps) => OdbError.InvalidArgument(Some(message)).asFailure
       case NotAuthorizedNewProposalStatus(user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
@@ -138,7 +142,8 @@ object ProgramService {
       case NoProposalForStatusChange(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
       case NoSemesterForSubmittedProposal(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
       case InvalidSemester(s) => OdbError.InvalidArgument(Some(message)).asFailure
-    
+      case DuplicateReference(r) => OdbError.InvalidArgument(Some(message)).asFailure
+
   }
 
   object UpdateProgramsError {
@@ -149,6 +154,7 @@ object ProgramService {
     case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
     case class NoSemesterForSubmittedProposal(pid: Program.Id) extends UpdateProgramsError
     case class InvalidSemester(s: Option[Semester]) extends UpdateProgramsError
+    case class DuplicateReference(ref: Option[String]) extends UpdateProgramsError
   }
 
   /**
@@ -165,9 +171,22 @@ object ProgramService {
         }
       }
 
-      def selectProposalReference(id: Program.Id): F[Option[ProposalReference]] = {
-        session.option(Statements.SelectProposalReference)(id)
-      }
+      def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]] =
+        session
+          .unique(Statements.SetProgramReference)(id, input)
+          .map(_.success)
+          .recover {
+            case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
+              UpdateProgramsError
+                .InvalidSemester(input.semester)
+                .failure
+            case SqlState.UniqueViolation(ex) =>
+              // See if we can parse out the duplicate reference string.
+              val pat = """\(c_program_reference\)=\(([^)]+)\)""".r
+              UpdateProgramsError
+                .DuplicateReference(pat.findFirstMatchIn(ex.getMessage).map(_.group(1)))
+                .failure
+          }
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
@@ -323,15 +342,29 @@ object ProgramService {
         (prop, prog) => sql"c_proposal_reference = $proposal_reference AND c_program_reference = $program_reference".apply(prop, prog)
       )
 
-    val SelectProposalReference: Query[Program.Id, ProposalReference] =
+    val SetProgramReference: Query[(Program.Id, ProgramReferencePropertiesInput), Option[ProgramReference]] =
       sql"""
-        SELECT
-          c_proposal_reference
-        FROM
+        UPDATE
           t_program
+        SET
+          c_program_type    = $program_type,
+          c_library_desc    = ${text.opt},
+          c_instrument      = ${instrument.opt},
+          c_semester        = ${semester.opt},
+          c_science_subtype = ${science_subtype.opt}
         WHERE
           c_program_id = $program_id
-      """.query(proposal_reference)
+        RETURNING
+          c_program_reference
+      """.query(program_reference.opt)
+         .contramap[(Program.Id, ProgramReferencePropertiesInput)] { (id, prpi) => (
+           prpi.programType,
+           prpi.description.map(_.value),
+           prpi.instrument,
+           prpi.semester,
+           prpi.scienceSubtype,
+           id
+         )}
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""

@@ -44,6 +44,7 @@ trait ProgramMapping[F[_]]
      with ObservationView[F]
      with ObsAttachmentTable[F]
      with Predicates[F]
+     with ProgramReferenceView[F]
      with ProposalAttachmentTable[F]
      with ResultMapping[F]
      with GroupElementView[F]
@@ -64,12 +65,8 @@ trait ProgramMapping[F[_]]
         SqlField("existence", ProgramTable.Existence, hidden = true),
         SqlField("name", ProgramTable.Name),
 
-        SqlField("programType",      ProgramTable.ProgramType),
-        SqlField("instrument",       ProgramTable.Reference.Instrument),
-        SqlField("scienceSubtype",   ProgramTable.Reference.ScienceSubtype),
-        SqlField("semester",         ProgramTable.Reference.Semester),
-        SqlField("semesterIndex",    ProgramTable.Reference.SemesterIndex),
-        SqlField("programReference", ProgramTable.Reference.ProgramReference),
+        SqlField("type", ProgramTable.ProgramType),
+        SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
 
         SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
         SqlField("proposalStatus", ProgramTable.ProposalStatus),

@@ -17,7 +17,10 @@ trait ProposalReferenceMapping[F[_]]
         SqlField("id",            ProposalReferenceView.Id, key = true, hidden = true),
         SqlField("label",         ProposalReferenceView.ProposalReference),
         SqlField("semester",      ProposalReferenceView.Semester),
-        SqlField("semesterIndex", ProposalReferenceView.SemesterIndex)
+        SqlField("semesterIndex", ProposalReferenceView.SemesterIndex),
+
+        // Used for WHERE clause matching
+        SqlField("labelString",   ProposalReferenceView.ProposalReferenceString, hidden = true)
       )
     )
 

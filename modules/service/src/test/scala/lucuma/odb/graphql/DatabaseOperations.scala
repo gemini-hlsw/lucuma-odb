@@ -92,6 +92,17 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def fetchPid(user: User, prg: ProgramReference): IO[Program.Id] =
+    query(user, s"""
+      query { program(programReference: "${prg.label}") { id } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
   def fetchProposalReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
     query(user, s"""
       query { program(programId: "$pid") { proposalReference } }
@@ -105,11 +116,12 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def fetchProgramReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     query(user, s"""
-      query { program(programId: "$pid") { programReference } }
+      query { program(programId: "$pid") { reference { label } } }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "programReference")
-        .as[Option[ProgramReference]]
+        .downFields("program", "reference", "label")
+        .success
+        .traverse(_.as[ProgramReference])
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
@@ -209,7 +221,7 @@ trait DatabaseOperations { this: OdbSuite =>
               WHERE: { id: { EQ: "$pid" } }
             }
           ) {
-            programs { programReference }
+            programs { reference { label } }
           }
         }
       """
@@ -218,8 +230,9 @@ trait DatabaseOperations { this: OdbSuite =>
         .downField("updatePrograms")
         .downField("programs")
         .downArray
-        .downField("programReference")
-        .as[Option[ProgramReference]]
+        .downFields("reference", "label")
+        .success
+        .traverse(_.as[ProgramReference])
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }

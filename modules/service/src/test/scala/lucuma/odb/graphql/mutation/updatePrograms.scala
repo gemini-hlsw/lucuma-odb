@@ -1185,8 +1185,6 @@ class updatePrograms extends OdbSuite {
               programs {
                 id
                 proposalStatus
-                semester
-                semesterIndex
                 proposal { reference { label } }
               }
             }
@@ -1200,8 +1198,6 @@ class updatePrograms extends OdbSuite {
                   {
                     "id" : $pid,
                     "proposalStatus": "SUBMITTED",
-                    "semester": "2024B",
-                    "semesterIndex": 1,
                     "proposal": { "reference": { "label": "G-2024B-0001" } }
                   }
                 ]

@@ -148,6 +148,7 @@ object OdbMapping {
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
+          with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
           with ProperMotionDeclinationMapping[F]
@@ -171,6 +172,7 @@ object OdbMapping {
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
+          with SetProgramReferenceResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
@@ -237,6 +239,7 @@ object OdbMapping {
               AsterismGroupSelectResultMapping,
               AtomRecordMapping,
               AtomRecordSelectResultMapping,
+              CalibrationProgramReferenceMapping,
               CatalogInfoMapping,
               CategorizedTimeMapping,
               CloneObservationResultMapping,
@@ -258,7 +261,9 @@ object OdbMapping {
               DatasetEventMapping,
               DatasetSelectResultMapping,
               DeclinationMapping,
+              EngineeringProgramReferenceMapping,
               ElevationRangeMapping,
+              ExampleProgramReferenceMapping,
               ExecutionMapping,
               ExecutionEventMapping,
               ExecutionEventSelectResultMapping,
@@ -283,6 +288,7 @@ object OdbMapping {
               GroupEditMapping,
               GroupElementMapping,
               HourAngleRangeMapping,
+              LibraryProgramReferenceMapping,
               LinkUserResultMapping,
               MutationMapping,
               NonsiderealMapping,
@@ -302,6 +308,7 @@ object OdbMapping {
               PosAngleConstraintMapping,
               ProgramMapping,
               ProgramEditMapping,
+              ProgramReferenceMapping,
               ProgramSelectResultMapping,
               ProgramUserMapping,
               ProperMotionDeclinationMapping,
@@ -323,10 +330,12 @@ object OdbMapping {
               RedeemUserInvitationResultMapping,
               RevokeUserInvitationResultMapping,
               RightAscensionMapping,
+              ScienceProgramReferenceMapping,
               ScienceRequirementsMapping,
               SequenceEventMapping,
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
+              SetProgramReferenceResultMapping,
               SiderealMapping,
               StepConfigMapping,
               StepConfigBiasMapping,

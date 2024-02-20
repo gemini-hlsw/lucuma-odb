@@ -3,10 +3,12 @@
 
 package lucuma.odb.graphql
 package table
+
 import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.program_id
 import lucuma.odb.util.Codecs.proposal_reference
 import lucuma.odb.util.Codecs.semester
+import skunk.codec.text.text
 
 trait ProposalReferenceView[F[_]] extends BaseMapping[F] {
 
@@ -15,6 +17,9 @@ trait ProposalReferenceView[F[_]] extends BaseMapping[F] {
     val Semester          = col("c_semester",           semester)
     val SemesterIndex     = col("c_semester_index",     int4_pos)
     val ProposalReference = col("c_proposal_reference", proposal_reference)
+
+    // Used for string matchers in WHERE clauses
+    val ProposalReferenceString = col("c_proposal_reference", text)
   }
 
 
