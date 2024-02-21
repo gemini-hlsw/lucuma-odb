@@ -85,6 +85,9 @@ import skunk.AppliedFragment
 import skunk.Transaction
 
 import scala.reflect.ClassTag
+import lucuma.odb.service.asFailure
+import lucuma.odb.service.Services.Syntax.error.invalidVisit
+import lucuma.odb.service.withDetail
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -409,20 +412,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private def executionEventResponseToResult(
     child:        Query,
-    predicates:   ExecutionEventPredicates
-  ): ExecutionEventService.InsertEventResponse => Result[Query] = {
+    predicates:   ExecutionEventPredicates,    
+  )(using Services[F]): ExecutionEventService.InsertEventResponse => Result[Query] = {
     import ExecutionEventService.InsertEventResponse.*
+    import Services.Syntax.*
     (response: ExecutionEventService.InsertEventResponse) => response match {
-      case NotAuthorized(user) =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
-      case DatasetNotFound(id)    =>
-        Result.failure(s"Dataset '${id.show}' not found")
-      case StepNotFound(id)    =>
-        Result.failure(s"Step '$id' not found")
-      case VisitNotFound(id)   =>
-        Result.failure(s"Visit '$id' not found")
-      case Success(e)     =>
-        Result(Unique(Filter(predicates.id.eql(e.id), child)))
+      case NotAuthorized(user) => error.notAuthorized.asFailure
+      case DatasetNotFound(id) => Result.failure(s"Dataset '${id.show}' not found")
+      case StepNotFound(id)    => Result.failure(s"Step '$id' not found")
+      case VisitNotFound(id)   => error.invalidVisit(id).withDetail(s"Visit '$id' not found").asFailure
+      case Success(e)          => Result(Unique(Filter(predicates.id.eql(e.id), child)))
     }
   }
 

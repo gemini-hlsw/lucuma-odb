@@ -41,6 +41,7 @@ object OdbError:
     case InvalidObservation  extends Category("invalid_observation", "Specified observation does not exist, is not visible, or is ineligible for the requested operation.")
     case SequenceUnavailable extends Category("sequence_unavailable", "Could not generate the requested sequence.")
     case InvalidTargetList   extends Category("invalid_target_list", "The provided target list is not valid for the requested operation.")
+    case InvalidVisit        extends Category("invalid_visit", "The specified visit does not exist, is not visible, or is ineligible for the requested operation.")
 
   given Enumerated[Category] = Enumerated.derived
   given Eq[OdbError] = Eq.by(e => (e.code, e.user, e.detail, e.data.toList)) // :-\
