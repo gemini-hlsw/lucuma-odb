@@ -254,7 +254,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalsError.CreationFailed.message))
+          Left(List(UpdateProposalsError.CreationFailed(pi).message))
       )
     }
   }
@@ -783,7 +783,7 @@ class updatePrograms extends OdbSuite {
             }
           }
         """,
-        expected = Left(List(UpdateProposalsError.InconsistentUpdate.message))
+        expected = Left(List(UpdateProposalsError.InconsistentUpdate(pi).message))
       )
 
     }
@@ -1145,7 +1145,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProgramsError.NoProposalForStatusChange(pid).message))
+          Left(List(UpdateProgramsError.NoProposalForStatusChange(pi, pid).message))
       )
     }
   }
@@ -1489,7 +1489,7 @@ class updatePrograms extends OdbSuite {
           Left(
             List(
               UpdateProgramsError.NotAuthorizedOldProposalStatus(pid1, pi, Tag("not_accepted")).message,
-              UpdateProgramsError.NoProposalForStatusChange(pid3).message
+              UpdateProgramsError.NoProposalForStatusChange(pi, pid3).message
             )
           )
       )
