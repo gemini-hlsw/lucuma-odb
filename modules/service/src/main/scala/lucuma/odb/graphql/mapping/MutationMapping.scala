@@ -289,7 +289,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             )
 
           // Failure Cases
-          case NoSuchTarget(targetId) => Result.failure(s"No such target: $targetId")
+          case NoSuchTarget(targetId) => error.invalidTarget(targetId).withDetail(s"No such target: $targetId").asFailure
           case UpdateFailed(problem)  =>
             problem match
               case SourceProfileUpdatesFailed(ps) => Result.Failure(ps)

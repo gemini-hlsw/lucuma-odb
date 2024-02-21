@@ -323,6 +323,16 @@ object Services:
           )
         )
 
+      def invalidTarget[F[_]: Services](targetId: Target.Id): OdbError =
+        OdbError(
+          InvalidTargetList, 
+          user, 
+          None,
+          SortedMap(
+            "targetId" -> targetId.asJson
+          )
+        )
+
       def invalidVisit[F[_]: Services](visitId: Visit.Id): OdbError =
         OdbError(
           InvalidVisit,

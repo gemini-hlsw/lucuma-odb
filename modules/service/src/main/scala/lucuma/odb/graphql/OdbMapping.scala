@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Monoid
-import cats.data.StateT
 import cats.effect.std.Supervisor
 import cats.effect.{Unique => _, _}
 import cats.syntax.all._
@@ -19,7 +18,6 @@ import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
-import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping._
 import lucuma.odb.graphql.topic.GroupTopic
@@ -385,16 +383,7 @@ object OdbMapping {
                 TimeChargeInvoiceElaborator,
                 QueryElaborator,
                 VisitElaborator
-              ).combineAll.andThen: elab =>
-
-                // Helper: given an Elab[A], make a new Elab[A] where any validation problems that would
-                // be generated are "promoted" such that they're encoded as proper OdbErrors.
-                def promote[A](e: Elab[A]): Elab[A] =
-                  StateT(s => Matcher.promoteValidatonProblemss(e.run(s), user))
-
-                // Promote any validation errors that would be produced by `elab` *or* by the computed child transform.
-                promote(elab) *> StateT.modify(s => s.copy(childTransform = s.childTransform.andThen(promote)))
-
+              ).combineAll
             )
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
