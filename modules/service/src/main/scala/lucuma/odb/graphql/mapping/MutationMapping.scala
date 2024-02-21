@@ -493,9 +493,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import SequenceService.InsertStepResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)           =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+        OdbError.Category.NotAuthorized.asOdbError(user).asFailure
       case AtomNotFound(id, instrument)  =>
-        Result.failure(s"Atom '$id' not found or is not a ${instrument.longName} atom")
+        OdbError.Category.InvalidAtom.asOdbError(user).withDetail(s"Atom '$id' not found or is not a ${instrument.longName} atom").asFailure
       case Success(sid)                  =>
         Result(Unique(Filter(predicate.eql(sid), child)))
     }
