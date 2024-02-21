@@ -43,6 +43,8 @@ object OdbError:
     case InvalidTarget       extends Category("invalid_target", "Specified target does not exist, is not visible, or is ineligible for the requested operation.")
     case InvalidTargetList   extends Category("invalid_target_list", "The provided target list is not valid for the requested operation.")
     case InvalidVisit        extends Category("invalid_visit", "The specified visit does not exist, is not visible, or is ineligible for the requested operation.")
+    case InvalidStep         extends Category("invalid_step", "The specified step does not exist, is not visible, or is ineligible for the requested operation.")
+    case InvalidFilename     extends Category("invalid_filename", "The specified filename is invalid or already exists.")
 
     def asOdbError(user: User): OdbError =
       OdbError(this, user, None, SortedMap.empty)

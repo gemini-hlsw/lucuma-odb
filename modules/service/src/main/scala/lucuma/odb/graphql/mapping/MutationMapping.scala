@@ -88,6 +88,8 @@ import scala.reflect.ClassTag
 import lucuma.odb.service.asFailure
 import lucuma.odb.service.Services.Syntax.error.invalidVisit
 import lucuma.odb.service.withDetail
+import lucuma.odb.service.OdbError
+import lucuma.odb.service.asFailureF
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -223,7 +225,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val AddConditionsEntry: MutationField =
     MutationField("addConditionsEntry", ConditionsEntryInput.Binding) { (input, child) =>
       if user.role.access < Access.Staff then {
-        Result.failure(s"This action is restricted to staff users.").pure[F]
+        OdbError.Category.NotAuthorized.asOdbError(user).withDetail(s"This action is restricted to staff users.").asFailureF
       } else {
         services.useTransactionally {
           chronicleService.addConditionsEntry(input).map { id =>
@@ -391,11 +393,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import DatasetService.InsertDatasetResponse.*
     (response: DatasetService.InsertDatasetResponse) => response match {
       case NotAuthorized(user)      =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+        OdbError.Category.NotAuthorized.asOdbError(user).asFailure
       case ReusedFilename(filename) =>
-        Result.failure(s"The filename '${filename.format}' is already assigned")
+        OdbError.Category.InvalidFilename.asOdbError(user).withDetail(s"The filename '${filename.format}' is already assigned").asFailure
       case StepNotFound(id)         =>
-        Result.failure(s"Step id '$id' not found")
+        OdbError.Category.InvalidStep.asOdbError(user).withDetail(s"Step id '$id' not found").asFailure
       case Success(did, _, _)       =>
         Result(Unique(Filter(predicates.id.eql(did), child)))
     }
