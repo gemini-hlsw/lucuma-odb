@@ -30,6 +30,7 @@ import scala.collection.immutable.SortedMap
 import scala.util.NotGiven
 import cats.data.NonEmptyList
 import lucuma.core.model.Target
+import lucuma.core.model.Visit
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -321,3 +322,14 @@ object Services:
             "targetIds" -> targetIds.asJson
           )
         )
+
+      def invalidVisit[F[_]: Services](visitId: Visit.Id): OdbError =
+        OdbError(
+          InvalidVisit,
+          user,
+          None,
+          SortedMap(
+            "visitId" -> visitId.asJson
+          )          
+        )
+
