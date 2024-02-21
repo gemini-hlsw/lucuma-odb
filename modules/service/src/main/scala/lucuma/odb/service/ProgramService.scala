@@ -32,6 +32,8 @@ import skunk.codec.all._
 import skunk.syntax.all._
 
 import Services.Syntax.*
+import io.circe.Json
+import io.circe.syntax.*
 
 trait ProgramService[F[_]] {
 
@@ -106,26 +108,37 @@ object ProgramService {
   }
 
   sealed trait UpdateProgramsError extends Product with Serializable {
+    def user: User
     import UpdateProgramsError.*
     def message: String = this match
-      case InvalidProposalStatus(ps)                     =>
+      case InvalidProposalStatus(_, ps)                     =>
         s"Invalid proposal status: ${ps.value}"
       case NotAuthorizedNewProposalStatus(user, ps)      =>
         s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase}."
       case NotAuthorizedOldProposalStatus(pid, user, ps) =>
         s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid."
-      case NoProposalForStatusChange(pid)                =>
+      case NoProposalForStatusChange(_, pid)                =>
         s"Proposal status in program $pid cannot be changed because it has no proposal."
 
-    def failure = Result.failure(message)
+    def failure = odbError.asFailure
+
+    def odbError: OdbError =
+      def err(c: OdbError.Category) = c.asOdbError(user).withDetail(message)
+      import OdbError.Category.*
+      this match      
+        case InvalidProposalStatus(_, ps)               => err(InvalidArgument).withData("proposalStatus" -> ps.asJson)
+        case NotAuthorizedNewProposalStatus(_, ps)      => err(NotAuthorized).withData("proposalStatus" -> ps.asJson)
+        case NotAuthorizedOldProposalStatus(pid, _, ps) => err(NotAuthorized).withData("programId" -> pid.asJson, "proposalStatus" -> ps.asJson)
+        case NoProposalForStatusChange(_, pid)          => err(InvalidProgram).withData("programId" -> pid.asJson)
+
   }
 
   object UpdateProgramsError {
     // we should never get this one, but we are converting between a Tag and a dynamic enum...
-    case class InvalidProposalStatus(ps: Tag) extends UpdateProgramsError
+    case class InvalidProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedNewProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
-    case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
+    case class NoProposalForStatusChange(user: User, pid: Program.Id) extends UpdateProgramsError
   }
 
   /**
@@ -201,7 +214,7 @@ object ProgramService {
         def tagToProposalStatus(tag: Tag): Result[enumsVal.ProposalStatus] =
           Enumerated[enumsVal.ProposalStatus]
             .fromTag(tag.value)
-            .fold(UpdateProgramsError.InvalidProposalStatus(tag).failure)(Result.apply)
+            .fold(UpdateProgramsError.InvalidProposalStatus(user, tag).failure)(Result.apply)
 
         def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
           user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
@@ -214,7 +227,7 @@ object ProgramService {
                   for {
                     ps <- tagToProposalStatus(psTag)
                     _  <- if (hasProposal) Result.unit
-                          else UpdateProgramsError.NoProposalForStatusChange(pid).failure
+                          else UpdateProgramsError.NoProposalForStatusChange(user, pid).failure
                     _  <- if (userCanChangeProposalStatus(ps)) Result.unit
                           else UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, psTag).failure
                   } yield ()
