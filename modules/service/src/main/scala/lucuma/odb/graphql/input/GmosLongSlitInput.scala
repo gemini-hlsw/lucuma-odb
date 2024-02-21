@@ -282,7 +282,7 @@ object GmosLongSlitInput {
         case Site.GS => "South"
       }
 
-      Result.fromOption(oa, s"A $itemName is required in order to create a GMOS ${siteName} Long Slit observing mode.")
+      Result.fromOption(oa, Matcher.validationProblem(s"A $itemName is required in order to create a GMOS ${siteName} Long Slit observing mode."))
     }
 
     final case class North(

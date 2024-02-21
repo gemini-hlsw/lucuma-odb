@@ -309,7 +309,7 @@ object ObservationService {
             _ <- moveObservations(SET.group, SET.groupIndex, which)
             r <- updates.value.recoverWith {
                    case SqlState.CheckViolation(ex) =>
-                     Result.failure(constraintViolationMessage(ex)).pure[F]
+                    error.invalidArgument.withDetail(constraintViolationMessage(ex)).asFailureF
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
