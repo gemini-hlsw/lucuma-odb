@@ -40,6 +40,7 @@ object OdbError:
     case InvalidProgram      extends Category("invalid_program", "Specified program does not exist, is not visible, or is ineligible for the requested operation.")
     case InvalidObservation  extends Category("invalid_observation", "Specified observation does not exist, is not visible, or is ineligible for the requested operation.")
     case SequenceUnavailable extends Category("sequence_unavailable", "Could not generate the requested sequence.")
+    case InvalidTarget       extends Category("invalid_target", "Specified target does not exist, is not visible, or is ineligible for the requested operation.")
     case InvalidTargetList   extends Category("invalid_target_list", "The provided target list is not valid for the requested operation.")
     case InvalidVisit        extends Category("invalid_visit", "The specified visit does not exist, is not visible, or is ineligible for the requested operation.")
 
