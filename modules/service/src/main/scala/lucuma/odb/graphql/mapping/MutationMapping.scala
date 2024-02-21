@@ -460,13 +460,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     response:  F[SequenceService.InsertAtomResponse],
     predicate: LeafPredicates[Atom.Id],
     child:     Query
-  ): F[Result[Query]] = {
+  )(using Services[F]): F[Result[Query]] = {
     import SequenceService.InsertAtomResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)           =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+        error.notAuthorized.asFailure
       case VisitNotFound(id, instrument) =>
-        Result.failure(s"Visit '$id' not found or is not a ${instrument.longName} visit")
+        error.invalidVisit(id).withDetail(s"Visit '$id' not found or is not a ${instrument.longName} visit").asFailure
       case Success(aid)                  =>
         Result(Unique(Filter(predicate.eql(aid), child)))
     }
