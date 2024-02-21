@@ -300,6 +300,9 @@ object Services:
       def notAuthorized[F[_]](using Services[F]): OdbError = 
         OdbError(NotAuthorized, user, Some(s"User ${user.id} is not authorized to perform this operation."))
 
+      def invalidArgument[F[_]](using Services[F]): OdbError = 
+        InvalidArgument.asOdbError(user)
+
       def invalidInvitation[F[_]](id: UserInvitation.Id)(using Services[F]): OdbError = 
         OdbError(InvitationError, user, None, SortedMap("invitationId" -> id.asJson))
 
