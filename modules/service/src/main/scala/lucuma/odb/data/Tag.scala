@@ -14,7 +14,7 @@ import lucuma.core.syntax.string._
 final case class Tag(value: String)
 object Tag {
 
-  implicit val TagCirceCodec: Encoder[Tag] with Decoder[Tag] =
+  implicit val TagCirceCodec: Encoder[Tag] & Decoder[Tag] =
     new Encoder[Tag] with Decoder[Tag] {
       def apply(c: HCursor) = c.as[String].map(s => Tag(s.toLowerCase))
       def apply(a: Tag) = Json.fromString(a.value.toScreamingSnakeCase)

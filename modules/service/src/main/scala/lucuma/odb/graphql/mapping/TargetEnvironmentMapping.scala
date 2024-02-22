@@ -38,7 +38,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
      with AsterismTargetTable[F]
      with ObservationView[F]
      with Predicates[F]
-     with TargetView[F] { this: SkunkMapping[F] with TargetMapping[F] =>
+     with TargetView[F] { this: SkunkMapping[F] & TargetMapping[F] =>
 
   def itcClient: ItcClient[F]
   def httpClient: Client[F]

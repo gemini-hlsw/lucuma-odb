@@ -51,7 +51,7 @@ class proposalAttachments extends AttachmentsSuite {
         """,
       expected = Right(
         Json.obj(
-          "program" -> expected(expectedTas: _*)
+          "program" -> expected(expectedTas*)
         )
       )
     )
@@ -86,7 +86,7 @@ class proposalAttachments extends AttachmentsSuite {
       """,
       expected = Right(
         Json.obj(
-          "updateProposalAttachments" -> expected(expectedTas: _*)
+          "updateProposalAttachments" -> expected(expectedTas*)
         )
       )
     )
