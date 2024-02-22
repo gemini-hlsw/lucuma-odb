@@ -64,7 +64,7 @@ object ResultMapping {
     // If we're selecting collectionField then continue by transforming the child query, otherwise
     // punt because there's really no point in doing such a selection.
     if !Query.hasField(child, collectionField)
-    then Result.failure(s"Field `$collectionField` must be selected.") // meh
+    then Result.internalError(s"Field `$collectionField` must be selected.") // meh
     else
       Result {
         Environment(

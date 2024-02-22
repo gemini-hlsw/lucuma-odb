@@ -32,6 +32,9 @@ import org.http4s.client.Client
 
 import binding._
 import table._
+import lucuma.odb.service.Services.Syntax.error
+import lucuma.odb.service.withDetail
+import lucuma.odb.service.asFailure
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F] 
@@ -120,11 +123,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
-        services.use { s =>
+        services.use { implicit s =>
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideEnvironment(pid, oid, obsTime)
             .map {
-              case Left(e)  => Result.failure(e.format)
+              case Left(e)  => error.guideEnvironmentError.withDetail(e.format).asFailure
               case Right(s) => s.success
             }
         }
@@ -138,16 +141,16 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         start <- env.getR[Timestamp](AvailabilityStartParam)
         end   <- env.getR[Timestamp](AvailabilityEndParam)
         period <- if (start < end) Result.success(TimestampInterval.between(start, end))
-                  else Result.failure("Start time must be prior to end time for guide star availability")
+                  else Matcher.validationFailure("Start time must be prior to end time for guide star availability")
       } yield period
 
     val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
-        services.use { s =>
+        services.use { implicit s =>
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideAvailability(pid, oid, period)
             .map {
-              case Left(e)  => Result.failure(e.format)
+              case Left(e)  => error.guideEnvironmentError.withDetail(e.format).asFailure
               case Right(s) => s.success
             }
         }

@@ -393,3 +393,11 @@ object Services:
           None,
           SortedMap.empty   
         )
+
+      def guideEnvironmentError[F[_]: Services]: OdbError =
+        OdbError(
+          GuideEnvironmentError,
+          user,
+          None,
+          SortedMap.empty   
+        )

@@ -75,7 +75,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
         c.fieldAs[Instrument]("instrument").flatMap {
           case Instrument.GmosNorth => Result(GmosNorthStepRecordType)
           case Instrument.GmosSouth => Result(GmosSouthStepRecordType)
-          case inst                 => Result.failure(s"No StepRecord implementation for ${inst.shortName}")
+          case inst                 => Result.internalError(s"No StepRecord implementation for ${inst.shortName}")
         }
 
       private def mkPredicate(instrument: Instrument): Option[Predicate] =

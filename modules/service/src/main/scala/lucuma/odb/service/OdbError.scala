@@ -50,6 +50,7 @@ object OdbError:
     case InvalidUser         extends Category("invalid_user", "The specified user does not exist, or is ineligible for the requested operation.")
     case UpdateFailed        extends Category("update_failed", "The specified operation could not be completed.")
     case ItcError            extends Category("itc_error", "The requested ITC operation could not be completed.")
+    case GuideEnvironmentError extends Category("guide_environment_error", "The guide environment as configured is ineligible for the requested operation.")
 
     def asOdbError(user: User): OdbError =
       OdbError(this, user, None, SortedMap.empty)
