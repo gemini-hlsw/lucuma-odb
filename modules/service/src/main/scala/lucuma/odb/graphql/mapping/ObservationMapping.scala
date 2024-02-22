@@ -28,7 +28,9 @@ import lucuma.odb.service.Services
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
 import table.ProgramTable
-
+import Services.Syntax.*
+import lucuma.odb.service.withDetail
+import lucuma.odb.service.asFailure
 
 trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]
@@ -102,11 +104,11 @@ trait ObservationMapping[F[_]]
 
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResult]] =
       (pid, oid, _) =>
-        services.use { s =>
-          s.itcService(itcClient)
+        services.use { implicit s =>
+          itcService(itcClient)
            .lookup(pid, oid)
            .map {
-             case Left(e)  => Result.failure(e.format)
+             case Left(e)  => error.itcError.withDetail(e.format).asFailure
              case Right(s) => s.success
            }
         }

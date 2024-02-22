@@ -26,7 +26,7 @@ object RadialVelocityInput {
           case (centimetersPerSecond, metersPerSecond, kilometersPerSecond) =>
             List(centimetersPerSecond, metersPerSecond, kilometersPerSecond).flatten match {
               case List(r) => Result(r)
-              case other   => Result.failure(s"Expected exactly one RadialVelocity representation; found ${other.length}.")
+              case other   => Matcher.validationFailure(s"Expected exactly one RadialVelocity representation; found ${other.length}.")
             }
         }
     }

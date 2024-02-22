@@ -24,7 +24,7 @@ object LinkUserInput {
       ) =>
         (rProgramId, rUserId, rRole, rSupportType, rPartner).parTupled.flatMap { (pid, uid, role, tpe, tag) =>
           ProgramService.LinkUserRequest.validate(pid, uid, role, tpe, tag) match {
-            case Left(err)  => Result.failure(err)
+            case Left(err)  => Matcher.validationFailure(err)
             case Right(req) => Result(req)
           }
         }

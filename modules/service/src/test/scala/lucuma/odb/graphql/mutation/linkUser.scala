@@ -30,7 +30,7 @@ class linkUser extends OdbSuite {
   test("[coi] guest user can't link a coi") {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
         linkCoiAs(guest, pi.id -> pid)
       }
     }
@@ -47,7 +47,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
       linkCoiAs(pi, pi2.id -> pid) >>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
         linkCoiAs(pi2, pi3.id -> pid)
       }
     }
@@ -56,7 +56,7 @@ class linkUser extends OdbSuite {
   test("[coi] pi user can't link coi to program they don't own") {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
         linkCoiAs(pi2, pi3.id -> pid)
       }
     }
@@ -82,7 +82,7 @@ class linkUser extends OdbSuite {
   test("[coi] ngo user can't add coi to program without time allocated by user's partner") {
     createUsers(pi, pi2, ngo) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
         linkCoiAs(ngo, pi2.id -> pid)
       }
     }
@@ -93,7 +93,7 @@ class linkUser extends OdbSuite {
   test("[observer] guest user can't link an observer") {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
         linkObserverAs(guest, pi.id -> pid)
       }
     }
@@ -109,7 +109,7 @@ class linkUser extends OdbSuite {
   test("[observer] pi user can't link observer to program they don't own") {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
         linkObserverAs(pi2, pi3.id -> pid)
       }
     }
@@ -127,7 +127,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
       linkObserverAs(pi, pi2.id -> pid) >>  // pi links pi2 as observer
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
         linkObserverAs(pi2, pi3.id -> pid)   // pi2 tries to link pi3 as observer
       }
     }
@@ -153,7 +153,7 @@ class linkUser extends OdbSuite {
   test("[observer] ngo user can't add observer to program without time allocated by user's partner") {
     createUsers(pi, pi2, ngo) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
         linkObserverAs(ngo, pi2.id -> pid)
       }
     }
@@ -164,7 +164,7 @@ class linkUser extends OdbSuite {
   test("[staff support] guest user can't link a staff support user") {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
         linkStaffSupportAs(guest, pi.id -> pid)
       }
     }
@@ -173,7 +173,7 @@ class linkUser extends OdbSuite {
   test("[staff support] pi user can't link a staff support user") {
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
         linkStaffSupportAs(pi, pi2.id -> pid)
       }
     }
@@ -192,7 +192,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), 42.hourTimeSpan) >>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
         linkStaffSupportAs(ngo, pi2.id -> pid)
       }
     }
@@ -203,7 +203,7 @@ class linkUser extends OdbSuite {
   test("[ngo support] guest user can't link a ngo support user") {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
         linkNgoSupportAs(guest, pi.id -> pid, Partner.Br)
       }
     }
@@ -212,7 +212,7 @@ class linkUser extends OdbSuite {
   test("[ngo support] pi user can't link a ngo support user") {
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
         linkNgoSupportAs(pi, pi2.id -> pid, Partner.Br)
       }
     }
@@ -230,7 +230,7 @@ class linkUser extends OdbSuite {
   test("[ngo support] ngo user can't link a ngo support user") {
     createUsers(ngo, pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this action") {
+      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
         linkNgoSupportAs(ngo, pi2.id -> pid, Partner.Br)
       }
     }

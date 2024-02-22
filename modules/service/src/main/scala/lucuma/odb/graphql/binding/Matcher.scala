@@ -36,7 +36,7 @@ trait Matcher[A] { outer =>
         // I apologize, there is certainly a better way to do it but this works for now.
         val msg = s"Argument '${b.name}' is invalid: $error"
         val msg0 = msg.replaceAll("' is invalid: Argument '", ".")
-        Result.failure(Matcher.validationProblem(msg0))
+        Matcher.validationFailure(msg0)
       case Right(value) => Result(value)
     }
 
@@ -105,7 +105,10 @@ object Matcher:
   /** Construct a problem that we can later promote to a properly encoded OdbError, once we know the user. */
   def validationProblem(msg: String): Problem =
     Problem(msg, Nil, Nil, Some(JsonObject(ValidationProblemKey -> Json.True)))
-  
+
+  def validationFailure(msg: String): Result[Nothing] =
+    Result.failure(validationProblem(msg))
+
   /** If `p` is a validation problem then turn it into a properly encoded OdbErrors, otherwise return `p` unchanged. */
   def promoteValidatonProblem(u: User)(p: Problem): Problem =
     if p.extensions.exists(_.contains(ValidationProblemKey)) then

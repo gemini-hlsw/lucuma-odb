@@ -31,6 +31,8 @@ import scala.util.NotGiven
 import cats.data.NonEmptyList
 import lucuma.core.model.Target
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.Dataset
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -346,3 +348,48 @@ object Services:
           )          
         )
 
+      def invalidStep[F[_]: Services](stepId: Step.Id): OdbError =
+        OdbError(
+          InvalidVisit,
+          user,
+          None,
+          SortedMap(
+            "stepId" -> stepId.asJson
+          )          
+        )
+
+      def invalidDataset[F[_]: Services](datasetId: Dataset.Id): OdbError =
+        OdbError(
+          InvalidVisit,
+          user,
+          None,
+          SortedMap(
+            "datasetId" -> datasetId.asJson
+          )          
+        )
+
+      def invalidUser[F[_]: Services](userId: User.Id): OdbError =
+        OdbError(
+          InvalidVisit,
+          user,
+          None,
+          SortedMap(
+            "userId" -> userId.asJson
+          )          
+        )
+
+      def updateFailed[F[_]: Services]: OdbError =
+        OdbError(
+          UpdateFailed,
+          user,
+          None,
+          SortedMap.empty   
+        )
+
+      def itcError[F[_]: Services]: OdbError =
+        OdbError(
+          ItcError,
+          user,
+          None,
+          SortedMap.empty   
+        )

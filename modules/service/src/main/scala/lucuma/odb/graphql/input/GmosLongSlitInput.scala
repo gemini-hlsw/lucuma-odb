@@ -157,7 +157,7 @@ object GmosLongSlitInput {
               )
             ))
           case _ =>
-            Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
+            Matcher.validationFailure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
         }
 
     }
@@ -232,7 +232,7 @@ object GmosLongSlitInput {
               )
             ))
           case _ =>
-            Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS South Long Slit observing mode.")
+            Matcher.validationFailure("grating, fpu, and centralWavelength are required when creating the GMOS South Long Slit observing mode.")
         }
 
     }

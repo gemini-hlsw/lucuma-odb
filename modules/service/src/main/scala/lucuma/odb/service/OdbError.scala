@@ -46,6 +46,10 @@ object OdbError:
     case InvalidStep         extends Category("invalid_step", "The specified step does not exist, is not visible, or is ineligible for the requested operation.")
     case InvalidFilename     extends Category("invalid_filename", "The specified filename is invalid or already exists.")
     case InvalidAtom         extends Category("invalid_atom", "The specified atom does not exist, is not visible, or is ineligible for the requested operation.")
+    case InvalidDataset      extends Category("invalid_dataset", "The specified dataset does not exist, is not visible, or is ineligible for the requested operation.")
+    case InvalidUser         extends Category("invalid_user", "The specified user does not exist, or is ineligible for the requested operation.")
+    case UpdateFailed        extends Category("update_failed", "The specified operation could not be completed.")
+    case ItcError            extends Category("itc_error", "The requested ITC operation could not be completed.")
 
     def asOdbError(user: User): OdbError =
       OdbError(this, user, None, SortedMap.empty)

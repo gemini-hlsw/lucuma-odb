@@ -32,7 +32,7 @@ object TimingWindowInput:
         TimingWindowEndInput.Binding.Option("end", rEnd)
       ) => (rInclusion, rStart, rEnd).parMapN(TimingWindowInput(_, _, _)).flatMap {
         case TimingWindowInput(_, start, Some(TimingWindowEndInput(Some(end), _, _)))
-          if end <= start => Result.failure(messages.EndAtAfterStart)
+          if end <= start => Matcher.validationFailure(messages.EndAtAfterStart)
         case other        => Result(other)
       }
     }
