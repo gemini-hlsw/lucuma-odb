@@ -64,7 +64,7 @@ object EmissionLinesInput {
       ) =>
         (rLines, rFluxDensityContinuum).parTupled.flatMap {
           case (Some(lines), Some(fluxDensityContinuum)) => Result(EmissionLines(lines.to(TreeMap), fluxDensityContinuum))
-          case _                                         => Result.failure("Both lines and fluxDensityContinuum are required on creation.")
+          case _                                         => Matcher.validationFailure("Both lines and fluxDensityContinuum are required on creation.")
         }
     }
 

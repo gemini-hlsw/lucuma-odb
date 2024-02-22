@@ -23,7 +23,7 @@ object StepConfigGcalInput {
       ) => (rArcs, rContinuum, rDiffuser, rFilter, rShutter).parTupled.flatMap {
          (arcs, continuum, diffuser, filter, shutter) =>
            Lamp.fromContinuumOrArcs(continuum, arcs.toList.flatten) match {
-             case Left(msg)   => Result.failure(msg)
+             case Left(msg)   => Matcher.validationFailure(msg)
              case Right(lamp) => Result(Gcal(lamp, filter, diffuser, shutter))
            }
 

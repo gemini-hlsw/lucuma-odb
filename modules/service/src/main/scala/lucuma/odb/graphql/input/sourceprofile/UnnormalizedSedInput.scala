@@ -52,18 +52,18 @@ object UnnormalizedSedInput {
 
           case (None, None, None, None, None, None, None, None, Some(v), None) =>
             numeric.PosInt.from(v) match {
-              case Left(err)  => Result.failure(err)
+              case Left(err)  => Matcher.validationFailure(err)
               case Right(pbd) => Result(UnnormalizedSED.BlackBody(Quantity(pbd)))
             }
 
           case (None, None, None, None, None, None, None, None, None, Some(v)) =>
             v match {
-              case Nil => Result.failure("fluxDensities cannot be empty")
+              case Nil => Matcher.validationFailure("fluxDensities cannot be empty")
               case h :: t => Result(UnnormalizedSED.UserDefined(NonEmptyMap.of(h, t: _*)))
             }
 
           case _ =>
-            Result.failure("Exactly one of stellarLibrary, coolStar, galaxy, planet, quasar, hiiRegion, planetaryNebula, powerLaw, blackBodyTempK, fluxDensities must be specified.")
+            Matcher.validationFailure("Exactly one of stellarLibrary, coolStar, galaxy, planet, quasar, hiiRegion, planetaryNebula, powerLaw, blackBodyTempK, fluxDensities must be specified.")
 
         }
     }

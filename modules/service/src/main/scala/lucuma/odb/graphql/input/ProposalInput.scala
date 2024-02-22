@@ -70,7 +70,7 @@ object ProposalInput {
   val CreateBinding: Matcher[Create] =
     data(ProposalClassInput.CreateBinding).rmap {
       case (title, Some(propClass), cat, Some(too), abs, Some(splits)) => Result(Create(title, propClass, cat, too, abs, splits))
-      case _ => Result.failure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
+      case _ => Matcher.validationFailure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
     }
 
   val EditBinding: Matcher[Edit] =
@@ -80,10 +80,10 @@ object ProposalInput {
     PartnerSplitInput.Binding.List.rmap { splits =>
       val map = splits.map(a => (a.partner -> a.percent)).toMap
       if splits.length != map.size
-      then Result.failure("Each partner may only appear once.")
+      then Matcher.validationFailure("Each partner may only appear once.")
       else
         if splits.foldMap(_.percent.value) != 100
-        then Result.failure("Percentages must sum to exactly 100.")
+        then Matcher.validationFailure("Percentages must sum to exactly 100.")
         else Result(map)
     }
 
@@ -105,7 +105,7 @@ object ProposalInput {
   // val CreateBinding: Matcher[ProposalInput] =
   //   binding(ProposalClassInput.CreateBinding).rmap {
   //     case ok @ ProposalInput(_, Some(_), _, Some(_), _, Some(_)) => Result(ok)
-  //     case _ => Result.failure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
+  //     case _ => Matcher.validationFailure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
   //   }
 
   // val EditBinding: Matcher[ProposalInput] =

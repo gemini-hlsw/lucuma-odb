@@ -40,7 +40,7 @@ object TargetPropertiesInput {
       ) => (rName, rSidereal, rNonsidereal, rSourceProfile, rExistence).parTupled.flatMap {
         case (name, sidereal, nonsidereal, sourceProfile, existence) =>
           (sidereal, nonsidereal) match {
-            case (Some(_), Some(_))  => Result.failure("Found both sidereal and nonsidereal tracking; at most one may be provided.")
+            case (Some(_), Some(_))  => Matcher.validationFailure("Found both sidereal and nonsidereal tracking; at most one may be provided.")
             case (a, b)              => Result(a.map(_.asLeft) orElse b.map(_.asRight))
           } map  { Edit(name, _, sourceProfile, existence) }
       } 
@@ -57,12 +57,12 @@ object TargetPropertiesInput {
       ) => (rName, rSidereal, rNonsidereal, rSourceProfile, rExistence).parTupled.flatMap {
         case (name, sidereal, nonsidereal, sourceProfile, existence) =>
           (name, sourceProfile, sidereal, nonsidereal) match {
-            case (None, _, _, _)             => Result.failure("Target name is required on creation.")
-            case (_, None, _, _)             => Result.failure("Source Profile is required on creation.")
+            case (None, _, _, _)             => Matcher.validationFailure("Target name is required on creation.")
+            case (_, None, _, _)             => Matcher.validationFailure("Source Profile is required on creation.")
             case (Some(t), Some(p), Some(s), None) => Result(Create(t, Left(s), p, existence.getOrElse(Existence.Default)))
             case (Some(t), Some(p), None, Some(n)) => Result(Create(t, Right(n), p, existence.getOrElse(Existence.Default)))
-            case (_, _, Some(_), Some(_))    => Result.failure("Found both sidereal and nonsidereal tracking; only one may be provided.")
-            case (_, _, None, None)          => Result.failure("Found neither sidereal noe nonsidereal tracking; exactly one must be provided.")
+            case (_, _, Some(_), Some(_))    => Matcher.validationFailure("Found both sidereal and nonsidereal tracking; only one may be provided.")
+            case (_, _, None, None)          => Matcher.validationFailure("Found neither sidereal noe nonsidereal tracking; exactly one must be provided.")
           }
       }
     }

@@ -44,4 +44,4 @@ object CreateUserInvitationInput:
           case (pid, ProgramUserRole.Observer, None, None)              => Result(Observer(pid))
           case (pid, ProgramUserRole.Support, Some(Staff), None)        => Result(StaffSupport(pid))
           case (pid, ProgramUserRole.Support, Some(Partner), Some(tag)) => Result(NgoSupportSupport(pid, tag))
-          case _                                                        => Result.failure("Invalid combination of role, support type, and partner.")
+          case _                                                        => Matcher.validationFailure("Invalid combination of role, support type, and partner.")
