@@ -83,7 +83,7 @@ trait MappingExtras[F[_]] extends CirceMappingLike[F] {
         f match {
           case None if fieldContext.tpe.isNullable => Result(CirceCursor(fieldContext, Json.Null, Some(parent), env))
           case Some(json) => Result(CirceCursor(fieldContext, json, Some(parent), env))
-          case _ => Result.failure(s"Json blob doesn't contain field '$fieldName' for type ${context.tpe}")
+          case _ => Result.internalError(s"Json blob doesn't contain field '$fieldName' for type ${context.tpe}")
         }
       case _ => super.mkCursorForField(parent, fieldName, resultName)
     }

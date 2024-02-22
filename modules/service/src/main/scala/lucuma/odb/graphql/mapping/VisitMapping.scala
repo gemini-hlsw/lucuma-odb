@@ -68,7 +68,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
         c.fieldAs[Instrument]("instrument").flatMap {
           case Instrument.GmosNorth => Result(GmosNorthVisitType)
           case Instrument.GmosSouth => Result(GmosSouthVisitType)
-          case inst                 => Result.failure(s"No Visit implementation for ${inst.shortName}")
+          case inst                 => Result.internalError(s"No Visit implementation for ${inst.shortName}")
         }
 
       private def mkPredicate(instrument: Instrument): Option[Predicate] =

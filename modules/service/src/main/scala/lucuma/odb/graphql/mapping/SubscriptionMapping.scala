@@ -68,7 +68,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                   .map(child3 => Environment(env, child3))
                   .value
               case _ =>
-                Result.failure(s"Unexpected: $child").pure[Stream[F, *]]
+                Result.internalError(s"Unexpected: $child").pure[Stream[F, *]]
           }
         val elaborator =
           case (SubscriptionType, `fieldName`, List(inputBinding("input", rInput))) =>
