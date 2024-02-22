@@ -47,12 +47,12 @@ object Nullable {
   case object Absent               extends Nullable[Nothing]
   case class  NonNull[A](value: A) extends Nullable[A]
 
-  implicit val NullableInstances: Monad[Nullable] with SemigroupK[Nullable] =
+  implicit val NullableInstances: Monad[Nullable] & SemigroupK[Nullable] =
     new Monad[Nullable] with SemigroupK[Nullable] {
       override def map[A, B](fa: Nullable[A])(fab: A => B): Nullable[B] = fa.map(fab)
       def flatMap[A, B](fa: Nullable[A])(f: A => Nullable[B]): Nullable[B] = fa.flatMap(f)
       def pure[A](x: A): Nullable[A] = NonNull(x)
-      def combineK[A](x: Nullable[A], y: Nullable[A]): Nullable[A] = x orElse y
+      def combineK[A](x: Nullable[A], y: Nullable[A]): Nullable[A] = x.orElse(y)
       @tailrec def tailRecM[A, B](a: A)(f: A => Nullable[Either[A,B]]): Nullable[B] =
         f(a) match {
           case Absent                => Absent

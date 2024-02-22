@@ -14,9 +14,6 @@ import io.circe.syntax._
 
 trait NumericCodec {
 
-  given Codec[PosBigDecimal] =
-    Codec[BigDecimal].iemap(PosBigDecimal.from)(_.value)
-
   given Codec[BigDecimal] with {
     def apply(d: BigDecimal): Json =
       d.bigDecimal.toPlainString.asJson
@@ -28,6 +25,9 @@ trait NumericCodec {
         }
       }
   }
+
+  given Codec[PosBigDecimal] =
+    Codec[BigDecimal].iemap(PosBigDecimal.from)(_.value)
 
 }
 
