@@ -7,12 +7,14 @@ import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
 import lucuma.core.enums.Instrument
@@ -28,7 +30,9 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.Timestamp
+import lucuma.odb.logic.EstimatorState
 import lucuma.odb.sequence.data.CompletedAtomMap
+import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -46,6 +50,15 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id
   )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]]
 
+  /**
+   * Selects the EstimatorState necessary to compute configuration change cost
+   * estimates for GmosNorth.  The estimator state is compared to the next step
+   * to figure the cost of the transition.
+   */
+  def selectGmosNorthEstimatorState(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[EstimatorState[GmosNorth]]
+
   def selectGmosSouthCompletedAtomMap(
     observationId: Observation.Id
   )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]]
@@ -53,6 +66,15 @@ trait SequenceService[F[_]] {
   def selectGmosSouthSteps(
     observationId: Observation.Id
   )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]]
+
+  /**
+   * Selects the EstimatorState necessary to compute configuration change cost
+   * estimates for GmosSouth.  The estimator state is compared to the next step
+   * to figure the cost of the transition.
+   */
+  def selectGmosSouthEstimatorState(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[EstimatorState[GmosSouth]]
 
   def setStepCompleted(
     stepId: Step.Id,
@@ -156,6 +178,34 @@ object SequenceService {
         observationId: Observation.Id
       )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]] =
         stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamic(observationId))
+
+      private def selectEstimatorState[D](
+        observationId: Observation.Id,
+        dynamicConfig: Step.Id => F[Option[D]]
+      )(using Transaction[F]): F[EstimatorState[D]] =
+        for {
+          g <- session.option(Statements.SelectLastGcalConfig)(observationId)
+          s <- session.option(Statements.SelectLastScienceConfig)(observationId)
+          t <- session.option(Statements.SelectLastStepConfig)(observationId)
+          i <- t.flatTraverse { case (id, _, _ ) => dynamicConfig(id) }
+        } yield
+           EstimatorState(
+             g,
+             s,
+             (t, i).mapN { case ((_, stepConfig, observeClass), dynamicConfig) =>
+               ProtoStep(dynamicConfig, stepConfig, observeClass)
+             }
+           )
+
+      override def selectGmosNorthEstimatorState(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[EstimatorState[GmosNorth]] =
+        selectEstimatorState(observationId, services.gmosSequenceService.selectGmosNorthDynamicStep)
+
+      override def selectGmosSouthEstimatorState(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[EstimatorState[GmosSouth]] =
+        selectEstimatorState(observationId, services.gmosSequenceService.selectGmosSouthDynamicStep)
 
       private def stepRecordMap[D](
         observationId:  Observation.Id,
@@ -540,6 +590,46 @@ object SequenceService {
            SET c_completed = ${core_timestamp.opt}
          WHERE c_step_id = $step_id
       """.command
+
+    val SelectLastGcalConfig: Query[Observation.Id, StepConfig.Gcal] =
+      sql"""
+        SELECT
+          #${encodeColumns(none, StepConfigGcalColumns)}
+        FROM v_step_record
+        WHERE
+          c_observation_id = $observation_id AND
+          c_step_type      = 'gcal'
+        ORDER BY c_created DESC
+        LIMIT 1
+      """.query(step_config_gcal)
+
+    val SelectLastScienceConfig: Query[Observation.Id, StepConfig.Science] =
+      sql"""
+        SELECT
+          #${encodeColumns(none, StepConfigScienceColumns)}
+        FROM v_step_record
+        WHERE
+          c_observation_id = $observation_id AND
+          c_step_type      = 'science'
+        ORDER BY c_created DESC
+        LIMIT 1
+      """.query(step_config_science)
+
+    val SelectLastStepConfig: Query[Observation.Id, (Step.Id, StepConfig, ObserveClass)] =
+      sql"""
+        SELECT
+          c_step_id,
+          c_step_type,
+          #${encodeColumns(none, StepConfigGcalColumns)},
+          #${encodeColumns(none, StepConfigScienceColumns)},
+          #${encodeColumns(none, StepConfigSmartGcalColumns)},
+          c_observe_class
+        FROM v_step_record
+        WHERE
+          c_observation_id = $observation_id
+        ORDER BY c_created DESC
+        LIMIT 1
+      """.query(step_id *: step_config *: obs_class)
 
   }
 }
