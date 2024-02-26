@@ -415,7 +415,10 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     )
   }
 
-  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord) 2") {
+  // There's a bug in Grackle 0.18.1 which causes the results to be returned
+  // out of order (stepConfig then instrumentConfig).  It should work in
+  // 0.19.0 or better
+  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord) 2".ignore) {
     testInterfaceMapping(500,
       s"""
         ... on GmosNorthStepRecord {
