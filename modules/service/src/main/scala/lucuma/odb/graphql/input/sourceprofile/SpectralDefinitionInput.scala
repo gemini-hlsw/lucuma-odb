@@ -41,7 +41,7 @@ object SpectralDefinitionInput {
       )
 
     val CreateOrEditBinding =
-      CreateBinding or EditBinding
+      CreateBinding.or(EditBinding)
 
   }
 
@@ -60,7 +60,7 @@ object SpectralDefinitionInput {
       )
 
     val CreateOrEditBinding =
-      CreateBinding or EditBinding
+      CreateBinding.or(EditBinding)
 
   }
 

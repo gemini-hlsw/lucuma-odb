@@ -190,7 +190,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createObservationAs(user, pid, None, tids: _*)
+    createObservationAs(user, pid, None, tids*)
 
   private def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match
