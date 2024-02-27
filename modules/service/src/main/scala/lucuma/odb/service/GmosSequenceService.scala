@@ -35,6 +35,13 @@ trait GmosSequenceService[F[_]] {
     observationId: Observation.Id
   )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)]
 
+  /**
+   * Selects the static configuration corresponding to the given step.
+   */
+  def selectGmosNorthStatic(
+    stepId: Step.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
+
   def selectGmosNorthDynamicStep(
     stepId: Step.Id
   )(using Transaction[F]): F[Option[DynamicConfig.GmosNorth]]
@@ -53,6 +60,13 @@ trait GmosSequenceService[F[_]] {
   def selectGmosSouthDynamic(
     observationId: Observation.Id
   )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)]
+
+  /**
+   * Selects the static configuration corresponding to the given step.
+   */
+  def selectGmosSouthStatic(
+    stepId: Step.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
 
   def selectGmosSouthDynamicStep(
     stepId: Step.Id
@@ -83,6 +97,11 @@ object GmosSequenceService {
       )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)] =
         session.stream(Statements.SelectGmosNorthDynamicForObs)(observationId, 1024)
 
+      override def selectGmosNorthStatic(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
+        session.option(Statements.SelectGmosNorthStatic)(stepId)
+
       override def selectGmosNorthDynamicStep(
         stepId: Step.Id
       )(using Transaction[F]): F[Option[DynamicConfig.GmosNorth]] =
@@ -109,6 +128,11 @@ object GmosSequenceService {
         observationId: Observation.Id
       )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)] =
         session.stream(Statements.SelectGmosSouthDynamicForObs)(observationId, 1024)
+
+      override def selectGmosSouthStatic(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
+        session.option(Statements.SelectGmosSouthStatic)(stepId)
 
       override def selectGmosSouthDynamicStep(
         stepId: Step.Id
@@ -196,35 +220,47 @@ object GmosSequenceService {
     val SelectGmosSouthDynamicForStep: Query[Step.Id, DynamicConfig.GmosSouth] =
       selectGmosDynamicStep("south", gmos_south_dynamic)
 
-    val InsertGmosNorthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosNorth), Long] =
+    private val GmosStaticColumns: List[String] =
+      List(
+        "c_detector",
+        "c_mos_pre_imaging",
+        "c_stage_mode"
+      )
+
+    def selectStatic[A](site: String, decoderA: Decoder[A]): Query[Step.Id, A] =
       sql"""
-        INSERT INTO t_gmos_north_static (
+        SELECT
+          #${encodeColumns("c".some, GmosStaticColumns)}
+        FROM t_gmos_#${site}_static c
+        INNER JOIN t_atom_record a ON a.c_visit_id = s.c_visit_id
+        INNER JOIN t_step_record s ON s.c_atom_id  = a.c_atom_id
+        WHERE s.c_step_id = $step_id
+      """.query(decoderA)
+
+    val SelectGmosNorthStatic: Query[Step.Id, StaticConfig.GmosNorth] =
+      selectStatic("north", gmos_north_static)
+
+    val SelectGmosSouthStatic: Query[Step.Id, StaticConfig.GmosSouth] =
+      selectStatic("south", gmos_south_static)
+
+    def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, Option[Visit.Id], A), Long] =
+      sql"""
+        INSERT INTO t_gmos_#${site}_static (
           c_observation_id,
           c_visit_id,
-          c_detector,
-          c_mos_pre_imaging,
-          c_stage_mode
+          #${encodeColumns(none, GmosStaticColumns)}
         ) SELECT
           $observation_id,
           ${visit_id.opt},
-          $gmos_north_static
+          $encoderA
         RETURNING c_static_id
       """.query(int8)
 
+    val InsertGmosNorthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosNorth), Long] =
+      insertStatic("north", gmos_north_static)
+
     val InsertGmosSouthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosSouth), Long] =
-      sql"""
-        INSERT INTO t_gmos_south_static (
-          c_observation_id,
-          c_visit_id,
-          c_detector,
-          c_mos_pre_imaging,
-          c_stage_mode
-        ) SELECT
-          $observation_id,
-          ${visit_id.opt},
-          $gmos_south_static
-        RETURNING c_static_id
-      """.query(int8)
+      insertStatic("south", gmos_south_static)
 
   }
 }

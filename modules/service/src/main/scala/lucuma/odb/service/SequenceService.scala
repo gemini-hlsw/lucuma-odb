@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.data.EitherT
+import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
 import cats.syntax.apply.*
@@ -27,6 +28,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth => GmosNorthStatic}
+import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth => GmosSouthStatic}
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.Timestamp
@@ -57,7 +60,7 @@ trait SequenceService[F[_]] {
    */
   def selectGmosNorthEstimatorState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[EstimatorState[GmosNorth]]
+  )(using Transaction[F]): F[Option[(GmosNorthStatic, EstimatorState[GmosNorth])]]
 
   def selectGmosSouthCompletedAtomMap(
     observationId: Observation.Id
@@ -74,7 +77,7 @@ trait SequenceService[F[_]] {
    */
   def selectGmosSouthEstimatorState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[EstimatorState[GmosSouth]]
+  )(using Transaction[F]): F[Option[(GmosSouthStatic, EstimatorState[GmosSouth])]]
 
   def setStepCompleted(
     stepId: Step.Id,
@@ -182,30 +185,40 @@ object SequenceService {
       private def selectEstimatorState[D](
         observationId: Observation.Id,
         dynamicConfig: Step.Id => F[Option[D]]
-      )(using Transaction[F]): F[EstimatorState[D]] =
+      )(using Transaction[F]): F[Option[(Step.Id, EstimatorState[D])]] =
         for {
           g <- session.option(Statements.SelectLastGcalConfig)(observationId)
           s <- session.option(Statements.SelectLastScienceConfig)(observationId)
           t <- session.option(Statements.SelectLastStepConfig)(observationId)
           i <- t.flatTraverse { case (id, _, _ ) => dynamicConfig(id) }
         } yield
-           EstimatorState(
-             g,
-             s,
-             (t, i).mapN { case ((_, stepConfig, observeClass), dynamicConfig) =>
-               ProtoStep(dynamicConfig, stepConfig, observeClass)
-             }
+           t.map(_._1).tupleRight(
+             EstimatorState(
+               g,
+               s,
+               (t, i).mapN { case ((_, stepConfig, observeClass), dynamicConfig) =>
+                 ProtoStep(dynamicConfig, stepConfig, observeClass)
+               }
+             )
            )
 
       override def selectGmosNorthEstimatorState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[EstimatorState[GmosNorth]] =
-        selectEstimatorState(observationId, services.gmosSequenceService.selectGmosNorthDynamicStep)
+      )(using Transaction[F]): F[Option[(GmosNorthStatic, EstimatorState[GmosNorth])]] =
+        (for {
+          t <- OptionT(selectEstimatorState(observationId, services.gmosSequenceService.selectGmosNorthDynamicStep))
+          (id, es) = t
+          s <- OptionT(services.gmosSequenceService.selectGmosNorthStatic(id))
+        } yield (s, es)).value
 
       override def selectGmosSouthEstimatorState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[EstimatorState[GmosSouth]] =
-        selectEstimatorState(observationId, services.gmosSequenceService.selectGmosSouthDynamicStep)
+      )(using Transaction[F]): F[Option[(GmosSouthStatic, EstimatorState[GmosSouth])]] =
+        (for {
+          t <- OptionT(selectEstimatorState(observationId, services.gmosSequenceService.selectGmosSouthDynamicStep))
+          (id, es) = t
+          s <- OptionT(services.gmosSequenceService.selectGmosSouthStatic(id))
+        } yield (s, es)).value
 
       private def stepRecordMap[D](
         observationId:  Observation.Id,
