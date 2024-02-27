@@ -96,7 +96,7 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
     ObjectMapping(
       tpe = tpe,
       fieldMappings = List(
-        SqlObject(collectionField, joins: _*),
+        SqlObject(collectionField, joins*),
         CursorField("hasMore", ResultMapping.hasMore(collectionField)),
         SqlField("<key>", parentKeyColumn, key = (parentKeyColumn ne root.bogus), hidden = true)
       )
@@ -106,7 +106,7 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
     resultMapping(tpe, "matches", root.bogus)
 
   def nestedSelectResultMapping(tpe: Type, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
-    resultMapping(tpe, "matches", parentKeyColumn, joins: _*)
+    resultMapping(tpe, "matches", parentKeyColumn, joins*)
 
   def updateResultMapping(tpe: Type, collectionField: String): ObjectMapping =
     resultMapping(tpe, collectionField, root.bogus)

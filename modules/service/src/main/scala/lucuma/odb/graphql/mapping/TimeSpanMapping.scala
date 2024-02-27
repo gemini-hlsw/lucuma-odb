@@ -66,7 +66,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
     ObjectMapping(
       tpe = TimeSpanType,
       fieldMappings =
-        keyFields(keys: _*) ++ List(
+        keyFields(keys*) ++ List(
         SqlField("value", data, hidden = true),
         valueAs("microseconds")(Format.fromPrism(TimeSpan.FromMicroseconds)),
         valueAs("milliseconds")(TimeSpan.FromMilliseconds),
