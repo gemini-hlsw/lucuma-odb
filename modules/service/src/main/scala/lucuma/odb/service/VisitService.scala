@@ -16,6 +16,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.Timestamp
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -69,10 +71,7 @@ object VisitService {
             .map(Result.success)
             .recover:
               case SqlState.ForeignKeyViolation(_) =>
-                error
-                  .invalidObservation(observationId)
-                  .withDetail(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")
-                  .asFailure
+                OdbError.InvalidObservation(observationId, Some(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")).asFailure
  
         val rt = for 
           _ <- ResultT.fromResult(checkUser2)

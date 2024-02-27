@@ -8,12 +8,9 @@ import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -26,13 +23,7 @@ import skunk.Transaction
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
-import scala.collection.immutable.SortedMap
 import scala.util.NotGiven
-import cats.data.NonEmptyList
-import lucuma.core.model.Target
-import lucuma.core.model.Visit
-import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.Dataset
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -293,111 +284,3 @@ object Services:
         using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =
           s.use(s => fa(using summon, s))
-
-    // Module of constructors for server errors.
-    object error:
-      import OdbError.Category.*
-      import io.circe.syntax.*
-
-      def notAuthorized[F[_]](using Services[F]): OdbError = 
-        OdbError(NotAuthorized, user, Some(s"User ${user.id} is not authorized to perform this operation."))
-
-      def invalidArgument[F[_]](using Services[F]): OdbError = 
-        InvalidArgument.asOdbError(user)
-
-      def invalidInvitation[F[_]](id: UserInvitation.Id)(using Services[F]): OdbError = 
-        OdbError(InvitationError, user, None, SortedMap("invitationId" -> id.asJson))
-
-      def noAction[F[_]: Services]: OdbError = 
-        OdbError(NoAction, user)
-
-      def invalidProgram[F[_]: Services](pid: Program.Id): OdbError = 
-        OdbError(InvalidProgram, user, None, SortedMap("programId" -> pid.asJson))
-
-      def invalidObservation[F[_]: Services](oid: Observation.Id): OdbError = 
-        OdbError(InvalidObservation, user, None, SortedMap("observationId" -> oid.asJson))
-
-      def invalidTargetList[F[_]: Services](programId: Program.Id, targetIds: NonEmptyList[Target.Id]): OdbError =
-        OdbError(
-          InvalidTargetList, 
-          user, 
-          Some(s"Target(s) ${targetIds.map(_.show).intercalate(", ")} must exist and be associated with Program ${programId.show}."),
-          SortedMap(
-            "programId" -> programId.asJson, 
-            "targetIds" -> targetIds.asJson
-          )
-        )
-
-      def invalidTarget[F[_]: Services](targetId: Target.Id): OdbError =
-        OdbError(
-          InvalidTargetList, 
-          user, 
-          None,
-          SortedMap(
-            "targetId" -> targetId.asJson
-          )
-        )
-
-      def invalidVisit[F[_]: Services](visitId: Visit.Id): OdbError =
-        OdbError(
-          InvalidVisit,
-          user,
-          None,
-          SortedMap(
-            "visitId" -> visitId.asJson
-          )          
-        )
-
-      def invalidStep[F[_]: Services](stepId: Step.Id): OdbError =
-        OdbError(
-          InvalidVisit,
-          user,
-          None,
-          SortedMap(
-            "stepId" -> stepId.asJson
-          )          
-        )
-
-      def invalidDataset[F[_]: Services](datasetId: Dataset.Id): OdbError =
-        OdbError(
-          InvalidVisit,
-          user,
-          None,
-          SortedMap(
-            "datasetId" -> datasetId.asJson
-          )          
-        )
-
-      def invalidUser[F[_]: Services](userId: User.Id): OdbError =
-        OdbError(
-          InvalidVisit,
-          user,
-          None,
-          SortedMap(
-            "userId" -> userId.asJson
-          )          
-        )
-
-      def updateFailed[F[_]: Services]: OdbError =
-        OdbError(
-          UpdateFailed,
-          user,
-          None,
-          SortedMap.empty   
-        )
-
-      def itcError[F[_]: Services]: OdbError =
-        OdbError(
-          ItcError,
-          user,
-          None,
-          SortedMap.empty   
-        )
-
-      def guideEnvironmentError[F[_]: Services]: OdbError =
-        OdbError(
-          GuideEnvironmentError,
-          user,
-          None,
-          SortedMap.empty   
-        )

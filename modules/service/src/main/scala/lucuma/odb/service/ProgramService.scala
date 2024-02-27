@@ -21,6 +21,8 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
@@ -32,8 +34,6 @@ import skunk.codec.all._
 import skunk.syntax.all._
 
 import Services.Syntax.*
-import io.circe.Json
-import io.circe.syntax.*
 
 trait ProgramService[F[_]] {
 
@@ -123,13 +123,11 @@ object ProgramService {
     def failure = odbError.asFailure
 
     def odbError: OdbError =
-      def err(c: OdbError.Category) = c.asOdbError(user).withDetail(message)
-      import OdbError.Category.*
       this match      
-        case InvalidProposalStatus(_, ps)               => err(InvalidArgument).withData("proposalStatus" -> ps.asJson)
-        case NotAuthorizedNewProposalStatus(_, ps)      => err(NotAuthorized).withData("proposalStatus" -> ps.asJson)
-        case NotAuthorizedOldProposalStatus(pid, _, ps) => err(NotAuthorized).withData("programId" -> pid.asJson, "proposalStatus" -> ps.asJson)
-        case NoProposalForStatusChange(_, pid)          => err(InvalidProgram).withData("programId" -> pid.asJson)
+        case InvalidProposalStatus(_, ps)               => OdbError.InvalidArgument(Some(message))
+        case NotAuthorizedNewProposalStatus(_, ps)      => OdbError.NotAuthorized(user.id, Some(message))
+        case NotAuthorizedOldProposalStatus(pid, _, ps) => OdbError.NotAuthorized(user.id, Some(message))
+        case NoProposalForStatusChange(_, pid)          => OdbError.InvalidProgram(pid, Some(message))
 
   }
 

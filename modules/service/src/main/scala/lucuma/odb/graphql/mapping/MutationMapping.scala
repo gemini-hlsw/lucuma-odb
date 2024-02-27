@@ -34,6 +34,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddDatasetEventInput
@@ -85,12 +87,6 @@ import skunk.AppliedFragment
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import lucuma.odb.service.asFailure
-import lucuma.odb.service.Services.Syntax.error.invalidVisit
-import lucuma.odb.service.withDetail
-import lucuma.odb.service.OdbError
-import lucuma.odb.service.asFailureF
-import lucuma.odb.service.asProblem
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -226,7 +222,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val AddConditionsEntry: MutationField =
     MutationField("addConditionsEntry", ConditionsEntryInput.Binding) { (input, child) =>
       if user.role.access < Access.Staff then {
-        OdbError.Category.NotAuthorized.asOdbError(user).withDetail(s"This action is restricted to staff users.").asFailureF
+        OdbError.NotAuthorized(user.id, Some(s"This action is restricted to staff users.")).asFailureF
       } else {
         services.useTransactionally {
           chronicleService.addConditionsEntry(input).map { id =>
@@ -292,11 +288,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             )
 
           // Failure Cases
-          case NoSuchTarget(targetId) => error.invalidTarget(targetId).withDetail(s"No such target: $targetId").asFailure
+          case NoSuchTarget(targetId) => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
           case UpdateFailed(problem)  =>
             problem match
-              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => error.updateFailed.withDetail(p.message).asProblem))
-              case TrackingSwitchFailed(p)        => error.updateFailed.withDetail(p).asFailure
+              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+              case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
         }
       }
@@ -353,8 +349,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         import TargetService.CreateTargetResponse._
         targetService.createTarget(input.programId, input.SET).map {
-          case NotAuthorized(user)  => error.notAuthorized.asFailure
-          case ProgramNotFound(pid) => error.invalidProgram(pid).withDetail(s"Program ${pid} was not found").asFailure
+          case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
+          case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
           case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
         }
       }
@@ -375,9 +371,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         import lucuma.odb.service.ProgramService.LinkUserResponse._
         programService.linkUser(input).map[Result[Query]] {
-          case NotAuthorized(user)     => error.notAuthorized.asFailure
-          case AlreadyLinked(pid, uid) => error.noAction.withDetail(s"User $uid is already linked to program $pid.").asFailure
-          case InvalidUser(uid)        => error.invalidUser(uid).withDetail(s"User $uid does not exist or is of a nonstandard type.").asFailure
+          case NotAuthorized(user)     => OdbError.NotAuthorized(user.id).asFailure
+          case AlreadyLinked(pid, uid) => OdbError.NoAction(Some(s"User $uid is already linked to program $pid.")).asFailure
+          case InvalidUser(uid)        => OdbError.InvalidUser(uid, Some(s"User $uid does not exist or is of a nonstandard type.")).asFailure
           case Success(pid, uid)       =>
             Result(Unique(Filter(And(
               Predicates.linkUserResult.programId.eql(pid),
@@ -394,11 +390,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import DatasetService.InsertDatasetResponse.*
     (response: DatasetService.InsertDatasetResponse) => response match {
       case NotAuthorized(user)      =>
-        OdbError.Category.NotAuthorized.asOdbError(user).asFailure
+        OdbError.NotAuthorized(user.id).asFailure
       case ReusedFilename(filename) =>
-        OdbError.Category.InvalidFilename.asOdbError(user).withDetail(s"The filename '${filename.format}' is already assigned").asFailure
+        OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
       case StepNotFound(id)         =>
-        OdbError.Category.InvalidStep.asOdbError(user).withDetail(s"Step id '$id' not found").asFailure
+        OdbError.InvalidStep(id, Some(s"Step id '$id' not found")).asFailure
       case Success(did, _, _)       =>
         Result(Unique(Filter(predicates.id.eql(did), child)))
     }
@@ -418,12 +414,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     predicates:   ExecutionEventPredicates,    
   )(using Services[F]): ExecutionEventService.InsertEventResponse => Result[Query] = {
     import ExecutionEventService.InsertEventResponse.*
-    import Services.Syntax.*
     (response: ExecutionEventService.InsertEventResponse) => response match {
-      case NotAuthorized(user) => error.notAuthorized.asFailure
-      case DatasetNotFound(id) => error.invalidDataset(id).withDetail(s"Dataset '${id.show}' not found").asFailure
-      case StepNotFound(id)    => error.invalidStep(id).withDetail(s"Step '$id' not found").asFailure
-      case VisitNotFound(id)   => error.invalidVisit(id).withDetail(s"Visit '$id' not found").asFailure
+      case NotAuthorized(user) => OdbError.NotAuthorized(user.id).asFailure
+      case DatasetNotFound(id) => OdbError.InvalidDataset(id, Some(s"Dataset '${id.show}' not found")).asFailure
+      case StepNotFound(id)    => OdbError.InvalidStep(id, Some(s"Step '$id' not found")).asFailure
+      case VisitNotFound(id)   => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found")).asFailure
       case Success(e)          => Result(Unique(Filter(predicates.id.eql(e.id), child)))
     }
   }
@@ -467,9 +462,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import SequenceService.InsertAtomResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)           =>
-        error.notAuthorized.asFailure
+        OdbError.NotAuthorized(user.id).asFailure
       case VisitNotFound(id, instrument) =>
-        error.invalidVisit(id).withDetail(s"Visit '$id' not found or is not a ${instrument.longName} visit").asFailure
+        OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
       case Success(aid)                  =>
         Result(Unique(Filter(predicate.eql(aid), child)))
     }
@@ -494,9 +489,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import SequenceService.InsertStepResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)           =>
-        OdbError.Category.NotAuthorized.asOdbError(user).asFailure
+        OdbError.NotAuthorized(user.id).asFailure
       case AtomNotFound(id, instrument)  =>
-        OdbError.Category.InvalidAtom.asOdbError(user).withDetail(s"Atom '$id' not found or is not a ${instrument.longName} atom").asFailure
+        OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
       case Success(sid)                  =>
         Result(Unique(Filter(predicate.eql(sid), child)))
     }
@@ -759,8 +754,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         idSelect.flatTraverse { which =>
           targetService.updateTargets(input.SET, which).map {
             case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
-            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => error.updateFailed.withDetail(p.message).asProblem))
-            case UpdateTargetsResponse.TrackingSwitchFailed(s)              => error.updateFailed.withDetail(s).asFailure
+            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+            case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
           }
         }
 
@@ -795,7 +790,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           import GroupService.UpdateGroupsResponse
           groupService.updateGroups(input.SET, which).map {
             case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
-            case UpdateGroupsResponse.Error(problem)    => error.updateFailed.withDetail(problem).asFailure
+            case UpdateGroupsResponse.Error(problem)    => OdbError.UpdateFailed(Some(problem)).asFailure
           }
         }
 

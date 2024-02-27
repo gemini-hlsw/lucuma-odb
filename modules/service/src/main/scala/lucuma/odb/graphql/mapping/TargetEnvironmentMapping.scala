@@ -22,6 +22,8 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -32,9 +34,6 @@ import org.http4s.client.Client
 
 import binding._
 import table._
-import lucuma.odb.service.Services.Syntax.error
-import lucuma.odb.service.withDetail
-import lucuma.odb.service.asFailure
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F] 
@@ -127,7 +126,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideEnvironment(pid, oid, obsTime)
             .map {
-              case Left(e)  => error.guideEnvironmentError.withDetail(e.format).asFailure
+              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
               case Right(s) => s.success
             }
         }
@@ -150,7 +149,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideAvailability(pid, oid, period)
             .map {
-              case Left(e)  => error.guideEnvironmentError.withDetail(e.format).asFailure
+              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
               case Right(s) => s.success
             }
         }
