@@ -31,18 +31,24 @@ trait GmosSequenceService[F[_]] {
     dynamic: DynamicConfig.GmosNorth
   )(using Transaction[F]): F[Unit]
 
-  def selectGmosNorthDynamic(
-    observationId: Observation.Id
-  )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)]
-
   /**
-   * Selects the static configuration corresponding to the given step.
+   * Selects the static configuration corresponding to the given visit.
    */
   def selectGmosNorthStatic(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
 
-  def selectGmosNorthDynamicStep(
+  /**
+   * Selects all the dynamic configurations for the given observation.
+   */
+  def selectGmosNorthDynamicForObs(
+    observationId: Observation.Id
+  )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)]
+
+  /**
+   * Selects the dynamic configuration corresponding to the given step.
+   */
+  def selectGmosNorthDynamicForStep(
     stepId: Step.Id
   )(using Transaction[F]): F[Option[DynamicConfig.GmosNorth]]
 
@@ -57,18 +63,24 @@ trait GmosSequenceService[F[_]] {
     dynamic: DynamicConfig.GmosSouth
   )(using Transaction[F]): F[Unit]
 
-  def selectGmosSouthDynamic(
-    observationId: Observation.Id
-  )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)]
-
   /**
-   * Selects the static configuration corresponding to the given step.
+   * Selects the static configuration corresponding to the given visit.
    */
   def selectGmosSouthStatic(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
 
-  def selectGmosSouthDynamicStep(
+  /**
+   * Selects all the dynamic configurations for the given observation.
+   */
+  def selectGmosSouthDynamicForObs(
+    observationId: Observation.Id
+  )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)]
+
+  /**
+   * Selects the dynamic configuration corresponding to the given step.
+   */
+  def selectGmosSouthDynamicForStep(
     stepId: Step.Id
   )(using Transaction[F]): F[Option[DynamicConfig.GmosSouth]]
 
@@ -92,17 +104,17 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertGmosNorthDynamic)(stepId, dynamic).void
 
-      override def selectGmosNorthDynamic(
-        observationId: Observation.Id
-      )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)] =
-        session.stream(Statements.SelectGmosNorthDynamicForObs)(observationId, 1024)
-
       override def selectGmosNorthStatic(
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
         session.option(Statements.SelectGmosNorthStatic)(visitId)
 
-      override def selectGmosNorthDynamicStep(
+      override def selectGmosNorthDynamicForObs(
+        observationId: Observation.Id
+      )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)] =
+        session.stream(Statements.SelectGmosNorthDynamicForObs)(observationId, 1024)
+
+      override def selectGmosNorthDynamicForStep(
         stepId: Step.Id
       )(using Transaction[F]): F[Option[DynamicConfig.GmosNorth]] =
         session.option(Statements.SelectGmosNorthDynamicForStep)(stepId)
@@ -124,17 +136,17 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertGmosSouthDynamic)(stepId, dynamic).void
 
-      override def selectGmosSouthDynamic(
-        observationId: Observation.Id
-      )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)] =
-        session.stream(Statements.SelectGmosSouthDynamicForObs)(observationId, 1024)
-
       override def selectGmosSouthStatic(
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
         session.option(Statements.SelectGmosSouthStatic)(visitId)
 
-      override def selectGmosSouthDynamicStep(
+      override def selectGmosSouthDynamicForObs(
+        observationId: Observation.Id
+      )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)] =
+        session.stream(Statements.SelectGmosSouthDynamicForObs)(observationId, 1024)
+
+      override def selectGmosSouthDynamicForStep(
         stepId: Step.Id
       )(using Transaction[F]): F[Option[DynamicConfig.GmosSouth]] =
         session.option(Statements.SelectGmosSouthDynamicForStep)(stepId)

@@ -140,7 +140,7 @@ object SequenceService {
       )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]] =
         selectCompletedAtomMap(
           observationId,
-          gmosSequenceService.selectGmosNorthDynamic(observationId)
+          gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
         )
 
       override def selectGmosSouthCompletedAtomMap(
@@ -148,7 +148,7 @@ object SequenceService {
       )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]] =
         selectCompletedAtomMap(
           observationId,
-          gmosSequenceService.selectGmosSouthDynamic(observationId)
+          gmosSequenceService.selectGmosSouthDynamicForObs(observationId)
         )
 
       private def selectCompletedAtomMap[D](
@@ -161,12 +161,12 @@ object SequenceService {
       def selectGmosNorthSteps(
         observationId: Observation.Id
       )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]] =
-        stepRecordMap(observationId, gmosSequenceService.selectGmosNorthDynamic(observationId))
+        stepRecordMap(observationId, gmosSequenceService.selectGmosNorthDynamicForObs(observationId))
 
       def selectGmosSouthSteps(
         observationId: Observation.Id
       )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]] =
-        stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamic(observationId))
+        stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamicForObs(observationId))
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
@@ -204,7 +204,7 @@ object SequenceService {
         selectEstimatorState(
           observationId,
           services.gmosSequenceService.selectGmosNorthStatic,
-          services.gmosSequenceService.selectGmosNorthDynamicStep
+          services.gmosSequenceService.selectGmosNorthDynamicForStep
         )
 
       private def selectGmosSouthEstimatorState(
@@ -213,7 +213,7 @@ object SequenceService {
         selectEstimatorState(
           observationId,
           services.gmosSequenceService.selectGmosSouthStatic,
-          services.gmosSequenceService.selectGmosSouthDynamicStep
+          services.gmosSequenceService.selectGmosSouthDynamicForStep
         )
 
       private def stepRecordMap[D](
