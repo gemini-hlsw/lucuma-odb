@@ -76,6 +76,8 @@ import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
+import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.service.AllocationService
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
@@ -138,6 +140,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // Resources defined in the final cake.
   def services: Resource[F, Services[F]]
   def user: User
+  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
@@ -550,7 +553,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosNorthStep", RecordGmosStepInput.GmosNorthBinding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass),
+          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosNorth),
           Predicates.gmosNorthStep.id,
           child
         )
@@ -561,7 +564,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("recordGmosSouthStep", RecordGmosStepInput.GmosSouthBinding) { (input, child) =>
       services.useTransactionally {
         recordStep(
-          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass),
+          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosSouth),
           Predicates.gmosSouthStep.id,
           child
         )

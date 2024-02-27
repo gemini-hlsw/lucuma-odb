@@ -39,7 +39,7 @@ trait GmosSequenceService[F[_]] {
    * Selects the static configuration corresponding to the given step.
    */
   def selectGmosNorthStatic(
-    stepId: Step.Id
+    visitId: Visit.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
 
   def selectGmosNorthDynamicStep(
@@ -65,7 +65,7 @@ trait GmosSequenceService[F[_]] {
    * Selects the static configuration corresponding to the given step.
    */
   def selectGmosSouthStatic(
-    stepId: Step.Id
+    visitId: Visit.Id
   )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
 
   def selectGmosSouthDynamicStep(
@@ -98,9 +98,9 @@ object GmosSequenceService {
         session.stream(Statements.SelectGmosNorthDynamicForObs)(observationId, 1024)
 
       override def selectGmosNorthStatic(
-        stepId: Step.Id
+        visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
-        session.option(Statements.SelectGmosNorthStatic)(stepId)
+        session.option(Statements.SelectGmosNorthStatic)(visitId)
 
       override def selectGmosNorthDynamicStep(
         stepId: Step.Id
@@ -130,9 +130,9 @@ object GmosSequenceService {
         session.stream(Statements.SelectGmosSouthDynamicForObs)(observationId, 1024)
 
       override def selectGmosSouthStatic(
-        stepId: Step.Id
+        visitId: Visit.Id
       )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
-        session.option(Statements.SelectGmosSouthStatic)(stepId)
+        session.option(Statements.SelectGmosSouthStatic)(visitId)
 
       override def selectGmosSouthDynamicStep(
         stepId: Step.Id
@@ -227,20 +227,18 @@ object GmosSequenceService {
         "c_stage_mode"
       )
 
-    def selectStatic[A](site: String, decoderA: Decoder[A]): Query[Step.Id, A] =
+    def selectStatic[A](site: String, decoderA: Decoder[A]): Query[Visit.Id, A] =
       sql"""
         SELECT
-          #${encodeColumns("c".some, GmosStaticColumns)}
-        FROM t_gmos_#${site}_static c
-        INNER JOIN t_atom_record a ON a.c_visit_id = s.c_visit_id
-        INNER JOIN t_step_record s ON s.c_atom_id  = a.c_atom_id
-        WHERE s.c_step_id = $step_id
+          #${encodeColumns(none, GmosStaticColumns)}
+        FROM t_gmos_#${site}_static
+        WHERE c_visit_id = $visit_id
       """.query(decoderA)
 
-    val SelectGmosNorthStatic: Query[Step.Id, StaticConfig.GmosNorth] =
+    val SelectGmosNorthStatic: Query[Visit.Id, StaticConfig.GmosNorth] =
       selectStatic("north", gmos_north_static)
 
-    val SelectGmosSouthStatic: Query[Step.Id, StaticConfig.GmosSouth] =
+    val SelectGmosSouthStatic: Query[Visit.Id, StaticConfig.GmosSouth] =
       selectStatic("south", gmos_south_static)
 
     def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, Option[Visit.Id], A), Long] =
