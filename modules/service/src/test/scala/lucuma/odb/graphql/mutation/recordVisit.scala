@@ -10,8 +10,8 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.odb.OdbError
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.service.OdbError
 
 class recordVisit extends OdbSuite {
 
@@ -29,7 +29,7 @@ class recordVisit extends OdbSuite {
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
       _   <- expectSuccessOrOdbError(user, query(oid), expected.leftMap: f =>
-        case OdbError(OdbError.Category.InvalidObservation, `user`, Some(d), _) if d === f(oid) => ()
+        case OdbError.InvalidObservation(_, Some(d)) if d === f(oid) => ()
       ) 
     } yield ()
 

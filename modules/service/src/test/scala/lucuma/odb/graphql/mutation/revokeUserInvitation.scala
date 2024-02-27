@@ -7,9 +7,8 @@ package mutation
 import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
+import lucuma.odb.OdbError
 import lucuma.odb.data.UserInvitation
-import lucuma.odb.service.OdbError
-import lucuma.odb.service.OdbError.Category.*
 
 class revokeUserInvitation extends OdbSuite {
 
@@ -80,7 +79,7 @@ class revokeUserInvitation extends OdbSuite {
   }
 
   def badInvitation(u: User): PartialFunction[OdbError, Unit] =
-    case OdbError(InvitationError, `u`, Some("Invitation does not exist, is no longer pending, or was issued by someone else."), _) => ()
+    case OdbError.InvitationError(_, Some("Invitation does not exist, is no longer pending, or was issued by someone else.")) => ()
 
   List(true, false).foreach { accept => 
     test(s"can't revoke an invitation that was already ${if accept then "accepted" else "delined"}") {    
@@ -113,11 +112,12 @@ class revokeUserInvitation extends OdbSuite {
   test("guest can't revoke an invitation") {
     createProgramAs(pi).flatMap { pid =>
       createUserInvitationAs(pi, pid).flatMap { inv =>
+        val gid = guest.id
         expectOdbError(
           user = guest,
           query = revoke(inv.id),
           expected =
-            case OdbError(NotAuthorized, `guest`, Some("Guest users cannot revoke invitations."), _) => ()
+            case OdbError.NotAuthorized(`gid`, Some("Guest users cannot revoke invitations.")) => ()
         )
       }
     }

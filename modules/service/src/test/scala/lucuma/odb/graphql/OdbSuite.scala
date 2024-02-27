@@ -41,11 +41,12 @@ import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
-import lucuma.odb.service.OdbError
 import lucuma.odb.service.S3FileService
 import lucuma.refined.*
 import munit.CatsEffectSuite

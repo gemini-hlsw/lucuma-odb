@@ -38,8 +38,6 @@ import skunk.Session
 import skunk.SqlState
 
 import scala.concurrent.duration._
-import lucuma.odb.graphql.binding.Matcher
-import io.circe.JsonObject
 
 
 object GraphQLRoutes {
@@ -103,16 +101,11 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(info(user, s"New service instance."))
                       map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
                       svc   = new GraphQLService(map) {
-
                         override def query(request: Operation): F[Result[Json]] =
                           super.query(request).retryOnInvalidCursorName.flatTap {
                             case Result.InternalError(t)  => warn(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}")
                             case _ => debug(user, s"Query (success).")
-                          }.map(Matcher.promoteValidatonProblemss(_, user)) // any escaping validation error gets the user added       
-
-                        override def parse(query: String, op: Option[String], vars: Option[JsonObject]): Result[Operation] =
-                          Matcher.promoteValidatonProblemss(super.parse(query, op, vars), user) // any escaping validation error gets the user added   
-
+                          }
                       }
                     } yield svc
                   } .widen[GraphQLService[F]]

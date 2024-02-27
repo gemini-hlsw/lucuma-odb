@@ -20,6 +20,8 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.service.ItcService
@@ -29,8 +31,6 @@ import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
 import table.ProgramTable
 import Services.Syntax.*
-import lucuma.odb.service.withDetail
-import lucuma.odb.service.asFailure
 
 trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]
@@ -108,7 +108,7 @@ trait ObservationMapping[F[_]]
           itcService(itcClient)
            .lookup(pid, oid)
            .map {
-             case Left(e)  => error.itcError.withDetail(e.format).asFailure
+             case Left(e)  => OdbError.ItcError(Some(e.format)).asFailure
              case Right(s) => s.success
            }
         }

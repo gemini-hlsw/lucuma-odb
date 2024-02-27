@@ -23,6 +23,8 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.TargetRole
 import lucuma.odb.json.all.query.given
@@ -106,7 +108,7 @@ object AsterismService {
             .as(Result.unit)
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) =>
-                error.invalidTargetList(programId, targetIds).asFailureF
+                OdbError.InvalidTargetList(programId, targetIds).asFailureF
             }
         }
       }

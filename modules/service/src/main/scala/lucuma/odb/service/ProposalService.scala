@@ -13,6 +13,9 @@ import grackle.ResultT
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProposalClassInput
 import lucuma.odb.graphql.input.ProposalInput
@@ -22,7 +25,6 @@ import skunk._
 import skunk.syntax.all._
 
 import Services.Syntax.*
-import lucuma.core.model.User
 
 private[service] trait ProposalService[F[_]] {
 
@@ -57,7 +59,7 @@ object ProposalService {
     def failure = odbError.asFailure
 
     def odbError: OdbError =
-      OdbError.Category.InvalidArgument.asOdbError(user).withDetail(message)
+      OdbError.InvalidArgument(Some(message))
 
   }
   

@@ -47,6 +47,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
+import lucuma.odb.OdbError
+import lucuma.odb.OdbErrorExtensions.*
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
@@ -73,7 +75,6 @@ import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.Syntax.error.notAuthorized
 
 sealed trait ObservationService[F[_]] {
 
@@ -175,7 +176,7 @@ object ObservationService {
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.option(af.argument).map {
                     case Some(oid) => Result(oid)
-                    case None      => notAuthorized.asFailure
+                    case None      => OdbError.NotAuthorized(user.id).asFailure
                   }
                 }.flatMap { rOid =>
 
@@ -309,7 +310,7 @@ object ObservationService {
             _ <- moveObservations(SET.group, SET.groupIndex, which)
             r <- updates.value.recoverWith {
                    case SqlState.CheckViolation(ex) =>
-                    error.invalidArgument.withDetail(constraintViolationMessage(ex)).asFailureF
+                    OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
