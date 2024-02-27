@@ -1733,6 +1733,9 @@ type GmosNorthStepRecord implements StepRecord {
   "The observe class of this step."
   observeClass: ObserveClass!
 
+  "Original time estimate for executing this step."
+  estimate: TimeSpan!
+
   """
   QA state based on a combination of dataset QA states.  The worst QA state is
   taken as the overall step QA state.  For example, one FAIL dataset will
@@ -2261,6 +2264,9 @@ type GmosSouthStepRecord implements StepRecord {
 
   "The observe class of this step."
   observeClass: ObserveClass!
+
+  "Original time estimate for executing this step."
+  estimate: TimeSpan!
 
   """
   QA state based on a combination of dataset QA states.  The worst QA state is
@@ -9359,6 +9365,9 @@ interface StepRecord {
 
   "The observe class of this step."
   observeClass: ObserveClass!
+
+  "Original time estimate for executing this step."
+  estimate: TimeSpan!
 
   """
   QA state based on a combination of dataset QA states.  The worst QA state is
