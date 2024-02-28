@@ -29,7 +29,7 @@ val paigesVersion              = "0.4.3"
 val postgresVersion            = "42.7.2"
 val skunkVersion               = "0.6.3"
 val pprintVersion              = "0.8.1"
-val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
+val testcontainersScalaVersion = "0.40.17" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
 ThisBuild / tlBaseVersion      := "0.11"
 ThisBuild / scalaVersion       := "3.4.0"
