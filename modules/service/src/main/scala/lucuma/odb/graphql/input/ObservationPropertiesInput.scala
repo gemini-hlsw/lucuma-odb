@@ -25,12 +25,13 @@ object ObservationPropertiesInput {
   trait AsterismInput {
     def targetEnvironment: Option[TargetEnvironmentInput]
 
+    // Some downstream stuff wants this as a Nullable NEL
     def asterism: Nullable[NonEmptyList[Target.Id]] =
-      for {
-        t <- Nullable.orAbsent(targetEnvironment)
-        a <- t.asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
-      } yield a
-
+      Nullable.orAbsent(targetEnvironment).flatMap: t =>
+        t match
+          case TargetEnvironmentInput.Create(_, asterism) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
+          case TargetEnvironmentInput.Edit(_, asterism)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+        
   }
 
   final case class Create(
@@ -39,7 +40,7 @@ object ObservationPropertiesInput {
     activeStatus:        Option[ObsActiveStatus],
     visualizationTime:   Option[Timestamp],
     posAngleConstraint:  Option[PosAngleConstraintInput],
-    targetEnvironment:   Option[TargetEnvironmentInput],
+    targetEnvironment:   Option[TargetEnvironmentInput.Create],
     constraintSet:       Option[ConstraintSetInput],
     timingWindows:       Option[List[TimingWindowInput]],
     obsAttachments:      Option[List[ObsAttachment.Id]],
@@ -78,7 +79,7 @@ object ObservationPropertiesInput {
           ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
           TimestampBinding.Option("visualizationTime", rVisualizationTime),
           PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
-          TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
+          TargetEnvironmentInput.Create.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Option("timingWindows", rTimingWindows),
           ObsAttachmentIdBinding.List.Option("obsAttachments", rObsAttachments),
@@ -113,7 +114,7 @@ object ObservationPropertiesInput {
     activeStatus:        Option[ObsActiveStatus],
     visualizationTime:   Nullable[Timestamp],
     posAngleConstraint:  Option[PosAngleConstraintInput],
-    targetEnvironment:   Option[TargetEnvironmentInput],
+    targetEnvironment:   Option[TargetEnvironmentInput.Edit],
     constraintSet:       Option[ConstraintSetInput],
     timingWindows:       Nullable[List[TimingWindowInput]],
     obsAttachments:      Nullable[List[ObsAttachment.Id]],
@@ -134,7 +135,7 @@ object ObservationPropertiesInput {
           ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
           TimestampBinding.Nullable("visualizationTime", rVisualizationTime),
           PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
-          TargetEnvironmentInput.Binding.Option("targetEnvironment", rTargetEnvironment),
+          TargetEnvironmentInput.Edit.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Nullable("timingWindows", rTimingWindows),
           ObsAttachmentIdBinding.List.Nullable("obsAttachments", rObsAttachments),

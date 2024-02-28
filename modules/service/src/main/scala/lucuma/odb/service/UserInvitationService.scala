@@ -15,6 +15,8 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -44,6 +46,11 @@ trait UserInvitationService[F[_]]:
 
 object UserInvitationService:
 
+  // temporary
+  extension (self: OdbError.InvitationError.type) 
+    def apply(id: UserInvitation.Id, detail: Option[String]): OdbError.InvitationError =
+      OdbError.InvitationError(UserInvitation.Id.fromString.reverseGet(id), detail)
+ 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
       
@@ -52,27 +59,27 @@ object UserInvitationService:
           .prepareR(Statements.createPiInvitation)
           .use: pq =>
             pq.option(user, pid, role)
-              .map(Result.fromOption(_, "Specified program does not exist, or user is not the PI."))
+              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or user is not the PI.")).asProblem))
 
       def createSuperUserInvitation(input: CreateUserInvitationInput) =
         session
           .prepareR(Statements.createSuperUserInvitation)
           .use: pq =>
             pq.option(user, input)
-              .map(Result.fromOption(_, "Specified program does not exist."))
+              .map(Result.fromOption(_, OdbError.InvalidProgram(input.programId, Some("Specified program does not exist.")).asProblem))
 
       def createNgoInvitation(pid: Program.Id, partner: Tag): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createNgoInvitation)
           .use: pq =>
             pq.option(user, pid, partner)
-              .map(Result.fromOption(_, "Specified program does not exist, or has no partner-allocated time."))
+              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or has no partner-allocated time.")).asProblem))
 
       def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
         user.role match
 
           // Guest can't create invitations
-          case GuestRole             => Result.failure("Guest users cannot create invitations.").pure[F]      
+          case GuestRole             => OdbError.NotAuthorized(user.id, Some("Guest users cannot create invitations.")).asFailureF
 
           // Superusers can do anything
           case ServiceRole(_)        => createSuperUserInvitation(input)
@@ -83,26 +90,26 @@ object UserInvitationService:
           case StandardRole.Ngo(_, p) =>
             input match
               case CreateUserInvitationInput.NgoSupportSupport(pid, t) if t.value == p.tag => createNgoInvitation(pid, t)
-              case _ => Result.failure("NGO users can only ngo support invitations, and only for their partner.").pure[F]          
+              case _ => OdbError.NotAuthorized(user.id, Some("NGO users can only ngo support invitations, and only for their partner.")).asFailureF
 
           // Science users can only create CoI or Observer invitations, and only if they're the PI
           case StandardRole.Pi(_)     => 
             input match
               case CreateUserInvitationInput.Coi(pid)      => createPiInvitation(pid, ProgramUserRole.Coi)
               case CreateUserInvitationInput.Observer(pid) => createPiInvitation(pid, ProgramUserRole.Observer)
-              case _                                       => Result.failure("Science users can only create co-investigator and observer invitations.").pure[F]
+              case _                                       => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
 
       def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
         user match
-          case GuestUser(_)                      => Result.failure("Guest users cannot redeemed user invitations.").pure[F]
-          case ServiceUser(_, _)                 => Result.failure("Service users cannot redeemed user invitations.").pure[F]
+          case GuestUser(_)                      => OdbError.NotAuthorized(user.id, Some("Guest users cannot redeem user invitations.")).asFailureF
+          case ServiceUser(_, _)                 => OdbError.NotAuthorized(user.id, Some("Service users cannot redeem user invitations.")).asFailureF
           case StandardUser(_, _, _, c_duration) =>                  
             val status = if input.accept then UserInvitation.Status.Redeemed else UserInvitation.Status.Declined
             session
               .prepareR(Statements.redeemUserInvitation)
               .use(_.option(user, status, input.key))
               .flatMap:
-                case None => Result.failure("Invitation is invalid, or has already been accepted, declined, or revoked.").pure[F]
+                case None => OdbError.InvitationError(input.key.id, Some("Invitation is invalid, or has already been accepted, declined, or revoked.")).asFailureF
                 case Some(r, ot, op, pid) =>
                   val xa = transaction
                   xa.savepoint.flatMap: sp =>
@@ -113,19 +120,19 @@ object UserInvitationService:
                       .recoverWith:
                         case SqlState.UniqueViolation(_) => 
                           xa.rollback(sp).as:
-                            Result.warning("You are already in the specified role; no action taken.", input.key.id)
+                            OdbError.NoAction(Some("You are already in the specified role; no action taken.")).asWarning(input.key.id)
                     
       def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
         user.role.access match
-          case Access.Guest => Result.failure("Guest users cannot revoke invitations.").pure[F]
+          case Access.Guest => OdbError.NotAuthorized(user.id, Some("Guest users cannot revoke invitations.")).asFailureF
           case Access.Admin | Access.Service | Access.Staff =>
             session.prepareR(Statements.revokeUserInvitationUnconditionially).use: pq =>
               pq.option(input.id).map: op =>
-                Result.fromOption(op, s"Invitation does not exist or is no longer pending.")
+                Result.fromOption(op, OdbError.InvitationError(input.id, Some(s"Invitation does not exist or is no longer pending.")).asProblem)
           case Access.Ngo | Access.Pi =>
             session.prepareR(Statements.revokeUserInvitation).use: pq =>
               pq.option(input.id, user.id).map: op =>
-                Result.fromOption(op, s"Invitation does not exist, is no longer pending, or was issued by someone else.")
+                Result.fromOption(op, OdbError.InvitationError(input.id, Some(s"Invitation does not exist, is no longer pending, or was issued by someone else.")).asProblem)
 
   object Statements:
 

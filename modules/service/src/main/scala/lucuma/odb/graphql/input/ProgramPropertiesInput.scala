@@ -63,7 +63,7 @@ object ProgramPropertiesInput {
   val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
     data(ProposalInput.CreateBinding).rmap {
       case (n, s, None, p, _) => Result(Create(n, s.toOption, p))
-      case _                  => Result.failure("proposalStatus cannot be specified during program creation.")
+      case _                  => Matcher.validationFailure("proposalStatus cannot be specified during program creation.")
     }
 
   val EditBinding: Matcher[Edit] =

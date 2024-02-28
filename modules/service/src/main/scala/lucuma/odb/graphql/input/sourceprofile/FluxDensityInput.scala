@@ -21,7 +21,7 @@ object FluxDensityInput {
       ) => (rWavelength, rDensity).parTupled.flatMap {
         case (wavelength, density) =>
           PosBigDecimal.from(density) match {
-            case Left(err) => Result.failure(err)
+            case Left(err) => Matcher.validationFailure(err)
             case Right(v)  => Result((wavelength, v))
           }
         }

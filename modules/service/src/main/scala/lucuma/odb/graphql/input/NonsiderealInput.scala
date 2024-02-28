@@ -26,15 +26,15 @@ object NonsiderealInput {
           case (Some(k), Some(d), None) =>
             EphemerisKey.fromTypeAndDes.getOption((k, d.value)) match {
               case Some(k) => Result(k)
-              case None    => Result.failure(s"Invalid designation '$d' for key type $k.")
+              case None    => Matcher.validationFailure(s"Invalid designation '$d' for key type $k.")
             }
           case (None, None, Some(k)) =>
             EphemerisKey.fromString.getOption(k.value) match {
               case Some(k) => Result(k)
-              case None    => Result.failure(s"Invalid ephemeris key: '$k'.")
+              case None    => Matcher.validationFailure(s"Invalid ephemeris key: '$k'.")
             }
           case _ =>
-            Result.failure(s"You must either provide key, or provide both keyType and des.")
+            Matcher.validationFailure(s"You must either provide key, or provide both keyType and des.")
 
         }
     }

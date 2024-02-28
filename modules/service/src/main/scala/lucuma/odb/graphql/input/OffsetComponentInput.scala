@@ -28,7 +28,7 @@ object OffsetComponentInput {
         case (microarcseconds, milliarcseconds, arcseconds) =>
           List(microarcseconds, milliarcseconds, arcseconds).flatten match {
             case List(a) => Result(componentIso.reverseGet(a))
-            case as      => Result.failure(s"Expected exactly one offset in $name; found ${as.length}.")
+            case as      => Matcher.validationFailure(s"Expected exactly one offset in $name; found ${as.length}.")
           }
       }
     }

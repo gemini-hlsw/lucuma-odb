@@ -68,7 +68,7 @@ object SiderealInput {
           (ra, dec, epoch, pm, rv, px, ci) =>
             (ra, dec, epoch) match {
               case (Some(r), Some(d), Some(e)) => Result(Create(r, d, e, pm, rv, px, ci))
-              case _ => Result.failure("RA, Dec, and Epoch must all be specified on target creation.")            
+              case _ => Matcher.validationFailure("RA, Dec, and Epoch must all be specified on target creation.")            
             }          
         }
     }

@@ -26,7 +26,7 @@ class setAllocation extends OdbSuite {
   test("guest, pi, ngo can't set allocation") {
     List(guest, pi, ngo).traverse { user =>
       createProgramAs(user).flatMap { pid =>
-        interceptGraphQL(s"User ${user.id} is not authorized to perform this action") {
+        interceptGraphQL(s"User ${user.id} is not authorized to perform this operation.") {
           setAllocationAs(user, pid, Tag("CA"), 42.hourTimeSpan)
         }
       }

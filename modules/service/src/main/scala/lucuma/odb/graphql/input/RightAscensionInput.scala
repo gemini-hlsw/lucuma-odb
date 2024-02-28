@@ -23,7 +23,7 @@ object RightAscensionInput {
         case (microarcseconds, microseconds, degrees, hours, hms) =>
           List(microarcseconds, microseconds, degrees, hours, hms).flatten match {
             case List(ha) => Result(RightAscension(ha))
-            case has => Result.failure(s"Expected exactly one right ascension format; found ${has.length}.")
+            case has => Matcher.validationFailure(s"Expected exactly one right ascension format; found ${has.length}.")
           }
       }
     }

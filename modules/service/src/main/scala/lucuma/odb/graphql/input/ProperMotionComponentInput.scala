@@ -39,7 +39,7 @@ object ProperMotionComponentInput {
           case (microarcsecondsPerYear, milliarcsecondsPerYear) =>
             List(microarcsecondsPerYear, milliarcsecondsPerYear).flatten match {
               case List(a) => Result(ProperMotion.AngularVelocity(a).tag[A])
-              case as => Result.failure(s"Expected exactly one proper motion component format; found ${as.length}.")
+              case as => Matcher.validationFailure(s"Expected exactly one proper motion component format; found ${as.length}.")
             }
         }
     }

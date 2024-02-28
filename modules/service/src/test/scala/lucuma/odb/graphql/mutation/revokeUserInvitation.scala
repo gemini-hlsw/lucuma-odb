@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.syntax.all.*
 import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.UserInvitation
 
 class revokeUserInvitation extends OdbSuite {
@@ -78,15 +78,18 @@ class revokeUserInvitation extends OdbSuite {
     }
   }
 
+  def badInvitation(u: User): PartialFunction[OdbError, Unit] =
+    case OdbError.InvitationError(_, Some("Invitation does not exist, is no longer pending, or was issued by someone else.")) => ()
+
   List(true, false).foreach { accept => 
     test(s"can't revoke an invitation that was already ${if accept then "accepted" else "delined"}") {    
       createProgramAs(pi).flatMap { pid =>
         createUserInvitationAs(pi, pid).flatMap { inv =>
           redeemUserInvitationAs(pi2, inv, accept) >>
-          expect(
+          expectOdbError(
             user = pi,
             query = revoke(inv.id),
-            expected = Left(List("Invitation does not exist, is no longer pending, or was issued by someone else."))
+            expected = badInvitation(pi)
           )
         }
       }
@@ -97,23 +100,24 @@ class revokeUserInvitation extends OdbSuite {
     createProgramAs(pi).flatMap { pid =>
       createUserInvitationAs(pi, pid).flatMap { inv =>
         revokeUserInvitationAs(pi, inv.id) >>
-        expect(
+        expectOdbError(
           user = pi,
           query = revoke(inv.id),
-          expected = Left(List("Invitation does not exist, is no longer pending, or was issued by someone else."))
+          expected = badInvitation(pi)
         )
       }
     }
   }
 
-
   test("guest can't revoke an invitation") {
     createProgramAs(pi).flatMap { pid =>
       createUserInvitationAs(pi, pid).flatMap { inv =>
-        expect(
+        val gid = guest.id
+        expectOdbError(
           user = guest,
           query = revoke(inv.id),
-          expected = Left(List("Guest users cannot revoke invitations."))
+          expected =
+            case OdbError.NotAuthorized(`gid`, Some("Guest users cannot revoke invitations.")) => ()
         )
       }
     }
@@ -123,10 +127,10 @@ class revokeUserInvitation extends OdbSuite {
     test(s"non-superuser (${u.role.access}) can't revoke someone else's invitation") {
       createProgramAs(pi).flatMap { pid =>
         createUserInvitationAs(pi, pid).flatMap { inv =>
-          expect(
+          expectOdbError(
             user = u,
             query = revoke(inv.id),
-            expected = Left(List("Invitation does not exist, is no longer pending, or was issued by someone else."))
+            expected = badInvitation(u)
           )
         }
       }

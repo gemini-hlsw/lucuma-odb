@@ -22,6 +22,8 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -120,11 +122,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
-        services.use { s =>
+        services.use { implicit s =>
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideEnvironment(pid, oid, obsTime)
             .map {
-              case Left(e)  => Result.failure(e.format)
+              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
               case Right(s) => s.success
             }
         }
@@ -138,16 +140,16 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         start <- env.getR[Timestamp](AvailabilityStartParam)
         end   <- env.getR[Timestamp](AvailabilityEndParam)
         period <- if (start < end) Result.success(TimestampInterval.between(start, end))
-                  else Result.failure("Start time must be prior to end time for guide star availability")
+                  else Matcher.validationFailure("Start time must be prior to end time for guide star availability")
       } yield period
 
     val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
-        services.use { s =>
+        services.use { implicit s =>
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideAvailability(pid, oid, period)
             .map {
-              case Left(e)  => Result.failure(e.format)
+              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
               case Right(s) => s.success
             }
         }

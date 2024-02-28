@@ -52,6 +52,8 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput
@@ -174,7 +176,7 @@ object ObservationService {
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.option(af.argument).map {
                     case Some(oid) => Result(oid)
-                    case None      => Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                    case None      => OdbError.NotAuthorized(user.id).asFailure
                   }
                 }.flatMap { rOid =>
 
@@ -308,7 +310,7 @@ object ObservationService {
             _ <- moveObservations(SET.group, SET.groupIndex, which)
             r <- updates.value.recoverWith {
                    case SqlState.CheckViolation(ex) =>
-                     Result.failure(constraintViolationMessage(ex)).pure[F]
+                    OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
@@ -392,7 +394,6 @@ object ObservationService {
       groupIndex: NonNegShort,
     ): Result[AppliedFragment] =
       for {
-        eb <- SET.targetEnvironment.flatMap(_.explicitBase.toOption).flatTraverse(_.create)
         cs <- SET.constraintSet.traverse(_.create)
       } yield
         insertObservationAs(
@@ -407,7 +408,7 @@ object ObservationService {
           SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
-          eb,
+          SET.targetEnvironment.flatMap(_.explicitBase),
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
@@ -597,7 +598,7 @@ object ObservationService {
       in.mode.map(upMode).toList ++ in.angle.map(upAngle).toList
     }
 
-    def explicitBaseUpdates(in: TargetEnvironmentInput): Result[List[AppliedFragment]] = {
+    def explicitBaseUpdates(in: TargetEnvironmentInput.Edit): Result[List[AppliedFragment]] = {
 
       val upRa  = sql"c_explicit_ra = ${right_ascension.opt}"
       val upDec = sql"c_explicit_dec = ${declination.opt}"

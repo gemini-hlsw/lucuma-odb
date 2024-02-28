@@ -23,7 +23,7 @@ object DeclinationInput {
           List(microarcseconds, degrees, hms).flatten match {
             case List(a) =>
               Result.fromOption(Declination.fromAngle.getOption(a), s"Invalid declination: ${Angle.fromStringDMS.reverseGet(a)}")
-            case as => Result.failure(s"Expected exactly one declination format; found ${as.length}.")
+            case as => Matcher.validationFailure(s"Expected exactly one declination format; found ${as.length}.")
           }
       }
     }

@@ -202,7 +202,7 @@ class updatePrograms extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalsError.CreationFailed.message))
+          Left(List(UpdateProposalsError.CreationFailed(pi).message))
       )
     }
   }
@@ -731,7 +731,7 @@ class updatePrograms extends OdbSuite {
             }
           }
         """,
-        expected = Left(List(UpdateProposalsError.InconsistentUpdate.message))
+        expected = Left(List(UpdateProposalsError.InconsistentUpdate(pi).message))
       )
 
     }

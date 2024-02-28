@@ -18,12 +18,12 @@ object SpectralDefinitionInput {
   extension [A](self: SpectralDefinition[A])
     def bandNormalized = self match {
       case a: BandNormalized[A] => Result(a)
-      case _ => Result.failure("Not a band normalized spectral definition.")
+      case _ => Matcher.validationFailure("Not a band normalized spectral definition.")
     }
 
     def emissionLines  = self match {
       case a: EmissionLines[A]  => Result(a)
-      case u => Result.failure(s"Not a emission lines spectral definition ${u}.")
+      case u => Matcher.validationFailure(s"Not a emission lines spectral definition ${u}.")
     }
 
   object Integrated {
@@ -76,7 +76,7 @@ object SpectralDefinitionInput {
         (rBandNormalized, rEmissionLines).parTupled.flatMap {
           case (Some(bandNormalized), None) => Result(bandNormalized)
           case (None, Some(emissionLines))  => Result(emissionLines)
-          case _                            => Result.failure("Expected exactly one of bandNormalized or emissionLines.")
+          case _                            => Matcher.validationFailure("Expected exactly one of bandNormalized or emissionLines.")
         }
     }
 
@@ -92,7 +92,7 @@ object SpectralDefinitionInput {
         (rBandNormalized, rEmissionLines).parTupled.flatMap {
           case (Some(f), None) => Result(a => a.bandNormalized.flatMap(f))
           case (None, Some(f)) => Result(a => a.emissionLines.map(f))
-          case _               => Result.failure("Expected exactly one of bandNormalized or emissionLines.")
+          case _               => Matcher.validationFailure("Expected exactly one of bandNormalized or emissionLines.")
         }
     }
 

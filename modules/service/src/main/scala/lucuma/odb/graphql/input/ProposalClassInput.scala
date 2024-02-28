@@ -37,7 +37,7 @@ object ProposalClassInput {
     def createBinding(tag: Tag): Matcher[Create] =
       DataBinding.rmap {
         case Some(t)  => Result(Create(tag, t))
-        case None     => Result.failure(s"minPercentTime is required on creation")
+        case None     => Matcher.validationFailure(s"minPercentTime is required on creation")
       }
 
     def editBinding(tag: Tag): Matcher[Edit] =
@@ -126,7 +126,7 @@ object ProposalClassInput {
               intensive.map(_.asRight),
             ).flatten match {
               case h :: Nil => Result(h)
-              case other    => Result.failure(s"Expected exactly one of classical, demoScience, directorsTime, exchange, fastTurnaround, intensive, largeProgram, poorWeather, queue, systemVerification; found ${other.length}.")
+              case other    => Matcher.validationFailure(s"Expected exactly one of classical, demoScience, directorsTime, exchange, fastTurnaround, intensive, largeProgram, poorWeather, queue, systemVerification; found ${other.length}.")
             }
         }
     }
@@ -188,7 +188,7 @@ object ProposalClassInput {
 
 //     def createBinding(tagValue: String): Matcher[ProposalClassInput] =
 //       binding(tagValue).rmap {
-//         case TypeA(_, None) => Result.failure(s"minPercentTime is required on creation")
+//         case TypeA(_, None) => Matcher.validationFailure(s"minPercentTime is required on creation")
 //         case ok             => Result(ok)
 //       }
 
@@ -221,7 +221,7 @@ object ProposalClassInput {
 //     def createBinding(tagValue: String): Matcher[ProposalClassInput] =
 //       binding(tagValue).rmap {
 //         case ok @ TypeB(_, Some(_), Some(_), Some(_)) => Result(ok)
-//         case _ => Result.failure(s"All of minPercentTime, minPercentTotalTime, and totalTime are required on creation.")
+//         case _ => Matcher.validationFailure(s"All of minPercentTime, minPercentTotalTime, and totalTime are required on creation.")
 //       }
 
 //     def editBinding(tagValue: String): Matcher[ProposalClassInput] =
@@ -286,7 +286,7 @@ object ProposalClassInput {
 //           (classical, demoScience, directorsTime, exchange, fastTurnaround, intensive, largeProgram, poorWeather, queue, systemVerification) =>
 //             List(classical, demoScience, directorsTime, exchange, fastTurnaround, intensive, largeProgram, poorWeather, queue, systemVerification).flatten match {
 //               case h :: Nil => Result(h)
-//               case other    => Result.failure(s"Expected exactly one of classical, demoScience, directorsTime, exchange, fastTurnaround, intensive, largeProgram, poorWeather, queue, systemVerification; found ${other.length}.")
+//               case other    => Matcher.validationFailure(s"Expected exactly one of classical, demoScience, directorsTime, exchange, fastTurnaround, intensive, largeProgram, poorWeather, queue, systemVerification; found ${other.length}.")
 //             }
 //         }
 //     }
