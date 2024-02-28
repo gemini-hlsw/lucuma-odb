@@ -13,6 +13,9 @@ import grackle.ResultT
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProposalClassInput
 import lucuma.odb.graphql.input.ProposalInput
@@ -45,19 +48,24 @@ private[service] trait ProposalService[F[_]] {
 object ProposalService {
 
   sealed trait UpdateProposalsError extends Product with Serializable {
+    def user: User
     import UpdateProposalsError.*
     def message: String = this match
-      case CreationFailed => 
+      case CreationFailed(_) => 
         "One or more programs has no proposal, and there is insufficient information to create one. To add a proposal all required fields must be specified."
-      case InconsistentUpdate =>
+      case InconsistentUpdate(_) =>
         "The specified edits for proposal class do not match the proposal class for one or more specified programs' proposals. To change the proposal class you must specify all fields for that class."
 
-    def failure = Result.failure(message)
+    def failure = odbError.asFailure
+
+    def odbError: OdbError =
+      OdbError.InvalidArgument(Some(message))
+
   }
   
   object UpdateProposalsError {
-    case object CreationFailed     extends UpdateProposalsError
-    case object InconsistentUpdate extends UpdateProposalsError
+    case class CreationFailed(user: User)     extends UpdateProposalsError
+    case class InconsistentUpdate(user: User) extends UpdateProposalsError
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
@@ -81,7 +89,7 @@ object ProposalService {
             }
             .recover {
               case SqlState.NotNullViolation(e) if e.columnName == Some("c_class") =>
-                UpdateProposalsError.InconsistentUpdate.failure
+                UpdateProposalsError.InconsistentUpdate(user).failure
             }
           }
 
@@ -95,7 +103,7 @@ object ProposalService {
           }
           .recover {
             case SqlState.NotNullViolation(ex) =>
-              UpdateProposalsError.CreationFailed.failure
+              UpdateProposalsError.CreationFailed(user).failure
           }
 
         // Replace the splits

@@ -39,7 +39,7 @@ object BandBrightnessInput {
         case (band, Some(value), Some(units), error) =>
           Result((band, units.withValueTagged(value, error)))
         case _ =>
-          Result.failure(s"Both value and units are required on creation.")
+          Matcher.validationFailure(s"Both value and units are required on creation.")
       }
     }
 

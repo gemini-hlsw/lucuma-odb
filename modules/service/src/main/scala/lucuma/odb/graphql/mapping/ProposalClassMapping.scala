@@ -72,7 +72,7 @@ trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
           case Tag("poor_weather")        => Result(PoorWeatherType)
           case Tag("queue")               => Result(QueueType)
           case Tag("system_verification") => Result(SystemVerificationType)
-          case other                      => Result.failure("ProposalClassMapping: cannot determine type for $other")
+          case other                      => Result.internalError("ProposalClassMapping: cannot determine type for $other")
         }
 
       def narrowPredicate(tpe: Type): Option[Predicate] = {

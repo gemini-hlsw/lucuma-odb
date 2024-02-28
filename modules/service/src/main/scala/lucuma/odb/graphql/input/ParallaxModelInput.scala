@@ -24,7 +24,7 @@ object ParallaxModelInput {
           case (microarcseconds, milliarcseconds) =>
             List(microarcseconds, milliarcseconds).flatten match {
               case List(p) => Result(p)
-              case other   => Result.failure(s"Expected exactly one parallax representation; found ${other.length}.")
+              case other   => Matcher.validationFailure(s"Expected exactly one parallax representation; found ${other.length}.")
             }
         }
     }

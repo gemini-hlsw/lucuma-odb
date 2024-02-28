@@ -29,10 +29,10 @@ object TimingWindowEndInput:
         TimeSpanInput.Binding.Option("after", rAfter),
         TimingWindowRepeatInput.Binding.Option("repeat", rRepeat)
       ) => (rAt, rAfter, rRepeat).parMapN(TimingWindowEndInput(_, _, _)).flatMap {
-        case TimingWindowEndInput(Some(_), Some(_), _) => Result.failure(messages.OnlyOneDefinition)
-        case TimingWindowEndInput(_, None, Some(_))    => Result.failure(messages.RepeatOnlyWhenAfter)
+        case TimingWindowEndInput(Some(_), Some(_), _) => Matcher.validationFailure(messages.OnlyOneDefinition)
+        case TimingWindowEndInput(_, None, Some(_))    => Matcher.validationFailure(messages.RepeatOnlyWhenAfter)
         case TimingWindowEndInput(_, Some(duration), Some(TimingWindowRepeatInput(period, _)))
-          if period <= duration                        => Result.failure(messages.RepeatPeriodGreaterThanAfter)
+          if period <= duration                        => Matcher.validationFailure(messages.RepeatPeriodGreaterThanAfter)
         case other                                     => Result(other)
       }
     }

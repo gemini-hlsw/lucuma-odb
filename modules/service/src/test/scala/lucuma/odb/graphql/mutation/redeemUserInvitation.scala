@@ -106,7 +106,7 @@ class redeemUserInvitation extends OdbSuite {
         expect(
           user = guest,
           query = redeem(inv),
-          expected = Left(List("Guest users cannot redeemed user invitations."))
+          expected = Left(List("Guest users cannot redeem user invitations."))
         )
       }
     }
@@ -118,7 +118,7 @@ class redeemUserInvitation extends OdbSuite {
         expect(
           user = service,
           query = redeem(inv),
-          expected = Left(List("Service users cannot redeemed user invitations."))
+          expected = Left(List("Service users cannot redeem user invitations."))
         )
       }
     }

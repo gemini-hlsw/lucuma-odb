@@ -21,7 +21,7 @@ final case class ElevationRangeInput(
       case (Some(am), None)   => am.create
       case (None, Some(hr))   => hr.create
       case (None, None)       => Result(AirMass.Default)
-      case (Some(_), Some(_)) => Result.failure(ElevationRangeInput.messages.OnlyOneDefinition)
+      case (Some(_), Some(_)) => Matcher.validationFailure(ElevationRangeInput.messages.OnlyOneDefinition)
     }
 
 }

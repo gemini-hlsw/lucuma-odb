@@ -27,6 +27,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
@@ -105,7 +107,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =
-      Result.warning(e.format, Json.Null)
+      OdbError.SequenceUnavailable(Some(e.format)).asWarning(Json.Null)
   }
 
   private lazy val configHandler: EffectHandler[F] = {

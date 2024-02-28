@@ -31,7 +31,7 @@ import lucuma.odb.graphql.binding._
           case (value, label) =>
             handler.lift((value, label)) match {
               case Some(r) => r
-              case None    => Result.failure(s"Unexpected ${name}Units value: $label")
+              case None    => Matcher.validationFailure(s"Unexpected ${name}Units value: $label")
             }
       }
     }

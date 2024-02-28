@@ -6,12 +6,15 @@ package lucuma.odb.graphql.binding
 import cats.data.Ior
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import grackle.Problem
 import grackle.Query.Binding
 import grackle.Result
 import grackle.Value
 import grackle.Value.AbsentValue
 import grackle.Value.NullValue
 import lucuma.odb.data
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 trait Matcher[A] { outer =>
 
@@ -24,7 +27,7 @@ trait Matcher[A] { outer =>
         // I apologize, there is certainly a better way to do it but this works for now.
         val msg = s"Argument '${b.name}' is invalid: $error"
         val msg0 = msg.replaceAll("' is invalid: Argument '", ".")
-        Result.failure(msg0)
+        Matcher.validationFailure(msg0)
       case Right(value) => Result(value)
     }
 
@@ -85,3 +88,11 @@ trait Matcher[A] { outer =>
       case (Right(a), Right(b)) => Right(Ior.Both(a, b))
 
 }
+
+object Matcher:
+
+  def validationProblem(msg: String): Problem =
+    OdbError.InvalidArgument(Some(msg)).asProblem
+
+  def validationFailure(msg: String): Result[Nothing] =
+    Result.failure(validationProblem(msg))

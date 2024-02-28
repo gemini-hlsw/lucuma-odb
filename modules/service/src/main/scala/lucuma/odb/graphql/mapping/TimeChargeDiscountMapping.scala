@@ -58,7 +58,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
           case DiscountDiscriminator.Daylight => Result(TimeChargeDaylightDiscountType)
           case DiscountDiscriminator.NoData   => Result(TimeChargeNoDataDiscountType)
           case DiscountDiscriminator.Qa       => Result(TimeChargeQaDiscountType)
-          case d                              => Result.failure(s"No TimeChargeDiscount implementation for ${d.dbTag}")
+          case d                              => Result.internalError(s"No TimeChargeDiscount implementation for ${d.dbTag}")
         }
 
       private def mkPredicate(discountType: DiscountDiscriminator): Option[Predicate] =

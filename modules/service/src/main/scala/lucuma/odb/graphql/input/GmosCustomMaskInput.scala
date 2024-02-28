@@ -19,7 +19,7 @@ object GmosCustomMaskInput {
         GmosCustomSlitWidthBinding("slitWidth", rSlitWidth)
       ) => (rFilename, rSlitWidth).parTupled.flatMap { (filename, slitWidth) =>
         NonEmptyString.from(filename) match {
-          case Left(_)  => Result.failure("The GMOS custom FPU mask 'filename' cannot be empty.")
+          case Left(_)  => Matcher.validationFailure("The GMOS custom FPU mask 'filename' cannot be empty.")
           case Right(n) => Result(Custom(n, slitWidth))
         }
       }

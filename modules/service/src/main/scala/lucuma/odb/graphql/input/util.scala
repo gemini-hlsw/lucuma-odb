@@ -5,9 +5,10 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.foldable.*
 import grackle.Result
+import lucuma.odb.graphql.binding.Matcher
 
 def oneOrFail[A](options: (Option[A], String)*): Result[A] =
   options.toList.flatMap(_._1.toList) match {
     case List(a) => Result(a)
-    case _       => Result.failure(s"Expected exactly one of ${options.map(_._2).intercalate(", ")}")
+    case _       => Matcher.validationFailure(s"Expected exactly one of ${options.map(_._2).intercalate(", ")}")
   }

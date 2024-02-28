@@ -23,6 +23,7 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
@@ -115,7 +116,7 @@ object ProgramService {
   sealed trait UpdateProgramsError extends Product with Serializable {
     import UpdateProgramsError.*
     def message: String = this match
-      case InvalidProposalStatus(ps)                     =>
+      case InvalidProposalStatus(_, ps)                     =>
         s"Invalid proposal status: ${ps.value}"
       case NotAuthorizedNewProposalStatus(user, ps)      =>
         s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase}."
@@ -127,12 +128,19 @@ object ProgramService {
         s"Submitted program $pid must be associated with a semester."
       case InvalidSemester(s: Option[Semester])          =>
         s"The maximum semester is capped at the current year +1${s.fold(".")(" ("+ _.format + " specified).")}"
-    def failure = Result.failure(message)
+    def failure = this match
+      case InvalidProposalStatus(user, ps) => OdbError.InvalidArgument(Some(message)).asFailure
+      case NotAuthorizedNewProposalStatus(user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
+      case NotAuthorizedOldProposalStatus(pid, user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
+      case NoProposalForStatusChange(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
+      case NoSemesterForSubmittedProposal(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
+      case InvalidSemester(s) => OdbError.InvalidArgument(Some(message)).asFailure
+    
   }
 
   object UpdateProgramsError {
     // we should never get this one, but we are converting between a Tag and a dynamic enum...
-    case class InvalidProposalStatus(ps: Tag) extends UpdateProgramsError
+    case class InvalidProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedNewProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
     case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
@@ -221,7 +229,7 @@ object ProgramService {
         def tagToProposalStatus(tag: Tag): Result[enumsVal.ProposalStatus] =
           Enumerated[enumsVal.ProposalStatus]
             .fromTag(tag.value)
-            .fold(UpdateProgramsError.InvalidProposalStatus(tag).failure)(Result.apply)
+            .fold(UpdateProgramsError.InvalidProposalStatus(user, tag).failure)(Result.apply)
 
         def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
           user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)

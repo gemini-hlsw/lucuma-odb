@@ -35,6 +35,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
@@ -71,7 +73,6 @@ import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.service.AllocationService
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
@@ -83,7 +84,6 @@ import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
-import lucuma.odb.service.VisitService
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -151,7 +151,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
                   .map(child3 => Environment(env, child3))
                   .value
               case _ =>
-                Result.failure(s"Unexpected: $child").pure[F]
+                Result.internalError(s"Unexpected: $child").pure[F]
             }
           }
         val elaborator =
@@ -179,13 +179,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     ref: Option[ProgramReference]
   )(using Services[F]): F[Result[Program.Id]] =
     (pid, ref) match {
-      case (None, None)    => Result.failure("One of programId or programReference must be provided.").pure[F]
+      case (None, None)    => OdbError.InvalidArgument(Some("One of programId or programReference must be provided.")).asFailureF
       case (Some(p), None) => p.success.pure[F]
       case (_, Some(r))    => programService.selectPid(r).map { op =>
         op.fold(Result.failure(s"Program reference '${r.format}' was not found.")) { selectedPid =>
           pid.fold(selectedPid.success) { givenPid =>
-            Result
-              .failure(s"Program reference ${r.format} (id $selectedPid) doesn't correspond to specified program id $givenPid")
+            OdbError.InvalidProgram(givenPid, Some(s"Program reference ${r.format} (id $selectedPid) doesn't correspond to specified program id $givenPid"))
+              .asFailure
               .unlessA(selectedPid === givenPid)
               .as(selectedPid)
           }
@@ -243,7 +243,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val AddConditionsEntry: MutationField =
     MutationField("addConditionsEntry", ConditionsEntryInput.Binding) { (input, child) =>
       if user.role.access < Access.Staff then {
-        Result.failure(s"This action is restricted to staff users.").pure[F]
+        OdbError.NotAuthorized(user.id, Some(s"This action is restricted to staff users.")).asFailureF
       } else {
         services.useTransactionally {
           chronicleService.addConditionsEntry(input).map { id =>
@@ -309,11 +309,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             )
 
           // Failure Cases
-          case NoSuchTarget(targetId) => Result.failure(s"No such target: $targetId")
+          case NoSuchTarget(targetId) => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
           case UpdateFailed(problem)  =>
             problem match
-              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps)
-              case TrackingSwitchFailed(p)        => Result.failure(p)
+              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+              case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
         }
       }
@@ -373,8 +373,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         import TargetService.CreateTargetResponse._
         ResultT(selectPid(input.programId, input.programReference)).flatMap { pid =>
           ResultT(targetService.createTarget(pid, input.SET).map {
-            case NotAuthorized(user)  => Result.failure(s"User ${user.id} is not authorized to perform this action")
-            case ProgramNotFound(pid) => Result.failure(s"Program ${pid} was not found")
+            case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
+            case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
             case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
           })
         }.value
@@ -396,9 +396,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         import lucuma.odb.service.ProgramService.LinkUserResponse._
         programService.linkUser(input).map[Result[Query]] {
-          case NotAuthorized(user)     => Result.failure(s"User ${user.id} is not authorized to perform this action")
-          case AlreadyLinked(pid, uid) => Result.failure(s"User $uid is already linked to program $pid.")
-          case InvalidUser(uid)        => Result.failure(s"User $uid does not exist or is of a nonstandard type.")
+          case NotAuthorized(user)     => OdbError.NotAuthorized(user.id).asFailure
+          case AlreadyLinked(pid, uid) => OdbError.NoAction(Some(s"User $uid is already linked to program $pid.")).asFailure
+          case InvalidUser(uid)        => OdbError.InvalidUser(uid, Some(s"User $uid does not exist or is of a nonstandard type.")).asFailure
           case Success(pid, uid)       =>
             Result(Unique(Filter(And(
               Predicates.linkUserResult.programId.eql(pid),
@@ -415,11 +415,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import DatasetService.InsertDatasetResponse.*
     (response: DatasetService.InsertDatasetResponse) => response match {
       case NotAuthorized(user)      =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+        OdbError.NotAuthorized(user.id).asFailure
       case ReusedFilename(filename) =>
-        Result.failure(s"The filename '${filename.format}' is already assigned")
+        OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
       case StepNotFound(id)         =>
-        Result.failure(s"Step id '$id' not found")
+        OdbError.InvalidStep(id, Some(s"Step id '$id' not found")).asFailure
       case Success(did, _, _)       =>
         Result(Unique(Filter(predicates.id.eql(did), child)))
     }
@@ -436,20 +436,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private def executionEventResponseToResult(
     child:        Query,
-    predicates:   ExecutionEventPredicates
-  ): ExecutionEventService.InsertEventResponse => Result[Query] = {
+    predicates:   ExecutionEventPredicates,    
+  )(using Services[F]): ExecutionEventService.InsertEventResponse => Result[Query] = {
     import ExecutionEventService.InsertEventResponse.*
     (response: ExecutionEventService.InsertEventResponse) => response match {
-      case NotAuthorized(user) =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
-      case DatasetNotFound(id)    =>
-        Result.failure(s"Dataset '${id.show}' not found")
-      case StepNotFound(id)    =>
-        Result.failure(s"Step '$id' not found")
-      case VisitNotFound(id)   =>
-        Result.failure(s"Visit '$id' not found")
-      case Success(e)     =>
-        Result(Unique(Filter(predicates.id.eql(e.id), child)))
+      case NotAuthorized(user) => OdbError.NotAuthorized(user.id).asFailure
+      case DatasetNotFound(id) => OdbError.InvalidDataset(id, Some(s"Dataset '${id.show}' not found")).asFailure
+      case StepNotFound(id)    => OdbError.InvalidStep(id, Some(s"Step '$id' not found")).asFailure
+      case VisitNotFound(id)   => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found")).asFailure
+      case Success(e)          => Result(Unique(Filter(predicates.id.eql(e.id), child)))
     }
   }
 
@@ -488,13 +483,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     response:  F[SequenceService.InsertAtomResponse],
     predicate: LeafPredicates[Atom.Id],
     child:     Query
-  ): F[Result[Query]] = {
+  )(using Services[F]): F[Result[Query]] = {
     import SequenceService.InsertAtomResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)           =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+        OdbError.NotAuthorized(user.id).asFailure
       case VisitNotFound(id, instrument) =>
-        Result.failure(s"Visit '$id' not found or is not a ${instrument.longName} visit")
+        OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
       case Success(aid)                  =>
         Result(Unique(Filter(predicate.eql(aid), child)))
     }
@@ -519,9 +514,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     import SequenceService.InsertStepResponse.*
     response.map[Result[Query]] {
       case NotAuthorized(user)           =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
+        OdbError.NotAuthorized(user.id).asFailure
       case AtomNotFound(id, instrument)  =>
-        Result.failure(s"Atom '$id' not found or is not a ${instrument.longName} atom")
+        OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
       case Success(sid)                  =>
         Result(Unique(Filter(predicate.eql(sid), child)))
     }
@@ -550,21 +545,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private def recordVisit(
-    response:  F[VisitService.InsertVisitResponse],
+    response:  F[Result[Visit.Id]],
     predicate: LeafPredicates[Visit.Id],
     child:     Query
-  )(using Services[F], Transaction[F]): F[Result[Query]] = {
-    import VisitService.InsertVisitResponse.*
-    response.map {
-      case NotAuthorized(user)                 =>
-        Result.failure(s"User '${user.id}' is not authorized to perform this action")
-      case ObservationNotFound(id, instrument) =>
-        Result.failure(s"Observation '$id' not found or is not a ${instrument.longName} observation")
-      case Success(vid)                        =>
-        Result(Unique(Filter(predicate.eql(vid), child)))
-    }
-  }
-
+  )(using Services[F], Transaction[F]): F[Result[Query]] =
+    ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
 
   private lazy val RecordGmosNorthVisit: MutationField =
     MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding) { (input, child) =>
@@ -603,21 +588,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
 
   private lazy val SetAllocation =
-    MutationField("setAllocation", SetAllocationInput.Binding) { (input, child) =>
-      import AllocationService.SetAllocationResponse._
-      services.useTransactionally {
-        allocationService.setAllocation(input).map[Result[Query]] {
-          case NotAuthorized(user) => Result.failure(s"User ${user.id} is not authorized to perform this action")
-          case PartnerNotFound(_)  => ???
-          case ProgramNotFound(_)  => ???
-          case Success             =>
-            Result(Unique(Filter(And(
+    MutationField("setAllocation", SetAllocationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        ResultT(allocationService.setAllocation(input))
+          .as:
+            Unique(Filter(And(
               Predicates.setAllocationResult.programId.eql(input.programId),
               Predicates.setAllocationResult.partner.eql(input.partner)
-            ), child)))
-        }
-      }
-    }
+            ), child))
+          .value
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
@@ -800,8 +779,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         idSelect.flatTraverse { which =>
           targetService.updateTargets(input.SET, which).map {
             case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
-            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems)
-            case UpdateTargetsResponse.TrackingSwitchFailed(problem)        => Result.failure(problem)
+            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+            case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
           }
         }
 
@@ -836,7 +815,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           import GroupService.UpdateGroupsResponse
           groupService.updateGroups(input.SET, which).map {
             case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
-            case UpdateGroupsResponse.Error(problem)    => Result.failure(problem)
+            case UpdateGroupsResponse.Error(problem)    => OdbError.UpdateFailed(Some(problem)).asFailure
           }
         }
 
