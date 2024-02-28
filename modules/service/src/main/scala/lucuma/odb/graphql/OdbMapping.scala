@@ -11,7 +11,6 @@ import cats.effect.{Unique => _, _}
 import cats.syntax.all._
 import com.github.vertical_blank.sqlformatter.SqlFormatter
 import fs2.concurrent.Topic
-import grackle.QueryCompiler.Elab
 import grackle.QueryCompiler.SelectElaborator
 import grackle._
 import grackle.skunk.SkunkMapping
