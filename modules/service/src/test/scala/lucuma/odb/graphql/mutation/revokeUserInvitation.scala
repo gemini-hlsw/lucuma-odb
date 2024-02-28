@@ -7,7 +7,7 @@ package mutation
 import io.circe.literal._
 import lucuma.core.model.Partner
 import lucuma.core.model.User
-import lucuma.odb.OdbError
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.UserInvitation
 
 class revokeUserInvitation extends OdbSuite {

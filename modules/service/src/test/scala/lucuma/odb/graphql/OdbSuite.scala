@@ -41,8 +41,8 @@ import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash

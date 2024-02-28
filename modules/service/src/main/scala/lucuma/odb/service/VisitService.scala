@@ -16,8 +16,8 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.Timestamp
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*

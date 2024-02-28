@@ -7,8 +7,8 @@ import cats.syntax.either.*
 import grackle.Result
 import lucuma.core.model.Access.Service
 import lucuma.core.model.User
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 import Services.Syntax.*
 
