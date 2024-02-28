@@ -10,8 +10,8 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.data.OdbError
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.OdbError
 
 class recordVisit extends OdbSuite {
 
