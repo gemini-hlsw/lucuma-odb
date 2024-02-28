@@ -12,9 +12,9 @@ import grackle.Result
 import grackle.Value
 import grackle.Value.AbsentValue
 import grackle.Value.NullValue
+import lucuma.odb.data
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data
 
 trait Matcher[A] { outer =>
 

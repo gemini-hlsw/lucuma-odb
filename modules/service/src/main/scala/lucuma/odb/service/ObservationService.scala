@@ -47,13 +47,13 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput

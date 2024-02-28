@@ -23,9 +23,9 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.Nullable
 import lucuma.odb.data.TargetRole
 import lucuma.odb.json.all.query.given
 import lucuma.odb.util.Codecs.*
