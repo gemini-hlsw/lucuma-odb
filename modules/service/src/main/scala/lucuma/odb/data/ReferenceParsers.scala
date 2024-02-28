@@ -39,8 +39,10 @@ trait ReferenceParsers {
   val half: Parser[Half] =
     char('A').as(Half.A) | char('B').as(Half.B)
 
-  val instrument: Parser[Instrument] =
-    enumBy[Instrument](_.tag)
+  val instrument: Parser[Instrument] = {
+    import ProgramReference.referenceName
+    enumBy[Instrument](_.referenceName.value)
+  }
 
   val semester: Parser[Semester] =
     (semesterYear ~ half).map(Semester.apply)
