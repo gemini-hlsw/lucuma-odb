@@ -214,7 +214,7 @@ class addDatasetEvent extends OdbSuite {
   private def timeTest(file: String, stages: DatasetStage*): IO[Unit] = {
     def expected(times: List[Timestamp]): (Option[Timestamp], Option[Timestamp]) =
       times.zip(stages).foldLeft((Option.empty[Timestamp], Option.empty[Timestamp])) { case ((start, end), (time, stage)) =>
-        if (stage === DatasetStage.StartObserve) (time.some, none)
+        if (stage === DatasetStage.StartExpose) (time.some, none)
         else if ((stage === DatasetStage.EndWrite) && start.isDefined) (start, time.some)
         else (start, end)
       }
@@ -233,11 +233,11 @@ class addDatasetEvent extends OdbSuite {
   }
 
   test("addDatasetEvent - start") {
-    timeTest("N18630101S0005.fits", DatasetStage.StartObserve)
+    timeTest("N18630101S0005.fits", DatasetStage.StartExpose)
   }
 
   test("addDatasetEvent - start, end") {
-    timeTest("N18630101S0006.fits", DatasetStage.StartObserve, DatasetStage.EndWrite)
+    timeTest("N18630101S0006.fits", DatasetStage.StartExpose, DatasetStage.EndWrite)
   }
 
   test("addDatasetEvent - end, no start") {
@@ -245,7 +245,7 @@ class addDatasetEvent extends OdbSuite {
   }
 
   test("addDatasetEvent - start, end, start") {
-    timeTest("N18630101S0008.fits", DatasetStage.StartObserve, DatasetStage.EndWrite, DatasetStage.StartObserve)
+    timeTest("N18630101S0008.fits", DatasetStage.StartExpose, DatasetStage.EndWrite, DatasetStage.StartExpose)
   }
 
 }
