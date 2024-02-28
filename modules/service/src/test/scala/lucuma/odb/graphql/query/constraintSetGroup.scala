@@ -13,6 +13,7 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.User
 
 class constraintSetGroup extends OdbSuite {
@@ -118,5 +119,79 @@ class constraintSetGroup extends OdbSuite {
     }
   }
 
+  test("should be able to use a program reference") {
+    List(pi).traverse { user =>
+      createProgramAs(user).flatMap { pid =>
+        def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
+        (
+          create2(ImageQuality.OnePointFive, SkyBackground.Bright),
+          create2(ImageQuality.PointOne, SkyBackground.Bright),
+          create2(ImageQuality.PointOne, SkyBackground.Dark)
+        ).parTupled.flatMap { (g1, g2, g3) =>
+          addProposal(user, pid) *>
+          submitProposal(user, pid, Semester.unsafeFromString("2025A").some) *>
+          expect(
+            user = user,
+            query =
+              s"""
+              query {
+                constraintSetGroup(programReference: "G-2025A-0001") {
+                  matches {
+                    constraintSet {
+                      imageQuality
+                      skyBackground
+                    }
+                    observations {
+                      matches {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+              """,
+            expected = Right(
+              // N.B. the ordering of groups is based on the concatenation of all the components so it's deterministic
+              json"""
+                {
+                  "constraintSetGroup" : {
+                    "matches" : [
+                      {
+                        "constraintSet" : {
+                          "imageQuality" : "ONE_POINT_FIVE",
+                          "skyBackground" : "BRIGHT"
+                        },
+                        "observations" : {
+                          "matches" : ${g1.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        }
+                      },
+                      {
+                        "constraintSet" : {
+                          "imageQuality" : "POINT_ONE",
+                          "skyBackground" : "BRIGHT"
+                        },
+                        "observations" : {
+                          "matches" : ${g2.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        }
+                      },
+                      {
+                        "constraintSet" : {
+                          "imageQuality" : "POINT_ONE",
+                          "skyBackground" : "DARK"
+                        },
+                        "observations" : {
+                          "matches" : ${g3.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
 
 }

@@ -154,7 +154,7 @@ type AtomRecord {
   created: Timestamp!
 
   "Time interval during which this atom executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Sequence type."
   sequenceType: SequenceType!
@@ -504,10 +504,12 @@ input CoordinatesInput {
 }
 
 """
-Observation creation parameters
+Observation creation parameters.  One of programId or programReference is
+required.  If both are provided, they must refer to the same program.
 """
 input CreateObservationInput {
-  programId: ProgramId!
+  programId: ProgramId
+  programReference: ProgramReference
   SET: ObservationPropertiesInput
 }
 
@@ -539,10 +541,12 @@ type CreateProgramResult {
 }
 
 """
-Target creation parameters
+Target creation parameters.  One of programId or programReference is required.
+If both are provided, they must refer to the same program.
 """
 input CreateTargetInput {
-  programId: ProgramId!
+  programId: ProgramId
+  programReference: ProgramReference
   SET: TargetPropertiesInput!
 }
 
@@ -1719,7 +1723,7 @@ type GmosNorthStepRecord implements StepRecord {
   created: Timestamp!
 
   "Time interval during which this step executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
@@ -1776,7 +1780,7 @@ type GmosNorthVisit implements Visit {
   created: Timestamp!
 
   "Time interval during which this visit executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -2248,7 +2252,7 @@ type GmosSouthStepRecord implements StepRecord {
   created: Timestamp!
 
   "Time interval during which this step executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "The step configuration. apart from instrument details in 'instrumentConfig'."
   stepConfig: StepConfig!
@@ -2305,7 +2309,7 @@ type GmosSouthVisit implements Visit {
   created: Timestamp!
 
   "Time interval during which this visit executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -2767,7 +2771,6 @@ type Mutation {
   """
   Update asterisms, adding or deleting targets, in (potentially) multiple
   observations at once.
-  
   """
   updateAsterisms(
     """
@@ -3095,6 +3098,13 @@ input ProgramPropertiesInput {
   The program name, which is both optional and nullable
   """
   name: NonEmptyString
+
+  """
+  The semester associated with the program, if any. If this value is
+  subsequently edited it will result in a new reference, with (likely) a
+  different index.
+  """
+  semester: Semester
 
   """
   The proposal status, which is both optional and nullable. 
@@ -4867,6 +4877,11 @@ type ConstraintSetGroup {
   Commonly held value across the observations
   """
   constraintSet: ConstraintSet!
+
+  """
+  Link back to program.
+  """
+  program: Program!
 }
 
 """
@@ -5084,13 +5099,13 @@ type DatasetSelectResult {
 "Execution stage or phase of an individual dataset."
 enum DatasetStage {
 
-  END_OBSERVE
+  END_EXPOSE
 
   END_READOUT
 
   END_WRITE
 
-  START_OBSERVE
+  START_EXPOSE
 
   START_READOUT
 
@@ -6600,6 +6615,15 @@ type Group {
   "Contained elements"
   elements: [GroupElement!]!
 
+  """
+  Remaining execution time estimate range, assuming it can be calculated.  In
+  order for an observation to have an estimate, it must be fully defined such
+  that a sequence can be generated for it.  If a group has observations that
+  are required and which are not fully defined, the remaining time estimate
+  cannot be calculated.
+  """
+  timeEstimateRange: CategorizedTimeRange
+
 }
 
 scalar GroupId
@@ -6640,8 +6664,13 @@ input GroupPropertiesInput {
 
 }
 
+"""
+Group creation parameters.  One of programId or programReference is required.
+If both are provided, they must refer to the same program.
+"""
 input CreateGroupInput {
-  programId: ProgramId!
+  programId: ProgramId
+  programReference: ProgramReference
   SET: GroupPropertiesInput
 }
 
@@ -6685,6 +6714,10 @@ type GuideEnvironment {
 Enumeration for Guide Probes
 """
 enum GuideProbe {
+  PWFS_1
+
+  PWFS_2
+
   GMOS_OIWFS
 }
 
@@ -7437,54 +7470,6 @@ enum PlanetaryNebulaSpectrum {
 }
 
 """
-An estimation of the remaining execution time, categorized by charge class.
-"""
-type PlannedTime {
-
-  """
-  Individual time charges.
-  """
-  charges: [PlannedTimeCharge!]!
-
-  """
-  The total of all charges (i.e., the remaining execution time estimate ignoring
-  charge class).
-  """
-  total: TimeSpan!
-}
-
-"""
-A charge class and its corresponding time amount
-"""
-type PlannedTimeCharge {
-
-  """
-  Charge class
-  """
-  chargeClass: ChargeClass!
-
-  """
-  Charge amount
-  """
-  time: TimeSpan!
-
-}
-
-"""
-The range of remaining time estimates from minimum to maximum.  The actual
-remaining time should vary between the two extremes, depending upon which
-observations and groups are actually completed.
-"""
-type PlannedTimeRange {
-
-   """Minimum remaining planned time estimate."""
-   minimum: PlannedTime!
-
-   """Maximum remaining planned time estimate."""
-   maximum: PlannedTime!
-}
-
-"""
 Poor Weather
 """
 type PoorWeather implements ProposalClass {
@@ -7575,6 +7560,18 @@ type Program {
   """
   name: NonEmptyString
 
+  "Semester associated with the program, if any."
+  semester: Semester
+
+  "Index, relative to the semester, if any."
+  semesterIndex: PosInt
+
+  """
+  Formatted program reference, if any.  Only submitted proposals obtain a
+  program reference.
+  """
+  reference: ProgramReference
+
   """
   Program proposal
   """
@@ -7629,15 +7626,6 @@ type Program {
 
   """
   Remaining execution time estimate range, assuming it can be calculated.  In
-  order for an observation to have a 'PlannedTime', it must be fully defined
-  such that a sequence can be generated for it.  If a program has observations
-  that are required and which are not fully defined, the planned time range
-  cannot be calculated.
-  """
-  plannedTimeRange: PlannedTimeRange @deprecated(reason: "Use timeEstimateRange instead.")
-
-  """
-  Remaining execution time estimate range, assuming it can be calculated.  In
   order for an observation to have an estimate, it must be fully defined such
   that a sequence can be generated for it.  If a program has observations that
   are required and which are not fully defined, the remaining time estimate
@@ -7649,6 +7637,7 @@ type Program {
   Program-wide time charge, summing all corrected observation time charges.
   """
   timeCharge: CategorizedTime!
+
   """
   All user invitations associated with this program.
   """
@@ -7660,6 +7649,12 @@ type Program {
 ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
 """
 scalar ProgramId
+
+"""
+Program reference in the format G-YYYY[AB]-NNNN+[CDLFSV]? For example, G-2024B-1234
+where 2024B refers to the associated semester.
+"""
+scalar ProgramReference
 
 """
 The matching program results, limited to a maximum of 1000 entries.
@@ -7866,10 +7861,12 @@ type Query {
   Observations grouped by commonly held science asterisms
   """
   asterismGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.
@@ -7893,13 +7890,17 @@ type Query {
   obsAttachmentTypeMeta: [ObsAttachmentTypeMeta!]!
 
   """
-  Observations grouped by commonly held constraints
+  Observations grouped by commonly held constraints. Specify one of programId or
+  programReference.  If both are set, both must match.  If neither are set,
+  nothing will match.
   """
   constraintSetGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.
@@ -7982,9 +7983,6 @@ type Query {
   Selects the first `LIMIT` matching observations based on the provided `WHERE` parameter, if any.
   """
   observations(
-
-    programId: ProgramId
-
     """
     Filters the selection of observations.
     """
@@ -8012,13 +8010,16 @@ type Query {
   partnerMeta: [PartnerMeta!]!
 
   """
-  Returns the program with the given id, if any.
+  Returns the program with the given id or reference, if any.  Specify one of
+  programId or programReference.  If both are set, both must match.  If neither
+  are set, nothing will match.
   """
   program(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+    "Program ID"
+    programId: ProgramId
+
+    "Program Reference"
+    programReference: ProgramReference
   ): Program
 
   """
@@ -8118,13 +8119,17 @@ type Query {
   # ): TargetEnvironmentGroupSelectResult!
 
   """
-  Observations grouped by commonly held targets
+  Observations grouped by commonly held targets.  Specify one of programId or
+  programReference.  If both are set, both must match.  If neither are set,
+  nothing will match.
   """
   targetGroup(
-    """
-    Program ID
-    """
-    programId: ProgramId!
+
+    "Program ID"
+    programId: ProgramId
+
+    "Program Reference"
+    programReference: ProgramReference
 
     """
     Filters the selection of observations.
@@ -8371,6 +8376,13 @@ type ScienceRequirementsGroupSelectResult {
 }
 
 """
+Semester string (from 2000A) in the format YYYY[AB].  An abbreviated format,
+which assumes the millennium 2000, is also permitted.  For example, 24A is read
+as 2024A.
+"""
+scalar Semester
+
+"""
 Sequence-level command
 """
 enum SequenceCommand {
@@ -8405,9 +8417,6 @@ type SequenceDigest {
 
   """ObserveClass of the whole sequence. """
   observeClass: ObserveClass!
-
-  """PlannedTime for the whole sequence. """
-  plannedTime: PlannedTime! @deprecated(reason: "Use timeEstimate instead.")
 
   """Time estimate for the whole sequence."""
   timeEstimate: CategorizedTime!
@@ -9156,7 +9165,7 @@ interface StepRecord {
   created: Timestamp!
 
   "Time interval during which this step executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   """
   The step configuration, apart from instrument details found in the
@@ -9496,10 +9505,9 @@ type TargetGroup {
   target: Target!
 
   """
-  Link back to program, temporary, to avoid some mapping issues.
-  Please don't use this in API calls.
+  Link back to program.
   """
-  program: Program! @deprecated
+  program: Program!
 
 }
 
@@ -9877,7 +9885,7 @@ interface Visit {
   created: Timestamp!
 
   "Time interval during which this visit executed."
-  interval: TimestampInterval!
+  interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
   atomRecords(
@@ -10142,7 +10150,7 @@ input WhereDataset {
   id: WhereOrderDatasetId
 
   "Matches all datasets associated with the observation."
-  observationId: WhereOrderObservationId
+  observation: WhereObservation
 
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
@@ -10426,9 +10434,9 @@ input WhereObservation {
   id: WhereOrderObservationId
 
   """
-  Matches the id of the associated program.
+  Matches the associated program.
   """
-  programId: WhereOrderProgramId
+  program: WhereProgram
 
   """
   Matches the subtitle of the observation.
@@ -10838,7 +10846,6 @@ input WhereOrderTimestamp {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderInt {
   """
@@ -10886,7 +10893,6 @@ input WhereOrderInt {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderObsActiveStatus {
   """
@@ -11030,7 +11036,6 @@ input WhereOrderObservationId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderProgramId {
   """
@@ -11078,7 +11083,159 @@ input WhereOrderProgramId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
+"""
+input WhereOptionOrderPosInt {
 
+  "Matches if the property is not defined."
+  IS_NULL: Boolean
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: PosInt
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: PosInt
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [PosInt!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [PosInt!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: PosInt
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: PosInt
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosInt
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosInt
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
+"""
+input WhereOptionOrderProgramReference {
+
+  "Matches if the ProgramReference is not defined."
+  IS_NULL: Boolean
+
+  """
+  Matches if the ProgramReference is exactly the supplied value.
+  """
+  EQ: ProgramReference
+
+  """
+  Matches if the ProgramReference is not the supplied value.
+  """
+  NEQ: ProgramReference
+
+  """
+  Matches if the ProgramReference is any of the supplied options.
+  """
+  IN: [ProgramReference!]
+
+  """
+  Matches if the ProgramReference is none of the supplied values.
+  """
+  NIN: [ProgramReference!]
+
+  """
+  Matches if the ProgramReference is ordered after (>) the supplied value.
+  """
+  GT: ProgramReference
+
+  """
+  Matches if the ProgramReference is ordered before (<) the supplied value.
+  """
+  LT: ProgramReference
+
+  """
+  Matches if the ProgramReference is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ProgramReference
+
+  """
+  Matches if the ProgramReference is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ProgramReference
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
+"""
+input WhereOptionOrderSemester {
+
+  "Matches if Semester is not defined."
+  IS_NULL: Boolean
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: Semester
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: Semester
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [Semester!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [Semester!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: Semester
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: Semester
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Semester
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Semester
+}
+
+"""
+Filters on equality or order comparisons of the property.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2'
+for an integer property will match when the value is 3 or more.
 """
 input WhereOrderSequenceCommand {
   """
@@ -11296,6 +11453,21 @@ input WhereProgram {
   name: WhereOptionString
 
   """
+  Matches the semester associated with the program.
+  """
+  semester: WhereOptionOrderSemester
+
+  """
+  Matches the semester index associated with the program (if any).
+  """
+  semesterIndex: WhereOptionOrderPosInt
+
+  """
+  Matches on the program reference (if any).
+  """
+  reference: WhereOptionOrderProgramReference
+
+  """
   Matches the proposalStatus.
   """
   proposalStatus: WhereEqProposalStatus
@@ -11476,9 +11648,9 @@ input WhereTarget {
   id: WhereOrderTargetId
 
   """
-  Matches the id of the associated program.
+  Matches the associated program.
   """
-  programId: WhereOrderProgramId
+  program: WhereProgram
 
   """
   Matches the target name.

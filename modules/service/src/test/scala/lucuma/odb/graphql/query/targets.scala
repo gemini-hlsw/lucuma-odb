@@ -7,7 +7,6 @@ package query
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 
@@ -28,8 +27,8 @@ class targets extends OdbSuite {
             query {
               targets(
                 WHERE: {
-                  programId: {
-                    EQ: ${pid.asJson}
+                  program: {
+                    id: { EQ: "$pid" }
                   }
                 }
               ) {
@@ -66,8 +65,8 @@ class targets extends OdbSuite {
             query {
               targets(
                 WHERE: {
-                  programId: {
-                    EQ: ${pid.asJson}
+                  program: {
+                    id: { EQ: "$pid" }
                   }
                 }
                 LIMIT: 3
@@ -105,8 +104,8 @@ class targets extends OdbSuite {
             query {
               targets(
                 WHERE: {
-                  programId: {
-                    EQ: ${pid.asJson}
+                  program: {
+                    id: { EQ: "$pid" }
                   }
                 }
                 OFFSET: ${tids(3).asJson}
@@ -148,8 +147,8 @@ class targets extends OdbSuite {
                   id: {
                     NEQ: ${tids(3).asJson}
                   }
-                  programId: {
-                    EQ: ${pid.asJson}
+                  program: {
+                    id: { EQ: "$pid" }
                   }
                 }
               ) {

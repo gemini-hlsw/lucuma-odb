@@ -5,20 +5,40 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.effect.Resource
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Query
 import grackle.Query.Binding
+import grackle.Query.EffectHandler
 import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.model.Group
+import lucuma.core.model.User
+import lucuma.core.model.sequence.CategorizedTimeRange
+import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.json.time.query.given
+import lucuma.odb.json.timeaccounting.given
+import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.Services
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] {
+import Services.Syntax.*
+
+
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] with KeyValueEffectHandler[F] {
+
+  def user: User
+  def itcClient: ItcClient[F]
+  def services: Resource[F, Services[F]]
+  def commitHash: CommitHash
+  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   lazy val GroupMapping =
     ObjectMapping(
@@ -34,6 +54,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
         SqlObject("minimumInterval"),
         SqlObject("maximumInterval"),
         SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
+        EffectField("timeEstimateRange", timeEstimateHandler, List("id"))
       )
     )
 
@@ -42,6 +63,14 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))), child)
       }
+
+  private lazy val timeEstimateHandler: EffectHandler[F] =
+    keyValueEffectHandler[Group.Id, Option[CategorizedTimeRange]]("id") { gid =>
+      services.useNonTransactionally {
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+          .estimateGroup(gid)
+      }
+    }
 
 }
 

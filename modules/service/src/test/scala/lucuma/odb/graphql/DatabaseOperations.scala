@@ -29,6 +29,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.*
 import lucuma.core.model.Target
@@ -45,6 +46,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -78,8 +80,117 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def fetchPid(user: User, ref: ProgramReference): IO[Program.Id] =
+    query(user, s"""
+      query { program(programReference: "${ref.format}") { id } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+    query(user, s"""
+      query { program(programId: "$pid") { reference } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "reference")
+        .as[Option[ProgramReference]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  // For proposal tests where it doesn't matter what the proposal is, just that
+  // there is one.
+  def addProposal(user: User, pid: Program.Id): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposal: {
+                  proposalClass: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                  category: COSMOLOGY
+                  toOActivation: NONE
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 100
+                    }
+                  ]
+                }
+              }
+              WHERE: {
+                id: {
+                  EQ: "$pid"
+                }
+              }
+            }
+          ) {
+            programs {
+              id
+            }
+          }
+        }
+      """,
+      expected =
+        Right(json"""
+          {
+            "updatePrograms" : {
+              "programs": [
+                {
+                  "id" : $pid
+                }
+              ]
+            }
+          }
+        """)
+    )
+
+  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
+    query(user, s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                proposalStatus: SUBMITTED
+                ${s.map(semster => s""",\nsemester: "${semster.format}"""").getOrElse("")}
+              }
+              WHERE: {
+                id: {
+                  EQ: "$pid"
+                }
+              }
+            }
+          ) {
+            programs {
+              reference
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("updatePrograms")
+        .downField("programs")
+        .downArray
+        .downField("reference")
+        .as[ProgramReference]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createObservationAs(user, pid, None, tids: _*)
+    createObservationAs(user, pid, None, tids*)
 
   private def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match

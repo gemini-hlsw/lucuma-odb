@@ -9,7 +9,6 @@ import cats.syntax.parallel._
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate._
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.graphql.binding._
 
@@ -17,7 +16,7 @@ object WhereTarget {
 
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderTargetIdBinding = WhereOrder.binding[Target.Id](path / "id", TargetIdBinding)
-    val WhereOrderProgramIdBinding = WhereOrder.binding[Program.Id](path / "program" / "id", ProgramIdBinding)
+    val WhereProgramBinding = WhereProgram.binding(path / "program")
     val WhereNameBinding = WhereString.binding(path / "name")
     lazy val WhereTargetBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -26,16 +25,16 @@ object WhereTarget {
         WhereTargetBinding.List.Option("OR", rOR),
         WhereTargetBinding.Option("NOT", rNOT),
         WhereOrderTargetIdBinding.Option("id", rId),
-        WhereOrderProgramIdBinding.Option("programId", rPid),
+        WhereProgramBinding.Option("program", rProgram),
         WhereNameBinding.Option("name", rName),
       ) =>
-        (rAND, rOR, rNOT, rId, rPid, rName).parMapN { (AND, OR, NOT, id, pid, name) =>
+        (rAND, rOR, rNOT, rId, rProgram, rName).parMapN { (AND, OR, NOT, id, program, name) =>
           and(List(
             AND.map(and),
             OR.map(or),
             NOT.map(Not(_)),
             id,
-            pid,
+            program,
             name,
           ).flatten)
         }

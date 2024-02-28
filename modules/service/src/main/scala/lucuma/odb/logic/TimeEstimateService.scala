@@ -15,6 +15,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.ObsStatus
+import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CategorizedTime
@@ -37,10 +38,19 @@ import skunk.Transaction
 sealed trait TimeEstimateService[F[_]] {
 
   /**
-   * Estimates the remaining time for observations that are well defined.
+   * Estimates the remaining time for all observations in the program that are
+   * well defined.
    */
   def estimateProgram(
     programId: Program.Id
+  )(using NoTransaction[F]): F[Option[CategorizedTimeRange]]
+
+  /**
+   * Estimates the remaining time for all observations in the group that are
+   * well defined.
+   */
+  def estimateGroup(
+    groupId: Group.Id
   )(using NoTransaction[F]): F[Option[CategorizedTimeRange]]
 
 }
@@ -152,13 +162,28 @@ object TimeEstimateService {
           case GroupTree.Root(_, children)                       => parentRange(pid, None, children, m)
         }
 
+      private def load(pid: Program.Id): F[(GroupTree, Map[Observation.Id, ObservationData])] =
+        services.transactionally {
+          (groupService.selectGroups(pid), ObservationData.load(pid, itcClient)).tupled
+        }
+
       override def estimateProgram(
         pid: Program.Id
       )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
-        services.transactionally {
-          (groupService.selectGroups(pid), ObservationData.load(pid, itcClient)).tupled
-        }.flatMap { case (tree, dataMap) =>
+        load(pid).flatMap { case (tree, dataMap) =>
           timeEstimateRange(pid, tree, dataMap)
         }
+
+      override def estimateGroup(
+        groupId: Group.Id
+      )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
+        (for {
+          p <- OptionT(groupService.selectPid(groupId))
+          d <- OptionT.liftF(load(p))
+          (tree, dataMap) = d
+          t <- OptionT.fromOption(tree.findGroup(groupId))
+          r <- OptionT(timeEstimateRange(p, t, dataMap))
+        } yield r).value
+
   }
 }

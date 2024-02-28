@@ -59,7 +59,7 @@ object UnnormalizedSedInput {
           case (None, None, None, None, None, None, None, None, None, Some(v)) =>
             v match {
               case Nil => Matcher.validationFailure("fluxDensities cannot be empty")
-              case h :: t => Result(UnnormalizedSED.UserDefined(NonEmptyMap.of(h, t: _*)))
+              case h :: t => Result(UnnormalizedSED.UserDefined(NonEmptyMap.of(h, t*)))
             }
 
           case _ =>
