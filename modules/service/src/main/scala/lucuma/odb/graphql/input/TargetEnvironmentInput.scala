@@ -10,21 +10,20 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.TargetIdBinding
 import lucuma.odb.graphql.binding.*
 
-trait TargetEnvironmentInput:
-  def asterism: Nullable[List[Target.Id]]
+sealed trait TargetEnvironmentInput
 
 object TargetEnvironmentInput:
 
   final case class Create(
-    explicitBase: Nullable[CoordinatesInput.Create],
-    asterism:     Nullable[List[Target.Id]]
+    explicitBase: Option[CoordinatesInput.Create],
+    asterism:     Option[List[Target.Id]]
   ) extends TargetEnvironmentInput
   object Create:
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          CoordinatesInput.Create.Binding.Nullable("explicitBase", rBase),
-          TargetIdBinding.List.Nullable("asterism", rAsterism)
+          CoordinatesInput.Create.Binding.Option("explicitBase", rBase),
+          TargetIdBinding.List.Option("asterism", rAsterism)
         ) => (rBase, rAsterism).parMapN(Create(_, _))
       }
 
