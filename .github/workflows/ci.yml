@@ -86,7 +86,7 @@ jobs:
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
       - name: Upload code coverage data
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
 
       - name: Docker compose down
         run: docker-compose down
