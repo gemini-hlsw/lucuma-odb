@@ -23,6 +23,7 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
@@ -127,7 +128,14 @@ object ProgramService {
         s"Submitted program $pid must be associated with a semester."
       case InvalidSemester(s: Option[Semester])          =>
         s"The maximum semester is capped at the current year +1${s.fold(".")(" ("+ _.format + " specified).")}"
-    def failure = Result.failure(message)
+    def failure = this match
+      case InvalidProposalStatus(user, ps) => OdbError.InvalidArgument(Some(message)).asFailure
+      case NotAuthorizedNewProposalStatus(user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
+      case NotAuthorizedOldProposalStatus(pid, user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
+      case NoProposalForStatusChange(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
+      case NoSemesterForSubmittedProposal(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
+      case InvalidSemester(s) => OdbError.InvalidArgument(Some(message)).asFailure
+    
   }
 
   object UpdateProgramsError {

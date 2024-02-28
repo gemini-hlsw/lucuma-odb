@@ -179,13 +179,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     ref: Option[ProgramReference]
   )(using Services[F]): F[Result[Program.Id]] =
     (pid, ref) match {
-      case (None, None)    => Result.failure("One of programId or programReference must be provided.").pure[F]
+      case (None, None)    => OdbError.InvalidArgument(Some("One of programId or programReference must be provided.")).asFailureF
       case (Some(p), None) => p.success.pure[F]
       case (_, Some(r))    => programService.selectPid(r).map { op =>
         op.fold(Result.failure(s"Program reference '${r.format}' was not found.")) { selectedPid =>
           pid.fold(selectedPid.success) { givenPid =>
-            Result
-              .failure(s"Program reference ${r.format} (id $selectedPid) doesn't correspond to specified program id $givenPid")
+            OdbError.InvalidProgram(givenPid, Some(s"Program reference ${r.format} (id $selectedPid) doesn't correspond to specified program id $givenPid"))
+              .asFailure
               .unlessA(selectedPid === givenPid)
               .as(selectedPid)
           }
