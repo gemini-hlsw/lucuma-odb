@@ -10420,7 +10420,7 @@ input WhereEqProgramType {
   """
   Matches if the program type is any of the supplied options.
   """
-  IN: [ProposalType!]
+  IN: [ProgramType!]
 
   """
   Matches if the program type is none of the supplied values.
