@@ -27,7 +27,7 @@ trait Matcher[A] { outer =>
         // I apologize, there is certainly a better way to do it but this works for now.
         val msg = s"Argument '${b.name}' is invalid: $error"
         val msg0 = msg.replaceAll("' is invalid: Argument '", ".")
-        OdbError.InvalidArgument(Some(msg0)).asFailure
+        Matcher.validationFailure(msg0)
       case Right(value) => Result(value)
     }
 
@@ -91,7 +91,6 @@ trait Matcher[A] { outer =>
 
 object Matcher:
 
-  /** Construct a problem that we can later promote to a properly encoded OdbError, once we know the user. */
   def validationProblem(msg: String): Problem =
     OdbError.InvalidArgument(Some(msg)).asProblem
 

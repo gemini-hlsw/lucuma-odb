@@ -39,7 +39,6 @@ import skunk.SqlState
 
 import scala.concurrent.duration._
 
-
 object GraphQLRoutes {
 
   implicit val x: Order[Authorization] =
