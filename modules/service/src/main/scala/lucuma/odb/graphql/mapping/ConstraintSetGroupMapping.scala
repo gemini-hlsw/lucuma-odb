@@ -18,11 +18,13 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ConstraintSetGroupView
 
 import table.ObservationView
+import table.ProgramTable
 import binding._
 
 trait ConstraintSetGroupMapping[F[_]]
   extends ConstraintSetGroupView[F]
      with ObservationView[F]
+     with ProgramTable[F]
      with Predicates[F] {
 
   lazy val ConstraintSetGroupMapping =
@@ -30,7 +32,7 @@ trait ConstraintSetGroupMapping[F[_]]
       tpe = ConstraintSetGroupType,
       fieldMappings = List(
         SqlField("key", ConstraintSetGroupView.ConstraintSetKey, key = true, hidden = true),
-        SqlField("programId", ConstraintSetGroupView.ProgramId),
+        SqlObject("program", Join(ConstraintSetGroupView.ProgramId, ProgramTable.Id)),
         SqlObject("observations", Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
         SqlObject("constraintSet", Join(ConstraintSetGroupView.ObservationId, ObservationView.Id)),
       )

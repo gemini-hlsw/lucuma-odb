@@ -47,8 +47,8 @@ trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite 
                1
 
     val stages = List(
-      DatasetStage.StartObserve,
-      DatasetStage.EndObserve,
+      DatasetStage.StartExpose,
+      DatasetStage.EndExpose,
       DatasetStage.StartReadout,
       DatasetStage.EndReadout,
       DatasetStage.StartWrite,

@@ -143,8 +143,8 @@ class updateObservations extends OdbSuite
               subtitle: "Charles Guiteau"
             },
             WHERE: {
-              programId: {
-                EQ: ${pid.asJson}
+              program: {
+                id: { EQ: "$pid" }
               }
             }
           }) {

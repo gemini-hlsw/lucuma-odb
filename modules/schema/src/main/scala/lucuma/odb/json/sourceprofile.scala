@@ -58,38 +58,6 @@ trait SourceProfileCodec {
   import numeric.given
   import wavelength.decoder.given
 
-  // SpectralDefinition[T]
-  given [T](using Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Decoder[SpectralDefinition[T]] =
-    Decoder.instance { c =>
-      c.downField("bandNormalized").as[BandNormalized[T]] orElse
-        c.downField("emissionLines").as[EmissionLines[T]]
-    }
-
-  given [T](using Encoder[Wavelength], Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Encoder[SpectralDefinition[T]] =
-    Encoder.instance { (sd: SpectralDefinition[T]) =>
-      Json.obj(
-        sd match {
-          case bn: BandNormalized[T] => "bandNormalized" -> bn.asJson
-          case el: EmissionLines[T]  => "emissionLines"  -> el.asJson
-        }
-      )
-    }
-
-  given Decoder[SourceProfile.Gaussian] =
-    Decoder.instance { c =>
-      for {
-        f <- c.downField("fwhm").as[Angle]
-        s <- Decoder[SpectralDefinition[Integrated]].apply(c)
-      } yield SourceProfile.Gaussian(f, s)
-    }
-
-  given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile.Gaussian] =
-    Encoder.instance { (g: SourceProfile.Gaussian) =>
-      g.spectralDefinition
-       .asJson
-       .mapObject(_.add("fwhm", g.fwhm.asJson))
-    }
-
   private def refinedBigDecimalCodec[V](
     name:           String,
     range:          String,
@@ -326,6 +294,38 @@ trait SourceProfileCodec {
       } yield EmissionLine(w, f)
 
   }
+
+  // SpectralDefinition[T]
+  given [T](using Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Decoder[SpectralDefinition[T]] =
+    Decoder.instance { c =>
+      c.downField("bandNormalized").as[BandNormalized[T]] orElse
+        c.downField("emissionLines").as[EmissionLines[T]]
+    }
+
+  given [T](using Encoder[Wavelength], Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Encoder[SpectralDefinition[T]] =
+    Encoder.instance { (sd: SpectralDefinition[T]) =>
+      Json.obj(
+        sd match {
+          case bn: BandNormalized[T] => "bandNormalized" -> bn.asJson
+          case el: EmissionLines[T]  => "emissionLines"  -> el.asJson
+        }
+      )
+    }
+
+  given Decoder[SourceProfile.Gaussian] =
+    Decoder.instance { c =>
+      for {
+        f <- c.downField("fwhm").as[Angle]
+        s <- Decoder[SpectralDefinition[Integrated]].apply(c)
+      } yield SourceProfile.Gaussian(f, s)
+    }
+
+  given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile.Gaussian] =
+    Encoder.instance { (g: SourceProfile.Gaussian) =>
+      g.spectralDefinition
+       .asJson
+       .mapObject(_.add("fwhm", g.fwhm.asJson))
+    }
 
   // type SourceProfile
   given Decoder[SourceProfile] =

@@ -10,7 +10,6 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate._
 import lucuma.core.enums.DatasetQaState
-import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding._
@@ -18,12 +17,12 @@ import lucuma.odb.graphql.binding._
 object WhereDataset {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereOrderDatasetIdBinding     = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
-    val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "observation" / "id", ObservationIdBinding)
-    val WhereEqStepIdBinding           = WhereEq.binding[Step.Id](path / "step" / "id", StepIdBinding)
-    val WhereOrderIndexBinding         = WhereOrder.binding[PosShort](path / "index", PosShortBinding)
-    val WhereFilenameBinding           = WhereString.binding(path / "filename")
-    val QaStateBinding                 = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
+    val WhereOrderDatasetIdBinding = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
+    val WhereObservationBinding    = WhereObservation.binding(path / "observation")
+    val WhereEqStepIdBinding       = WhereEq.binding[Step.Id](path / "step" / "id", StepIdBinding)
+    val WhereOrderIndexBinding     = WhereOrder.binding[PosShort](path / "index", PosShortBinding)
+    val WhereFilenameBinding       = WhereString.binding(path / "filename")
+    val QaStateBinding             = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
 
     lazy val WhereDatasetBinding = binding(path)
 
@@ -34,7 +33,7 @@ object WhereDataset {
         WhereDatasetBinding.Option("NOT", rNOT),
 
         WhereOrderDatasetIdBinding.Option("id", rId),
-        WhereOrderObservationIdBinding.Option("observationId", rObs),
+        WhereObservationBinding.Option("observation", rObs),
         WhereEqStepIdBinding.Option("stepId", rStepId),
         WhereOrderIndexBinding.Option("index", rIndex),
         WhereFilenameBinding.Option("filename", rFile),

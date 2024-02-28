@@ -4,9 +4,8 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.core.model.Program
 
 class ConstraintSetGroupPredicates(path: Path) {
-  val programId = LeafPredicates[Program.Id](path / "programId")
+  val program      = ProgramPredicates(path / "program")
   val observations = ObservationSelectResultPredicates(path / "observations")
 }

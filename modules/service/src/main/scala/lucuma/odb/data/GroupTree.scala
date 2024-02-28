@@ -3,6 +3,7 @@
 
 package lucuma.odb.data
 
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
@@ -14,7 +15,22 @@ import lucuma.core.util.TimeSpan
 /**
  * A simple in-memory group representation.
  */
-sealed trait GroupTree extends Product with Serializable
+sealed trait GroupTree extends Product with Serializable {
+
+  def findGroup(groupId: Group.Id): Option[GroupTree] = {
+    @scala.annotation.tailrec
+    def go(remaining: List[GroupTree]): Option[GroupTree] =
+      remaining match {
+        case Nil => None
+        case GroupTree.Leaf(_) :: tail => go(tail)
+        case GroupTree.Root(_, c) :: tail => go(c ::: tail)
+        case (b @ GroupTree.Branch(g, _, _, c, _, _, _, _)) :: tail =>
+          if (g === groupId) b.some else go(c ::: tail)
+      }
+    go(List(this))
+  }
+
+}
 
 object GroupTree {
 

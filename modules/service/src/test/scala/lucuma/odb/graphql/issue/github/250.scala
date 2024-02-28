@@ -8,9 +8,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
-import io.circe.syntax._
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 
@@ -75,7 +73,11 @@ class GitHub_250 extends OdbSuite {
         query =
           s"""
             query {
-              observations(programId: ${pid.asJson}) {
+              observations(WHERE: {
+                program: {
+                  id: { EQ: "$pid" }
+                }
+              }) {
                 matches {
                   id
                   title
@@ -126,7 +128,11 @@ class GitHub_250 extends OdbSuite {
         query =
           s"""
             query {
-              observations(programId: ${pid.asJson}) {
+              observations(WHERE: {
+                program: {
+                  id: { EQ: "$pid" }
+                }
+              }) {
                 matches {
                   id
                   title

@@ -35,6 +35,7 @@ import lucuma.core.math.Angle
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -150,6 +151,123 @@ class createObservation extends OdbSuite {
           .liftTo[IO]
         assertIO(get, pid)
       }
+    }
+  }
+
+  test("[general] can create observation with a program reference") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programReference: "G-2025A-0001"
+              SET: {
+                subtitle: "crunchy frog"
+              }
+            }) {
+              observation {
+                subtitle
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("subtitle")
+          .as[String]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, "crunchy frog")
+      }
+    }
+  }
+
+  test("[general] can create an observation when both ref and pid are supplied if they correspond") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              programReference: "G-2025A-0002"
+              SET: {
+                subtitle: "crunchy frog"
+              }
+            }) {
+              observation {
+                subtitle
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("subtitle")
+          .as[String]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, "crunchy frog")
+      }
+    }
+  }
+
+  test("[general] cannot create an observation when both ref and pid are supplied if they do not correspond") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      expect(
+        pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "p-123"
+              programReference: "G-2025A-0003"
+              SET: {
+                subtitle: "crunchy frog"
+              }
+            }) {
+              observation {
+                subtitle
+              }
+            }
+          }
+        """,
+        Left(List(
+          "Program reference G-2025A-0003 (id p-105) doesn't correspond to specified program id p-123"
+        ))
+      )
+    }
+  }
+
+  test("[general] cannot create an observation without a ref or pid") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      expect(
+        pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              SET: {
+                subtitle: "crunchy frog"
+              }
+            }) {
+              observation {
+                subtitle
+              }
+            }
+          }
+        """,
+        Left(List(
+          "One of programId or programReference must be provided."
+        ))
+      )
     }
   }
 

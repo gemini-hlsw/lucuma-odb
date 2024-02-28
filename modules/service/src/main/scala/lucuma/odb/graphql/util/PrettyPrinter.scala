@@ -44,7 +44,7 @@ object PrettyPrinter {
     char('"') + text(s) + char('"')
 
   def obj(name: String, ps: (String, Doc)*): Doc =
-    obj(name, ps.map(prop): _*)
+    obj(name, ps.map(prop)*)
 
   def obj(name: String, vs: Doc*)(using DummyImplicit): Doc =
     elems(vs.toList).tightBracketBy(text(name) + Paren.Open, Paren.Close)
@@ -63,7 +63,7 @@ object PrettyPrinter {
       case Empty                           => text("Empty")
       case Environment(e, child)           => obj("Environment", "env" -> env(e), "child" -> query(child))
       case Filter(pred, child)             => obj("Filter", "pred" -> predicate(pred), "child" -> query(child))
-      case Group(queries)                  => obj("Group", queries.map(query):_*)
+      case Group(queries)                  => obj("Group", queries.map(query)*)
       case Introspect(schema, child)       => obj("Introspect", "schema" -> str("<schema>"), "child" -> query(child))
       case Limit(num, child)               => obj("Limit", "num" -> str(num), "child" -> query(child))
       case Narrow(subtpe, child)           => obj("Narrow", "subtpe" -> str(subtpe), "child" -> query(child))
@@ -72,18 +72,18 @@ object PrettyPrinter {
       case Select(name, alias, child) =>
         var props = List("name" -> quoted(name)) ++ alias.foldMap(a => List("alias" -> quoted(a)))
         if child != Query.Empty then props :+= "child" -> query(child)
-        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
+        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props*)
       case TransformCursor(f, child)       => obj("TransformCursor", "f" -> text("<function>"), "child" -> query(child))
       case Unique(child)                   => obj("Unique", query(child))
       case UntypedFragmentSpread(name, ds) => obj("UntypedFragmentSpread", "directives" -> directives(ds))
       case UntypedInlineFragment(tpnme, ds, child) => 
         val ps = tpnme.foldMap(n => List("tpnme" -> quoted(n))) :+ ("directives" -> directives(ds)) :+ ("child" -> query(child))
-        obj("UntypedInlineFragment", ps:_*)
+        obj("UntypedInlineFragment", ps*)
       case UntypedSelect(name, alias, args, ds, child) =>
         var props = List("name" -> quoted(name)) ++ alias.foldMap(a => List("alias" -> quoted(a)))
         if args.nonEmpty then props = props :+ ("args" -> elems(args.map(binding)).tightBracketBy(Bracket.Open, Bracket.Close))
         if child != Query.Empty then props :+= "child" -> query(child)
-        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props: _*)
+        if props.length == 1 then obj("Select", props.head._2) else obj("Select", props*)
 
   def env(e: Env): Doc =
     e match
@@ -99,7 +99,6 @@ object PrettyPrinter {
   def predicate(pred: Predicate): Doc =
     pred match
       case Predicate.And(x, y)             => obj("And", predicate(x), predicate(y))
-      case Predicate.AndB(x, y)            => obj("AndB", term(x), term(y))
       case Predicate.Contains(a, as)       => obj("Contains", term(a), term(as))
       case Predicate.Eql(x, y)             => obj("Eql", term(x), term(y))
       case Predicate.False                 => text("False")
@@ -112,9 +111,7 @@ object PrettyPrinter {
       case Predicate.Matches(x, r)         => obj("Matches", term(x), str(r))
       case Predicate.NEql(x, y)            => obj("NEql", term(x), term(y))
       case Predicate.Not(x)                => obj("Not", predicate(x))
-      case Predicate.NotB(x)               => obj("NotB", term(x))
       case Predicate.Or(x, y)              => obj("Or", predicate(x), predicate(y))
-      case Predicate.OrB(x, y)             => obj("OrB", term(x), term(y))
       case Predicate.StartsWith(x, prefix) => obj("StartsWith", term(x), quoted(prefix))
       case Predicate.True                  => text("True")
       case p                               => text(s"<Predicate:${p.getClass.getSimpleName}>")
@@ -122,8 +119,8 @@ object PrettyPrinter {
   def term[A](t: Term[A]): Doc =
     t match
       case p: Predicate => predicate(p) // Predicate <: Term[Boolean]
-      case PathTerm.ListPath(ss) => obj("ListPath", ss.map(quoted): _*)
-      case PathTerm.UniquePath(ss) => obj("UniquePath", ss.map(quoted): _*)
+      case PathTerm.ListPath(ss) => obj("ListPath", ss.map(quoted)*)
+      case PathTerm.UniquePath(ss) => obj("UniquePath", ss.map(quoted)*)
       case Predicate.Const(a: String) => obj("Const", quoted(a))
       case Predicate.Const(a) => obj("Const", str(a))
       case Predicate.ToLowerCase(x) => obj("ToLowerCase", term(x))

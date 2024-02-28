@@ -11,6 +11,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.Target
 
 class targetGroup extends OdbSuite {
@@ -137,7 +138,11 @@ class targetGroup extends OdbSuite {
           query =
             s"""
               query {
-                observations(programId: ${pid.asJson}) {
+                observations(WHERE: {
+                  program: {
+                    id: { EQ: "$pid" }
+                  }
+                }) {
                   matches {
                     id
                     title
@@ -175,4 +180,125 @@ class targetGroup extends OdbSuite {
     }
   }
 
+  test("should work with a program reference") {
+    List(pi).traverse { user =>
+      for {
+        pid  <- createProgramAs(user)
+        _    <- addProposal(user, pid)
+        _    <- submitProposal(user, pid, Semester.unsafeFromString("2025A").some)
+        tids <- createTargetAs(user, pid).replicateA(3)
+        oid1 <- createObservationAs(user, pid, tids(0), tids(1))
+        oid2 <- createObservationAs(user, pid, tids(1), tids(2))
+        _  <- expect(
+          user = user,
+          query =
+            s"""
+              query {
+                targetGroup(programReference: "G-2025A-0001") {
+                  matches {
+                    observations {
+                      matches {
+                        id
+                      }
+                    }
+                    target {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(
+            json"""
+              {
+                "targetGroup" : {
+                  "matches" : [
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid1
+                          }
+                        ]
+                      },
+                      "target" : {
+                        "id" : ${tids(0)}
+                      }
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid1
+                          },
+                          {
+                            "id" : $oid2
+                          }
+                        ]
+                      },
+                      "target" : {
+                        "id" : ${tids(1)}
+                      }
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid2
+                          }
+                        ]
+                      },
+                      "target" : {
+                        "id" : ${tids(2)}
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      } yield ()
+    }
+  }
+
+  test("should handle missing program id and reference") {
+    List(pi).traverse { user =>
+      for {
+        pid  <- createProgramAs(user)
+        tids <- createTargetAs(user, pid).replicateA(2)
+        oid1 <- createObservationAs(user, pid, tids(0), tids(1))
+        _  <- expect(
+          user = user,
+          query =
+            s"""
+              query {
+                targetGroup {
+                  matches {
+                    observations {
+                      matches {
+                        id
+                      }
+                    }
+                    target {
+                      id
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(
+            json"""
+              {
+                "targetGroup" : {
+                  "matches" : [
+                  ]
+                }
+              }
+            """
+          )
+        )
+      } yield ()
+    }
+  }
 }

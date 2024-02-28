@@ -202,6 +202,13 @@ object OdbMapping {
           with WavelengthMapping[F]
         {
 
+          // By default there is a tight (5 level) limit on the nesting of
+          // objects in inputs.  We need to increase it to handle our schema.
+          override def parserConfig: GraphQLParser.Config =
+            GraphQLParser
+              .defaultConfig
+              .copy(maxInputValueDepth = 16)
+
           // Our schema
           val schema: Schema =
             unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema

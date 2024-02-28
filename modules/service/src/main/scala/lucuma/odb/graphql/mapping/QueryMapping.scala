@@ -8,13 +8,16 @@ package mapping
 import cats.effect.Resource
 import cats.syntax.all._
 import grackle.Path
+import grackle.Predicate
 import grackle.Predicate._
 import grackle.Query
 import grackle.Query._
 import grackle.QueryCompiler.Elab
+import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model
+import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
@@ -22,8 +25,9 @@ import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
-import lucuma.odb.graphql.input.WhereTargetInput
+import lucuma.odb.graphql.input.WhereTarget
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.Services
 
@@ -85,20 +89,21 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches")
     {
       case (QueryType, "asterismGroup", List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProgramReferenceBinding.Option("programReference", rRef),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          (programPredicate(rPid, rRef, Predicates.asterismGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(
                   and(List(
                     WHERE.getOrElse(True),
-                    Predicates.asterismGroup.program.id.eql(pid),
+                    program,
                     Predicates.asterismGroup.program.existence.includeDeleted(includeDeleted),
                     Predicates.asterismGroup.program.isVisibleTo(user),
                   ))
@@ -184,20 +189,21 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
     {
       case (QueryType, "constraintSetGroup", List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProgramReferenceBinding.Option("programReference", rRef),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          (programPredicate(rPid, rRef, Predicates.constraintSetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(
                   and(List(
                     WHERE.getOrElse(True),
-                    Predicates.constraintSetGroup.programId.eql(pid),
+                    program,
                     Predicates.constraintSetGroup.observations.matches.existence.includeDeleted(includeDeleted),
                     Predicates.constraintSetGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
                     Predicates.constraintSetGroup.observations.matches.program.isVisibleTo(user),
@@ -274,19 +280,17 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
     {
       case (QueryType, "observations", List(
-        ProgramIdBinding.Option("programId", rPid),
         WhereObservationBinding.Option("WHERE", rWHERE),
         ObservationIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rPid, rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, OFFSET, LIMIT, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
-                  pid.map(Predicates.observation.program.id.eql).getOrElse(True),
                   OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
                   Predicates.observation.existence.includeDeleted(includeDeleted),
                   Predicates.observation.program.isVisibleTo(user),
@@ -311,20 +315,30 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         OrderBy(OrderSelections(List(OrderSelection[Tag](PartnerMetaType / "tag"))), child)
       }
 
+  private def programPredicate(
+    rPid: Result[Option[model.Program.Id]],
+    rRef: Result[Option[ProgramReference]],
+    prog: ProgramPredicates
+  ): Result[Predicate] =
+    (rPid, rRef).parTupled.map { (pid, ref) =>
+      and(List(
+        pid.map(prog.id.eql).toList,
+        ref.map(r => prog.reference.eql(r.some)).toList
+      ).flatten) match {
+        case True => False // neither pid nor ref was supplied
+        case p    => p
+      }
+    }
+
   private lazy val Program: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "program", List(
-      ProgramIdBinding("programId", rPid),
+      ProgramIdBinding.Option("programId", rPid),
+      ProgramReferenceBinding.Option("programReference", rRef)
     )) =>
       Elab.transformChild { child =>
-        rPid.map { pid =>
+        programPredicate(rPid, rRef, Predicates.program).map { program =>
           Unique(
-            Filter(
-              And(
-                Predicates.program.id.eql(pid),
-                Predicates.program.isVisibleTo(user),
-              ),
-              child
-            )
+            Filter(And(program, Predicates.program.isVisibleTo(user)), child)
           )
         }
       }
@@ -387,20 +401,21 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches")
     {
       case (QueryType, "targetGroup", List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProgramReferenceBinding.Option("programReference", rRef),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rProgramId, rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (pid, WHERE, LIMIT, includeDeleted) =>
+          (programPredicate(rPid, rRef, Predicates.targetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(
                   and(List(
                     WHERE.getOrElse(True),
-                    Predicates.targetGroup.program.id.eql(pid),
+                    program,
                     Predicates.targetGroup.target.existence.includeDeleted(includeDeleted),
                     Predicates.targetGroup.program.isVisibleTo(user),
                   ))
@@ -419,10 +434,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   }
 
   private lazy val Targets: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    val WhereTargetInputBinding = WhereTargetInput.binding(Path.from(TargetType))
+    val WhereTargetBinding = WhereTarget.binding(Path.from(TargetType))
     {
       case (QueryType, "targets", List(
-        WhereTargetInputBinding.Option("WHERE", rWHERE),
+        WhereTargetBinding.Option("WHERE", rWHERE),
         TargetIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)

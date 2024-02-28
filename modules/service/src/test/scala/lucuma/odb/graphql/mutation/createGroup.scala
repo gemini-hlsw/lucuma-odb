@@ -4,9 +4,11 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal._
+import lucuma.core.model.Semester
 
 class createGroup extends OdbSuite {
 
@@ -145,4 +147,38 @@ class createGroup extends OdbSuite {
     } yield assertEquals(ids, List(Left(g1), Left(g3), Left(g2)))
   }
 
+  test("create group with a program reference") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createGroup(
+              input: {
+                programReference: "G-2025A-0001"
+                SET: {
+                  name: "My Group"
+                }
+              }
+            ) {
+              group {
+                name
+              }
+            }
+          }
+        """,
+        expected = Right(json"""
+          {
+            "createGroup" : {
+              "group" : {
+                "name" : "My Group"
+              }
+            }
+          }
+        """)
+      )
+    }
+  }
 }

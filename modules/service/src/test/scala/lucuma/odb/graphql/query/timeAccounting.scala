@@ -489,12 +489,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
       List(
         StepEvent(   EventId, ts(0), v.oid, v.vid, sid0,       StepStage.StartStep),
-        DatasetEvent(EventId, ts(1), v.oid, v.vid, sid0, did0, DatasetStage.StartObserve),
+        DatasetEvent(EventId, ts(1), v.oid, v.vid, sid0, did0, DatasetStage.StartExpose),
         DatasetEvent(EventId, ts(2), v.oid, v.vid, sid0, did0, DatasetStage.EndWrite),
         StepEvent(   EventId, ts(3), v.oid, v.vid, sid0,       StepStage.EndStep),
 
         StepEvent(   EventId, ts(4), v.oid, v.vid, sid1,       StepStage.StartStep),
-        DatasetEvent(EventId, ts(5), v.oid, v.vid, sid1, did1, DatasetStage.StartObserve),
+        DatasetEvent(EventId, ts(5), v.oid, v.vid, sid1, did1, DatasetStage.StartExpose),
         DatasetEvent(EventId, ts(6), v.oid, v.vid, sid1, did1, DatasetStage.EndWrite),
         StepEvent(   EventId, ts(7), v.oid, v.vid, sid1,       StepStage.EndStep)
       )

@@ -8,7 +8,6 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.ObservingModeType
 
@@ -94,7 +93,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
       case (oid, List((_, List(_, did, _)))) =>
         val q = s"""
           query {
-            datasets(WHERE: { id: { NEQ: "$did" }, observationId: { EQ: "$oid" } }) {
+            datasets(WHERE: { id: { NEQ: "$did" }, observation: { id: { EQ: "$oid" } } }) {
               hasMore
               matches {
                 filename
@@ -126,7 +125,7 @@ class datasets extends OdbSuite with DatasetSetupOperations {
       case (oid, _) =>
         val q = s"""
           query {
-            datasets(WHERE: { observationId: { EQ: "$oid" } }) {
+            datasets(WHERE: { observation: { id: { EQ: "$oid" } } }) {
               hasMore
               matches {
                 filename

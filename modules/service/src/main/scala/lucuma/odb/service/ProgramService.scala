@@ -11,9 +11,11 @@ import cats.syntax.all._
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
@@ -21,8 +23,6 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
@@ -36,6 +36,11 @@ import skunk.syntax.all._
 import Services.Syntax.*
 
 trait ProgramService[F[_]] {
+
+  /**
+   * Find the program id matching the given reference, if any.
+   */
+  def selectPid(ref: ProgramReference): F[Option[Program.Id]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -108,7 +113,6 @@ object ProgramService {
   }
 
   sealed trait UpdateProgramsError extends Product with Serializable {
-    def user: User
     import UpdateProgramsError.*
     def message: String = this match
       case InvalidProposalStatus(_, ps)                     =>
@@ -117,18 +121,13 @@ object ProgramService {
         s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase}."
       case NotAuthorizedOldProposalStatus(pid, user, ps) =>
         s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid."
-      case NoProposalForStatusChange(_, pid)                =>
+      case NoProposalForStatusChange(pid)                =>
         s"Proposal status in program $pid cannot be changed because it has no proposal."
-
-    def failure = odbError.asFailure
-
-    def odbError: OdbError =
-      this match      
-        case InvalidProposalStatus(_, ps)               => OdbError.InvalidArgument(Some(message))
-        case NotAuthorizedNewProposalStatus(_, ps)      => OdbError.NotAuthorized(user.id, Some(message))
-        case NotAuthorizedOldProposalStatus(pid, _, ps) => OdbError.NotAuthorized(user.id, Some(message))
-        case NoProposalForStatusChange(_, pid)          => OdbError.InvalidProgram(pid, Some(message))
-
+      case NoSemesterForSubmittedProposal(pid)           =>
+        s"Submitted program $pid must be associated with a semester."
+      case InvalidSemester(s: Option[Semester])          =>
+        s"The maximum semester is capped at the current year +1${s.fold(".")(" ("+ _.format + " specified).")}"
+    def failure = Result.failure(message)
   }
 
   object UpdateProgramsError {
@@ -136,7 +135,9 @@ object ProgramService {
     case class InvalidProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedNewProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
     case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
-    case class NoProposalForStatusChange(user: User, pid: Program.Id) extends UpdateProgramsError
+    case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
+    case class NoSemesterForSubmittedProposal(pid: Program.Id) extends UpdateProgramsError
+    case class InvalidSemester(s: Option[Semester]) extends UpdateProgramsError
   }
 
   /**
@@ -146,10 +147,14 @@ object ProgramService {
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramService[F] =
     new ProgramService[F] {
 
+      def selectPid(ref: ProgramReference): F[Option[Program.Id]] =
+        session.option(Statements.selectPid)(ref)
+
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
-          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create(None, None))
-          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user)).flatTap { pid =>
+          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
+
+          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, SETʹ.semester, user)).flatTap { pid =>
             SETʹ.proposal.traverse { proposalInput =>
               proposalService.insertProposal(proposalInput, pid)
             }
@@ -191,13 +196,17 @@ object ProgramService {
         }
 
         // Update programs
-        val updatePrograms: F[List[Program.Id]] =
-          Statements.updatePrograms(SET).fold(Nil.pure[F]) { af =>
+        val updatePrograms: F[Result[List[Program.Id]]] =
+          Statements.updatePrograms(SET).fold(Nil.success.pure[F]) { af =>
             session.prepareR(af.fragment.query(program_id)).use { ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
+                .map(_.success)
             }
+          }.recover {
+            case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
+              UpdateProgramsError.InvalidSemester(SET.semester.toOption).failure
           }
 
         // Update proposals. This can fail in a few ways.
@@ -216,42 +225,54 @@ object ProgramService {
 
         def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
           user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
-        
-        val checkCurrentProposalStatus: F[Result[Unit]] =
+
+        def validateStatusUpdate(
+          pid:             Program.Id,
+          oldStatus:       enumsVal.ProposalStatus,
+          newStatusUpdate: Option[enumsVal.ProposalStatus],
+          hasProposal:     Boolean
+        ): Result[Unit] =
+          newStatusUpdate
+            .filter(_ =!= oldStatus) // if they match we're not really trying to update
+            .fold(Result.unit) { newStatus =>
+              (
+                UpdateProgramsError.NoProposalForStatusChange(pid)
+                  .failure.unlessA(hasProposal),
+
+                UpdateProgramsError.NotAuthorizedNewProposalStatus(user, Tag(newStatus.tag))
+                  .failure.unlessA(userCanChangeProposalStatus(newStatus)),
+
+                UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, Tag(oldStatus.tag))
+                  .failure.unlessA(userCanChangeProposalStatus(oldStatus))
+
+              ).tupled.void  // do we want all of the errors or would it be annoying?
+            }
+
+        def validateUpdate(newStatusUpdate: Option[enumsVal.ProposalStatus]): F[Result[Unit]] =
           session.prepareR(Statements.getTempTableData).use(
             _.stream(Void, chunkSize = 1024)
-              .fold(Result.unit){ case (acc, (pid, psTag, hasProposal)) => 
-                val check: Result[Unit] =
-                  for {
-                    ps <- tagToProposalStatus(psTag)
-                    _  <- if (hasProposal) Result.unit
-                          else UpdateProgramsError.NoProposalForStatusChange(user, pid).failure
-                    _  <- if (userCanChangeProposalStatus(ps)) Result.unit
-                          else UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, psTag).failure
-                  } yield ()
-                (acc, check).parMapN((_, _) => ())
-              }
-              .compile
-              .toList
-              .map(_.head)
-          )
+             .fold(Result.unit) { case (acc, (pid, oldSemester, psTag, hasProposal)) =>
+               val check: Result[Unit] =
+                 for {
+                   oldStatus <- tagToProposalStatus(psTag)
+                   _         <- validateStatusUpdate(pid, oldStatus, newStatusUpdate, hasProposal)
+                   finalStatus   = newStatusUpdate.getOrElse(oldStatus)
+                   finalSemester = SET.semester.fold(none, oldSemester, _.some)
+                   _         <- UpdateProgramsError.NoSemesterForSubmittedProposal(pid)
+                                  .failure.unlessA(finalStatus === enumsVal.ProposalStatus.NotSubmitted || finalSemester.isDefined)
+                 } yield ()
 
-        val validateProposalStatus: F[Result[Unit]] =
-          SET.proposalStatus.fold(Result.unit.pure[F]){psTag =>
-            (for {
-              ps   <- ResultT(tagToProposalStatus(psTag).pure[F])
-              _    <- ResultT(
-                        if (userCanChangeProposalStatus(ps)) Result.unit.pure[F]
-                        else UpdateProgramsError.NotAuthorizedNewProposalStatus(user, psTag).failure.pure[F]
-                      )
-              _    <- ResultT(checkCurrentProposalStatus)
-            } yield(())).value
-          }
+               (acc, check).parTupled.void
+             }
+             .compile
+             .onlyOrError
+          )
 
         (for {
           _    <- ResultT(setup.map(Result.apply))
-          _    <- ResultT(validateProposalStatus)
-          ids1 <- ResultT(updatePrograms.map(Result.apply))
+          n    <- ResultT(SET.proposalStatus.traverse(tagToProposalStatus).pure[F])
+          _    <- ResultT(validateUpdate(n))
+          ids1 <- ResultT(updatePrograms)
           ids2 <- ResultT(updateProposals) 
         } yield (ids1 |+| ids2)).value
 
@@ -270,31 +291,55 @@ object ProgramService {
 
   object Statements {
 
+    val selectPid: Query[ProgramReference, Program.Id] =
+      sql"""
+        SELECT
+          c_program_id
+        FROM
+          t_program
+        WHERE
+          c_program_reference = $program_reference
+      """.query(program_id)
+
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""
-        CREATE TEMPORARY TABLE t_program_update (c_program_id, c_proposal_status, c_has_proposal)
+        CREATE TEMPORARY TABLE t_program_update (
+          c_program_id,
+          c_semester,
+          c_proposal_status,
+          c_has_proposal
+        )
         ON COMMIT DROP
-          AS SELECT which.pid, prog.c_proposal_status, prop.c_program_id IS NOT NULL
-        FROM (""" |+| whichProgramIds |+| void""") as which (pid)
+          AS SELECT
+            which.pid,
+            prog.c_semester,
+            prog.c_proposal_status,
+            prop.c_program_id IS NOT NULL
+        FROM (""" |+| whichProgramIds |+| void""") AS which (pid)
         INNER JOIN t_program prog
           ON prog.c_program_id = which.pid
         LEFT JOIN t_proposal prop
           ON prop.c_program_id = which.pid
       """
 
-    def getTempTableData: Query[Void, (Program.Id, Tag, Boolean)] =
+    def getTempTableData: Query[Void, (Program.Id, Option[Semester], Tag, Boolean)] =
       sql"""
-        SELECT c_program_id, c_proposal_status, c_has_proposal
+        SELECT
+           c_program_id,
+           c_semester,
+           c_proposal_status,
+           c_has_proposal
         FROM t_program_update
         ORDER BY c_program_id
-      """.query(program_id *: tag *: bool)
+      """.query(program_id *: semester.opt *: tag *: bool)
 
     def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
           SET.name.map(sql"c_name = $text_nonempty"),
-          SET.proposalStatus.map(sql"c_proposal_status = $tag")
+          SET.proposalStatus.map(sql"c_proposal_status = $tag"),
+          SET.semester.fold(void"c_semester = null".some, none, s => sql"c_semester = $semester"(s).some),
         ).flatten
       )
 
@@ -362,15 +407,15 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[(Option[NonEmptyString], User), Program.Id] =
+    val InsertProgram: Query[(Option[NonEmptyString], Option[Semester], User), Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
-        VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
+        INSERT INTO t_program (c_name, c_semester, c_pi_user_id, c_pi_user_type)
+        VALUES (${text_nonempty.opt}, ${semester.opt}, ${(user_id ~ user_type).opt})
         RETURNING c_program_id
       """.query(program_id)
          .contramap {
-            case (oNes, ServiceUser(_, _)) => (oNes, None)
-            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
+            case (oNes, oSem, ServiceUser(_, _)) => (oNes, oSem, None)
+            case (oNes, oSem, nonServiceUser   ) => (oNes, oSem, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
          }
 
     /** Link a user to a program, without any access checking. */
