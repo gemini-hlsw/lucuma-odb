@@ -1,5 +1,22 @@
 DROP TRIGGER update_semester_index_trigger ON t_program;
 
+-- Instruments gain a new reference name used in program references.
+ALTER TABLE t_instrument
+  ADD COLUMN c_reference_name text;
+
+UPDATE t_instrument
+  SET c_reference_name =
+    CASE
+      WHEN c_tag = 'GmosNorth' THEN 'GMOSN'
+      WHEN c_tag = 'GmosSouth' THEN 'GMOSS'
+      ELSE UPPER(c_tag)
+    END;
+
+ALTER TABLE t_instrument
+  ADD CONSTRAINT check_reference_name CHECK (
+    c_reference_name IS NOT NULL AND c_reference_name ~ '^[A-Z0-9]+$'
+  );
+
 -- The broad categories of programs.  If a science program, then there is a
 -- sub-type (see t_science_subtype below) that further distinguishes it.
 
@@ -255,9 +272,11 @@ CREATE OR REPLACE FUNCTION format_cal_or_eng_reference(ptype e_program_type, sem
 RETURNS text AS $$
 DECLARE
   abbr text;
+  inst text;
 BEGIN
-    SELECT c_abbr INTO abbr FROM t_program_type WHERE c_type = ptype;
-    RETURN CONCAT('G-', semester, '-', abbr, '-', instrument, '-', LPAD(index::text, 2, '0'));
+    SELECT c_abbr           INTO abbr FROM t_program_type WHERE c_type = ptype;
+    SELECT c_reference_name INTO inst FROM t_instrument   WHERE c_tag = instrument;
+    RETURN CONCAT('G-', semester, '-', abbr, '-', inst, '-', LPAD(index::text, 2, '0'));
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -265,10 +284,12 @@ CREATE OR REPLACE FUNCTION format_lib_or_xpl_reference(ptype e_program_type, ins
 RETURNS text AS $$
 DECLARE
   abbr text;
+  inst text;
   prefix text;
 BEGIN
-    SELECT c_abbr INTO abbr FROM t_program_type WHERE c_type = ptype;
-    prefix := CONCAT('G-', abbr, '-', instrument);
+    SELECT c_abbr           INTO abbr FROM t_program_type WHERE c_type = ptype;
+    SELECT c_reference_name INTO inst FROM t_instrument   WHERE c_tag = instrument;
+    prefix := CONCAT('G-', abbr, '-', inst);
 
     RETURN  CASE
       WHEN ptype = 'library' THEN CONCAT(prefix, '-', description)

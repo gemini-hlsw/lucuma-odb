@@ -582,20 +582,20 @@ class reference extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
-    } yield assertEquals(ref, "G-2025B-CAL-GmosSouth-01".some)
+    } yield assertEquals(ref, "G-2025B-CAL-GMOSS-01".some)
   }
 
   test("setProposalReference CAL, different instrument has its own index") {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
-    } yield assertEquals(ref, "G-2025B-CAL-GmosNorth-01".some)
+    } yield assertEquals(ref, "G-2025B-CAL-GMOSN-01".some)
   }
 
   test("program reference CAL fields") {
     expect(pi, s"""
       query {
-        program(programReference: "G-2025B-CAL-GmosSouth-01") {
+        program(programReference: "G-2025B-CAL-GMOSS-01") {
           reference {
             label
             ... on CalibrationProgramReference {
@@ -610,7 +610,7 @@ class reference extends OdbSuite {
         {
           "program": {
             "reference": {
-              "label": "G-2025B-CAL-GmosSouth-01",
+              "label": "G-2025B-CAL-GMOSS-01",
               "semester": "2025B",
               "instrument": "GMOS_SOUTH",
               "semesterIndex": 1
@@ -625,20 +625,20 @@ class reference extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
-    } yield assertEquals(ref, "G-2025B-ENG-GmosSouth-01".some)
+    } yield assertEquals(ref, "G-2025B-ENG-GMOSS-01".some)
   }
 
   test("setProposalReference ENG, second time increases index") {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
-    } yield assertEquals(ref, "G-2025B-ENG-GmosSouth-02".some)
+    } yield assertEquals(ref, "G-2025B-ENG-GMOSS-02".some)
   }
 
   test("program reference ENG fields") {
     expect(pi, s"""
       query {
-        program(programReference: "G-2025B-ENG-GmosSouth-02") {
+        program(programReference: "G-2025B-ENG-GMOSS-02") {
           reference {
             label
             ... on EngineeringProgramReference {
@@ -653,7 +653,7 @@ class reference extends OdbSuite {
         {
           "program": {
             "reference": {
-              "label": "G-2025B-ENG-GmosSouth-02",
+              "label": "G-2025B-ENG-GMOSS-02",
               "semester": "2025B",
               "instrument": "GMOS_SOUTH",
               "semesterIndex": 2
@@ -668,7 +668,7 @@ class reference extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(pid, """example: { instrument: GMOS_SOUTH }""")
-    } yield assertEquals(ref, "G-XPL-GmosSouth".some)
+    } yield assertEquals(ref, "G-XPL-GMOSS".some)
   }
 
   test("setProposalReference XPL, already taken") {
@@ -685,7 +685,7 @@ class reference extends OdbSuite {
             }
           }
         """,
-        List("Program reference 'G-XPL-GmosSouth' already exists.").asLeft
+        List("Program reference 'G-XPL-GMOSS' already exists.").asLeft
       )
     }
   }
@@ -693,7 +693,7 @@ class reference extends OdbSuite {
   test("program reference XPL fields") {
     expect(pi, s"""
       query {
-        program(programReference: "G-XPL-GmosSouth") {
+        program(programReference: "G-XPL-GMOSS") {
           reference {
             label
             ... on ExampleProgramReference {
@@ -706,7 +706,7 @@ class reference extends OdbSuite {
         {
           "program": {
             "reference": {
-              "label": "G-XPL-GmosSouth",
+              "label": "G-XPL-GMOSS",
               "instrument": "GMOS_SOUTH"
             }
           }
@@ -719,7 +719,7 @@ class reference extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(pid, """library: { instrument: GMOS_SOUTH, description: "FOO" }""")
-    } yield assertEquals(ref, "G-LIB-GmosSouth-FOO".some)
+    } yield assertEquals(ref, "G-LIB-GMOSS-FOO".some)
   }
 
   test("setProposalReference LIB, invalid description") {
@@ -745,7 +745,7 @@ class reference extends OdbSuite {
   test("program reference LIB fields") {
     expect(pi, s"""
       query {
-        program(programReference: "G-LIB-GmosSouth-FOO") {
+        program(programReference: "G-LIB-GMOSS-FOO") {
           reference {
             label
             ... on LibraryProgramReference {
@@ -759,7 +759,7 @@ class reference extends OdbSuite {
         {
           "program": {
             "reference": {
-              "label": "G-LIB-GmosSouth-FOO",
+              "label": "G-LIB-GMOSS-FOO",
               "instrument": "GMOS_SOUTH",
               "description": "FOO"
             }
@@ -801,12 +801,12 @@ class reference extends OdbSuite {
   }
 
   // Program references created above
-  val ref25BCalGmosSouth01 = ProgramReference.fromString.unsafeGet("G-2025B-CAL-GmosSouth-01")
-  val ref25BCalGmosNorth01 = ProgramReference.fromString.unsafeGet("G-2025B-CAL-GmosNorth-01")
-  val ref25BEngGmosSouth01 = ProgramReference.fromString.unsafeGet("G-2025B-ENG-GmosSouth-01")
-  val ref25BEngGmosSouth02 = ProgramReference.fromString.unsafeGet("G-2025B-ENG-GmosSouth-02")
-  val refXplGmosSouth      = ProgramReference.fromString.unsafeGet("G-XPL-GmosSouth")
-  val refLibGmosSouthFoo   = ProgramReference.fromString.unsafeGet("G-LIB-GmosSouth-FOO")
+  val ref25BCalGmosSouth01 = ProgramReference.fromString.unsafeGet("G-2025B-CAL-GMOSS-01")
+  val ref25BCalGmosNorth01 = ProgramReference.fromString.unsafeGet("G-2025B-CAL-GMOSN-01")
+  val ref25BEngGmosSouth01 = ProgramReference.fromString.unsafeGet("G-2025B-ENG-GMOSS-01")
+  val ref25BEngGmosSouth02 = ProgramReference.fromString.unsafeGet("G-2025B-ENG-GMOSS-02")
+  val refXplGmosSouth      = ProgramReference.fromString.unsafeGet("G-XPL-GMOSS")
+  val refLibGmosSouthFoo   = ProgramReference.fromString.unsafeGet("G-LIB-GMOSS-FOO")
   val ref24ASci01C         = ProgramReference.fromString.unsafeGet("G-2024A-0001-C")
   val ref24ASci02Q         = ProgramReference.fromString.unsafeGet("G-2024A-0002-Q")
   val ref25BSci02Q         = ProgramReference.fromString.unsafeGet("G-2025B-0002-Q")

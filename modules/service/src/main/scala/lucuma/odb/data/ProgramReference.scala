@@ -11,6 +11,7 @@ import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.cats.given
 import eu.timepit.refined.string.MatchesRegex
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.syntax.*
@@ -27,6 +28,35 @@ sealed trait ProgramReference extends Product with Serializable {
 
 object ProgramReference {
 
+  // Temporary -- to be added to lucuma.core.enums.Instrument.
+  extension (instrument: Instrument) {
+    def referenceName: NonEmptyString =
+      NonEmptyString.unsafeFrom(
+        instrument match {
+          case Instrument.AcqCam     => "ACQCAM"
+          case Instrument.Bhros      => "BHROS"
+          case Instrument.Flamingos2 => "FLAMINGOS2"
+          case Instrument.Ghost      => "GHOST"
+          case Instrument.GmosNorth  => "GMOSN"
+          case Instrument.GmosSouth  => "GMOSS"
+          case Instrument.Gnirs      => "GNIRS"
+          case Instrument.Gpi        => "GPI"
+          case Instrument.Gsaoi      => "GSAOI"
+          case Instrument.Igrins2    => "IGNRIS2"
+          case Instrument.Michelle   => "MICHELLE"
+          case Instrument.Nici       => "NICI"
+          case Instrument.Nifs       => "NIFS"
+          case Instrument.Niri       => "NIRI"
+          case Instrument.Phoenix    => "PHOENIX"
+          case Instrument.Trecs      => "TRECS"
+          case Instrument.Visitor    => "VISITOR"
+          case Instrument.Scorpio    => "SCORPIO"
+          case Instrument.Alopeke    => "ALOPEKE"
+          case Instrument.Zorro      => "ZORRO"
+        }
+     )
+  }
+
   type Description = String Refined MatchesRegex["""^[A-Z0-9]+"""]
   object Description extends RefinedTypeOps[Description, String]
 
@@ -35,7 +65,7 @@ object ProgramReference {
       ProgramType.Calibration
 
     override def label: String =
-      f"G-${semester.format}-${programType.abbreviation}-${instrument.tag}-$index%02d"
+      f"G-${semester.format}-${programType.abbreviation}-${instrument.referenceName}-$index%02d"
   }
 
   object Calibration {
@@ -53,7 +83,7 @@ object ProgramReference {
       ProgramType.Engineering
 
     override def label: String =
-      f"G-${semester.format}-${programType.abbreviation}-${instrument.tag}-$index%02d"
+      f"G-${semester.format}-${programType.abbreviation}-${instrument.referenceName}-$index%02d"
   }
 
   object Engineering {
@@ -71,7 +101,7 @@ object ProgramReference {
       ProgramType.Example
 
     override def label: String =
-      s"G-${programType.abbreviation}-${instrument.tag}"
+      s"G-${programType.abbreviation}-${instrument.referenceName}"
   }
 
   object Example {
@@ -89,7 +119,7 @@ object ProgramReference {
       ProgramType.Library
 
     override def label: String =
-      s"G-${programType.abbreviation}-${instrument.tag}-${description.value}"
+      s"G-${programType.abbreviation}-${instrument.referenceName}-${description.value}"
   }
 
   object Library {
