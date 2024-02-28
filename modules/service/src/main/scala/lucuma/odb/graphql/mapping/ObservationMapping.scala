@@ -20,8 +20,8 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.service.ItcService

@@ -21,8 +21,8 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport

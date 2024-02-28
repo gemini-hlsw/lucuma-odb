@@ -47,8 +47,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent

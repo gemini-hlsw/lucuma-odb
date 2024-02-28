@@ -22,8 +22,8 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
 import lucuma.odb.logic.TimeEstimateCalculator

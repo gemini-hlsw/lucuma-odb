@@ -11,8 +11,8 @@ import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
-import lucuma.odb.OdbError
-import lucuma.odb.OdbErrorExtensions.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs._
