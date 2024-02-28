@@ -25,12 +25,13 @@ object ObservationPropertiesInput {
   trait AsterismInput {
     def targetEnvironment: Option[TargetEnvironmentInput]
 
+    // Some downstream stuff wants this as a Nullable NEL
     def asterism: Nullable[NonEmptyList[Target.Id]] =
-      for {
-        t <- Nullable.orAbsent(targetEnvironment)
-        a <- t.asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
-      } yield a
-
+      Nullable.orAbsent(targetEnvironment).flatMap: t =>
+        t match
+          case TargetEnvironmentInput.Create(_, asterism) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
+          case TargetEnvironmentInput.Edit(_, asterism)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+        
   }
 
   final case class Create(

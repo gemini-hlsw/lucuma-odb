@@ -408,7 +408,7 @@ object ObservationService {
           SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
-          SET.targetEnvironment.flatMap(_.explicitBase.toOption),
+          SET.targetEnvironment.flatMap(_.explicitBase),
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
