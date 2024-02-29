@@ -85,7 +85,6 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TargetService
 import lucuma.odb.service.TargetService.CloneTargetResponse
 import lucuma.odb.service.TargetService.UpdateTargetsResponse
-import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -273,7 +272,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("addConditionsEntry", ConditionsEntryInput.Binding): (input, child) =>
       services.useTransactionally:
         chronicleService.addConditionsEntry(input).nestMap: id =>
-            Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
+          Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
 
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
@@ -388,16 +387,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CreateTarget =
-    MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        {      
-          for
+    MutationField("createTarget", CreateTargetInput.Binding): (input, child) =>
+      services.useTransactionally:
+        { for
             pid <- ResultT(selectPid(input.programId, input.proposalReference, input.programReference))
             tid <- ResultT(targetService.createTarget(pid, input.SET))
           yield Unique(Filter(Predicates.target.id.eql(tid), child)): Query
         }.value
-      }
-    }
 
   private lazy val CreateUserInvitation =
     MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
@@ -796,13 +792,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
 
         // Update the specified targets and then return a query for the affected targets (or an error)
-        idSelect.flatTraverse { which =>
-          targetService.updateTargets(input.SET, which).map {
-            case UpdateTargetsResponse.Success(selected)                    => targetResultSubquery(selected, input.LIMIT, child)
-            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
-            case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
-          }
-        }
+        idSelect.flatTraverse: which =>
+          ResultT(targetService.updateTargets(input.SET, which)).flatMap: selected =>
+            ResultT(targetResultSubquery(selected, input.LIMIT, child).pure[F])
+          .value
 
       }
     }
