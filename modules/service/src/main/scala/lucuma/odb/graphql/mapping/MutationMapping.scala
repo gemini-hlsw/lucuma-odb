@@ -25,7 +25,6 @@ import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
-import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -267,19 +266,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // Field definitions
 
   private lazy val AddConditionsEntry: MutationField =
-    MutationField("addConditionsEntry", ConditionsEntryInput.Binding) { (input, child) =>
-      if user.role.access < Access.Staff then {
-        OdbError.NotAuthorized(user.id, Some(s"This action is restricted to staff users.")).asFailureF
-      } else {
-        services.useTransactionally {
-          chronicleService.addConditionsEntry(input).map { id =>
-            Result(
-              Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
-            )
-          }
-        }  
-      }
-    }
+    MutationField("addConditionsEntry", ConditionsEntryInput.Binding): (input, child) =>
+      services.useTransactionally:
+        ResultT(chronicleService.addConditionsEntry(input)).map: id =>
+            Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
+          .value
 
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
