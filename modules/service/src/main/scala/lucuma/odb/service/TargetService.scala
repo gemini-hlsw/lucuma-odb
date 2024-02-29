@@ -50,11 +50,13 @@ import skunk.implicits._
 import Services.Syntax.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 
 trait TargetService[F[_]] {
-  import TargetService.{ CloneTargetResponse, UpdateTargetsResponse }
+  import TargetService.CloneTargetResponse
   def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]]
-  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse]
+  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse]
 }
 
@@ -106,7 +108,13 @@ object TargetService {
           case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
           case Success(id)          => Result(id)
 
-      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
+      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]] =
+        updateTargetsImpl(input, which).map:
+          case UpdateTargetsResponse.Success(selected)                    => Result.success(selected)
+          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+          case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure                  
+
+      def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
         updateTargetsʹ(input, which)
 
       def updateTargetsʹ(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
