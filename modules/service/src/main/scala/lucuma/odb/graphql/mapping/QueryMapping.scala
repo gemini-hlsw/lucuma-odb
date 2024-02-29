@@ -17,8 +17,8 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProposalReference
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._

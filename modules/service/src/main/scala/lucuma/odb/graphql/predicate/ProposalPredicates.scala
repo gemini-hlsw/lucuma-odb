@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.odb.data.ProposalReference
+import lucuma.core.model.ProposalReference
 
 class ProposalPredicates(path: Path) {
 

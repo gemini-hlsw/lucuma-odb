@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.odb.data.ProgramReference
+import lucuma.core.model.ProgramReference
 
 class ProgramReferencePredicates(path: Path) {
   val label = LeafPredicates[ProgramReference](path / "label")

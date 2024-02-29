@@ -29,6 +29,8 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.*
@@ -46,10 +48,8 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.UserInvitation

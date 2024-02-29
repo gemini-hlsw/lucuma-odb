@@ -4,8 +4,8 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.Semester
-import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.ScienceSubtypeBinding

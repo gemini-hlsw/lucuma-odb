@@ -27,7 +27,6 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
-import lucuma.core.model.Group
 import lucuma.core.model.*
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
@@ -48,11 +47,8 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.ProposalReference
-import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -348,7 +344,7 @@ trait Codecs {
       ProgramReference.fromString.reverseGet
     )
 
-  val program_type: Codec[lucuma.odb.data.ProgramType] =
+  val program_type: Codec[ProgramType] =
     enumerated(Type("e_program_type"))
 
   val program_user_role: Codec[ProgramUserRole] =
@@ -377,7 +373,7 @@ trait Codecs {
 
   val semester: Codec[Semester] =
     varchar.eimap(
-      s => Semester.fromString(s).toRight(s"Invalid semester: $s"))(
+      s => Semester.fromString.getOption(s).toRight(s"Invalid semester: $s"))(
       _.format
     )
 

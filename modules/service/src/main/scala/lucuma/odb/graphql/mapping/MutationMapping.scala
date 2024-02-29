@@ -30,6 +30,8 @@ import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
@@ -38,8 +40,6 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddDatasetEventInput

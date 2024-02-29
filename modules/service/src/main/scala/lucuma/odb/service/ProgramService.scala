@@ -16,6 +16,8 @@ import grackle.syntax.*
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
