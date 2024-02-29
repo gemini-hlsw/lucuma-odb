@@ -13,13 +13,13 @@ val http4sBlazeVersion         = "0.23.16"
 val http4sEmberVersion         = "0.23.25"
 val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.5.0"
+val logbackVersion             = "1.5.1"
 val log4catsVersion            = "2.6.0"
-val lucumaCatalogVersion       = "0.44.6"
-val lucumaItcVersion           = "0.21.4"
-val lucumaCoreVersion          = "0.92.0"
+val lucumaCatalogVersion       = "0.44.7"
+val lucumaItcVersion           = "0.21.5"
+val lucumaCoreVersion          = "0.93.0"
 val lucumaGraphQLRoutesVersion = "0.8.7"
-val lucumaSsoVersion           = "0.6.12"
+val lucumaSsoVersion           = "0.6.13"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -135,7 +135,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.667"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.669"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,

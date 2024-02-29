@@ -4,9 +4,8 @@
 package lucuma.odb.graphql.binding
 
 import lucuma.core.model.Semester
-import lucuma.odb.data.ReferenceParsers.semester
 
 val SemesterBinding: Matcher[Semester] =
   StringBinding.emap { s =>
-    semester.parseAll(s).toOption.toRight(s"'$s' is not a valid semester.")
+    Semester.fromString.getOption(s).toRight(s"'$s' is not a valid semester.")
   }

@@ -5,7 +5,7 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.Instrument
-import lucuma.odb.data.ProgramReference
+import lucuma.core.model.ProgramReference
 import lucuma.odb.graphql.binding.InstrumentBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding

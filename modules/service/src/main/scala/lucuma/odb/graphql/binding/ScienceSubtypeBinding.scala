@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ScienceSubtype
+import lucuma.core.enums.ScienceSubtype
 
 val ScienceSubtypeBinding: Matcher[ScienceSubtype] =
   enumeratedBinding

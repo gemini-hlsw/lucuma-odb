@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ProposalReference
+import lucuma.core.model.ProposalReference
 
 val ProposalReferenceBinding: Matcher[ProposalReference] =
   StringBinding.emap { s =>

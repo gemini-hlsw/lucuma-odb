@@ -26,6 +26,8 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -41,12 +43,8 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProgramType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.ProposalReference
-import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType

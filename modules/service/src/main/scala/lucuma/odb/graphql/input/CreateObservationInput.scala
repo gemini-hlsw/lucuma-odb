@@ -8,10 +8,10 @@ package input
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProposalReference
 import lucuma.odb.graphql.binding._
 
 final case class CreateObservationInput(
