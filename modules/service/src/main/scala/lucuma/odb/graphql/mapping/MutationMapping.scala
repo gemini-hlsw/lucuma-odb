@@ -202,7 +202,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       )
 
     (pid, Ior.fromOptions(prop, prog)) match {
-      case (None, None)    => OdbError.InvalidArgument("One of programId or programReference must be provided.".some).asFailureF
+      case (None, None)    => OdbError.InvalidArgument("One of programId, programReference or proposalReference must be provided.".some).asFailureF
       case (Some(p), None) => p.success.pure[F]
       case (_, Some(r))    => programService.selectPid(r).map { op =>
         op.fold(OdbError.InvalidArgument(notFound(r).some).asFailure) { selectedPid =>
