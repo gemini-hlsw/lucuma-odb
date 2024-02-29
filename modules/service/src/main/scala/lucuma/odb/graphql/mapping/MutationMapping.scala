@@ -387,13 +387,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
       services.useTransactionally {
-        import TargetService.CreateTargetResponse._
-        ResultT(selectPid(input.programId, input.proposalReference, input.programReference)).flatMap { pid =>
-          ResultT(targetService.createTarget(pid, input.SET).map {
-            case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
-            case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
-            case Success(id)          => Result(Unique(Filter(Predicates.target.id.eql(id), child)))
-          })
+        {      
+          for
+            pid <- ResultT(selectPid(input.programId, input.proposalReference, input.programReference))
+            tid <- ResultT(targetService.createTarget(pid, input.SET))
+          yield Unique(Filter(Predicates.target.id.eql(tid), child)): Query
         }.value
       }
     }

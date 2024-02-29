@@ -48,10 +48,12 @@ import skunk.codec.all._
 import skunk.implicits._
 
 import Services.Syntax.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 trait TargetService[F[_]] {
-  import TargetService.{ CloneTargetResponse, CreateTargetResponse, UpdateTargetsResponse }
-  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse]
+  import TargetService.{ CloneTargetResponse, UpdateTargetsResponse }
+  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse]
   def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse]
 }
@@ -82,7 +84,7 @@ object TargetService {
   def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
     new TargetService[F] {
 
-      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
+      private def createTargetImpl(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
         val insert: AppliedFragment =
           input.tracking match {
             case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, TargetRole.Science)
@@ -97,6 +99,12 @@ object TargetService {
           } // todo: catch key violation to indicate ProgramNotFound
         }
       }
+
+      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]] =
+        createTargetImpl(pid, input).map:
+          case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
+          case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
+          case Success(id)          => Result(id)
 
       def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
         updateTargetsʹ(input, which)
