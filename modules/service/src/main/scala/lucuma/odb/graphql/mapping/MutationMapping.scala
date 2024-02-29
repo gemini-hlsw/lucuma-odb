@@ -92,6 +92,7 @@ import skunk.AppliedFragment
 import skunk.Transaction
 
 import scala.reflect.ClassTag
+import cats.Functor
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -263,14 +264,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       child
     )
 
+  // We do this a lot
+  extension [F[_]: Functor, G[_]: Functor, A, B](fga: F[G[A]]) def nestMap(fab: A => B): F[G[B]] =
+    fga.map(_.map(fab))
+
   // Field definitions
 
   private lazy val AddConditionsEntry: MutationField =
     MutationField("addConditionsEntry", ConditionsEntryInput.Binding): (input, child) =>
       services.useTransactionally:
-        ResultT(chronicleService.addConditionsEntry(input)).map: id =>
+        chronicleService.addConditionsEntry(input).nestMap: id =>
             Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
-          .value
 
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
