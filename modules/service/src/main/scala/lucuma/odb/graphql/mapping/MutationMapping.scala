@@ -77,7 +77,6 @@ import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
-import lucuma.odb.service.AllocationService
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
