@@ -31,9 +31,26 @@ trait GmosSequenceService[F[_]] {
     dynamic: DynamicConfig.GmosNorth
   )(using Transaction[F]): F[Unit]
 
-  def selectGmosNorthDynamic(
+  /**
+   * Selects the static configuration corresponding to the given visit.
+   */
+  def selectGmosNorthStatic(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]]
+
+  /**
+   * Selects all the dynamic configurations for the given observation.
+   */
+  def selectGmosNorthDynamicForObs(
     observationId: Observation.Id
   )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)]
+
+  /**
+   * Selects the dynamic configuration corresponding to the given step.
+   */
+  def selectGmosNorthDynamicForStep(
+    stepId: Step.Id
+  )(using Transaction[F]): F[Option[DynamicConfig.GmosNorth]]
 
   def insertGmosNorthStatic(
     observationId: Observation.Id,
@@ -46,9 +63,26 @@ trait GmosSequenceService[F[_]] {
     dynamic: DynamicConfig.GmosSouth
   )(using Transaction[F]): F[Unit]
 
-  def selectGmosSouthDynamic(
+  /**
+   * Selects the static configuration corresponding to the given visit.
+   */
+  def selectGmosSouthStatic(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]]
+
+  /**
+   * Selects all the dynamic configurations for the given observation.
+   */
+  def selectGmosSouthDynamicForObs(
     observationId: Observation.Id
   )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)]
+
+  /**
+   * Selects the dynamic configuration corresponding to the given step.
+   */
+  def selectGmosSouthDynamicForStep(
+    stepId: Step.Id
+  )(using Transaction[F]): F[Option[DynamicConfig.GmosSouth]]
 
   def insertGmosSouthStatic(
     observationId: Observation.Id,
@@ -70,10 +104,20 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertGmosNorthDynamic)(stepId, dynamic).void
 
-      override def selectGmosNorthDynamic(
+      override def selectGmosNorthStatic(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
+        session.option(Statements.SelectGmosNorthStatic)(visitId)
+
+      override def selectGmosNorthDynamicForObs(
         observationId: Observation.Id
       )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)] =
         session.stream(Statements.SelectGmosNorthDynamicForObs)(observationId, 1024)
+
+      override def selectGmosNorthDynamicForStep(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[DynamicConfig.GmosNorth]] =
+        session.option(Statements.SelectGmosNorthDynamicForStep)(stepId)
 
       override def insertGmosNorthStatic(
         observationId: Observation.Id,
@@ -92,10 +136,20 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.InsertGmosSouthDynamic)(stepId, dynamic).void
 
-      override def selectGmosSouthDynamic(
+      override def selectGmosSouthStatic(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Option[StaticConfig.GmosSouth]] =
+        session.option(Statements.SelectGmosSouthStatic)(visitId)
+
+      override def selectGmosSouthDynamicForObs(
         observationId: Observation.Id
       )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosSouth)] =
         session.stream(Statements.SelectGmosSouthDynamicForObs)(observationId, 1024)
+
+      override def selectGmosSouthDynamicForStep(
+        stepId: Step.Id
+      )(using Transaction[F]): F[Option[DynamicConfig.GmosSouth]] =
+        session.option(Statements.SelectGmosSouthDynamicForStep)(stepId)
 
       override def insertGmosSouthStatic(
         observationId: Observation.Id,
@@ -158,41 +212,65 @@ object GmosSequenceService {
         WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
       ).query(step_id *: decoderA)
 
+    private def selectGmosDynamicStep[A](site: String, decoderA: Decoder[A]): Query[Step.Id, A] =
+      sql"""
+        SELECT
+          #${encodeColumns(none, GmosDynamicColumns)}
+        FROM t_gmos_#${site}_dynamic
+        WHERE c_step_id = $step_id
+      """.query(decoderA)
+
     val SelectGmosNorthDynamicForObs: Query[Observation.Id, (Step.Id, DynamicConfig.GmosNorth)] =
       selectGmosDynamic("north", gmos_north_dynamic)
 
     val SelectGmosSouthDynamicForObs: Query[Observation.Id, (Step.Id, DynamicConfig.GmosSouth)] =
       selectGmosDynamic("south", gmos_south_dynamic)
 
-    val InsertGmosNorthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosNorth), Long] =
+    val SelectGmosNorthDynamicForStep: Query[Step.Id, DynamicConfig.GmosNorth] =
+      selectGmosDynamicStep("north", gmos_north_dynamic)
+
+    val SelectGmosSouthDynamicForStep: Query[Step.Id, DynamicConfig.GmosSouth] =
+      selectGmosDynamicStep("south", gmos_south_dynamic)
+
+    private val GmosStaticColumns: List[String] =
+      List(
+        "c_detector",
+        "c_mos_pre_imaging",
+        "c_stage_mode"
+      )
+
+    def selectStatic[A](site: String, decoderA: Decoder[A]): Query[Visit.Id, A] =
       sql"""
-        INSERT INTO t_gmos_north_static (
+        SELECT
+          #${encodeColumns(none, GmosStaticColumns)}
+        FROM t_gmos_#${site}_static
+        WHERE c_visit_id = $visit_id
+      """.query(decoderA)
+
+    val SelectGmosNorthStatic: Query[Visit.Id, StaticConfig.GmosNorth] =
+      selectStatic("north", gmos_north_static)
+
+    val SelectGmosSouthStatic: Query[Visit.Id, StaticConfig.GmosSouth] =
+      selectStatic("south", gmos_south_static)
+
+    def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, Option[Visit.Id], A), Long] =
+      sql"""
+        INSERT INTO t_gmos_#${site}_static (
           c_observation_id,
           c_visit_id,
-          c_detector,
-          c_mos_pre_imaging,
-          c_stage_mode
+          #${encodeColumns(none, GmosStaticColumns)}
         ) SELECT
           $observation_id,
           ${visit_id.opt},
-          $gmos_north_static
+          $encoderA
         RETURNING c_static_id
       """.query(int8)
 
+    val InsertGmosNorthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosNorth), Long] =
+      insertStatic("north", gmos_north_static)
+
     val InsertGmosSouthStatic: Query[(Observation.Id, Option[Visit.Id], StaticConfig.GmosSouth), Long] =
-      sql"""
-        INSERT INTO t_gmos_south_static (
-          c_observation_id,
-          c_visit_id,
-          c_detector,
-          c_mos_pre_imaging,
-          c_stage_mode
-        ) SELECT
-          $observation_id,
-          ${visit_id.opt},
-          $gmos_south_static
-        RETURNING c_static_id
-      """.query(int8)
+      insertStatic("south", gmos_south_static)
 
   }
 }

@@ -91,6 +91,9 @@ class recordStep extends OdbSuite {
                 }
               }
               observeClass
+              estimate {
+                seconds
+              }
             }
           }
         }
@@ -125,12 +128,25 @@ class recordStep extends OdbSuite {
                   "builtin": "LONG_SLIT_0_50"
                 }
               },
-              "observeClass": "ACQUISITION"
+              "observeClass": "ACQUISITION",
+              "estimate": {
+                "seconds": 1299.562500
+              }
             }
           }
         }
       """.asRight
     )
+
+    // Step Time estimate:
+    // 1200.0     Exposure
+    //   82.5     Readout (HAMAMATSU, 1x1, 12 amp, Low gain, Slow read, FullFrame)
+    //   10.0     Writeout
+    //    7.0     Offset constant
+    //    0.06250 Offset distance (0.00625 sec / arcsec X 10 arcsec)
+    // ----------
+    // 1299.56250 seconds
+
   }
 
   test("recordStep - GmosSouth") {
@@ -176,6 +192,9 @@ class recordStep extends OdbSuite {
                 }
               },
               observeClass
+              estimate {
+                seconds
+              }
             }
           }
         }
@@ -210,7 +229,10 @@ class recordStep extends OdbSuite {
                   "builtin": "LONG_SLIT_0_50"
                 }
               },
-              "observeClass": "ACQUISITION"
+              "observeClass": "ACQUISITION",
+              "estimate": {
+                "seconds": 1299.562500
+              }
             }
           }
         }
@@ -684,6 +706,87 @@ class recordStep extends OdbSuite {
         }
       """.asRight
     )
+  }
+
+  test("recordStep - with instrument config change cost") {
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val cfg0 = dynamicConfig(mode.instrument)
+    val cfg1 = cfg0.replaceFirst("builtin: LONG_SLIT_0_50", "builtin: LONG_SLIT_1_00")
+    for {
+      pid  <- createProgramAs(service)
+      oid  <- createObservationAs(service, pid, mode.some)
+      vid  <- recordVisitAs(service, mode.instrument, oid)
+      aid  <- recordAtomAs(service, mode.instrument, vid)
+      sid0 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScience)
+      sid1 <- recordStepAs(service, aid, mode.instrument, cfg1, stepConfigScience)
+      _    <- expect(service,
+        s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                atomRecords {
+                  matches {
+                    steps {
+                      matches {
+                        estimate {
+                          seconds
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "observation" : {
+             "execution" : {
+                "atomRecords" : {
+                  "matches" : [
+                    {
+                      "steps" : {
+                        "matches" : [
+                          {
+                            "estimate" : {
+                              "seconds" : 1299.562500
+                            }
+                          },
+                          {
+                            "estimate" : {
+                              "seconds" : 1352.500000
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield ()
+
+    // Step Estimate 1:
+    // 1200.0     Exposure
+    //   82.5     Readout (HAMAMATSU, 1x1, 12 amp, Low gain, Slow read, FullFrame)
+    //   10.0     Writeout
+    //    7.0     Offset constant
+    //    0.06250 Offset distance (0.00625 sec / arcsec X 10 arcsec)
+    // ----------
+    // 1299.562500 seconds
+
+    // Step Estimate 2:
+    // 1200.0     Exposure
+    //   82.5     Readout (HAMAMATSU, 1x1, 12 amp, Low gain, Slow read, FullFrame)
+    //   10.0     Writeout
+    //   60.0     FPU change cost
+    // ----------
+    // 1352.500000 seconds
+
   }
 
 }

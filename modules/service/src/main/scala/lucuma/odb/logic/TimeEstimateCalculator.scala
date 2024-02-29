@@ -21,6 +21,9 @@ trait TimeEstimateCalculator[S, D] {
   def estimateSetup: SetupTime
 
   def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]]
+
+  def estimateStep(static: S, state: EstimatorState[D], next: ProtoStep[D]): StepEstimate
+
 }
 
 object TimeEstimateCalculator {
@@ -40,6 +43,12 @@ object TimeEstimateCalculator {
       def estimateSetup: SetupTime =
         setup
 
+      def estimateStep(static: S, past: EstimatorState[D], next: ProtoStep[D]): StepEstimate = {
+        val c = configChange.estimate(past, next)
+        val d = detectorEstimator.estimate(static, next)
+        StepEstimate.fromMax(c, d)
+      }
+
       def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]] =
         _.mapAccumulate(EstimatorState.empty[D]) { (s, eAtom) =>
           eAtom.fold(
@@ -48,9 +57,7 @@ object TimeEstimateCalculator {
             atomI =>
              val (atom, index) = atomI
              val sa = atom.mapAccumulate(s) { (sʹ, step) =>
-               val c = configChange.estimate(sʹ, step)
-               val d = detectorEstimator.estimate(static, step)
-               (sʹ.next(step), step.tupleRight(StepEstimate.fromMax(c, d)))
+               (sʹ.next(step), step.tupleRight(estimateStep(static, sʹ, step)))
              }
              // Restore the atom index and convert to Either
              sa.tupleRight(index).map(_.asRight)
