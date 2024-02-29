@@ -41,7 +41,7 @@ object DetectorEstimator {
         DatasetEstimate(
           gn.exposure,
           ctx.gmosReadout(readoutKey(detector)),
-          ctx.enums.TimeEstimate.GmosSouthWrite.time
+          ctx.enums.TimeEstimate.GmosNorthWrite.time
         )
     }
 

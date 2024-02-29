@@ -5,14 +5,17 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.data.EitherT
+import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
 import lucuma.core.enums.Instrument
@@ -25,13 +28,19 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth => GmosNorthStatic}
+import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth => GmosSouthStatic}
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.logic.EstimatorState
+import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.CompletedAtomMap
+import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.util.Codecs.*
 import skunk.*
-import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -67,17 +76,19 @@ trait SequenceService[F[_]] {
   )(using Transaction[F]): F[SequenceService.InsertAtomResponse]
 
   def insertGmosNorthStepRecord(
-    atomId:       Atom.Id,
-    instrument:   GmosNorth,
-    step:         StepConfig,
-    observeClass: ObserveClass
+    atomId:         Atom.Id,
+    instrument:     GmosNorth,
+    step:           StepConfig,
+    observeClass:   ObserveClass,
+    timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
   )(using Transaction[F]): F[SequenceService.InsertStepResponse]
 
   def insertGmosSouthStepRecord(
-    atomId:       Atom.Id,
-    instrument:   GmosSouth,
-    step:         StepConfig,
-    observeClass: ObserveClass
+    atomId:         Atom.Id,
+    instrument:     GmosSouth,
+    step:           StepConfig,
+    observeClass:   ObserveClass,
+    timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
   )(using Transaction[F]): F[SequenceService.InsertStepResponse]
 
 }
@@ -129,7 +140,7 @@ object SequenceService {
       )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]] =
         selectCompletedAtomMap(
           observationId,
-          gmosSequenceService.selectGmosNorthDynamic(observationId)
+          gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
         )
 
       override def selectGmosSouthCompletedAtomMap(
@@ -137,7 +148,7 @@ object SequenceService {
       )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]] =
         selectCompletedAtomMap(
           observationId,
-          gmosSequenceService.selectGmosSouthDynamic(observationId)
+          gmosSequenceService.selectGmosSouthDynamicForObs(observationId)
         )
 
       private def selectCompletedAtomMap[D](
@@ -150,12 +161,60 @@ object SequenceService {
       def selectGmosNorthSteps(
         observationId: Observation.Id
       )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]] =
-        stepRecordMap(observationId, gmosSequenceService.selectGmosNorthDynamic(observationId))
+        stepRecordMap(observationId, gmosSequenceService.selectGmosNorthDynamicForObs(observationId))
 
       def selectGmosSouthSteps(
         observationId: Observation.Id
       )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]] =
-        stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamic(observationId))
+        stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamicForObs(observationId))
+
+      /**
+       * We'll need to estimate the cost of executing the next step.  For that
+       * we have to find the static config, the last gcal step (if any), the
+       * last science step (if any) and the last step in general (if any).
+       * This will serve as an input to the time estimate calculator so that it
+       * can compare a new step being recorded with the previous state and
+       * determine the cost of making the prescribed changes.
+       */
+      private def selectEstimatorState[S, D](
+        observationId: Observation.Id,
+        staticConfig:  Visit.Id => F[Option[S]],
+        dynamicConfig: Step.Id => F[Option[D]]
+      )(using Transaction[F]): F[Option[(S, EstimatorState[D])]] =
+        for {
+          vid     <- session.option(Statements.SelectLastVisit)(observationId)
+          static  <- vid.flatTraverse(staticConfig)
+          gcal    <- session.option(Statements.SelectLastGcalConfig)(observationId)
+          science <- session.option(Statements.SelectLastScienceConfig)(observationId)
+          step    <- session.option(Statements.SelectLastStepConfig)(observationId)
+          dynamic <- step.flatTraverse { case (id, _, _) => dynamicConfig(id) }
+        } yield static.tupleRight(
+          EstimatorState(
+            gcal,
+            science,
+            (step, dynamic).mapN { case ((_, stepConfig, observeClass), d) =>
+              ProtoStep(d, stepConfig, observeClass)
+            }
+          )
+        )
+
+      private def selectGmosNorthEstimatorState(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[(GmosNorthStatic, EstimatorState[GmosNorth])]] =
+        selectEstimatorState(
+          observationId,
+          services.gmosSequenceService.selectGmosNorthStatic,
+          services.gmosSequenceService.selectGmosNorthDynamicForStep
+        )
+
+      private def selectGmosSouthEstimatorState(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[(GmosSouthStatic, EstimatorState[GmosSouth])]] =
+        selectEstimatorState(
+          observationId,
+          services.gmosSequenceService.selectGmosSouthStatic,
+          services.gmosSequenceService.selectGmosSouthDynamicForStep
+        )
 
       private def stepRecordMap[D](
         observationId:  Observation.Id,
@@ -306,63 +365,71 @@ object SequenceService {
           case s @ StepConfig.SmartGcal(_)       => session.execute(Statements.InsertStepConfigSmartGcal)(stepId, s).void
         }
 
-      private def insertStepRecord(
+      private def insertStepRecord[S, D](
         atomId:              Atom.Id,
         instrument:          Instrument,
         stepConfig:          StepConfig,
         observeClass:        ObserveClass,
+        timeEstimate:        (S, EstimatorState[D]) => StepEstimate,
+        estimatorState:      Observation.Id => F[Option[(S, EstimatorState[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
       )(using Transaction[F]): F[InsertStepResponse] =
         (for {
           _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
-          a    = session.unique(Statements.AtomExists)((atomId, instrument)).map(Option.when(_)(()))
-          _   <- EitherT.fromOptionF(a, AtomNotFound(atomId, instrument))
-          sid <- EitherT.right[InsertStepResponse](UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
-          _   <- EitherT.right[InsertStepResponse](session.execute(Statements.InsertStep)(sid, atomId, instrument, stepConfig.stepType, observeClass)).void
+          foo  = session.option(Statements.SelectObservationId)((atomId, instrument))
+          fos  = OptionT(foo).flatMap(o => OptionT(estimatorState(o))).value
+          sid <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
+          es  <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
+          _   <- EitherT.right(session.execute(Statements.InsertStep)(
+                   sid, atomId, instrument, stepConfig.stepType, observeClass, timeEstimate.tupled(es).total
+                 )).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
         } yield Success(sid)).merge
 
       override def insertGmosNorthStepRecord(
-        atomId:        Atom.Id,
-        dynamicConfig: GmosNorth,
-        stepConfig:    StepConfig,
-        observeClass:  ObserveClass
+        atomId:         Atom.Id,
+        dynamicConfig:  GmosNorth,
+        stepConfig:     StepConfig,
+        observeClass:   ObserveClass,
+        timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
       )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
           stepConfig,
           observeClass,
+          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, observeClass)),
+          selectGmosNorthEstimatorState,
           sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
         )
 
       override def insertGmosSouthStepRecord(
-        atomId:        Atom.Id,
-        dynamicConfig: GmosSouth,
-        stepConfig:    StepConfig,
-        observeClass:  ObserveClass
+        atomId:         Atom.Id,
+        dynamicConfig:  GmosSouth,
+        stepConfig:     StepConfig,
+        observeClass:   ObserveClass,
+        timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
       )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,
           stepConfig,
           observeClass,
+          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, observeClass)),
+          selectGmosSouthEstimatorState,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
         )
-
     }
 
   object Statements {
 
-    val AtomExists: Query[(Atom.Id, Instrument), Boolean] =
+    val SelectObservationId: Query[(Atom.Id, Instrument), Observation.Id] =
       sql"""
-        SELECT EXISTS (
-          SELECT 1
-            FROM t_atom_record
-           WHERE c_atom_id = $atom_id AND c_instrument = $instrument
-        )
-      """.query(bool)
+        SELECT c_observation_id
+          FROM t_atom_record
+         WHERE c_atom_id = $atom_id AND c_instrument = $instrument
+      """.query(observation_id)
 
     val InsertAtom: Command[(
       Atom.Id,
@@ -394,7 +461,8 @@ object SequenceService {
       Atom.Id,
       Instrument,
       StepType,
-      ObserveClass
+      ObserveClass,
+      TimeSpan
     )] =
       sql"""
         INSERT INTO t_step_record (
@@ -402,13 +470,15 @@ object SequenceService {
           c_atom_id,
           c_instrument,
           c_step_type,
-          c_observe_class
+          c_observe_class,
+          c_time_estimate
         ) SELECT
           $step_id,
           $atom_id,
           $instrument,
           $step_type,
-          $obs_class
+          $obs_class,
+          $time_span
       """.command
 
     /**
@@ -540,6 +610,58 @@ object SequenceService {
            SET c_completed = ${core_timestamp.opt}
          WHERE c_step_id = $step_id
       """.command
+
+    val SelectLastVisit: Query[Observation.Id, Visit.Id] =
+      sql"""
+        SELECT c_visit_id
+          FROM t_visit
+         WHERE c_observation_id = $observation_id
+      ORDER BY c_created DESC
+         LIMIT 1
+      """.query(visit_id)
+
+    val SelectLastGcalConfig: Query[Observation.Id, StepConfig.Gcal] =
+      sql"""
+        SELECT
+          #${encodeColumns("s".some, StepConfigGcalColumns)}
+        FROM v_step_record s
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        WHERE
+          a.c_observation_id = $observation_id AND
+          s.c_step_type      = 'gcal'
+        ORDER BY s.c_created DESC
+        LIMIT 1
+      """.query(step_config_gcal)
+
+    val SelectLastScienceConfig: Query[Observation.Id, StepConfig.Science] =
+      sql"""
+        SELECT
+          #${encodeColumns("s".some, StepConfigScienceColumns)}
+        FROM v_step_record s
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        WHERE
+          a.c_observation_id = $observation_id AND
+          s.c_step_type      = 'science'
+        ORDER BY s.c_created DESC
+        LIMIT 1
+      """.query(step_config_science)
+
+    val SelectLastStepConfig: Query[Observation.Id, (Step.Id, StepConfig, ObserveClass)] =
+      sql"""
+        SELECT
+          s.c_step_id,
+          s.c_step_type,
+          #${encodeColumns("s".some, StepConfigGcalColumns)},
+          #${encodeColumns("s".some, StepConfigScienceColumns)},
+          #${encodeColumns("s".some, StepConfigSmartGcalColumns)},
+          s.c_observe_class
+        FROM v_step_record s
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        WHERE
+          a.c_observation_id = $observation_id
+        ORDER BY s.c_created DESC
+        LIMIT 1
+      """.query(step_id *: step_config *: obs_class)
 
   }
 }

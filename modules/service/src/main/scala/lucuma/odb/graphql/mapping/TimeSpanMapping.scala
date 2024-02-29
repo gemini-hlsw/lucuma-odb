@@ -12,6 +12,7 @@ import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalTable
+import lucuma.odb.graphql.table.StepRecordView
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
@@ -23,6 +24,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ProposalTable[F]
                                with ObservationView[F]
                                with GroupView[F]
+                               with StepRecordView[F]
                                with TimeChargeCorrectionTable[F]
                                with TimeChargeDiscountTable[F]
                                with TimingWindowView[F]
@@ -35,12 +37,15 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       List(
         AllocationType / "duration"                               -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
         ConditionsExpectationType / "timeframe"                   -> timeSpanMapping(ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
+        GmosNorthStepRecordType / "estimate"                      -> timeSpanMapping(StepRecordView.TimeEstimate)(StepRecordView.Id),
         GmosNorthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
+        GmosSouthStepRecordType / "estimate"                      -> timeSpanMapping(StepRecordView.TimeEstimate)(StepRecordView.Id),
         GmosSouthStepRecordType / "instrumentConfig" / "exposure" -> timeSpanMapping(GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
         GroupType / "maximumInterval"                             -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
         GroupType / "minimumInterval"                             -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
         IntensiveType / "totalTime"                               -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
         LargeProgramType / "totalTime"                            -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
+        StepRecordType / "estimate"                               -> timeSpanMapping(StepRecordView.TimeEstimate)(StepRecordView.Id),
         TimeChargeCorrectionType / "amount"                       -> timeSpanMapping(TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
         TimeChargeDiscountType / "partner"                        -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
         TimeChargeDiscountType / "program"                        -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),

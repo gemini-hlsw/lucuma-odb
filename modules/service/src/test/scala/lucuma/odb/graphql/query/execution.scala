@@ -2035,7 +2035,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .gmosSequenceService
-            .selectGmosNorthDynamic(oid)(using xa)
+            .selectGmosNorthDynamicForObs(oid)(using xa)
             .compile
             .toList
         }
@@ -2183,7 +2183,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .gmosSequenceService
-            .selectGmosNorthDynamic(o)(using xa)
+            .selectGmosNorthDynamicForObs(o)(using xa)
             .compile
             .toList
         }
@@ -2300,7 +2300,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .gmosSequenceService
-            .selectGmosNorthDynamic(o)(using xa)
+            .selectGmosNorthDynamicForObs(o)(using xa)
             .compile
             .toList
             .map(_.toMap)
