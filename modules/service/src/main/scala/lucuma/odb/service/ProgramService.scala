@@ -39,6 +39,7 @@ import skunk.codec.all._
 import skunk.syntax.all._
 
 import Services.Syntax.*
+import lucuma.odb.service.ProgramService.LinkUserResponse.Success
 
 trait ProgramService[F[_]] {
 
@@ -59,7 +60,7 @@ trait ProgramService[F[_]] {
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
    * if the user was not authorized to perform the action.
    */
-  def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[ProgramService.LinkUserResponse]
+  def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[Result[(Program.Id, User.Id)]]
 
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
   def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[Result[List[Program.Id]]]
@@ -115,7 +116,7 @@ object ProgramService {
   object LinkUserResponse {
     case class NotAuthorized(user: User)                     extends LinkUserResponse
     case class AlreadyLinked(pid: Program.Id, user: User.Id) extends LinkUserResponse
-    case class Success(pis: Program.Id, user: User.Id)       extends LinkUserResponse
+    case class Success(pid: Program.Id, user: User.Id)       extends LinkUserResponse
     case class InvalidUser(user: User.Id)                    extends LinkUserResponse
   }
 
@@ -201,7 +202,7 @@ object ProgramService {
           }
         }
 
-      def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
+      def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
             case LinkUserRequest.Coi(programId, userId) => Statements.linkCoi(programId, userId, user)
@@ -224,6 +225,13 @@ object ProgramService {
             }
         }
       }
+
+      def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[Result[(Program.Id, User.Id)]] =
+        linkUserImpl(req).map:
+          case LinkUserResponse.NotAuthorized(user)     => OdbError.NotAuthorized(user.id).asFailure
+          case LinkUserResponse.AlreadyLinked(pid, uid) => OdbError.NoAction(Some(s"User $uid is already linked to program $pid.")).asFailure
+          case LinkUserResponse.InvalidUser(uid)        => OdbError.InvalidUser(uid, Some(s"User $uid does not exist or is of a nonstandard type.")).asFailure
+          case LinkUserResponse.Success(pid, user)      => Result((pid, user))
 
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
         F[Result[List[Program.Id]]] = {

@@ -79,7 +79,6 @@ import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.GroupService
-import lucuma.odb.service.ProgramService
 import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -411,21 +410,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             )
 
   private lazy val LinkUser =
-    MutationField("linkUser", LinkUserInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        import lucuma.odb.service.ProgramService.LinkUserResponse._
-        programService.linkUser(input).map[Result[Query]] {
-          case NotAuthorized(user)     => OdbError.NotAuthorized(user.id).asFailure
-          case AlreadyLinked(pid, uid) => OdbError.NoAction(Some(s"User $uid is already linked to program $pid.")).asFailure
-          case InvalidUser(uid)        => OdbError.InvalidUser(uid, Some(s"User $uid does not exist or is of a nonstandard type.")).asFailure
-          case Success(pid, uid)       =>
-            Result(Unique(Filter(And(
-              Predicates.linkUserResult.programId.eql(pid),
-              Predicates.linkUserResult.userId.eql(uid),
-            ), child)))
-        }
-      }
-    }
+    MutationField("linkUser", LinkUserInput.Binding): (input, child) =>
+      services.useTransactionally:
+        programService.linkUser(input).nestMap: (pid, uid) =>
+          Unique(Filter(And(
+            Predicates.linkUserResult.programId.eql(pid),
+            Predicates.linkUserResult.userId.eql(uid),
+          ), child))
 
   private def recordDatasetResponseToResult(
     child:        Query,
