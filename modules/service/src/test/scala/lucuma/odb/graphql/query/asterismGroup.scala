@@ -186,7 +186,7 @@ class asterismGroup extends OdbSuite {
     }
   }
 
-  test("lookup by program reference should work") {
+  test("lookup by proposal reference should work") {
     List(pi).traverse { user =>
       for {
         pid  <- createProgramAs(user)
@@ -203,7 +203,7 @@ class asterismGroup extends OdbSuite {
           query =
             s"""
               query {
-                asterismGroup(programReference: "G-2025A-0001", WHERE: { id: { EQ: "$oid0"} }) {
+                asterismGroup(proposalReference: "G-2025A-0001", WHERE: { id: { EQ: "$oid0"} }) {
                   matches {
                     observations {
                       matches {

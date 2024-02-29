@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.data.Ior
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Resource
@@ -38,6 +39,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramReference
+import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding._
 import lucuma.odb.graphql.input.AddDatasetEventInput
@@ -61,6 +63,7 @@ import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
+import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
@@ -116,6 +119,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RedeemUserInvitation,
       RevokeUserInvitation,
       SetAllocation,
+      SetProgramReference,
       UpdateAsterisms,
       UpdateDatasets,
       UpdateGroups,
@@ -175,16 +179,35 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private def selectPid(
-    pid: Option[Program.Id],
-    ref: Option[ProgramReference]
-  )(using Services[F]): F[Result[Program.Id]] =
-    (pid, ref) match {
-      case (None, None)    => OdbError.InvalidArgument(Some("One of programId or programReference must be provided.")).asFailureF
+    pid:  Option[Program.Id],
+    prop: Option[ProposalReference],
+    prog: Option[ProgramReference]
+  )(using Services[F]): F[Result[Program.Id]] = {
+    def notFound(ref: Ior[ProposalReference, ProgramReference]): String =
+      ref.fold(
+        r => s"Proposal '${r.label}' was not found.",
+        r => s"Program '${r.label}' was not found.",
+        (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' were not found or do not correspond to the same program."
+      )
+
+    def notCorresponding(
+      ref:      Ior[ProposalReference, ProgramReference],
+      pid:      Program.Id,
+      givenPid: Program.Id
+    ): String =
+      ref.fold(
+        r => s"Proposal '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+        r => s"Program '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+        (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' (id $pid) do not correspond to the specified program id $givenPid."
+      )
+
+    (pid, Ior.fromOptions(prop, prog)) match {
+      case (None, None)    => OdbError.InvalidArgument("One of programId, programReference or proposalReference must be provided.".some).asFailureF
       case (Some(p), None) => p.success.pure[F]
       case (_, Some(r))    => programService.selectPid(r).map { op =>
-        op.fold(Result.failure(s"Program reference '${r.format}' was not found.")) { selectedPid =>
+        op.fold(OdbError.InvalidArgument(notFound(r).some).asFailure) { selectedPid =>
           pid.fold(selectedPid.success) { givenPid =>
-            OdbError.InvalidProgram(givenPid, Some(s"Program reference ${r.format} (id $selectedPid) doesn't correspond to specified program id $givenPid"))
+            OdbError.InvalidArgument(notCorresponding(r, selectedPid, givenPid).some)
               .asFailure
               .unlessA(selectedPid === givenPid)
               .as(selectedPid)
@@ -192,6 +215,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         }
       }
     }
+  }
 
   def datasetResultSubquery(dids: List[Dataset.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
@@ -322,7 +346,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
       services.useTransactionally {
-        ResultT(selectPid(input.programId, input.programReference)).flatMap { pid =>
+        ResultT(selectPid(input.programId, input.proposalReference, input.programReference)).flatMap { pid =>
           ResultT(groupService.createGroup(pid, input.SET).map { gid =>
             Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
           })
@@ -345,7 +369,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           }.map(_.getOrElse(Result.unit))
 
         val query = for {
-          pid <- ResultT(selectPid(input.programId, input.programReference))
+          pid <- ResultT(selectPid(input.programId, input.proposalReference, input.programReference))
           tup <- ResultT(createObservation(pid))
           (oid, query) = tup
           _   <- ResultT(insertAsterism(pid, oid))
@@ -371,7 +395,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("createTarget", CreateTargetInput.Binding) { (input, child) =>
       services.useTransactionally {
         import TargetService.CreateTargetResponse._
-        ResultT(selectPid(input.programId, input.programReference)).flatMap { pid =>
+        ResultT(selectPid(input.programId, input.proposalReference, input.programReference)).flatMap { pid =>
           ResultT(targetService.createTarget(pid, input.SET).map {
             case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
             case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
@@ -597,6 +621,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               Predicates.setAllocationResult.partner.eql(input.partner)
             ), child))
           .value
+
+  private lazy val SetProgramReference =
+    MutationField("setProgramReference", SetProgramReferenceInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        (for {
+          pid <- ResultT(selectPid(input.programId, input.proposalReference, input.programReference))
+          _   <- ResultT(programService.setProgramReference(pid, input.SET))
+        } yield Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+        ).value
+      }
+    }
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
