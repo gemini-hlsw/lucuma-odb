@@ -13,19 +13,24 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
+import grackle.Result
 
 trait ChronicleService[F[_]]:
-  def addConditionsEntry(input: ConditionsEntryInput): F[Long]
+  def addConditionsEntry(input: ConditionsEntryInput): F[Result[Long]]
 
 object ChronicleService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): ChronicleService[F] =
     new ChronicleService[F]:
-      def addConditionsEntry(input: ConditionsEntryInput): F[Long] =
-        user.verifyAccess(Access.Staff) >>
-        session.prepareR(Statements.InsertConditionsEntry).use { pq =>
-          pq.unique(input)
-        }
+      def addConditionsEntry(input: ConditionsEntryInput): F[Result[Long]] =
+        if user.role.access < Access.Staff then
+          OdbError.NotAuthorized(user.id, Some(s"This action is restricted to staff users.")).asFailureF
+        else
+          session.prepareR(Statements.InsertConditionsEntry).use { pq =>
+            pq.unique(input).map(Result.success)
+          }
 
   object Statements {
     
