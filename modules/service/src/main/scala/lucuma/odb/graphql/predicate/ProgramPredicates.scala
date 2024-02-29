@@ -8,8 +8,8 @@ import grackle.Predicate
 import grackle.Predicate._
 import lucuma.core.model.Access._
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
 import lucuma.core.model.User
-import lucuma.odb.data.ProgramReference
 
 class ProgramPredicates(path: Path) {
 

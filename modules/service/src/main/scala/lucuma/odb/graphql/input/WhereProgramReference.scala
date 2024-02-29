@@ -10,8 +10,8 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate._
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.Semester
-import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.InstrumentBinding
 import lucuma.odb.graphql.binding.Matcher

@@ -9,10 +9,10 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProposalReference
 
 
 class reference extends OdbSuite {

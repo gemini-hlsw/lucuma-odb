@@ -5,8 +5,8 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import lucuma.core.model.Program
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProposalReference
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.odb.graphql.binding._
 
 case class SetProgramReferenceInput(
