@@ -175,10 +175,10 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     }
   }
 
-  test("atomsIn") {
+  test("atomsIntersecting") {
     forAll { (d: TestData) =>
       assertEquals(
-        d.state.atomsIn(d.interval),
+        d.state.atomsIntersecting(d.interval),
         d.state.toList.foldLeft(SortedSet.empty[Atom.Id]) { case (s, (interval, ctx)) =>
           ctx.step.fold(s) { step =>
             if (interval.intersects(d.interval)) s + step.atomId else s
@@ -203,7 +203,7 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     forAll { (d: TestData) =>
       val s  = d.state
       val i  = d.interval
-      val as = s.atomsIn(i)
+      val as = s.atomsIntersecting(i)
       val iʹ = s.intervalContaining(as).getOrElse(i)
       as.subsetOf(s.between(iʹ).allAtoms)
     }
