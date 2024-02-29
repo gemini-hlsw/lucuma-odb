@@ -150,8 +150,9 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    * Returns the set of `Atom.Id` that are associated with state intervals which
    * intersect with `interval`.
    */
-  def atomsIn(interval: TimestampInterval): SortedSet[Atom.Id] =
-    between(interval).allAtoms
+  def atomsIntersecting(interval: TimestampInterval): SortedSet[Atom.Id] =
+    if (interval.nonEmpty) between(interval).allAtoms
+    else SortedSet.from(contextAt(interval.start).flatMap(_.step).map(_.atomId))
 
   /**
    * The minimal interval containing all the given atoms, if any.
@@ -183,7 +184,7 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    *         intersect
    */
   def partitionOnAtomBoundary(interval: TimestampInterval): (TimeAccountingState, TimeAccountingState) = {
-    val intervalʹ = intervalContaining(atomsIn(interval)).getOrElse(interval).span(interval)
+    val intervalʹ = intervalContaining(atomsIntersecting(interval)).getOrElse(interval).span(interval)
     (between(intervalʹ), excluding(intervalʹ))
   }
 
