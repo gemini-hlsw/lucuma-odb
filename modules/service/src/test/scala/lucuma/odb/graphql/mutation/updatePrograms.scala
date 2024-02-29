@@ -1185,9 +1185,7 @@ class updatePrograms extends OdbSuite {
               programs {
                 id
                 proposalStatus
-                semester
-                semesterIndex
-                reference
+                proposal { reference { label } }
               }
             }
           }
@@ -1200,9 +1198,7 @@ class updatePrograms extends OdbSuite {
                   {
                     "id" : $pid,
                     "proposalStatus": "SUBMITTED",
-                    "semester": "2024B",
-                    "semesterIndex": 1,
-                    "reference": "G-2024B-0001"
+                    "proposal": { "reference": { "label": "G-2024B-0001" } }
                   }
                 ]
               }
@@ -1248,7 +1244,7 @@ class updatePrograms extends OdbSuite {
           """
         )
       ) >>
-      chronProgramUpdates(pid).map(_.drop(1)).assertEquals(
+      chronProgramUpdates(pid).map(_.drop(2)).assertEquals(
         List(
           json"""
           {

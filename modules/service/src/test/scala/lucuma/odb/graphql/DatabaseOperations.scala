@@ -49,6 +49,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramReference
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.ProposalReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.UserInvitation
@@ -80,9 +81,9 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def fetchPid(user: User, ref: ProgramReference): IO[Program.Id] =
+  def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""
-      query { program(programReference: "${ref.format}") { id } }
+      query { program(proposalReference: "${pro.label}") { id } }
     """).flatMap { js =>
       js.hcursor
         .downFields("program", "id")
@@ -91,13 +92,36 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def fetchReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+  def fetchPid(user: User, prg: ProgramReference): IO[Program.Id] =
     query(user, s"""
-      query { program(programId: "$pid") { reference } }
+      query { program(programReference: "${prg.label}") { id } }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "reference")
-        .as[Option[ProgramReference]]
+        .downFields("program", "id")
+        .as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def fetchProposalReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
+    query(user, s"""
+      query { program(programId: "$pid") { proposalReference } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "proposalReference")
+        .as[Option[ProposalReference]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def fetchProgramReference(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+    query(user, s"""
+      query { program(programId: "$pid") { reference { label } } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("program", "reference", "label")
+        .success
+        .traverse(_.as[ProgramReference])
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
@@ -155,7 +179,7 @@ trait DatabaseOperations { this: OdbSuite =>
         """)
     )
 
-  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProgramReference] =
+  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProposalReference] =
     query(user, s"""
         mutation {
           updatePrograms(
@@ -172,7 +196,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           ) {
             programs {
-              reference
+              proposal { reference { label } }
             }
           }
         }
@@ -182,12 +206,36 @@ trait DatabaseOperations { this: OdbSuite =>
         .downField("updatePrograms")
         .downField("programs")
         .downArray
-        .downField("reference")
-        .as[ProgramReference]
+        .downFields("proposal", "reference", "label")
+        .as[ProposalReference]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
 
+  def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
+    query(user, s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET:   { proposalStatus: ACCEPTED }
+              WHERE: { id: { EQ: "$pid" } }
+            }
+          ) {
+            programs { reference { label } }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("updatePrograms")
+        .downField("programs")
+        .downArray
+        .downFields("reference", "label")
+        .success
+        .traverse(_.as[ProgramReference])
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)

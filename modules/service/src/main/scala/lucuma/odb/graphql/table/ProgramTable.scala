@@ -21,10 +21,16 @@ trait ProgramTable[F[_]] extends BaseMapping[F] {
       val Uncharged = col("c_pts_uncharged", time_span)
       val Execution = col("c_pts_execution", time_span)
     }
+
+    val ProgramType    = col("c_program_type", program_type)
+
     object Reference {
-      val Semester         = col("c_semester",          semester.opt)
-      val SemesterIndex    = col("c_semester_index",    int4_pos.opt)
-      val ProgramReference = col("c_program_reference", program_reference.opt)
+      val Instrument        = col("c_instrument",         instrument.opt)
+      val ProgramReference  = col("c_program_reference",  program_reference.opt)
+      val ProposalReference = col("c_proposal_reference", proposal_reference.opt)
+      val ScienceSubtype    = col("c_science_subtype",    science_subtype.opt)
+      val Semester          = col("c_semester",           semester.opt)
+      val SemesterIndex     = col("c_semester_index",     int4_pos.opt)
     }
   }
 
