@@ -39,7 +39,7 @@ trait ProgramReferenceMapping[F[_]]
 
   private lazy val programReferenceTypeDiscriminator: SqlDiscriminator =
     new SqlDiscriminator {
-      import lucuma.odb.data.{ProgramType => PT}
+      import lucuma.core.enums.{ProgramType => PT}
 
       override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[PT]("type").flatMap {

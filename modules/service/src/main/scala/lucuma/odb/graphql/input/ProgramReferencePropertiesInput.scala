@@ -8,10 +8,10 @@ import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.model.ProgramReference
+import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.Semester
-import lucuma.odb.data.ProgramReference
-import lucuma.odb.data.ProgramType
-import lucuma.odb.data.ScienceSubtype
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 

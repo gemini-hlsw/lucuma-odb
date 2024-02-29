@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ProgramReference
+import lucuma.core.model.ProgramReference
 
 val ProgramReferenceBinding: Matcher[ProgramReference] =
   StringBinding.emap { s =>

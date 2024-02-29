@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ProgramType
+import lucuma.core.enums.ProgramType
 
 val ProgramTypeBinding: Matcher[ProgramType] =
   enumeratedBinding
