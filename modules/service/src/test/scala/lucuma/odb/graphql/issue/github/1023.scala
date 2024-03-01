@@ -7,9 +7,9 @@ package issue.github
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import io.circe.literal.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
+import io.circe.literal.*
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
