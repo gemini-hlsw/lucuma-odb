@@ -106,7 +106,7 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config(futureLimit: 100) {
                      ... on GmosNorthExecutionConfig {
-                       static {
+                       gmosNorthStatic {
                          stageMode
                          detector
                        }
@@ -122,7 +122,7 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
               "observation" : {
                 "execution" : {
                   "config" : {
-                    "static" : {
+                    "gmosNorthStatic" : {
                       "stageMode" : "FOLLOW_XY",
                       "detector" : "HAMAMATSU"
                     }
@@ -154,13 +154,13 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config(futureLimit: 100) {
                      ... on GmosNorthExecutionConfig {
-                       static {
+                       gmosNorthStatic {
                          stageMode
                          detector
                        }
                      }
                      ... on GmosSouthExecutionConfig {
-                       static {
+                       gmosSouthStatic {
                          stageMode
                          detector
                        }
@@ -176,7 +176,7 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
               "observation" : {
                 "execution" : {
                   "config" : {
-                    "static" : {
+                    "gmosNorthStatic" : {
                       "stageMode" : "FOLLOW_XY",
                       "detector" : "HAMAMATSU"
                     }

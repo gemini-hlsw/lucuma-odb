@@ -500,7 +500,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       static {
+                       gmosNorthStatic {
                          stageMode
                          detector
                          mosPreImaging
@@ -508,7 +508,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                            posA { p { microarcseconds } }
                          }
                        }
-                       acquisition {
+                       gmosNorthAcquisition {
                          nextAtom {
                            observeClass
                            steps {
@@ -567,13 +567,13 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "static": {
+                    "gmosNorthStatic": {
                       "stageMode": "FOLLOW_XY",
                       "detector": "HAMAMATSU",
                       "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
                       "nodAndShuffle": null
                     },
-                    "acquisition": {
+                    "gmosNorthAcquisition": {
                       "nextAtom": {
                         "observeClass": "ACQUISITION",
                         "steps": [
@@ -695,7 +695,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       static {
+                       gmosNorthStatic {
                          stageMode
                        }
                      }
@@ -738,7 +738,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config(futureLimit: 1) {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            observeClass
                          }
@@ -770,7 +770,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "observeClass": "SCIENCE"
                       },
@@ -833,7 +833,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config(futureLimit: 101) {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          possibleFuture {
                            observeClass
                          }
@@ -891,7 +891,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                    }
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            description
                            steps {
@@ -947,7 +947,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                     }
                   },
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "description": "q -15.0″, λ 500.0 nm",
                         "steps": [
@@ -1116,7 +1116,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            description
                            steps {
@@ -1150,7 +1150,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "description": "q 0.0″, λ 495.0 nm",
                         "steps": [
@@ -1357,7 +1357,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosSouthExecutionConfig {
-                       science {
+                       gmosSouthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {
@@ -1499,7 +1499,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       acquisition {
+                       gmosNorthAcquisition {
                          nextAtom {
                            ...gmosNorthAtomFields
                          }
@@ -1519,7 +1519,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "acquisition": {
+                    "gmosNorthAcquisition": {
                       "nextAtom": {
                          "steps": [
                           {
@@ -1853,7 +1853,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                    }
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            ...gmosNorthAtomFields
                          }
@@ -1899,7 +1899,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                     }
                   },
                   "config" : {
-                    "science" : {
+                    "gmosNorthScience" : {
                       "nextAtom" : {
                         "steps" : [
                           {
@@ -2378,7 +2378,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             execution {
               config(futureLimit: $futureLimit) {
                 ... on GmosNorthExecutionConfig {
-                  science {
+                  gmosNorthScience {
                     nextAtom {
                       id
                     }
@@ -2393,7 +2393,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         }
       """
     ).map { json =>
-      val sci = json.hcursor.downFields("observation", "execution", "config", "science")
+      val sci = json.hcursor.downFields("observation", "execution", "config", "gmosNorthScience")
       val n   = sci.downFields("nextAtom", "id").require[Atom.Id]
       val fs  = sci.downFields("possibleFuture").values.toList.flatMap(_.toList.map(_.hcursor.downField("id").require[Atom.Id]))
       n :: fs
@@ -2537,7 +2537,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {
@@ -2561,7 +2561,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "steps": [
                           {

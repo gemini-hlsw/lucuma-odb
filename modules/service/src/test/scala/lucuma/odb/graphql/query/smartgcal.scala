@@ -209,7 +209,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {
@@ -253,7 +253,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "steps": [
                           {
@@ -439,7 +439,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosSouthExecutionConfig {
-                       science {
+                       gmosSouthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {
@@ -468,7 +468,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosSouthScience": {
                       "nextAtom": {
                         "steps": [
                           {
@@ -537,7 +537,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {
@@ -566,7 +566,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "steps": [
                           {
@@ -644,7 +644,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {
@@ -673,7 +673,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               "observation": {
                 "execution": {
                   "config": {
-                    "science": {
+                    "gmosNorthScience": {
                       "nextAtom": {
                         "steps": [
                           {
@@ -749,7 +749,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                  execution {
                    config {
                      ... on GmosNorthExecutionConfig {
-                       science {
+                       gmosNorthScience {
                          nextAtom {
                            steps {
                              instrumentConfig {

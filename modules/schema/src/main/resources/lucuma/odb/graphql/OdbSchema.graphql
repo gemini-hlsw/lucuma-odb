@@ -1418,24 +1418,19 @@ GMOS North Execution Config
 type GmosNorthExecutionConfig implements ExecutionConfig {
 
   """
-  Bogus field that makes the structure of this instrument distinct from the others.
-  """
-  gmosNorth: Boolean! @deprecated
-
-  """
   GMOS North static configuration
   """
-  static: GmosNorthStatic!
+  gmosNorthStatic: GmosNorthStatic!
 
   """
   GMOS North acquisition execution
   """
-  acquisition: GmosNorthExecutionSequence
+  gmosNorthAcquisition: GmosNorthExecutionSequence
 
   """
   GMOS North science execution
   """
-  science: GmosNorthExecutionSequence
+  gmosNorthScience: GmosNorthExecutionSequence
 
   """
   Instrument type
@@ -1945,24 +1940,19 @@ GMOS South Execution Config
 type GmosSouthExecutionConfig implements ExecutionConfig {
 
   """
-  Bogus field that makes the structure of this instrument distinct from the others.
-  """
-  gmosSouth: Boolean! @deprecated
-
-  """
   GMOS South static configuration
   """
-  static: GmosSouthStatic!
+  gmosSouthStatic: GmosSouthStatic!
 
   """
   GMOS South acquisition execution
   """
-  acquisition: GmosSouthExecutionSequence
+  gmosSouthAcquisition: GmosSouthExecutionSequence
 
   """
   GMOS South science execution
   """
-  science: GmosSouthExecutionSequence
+  gmosSouthScience: GmosSouthExecutionSequence
 
   """
   Instrument type

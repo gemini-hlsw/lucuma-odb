@@ -152,47 +152,54 @@ trait SequenceCodec {
       )
     }
 
-  given [S: Decoder, D: Decoder]: Decoder[ExecutionConfig[S, D]] =
+  def executionConfigDecoder[S: Decoder, D: Decoder](
+    prefix: String
+  ): Decoder[ExecutionConfig[S, D]] =
     Decoder.instance { c =>
       for {
-        t <- c.downField("static").as[S]
-        a <- c.downField("acquisition").as[Option[ExecutionSequence[D]]]
-        s <- c.downField("science").as[Option[ExecutionSequence[D]]]
+        t <- c.downField(s"${prefix}Static").as[S]
+        a <- c.downField(s"${prefix}Acquisition").as[Option[ExecutionSequence[D]]]
+        s <- c.downField(s"${prefix}Science").as[Option[ExecutionSequence[D]]]
       } yield ExecutionConfig(t, a, s)
     }
 
-  given [S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionConfig[S, D]] =
+  def executionConfigEncoder[S: Encoder, D: Encoder](
+    prefix: String
+  )(using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionConfig[S, D]] =
     Encoder.instance { (a: ExecutionConfig[S, D]) =>
       Json.obj(
-        "static"        -> a.static.asJson,
-        "acquisition"   -> a.acquisition.asJson,
-        "science"       -> a.science.asJson
+        s"${prefix}Static"      -> a.static.asJson,
+        s"${prefix}Acquisition" -> a.acquisition.asJson,
+        s"${prefix}Science"     -> a.science.asJson
       )
     }
 
   import lucuma.odb.json.gmos.given
 
-  private def rootDecoder[R, S: Decoder, D: Decoder](instrument: Instrument)(instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
+  private def rootDecoder[R, S: Decoder, D: Decoder](
+    name:       String,
+    instrument: Instrument
+  )(instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
     Decoder.instance { c =>
       for {
         _ <- c.downField("instrument").as[Instrument].filterOrElse(_ === instrument, DecodingFailure(s"Expected instrument $instrument", c.history))
-        r <- c.as[ExecutionConfig[S, D]]
+        r <- c.as[ExecutionConfig[S, D]](using executionConfigDecoder(name))
       } yield instrumentExecutionConfig(r)
     }
 
   given Decoder[InstrumentExecutionConfig.GmosNorth] =
-    rootDecoder(Instrument.GmosNorth)(InstrumentExecutionConfig.GmosNorth.apply)
+    rootDecoder("gmosNorth", Instrument.GmosNorth)(InstrumentExecutionConfig.GmosNorth.apply)
 
   given Decoder[InstrumentExecutionConfig.GmosSouth] =
-    rootDecoder(Instrument.GmosSouth)(InstrumentExecutionConfig.GmosSouth.apply)
+    rootDecoder("gmosSouth", Instrument.GmosSouth)(InstrumentExecutionConfig.GmosSouth.apply)
 
   private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
     name:       String,
     instrument: Instrument
   )(root: R => ExecutionConfig[S, D]): Encoder[R] =
     Encoder.instance { (a: R) =>
-      root(a).asJson.mapObject { obj =>
-        ("instrument", instrument.asJson) +: (name, true.asJson) +: obj
+      root(a).asJson(using executionConfigEncoder(name)).mapObject { obj =>
+        ("instrument", instrument.asJson) +: obj
       }
     }
 

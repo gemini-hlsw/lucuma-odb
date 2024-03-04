@@ -7,22 +7,18 @@ import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
-import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.arb.ArbAtom
 import lucuma.core.model.sequence.arb.ArbDataset
-import lucuma.core.model.sequence.arb.ArbExecutionConfig
 import lucuma.core.model.sequence.arb.ArbExecutionSequence
 import lucuma.core.model.sequence.arb.ArbInstrumentExecutionConfig
 import lucuma.core.model.sequence.arb.ArbSequenceDigest
 import lucuma.core.model.sequence.arb.ArbStep
 import lucuma.core.model.sequence.gmos.DynamicConfig
-import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
-import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
 import munit.DisciplineSuite
 
@@ -33,10 +29,8 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   import ArbDynamicConfig._
   import ArbGid.*
   import ArbInstrumentExecutionConfig.given
-  import ArbExecutionConfig.given
   import ArbExecutionSequence.given
   import ArbSequenceDigest.given
-  import ArbStaticConfig._
   import ArbStep.given
 
   import offset.query.given
@@ -51,7 +45,9 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
   checkAll("Step[GmosNorth]",              CodecTests[Step[DynamicConfig.GmosNorth]].codec)
   checkAll("Atom[GmosNorth]",              CodecTests[Atom[DynamicConfig.GmosNorth]].codec)
   checkAll("ExecutionSequence[GmosNorth]", CodecTests[ExecutionSequence[DynamicConfig.GmosNorth]].codec)
-  checkAll("ExecutionConfig[GmosNorth]",   CodecTests[ExecutionConfig[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]].codec)
-  checkAll("InstrumentExecutionConfig",    CodecTests[InstrumentExecutionConfig].codec)
+
+  checkAll("InstrumentExecutionConfig.GmosNorth", CodecTests[InstrumentExecutionConfig.GmosNorth].codec)
+  checkAll("InstrumentExecutionConfig.GmosSouth", CodecTests[InstrumentExecutionConfig.GmosSouth].codec)
+  checkAll("InstrumentExecutionConfig",           CodecTests[InstrumentExecutionConfig].codec)
 
 }
