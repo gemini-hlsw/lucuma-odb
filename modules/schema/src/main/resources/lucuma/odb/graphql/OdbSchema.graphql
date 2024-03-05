@@ -3047,7 +3047,7 @@ type RecordDatasetResult {
 "Input parameters for creating a new GmosNorth StepRecord"
 input RecordGmosNorthStepInput {
   atomId:       AtomId!
-  instrument:   GmosNorthDynamicInput!
+  gmosNorth:    GmosNorthDynamicInput!
   stepConfig:   StepConfigInput!
   observeClass: ObserveClass!
 }
@@ -3067,7 +3067,7 @@ Input parameters for creating a new GmosNorthVisit
 """
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
-  static: GmosNorthStaticInput!
+  gmosNorth:     GmosNorthStaticInput!
 }
 
 """
@@ -3085,7 +3085,7 @@ Input parameters for creating a new GmosSouth StepRecord
 """
 input RecordGmosSouthStepInput {
   atomId:       AtomId!
-  instrument:   GmosSouthDynamicInput!
+  gmosSouth:    GmosSouthDynamicInput!
   stepConfig:   StepConfigInput!
   observeClass: ObserveClass!
 }
@@ -3105,7 +3105,7 @@ Input parameters for creating a new GmosSouthVisit
 """
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
-  static: GmosSouthStaticInput!
+  gmosSouth:     GmosSouthStaticInput!
 }
 
 """

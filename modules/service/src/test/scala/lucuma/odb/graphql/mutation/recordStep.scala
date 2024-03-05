@@ -269,7 +269,7 @@ class recordStep extends OdbSuite {
   test("recordStep - no grating") {
     val instrumentNoGrating: String =
     """
-      instrument: {
+      gmosNorth: {
         exposure: {
           seconds: 1200
         },
@@ -336,7 +336,7 @@ class recordStep extends OdbSuite {
   test("recordStep - no fpu") {
     val instrumentNoGrating: String =
     """
-      instrument: {
+      gmosNorth: {
         exposure: {
           seconds: 1200
         },
@@ -396,7 +396,7 @@ class recordStep extends OdbSuite {
   test("recordStep - custom mask") {
     val instrumentNoGrating: String =
     """
-      instrument: {
+      gmosNorth: {
         exposure: {
           seconds: 1200
         },
