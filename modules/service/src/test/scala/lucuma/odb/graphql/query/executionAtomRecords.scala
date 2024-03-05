@@ -342,6 +342,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
+  // N.B. there is no longer an "interface" involved but the test remains.
   private def testInterfaceMapping(
     offset:       Int,
     matchesQuery: String
@@ -398,20 +399,8 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
       expect(pi, q, e)
     }
 
-  test("observation -> execution -> atomRecords -> steps 1") {
+  test("observation -> execution -> atomRecords -> steps") {
     testInterfaceMapping(400,
-      s"""
-        gmosNorth { fpu { builtin } }
-        stepConfig { stepType }
-      """
-    )
-  }
-
-  // There's a bug in Grackle 0.18.1 which causes the results to be returned
-  // out of order (stepConfig then instrumentConfig).  It should work in
-  // 0.19.0 or better
-  test("observation -> execution -> atomRecords -> steps 2".ignore) {
-    testInterfaceMapping(500,
       s"""
         gmosNorth { fpu { builtin } }
         stepConfig { stepType }
