@@ -42,7 +42,7 @@ class recordVisit extends OdbSuite {
         mutation {
           recordGmosNorthVisit(input: {
             observationId: "$oid",
-            static: {
+            gmosNorth: {
               stageMode: NO_FOLLOW
             }
           }) {
@@ -82,7 +82,7 @@ class recordVisit extends OdbSuite {
         mutation {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
-            static: {
+            gmosSouth: {
               stageMode: FOLLOW_XY
             }
           }) {
@@ -122,7 +122,7 @@ class recordVisit extends OdbSuite {
         mutation {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
-            static: {
+            gmosSouth: {
               stageMode: FOLLOW_XY,
               detector: HAMAMATSU,
               mosPreImaging: IS_NOT_MOS_PRE_IMAGING
