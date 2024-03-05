@@ -81,9 +81,6 @@ import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.service.TargetService
-import lucuma.odb.service.TargetService.CloneTargetResponse
-import lucuma.odb.service.TargetService.UpdateTargetsResponse
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -311,31 +308,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CloneTarget: MutationField =
-    import CloneTargetResponse.*
-    import UpdateTargetsResponse.{ SourceProfileUpdatesFailed, TrackingSwitchFailed }
-    MutationField("cloneTarget", CloneTargetInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        targetService.cloneTarget(input).map {
-
-          // Typical case
-          case Success(oldTargetId, newTargetId) =>
-            Result(
-              Filter(And(
-                Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
-                Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
-              ), child)
-            )
-
-          // Failure Cases
-          case NoSuchTarget(targetId) => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
-          case UpdateFailed(problem)  =>
-            problem match
-              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
-              case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
-
-        }
-      }
-    }
+    MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
+      services.useTransactionally:
+        targetService.cloneTarget(input).nestMap: (oldTargetId, newTargetId) =>
+          Filter(And(
+            Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
+            Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
+          ), child)
 
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
