@@ -1415,13 +1415,7 @@ input GmosNorthDynamicInput {
 """
 GMOS North Execution Config
 """
-type GmosNorthExecutionConfig implements ExecutionConfig {
-
-  """
-  Bogus field that makes the structure of this instrument distinct from the others.
-  """
-  gmosNorth: Boolean! @deprecated
-
+type GmosNorthExecutionConfig {
   """
   GMOS North static configuration
   """
@@ -1436,11 +1430,6 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   GMOS North science execution
   """
   science: GmosNorthExecutionSequence
-
-  """
-  Instrument type
-  """
-  instrument: Instrument!
 }
 
 """
@@ -1942,13 +1931,7 @@ input GmosSouthDynamicInput {
 """
 GMOS South Execution Config
 """
-type GmosSouthExecutionConfig implements ExecutionConfig {
-
-  """
-  Bogus field that makes the structure of this instrument distinct from the others.
-  """
-  gmosSouth: Boolean! @deprecated
-
+type GmosSouthExecutionConfig {
   """
   GMOS South static configuration
   """
@@ -1963,11 +1946,6 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   GMOS South science execution
   """
   science: GmosSouthExecutionSequence
-
-  """
-  Instrument type
-  """
-  instrument: Instrument!
 }
 
 """
@@ -5393,13 +5371,20 @@ type Execution {
 }
 
 """
-Execution configuration
+Execution configuration.  All but one of the instruments will be `null`.
 """
-interface ExecutionConfig {
+type ExecutionConfig {
+
   """
-  Instrument type
+  Instrument type.  This will indicate which of the instrument-specific fields
+  is defined.
   """
   instrument: Instrument!
+
+  gmosNorth: GmosNorthExecutionConfig
+
+  gmosSouth: GmosSouthExecutionConfig
+
 }
 
 """

@@ -6,7 +6,6 @@ package lucuma.odb.json
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
@@ -32,6 +31,10 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.gmos.DynamicConfig.{GmosNorth => DynamicGmosNorth}
+import lucuma.core.model.sequence.gmos.DynamicConfig.{GmosSouth => DynamicGmosSouth}
+import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth  => StaticGmosNorth}
+import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth  => StaticGmosSouth}
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
@@ -172,52 +175,47 @@ trait SequenceCodec {
 
   import lucuma.odb.json.gmos.given
 
-  private def rootDecoder[R, S: Decoder, D: Decoder](instrument: Instrument)(instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
-    Decoder.instance { c =>
-      for {
-        _ <- c.downField("instrument").as[Instrument].filterOrElse(_ === instrument, DecodingFailure(s"Expected instrument $instrument", c.history))
-        r <- c.as[ExecutionConfig[S, D]]
-      } yield instrumentExecutionConfig(r)
-    }
+  private def rootDecoder[R, S: Decoder, D: Decoder](instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
+    Decoder.instance { _.as[ExecutionConfig[S, D]].map(instrumentExecutionConfig) }
 
   given Decoder[InstrumentExecutionConfig.GmosNorth] =
-    rootDecoder(Instrument.GmosNorth)(InstrumentExecutionConfig.GmosNorth.apply)
+    rootDecoder(InstrumentExecutionConfig.GmosNorth.apply)
 
   given Decoder[InstrumentExecutionConfig.GmosSouth] =
-    rootDecoder(Instrument.GmosSouth)(InstrumentExecutionConfig.GmosSouth.apply)
+    rootDecoder(InstrumentExecutionConfig.GmosSouth.apply)
 
   private def rootEncoder[R, S: Encoder, D: Encoder](using Encoder[Offset], Encoder[TimeSpan])(
-    name:       String,
-    instrument: Instrument
-  )(root: R => ExecutionConfig[S, D]): Encoder[R] =
-    Encoder.instance { (a: R) =>
-      root(a).asJson.mapObject { obj =>
-        ("instrument", instrument.asJson) +: (name, true.asJson) +: obj
-      }
-    }
+    root: R => ExecutionConfig[S, D]
+  ): Encoder[R] =
+    Encoder.instance { (a: R) => root(a).asJson }
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =
-    rootEncoder("gmosNorth", Instrument.GmosNorth)(_.executionConfig)
+    rootEncoder(_.executionConfig)
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosSouth] =
-    rootEncoder("gmosSouth", Instrument.GmosSouth)(_.executionConfig)
+    rootEncoder(_.executionConfig)
 
   given Decoder[InstrumentExecutionConfig] =
     Decoder.instance { c =>
       for {
         i <- c.downField("instrument").as[Instrument]
         r <- i match {
-          case Instrument.GmosNorth => c.as[InstrumentExecutionConfig.GmosNorth]
-          case Instrument.GmosSouth => c.as[InstrumentExecutionConfig.GmosSouth]
+          case Instrument.GmosNorth => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
+          case Instrument.GmosSouth => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
           case _                    => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
         }
       } yield r
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig] =
-    Encoder.instance {
-      case i@InstrumentExecutionConfig.GmosNorth(_) => i.asJson
-      case i@InstrumentExecutionConfig.GmosSouth(_) => i.asJson
+    Encoder.instance { (a: InstrumentExecutionConfig) =>
+      Json.obj(
+        "instrument" -> a.instrument.asJson,
+        a match {
+          case i@InstrumentExecutionConfig.GmosNorth(_) => "gmosNorth" -> i.asJson
+          case i@InstrumentExecutionConfig.GmosSouth(_) => "gmosSouth" -> i.asJson
+        }
+      )
     }
 
 }
