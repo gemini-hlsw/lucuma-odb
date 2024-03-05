@@ -90,6 +90,11 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
+              gmosSouth {
+                exposure {
+                  seconds
+                }
+              }
               observeClass
               estimate {
                 seconds
@@ -128,6 +133,7 @@ class recordStep extends OdbSuite {
                   "builtin": "LONG_SLIT_0_50"
                 }
               },
+              "gmosSouth": null,
               "observeClass": "ACQUISITION",
               "estimate": {
                 "seconds": 1299.562500

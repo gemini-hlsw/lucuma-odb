@@ -5095,8 +5095,16 @@ type ExecutionConfig {
   """
   instrument: Instrument!
 
+  """
+  GMOS North execution config.  This will be null unless the `instrument` is
+  `GMOS_NORTH`.
+  """
   gmosNorth: GmosNorthExecutionConfig
 
+  """
+  GMOS South execution config.  This will be null unless the `instrument` is
+  `GMOS_SOUTH`.
+  """
   gmosSouth: GmosSouthExecutionConfig
 
 }
@@ -9044,7 +9052,11 @@ type StepRecord {
   "Step ID."
   id: StepId!
 
-  "Instrument associated with the step."
+  """
+  Instrument associated with the step. This will indicate which of the
+  instrument-specific dynamic fields (e.g., `gmosNorth: GmosNorthDynamic`) is
+  defined.
+  """
   instrument: Instrument!
 
   "The atom in which the step was executed."
@@ -9098,13 +9110,13 @@ type StepRecord {
   GMOS North instrument configuration for this step, if any.  This will be null
   unless the `instrument` discriminator is "GMOS_NORTH".
   """
-  gmosNorth: GmosNorthDynamic!
+  gmosNorth: GmosNorthDynamic
 
   """
   GMOS South instrument configuration for this step, if any.  This will be null
   unless the `instrument` discriminator is "GMOS_SOUTH".
   """
-  gmosSouth: GmosSouthDynamic!
+  gmosSouth: GmosSouthDynamic
 }
 
 "StepRecord query results, limited to a maximum of 1000 entries."
@@ -9768,7 +9780,8 @@ type User {
 
 """
 A visit is recorded whenever any part of an observation is attempted.  There
-are specific impementations for each instrument.
+is a specific static configuration for each instrument, only one of which is
+defined.  The same static configuration holds for the entire visit.
 """
 type Visit {
 
@@ -9777,7 +9790,8 @@ type Visit {
 
   """
   Instrument in use for this visit.  This serves as a discriminator between the
-  various specific instrument visit types.
+  various specific static instrument configuration types (e.g.,
+  `gmosNorth: GmosNorthStatic`.)
   """
   instrument: Instrument!
 
@@ -9821,14 +9835,18 @@ type Visit {
   timeChargeInvoice: TimeChargeInvoice!
 
   """
-  GmosNorth static instrument configuration, for GMOS North visits.
+  GmosNorth static instrument configuration, for GMOS North visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `GMOS_NORTH`.
   """
-  gmosNorth: GmosNorthStatic!
+  gmosNorth: GmosNorthStatic
 
   """
-  GmosSouth static instrument configuration, for GMOS South visits.
+  GmosSouth static instrument configuration, for GMOS South visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `GMOS_SOUTH`.
   """
-  gmosSouth: GmosSouthStatic!
+  gmosSouth: GmosSouthStatic
 
 }
 

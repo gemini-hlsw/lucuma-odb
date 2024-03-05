@@ -52,6 +52,9 @@ class recordVisit extends OdbSuite {
                 detector
                 mosPreImaging
               }
+              gmosSouth {
+                stageMode
+              }
             }
           }
         }
@@ -64,7 +67,8 @@ class recordVisit extends OdbSuite {
               "stageMode": "NO_FOLLOW",
               "detector": "HAMAMATSU",
               "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
-            }
+            },
+            "gmosSouth": null
           }
         }
       }
