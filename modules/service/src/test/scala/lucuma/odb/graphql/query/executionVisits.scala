@@ -215,7 +215,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
 
       val matches = on.visits.map { v =>
         Json.obj(
-          "static" -> Json.obj(
+          "gmosNorth" -> Json.obj(
             "stageMode" -> "FOLLOW_XY".asJson,
           ),
           "atomRecords" -> Json.obj(
@@ -239,32 +239,11 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
       expect(pi, q, e)
     }
 
-  test("observation -> execution -> visits (GmosNorthVisit) 1") {
+  test("observation -> execution -> visits 1") {
     testInterfaceMapping(400,
       s"""
-        ... on GmosNorthVisit {
-          static {
-            stageMode
-          }
-          atomRecords {
-            matches {
-              id
-            }
-          }
-        }
-      """
-    )
-  }
-
-  // There's a bug in Grackle 0.18.1 which causes the results to be returned
-  // out of order (atomRecords then static).  It should work in 0.19.0 or better
-  test("observation -> execution -> visits (GmosNorthVisit) 2".ignore) {
-    testInterfaceMapping(500,
-      s"""
-        ... on GmosNorthVisit {
-          static {
-            stageMode
-          }
+        gmosNorth {
+          stageMode
         }
         atomRecords {
           matches {

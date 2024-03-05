@@ -9,7 +9,7 @@ import lucuma.core.math.Angle
 
 import table.StepRecordView
 
-trait OffsetMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
+trait OffsetMapping[F[_]] extends StepRecordView[F] {
 
   private def offsetComponentMapping(
     typeRef:     TypeRef,

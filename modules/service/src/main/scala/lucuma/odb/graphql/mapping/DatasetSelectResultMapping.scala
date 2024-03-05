@@ -13,7 +13,6 @@ import table.VisitTable
 trait DatasetSelectResultMapping[F[_]]
   extends DatasetTable[F]
      with AtomRecordTable[F]
-     with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
      with StepRecordView[F]
@@ -35,9 +34,9 @@ trait DatasetSelectResultMapping[F[_]]
       List(
         QueryType      / "datasets" -> topLevelSelectResultMapping(DatasetSelectResultType),
         ExecutionType  / "datasets" -> fromExecution,
-        StepRecordType / "datasets" -> fromStepRecord
-      ) ++
-      lookupFromVisit(fromVisit, "datasets")
+        StepRecordType / "datasets" -> fromStepRecord,
+        VisitType      / "datasets" -> fromVisit
+      )
     )
   }
 

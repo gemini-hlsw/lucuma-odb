@@ -18,7 +18,7 @@ import lucuma.core.enums.StepType
 
 import table.StepRecordView
 
-trait StepConfigMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
+trait StepConfigMapping[F[_]] extends StepRecordView[F] {
 
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
