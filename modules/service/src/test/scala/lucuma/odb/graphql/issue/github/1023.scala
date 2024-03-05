@@ -105,7 +105,7 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
                observation(observationId: "$oid") {
                  execution {
                    config(futureLimit: 100) {
-                     ... on GmosNorthExecutionConfig {
+                     gmosNorth {
                        static {
                          stageMode
                          detector
@@ -122,9 +122,11 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
               "observation" : {
                 "execution" : {
                   "config" : {
-                    "static" : {
-                      "stageMode" : "FOLLOW_XY",
-                      "detector" : "HAMAMATSU"
+                    "gmosNorth": {
+                      "static" : {
+                        "stageMode" : "FOLLOW_XY",
+                        "detector" : "HAMAMATSU"
+                      }
                     }
                   }
                 }
@@ -153,13 +155,14 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
                observation(observationId: "$oid") {
                  execution {
                    config(futureLimit: 100) {
-                     ... on GmosNorthExecutionConfig {
+                     instrument
+                     gmosNorth {
                        static {
                          stageMode
                          detector
                        }
                      }
-                     ... on GmosSouthExecutionConfig {
+                     gmosSouth {
                        static {
                          stageMode
                          detector
@@ -176,10 +179,14 @@ class GitHub_1023 extends OdbSuite with ObservingModeSetupOperations {
               "observation" : {
                 "execution" : {
                   "config" : {
-                    "static" : {
-                      "stageMode" : "FOLLOW_XY",
-                      "detector" : "HAMAMATSU"
-                    }
+                    "instrument": "GMOS_NORTH",
+                    "gmosNorth": {
+                      "static" : {
+                        "stageMode" : "FOLLOW_XY",
+                        "detector" : "HAMAMATSU"
+                      }
+                    },
+                    "gmosSouth": null
                   }
                 }
               }
