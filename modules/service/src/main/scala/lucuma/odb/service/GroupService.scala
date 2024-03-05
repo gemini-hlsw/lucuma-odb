@@ -18,19 +18,16 @@ import skunk.codec.all.*
 import skunk.implicits._
 
 import Services.Syntax.*
+import grackle.Result
 
 trait GroupService[F[_]] {
   def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id]
-  def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[GroupService.UpdateGroupsResponse]
+  def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(programId: Program.Id): F[GroupTree]
   def selectPid(groupId: Group.Id): F[Option[Program.Id]]
 }
 
 object GroupService {
-
-  enum UpdateGroupsResponse:
-    case Success(selected: List[Group.Id])
-    case Error(message: String)
 
   // TODO: check access control
 
@@ -58,12 +55,12 @@ object GroupService {
             val af = Statements.moveGroups(gid.toOption, index, which)
             session.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
-      def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateGroupsResponse] =
+      def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]] =
         session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
         moveGroups(SET.parentGroupId, SET.parentGroupIndex, which).flatMap { ids =>
           Statements.updateGroups(SET, which).traverse { af =>
             session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
-          } .map(moreIds => UpdateGroupsResponse.Success(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
+          } .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
         }
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
