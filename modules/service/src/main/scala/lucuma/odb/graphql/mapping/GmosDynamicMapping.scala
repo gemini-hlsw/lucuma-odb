@@ -31,21 +31,21 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
   private def dynamicSwitchMapping[G, L, U](
-    stepRecordType: TypeRef,
-    dynamicType:    TypeRef,
-    table:          GmosDynamicTable[G, L, U]
+    name:        String,
+    dynamicType: TypeRef,
+    table:       GmosDynamicTable[G, L, U]
   ): TypeMapping =
     SwitchMapping(
       dynamicType,
       List(
-        stepRecordType / "instrumentConfig" -> dynamicMapping(dynamicType, table)
+        StepRecordType / name -> dynamicMapping(dynamicType, table)
       )
     )
 
   lazy val GmosNorthDynamicMapping: TypeMapping =
-    dynamicSwitchMapping(GmosNorthStepRecordType, GmosNorthDynamicType, GmosNorthDynamicTable)
+    dynamicSwitchMapping("gmosNorth", GmosNorthDynamicType, GmosNorthDynamicTable)
 
   lazy val GmosSouthDynamicMapping: TypeMapping =
-    dynamicSwitchMapping(GmosSouthStepRecordType, GmosSouthDynamicType, GmosSouthDynamicTable)
+    dynamicSwitchMapping("gmosSouth", GmosSouthDynamicType, GmosSouthDynamicTable)
 
 }

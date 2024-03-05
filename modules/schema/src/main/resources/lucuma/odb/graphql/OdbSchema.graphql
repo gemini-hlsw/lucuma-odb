@@ -111,29 +111,6 @@ input AngleInput {
 }
 
 """
-Sequence atom
-"""
-interface Atom {
-
-  """
-  Atom id
-  """
-  id: AtomId!
-
-  """
-  Optional description of the atom.
-  """
-  description: String
-
-  """
-  Observe class for this atom as a whole (combined observe class for each of
-  its steps).
-  """
-  observeClass: ObserveClass!
-
-}
-
-"""
 AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
 """
 scalar AtomId
@@ -1299,7 +1276,7 @@ input GmosNodAndShuffleInput {
 """
 GmosNorth atom, a collection of steps that should be executed in their entirety
 """
-type GmosNorthAtom implements Atom {
+type GmosNorthAtom {
   """
   Atom id
   """
@@ -1415,13 +1392,7 @@ input GmosNorthDynamicInput {
 """
 GMOS North Execution Config
 """
-type GmosNorthExecutionConfig implements ExecutionConfig {
-
-  """
-  Bogus field that makes the structure of this instrument distinct from the others.
-  """
-  gmosNorth: Boolean! @deprecated
-
+type GmosNorthExecutionConfig {
   """
   GMOS North static configuration
   """
@@ -1436,11 +1407,6 @@ type GmosNorthExecutionConfig implements ExecutionConfig {
   GMOS North science execution
   """
   science: GmosNorthExecutionSequence
-
-  """
-  Instrument type
-  """
-  instrument: Instrument!
 }
 
 """
@@ -1676,7 +1642,7 @@ input GmosNorthStaticInput {
 """
 GmosNorth step with potential breakpoint
 """
-type GmosNorthStep implements Step {
+type GmosNorthStep {
   """
   Instrument configuration for this step
   """
@@ -1709,125 +1675,10 @@ type GmosNorthStep implements Step {
 
 }
 
-"GMOS North step configuration as recorded by Observe."
-type GmosNorthStepRecord implements StepRecord {
-
-  "Step ID."
-  id: StepId!
-
-  "Instrument associated with the concrete implementation."
-  instrument: Instrument!
-
-  "The atom in which the step was executed."
-  atom: AtomRecord!
-
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
-  "Time interval during which this step executed."
-  interval: TimestampInterval
-
-  "The step configuration. apart from instrument details in 'instrumentConfig'."
-  stepConfig: StepConfig!
-
-  "The observe class of this step."
-  observeClass: ObserveClass!
-
-  "Original time estimate for executing this step."
-  estimate: TimeSpan!
-
-  """
-  QA state based on a combination of dataset QA states.  The worst QA state is
-  taken as the overall step QA state.  For example, one FAIL dataset will
-  result in the step having a FAIL QA state.  Unset QA states are ignored, but
-  if none are set the result will be null.
-  """
-  qaState: DatasetQaState
-
-  "Datasets associated with this step."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this step."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "GMOS North instrument configuration for this step."
-  instrumentConfig: GmosNorthDynamic!
-
-}
-
-"""
-A GmosNorth visit as recorded by Observe
-"""
-type GmosNorthVisit implements Visit {
-
-  "Visit id."
-  id: VisitId!
-
-  "Implements the Visit.instrument field to return GMOS_NORTH."
-  instrument: Instrument!
-
-  "Observation associated with this visit."
-  observation: Observation!
-
-  "Created by Observe at time."
-  created: Timestamp!
-
-  "Time interval during which this visit executed."
-  interval: TimestampInterval
-
-  "Executed (or at least partially executed) atom records for this visit."
-  atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): AtomRecordSelectResult!
-
-  "Datasets associated with this visit."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this visit."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "Time accounting details for this visit."
-  timeChargeInvoice: TimeChargeInvoice!
-
-  """
-  GmosNorth static instrument configuration
-  """
-  static: GmosNorthStatic!
-
-}
-
 """
 GmosSouth atom, a collection of steps that should be executed in their entirety
 """
-type GmosSouthAtom implements Atom {
+type GmosSouthAtom {
   """
   Atom id
   """
@@ -1942,13 +1793,7 @@ input GmosSouthDynamicInput {
 """
 GMOS South Execution Config
 """
-type GmosSouthExecutionConfig implements ExecutionConfig {
-
-  """
-  Bogus field that makes the structure of this instrument distinct from the others.
-  """
-  gmosSouth: Boolean! @deprecated
-
+type GmosSouthExecutionConfig {
   """
   GMOS South static configuration
   """
@@ -1963,11 +1808,6 @@ type GmosSouthExecutionConfig implements ExecutionConfig {
   GMOS South science execution
   """
   science: GmosSouthExecutionSequence
-
-  """
-  Instrument type
-  """
-  instrument: Instrument!
 }
 
 """
@@ -2206,7 +2046,7 @@ input GmosSouthStaticInput {
 """
 GmosSouth step with potential breakpoint
 """
-type GmosSouthStep implements Step {
+type GmosSouthStep {
   """
   Instrument configuration for this step
   """
@@ -2236,123 +2076,6 @@ type GmosSouthStep implements Step {
   Observe class for this step
   """
   observeClass: ObserveClass!
-
-}
-
-"""
-A GmosSouth step configuration as recorded by Observe
-"""
-type GmosSouthStepRecord implements StepRecord {
-
-  "Step ID."
-  id: StepId!
-
-  "Instrument associated with the concrete implementation."
-  instrument: Instrument!
-
-  "The atom in which the step was executed."
-  atom: AtomRecord!
-
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
-  "Time interval during which this step executed."
-  interval: TimestampInterval
-
-  "The step configuration. apart from instrument details in 'instrumentConfig'."
-  stepConfig: StepConfig!
-
-  "The observe class of this step."
-  observeClass: ObserveClass!
-
-  "Original time estimate for executing this step."
-  estimate: TimeSpan!
-
-  """
-  QA state based on a combination of dataset QA states.  The worst QA state is
-  taken as the overall step QA state.  For example, one FAIL dataset will
-  result in the step having a FAIL QA state.  Unset QA states are ignored, but
-  if none are set the result will be null.
-  """
-  qaState: DatasetQaState
-
-  "Datasets associated with this step."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this step."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "GMOS South instrument configuration for this step."
-  instrumentConfig: GmosSouthDynamic!
-
-}
-
-"""
-A GmosSouth visit as recorded by Observe
-"""
-type GmosSouthVisit implements Visit {
-
-  "Visit id."
-  id: VisitId!
-
-  "Implements the Visit.instrument field to return GMOS_SOUTH."
-  instrument: Instrument!
-
-  "Observation associated with this visit."
-  observation: Observation!
-
-  "Created by Observe at time."
-  created: Timestamp!
-
-  "Time interval during which this visit executed."
-  interval: TimestampInterval
-
-  "Executed (or at least partially executed) atom records for this visit."
-  atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): AtomRecordSelectResult!
-
-  "Datasets associated with this visit."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this visit."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "Time accounting details for this visit."
-  timeChargeInvoice: TimeChargeInvoice!
-
-  """
-  GmosSouth static instrument configuration
-  """
-  static: GmosSouthStatic!
 
 }
 
@@ -3324,7 +3047,7 @@ type RecordDatasetResult {
 "Input parameters for creating a new GmosNorth StepRecord"
 input RecordGmosNorthStepInput {
   atomId:       AtomId!
-  instrument:   GmosNorthDynamicInput!
+  gmosNorth:    GmosNorthDynamicInput!
   stepConfig:   StepConfigInput!
   observeClass: ObserveClass!
 }
@@ -3336,7 +3059,7 @@ type RecordGmosNorthStepResult {
   """
   The newly added step record itself.
   """
-  stepRecord: GmosNorthStepRecord!
+  stepRecord: StepRecord!
 }
 
 """
@@ -3344,7 +3067,7 @@ Input parameters for creating a new GmosNorthVisit
 """
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
-  static: GmosNorthStaticInput!
+  gmosNorth:     GmosNorthStaticInput!
 }
 
 """
@@ -3354,7 +3077,7 @@ type RecordGmosNorthVisitResult {
   """
   The newly added visit record itself.
   """
-  visit: GmosNorthVisit!
+  visit: Visit!
 }
 
 """
@@ -3362,7 +3085,7 @@ Input parameters for creating a new GmosSouth StepRecord
 """
 input RecordGmosSouthStepInput {
   atomId:       AtomId!
-  instrument:   GmosSouthDynamicInput!
+  gmosSouth:    GmosSouthDynamicInput!
   stepConfig:   StepConfigInput!
   observeClass: ObserveClass!
 }
@@ -3374,7 +3097,7 @@ type RecordGmosSouthStepResult {
   """
   The newly added step record itself.
   """
-  stepRecord: GmosSouthStepRecord!
+  stepRecord: StepRecord!
 }
 
 """
@@ -3382,7 +3105,7 @@ Input parameters for creating a new GmosSouthVisit
 """
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
-  static: GmosSouthStaticInput!
+  gmosSouth:     GmosSouthStaticInput!
 }
 
 """
@@ -3392,7 +3115,7 @@ type RecordGmosSouthVisitResult {
   """
   The newly added visit record itself.
   """
-  visit: GmosSouthVisit!
+  visit: Visit!
 }
 
 """
@@ -3691,37 +3414,6 @@ input SpectroscopyScienceRequirementsInput {
   The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   capability: SpectroscopyCapabilities
-}
-
-"""
-Sequence step
-"""
-interface Step {
-  """
-  Step id
-  """
-  id: StepId!
-
-  """
-  Whether to pause before the execution of this step
-  """
-  breakpoint: Breakpoint!
-
-  """
-  The sequence step itself
-  """
-  stepConfig: StepConfig!
-
-  """
-  Time estimate for this step's execution
-  """
-  estimate: StepEstimate!
-
-  """
-  Observe class for this step
-  """
-  observeClass: ObserveClass!
-
 }
 
 """
@@ -5393,13 +5085,28 @@ type Execution {
 }
 
 """
-Execution configuration
+Execution configuration.  All but one of the instruments will be `null`.
 """
-interface ExecutionConfig {
+type ExecutionConfig {
+
   """
-  Instrument type
+  Instrument type.  This will indicate which of the instrument-specific fields
+  is defined.
   """
   instrument: Instrument!
+
+  """
+  GMOS North execution config.  This will be null unless the `instrument` is
+  `GMOS_NORTH`.
+  """
+  gmosNorth: GmosNorthExecutionConfig
+
+  """
+  GMOS South execution config.  This will be null unless the `instrument` is
+  `GMOS_SOUTH`.
+  """
+  gmosSouth: GmosSouthExecutionConfig
+
 }
 
 """
@@ -9337,15 +9044,19 @@ type StepEstimate {
 }
 
 """
-A step as recorded by Observe.  There will be one `StepRecord` implementation
-per instrument.
+A step as recorded by Observe.  There will be one instrument configuration per
+instrument, all but one of which will be null.
 """
-interface StepRecord {
+type StepRecord {
 
   "Step ID."
   id: StepId!
 
-  "Instrument associated with the concrete implementation."
+  """
+  Instrument associated with the step. This will indicate which of the
+  instrument-specific dynamic fields (e.g., `gmosNorth: GmosNorthDynamic`) is
+  defined.
+  """
   instrument: Instrument!
 
   "The atom in which the step was executed."
@@ -9395,6 +9106,17 @@ interface StepRecord {
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
 
+  """
+  GMOS North instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "GMOS_NORTH".
+  """
+  gmosNorth: GmosNorthDynamic
+
+  """
+  GMOS South instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "GMOS_SOUTH".
+  """
+  gmosSouth: GmosSouthDynamic
 }
 
 "StepRecord query results, limited to a maximum of 1000 entries."
@@ -10058,16 +9780,18 @@ type User {
 
 """
 A visit is recorded whenever any part of an observation is attempted.  There
-are specific impementations for each instrument.
+is a specific static configuration for each instrument, only one of which is
+defined.  The same static configuration holds for the entire visit.
 """
-interface Visit {
+type Visit {
 
   "Visit id."
   id: VisitId!
 
   """
   Instrument in use for this visit.  This serves as a discriminator between the
-  various specific instrument visit types.
+  various specific static instrument configuration types (e.g.,
+  `gmosNorth: GmosNorthStatic`.)
   """
   instrument: Instrument!
 
@@ -10109,6 +9833,20 @@ interface Visit {
 
   "Time accounting details for this visit."
   timeChargeInvoice: TimeChargeInvoice!
+
+  """
+  GmosNorth static instrument configuration, for GMOS North visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `GMOS_NORTH`.
+  """
+  gmosNorth: GmosNorthStatic
+
+  """
+  GmosSouth static instrument configuration, for GMOS South visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `GMOS_SOUTH`.
+  """
+  gmosSouth: GmosSouthStatic
 
 }
 

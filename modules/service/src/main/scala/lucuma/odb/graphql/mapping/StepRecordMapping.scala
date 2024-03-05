@@ -8,25 +8,19 @@ import cats.effect.Resource
 import cats.syntax.applicative.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import cats.syntax.traverse.*
 import grackle.Cursor
-import grackle.Predicate
-import grackle.Predicate.Const
-import grackle.Predicate.Eql
 import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.ResultT
-import grackle.Type
 import grackle.TypeRef
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetQaState
-import lucuma.core.enums.Instrument
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding.DatasetIdBinding
@@ -52,9 +46,8 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
   def services: Resource[F, Services[F]]
 
   lazy val StepRecordMapping: ObjectMapping =
-    SqlInterfaceMapping(
+    ObjectMapping(
       tpe           = StepRecordType,
-      discriminator = stepRecordTypeDiscriminator,
       fieldMappings = List(
         SqlField("id",           StepRecordView.Id, key = true),
         SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
@@ -66,29 +59,11 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
         SqlObject("estimate"),
         EffectField("qaState", qaStateHandler, List("id")),
         SqlObject("datasets"),
-        SqlObject("events")
+        SqlObject("events"),
+        SqlObject("gmosNorth", Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
+        SqlObject("gmosSouth", Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
       )
     )
-
-  private lazy val stepRecordTypeDiscriminator: SqlDiscriminator =
-    new SqlDiscriminator {
-      override def discriminate(c: Cursor): Result[Type] =
-        c.fieldAs[Instrument]("instrument").flatMap {
-          case Instrument.GmosNorth => Result(GmosNorthStepRecordType)
-          case Instrument.GmosSouth => Result(GmosSouthStepRecordType)
-          case inst                 => Result.internalError(s"No StepRecord implementation for ${inst.shortName}")
-        }
-
-      private def mkPredicate(instrument: Instrument): Option[Predicate] =
-        Eql(StepRecordType / "instrument", Const(instrument)).some
-
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
-        tpe match {
-          case GmosNorthStepRecordType => mkPredicate(Instrument.GmosNorth)
-          case GmosSouthStepRecordType => mkPredicate(Instrument.GmosSouth)
-          case _                       => none
-        }
-    }
 
   lazy val StepRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
 
@@ -132,27 +107,5 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
                   )
         } yield res).value
     }
-
-  lazy val GmosNorthStepRecordMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = GmosNorthStepRecordType,
-      fieldMappings = List(
-        SqlField("id", StepRecordView.Id, key = true),
-        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
-        EffectField("interval",  intervalHandler, List("id")),
-        EffectField("qaState", qaStateHandler, List("id")),
-      )
-    )
-
-  lazy val GmosSouthStepRecordMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = GmosSouthStepRecordType,
-      fieldMappings = List(
-        SqlField("id", StepRecordView.Id, key = true),
-        SqlObject("instrumentConfig", Join(StepRecordView.Id, GmosSouthDynamicTable.Id)),
-        EffectField("interval",  intervalHandler, List("id")),
-        EffectField("qaState", qaStateHandler, List("id")),
-      )
-    )
 
 }

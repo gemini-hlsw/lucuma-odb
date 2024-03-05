@@ -42,15 +42,18 @@ class recordVisit extends OdbSuite {
         mutation {
           recordGmosNorthVisit(input: {
             observationId: "$oid",
-            static: {
+            gmosNorth: {
               stageMode: NO_FOLLOW
             }
           }) {
             visit {
-              static {
+              gmosNorth {
                 stageMode
                 detector
                 mosPreImaging
+              }
+              gmosSouth {
+                stageMode
               }
             }
           }
@@ -60,11 +63,12 @@ class recordVisit extends OdbSuite {
       {
         "recordGmosNorthVisit": {
           "visit": {
-            "static": {
+            "gmosNorth": {
               "stageMode": "NO_FOLLOW",
               "detector": "HAMAMATSU",
               "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
-            }
+            },
+            "gmosSouth": null
           }
         }
       }
@@ -82,12 +86,12 @@ class recordVisit extends OdbSuite {
         mutation {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
-            static: {
+            gmosSouth: {
               stageMode: FOLLOW_XY
             }
           }) {
             visit {
-              static {
+              gmosSouth {
                 stageMode
                 detector
                 mosPreImaging
@@ -100,7 +104,7 @@ class recordVisit extends OdbSuite {
       {
         "recordGmosSouthVisit": {
           "visit": {
-            "static": {
+            "gmosSouth": {
               "stageMode": "FOLLOW_XY",
               "detector": "HAMAMATSU",
               "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
@@ -122,14 +126,14 @@ class recordVisit extends OdbSuite {
         mutation {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
-            static: {
+            gmosSouth: {
               stageMode: FOLLOW_XY,
               detector: HAMAMATSU,
               mosPreImaging: IS_NOT_MOS_PRE_IMAGING
             }
           }) {
             visit {
-              static {
+              gmosSouth {
                 stageMode
               }
             }

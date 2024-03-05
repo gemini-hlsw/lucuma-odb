@@ -27,8 +27,8 @@ trait GmosCcdModeMapping[F[_]] extends GmosDynamicTables[F] {
     SwitchMapping(
       GmosCcdModeType,
       List(
-        GmosNorthStepRecordType / "instrumentConfig" / "readout" -> ccdModeMapping(GmosNorthDynamicTable),
-        GmosSouthStepRecordType / "instrumentConfig" / "readout" -> ccdModeMapping(GmosSouthDynamicTable)
+        StepRecordType / "gmosNorth" / "readout" -> ccdModeMapping(GmosNorthDynamicTable),
+        StepRecordType / "gmosSouth" / "readout" -> ccdModeMapping(GmosSouthDynamicTable)
       )
     )
 

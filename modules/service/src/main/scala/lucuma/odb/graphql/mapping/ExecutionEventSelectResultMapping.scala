@@ -13,7 +13,6 @@ import table.VisitTable
 trait ExecutionEventSelectResultMapping[F[_]]
   extends ExecutionEventTable[F]
      with DatasetTable[F]
-     with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
      with StepRecordView[F]
@@ -39,12 +38,12 @@ trait ExecutionEventSelectResultMapping[F[_]]
     SwitchMapping(
       ExecutionEventSelectResultType,
       List(
-        DatasetType   / "events" -> fromDataset,
-        ExecutionType / "events" -> fromExecution,
-        QueryType / "events" -> fromQuery
-      ) ++
-      lookupFromStepRecord(fromStepRecord, "events") ++
-      lookupFromVisit(fromVisit, "events")
+        DatasetType    / "events" -> fromDataset,
+        ExecutionType  / "events" -> fromExecution,
+        QueryType      / "events" -> fromQuery,
+        StepRecordType / "events" -> fromStepRecord,
+        VisitType      / "events" -> fromVisit
+      )
     )
   }
 

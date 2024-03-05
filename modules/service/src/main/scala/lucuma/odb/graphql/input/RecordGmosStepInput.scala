@@ -21,11 +21,14 @@ case class RecordGmosStepInput[A](
 
 object RecordGmosStepInput {
 
-  private def binding[A](instrumentMatcher: Matcher[A]): Matcher[RecordGmosStepInput[A]] =
+  private def binding[A](
+    instrumentName:    String,
+    instrumentMatcher: Matcher[A]
+  ): Matcher[RecordGmosStepInput[A]] =
     ObjectFieldsBinding.rmap {
       case List(
         AtomIdBinding("atomId", rAtomId),
-        instrumentMatcher("instrument", rInstrument),
+        instrumentMatcher(`instrumentName`, rInstrument),
         StepConfigInput.Binding("stepConfig", rStepConfig),
         ObserveClassBinding("observeClass", rObserveClass)
       ) => (rAtomId, rInstrument, rStepConfig, rObserveClass).parMapN { (atomId, instrument, step, oclass) =>
@@ -34,9 +37,9 @@ object RecordGmosStepInput {
     }
 
   val GmosNorthBinding: Matcher[RecordGmosStepInput[GmosNorth]] =
-    binding(GmosNorthDynamicInput.Binding)
+    binding("gmosNorth", GmosNorthDynamicInput.Binding)
 
   val GmosSouthBinding: Matcher[RecordGmosStepInput[GmosSouth]] =
-    binding(GmosSouthDynamicInput.Binding)
+    binding("gmosSouth", GmosSouthDynamicInput.Binding)
 
 }

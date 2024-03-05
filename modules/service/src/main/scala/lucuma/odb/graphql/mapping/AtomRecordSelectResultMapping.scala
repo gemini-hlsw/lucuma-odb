@@ -10,7 +10,6 @@ import table.VisitTable
 
 trait AtomRecordSelectResultMapping[F[_]]
   extends AtomRecordTable[F]
-     with LookupFrom[F]
      with ObservationView[F]
      with ResultMapping[F]
      with VisitTable[F] {
@@ -25,7 +24,10 @@ trait AtomRecordSelectResultMapping[F[_]]
 
     SwitchMapping(
       AtomRecordSelectResultType,
-      (ExecutionType / "atomRecords" -> fromExecution) :: lookupFromVisit(fromVisit, "atomRecords")
+      List(
+        ExecutionType / "atomRecords" -> fromExecution,
+        VisitType     / "atomRecords" -> fromVisit
+      )
     )
   }
 
