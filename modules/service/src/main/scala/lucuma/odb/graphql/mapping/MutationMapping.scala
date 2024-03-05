@@ -78,7 +78,6 @@ import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
-import lucuma.odb.service.GroupService
 import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -824,13 +823,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
 
         // Update the specified groups and then return a query for the affected groups (or an error)
-        idSelect.flatTraverse { which =>
-          import GroupService.UpdateGroupsResponse
-          groupService.updateGroups(input.SET, which).map {
-            case UpdateGroupsResponse.Success(selected) => groupResultSubquery(selected, input.LIMIT, child)
-            case UpdateGroupsResponse.Error(problem)    => OdbError.UpdateFailed(Some(problem)).asFailure
-          }
-        }
+        idSelect.flatTraverse: which =>
+          groupService.updateGroups(input.SET, which).map: r =>
+            r.flatMap: selected =>
+              groupResultSubquery(selected, input.LIMIT, child)          
 
       }
     }
