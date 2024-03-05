@@ -61,7 +61,7 @@ class recordStep extends OdbSuite {
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              instrumentConfig {
+              gmosNorth {
                 exposure {
                   seconds
                 }
@@ -90,6 +90,11 @@ class recordStep extends OdbSuite {
                   builtin
                 }
               }
+              gmosSouth {
+                exposure {
+                  seconds
+                }
+              }
               observeClass
               estimate {
                 seconds
@@ -102,7 +107,7 @@ class recordStep extends OdbSuite {
         {
           "recordGmosNorthStep": {
             "stepRecord": {
-              "instrumentConfig": {
+              "gmosNorth": {
                 "exposure": {
                   "seconds": 1200.000000
                 },
@@ -128,6 +133,7 @@ class recordStep extends OdbSuite {
                   "builtin": "LONG_SLIT_0_50"
                 }
               },
+              "gmosSouth": null,
               "observeClass": "ACQUISITION",
               "estimate": {
                 "seconds": 1299.562500
@@ -162,7 +168,7 @@ class recordStep extends OdbSuite {
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              instrumentConfig {
+              gmosSouth {
                 exposure {
                   seconds
                 }
@@ -203,7 +209,7 @@ class recordStep extends OdbSuite {
         {
           "recordGmosSouthStep": {
             "stepRecord": {
-              "instrumentConfig": {
+              "gmosSouth": {
                 "exposure": {
                   "seconds": 1200.000000
                 },
@@ -253,7 +259,7 @@ class recordStep extends OdbSuite {
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              instrumentConfig {
+              gmosSouth {
                 exposure {
                   seconds
                 }
@@ -269,7 +275,7 @@ class recordStep extends OdbSuite {
   test("recordStep - no grating") {
     val instrumentNoGrating: String =
     """
-      instrument: {
+      gmosNorth: {
         exposure: {
           seconds: 1200
         },
@@ -300,7 +306,7 @@ class recordStep extends OdbSuite {
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              instrumentConfig {
+              gmosNorth {
                 exposure {
                   seconds
                 }
@@ -320,7 +326,7 @@ class recordStep extends OdbSuite {
         {
           "recordGmosNorthStep": {
             "stepRecord": {
-              "instrumentConfig": {
+              "gmosNorth": {
                 "exposure": {
                   "seconds": 1200.000000
                 },
@@ -336,7 +342,7 @@ class recordStep extends OdbSuite {
   test("recordStep - no fpu") {
     val instrumentNoGrating: String =
     """
-      instrument: {
+      gmosNorth: {
         exposure: {
           seconds: 1200
         },
@@ -364,7 +370,7 @@ class recordStep extends OdbSuite {
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              instrumentConfig {
+              gmosNorth {
                 exposure {
                   seconds
                 }
@@ -380,7 +386,7 @@ class recordStep extends OdbSuite {
         {
           "recordGmosNorthStep": {
             "stepRecord": {
-              "instrumentConfig": {
+              "gmosNorth": {
                 "exposure": {
                   "seconds": 1200.000000
                 },
@@ -396,7 +402,7 @@ class recordStep extends OdbSuite {
   test("recordStep - custom mask") {
     val instrumentNoGrating: String =
     """
-      instrument: {
+      gmosNorth: {
         exposure: {
           seconds: 1200
         },
@@ -430,7 +436,7 @@ class recordStep extends OdbSuite {
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              instrumentConfig {
+              gmosNorth {
                 exposure {
                   seconds
                 }
@@ -450,7 +456,7 @@ class recordStep extends OdbSuite {
         {
           "recordGmosNorthStep": {
             "stepRecord": {
-              "instrumentConfig": {
+              "gmosNorth": {
                 "exposure": {
                   "seconds": 1200.000000
                 },

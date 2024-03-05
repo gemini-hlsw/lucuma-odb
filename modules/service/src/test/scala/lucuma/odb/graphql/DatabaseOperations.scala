@@ -59,6 +59,7 @@ import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import natchez.Trace.Implicits.noop
@@ -668,7 +669,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   protected def dynamicConfig(instrument: Instrument): String =
     s"""
-      instrument: {
+      ${instrument.fieldName}: {
         exposure: {
           seconds: 1200
         },
@@ -752,7 +753,7 @@ trait DatabaseOperations { this: OdbSuite =>
           mutation {
             $name(input: {
               observationId: ${oid.asJson},
-              static: ${staticConfig(instrument)}
+              ${instrument.fieldName}: ${staticConfig(instrument)}
             }) {
               visit {
                 id
@@ -872,7 +873,7 @@ trait DatabaseOperations { this: OdbSuite =>
     val vars = Json.obj(
       "input" -> Json.obj(
         "atomId" -> aid.asJson,
-        "instrument" -> instrumentInput.asJson,
+        instrument.fieldName -> instrumentInput.asJson,
         "stepConfig" -> (stepConfig match {
           case StepConfig.Bias          => Json.obj("bias" -> "true".asJson)
           case StepConfig.Dark          => Json.obj("dark" -> "true".asJson)

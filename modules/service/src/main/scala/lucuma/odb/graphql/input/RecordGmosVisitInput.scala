@@ -17,19 +17,22 @@ case class RecordGmosVisitInput[A](
 
 object RecordGmosVisitInput {
 
-  private def binding[A](staticMatcher: Matcher[A]): Matcher[RecordGmosVisitInput[A]] =
+  private def binding[A](
+    instrumentName: String,
+    staticMatcher:  Matcher[A]
+  ): Matcher[RecordGmosVisitInput[A]] =
     ObjectFieldsBinding.rmap {
       case List(
         ObservationIdBinding("observationId", rObservationId),
-        staticMatcher("static", rStatic)
+        staticMatcher(`instrumentName`, rStatic)
       ) =>
         (rObservationId, rStatic).parMapN(RecordGmosVisitInput(_, _))
     }
 
   val GmosNorthBinding: Matcher[RecordGmosVisitInput[GmosNorth]] =
-    binding(GmosNorthStaticInput.Binding)
+    binding("gmosNorth", GmosNorthStaticInput.Binding)
 
   val GmosSouthBinding: Matcher[RecordGmosVisitInput[GmosSouth]] =
-    binding(GmosSouthStaticInput.Binding)
+    binding("gmosSouth", GmosSouthStaticInput.Binding)
 
 }
