@@ -111,29 +111,6 @@ input AngleInput {
 }
 
 """
-Sequence atom
-"""
-interface Atom {
-
-  """
-  Atom id
-  """
-  id: AtomId!
-
-  """
-  Optional description of the atom.
-  """
-  description: String
-
-  """
-  Observe class for this atom as a whole (combined observe class for each of
-  its steps).
-  """
-  observeClass: ObserveClass!
-
-}
-
-"""
 AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
 """
 scalar AtomId
@@ -1299,7 +1276,7 @@ input GmosNodAndShuffleInput {
 """
 GmosNorth atom, a collection of steps that should be executed in their entirety
 """
-type GmosNorthAtom implements Atom {
+type GmosNorthAtom {
   """
   Atom id
   """
@@ -1665,7 +1642,7 @@ input GmosNorthStaticInput {
 """
 GmosNorth step with potential breakpoint
 """
-type GmosNorthStep implements Step {
+type GmosNorthStep {
   """
   Instrument configuration for this step
   """
@@ -1816,7 +1793,7 @@ type GmosNorthVisit implements Visit {
 """
 GmosSouth atom, a collection of steps that should be executed in their entirety
 """
-type GmosSouthAtom implements Atom {
+type GmosSouthAtom {
   """
   Atom id
   """
@@ -2184,7 +2161,7 @@ input GmosSouthStaticInput {
 """
 GmosSouth step with potential breakpoint
 """
-type GmosSouthStep implements Step {
+type GmosSouthStep {
   """
   Instrument configuration for this step
   """
@@ -3669,37 +3646,6 @@ input SpectroscopyScienceRequirementsInput {
   The capabilities field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   capability: SpectroscopyCapabilities
-}
-
-"""
-Sequence step
-"""
-interface Step {
-  """
-  Step id
-  """
-  id: StepId!
-
-  """
-  Whether to pause before the execution of this step
-  """
-  breakpoint: Breakpoint!
-
-  """
-  The sequence step itself
-  """
-  stepConfig: StepConfig!
-
-  """
-  Time estimate for this step's execution
-  """
-  estimate: StepEstimate!
-
-  """
-  Observe class for this step
-  """
-  observeClass: ObserveClass!
-
 }
 
 """
