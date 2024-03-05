@@ -54,10 +54,9 @@ import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdat
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 
 trait TargetService[F[_]] {
-  import TargetService.CloneTargetResponse
   def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
-  def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse]
+  def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
 }
 
 object TargetService {
@@ -164,7 +163,7 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
+      def cloneTargetImpl(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
         import CloneTargetResponse.*
 
         val pid: F[Option[Program.Id]] =
@@ -199,6 +198,15 @@ object TargetService {
                 }
             }
         }
+
+      def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
+        cloneTargetImpl(input).map:
+          case CloneTargetResponse.Success(oldTargetId, newTargetId) => Result((oldTargetId, newTargetId))
+          case CloneTargetResponse.NoSuchTarget(targetId) => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
+          case CloneTargetResponse.UpdateFailed(problem)  =>
+            problem match
+              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+              case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
     }
 
