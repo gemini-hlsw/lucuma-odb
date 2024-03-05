@@ -8,7 +8,6 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Path
 import grackle.Predicate
-import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
 
 
@@ -16,8 +15,6 @@ import lucuma.odb.graphql.binding._
 //# with the 'WHERE' input and specify the changes in 'SET'.
 //#
 //input UpdateAsterismsInput {
-//  # Program ID for the program whose asterism is to be edited.
-//  programId: ProgramId!
 //
 //  # Describes the values to modify.
 //  SET: EditAsterismsPatchInput!
@@ -30,7 +27,6 @@ import lucuma.odb.graphql.binding._
 //}
 
 final case class UpdateAsterismsInput(
-  programId:      Program.Id,
   SET:            EditAsterismsPatchInput,
   WHERE:          Option[Predicate],
   LIMIT:          Option[NonNegInt],
@@ -43,13 +39,12 @@ object UpdateAsterismsInput {
     val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rPid),
         EditAsterismsPatchInput.Binding("SET", rSET),
         WhereObservationBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
-        (rPid, rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
+        (rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
     }
   }
 

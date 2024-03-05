@@ -3754,27 +3754,24 @@ input UnnormalizedSedInput {
 
 """
 Input for bulk updating multiple observations.  Select observations
-with the 'WHERE' input and specify the changes in 'SET'.
-
+with the 'WHERE' input and specify the changes in 'SET'.  All the selected
+observations must be in the same program.
 """
 input UpdateAsterismsInput {
-  """
-  Program ID for the program whose asterism is to be edited.
-  """
-  programId: ProgramId!
-
   """
   Describes the values to modify.
   """
   SET: EditAsterismsPatchInput!
 
   """
-  Filters the observations to be updated according to those that match the given constraints.
+  Filters the observations to be updated according to those that match the
+  given constraints.  All must correspond to the same program.
   """
   WHERE: WhereObservation
 
   """
-  Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  Caps the number of results returned to the given value (if additional
+  observations match the WHERE clause they will be updated but not returned).
   """
   LIMIT: NonNegInt
 
@@ -3782,7 +3779,9 @@ input UpdateAsterismsInput {
 }
 
 """
-The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
+The result of updating the selected observations, up to `LIMIT` or the maximum
+of (1000).  If `hasMore` is true, additional observations were modified and not
+included here.
 """
 type UpdateAsterismsResult {
   """

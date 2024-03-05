@@ -496,7 +496,6 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def updateAsterisms(
     user: User,
-    pid:  Program.Id,
     oids: List[Observation.Id],
     add:  List[Target.Id],
     del:  List[Target.Id],
@@ -508,7 +507,6 @@ trait DatabaseOperations { this: OdbSuite =>
         s"""
         mutation {
           updateAsterisms(input: {
-            programId: ${pid.asJson}
             SET: {
               ${
                  add match {

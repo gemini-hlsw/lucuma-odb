@@ -13,6 +13,8 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion
 import lucuma.core.model.CatalogInfo
@@ -74,7 +76,6 @@ trait AsterismService[F[_]] {
    * deleting targets as indicated.
    */
   def updateAsterism(
-    programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     ADD:            Option[NonEmptyList[Target.Id]],
     DELETE:         Option[NonEmptyList[Target.Id]]
@@ -96,6 +97,22 @@ object AsterismService {
   def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
+
+      private def selectProgramId(
+        observationIds: NonEmptyList[Observation.Id]
+      ): F[Result[Program.Id]] = {
+        val af = Statements.selectProgramId(observationIds)
+        session.prepareR(af.fragment.query(program_id)).use { p =>
+          p.stream(af.argument, chunkSize = 16)
+           .take(2)
+           .compile
+           .toList
+           .map {
+             case List(pid) => pid.success
+             case _         => OdbError.InvalidObservationList(observationIds).asFailure
+           }
+        }
+      }
 
       override def insertAsterism(
         programId:      Program.Id,
@@ -140,18 +157,19 @@ object AsterismService {
         }
 
       override def updateAsterism(
-        programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         ADD:            Option[NonEmptyList[Target.Id]],
         DELETE:         Option[NonEmptyList[Target.Id]]
       )(using Transaction[F]): F[Result[Unit]] =
-        ADD.fold(Result.unit.pure[F])(insertAsterism(programId, observationIds, _)) *>
-          DELETE.fold(Result.unit.pure[F]) { tids =>
-            val af = Statements.deleteLinksAs(user, programId, observationIds, tids)
-            session.prepareR(af.fragment.command).use { p =>
-              p.execute(af.argument).as(Result.unit)
-            }
-          }
+        ResultT(selectProgramId(observationIds)).flatMap { pid =>
+          ResultT(ADD.fold(Result.unit.pure[F])(insertAsterism(pid, observationIds, _))) *>
+            ResultT(DELETE.fold(Result.unit.pure[F]) { tids =>
+              val af = Statements.deleteLinksAs(user, pid, observationIds, tids)
+              session.prepareR(af.fragment.command).use { p =>
+                p.execute(af.argument).as(Result.unit)
+              }
+            })
+        }.value
 
       override def cloneAsterism(
         originalId: Observation.Id,
@@ -175,6 +193,14 @@ object AsterismService {
   object Statements {
 
     import ProgramService.Statements.{andWhereUserAccess, whereUserAccess}
+
+    def selectProgramId(
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      void"""
+        SELECT DISTINCT c_program_id
+        FROM t_observation
+        WHERE """ |+| observationIdIn(observationIds)
 
     def insertLinksAs(
       user:           User,
