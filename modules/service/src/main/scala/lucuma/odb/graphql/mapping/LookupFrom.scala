@@ -9,13 +9,6 @@ import grackle.Type
 
 trait LookupFrom[F[_]] extends BaseMapping[F] {
 
-  private lazy val StepRecordTypes: List[Type] =
-    List(
-      StepRecordType,
-      GmosNorthStepRecordType,
-      GmosSouthStepRecordType
-    )
-
   private lazy val VisitTypes: List[Type] =
     List(
       VisitType,
@@ -27,9 +20,6 @@ trait LookupFrom[F[_]] extends BaseMapping[F] {
     tpes.toList.map { tpe =>
       (path.foldLeft(Path.from(tpe)) { case (t, p) => t / p }, mapping)
     }
-
-  def lookupFromStepRecord(mapping: ObjectMapping, path: String*): List[(Path, ObjectMapping)] =
-    defineLookup(StepRecordTypes, path, mapping)
 
   def lookupFromVisit(mapping: ObjectMapping, path: String*): List[(Path, ObjectMapping)] =
     defineLookup(VisitTypes, path, mapping)

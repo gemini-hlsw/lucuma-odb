@@ -27,21 +27,21 @@ trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
   private def gratingSwitchMapping[G, L, U](
-    stepRecordType:    TypeRef,
+    name:              String,
     gratingConfigType: TypeRef,
     table:             GmosDynamicTable[G, L, U]
   ): TypeMapping =
     SwitchMapping(
       gratingConfigType,
       List(
-        stepRecordType / "instrumentConfig" / "gratingConfig" -> gratingMapping(gratingConfigType, table)
+        StepRecordType / name / "gratingConfig" -> gratingMapping(gratingConfigType, table)
       )
     )
 
   lazy val GmosNorthGratingConfigMapping: TypeMapping =
-    gratingSwitchMapping(GmosNorthStepRecordType, GmosNorthGratingConfigType, GmosNorthDynamicTable)
+    gratingSwitchMapping("gmosNorth", GmosNorthGratingConfigType, GmosNorthDynamicTable)
 
   lazy val GmosSouthGratingConfigMapping: TypeMapping =
-    gratingSwitchMapping(GmosSouthStepRecordType, GmosSouthGratingConfigType, GmosSouthDynamicTable)
+    gratingSwitchMapping("gmosSouth", GmosSouthGratingConfigType, GmosSouthDynamicTable)
 
 }

@@ -39,11 +39,11 @@ trait ExecutionEventSelectResultMapping[F[_]]
     SwitchMapping(
       ExecutionEventSelectResultType,
       List(
-        DatasetType   / "events" -> fromDataset,
-        ExecutionType / "events" -> fromExecution,
-        QueryType / "events" -> fromQuery
+        DatasetType    / "events" -> fromDataset,
+        ExecutionType  / "events" -> fromExecution,
+        QueryType      / "events" -> fromQuery,
+        StepRecordType / "events" -> fromStepRecord
       ) ++
-      lookupFromStepRecord(fromStepRecord, "events") ++
       lookupFromVisit(fromVisit, "events")
     )
   }

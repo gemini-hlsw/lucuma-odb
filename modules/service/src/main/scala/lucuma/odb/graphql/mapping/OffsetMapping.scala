@@ -35,7 +35,9 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
   ): TypeMapping =
     SwitchMapping(
       typeRef,
-      lookupFromStepRecord(offsetComponentMapping(typeRef, idColumn, valueColumn), "stepConfig", "offset", name)
+      List(
+        StepRecordType / "stepConfig" / "offset" / name -> offsetComponentMapping(typeRef, idColumn, valueColumn)
+      )
     )
 
   lazy val OffsetPMapping: TypeMapping =
@@ -59,6 +61,8 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
   lazy val OffsetMapping: TypeMapping =
     SwitchMapping(
       OffsetType,
-      lookupFromStepRecord(offsetMapping(StepRecordView.Id), "stepConfig", "offset")
+      List(
+        StepRecordType / "stepConfig" / "offset" -> offsetMapping(StepRecordView.Id)
+      )
     )
 }

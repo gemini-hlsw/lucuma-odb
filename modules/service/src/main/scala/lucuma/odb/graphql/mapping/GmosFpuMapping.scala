@@ -26,23 +26,23 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
   // Defines a switch mapping from the step record root to prevent the mapping
   // from being picked up in the context of a generated sequence.
   private def fpuSwitchMapping[G, L, U](
-    stepRecordType: TypeRef,
-    fpuType:        TypeRef,
-    table:          GmosDynamicTable[G, L, U]
+    name:    String,
+    fpuType: TypeRef,
+    table:   GmosDynamicTable[G, L, U]
   ): TypeMapping =
     SwitchMapping(
       fpuType,
       List(
-        stepRecordType / "instrumentConfig" / "fpu" -> fpuMapping(fpuType, table)
+        StepRecordType / name / "fpu" -> fpuMapping(fpuType, table)
       )
     )
 
   lazy val GmosNorthFpuMapping: TypeMapping =
-    fpuSwitchMapping(GmosNorthStepRecordType, GmosNorthFpuType, GmosNorthDynamicTable)
+    fpuSwitchMapping("gmosNorth", GmosNorthFpuType, GmosNorthDynamicTable)
 
 
   lazy val GmosSouthFpuMapping: TypeMapping =
-    fpuSwitchMapping(GmosSouthStepRecordType, GmosSouthFpuType, GmosSouthDynamicTable)
+    fpuSwitchMapping("gmosSouth", GmosSouthFpuType, GmosSouthDynamicTable)
 
 
 }

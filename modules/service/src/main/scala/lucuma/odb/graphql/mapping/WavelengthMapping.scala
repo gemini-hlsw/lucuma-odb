@@ -47,15 +47,15 @@ trait WavelengthMapping[F[_]]
       WavelengthType,
       List(
         ConditionsMeasurementType / "wavelength"                   -> wavelengthMapping(ChronConditionsEntryView.Measurement.Wavelength.SyntheticId, ChronConditionsEntryView.Measurement.Wavelength.Value),
-        GmosNorthStepRecordType / "instrumentConfig" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosNorthDynamicTable.Id, GmosNorthDynamicTable.Grating.Wavelength),
         GmosNorthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.CentralWavelength),
         GmosNorthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosNorthLongSlitView.Common.ObservationId, GmosNorthLongSlitView.Common.InitialCentralWavelength),
-        GmosSouthStepRecordType / "instrumentConfig" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosSouthDynamicTable.Id, GmosSouthDynamicTable.Grating.Wavelength),
         GmosSouthLongSlitType / "centralWavelength"                -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.CentralWavelength),
         GmosSouthLongSlitType / "initialCentralWavelength"         -> wavelengthMapping(GmosSouthLongSlitView.Common.ObservationId, GmosSouthLongSlitView.Common.InitialCentralWavelength),
         SpectroscopyScienceRequirementsType / "wavelength"         -> wavelengthMapping(Spectroscopy.Wavelength.SyntheticId, Spectroscopy.Wavelength.Value),
         SpectroscopyScienceRequirementsType / "signalToNoiseAt"    -> wavelengthMapping(Spectroscopy.SignalToNoiseAt.SyntheticId, Spectroscopy.SignalToNoiseAt.Value),
         SpectroscopyScienceRequirementsType / "wavelengthCoverage" -> wavelengthMapping(Spectroscopy.WavelengthCoverage.SyntheticId, Spectroscopy.WavelengthCoverage.Value),
+        StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosNorthDynamicTable.Id, GmosNorthDynamicTable.Grating.Wavelength),
+        StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength" -> wavelengthMapping(GmosSouthDynamicTable.Id, GmosSouthDynamicTable.Grating.Wavelength)
       )
     )
 }

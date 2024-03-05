@@ -33,10 +33,10 @@ trait DatasetSelectResultMapping[F[_]]
     SwitchMapping(
       DatasetSelectResultType,
       List(
-        QueryType     / "datasets" -> topLevelSelectResultMapping(DatasetSelectResultType),
-        ExecutionType / "datasets" -> fromExecution
+        QueryType      / "datasets" -> topLevelSelectResultMapping(DatasetSelectResultType),
+        ExecutionType  / "datasets" -> fromExecution,
+        StepRecordType / "datasets" -> fromStepRecord
       ) ++
-      lookupFromStepRecord(fromStepRecord, "datasets") ++
       lookupFromVisit(fromVisit, "datasets")
     )
   }

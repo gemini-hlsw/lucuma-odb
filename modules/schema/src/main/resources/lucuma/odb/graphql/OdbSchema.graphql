@@ -1675,64 +1675,6 @@ type GmosNorthStep {
 
 }
 
-"GMOS North step configuration as recorded by Observe."
-type GmosNorthStepRecord implements StepRecord {
-
-  "Step ID."
-  id: StepId!
-
-  "Instrument associated with the concrete implementation."
-  instrument: Instrument!
-
-  "The atom in which the step was executed."
-  atom: AtomRecord!
-
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
-  "Time interval during which this step executed."
-  interval: TimestampInterval
-
-  "The step configuration. apart from instrument details in 'instrumentConfig'."
-  stepConfig: StepConfig!
-
-  "The observe class of this step."
-  observeClass: ObserveClass!
-
-  "Original time estimate for executing this step."
-  estimate: TimeSpan!
-
-  """
-  QA state based on a combination of dataset QA states.  The worst QA state is
-  taken as the overall step QA state.  For example, one FAIL dataset will
-  result in the step having a FAIL QA state.  Unset QA states are ignored, but
-  if none are set the result will be null.
-  """
-  qaState: DatasetQaState
-
-  "Datasets associated with this step."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this step."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "GMOS North instrument configuration for this step."
-  instrumentConfig: GmosNorthDynamic!
-
-}
-
 """
 A GmosNorth visit as recorded by Observe
 """
@@ -2191,66 +2133,6 @@ type GmosSouthStep {
   Observe class for this step
   """
   observeClass: ObserveClass!
-
-}
-
-"""
-A GmosSouth step configuration as recorded by Observe
-"""
-type GmosSouthStepRecord implements StepRecord {
-
-  "Step ID."
-  id: StepId!
-
-  "Instrument associated with the concrete implementation."
-  instrument: Instrument!
-
-  "The atom in which the step was executed."
-  atom: AtomRecord!
-
-  "The step was created by Observe at this time."
-  created: Timestamp!
-
-  "Time interval during which this step executed."
-  interval: TimestampInterval
-
-  "The step configuration. apart from instrument details in 'instrumentConfig'."
-  stepConfig: StepConfig!
-
-  "The observe class of this step."
-  observeClass: ObserveClass!
-
-  "Original time estimate for executing this step."
-  estimate: TimeSpan!
-
-  """
-  QA state based on a combination of dataset QA states.  The worst QA state is
-  taken as the overall step QA state.  For example, one FAIL dataset will
-  result in the step having a FAIL QA state.  Unset QA states are ignored, but
-  if none are set the result will be null.
-  """
-  qaState: DatasetQaState
-
-  "Datasets associated with this step."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this step."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "GMOS South instrument configuration for this step."
-  instrumentConfig: GmosSouthDynamic!
 
 }
 
@@ -3291,7 +3173,7 @@ type RecordGmosNorthStepResult {
   """
   The newly added step record itself.
   """
-  stepRecord: GmosNorthStepRecord!
+  stepRecord: StepRecord!
 }
 
 """
@@ -3329,7 +3211,7 @@ type RecordGmosSouthStepResult {
   """
   The newly added step record itself.
   """
-  stepRecord: GmosSouthStepRecord!
+  stepRecord: StepRecord!
 }
 
 """
@@ -9268,15 +9150,15 @@ type StepEstimate {
 }
 
 """
-A step as recorded by Observe.  There will be one `StepRecord` implementation
-per instrument.
+A step as recorded by Observe.  There will be one instrument configuration per
+instrument, all but one of which will be null.
 """
-interface StepRecord {
+type StepRecord {
 
   "Step ID."
   id: StepId!
 
-  "Instrument associated with the concrete implementation."
+  "Instrument associated with the step."
   instrument: Instrument!
 
   "The atom in which the step was executed."
@@ -9326,6 +9208,17 @@ interface StepRecord {
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
 
+  """
+  GMOS North instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "GMOS_NORTH".
+  """
+  gmosNorth: GmosNorthDynamic!
+
+  """
+  GMOS South instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "GMOS_SOUTH".
+  """
+  gmosSouth: GmosSouthDynamic!
 }
 
 "StepRecord query results, limited to a maximum of 1000 entries."

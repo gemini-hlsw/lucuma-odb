@@ -26,7 +26,10 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] with LookupFrom[F] {
     typeRef:    TypeRef,
     underlying: ObjectMapping
   ): TypeMapping =
-    SwitchMapping(typeRef, lookupFromStepRecord(underlying, "stepConfig"))
+    SwitchMapping(
+      typeRef,
+      List(StepRecordType / "stepConfig" -> underlying)
+    )
 
   private lazy val stepConfigInterfaceMapping: ObjectMapping =
     SqlInterfaceMapping(

@@ -371,7 +371,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
             "matches" ->
               a.steps.map { s =>
                 Json.obj(
-                  "instrumentConfig" -> Json.obj(
+                  "gmosNorth" -> Json.obj(
                     "fpu" -> Json.obj("builtin" -> "LONG_SLIT_0_50".asJson)
                   ),
                   "stepConfig" -> Json.obj(
@@ -398,19 +398,11 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
       expect(pi, q, e)
     }
 
-  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord) 1") {
+  test("observation -> execution -> atomRecords -> steps 1") {
     testInterfaceMapping(400,
       s"""
-        ... on GmosNorthStepRecord {
-          instrumentConfig {
-            fpu {
-              builtin
-            }
-          }
-          stepConfig {
-            stepType
-          }
-        }
+        gmosNorth { fpu { builtin } }
+        stepConfig { stepType }
       """
     )
   }
@@ -418,19 +410,11 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   // There's a bug in Grackle 0.18.1 which causes the results to be returned
   // out of order (stepConfig then instrumentConfig).  It should work in
   // 0.19.0 or better
-  test("observation -> execution -> atomRecords -> steps (GmosNorthStepRecord) 2".ignore) {
+  test("observation -> execution -> atomRecords -> steps 2".ignore) {
     testInterfaceMapping(500,
       s"""
-        ... on GmosNorthStepRecord {
-          instrumentConfig {
-            fpu {
-              builtin
-            }
-          }
-        }
-        stepConfig {
-          stepType
-        }
+        gmosNorth { fpu { builtin } }
+        stepConfig { stepType }
       """
     )
   }
