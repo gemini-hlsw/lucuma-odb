@@ -1676,63 +1676,6 @@ type GmosNorthStep {
 }
 
 """
-A GmosNorth visit as recorded by Observe
-"""
-type GmosNorthVisit implements Visit {
-
-  "Visit id."
-  id: VisitId!
-
-  "Implements the Visit.instrument field to return GMOS_NORTH."
-  instrument: Instrument!
-
-  "Observation associated with this visit."
-  observation: Observation!
-
-  "Created by Observe at time."
-  created: Timestamp!
-
-  "Time interval during which this visit executed."
-  interval: TimestampInterval
-
-  "Executed (or at least partially executed) atom records for this visit."
-  atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): AtomRecordSelectResult!
-
-  "Datasets associated with this visit."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this visit."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "Time accounting details for this visit."
-  timeChargeInvoice: TimeChargeInvoice!
-
-  """
-  GmosNorth static instrument configuration
-  """
-  static: GmosNorthStatic!
-
-}
-
-"""
 GmosSouth atom, a collection of steps that should be executed in their entirety
 """
 type GmosSouthAtom {
@@ -2133,63 +2076,6 @@ type GmosSouthStep {
   Observe class for this step
   """
   observeClass: ObserveClass!
-
-}
-
-"""
-A GmosSouth visit as recorded by Observe
-"""
-type GmosSouthVisit implements Visit {
-
-  "Visit id."
-  id: VisitId!
-
-  "Implements the Visit.instrument field to return GMOS_SOUTH."
-  instrument: Instrument!
-
-  "Observation associated with this visit."
-  observation: Observation!
-
-  "Created by Observe at time."
-  created: Timestamp!
-
-  "Time interval during which this visit executed."
-  interval: TimestampInterval
-
-  "Executed (or at least partially executed) atom records for this visit."
-  atomRecords(
-    "Starts the result set at the given atom creation time."
-    OFFSET: Timestamp
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): AtomRecordSelectResult!
-
-  "Datasets associated with this visit."
-  datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
-    OFFSET: DatasetId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): DatasetSelectResult!
-
-  "Execution events associated with this visit."
-  events(
-    "Starts the result set at (or after if not existent) the given execution event id."
-    OFFSET: ExecutionEventId
-
-    "Limits the result to at most this number of matches (but never more than 1000)."
-    LIMIT: NonNegInt
-  ): ExecutionEventSelectResult!
-
-  "Time accounting details for this visit."
-  timeChargeInvoice: TimeChargeInvoice!
-
-  """
-  GmosSouth static instrument configuration
-  """
-  static: GmosSouthStatic!
 
 }
 
@@ -3191,7 +3077,7 @@ type RecordGmosNorthVisitResult {
   """
   The newly added visit record itself.
   """
-  visit: GmosNorthVisit!
+  visit: Visit!
 }
 
 """
@@ -3229,7 +3115,7 @@ type RecordGmosSouthVisitResult {
   """
   The newly added visit record itself.
   """
-  visit: GmosSouthVisit!
+  visit: Visit!
 }
 
 """
@@ -9884,7 +9770,7 @@ type User {
 A visit is recorded whenever any part of an observation is attempted.  There
 are specific impementations for each instrument.
 """
-interface Visit {
+type Visit {
 
   "Visit id."
   id: VisitId!
@@ -9933,6 +9819,16 @@ interface Visit {
 
   "Time accounting details for this visit."
   timeChargeInvoice: TimeChargeInvoice!
+
+  """
+  GmosNorth static instrument configuration, for GMOS North visits.
+  """
+  gmosNorth: GmosNorthStatic!
+
+  """
+  GmosSouth static instrument configuration, for GMOS South visits.
+  """
+  gmosSouth: GmosSouthStatic!
 
 }
 

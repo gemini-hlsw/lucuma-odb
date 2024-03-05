@@ -582,7 +582,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         recordVisit(
           visitService.insertGmosNorth(input.observationId, input.static),
-          Predicates.gmosNorthVisit.id,
+          Predicates.visit.id,
           child
         )
       }
@@ -593,7 +593,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
         recordVisit(
           visitService.insertGmosSouth(input.observationId, input.static),
-          Predicates.gmosSouthVisit.id,
+          Predicates.visit.id,
           child
         )
       }
