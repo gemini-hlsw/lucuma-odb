@@ -32,6 +32,7 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
+import lucuma.odb.service.ProgramService.LinkUserResponse.Success
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
@@ -39,7 +40,6 @@ import skunk.codec.all._
 import skunk.syntax.all._
 
 import Services.Syntax.*
-import lucuma.odb.service.ProgramService.LinkUserResponse.Success
 
 trait ProgramService[F[_]] {
 

@@ -28,6 +28,8 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.CatalogInfoInput
@@ -37,6 +39,8 @@ import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Encoder
@@ -48,10 +52,6 @@ import skunk.codec.all._
 import skunk.implicits._
 
 import Services.Syntax.*
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
-import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 
 trait TargetService[F[_]] {
   def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]]
