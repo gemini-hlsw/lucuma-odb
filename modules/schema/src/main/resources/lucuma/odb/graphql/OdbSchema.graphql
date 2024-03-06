@@ -3801,11 +3801,6 @@ Obs Attachment selection and update description.  Use `SET` to specify the chang
 """
 input UpdateObsAttachmentsInput {
   """
-  Program ID for the program whose obs attachments are to be edited.
-  """
-  programId: ProgramId!
-
-  """
   Describes the obs attachment values to modify.
   """
   SET: ObsAttachmentPropertiesInput!
@@ -9984,6 +9979,11 @@ input WhereObsAttachment {
   Matches whether the attachment has been checked or not
   """
   checked: Boolean
+
+  """
+  Matches the program containing the attachment.
+  """
+  program: WhereProgram
 }
 
 """
