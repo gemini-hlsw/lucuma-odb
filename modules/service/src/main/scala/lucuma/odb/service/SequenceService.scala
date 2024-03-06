@@ -84,7 +84,7 @@ trait SequenceService[F[_]] {
     step:           StepConfig,
     observeClass:   ObserveClass,
     timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-  )(using Transaction[F]): F[SequenceService.InsertStepResponse]
+  )(using Transaction[F]): F[Result[Step.Id]]
 
   def insertGmosSouthStepRecord(
     atomId:         Atom.Id,
@@ -92,7 +92,7 @@ trait SequenceService[F[_]] {
     step:           StepConfig,
     observeClass:   ObserveClass,
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-  )(using Transaction[F]): F[SequenceService.InsertStepResponse]
+  )(using Transaction[F]): F[Result[Step.Id]]
 
 }
 
@@ -387,7 +387,7 @@ object SequenceService {
         timeEstimate:        (S, EstimatorState[D]) => StepEstimate,
         estimatorState:      Observation.Id => F[Option[(S, EstimatorState[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
-      )(using Transaction[F]): F[InsertStepResponse] =
+      )(using Transaction[F]): F[Result[Step.Id]] =
         (for {
           _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           foo  = session.option(Statements.SelectObservationId)((atomId, instrument))
@@ -399,7 +399,10 @@ object SequenceService {
                  )).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
-        } yield Success(sid)).merge
+        } yield Success(sid)).merge.map:
+          case NotAuthorized(user)           =>   OdbError.NotAuthorized(user.id).asFailure
+          case AtomNotFound(id, instrument)  =>   OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
+          case Success(sid)                  =>   Result(sid)
 
       override def insertGmosNorthStepRecord(
         atomId:         Atom.Id,
@@ -407,7 +410,7 @@ object SequenceService {
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
         timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-      )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
+      )(using Transaction[F]): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
@@ -424,7 +427,7 @@ object SequenceService {
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
         timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-      )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
+      )(using Transaction[F]): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,
