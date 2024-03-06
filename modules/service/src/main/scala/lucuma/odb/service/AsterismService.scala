@@ -98,6 +98,8 @@ object AsterismService {
 
     new AsterismService[F] {
 
+      // Selects the program id that is shared by all the given observations,
+      // or else fails.
       private def selectProgramId(
         observationIds: NonEmptyList[Observation.Id]
       ): F[Result[Program.Id]] = {
