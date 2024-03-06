@@ -78,7 +78,6 @@ import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
-import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.tpolecat.typename.TypeName
@@ -483,20 +482,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private def recordStep(
-    action:    F[SequenceService.InsertStepResponse],
+    action:    F[Result[Step.Id]],
     predicate: LeafPredicates[Step.Id],
     child:     Query
-  ): F[Result[Query]] = {
-    import SequenceService.InsertStepResponse.*
-    action.map[Result[Query]] {
-      case NotAuthorized(user)           =>
-        OdbError.NotAuthorized(user.id).asFailure
-      case AtomNotFound(id, instrument)  =>
-        OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
-      case Success(sid)                  =>
-        Result(Unique(Filter(predicate.eql(sid), child)))
-    }
-  }
+  ): F[Result[Query]] =
+    action.nestMap: sid =>
+      Unique(Filter(predicate.eql(sid), child))
 
   private lazy val RecordGmosNorthStep: MutationField =
     MutationField("recordGmosNorthStep", RecordGmosStepInput.GmosNorthBinding) { (input, child) =>
