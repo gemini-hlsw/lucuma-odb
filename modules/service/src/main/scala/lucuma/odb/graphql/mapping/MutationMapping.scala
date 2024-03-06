@@ -464,20 +464,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private def recordAtom(
-    response:  F[SequenceService.InsertAtomResponse],
+    response:  F[Result[Atom.Id]],
     predicate: LeafPredicates[Atom.Id],
     child:     Query
-  )(using Services[F]): F[Result[Query]] = {
-    import SequenceService.InsertAtomResponse.*
-    response.map[Result[Query]] {
-      case NotAuthorized(user)           =>
-        OdbError.NotAuthorized(user.id).asFailure
-      case VisitNotFound(id, instrument) =>
-        OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
-      case Success(aid)                  =>
-        Result(Unique(Filter(predicate.eql(aid), child)))
-    }
-  }
+  ): F[Result[Query]] =
+    response.nestMap: aid =>
+      Unique(Filter(predicate.eql(aid), child))
 
   private lazy val RecordAtom: MutationField =
     MutationField("recordAtom", RecordAtomInput.Binding) { (input, child) =>
@@ -491,12 +483,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private def recordStep(
-    response:  F[SequenceService.InsertStepResponse],
+    action:    F[SequenceService.InsertStepResponse],
     predicate: LeafPredicates[Step.Id],
     child:     Query
   ): F[Result[Query]] = {
     import SequenceService.InsertStepResponse.*
-    response.map[Result[Query]] {
+    action.map[Result[Query]] {
       case NotAuthorized(user)           =>
         OdbError.NotAuthorized(user.id).asFailure
       case AtomNotFound(id, instrument)  =>

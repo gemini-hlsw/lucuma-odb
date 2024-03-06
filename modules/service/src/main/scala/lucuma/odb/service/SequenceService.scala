@@ -44,6 +44,9 @@ import skunk.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import grackle.Result
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 trait SequenceService[F[_]] {
 
@@ -73,7 +76,7 @@ trait SequenceService[F[_]] {
     instrument:   Instrument,
     stepCount:    NonNegShort,
     sequenceType: SequenceType
-  )(using Transaction[F]): F[SequenceService.InsertAtomResponse]
+  )(using Transaction[F]): F[Result[Atom.Id]]
 
   def insertGmosNorthStepRecord(
     atomId:         Atom.Id,
@@ -338,7 +341,7 @@ object SequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.SetStepCompleted)(time, stepId).void
 
-      override def insertAtomRecord(
+      def insertAtomRecordImpl(
         visitId:      Visit.Id,
         instrument:   Instrument,
         stepCount:    NonNegShort,
@@ -351,6 +354,17 @@ object SequenceService {
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
           _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType))
         } yield InsertAtomResponse.Success(aid)).merge
+
+      override def insertAtomRecord(
+        visitId:      Visit.Id,
+        instrument:   Instrument,
+        stepCount:    NonNegShort,
+        sequenceType: SequenceType
+      )(using Transaction[F]): F[Result[Atom.Id]] =
+        insertAtomRecordImpl(visitId, instrument, stepCount, sequenceType).map:
+          case InsertAtomResponse.NotAuthorized(user)           => OdbError.NotAuthorized(user.id).asFailure
+          case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
+          case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
       import InsertStepResponse.*
 
