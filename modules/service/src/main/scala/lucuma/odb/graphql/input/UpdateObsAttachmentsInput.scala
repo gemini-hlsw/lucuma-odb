@@ -9,11 +9,9 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Path
 import grackle.Predicate
-import lucuma.core.model.Program
 import lucuma.odb.graphql.binding._
 
 case class UpdateObsAttachmentsInput(
-  programId: Program.Id,
   SET:       ObsAttachmentPropertiesInput.Edit,
   WHERE:     Option[Predicate],
   LIMIT:     Option[NonNegInt]
@@ -25,12 +23,11 @@ object UpdateObsAttachmentsInput {
     val WhereObsAttachmentBinding = WhereObsAttachment.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rPid),
         ObsAttachmentPropertiesInput.EditBinding("SET", rSET),
         WhereObsAttachmentBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       ) =>
-        (rPid, rSET, rWHERE, rLIMIT).parMapN(apply)
+        (rSET, rWHERE, rLIMIT).parMapN(apply)
     }
   }
 }
