@@ -674,7 +674,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           NonEmptyList.fromList(oids).traverse { os =>
             val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
             val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
-            asterismService.updateAsterism(input.programId, os, add, del)
+            asterismService.updateAsterism(os, add, del)
           }.map(_.getOrElse(Result.unit))
 
         for {

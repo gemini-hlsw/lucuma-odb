@@ -4,13 +4,18 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.show.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.Gid
+import lucuma.odb.data.OdbError
 
 class updateAsterisms extends OdbSuite {
 
@@ -25,7 +30,6 @@ class updateAsterisms extends OdbSuite {
       tid <- createTargetAs(pi, pid, "Larry")
       _   <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(oid),
         add  = List(tid),
         del  = Nil,
@@ -55,7 +59,6 @@ class updateAsterisms extends OdbSuite {
       t1  <- createTargetAs(pi, pid, "Curly")
       _   <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(oid),
         add  = List(t0),
         del  = Nil,
@@ -63,7 +66,6 @@ class updateAsterisms extends OdbSuite {
       )
       _   <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(oid),
         add  = List(t1),
         del  = Nil,
@@ -102,7 +104,6 @@ class updateAsterisms extends OdbSuite {
       t1 <- createTargetAs(pi, pid, "Curly")
       _ <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(oid),
         add  = List(t0, t1),
         del  = Nil,
@@ -110,7 +111,6 @@ class updateAsterisms extends OdbSuite {
       )
       _ <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(oid),
         add  = Nil,
         del  = List(t0),
@@ -160,7 +160,6 @@ class updateAsterisms extends OdbSuite {
       t2  <- createTargetAs(pi, pid, "Moe")
       _   <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(o0),
         add  = List(t0, t1),
         del  = Nil,
@@ -168,7 +167,6 @@ class updateAsterisms extends OdbSuite {
       )
       _ <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(o1),
         add  = List(t1, t2),
         del  = Nil,
@@ -176,7 +174,6 @@ class updateAsterisms extends OdbSuite {
       )
       _   <- updateAsterisms(
         user = pi,
-        pid  = pid,
         oids = List(o0, o1),
         add  = Nil,
         del  = List(t1),
@@ -243,4 +240,69 @@ class updateAsterisms extends OdbSuite {
     } yield ()
   }
 
+  private def gidList[A: Gid](as: List[A]): String =
+    s"[ ${as.map(_.show).mkString("\"", "\",\"", "\"")} ]"
+
+  test("fail multi-program observations") {
+
+    def expectFail(
+      oids: List[Observation.Id],
+      add:  List[Target.Id]
+    ): IO[Unit] =
+      expect(
+        user = pi,
+        query =
+          s"""
+          mutation {
+            updateAsterisms(input: {
+              SET: { ADD: ${gidList(add)} }
+              WHERE: { id: { IN: ${gidList(oids)} } }
+            }) { observations { id } }
+          }
+        """,
+        expected = List(OdbError.InvalidObservationList(NonEmptyList.fromListUnsafe(oids)).message).asLeft
+      )
+
+    for {
+      p0 <- createProgramAs(pi)
+      p1 <- createProgramAs(pi)
+      o0 <- createObservationAs(pi, p0)
+      o1 <- createObservationAs(pi, p1)
+      t0  <- createTargetAs(pi, p0, "Larry")
+      t1  <- createTargetAs(pi, p0, "Curly")
+      _   <- expectFail(List(o0, o1), List(t0, t1))
+    } yield ()
+  }
+
+  test("fail multi-program targets") {
+
+    def expectFail(
+      pid:  Program.Id,
+      oids: List[Observation.Id],
+      add:  List[Target.Id]
+    ): IO[Unit] =
+      expect(
+        user = pi,
+        query =
+          s"""
+          mutation {
+            updateAsterisms(input: {
+              SET: { ADD: ${gidList(add)} }
+              WHERE: { id: { IN: ${gidList(oids)} } }
+            }) { observations { id } }
+          }
+        """,
+        expected = List(OdbError.InvalidTargetList(pid, NonEmptyList.fromListUnsafe(add)).message).asLeft
+      )
+
+    for {
+      p0 <- createProgramAs(pi)
+      p1 <- createProgramAs(pi)
+      o0 <- createObservationAs(pi, p0)
+      o1 <- createObservationAs(pi, p0)
+      t0  <- createTargetAs(pi, p0, "Larry")
+      t1  <- createTargetAs(pi, p1, "Curly")
+      _   <- expectFail(p0, List(o0, o1), List(t0, t1))
+    } yield ()
+  }
 }
