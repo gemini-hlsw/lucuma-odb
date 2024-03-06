@@ -77,7 +77,6 @@ import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
-import lucuma.odb.service.DatasetService
 import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -394,19 +393,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private def recordDatasetResponseToResult(
     child:        Query,
     predicates:   DatasetPredicates
-  ): DatasetService.InsertDatasetResponse => Result[Query] = {
-    import DatasetService.InsertDatasetResponse.*
-    (response: DatasetService.InsertDatasetResponse) => response match {
-      case NotAuthorized(user)      =>
-        OdbError.NotAuthorized(user.id).asFailure
-      case ReusedFilename(filename) =>
-        OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
-      case StepNotFound(id)         =>
-        OdbError.InvalidStep(id, Some(s"Step id '$id' not found")).asFailure
-      case Success(did, _, _)       =>
-        Result(Unique(Filter(predicates.id.eql(did), child)))
-    }
-  }
+  ): Result[Dataset.Id] => Result[Query] = r =>
+      r.map: did => 
+        Unique(Filter(predicates.id.eql(did), child))
 
   private lazy val RecordDataset: MutationField =
     MutationField("recordDataset", RecordDatasetInput.Binding) { (input, child) =>
