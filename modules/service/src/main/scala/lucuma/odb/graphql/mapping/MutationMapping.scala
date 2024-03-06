@@ -26,6 +26,7 @@ import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
+import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -77,7 +78,6 @@ import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
-import lucuma.odb.service.ExecutionEventService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.tpolecat.typename.TypeName
@@ -406,33 +406,19 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
-  private def executionEventResponseToResult(
-    child:        Query,
-    predicates:   ExecutionEventPredicates,    
-  )(using Services[F]): ExecutionEventService.InsertEventResponse => Result[Query] = {
-    import ExecutionEventService.InsertEventResponse.*
-    (response: ExecutionEventService.InsertEventResponse) => response match {
-      case NotAuthorized(user) => OdbError.NotAuthorized(user.id).asFailure
-      case DatasetNotFound(id) => OdbError.InvalidDataset(id, Some(s"Dataset '${id.show}' not found")).asFailure
-      case StepNotFound(id)    => OdbError.InvalidStep(id, Some(s"Step '$id' not found")).asFailure
-      case VisitNotFound(id)   => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found")).asFailure
-      case Success(e)          => Result(Unique(Filter(predicates.id.eql(e.id), child)))
-    }
-  }
-
   private def addEvent[I: ClassTag: TypeName](
     fieldName: String,
     matcher:   Matcher[I],
     pred:      ExecutionEventPredicates
   )(
-    insert:    I => (Transaction[F], Services[F]) ?=> F[ExecutionEventService.InsertEventResponse]
+    insert:    I => (Transaction[F], Services[F]) ?=> F[Result[ExecutionEvent]]
   ): MutationField =
     MutationField(fieldName, matcher) { (input, child) =>
       services.useTransactionally {
         for {
           r <- insert(input)
-          _ <- r.asSuccess.traverse_(s => timeAccountingService.update(s.event.visitId))
-        } yield executionEventResponseToResult(child, pred)(r)
+          _ <- r.traverse_(s => timeAccountingService.update(s.visitId))
+        } yield r.map(e => Unique(Filter(pred.id.eql(e.id), child)))
       }
     }
 
