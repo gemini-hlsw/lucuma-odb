@@ -28,6 +28,8 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.CatalogInfoInput
@@ -37,6 +39,8 @@ import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
+import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs._
 import skunk.AppliedFragment
 import skunk.Encoder
@@ -50,10 +54,9 @@ import skunk.implicits._
 import Services.Syntax.*
 
 trait TargetService[F[_]] {
-  import TargetService.{ CloneTargetResponse, CreateTargetResponse, UpdateTargetsResponse }
-  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse]
-  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse]
-  def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse]
+  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]]
+  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
+  def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
 }
 
 object TargetService {
@@ -82,7 +85,7 @@ object TargetService {
   def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
     new TargetService[F] {
 
-      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
+      private def createTargetImpl(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
         val insert: AppliedFragment =
           input.tracking match {
             case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, TargetRole.Science)
@@ -98,7 +101,19 @@ object TargetService {
         }
       }
 
-      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
+      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]] =
+        createTargetImpl(pid, input).map:
+          case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
+          case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
+          case Success(id)          => Result(id)
+
+      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]] =
+        updateTargetsImpl(input, which).map:
+          case UpdateTargetsResponse.Success(selected)                    => Result.success(selected)
+          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+          case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure                  
+
+      def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
         updateTargetsʹ(input, which)
 
       def updateTargetsʹ(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
@@ -148,7 +163,7 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
+      def cloneTargetImpl(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
         import CloneTargetResponse.*
 
         val pid: F[Option[Program.Id]] =
@@ -183,6 +198,15 @@ object TargetService {
                 }
             }
         }
+
+      def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
+        cloneTargetImpl(input).map:
+          case CloneTargetResponse.Success(oldTargetId, newTargetId) => Result((oldTargetId, newTargetId))
+          case CloneTargetResponse.NoSuchTarget(targetId) => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
+          case CloneTargetResponse.UpdateFailed(problem)  =>
+            problem match
+              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+              case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
     }
 
