@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.Functor
 import cats.data.Ior
 import cats.data.Nested
 import cats.data.NonEmptyList
@@ -85,7 +86,6 @@ import skunk.AppliedFragment
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import cats.Functor
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 

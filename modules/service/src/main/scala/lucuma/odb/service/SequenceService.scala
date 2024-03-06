@@ -18,6 +18,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
+import grackle.Result
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -35,6 +36,8 @@ import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth => GmosNorthStati
 import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth => GmosSouthStatic}
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.EstimatorState
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.CompletedAtomMap
@@ -44,9 +47,6 @@ import skunk.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import grackle.Result
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 
 trait SequenceService[F[_]] {
 

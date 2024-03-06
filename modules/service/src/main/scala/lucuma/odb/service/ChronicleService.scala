@@ -5,7 +5,10 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.model.Access
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -13,9 +16,6 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
-import grackle.Result
 
 trait ChronicleService[F[_]]:
   def addConditionsEntry(input: ConditionsEntryInput): F[Result[Long]]

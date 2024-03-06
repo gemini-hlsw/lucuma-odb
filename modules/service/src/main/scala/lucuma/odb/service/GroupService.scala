@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric.NonNegShort
+import grackle.Result
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.data.GroupTree
@@ -18,7 +19,6 @@ import skunk.codec.all.*
 import skunk.implicits._
 
 import Services.Syntax.*
-import grackle.Result
 
 trait GroupService[F[_]] {
   def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id]
