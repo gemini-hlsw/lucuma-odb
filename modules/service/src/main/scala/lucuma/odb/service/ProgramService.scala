@@ -39,6 +39,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
 
+import OdbErrorExtensions.*
 import Services.Syntax.*
 
 trait ProgramService[F[_]] {
@@ -47,6 +48,15 @@ trait ProgramService[F[_]] {
    * Find the program id matching the given reference, if any.
    */
   def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
+
+  /**
+   * Convenience method. Find the program id consistent with the provided ids (if any).
+   */
+  def resolvePid(
+    pid:  Option[Program.Id],
+    prop: Option[ProposalReference],
+    prog: Option[ProgramReference]
+  ): F[Result[Program.Id]]
 
   def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]]
 
@@ -171,6 +181,45 @@ object ProgramService {
         val af = Statements.selectPid(ref)
         session.prepareR(af.fragment.query(program_id)).use { ps =>
           ps.option(af.argument)
+        }
+      }
+
+      override def resolvePid(
+        pid:  Option[Program.Id],
+        prop: Option[ProposalReference],
+        prog: Option[ProgramReference]
+      ): F[Result[Program.Id]] = {
+        def notFound(ref: Ior[ProposalReference, ProgramReference]): String =
+          ref.fold(
+            r => s"Proposal '${r.label}' was not found.",
+            r => s"Program '${r.label}' was not found.",
+            (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' were not found or do not correspond to the same program."
+          )
+
+        def notCorresponding(
+          ref:      Ior[ProposalReference, ProgramReference],
+          pid:      Program.Id,
+          givenPid: Program.Id
+        ): String =
+          ref.fold(
+            r => s"Proposal '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+            r => s"Program '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+            (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' (id $pid) do not correspond to the specified program id $givenPid."
+          )
+
+        (pid, Ior.fromOptions(prop, prog)) match {
+          case (None, None)    => OdbError.InvalidArgument("One of programId, programReference or proposalReference must be provided.".some).asFailureF
+          case (Some(p), None) => p.success.pure[F]
+          case (_, Some(r))    => selectPid(r).map { op =>
+            op.fold(OdbError.InvalidArgument(notFound(r).some).asFailure) { selectedPid =>
+              pid.fold(selectedPid.success) { givenPid =>
+                OdbError.InvalidArgument(notCorresponding(r, selectedPid, givenPid).some)
+                  .asFailure
+                  .unlessA(selectedPid === givenPid)
+                  .as(selectedPid)
+              }
+            }
+          }
         }
       }
 
