@@ -13,6 +13,8 @@ import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.show.*
+import grackle.Result
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
@@ -26,12 +28,13 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-
 
 trait ExecutionEventService[F[_]] {
 
@@ -50,17 +53,17 @@ trait ExecutionEventService[F[_]] {
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
     datasetStage: DatasetStage
-  )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse]
+  )(using Transaction[F]): F[Result[ExecutionEvent]]
 
   def insertSequenceEvent(
     visitId: Visit.Id,
     command: SequenceCommand
-  )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse]
+  )(using Transaction[F]): F[Result[ExecutionEvent]]
 
   def insertStepEvent(
     stepId:    Step.Id,
     stepStage: StepStage
-  )(using Transaction[F]): F[ExecutionEventService.InsertEventResponse]
+  )(using Transaction[F]): F[Result[ExecutionEvent]]
 
 }
 
@@ -119,7 +122,7 @@ object ExecutionEventService {
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
         datasetStage: DatasetStage
-      )(using xa: Transaction[F]): F[ExecutionEventService.InsertEventResponse] = {
+      )(using xa: Transaction[F]): F[Result[ExecutionEvent]] = {
 
         import InsertEventResponse.*
 
@@ -158,12 +161,20 @@ object ExecutionEventService {
           _ <- EitherT.liftF(setDatasetTime(time))
         } yield Success(DatasetEvent(eid, time, oid, vid, sid, datasetId, datasetStage))).merge
 
-      }
+      } .map(executionEventResponseToResult)
+
+      private def executionEventResponseToResult(r: InsertEventResponse): Result[ExecutionEvent] =
+        r match
+          case InsertEventResponse.NotAuthorized(user) => OdbError.NotAuthorized(user.id).asFailure
+          case InsertEventResponse.DatasetNotFound(id) => OdbError.InvalidDataset(id, Some(s"Dataset '${id.show}' not found")).asFailure
+          case InsertEventResponse.StepNotFound(id)    => OdbError.InvalidStep(id, Some(s"Step '$id' not found")).asFailure
+          case InsertEventResponse.VisitNotFound(id)   => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found")).asFailure
+          case InsertEventResponse.Success(e)          => Result(e)
 
       override def insertSequenceEvent(
         visitId: Visit.Id,
         command: SequenceCommand
-      )(using Transaction[F]): F[InsertEventResponse] = {
+      )(using Transaction[F]): F[Result[ExecutionEvent]] = {
 
         import InsertEventResponse.*
 
@@ -180,12 +191,12 @@ object ExecutionEventService {
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time, oid) = e
         } yield Success(SequenceEvent(eid, time, oid, visitId, command))).merge
-      }
+      }.map(executionEventResponseToResult)
 
       override def insertStepEvent(
         stepId:       Step.Id,
         stepStage:    StepStage
-      )(using Transaction[F]): F[InsertEventResponse] = {
+      )(using Transaction[F]): F[Result[ExecutionEvent]] = {
 
         import InsertEventResponse.*
 
@@ -209,7 +220,7 @@ object ExecutionEventService {
                 .setStepCompleted(stepId, Option.when(stepStage === StepStage.EndStep)(time))
           )
         } yield Success(StepEvent(eid, time, oid, vid, stepId, stepStage))).merge
-      }
+      }.map(executionEventResponseToResult)
     }
 
   object Statements {
