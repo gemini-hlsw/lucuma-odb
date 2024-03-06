@@ -43,7 +43,6 @@ class obsAttachments extends ObsAttachmentsSuite {
 
   def updateAttachmentsGql(
     user:        User,
-    programId:   Program.Id,
     WHERE:       String,
     SET:         String,
     expectedTas: (ObsAttachment.Id, TestAttachment)*
@@ -54,7 +53,6 @@ class obsAttachments extends ObsAttachmentsSuite {
         mutation {
           updateObsAttachments(
             input: {
-              programId: "$programId"
               WHERE: """ + WHERE + """
               SET: """ + SET + s"""
             }
@@ -377,6 +375,21 @@ class obsAttachments extends ObsAttachmentsSuite {
     } yield ()
   }
 
+  test("pi can update multiple programs") {
+    for {
+      pid1 <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid1, preImaging).toAttachmentId
+      pid2 <- createProgramAs(pi)
+      aid2 <- insertAttachment(pi, pid2, preImaging).toAttachmentId
+      ta3c  = preImaging.copy(checked = true)
+      _    <- updateAttachmentsGql(pi,
+                                   WHERE = s"""{ id: { IN: [ "$aid1", "$aid2" ] } }""",
+                                   SET = s"""{ checked: true }""",
+                                   (aid1, ta3c), (aid2, ta3c)
+              )
+    } yield ()
+  }
+
   test("pi can only insert to their own programs") {
     for {
       pid1 <- createProgramAs(pi)
@@ -473,8 +486,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       newDesc = "New description"
       newTa   = mosMask1A.copy(description = newDesc.some)
       _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ id: { EQ: "$aid"}}""",
+                                     WHERE = s"""{ id: { EQ: "$aid" }}""",
                                      SET = s"""{ description: "$newDesc" }""",
                                      (aid, newTa)
                 )
@@ -487,7 +499,6 @@ class obsAttachments extends ObsAttachmentsSuite {
       aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       newTa = mosMask1A.copy(description = none)
       _    <- updateAttachmentsGql(pi,
-                                   pid,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
                                    SET = """{ description: null }""",
                                    (aid, newTa)
@@ -501,7 +512,6 @@ class obsAttachments extends ObsAttachmentsSuite {
       aid  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       newTa = mosMask1A.copy(checked = true)
       _    <- updateAttachmentsGql(pi,
-                                   pid,
                                    WHERE = s"""{ id: { EQ: "$aid"}}""",
                                    SET = """{ checked: true }""",
                                    (aid, newTa)
@@ -519,8 +529,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       newTa1  = mosMask1A.copy(description = newDesc.some, checked = true)
       newTa2  = mosMask2.copy(description = newDesc.some, checked = true)
       _      <- updateAttachmentsGql(pi,
-                                     pid,
-                                     WHERE = s"""{ fileName: { LIKE: "file%"}}""",
+                                     WHERE = s"""{ fileName: { LIKE: "file%"}, program: { id: { EQ: "$pid" } } }""",
                                      SET = s"""{ checked: true, description: "$newDesc" }""",
                                      (aid1, newTa1),
                                      (aid2, newTa2)
@@ -537,7 +546,6 @@ class obsAttachments extends ObsAttachmentsSuite {
       newTa1 = mosMask1A.copy(description = none, checked = true)
       newTa3 = finderPNG.copy(description = none, checked = true)
       _     <- updateAttachmentsGql(pi,
-                                    pid,
                                     WHERE = s"""{ id: { IN: ["$aid1", "$aid3"]}}""",
                                     SET = """{ checked: true, description: null }""",
                                     (aid1, newTa1),
@@ -554,15 +562,13 @@ class obsAttachments extends ObsAttachmentsSuite {
       aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
       ta3c   = finderPNG.copy(checked = true)
       _     <- updateAttachmentsGql(pi,
-                                    pid,
                                     WHERE = s"""{ id: { EQ: "$aid3"}}""",
                                     SET = s"""{ checked: true }""",
                                     (aid3, ta3c)
                )
       newTa3 = ta3c.copy(description = "Verified".some)
       _     <- updateAttachmentsGql(pi,
-                                    pid,
-                                    WHERE = s"""{ checked: true }""",
+                                    WHERE = s"""{ checked: true, program: { id: { EQ: "$pid" } } }""",
                                     SET = """{ description: "Verified" }""",
                                     (aid3, newTa3)
                )
@@ -578,8 +584,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       newTa2 = mosMask2.copy(description = none)
       newTa3 = finderPNG.copy(description = none)
       _     <- updateAttachmentsGql(pi,
-                                    pid,
-                                    WHERE = s"""{ description: { NLIKE: "%script%" }}""",
+                                    WHERE = s"""{ description: { NLIKE: "%script%" }, program: { id: { EQ: "$pid" } } }""",
                                     SET = """{ description: null }""",
                                     (aid2, newTa2),
                                     (aid3, newTa3)
@@ -595,8 +600,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       aid3  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
       newTa1 = mosMask1B.copy(description = "No longer null!".some)
       _     <- updateAttachmentsGql(pi,
-                                    pid,
-                                    WHERE = s"""{ description: { IS_NULL: true }}""",
+                                    WHERE = s"""{ description: { IS_NULL: true }, program: { id: { EQ: "$pid" } } }""",
                                     SET = """{ description: "No longer null!" }""",
                                     (aid1, newTa1)
                )
@@ -612,8 +616,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       newTa1 = mosMask1B.copy(description = "Found".some)
       newTa2 = mosMask2.copy(description = "Found".some)
       _     <- updateAttachmentsGql(pi,
-                                    pid,
-                                    WHERE = s"""{ attachmentType: { EQ: MOS_MASK }}""",
+                                    WHERE = s"""{ attachmentType: { EQ: MOS_MASK }, program: { id: { EQ: "$pid" } } }""",
                                     SET = """{ description: "Found" }""",
                                     (aid1, newTa1),
                                     (aid2, newTa2)
@@ -626,8 +629,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       pid   <- createProgramAs(pi)
       aid1  <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       _     <- updateAttachmentsGql(pi,
-                                    pid,
-                                    WHERE = s"""{ id: { NEQ: "$aid1" }}""",
+                                    WHERE = s"""{ id: { NEQ: "$aid1" }, program: { id: { EQ: "$pid" } } }""",
                                     SET = """{ description: "Found" }"""
                )
     } yield ()

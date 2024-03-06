@@ -19,6 +19,7 @@ object WhereObsAttachment {
     val WhereFileNameBinding   = WhereString.binding(path / "fileName")
     val WhereDescriptionBinding   = WhereOptionString.binding(path / "description")
     val WhereAttachmentTypeBinding = WhereUnorderedTag.binding(path / "attachmentType", TagBinding)
+    val WhereProgramBinding = WhereProgram.binding(path / "program")
 
     lazy val WhereObsAttachmentBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -30,10 +31,11 @@ object WhereObsAttachment {
             WhereFileNameBinding.Option("fileName", rFileName),
             WhereDescriptionBinding.Option("description", rDescription),
             WhereAttachmentTypeBinding.Option("attachmentType", rAttachmentType),
-            BooleanBinding.Option("checked", rChecked)
+            BooleanBinding.Option("checked", rChecked),
+            WhereProgramBinding.Option("program", rProgram)
           ) =>
-        (rAND, rOR, rNOT, rId, rFileName, rDescription, rAttachmentType, rChecked).parMapN { 
-          (AND, OR, NOT, id, name, desc, atType, checked) =>
+        (rAND, rOR, rNOT, rId, rFileName, rDescription, rAttachmentType, rChecked, rProgram).parMapN {
+          (AND, OR, NOT, id, name, desc, atType, checked, program) =>
             and(
               List(
                 AND.map(and),
@@ -43,7 +45,8 @@ object WhereObsAttachment {
                 name,
                 desc,
                 atType,
-                checked.map(b => Eql(path / "checked", Const(b)))
+                checked.map(b => Eql(path / "checked", Const(b))),
+                program
               ).flatten
             )
         }

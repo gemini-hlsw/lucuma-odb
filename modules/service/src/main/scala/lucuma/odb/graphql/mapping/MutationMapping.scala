@@ -712,7 +712,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("updateObsAttachments", UpdateObsAttachmentsInput.binding(Path.from(ObsAttachmentType))) { (input, child) =>
       services.useTransactionally {
         val filterPredicate = and(List(
-          Predicates.obsAttachment.program.id.eql(input.programId),
           Predicates.obsAttachment.program.isWritableBy(user),
           input.WHERE.getOrElse(True)
         ))
