@@ -9984,6 +9984,11 @@ input WhereObsAttachment {
   Matches whether the attachment has been checked or not
   """
   checked: Boolean
+
+  """
+  Matches the program containing the attachment.
+  """
+  program: WhereProgram
 }
 
 """
