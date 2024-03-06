@@ -32,12 +32,14 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
+import lucuma.odb.service.ProgramService.LinkUserResponse.Success
 import lucuma.odb.util.Codecs._
 import natchez.Trace
 import skunk._
 import skunk.codec.all._
 import skunk.syntax.all._
 
+import OdbErrorExtensions.*
 import Services.Syntax.*
 
 trait ProgramService[F[_]] {
@@ -46,6 +48,15 @@ trait ProgramService[F[_]] {
    * Find the program id matching the given reference, if any.
    */
   def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
+
+  /**
+   * Convenience method. Find the program id consistent with the provided ids (if any).
+   */
+  def resolvePid(
+    pid:  Option[Program.Id],
+    prop: Option[ProposalReference],
+    prog: Option[ProgramReference]
+  ): F[Result[Program.Id]]
 
   def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]]
 
@@ -59,7 +70,7 @@ trait ProgramService[F[_]] {
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
    * if the user was not authorized to perform the action.
    */
-  def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[ProgramService.LinkUserResponse]
+  def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[Result[(Program.Id, User.Id)]]
 
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
   def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[Result[List[Program.Id]]]
@@ -115,7 +126,7 @@ object ProgramService {
   object LinkUserResponse {
     case class NotAuthorized(user: User)                     extends LinkUserResponse
     case class AlreadyLinked(pid: Program.Id, user: User.Id) extends LinkUserResponse
-    case class Success(pis: Program.Id, user: User.Id)       extends LinkUserResponse
+    case class Success(pid: Program.Id, user: User.Id)       extends LinkUserResponse
     case class InvalidUser(user: User.Id)                    extends LinkUserResponse
   }
 
@@ -173,6 +184,45 @@ object ProgramService {
         }
       }
 
+      override def resolvePid(
+        pid:  Option[Program.Id],
+        prop: Option[ProposalReference],
+        prog: Option[ProgramReference]
+      ): F[Result[Program.Id]] = {
+        def notFound(ref: Ior[ProposalReference, ProgramReference]): String =
+          ref.fold(
+            r => s"Proposal '${r.label}' was not found.",
+            r => s"Program '${r.label}' was not found.",
+            (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' were not found or do not correspond to the same program."
+          )
+
+        def notCorresponding(
+          ref:      Ior[ProposalReference, ProgramReference],
+          pid:      Program.Id,
+          givenPid: Program.Id
+        ): String =
+          ref.fold(
+            r => s"Proposal '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+            r => s"Program '${r.label}' (id $pid) does not correspond to the specified program id $givenPid.",
+            (r0, r1) => s"Proposal '${r0.label}' and program '${r1.label}' (id $pid) do not correspond to the specified program id $givenPid."
+          )
+
+        (pid, Ior.fromOptions(prop, prog)) match {
+          case (None, None)    => OdbError.InvalidArgument("One of programId, programReference or proposalReference must be provided.".some).asFailureF
+          case (Some(p), None) => p.success.pure[F]
+          case (_, Some(r))    => selectPid(r).map { op =>
+            op.fold(OdbError.InvalidArgument(notFound(r).some).asFailure) { selectedPid =>
+              pid.fold(selectedPid.success) { givenPid =>
+                OdbError.InvalidArgument(notCorresponding(r, selectedPid, givenPid).some)
+                  .asFailure
+                  .unlessA(selectedPid === givenPid)
+                  .as(selectedPid)
+              }
+            }
+          }
+        }
+      }
+
       def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]] =
         session
           .unique(Statements.SetProgramReference)(id, input)
@@ -201,7 +251,7 @@ object ProgramService {
           }
         }
 
-      def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
+      def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
             case LinkUserRequest.Coi(programId, userId) => Statements.linkCoi(programId, userId, user)
@@ -224,6 +274,13 @@ object ProgramService {
             }
         }
       }
+
+      def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[Result[(Program.Id, User.Id)]] =
+        linkUserImpl(req).map:
+          case LinkUserResponse.NotAuthorized(user)     => OdbError.NotAuthorized(user.id).asFailure
+          case LinkUserResponse.AlreadyLinked(pid, uid) => OdbError.NoAction(Some(s"User $uid is already linked to program $pid.")).asFailure
+          case LinkUserResponse.InvalidUser(uid)        => OdbError.InvalidUser(uid, Some(s"User $uid does not exist or is of a nonstandard type.")).asFailure
+          case LinkUserResponse.Success(pid, user)      => Result((pid, user))
 
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
         F[Result[List[Program.Id]]] = {

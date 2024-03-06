@@ -11,6 +11,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosShort
+import grackle.Result
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.Visit
@@ -19,6 +20,8 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.DatasetPropertiesInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -33,7 +36,7 @@ sealed trait DatasetService[F[_]] {
     stepId:   Step.Id,
     filename: Dataset.Filename,
     qaState:  Option[DatasetQaState]
-  )(using Transaction[F]): F[DatasetService.InsertDatasetResponse]
+  )(using Transaction[F]): F[Result[Dataset.Id]]
 
   def updateDatasets(
     SET:   DatasetPropertiesInput,
@@ -94,7 +97,7 @@ object DatasetService {
   def instantiate[F[_]: Concurrent](using Services[F]): DatasetService[F] =
     new DatasetService[F] with ExecutionUserCheck {
 
-      override def insertDataset(
+      def insertDatasetImpl(
         stepId:   Step.Id,
         filename: Dataset.Filename,
         qaState:  Option[DatasetQaState]
@@ -118,6 +121,18 @@ object DatasetService {
           d <- EitherT(insert).leftWiden[InsertDatasetResponse]
         } yield Success.apply.tupled(d)).merge
       }
+
+      def insertDataset(
+        stepId:   Step.Id,
+        filename: Dataset.Filename,
+        qaState:  Option[DatasetQaState]
+      )(using Transaction[F]): F[Result[Dataset.Id]] = 
+        import InsertDatasetResponse.*
+        insertDatasetImpl(stepId, filename, qaState).map:
+          case NotAuthorized(user)      => OdbError.NotAuthorized(user.id).asFailure
+          case ReusedFilename(filename) => OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
+          case StepNotFound(id)         => OdbError.InvalidStep(id, Some(s"Step id '$id' not found")).asFailure
+          case Success(did, _, _)       => Result(did)
 
       override def updateDatasets(
         SET:   DatasetPropertiesInput,

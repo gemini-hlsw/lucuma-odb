@@ -18,6 +18,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
+import grackle.Result
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -35,6 +36,8 @@ import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth => GmosNorthStati
 import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth => GmosSouthStatic}
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.EstimatorState
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.CompletedAtomMap
@@ -73,7 +76,7 @@ trait SequenceService[F[_]] {
     instrument:   Instrument,
     stepCount:    NonNegShort,
     sequenceType: SequenceType
-  )(using Transaction[F]): F[SequenceService.InsertAtomResponse]
+  )(using Transaction[F]): F[Result[Atom.Id]]
 
   def insertGmosNorthStepRecord(
     atomId:         Atom.Id,
@@ -81,7 +84,7 @@ trait SequenceService[F[_]] {
     step:           StepConfig,
     observeClass:   ObserveClass,
     timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-  )(using Transaction[F]): F[SequenceService.InsertStepResponse]
+  )(using Transaction[F]): F[Result[Step.Id]]
 
   def insertGmosSouthStepRecord(
     atomId:         Atom.Id,
@@ -89,7 +92,7 @@ trait SequenceService[F[_]] {
     step:           StepConfig,
     observeClass:   ObserveClass,
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-  )(using Transaction[F]): F[SequenceService.InsertStepResponse]
+  )(using Transaction[F]): F[Result[Step.Id]]
 
 }
 
@@ -338,7 +341,7 @@ object SequenceService {
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.SetStepCompleted)(time, stepId).void
 
-      override def insertAtomRecord(
+      def insertAtomRecordImpl(
         visitId:      Visit.Id,
         instrument:   Instrument,
         stepCount:    NonNegShort,
@@ -351,6 +354,17 @@ object SequenceService {
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
           _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType))
         } yield InsertAtomResponse.Success(aid)).merge
+
+      override def insertAtomRecord(
+        visitId:      Visit.Id,
+        instrument:   Instrument,
+        stepCount:    NonNegShort,
+        sequenceType: SequenceType
+      )(using Transaction[F]): F[Result[Atom.Id]] =
+        insertAtomRecordImpl(visitId, instrument, stepCount, sequenceType).map:
+          case InsertAtomResponse.NotAuthorized(user)           => OdbError.NotAuthorized(user.id).asFailure
+          case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
+          case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
       import InsertStepResponse.*
 
@@ -373,7 +387,7 @@ object SequenceService {
         timeEstimate:        (S, EstimatorState[D]) => StepEstimate,
         estimatorState:      Observation.Id => F[Option[(S, EstimatorState[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
-      )(using Transaction[F]): F[InsertStepResponse] =
+      )(using Transaction[F]): F[Result[Step.Id]] =
         (for {
           _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           foo  = session.option(Statements.SelectObservationId)((atomId, instrument))
@@ -385,7 +399,10 @@ object SequenceService {
                  )).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
-        } yield Success(sid)).merge
+        } yield Success(sid)).merge.map:
+          case NotAuthorized(user)           =>   OdbError.NotAuthorized(user.id).asFailure
+          case AtomNotFound(id, instrument)  =>   OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
+          case Success(sid)                  =>   Result(sid)
 
       override def insertGmosNorthStepRecord(
         atomId:         Atom.Id,
@@ -393,7 +410,7 @@ object SequenceService {
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
         timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-      )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
+      )(using Transaction[F]): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
@@ -410,7 +427,7 @@ object SequenceService {
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
         timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-      )(using Transaction[F]): F[SequenceService.InsertStepResponse] =
+      )(using Transaction[F]): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,
