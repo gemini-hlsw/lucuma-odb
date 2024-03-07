@@ -252,15 +252,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           ), child)
 
   private lazy val CreateGroup: MutationField =
-    MutationField("createGroup", CreateGroupInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference)).flatMap { pid =>
-          ResultT(groupService.createGroup(pid, input.SET).map { gid =>
-            Result(Unique(Filter(Predicates.group.id.eql(gid), child)))
-          })
-        }.value
-      }
-    }
+    MutationField("createGroup", CreateGroupInput.Binding): (input, child) =>
+      services.useTransactionally:
+        groupService.createGroup(input).nestMap: gid =>
+            Unique(Filter(Predicates.group.id.eql(gid), child))
 
   private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding): (input, child) =>
@@ -280,11 +275,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding): (input, child) =>
       services.useTransactionally:
-        { for
-            pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-            tid <- ResultT(targetService.createTarget(pid, input.SET))
-          yield Unique(Filter(Predicates.target.id.eql(tid), child)): Query
-        }.value
+        targetService.createTarget(input).nestMap: tid =>
+          Unique(Filter(Predicates.target.id.eql(tid), child))
 
   private lazy val CreateUserInvitation =
     MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
@@ -452,15 +444,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           .value
 
   private lazy val SetProgramReference =
-    MutationField("setProgramReference", SetProgramReferenceInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        (for {
-          pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-          _   <- ResultT(programService.setProgramReference(pid, input.SET))
-        } yield Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
-        ).value
-      }
-    }
+    MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
+      services.useTransactionally:
+        programService.setProgramReference(input).nestMap: (pid, _) =>
+          Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
