@@ -58,6 +58,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
+import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
@@ -79,8 +80,7 @@ import Services.Syntax.*
 sealed trait ObservationService[F[_]] {
 
   def createObservation(
-    programId: Program.Id,
-    SET:       ObservationPropertiesInput.Create
+    input: CreateObservationInput
   )(using Transaction[F]): F[Result[Observation.Id]]
 
   def selectObservations(
@@ -163,7 +163,8 @@ object ObservationService {
             optF.fold(().pure[F])( f => f(oids, transaction) )
           }.sequence
 
-      override def createObservation(
+      /** Create the observation itself, with no asterism. */
+      private def createObservationImpl(
         programId: Program.Id,
         SET:       ObservationPropertiesInput.Create
       )(using Transaction[F]): F[Result[Observation.Id]] =
@@ -199,6 +200,30 @@ object ObservationService {
               }
           }
         }
+
+      override def createObservation(
+        input: CreateObservationInput
+      )(using Transaction[F]): F[Result[Observation.Id]] = {
+
+        def create(pid: Program.Id): F[Result[Observation.Id]] =
+          createObservationImpl(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default))
+
+        def insertAsterism(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
+          input.asterism.toOption.traverse { a =>
+            asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
+          }.map(_.getOrElse(Result.unit))
+
+        val go = 
+          for
+            pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
+            oid <- ResultT(create(pid))
+            _   <- ResultT(insertAsterism(pid, oid))
+          yield oid
+
+        go.value.flatTap: r =>
+          transaction.rollback.unlessA(r.hasValue)
+      
+      }
 
       override def selectObservations(
         which: AppliedFragment
