@@ -449,15 +449,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           .value
 
   private lazy val SetProgramReference =
-    MutationField("setProgramReference", SetProgramReferenceInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        (for {
-          pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-          _   <- ResultT(programService.setProgramReference(pid, input.SET))
-        } yield Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
-        ).value
-      }
-    }
+    MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
+      services.useTransactionally:
+        programService.setProgramReference(input).nestMap: (pid, _) =>
+          Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
