@@ -50,7 +50,6 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.LinkUserInput
-import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.RecordAtomInput
 import lucuma.odb.graphql.input.RecordDatasetInput
 import lucuma.odb.graphql.input.RecordGmosStepInput
@@ -235,30 +234,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CloneObservation: MutationField =
-    MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
-      services.useTransactionally {
-
-        val clone: ResultT[F, (Program.Id, Observation.Id)] = 
-          ResultT(observationService.cloneObservation(input))
-
-        // this will do nothing if input.asterism is Absent
-        def setAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
-          ResultT(asterismService.setAsterism(pid, NonEmptyList.of(oid), input.asterism))
-
-        val doTheThing: F[Result[Observation.Id]] =
-          clone.flatMap { (pid, oid) => setAsterism(pid, oid).as(oid) } .value
-
-        doTheThing.map { r =>
-          r.map { oid =>
-            Filter(And(
-              Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
-              Predicates.cloneObservationResult.newObservation.id.eql(oid)
-            ), child)
-          }
-        }
-        
-      }
-    }
+    MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        observationService.cloneObservation(input).nestMap: oid =>
+          Filter(And(
+            Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
+            Predicates.cloneObservationResult.newObservation.id.eql(oid)
+          ), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
@@ -281,32 +263,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CreateObservation: MutationField =
-    MutationField("createObservation", CreateObservationInput.Binding) { (input, child) =>
-      services.useTransactionally {
-
-        def createObservation(pid: Program.Id): F[Result[(Observation.Id, Query)]] =
-          observationService.createObservation(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)).map(
-            _.fproduct(id => Unique(Filter(Predicates.observation.id.eql(id), child)))
-          )
-
-        def insertAsterism(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
-          input.asterism.toOption.traverse { a =>
-            asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
-          }.map(_.getOrElse(Result.unit))
-
-        val query = for {
-          pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-          tup <- ResultT(createObservation(pid))
-          (oid, query) = tup
-          _   <- ResultT(insertAsterism(pid, oid))
-        } yield query
-
-        for {
-          rQuery <- query.value
-          _      <- transaction.rollback.unlessA(rQuery.hasValue)
-        } yield rQuery
-      }
-    }
+    MutationField("createObservation", CreateObservationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        observationService.createObservation(input).nestMap: oid =>
+          Unique(Filter(Predicates.observation.id.eql(oid), child))
 
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
