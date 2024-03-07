@@ -52,9 +52,10 @@ import skunk.codec.all._
 import skunk.implicits._
 
 import Services.Syntax.*
+import lucuma.odb.graphql.input.CreateTargetInput
 
 trait TargetService[F[_]] {
-  def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]]
+  def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
 }
@@ -101,11 +102,13 @@ object TargetService {
         }
       }
 
-      override def createTarget(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[Result[Target.Id]] =
-        createTargetImpl(pid, input).map:
-          case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
-          case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
-          case Success(id)          => Result(id)
+      def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]] =
+        programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
+          r.flatTraverse: pid =>
+            createTargetImpl(pid, input.SET).map:
+              case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
+              case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
+              case Success(id)          => Result(id)
 
       def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]] =
         updateTargetsImpl(input, which).map:
