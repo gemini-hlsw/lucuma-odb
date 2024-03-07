@@ -6,16 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
-import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
-import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
-import cats.syntax.functor.*
-import cats.syntax.functorFilter.*
-import cats.syntax.option.*
-import cats.syntax.parallel.*
-import cats.syntax.traverse.*
+import cats.syntax.all.*
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -98,7 +89,7 @@ sealed trait ObservationService[F[_]] {
 
   def cloneObservation(
     input: CloneObservationInput
-  )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]]
+  )(using Transaction[F]): F[Result[Observation.Id]]
 
 }
 
@@ -341,7 +332,7 @@ object ObservationService {
           } yield r
         }
 
-      def cloneObservation(
+      private def cloneObservationImpl(
         input: CloneObservationInput
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
@@ -405,6 +396,14 @@ object ObservationService {
         }
       }
 
+      def cloneObservation(
+        input: CloneObservationInput
+      )(using Transaction[F]): F[Result[Observation.Id]] =
+        (for
+          (pid, oid) <- ResultT(cloneObservationImpl(input))
+          _          <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(oid), input.asterism))
+        yield oid).value
+        
     }
 
   object Statements {
