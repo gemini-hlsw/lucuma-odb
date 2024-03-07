@@ -5,14 +5,16 @@ package lucuma.odb.graphql
 package feature
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.odb.data.ObservationReference
 
 
 class reference extends OdbSuite {
@@ -24,22 +26,37 @@ class reference extends OdbSuite {
 
   val validUsers = List(pi, guest, service, staff)
 
-  val sem2024A   = Semester.unsafeFromString("2024A")
-  val ref2024A1  = ProposalReference.fromString.unsafeGet("G-2024A-0001")
-  val ref2024A1Q = ProgramReference.fromString.unsafeGet("G-2024A-0001-Q")
-  val ref2024A1C = ProgramReference.fromString.unsafeGet("G-2024A-0001-C")
+  // Unsafe convenience for testing.
+  extension (s: String) {
+    def proposalReference: ProposalReference =
+      ProposalReference.fromString.unsafeGet(s)
 
-  val sem2024B   = Semester.unsafeFromString("2024B")
-  val ref2024B1  = ProposalReference.fromString.unsafeGet("G-2024B-0001")
-  val ref2024B2  = ProposalReference.fromString.unsafeGet("G-2024B-0002")
-  val ref2024B3  = ProposalReference.fromString.unsafeGet("G-2024B-0003")
+    def programReference: ProgramReference =
+      ProgramReference.fromString.unsafeGet(s)
 
-  val sem2025A   = Semester.unsafeFromString("2025A")
-  val ref2025A1  = ProposalReference.fromString.unsafeGet("G-2025A-0001")
+    def observationReference: ObservationReference =
+      ObservationReference.fromString.unsafeGet(s)
 
-  val sem2025B   = Semester.unsafeFromString("2025B")
-  val ref2025B1  = ProposalReference.fromString.unsafeGet("G-2025B-0001")
-  val ref2025B2  = ProposalReference.fromString.unsafeGet("G-2025B-0002")
+    def semester: Semester =
+      Semester.unsafeFromString(s)
+  }
+
+  val sem2024A   = "2024A".semester
+  val ref2024A1  = "G-2024A-0001".proposalReference
+  val ref2024A1Q = "G-2024A-0001-Q".programReference
+  val ref2024A1C = "G-2024A-0001-C".programReference
+
+  val sem2024B   = "2024B".semester
+  val ref2024B1  = "G-2024B-0001".proposalReference
+  val ref2024B2  = "G-2024B-0002".proposalReference
+  val ref2024B3  = "G-2024B-0003".proposalReference
+
+  val sem2025A   = "2025A".semester
+  val ref2025A1  = "G-2025A-0001".proposalReference
+
+  val sem2025B   = "2025B".semester
+  val ref2025B1  = "G-2025B-0001".proposalReference
+  val ref2025B2  = "G-2025B-0002".proposalReference
 
   def createProgramWithSemester(semester: String): IO[Program.Id] =
     query(pi,
@@ -239,7 +256,7 @@ class reference extends OdbSuite {
     )
   }
 
-  val ref2010A1 = ProposalReference.fromString.unsafeGet("G-2010A-0001")
+  val ref2010A1 = "G-2010A-0001".proposalReference
 
   // TODO: proposal status mutations
   // I think we want to remove semester as an independently settable property.
@@ -787,29 +804,29 @@ class reference extends OdbSuite {
 
   test("setProposalReference SCI, change subtype but index remains the same") {
     for {
-      pid <- fetchPid(pi, ProgramReference.fromString.unsafeGet("G-2025B-0001-Q"))
+      pid <- fetchPid(pi, "G-2025B-0001-Q".programReference)
       ref <- setProgramReference(pid, """science: { semester: "2025B", scienceSubtype: CLASSICAL }""")
     } yield assertEquals(ref, "G-2025B-0001-C".some)
   }
 
   test("setProposalReference SCI -> CAL -> SCI, index increases") {
     for {
-      pid <- fetchPid(pi, ProgramReference.fromString.unsafeGet("G-2025B-0001-C"))
+      pid <- fetchPid(pi, "G-2025B-0001-C".programReference)
       _   <- setProgramReference(pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       ref <- setProgramReference(pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
     } yield assertEquals(ref, "G-2025B-0002-Q".some)
   }
 
   // Program references created above
-  val ref25BCalGmosSouth01 = ProgramReference.fromString.unsafeGet("G-2025B-CAL-GMOSS-01")
-  val ref25BCalGmosNorth01 = ProgramReference.fromString.unsafeGet("G-2025B-CAL-GMOSN-01")
-  val ref25BEngGmosSouth01 = ProgramReference.fromString.unsafeGet("G-2025B-ENG-GMOSS-01")
-  val ref25BEngGmosSouth02 = ProgramReference.fromString.unsafeGet("G-2025B-ENG-GMOSS-02")
-  val refXplGmosSouth      = ProgramReference.fromString.unsafeGet("G-XPL-GMOSS")
-  val refLibGmosSouthFoo   = ProgramReference.fromString.unsafeGet("G-LIB-GMOSS-FOO")
-  val ref24ASci01C         = ProgramReference.fromString.unsafeGet("G-2024A-0001-C")
-  val ref24ASci02Q         = ProgramReference.fromString.unsafeGet("G-2024A-0002-Q")
-  val ref25BSci02Q         = ProgramReference.fromString.unsafeGet("G-2025B-0002-Q")
+  val ref25BCalGmosSouth01 = "G-2025B-CAL-GMOSS-01".programReference
+  val ref25BCalGmosNorth01 = "G-2025B-CAL-GMOSN-01".programReference
+  val ref25BEngGmosSouth01 = "G-2025B-ENG-GMOSS-01".programReference
+  val ref25BEngGmosSouth02 = "G-2025B-ENG-GMOSS-02".programReference
+  val refXplGmosSouth      = "G-XPL-GMOSS".programReference
+  val refLibGmosSouthFoo   = "G-LIB-GMOSS-FOO".programReference
+  val ref24ASci01C         = "G-2024A-0001-C".programReference
+  val ref24ASci02Q         = "G-2024A-0002-Q".programReference
+  val ref25BSci02Q         = "G-2025B-0002-Q".programReference
 
   test("select via WHERE program reference label LIKE") {
     assertIO(
@@ -866,4 +883,76 @@ class reference extends OdbSuite {
       List(ref24ASci01C)
     )
   }
+
+  def expectObservationReference(
+    oid: Observation.Id,
+    ref: ObservationReference
+  ): IO[Unit] =
+    expect(pi, s"""
+      query {
+        observation(observationId: "$oid") {
+          reference {
+            label
+            program { label }
+            index
+          }
+        }
+      }""",
+      json"""
+        {
+          "observation": {
+            "reference": {
+              "label": ${ref.label},
+              "program": {
+                "label": ${ref.programReference.label}
+              },
+              "index": ${ref.observationIndex.value}
+            }
+          }
+        }
+      """.asRight
+    )
+
+  def expectObservationIndex(
+    oid:   Observation.Id,
+    index: Int
+  ): IO[Unit] =
+    expect(pi,
+      s"""query { observation(observationId: "$oid") { index } }""",
+      json"""{ "observation": { "index": $index } }""".asRight
+    )
+
+  test("no observation reference") {
+    for {
+      pid <- createProgramAs(pi)
+      o   <- createObservationAs(pi, pid)
+      _   <- expect(pi, s"""query { observation(observationId: "$o") { reference { label } } }""", json"""{"observation":  { "reference":  null}}""".asRight)
+    } yield ()
+  }
+
+  test("observation reference SCI") {
+    for {
+      pid <- createProgramWithSemester("2025B")
+      _   <- addProposal(pi, pid)
+      _   <- acceptProposal(staff, pid)
+      ref <- setProgramReference(pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
+      o   <- createObservationAs(pi, pid)
+      _   <- expectObservationReference(o, s"${ref.get}-0001".observationReference)
+      _   <- expectObservationIndex(o, 1)
+    } yield ()
+  }
+
+  test("observation reference ENG") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      o1  <- createObservationAs(pi, pid)
+      _   <- expectObservationReference(o1, s"${ref.get}-0001".observationReference)
+      _   <- expectObservationIndex(o1, 1)
+      o2  <- createObservationAs(pi, pid)
+      _   <- expectObservationReference(o2, s"${ref.get}-0002".observationReference)
+      _   <- expectObservationIndex(o2, 2)
+    } yield ()
+  }
+
 }

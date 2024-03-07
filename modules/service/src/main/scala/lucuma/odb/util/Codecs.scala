@@ -45,6 +45,7 @@ import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -331,6 +332,12 @@ trait Codecs {
 
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
+
+  val observation_reference: Codec[ObservationReference] =
+    text.eimap(
+      s => ObservationReference.fromString.getOption(s).toRight(s"Invalid observation reference: $s"))(
+      ObservationReference.fromString.reverseGet
+    )
 
   val proposal_reference: Codec[ProposalReference] =
     text.eimap(
