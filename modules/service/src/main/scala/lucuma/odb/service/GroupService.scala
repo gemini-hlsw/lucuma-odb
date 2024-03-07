@@ -12,6 +12,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
+import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.util.Codecs._
 import skunk._
@@ -21,7 +22,7 @@ import skunk.implicits._
 import Services.Syntax.*
 
 trait GroupService[F[_]] {
-  def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id]
+  def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(programId: Program.Id): F[GroupTree]
   def selectPid(groupId: Group.Id): F[Option[Program.Id]]
@@ -34,12 +35,16 @@ object GroupService {
   def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
 
-      def createGroup(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id] =
+      private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id] =
         for {
           _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
           i <- openHole(pid, SET.parentGroupId, SET.parentGroupIndex)
           g <- session.prepareR(Statements.InsertGroup).use(_.unique((pid, SET), i))
         } yield g
+
+      override def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Result[Group.Id]] =
+        programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
+          r.traverse(createGroupImpl(_, input.SET))
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of
