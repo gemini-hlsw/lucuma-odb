@@ -280,11 +280,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding): (input, child) =>
       services.useTransactionally:
-        { for
-            pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-            tid <- ResultT(targetService.createTarget(pid, input.SET))
-          yield Unique(Filter(Predicates.target.id.eql(tid), child)): Query
-        }.value
+        targetService.createTarget(input).nestMap: tid =>
+          Unique(Filter(Predicates.target.id.eql(tid), child))
 
   private lazy val CreateUserInvitation =
     MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
