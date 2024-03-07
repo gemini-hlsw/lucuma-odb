@@ -328,14 +328,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   )(
     insert:    I => (Transaction[F], Services[F]) ?=> F[Result[ExecutionEvent]]
   ): MutationField =
-    MutationField(fieldName, matcher) { (input, child) =>
-      services.useTransactionally {
-        for {
-          r <- insert(input)
-          _ <- r.traverse_(s => timeAccountingService.update(s.visitId))
-        } yield r.map(e => Unique(Filter(pred.id.eql(e.id), child)))
-      }
-    }
+    MutationField(fieldName, matcher): (input, child) =>
+      services.useTransactionally:
+        insert(input).nestMap: e =>
+          Unique(Filter(pred.id.eql(e.id), child))
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>

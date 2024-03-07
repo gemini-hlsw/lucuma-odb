@@ -162,6 +162,7 @@ object ExecutionEventService {
         } yield Success(DatasetEvent(eid, time, oid, vid, sid, datasetId, datasetStage))).merge
 
       } .map(executionEventResponseToResult)
+        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
 
       private def executionEventResponseToResult(r: InsertEventResponse): Result[ExecutionEvent] =
         r match
@@ -191,7 +192,8 @@ object ExecutionEventService {
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time, oid) = e
         } yield Success(SequenceEvent(eid, time, oid, visitId, command))).merge
-      }.map(executionEventResponseToResult)
+      } .map(executionEventResponseToResult)
+        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
 
       override def insertStepEvent(
         stepId:       Step.Id,
@@ -220,7 +222,9 @@ object ExecutionEventService {
                 .setStepCompleted(stepId, Option.when(stepStage === StepStage.EndStep)(time))
           )
         } yield Success(StepEvent(eid, time, oid, vid, stepId, stepStage))).merge
-      }.map(executionEventResponseToResult)
+      } .map(executionEventResponseToResult)
+        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
+
     }
 
   object Statements {
