@@ -29,6 +29,7 @@ import lucuma.odb.service.Services
 
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
+import table.ObservationReferenceView
 import table.ProgramTable
 import Services.Syntax.*
 
@@ -37,7 +38,8 @@ trait ObservationMapping[F[_]]
      with ProgramTable[F]
      with TimingWindowView[F]
      with ObsAttachmentTable[F]
-     with ObsAttachmentAssignmentTable[F] {
+     with ObsAttachmentAssignmentTable[F]
+     with ObservationReferenceView[F] {
 
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
@@ -49,6 +51,8 @@ trait ObservationMapping[F[_]]
         SqlField("id", ObservationView.Id, key = true),
         SqlField("programId", ObservationView.ProgramId, hidden = true),
         SqlField("existence", ObservationView.Existence, hidden = true),
+        SqlObject("reference", Join(ObservationView.Id, ObservationReferenceView.Id)),
+        SqlField("index", ObservationView.ObservationIndex),
         SqlField("title", ObservationView.Title),
         SqlField("subtitle", ObservationView.Subtitle),
         SqlField("status", ObservationView.Status),

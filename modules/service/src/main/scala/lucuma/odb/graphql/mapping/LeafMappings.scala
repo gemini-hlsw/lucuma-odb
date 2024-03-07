@@ -41,6 +41,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
@@ -123,6 +124,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](ObsAttachmentTypeType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
+      LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[Tag](PartnerType),

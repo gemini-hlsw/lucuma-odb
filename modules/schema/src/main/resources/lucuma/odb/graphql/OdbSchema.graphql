@@ -7018,6 +7018,17 @@ type Observation {
   existence: Existence!
 
   """
+  Observation reference, if any (requires the existence of a reference for the
+  program itself).
+  """
+  reference: ObservationReference
+
+  """
+  Observation index, relative to other observations in the same program.
+  """
+  index: PosInt!
+
+  """
   Observation title generated from id and targets
   """
   title: String!
@@ -7144,6 +7155,29 @@ type ObservationSelectResult {
   """
   hasMore: Boolean!
 }
+
+"""
+Observation reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type ObservationReference {
+
+  "Formatted observation reference label."
+  label:   ObservationReferenceLabel!
+
+  "The program reference."
+  program: ProgramReference!
+
+  "The observation index relative to its program."
+  index:   PosInt!
+}
+
+"""
+Observation reference, formatted according to the program type, suffixed with
+observation index. For example, G-2024B-1234-Q-0001 where G-2024B-1234-Q is
+the program reference label and the observation index is 1.
+"""
+scalar ObservationReferenceLabel
 
 """
 Each step in a sequence is tagged with an observe class which identifies its
