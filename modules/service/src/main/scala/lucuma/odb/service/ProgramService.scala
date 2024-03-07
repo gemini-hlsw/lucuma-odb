@@ -30,6 +30,7 @@ import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.service.ProgramService.LinkUserResponse.Success
@@ -58,7 +59,7 @@ trait ProgramService[F[_]] {
     prog: Option[ProgramReference]
   ): F[Result[Program.Id]]
 
-  def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]]
+  def setProgramReference(input: SetProgramReferenceInput): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -223,7 +224,7 @@ object ProgramService {
         }
       }
 
-      def setProgramReference(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]] =
+      private def setProgramReferenceImpl(id: Program.Id, input: ProgramReferencePropertiesInput): F[Result[Option[ProgramReference]]] =
         session
           .unique(Statements.SetProgramReference)(id, input)
           .map(_.success)
@@ -239,6 +240,12 @@ object ProgramService {
                 .DuplicateReference(pat.findFirstMatchIn(ex.getMessage).map(_.group(1)))
                 .failure
           }
+
+      override def setProgramReference(input: SetProgramReferenceInput): F[Result[(Program.Id, Option[ProgramReference])]] =
+        programService.resolvePid(input.programId,input.proposalReference, input.programReference).flatMap: r =>
+          r.flatTraverse: pid =>
+            setProgramReferenceImpl(pid, input.SET).map: oref =>
+              oref.map((pid, _))
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {

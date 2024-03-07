@@ -34,6 +34,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.json.angle.query.given
@@ -52,7 +53,6 @@ import skunk.codec.all._
 import skunk.implicits._
 
 import Services.Syntax.*
-import lucuma.odb.graphql.input.CreateTargetInput
 
 trait TargetService[F[_]] {
   def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]]
