@@ -234,30 +234,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CloneObservation: MutationField =
-    MutationField("cloneObservation", CloneObservationInput.Binding) { (input, child) =>
-      services.useTransactionally {
-
-        val clone: ResultT[F, (Program.Id, Observation.Id)] = 
-          ResultT(observationService.cloneObservation(input))
-
-        // this will do nothing if input.asterism is Absent
-        def setAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
-          ResultT(asterismService.setAsterism(pid, NonEmptyList.of(oid), input.asterism))
-
-        val doTheThing: F[Result[Observation.Id]] =
-          clone.flatMap { (pid, oid) => setAsterism(pid, oid).as(oid) } .value
-
-        doTheThing.map { r =>
-          r.map { oid =>
-            Filter(And(
-              Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
-              Predicates.cloneObservationResult.newObservation.id.eql(oid)
-            ), child)
-          }
-        }
-        
-      }
-    }
+    MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
+      services.useTransactionally:
+        observationService.cloneObservation(input).nestMap: oid =>
+          Filter(And(
+            Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
+            Predicates.cloneObservationResult.newObservation.id.eql(oid)
+          ), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
