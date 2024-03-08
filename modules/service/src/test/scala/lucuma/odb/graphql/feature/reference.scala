@@ -931,28 +931,99 @@ class reference extends OdbSuite {
   }
 
   test("observation reference SCI") {
+    val pRef = "G-2025B-0002-Q".programReference
     for {
-      pid <- createProgramWithSemester("2025B")
-      _   <- addProposal(pi, pid)
-      _   <- acceptProposal(staff, pid)
-      ref <- setProgramReference(pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
+      pid <- fetchPid(pi, pRef)
       o   <- createObservationAs(pi, pid)
-      _   <- expectObservationReference(o, s"${ref.get}-0001".observationReference)
+      _   <- expectObservationReference(o, s"${pRef.label}-0001".observationReference)
       _   <- expectObservationIndex(o, 1)
     } yield ()
   }
 
   test("observation reference ENG") {
+    val pRef = "G-2025B-ENG-GMOSS-02".programReference
     for {
-      pid <- createProgramAs(pi)
-      ref <- setProgramReference(pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      pid <- fetchPid(pi, pRef)
       o1  <- createObservationAs(pi, pid)
-      _   <- expectObservationReference(o1, s"${ref.get}-0001".observationReference)
+      _   <- expectObservationReference(o1, s"${pRef.label}-0001".observationReference)
       _   <- expectObservationIndex(o1, 1)
       o2  <- createObservationAs(pi, pid)
-      _   <- expectObservationReference(o2, s"${ref.get}-0002".observationReference)
+      _   <- expectObservationReference(o2, s"${pRef.label}-0002".observationReference)
       _   <- expectObservationIndex(o2, 2)
     } yield ()
+  }
+
+  def observationRefsWhere(where: String): IO[List[ObservationReference]] =
+    query(pi, s"query { observations(WHERE: $where) { matches { reference { label } } } }")
+      .flatMap {
+        _.hcursor
+         .downFields("observations", "matches")
+         .values
+         .toList
+         .flatMap(_.toList)
+         .flatTraverse {
+           _.hcursor
+            .downFields("reference", "label")
+            .success
+            .toList
+            .traverse(_.as[ObservationReference])
+         }
+         .leftMap(f => new RuntimeException(f.message))
+         .liftTo[IO]
+      }
+
+  test("select via WHERE observation reference label") {
+    assertIO(
+      observationRefsWhere( s"""{ reference: { label: { LIKE: "%-Q-%" } } }"""),
+      List(
+        "G-2025B-0002-Q-0001".observationReference
+      )
+    )
+  }
+
+  test("select via WHERE observation reference index") {
+    assertIO(
+      observationRefsWhere( s"""{ reference: { index: { EQ: 2 } } }"""),
+      List("G-2025B-ENG-GMOSS-02-0002".observationReference)
+    )
+  }
+
+  test("select via WHERE observation reference program ") {
+    assertIO(
+      observationRefsWhere( s"""{ reference: { program: { label: { LIKE: "G-2025B-ENG-GMOSS-%" } } } }"""),
+      List(
+        "G-2025B-ENG-GMOSS-02-0001".observationReference,
+        "G-2025B-ENG-GMOSS-02-0002".observationReference
+      )
+    )
+  }
+
+  test("select via WHERE observation reference not null") {
+    assertIO(
+      observationRefsWhere( s"""{ reference: { IS_NULL: false } }"""),
+      List(
+        "G-2025B-0002-Q-0001".observationReference,
+        "G-2025B-ENG-GMOSS-02-0001".observationReference,
+        "G-2025B-ENG-GMOSS-02-0002".observationReference
+      )
+    )
+  }
+
+  test("select via WHERE observation reference is null") {
+    // We created a single observation in a program without a program reference
+    // above in test 'no observation reference'.
+    assertIO(
+      query(pi, s"""query { observations(WHERE: { reference: { IS_NULL: true } }) { matches { id } } }""")
+        .map {
+          _.hcursor
+           .downFields("observations", "matches")
+           .values
+           .toList
+           .flatMap(_.toList)
+           .size
+        },
+      1
+    )
   }
 
 }

@@ -20,7 +20,10 @@ trait ObservationReferenceMapping[F[_]]
         SqlField("id",       ObservationReferenceView.Id, key = true, hidden = true),
         SqlObject("program", Join(ObservationReferenceView.ProgramId, ProgramReferenceView.Id)),
         SqlField("index",    ObservationReferenceView.ObservationIndex),
-        SqlField("label",    ObservationReferenceView.ObservationReference)
+        SqlField("label",    ObservationReferenceView.ObservationReference),
+
+        // Used for WHERE clause matching
+        SqlField("labelString", ObservationReferenceView.ObservationReferenceString, hidden = true)
       )
     )
 }
