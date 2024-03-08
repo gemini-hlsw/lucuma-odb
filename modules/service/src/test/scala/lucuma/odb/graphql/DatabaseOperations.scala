@@ -127,6 +127,29 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def setProgramReference(user: User, pid: Program.Id, set: String): IO[Option[ProgramReference]] =
+    query(
+      user,
+      s"""
+        mutation {
+          setProgramReference(input: {
+            programId: "$pid"
+            SET: { $set }
+          }) {
+            reference { label }
+          }
+        }
+      """
+    ).flatMap {
+      _.hcursor
+       .downFields("setProgramReference", "reference", "label")
+       .success
+       .traverse(_.as[ProgramReference])
+       .leftMap(f => new RuntimeException(f.message))
+       .liftTo[IO]
+    }
+
+
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.
   def addProposal(user: User, pid: Program.Id): IO[Unit] =

@@ -327,11 +327,16 @@ input ClassicalInput {
 }
 
 """
-Describes an observation clone operation, making any edits in the `SET` parameter.  The observation status in the cloned observation defaults to NEW.
+Describes an observation clone operation, making any edits in the `SET`
+parameter.  The observation status in the cloned observation defaults to NEW.
+Identify the observation to clone by specifying either its id or reference.  If
+both are specified, they must refer to the same observation.  If neither is
+specified, nothing will be cloned.
 """
 input CloneObservationInput {
-  observationId: ObservationId!
-  SET: ObservationPropertiesInput
+  observationId:        ObservationId
+  observationReference: ObservationReferenceLabel
+  SET:                  ObservationPropertiesInput
 }
 
 """

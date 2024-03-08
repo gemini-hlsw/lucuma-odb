@@ -10,11 +10,13 @@ import cats.syntax.all.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.ObservationReference
 import lucuma.odb.graphql.binding._
 
 final case class CloneObservationInput(
-  observationId: Observation.Id,
-  SET:           Option[ObservationPropertiesInput.Edit],
+  observationId:  Option[Observation.Id],
+  observationRef: Option[ObservationReference],
+  SET:            Option[ObservationPropertiesInput.Edit],
 ) {
 
   def asterism: Nullable[NonEmptyList[Target.Id]] =
@@ -27,10 +29,11 @@ object CloneObservationInput {
  val Binding: Matcher[CloneObservationInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ObservationIdBinding("observationId", rObservationId),
+        ObservationIdBinding.Option("observationId", rObservationId),
+        ObservationReferenceBinding.Option("observationReference", rObservationRef),
         ObservationPropertiesInput.Edit.Binding.Option("SET", rSET),
       ) =>
-        (rObservationId, rSET).mapN(CloneObservationInput.apply)
+        (rObservationId, rObservationRef, rSET).mapN(CloneObservationInput.apply)
     }
 
 }
