@@ -19,6 +19,7 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.model
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
+import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._
@@ -27,6 +28,7 @@ import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTarget
+import lucuma.odb.graphql.predicate.ObservationPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
@@ -261,20 +263,30 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
       }
 
+  private def observationPredicate(
+    rOid: Result[Option[model.Observation.Id]],
+    rRef: Result[Option[ObservationReference]],
+    pred: ObservationPredicates
+  ): Result[Predicate] =
+    (rOid, rRef).parTupled.map { (oid, ref) =>
+      and(List(
+        oid.map(pred.id.eql).toList,
+        ref.map(r => pred.referenceLabel.eql(r)).toList
+      ).flatten) match {
+        case True => False // neither oid nor ref nor pro was supplied
+        case p    => p
+      }
+    }
+
   private lazy val Observation: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "observation", List(
-      ObservationIdBinding("observationId", rOid)
+      ObservationIdBinding.Option("observationId", rOid),
+      ObservationReferenceBinding.Option("observationReference", rRef)
     )) =>
       Elab.transformChild { child =>
-        rOid.map { oid =>
+        observationPredicate(rOid, rRef, Predicates.observation).map { obs =>
           Unique(
-            Filter(
-              And(
-                Predicates.observation.id.eql(oid),
-                Predicates.observation.program.isVisibleTo(user)
-              ),
-              child
-            )
+            Filter(And(obs, Predicates.observation.program.isVisibleTo(user)), child)
           )
         }
       }

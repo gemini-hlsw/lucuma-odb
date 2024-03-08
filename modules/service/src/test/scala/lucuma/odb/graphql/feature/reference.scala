@@ -188,7 +188,7 @@ class reference extends OdbSuite {
     )
   }
 
-  test("lookup, no pid, no ref") {
+  test("lookup program, no pid, no ref") {
     expect(
       user  = pi,
       query = s"""
@@ -1023,6 +1023,46 @@ class reference extends OdbSuite {
            .size
         },
       1
+    )
+  }
+
+  test("lookup via observation ref") {
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          observation(observationReference: "G-2025B-ENG-GMOSS-02-0001") {
+            reference {
+              label
+              index
+              program { label }
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "observation": {
+              "reference": {
+                "label": "G-2025B-ENG-GMOSS-02-0001",
+                "index": 1,
+                "program": {
+                  "label": "G-2025B-ENG-GMOSS-02"
+                }
+              }
+            }
+          }
+        """
+      )
+    )
+  }
+
+  test("lookup observation, no oid, no ref") {
+    expect(
+      user     = pi,
+      query    = s""" query { observation { reference { label } } } """,
+      expected = json"""{ "observation": null }""".asRight
     )
   }
 

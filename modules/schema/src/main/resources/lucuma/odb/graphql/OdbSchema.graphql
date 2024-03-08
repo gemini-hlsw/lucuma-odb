@@ -7865,13 +7865,19 @@ type Query {
   filterTypeMeta: [FilterTypeMeta!]!
 
   """
-  Returns the observation with the given id, if any.
+  Returns the observation with the given id or reference, if any.  Identify the
+  observation by specifying only one of observationId or observationReference.
+  If more than one is provided, all must match.  If neither are set, nothing
+  will match.
   """
   observation(
-    """
-    Observation ID
-    """
-    observationId: ObservationId!
+
+    "Specify to lookup the observation by its ID."
+    observationId: ObservationId
+
+    "Specify to lookup the observation by its reference."
+    observationReference: ObservationReferenceLabel
+
   ): Observation
 
   """
