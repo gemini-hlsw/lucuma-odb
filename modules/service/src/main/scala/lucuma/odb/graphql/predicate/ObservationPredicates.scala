@@ -5,9 +5,11 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import lucuma.core.model.Observation
+import lucuma.odb.data.ObservationReference
 
 class ObservationPredicates(path: Path) {
-  lazy val existence = ExistencePredicates(path / "existence")
-  lazy val id        = LeafPredicates[Observation.Id](path / "id")
-  lazy val program   = new ProgramPredicates(path / "program")
+  lazy val existence      = ExistencePredicates(path / "existence")
+  lazy val id             = LeafPredicates[Observation.Id](path / "id")
+  lazy val program        = new ProgramPredicates(path / "program")
+  lazy val referenceLabel = LeafPredicates[ObservationReference](path / "reference" / "label")
 }

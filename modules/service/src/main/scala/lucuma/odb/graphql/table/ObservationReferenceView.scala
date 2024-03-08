@@ -18,7 +18,7 @@ trait ObservationReferenceView[F[_]] extends BaseMapping[F] {
     val ObservationIndex     = col("c_observation_index",     int4_pos)
     val ObservationReference = col("c_observation_reference", observation_reference)
 
-    // (To be) used in WhereObservationReference
+    // Used in WhereObservationReference
     val ObservationReferenceString = col("c_observation_reference", text)
   }
 
