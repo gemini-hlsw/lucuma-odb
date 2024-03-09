@@ -1043,4 +1043,16 @@ class reference extends OdbSuite {
     )
   }
 
+  test("change program reference, updates observation reference") {
+    val pRef = "G-2025B-ENG-GMOSS-02".programReference
+    for {
+      pid <- fetchPid(pi, pRef)
+      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      oref1 = s"${ref.get.label}-0001".observationReference
+      oref2 = s"${ref.get.label}-0002".observationReference
+      _  <- fetchOid(pi, oref1)
+      _  <- fetchOid(pi, oref2)
+    } yield ()
+  }
+
 }

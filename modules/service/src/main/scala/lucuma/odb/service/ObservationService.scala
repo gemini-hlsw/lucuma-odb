@@ -464,14 +464,10 @@ object ObservationService {
 
     val selectOid: Query[ObservationReference, Observation.Id] =
       sql"""
-        SELECT o.c_observation_id
-        FROM t_observation o
-        INNER JOIN t_program p ON p.c_program_id = o.c_program_id
-        WHERE p.c_program_reference = $program_reference
-          AND o.c_observation_index = $int4_pos
-      """.query(observation_id).contramap[ObservationReference] { ref =>
-        (ref.programReference, ref.observationIndex)
-      }
+        SELECT c_observation_id
+          FROM t_observation
+         WHERE c_observation_reference = $observation_reference
+      """.query(observation_id)
 
     import ProgramService.Statements.existsUserAccess
     import ProgramService.Statements.whereUserAccess
