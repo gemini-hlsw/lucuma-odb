@@ -47,6 +47,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
@@ -123,6 +124,17 @@ trait DatabaseOperations { this: OdbSuite =>
         .downFields("program", "reference", "label")
         .success
         .traverse(_.as[ProgramReference])
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def fetchOid(user: User, obs: ObservationReference): IO[Observation.Id] =
+    query(user, s"""
+      query { observation(observationReference: "${obs.label}") { id } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "id")
+        .as[Observation.Id]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }

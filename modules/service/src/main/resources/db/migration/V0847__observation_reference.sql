@@ -61,9 +61,73 @@ BEFORE UPDATE on t_observation
 FOR EACH ROW
 EXECUTE FUNCTION prevent_observation_index_update();
 
+-- Add a c_program_reference that is a copy of the corresponding reference
+-- from t_program.  We'll be maintaining it with triggers.  :-/
+ALTER TABLE t_observation
+  ADD COLUMN c_program_reference text;
 
--- Update the observation v to include the new column.
--- Re-create this view to include the new index column.
+-- Set the program reference value for existing observations.
+UPDATE t_observation AS o
+   SET c_program_reference = p.c_program_reference
+  FROM t_program p
+ WHERE p.c_program_id = o.c_program_id;
+
+-- When a new row is inserted into t_observation, set the program reference.
+CREATE OR REPLACE FUNCTION set_initial_program_reference_in_observation()
+RETURNS TRIGGER AS $$
+BEGIN
+  SELECT c_program_reference INTO NEW.c_program_reference
+  FROM t_program
+  WHERE c_program_id = NEW.c_program_id;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_initial_program_reference_in_observation_trigger
+BEFORE INSERT ON t_observation
+FOR EACH ROW
+EXECUTE FUNCTION set_initial_program_reference_in_observation();
+
+-- When a program reference in t_program changes, "cascade" the change
+-- down to the the observations.
+CREATE OR REPLACE FUNCTION update_program_reference_in_observation()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.c_program_reference <> OLD.c_program_reference THEN
+    UPDATE t_observation
+    SET c_program_reference = NEW.c_program_reference
+    WHERE c_program_id = NEW.c_program_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_program_reference_in_observation_trigger
+AFTER UPDATE OF c_program_reference ON t_program
+FOR EACH ROW
+EXECUTE FUNCTION update_program_reference_in_observation();
+
+-- Now we're ready to generate the c_observation_reference.
+CREATE OR REPLACE FUNCTION format_observation_reference(program_reference text, index int4)
+RETURNS text AS $$
+BEGIN
+    RETURN CASE
+        WHEN program_reference IS NULL THEN NULL
+        ELSE CONCAT(program_reference, '-', LPAD(index::text, 4, '0'))
+    END;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+ALTER TABLE t_observation
+  ADD COLUMN c_observation_reference text GENERATED ALWAYS AS (format_observation_reference(c_program_reference, c_observation_index)) STORED UNIQUE;
+
+-- Index on the observation reference.
+CREATE INDEX i_observation_reference ON t_observation (c_observation_reference);
+
+-- Re-create v_observation to include the new columns: c_observation_index,
+-- c_program_reference, c_observation_reference
 DROP VIEW v_observation;
 CREATE VIEW v_observation AS
   SELECT o.*,
@@ -81,12 +145,11 @@ CREATE VIEW v_observation AS
 -- a defined reference.  This makes mapping the reference as optional easier.
 CREATE VIEW v_observation_reference AS
   SELECT
-    o.c_observation_id,
-    o.c_program_id,
-    o.c_observation_index,
-    p.c_program_reference,
-    CONCAT(p.c_program_reference::text, '-', LPAD(o.c_observation_index::text, 4, '0')) AS c_observation_reference
-  FROM t_observation o
-  JOIN t_program p ON o.c_program_id = p.c_program_id
-  WHERE p.c_program_reference IS NOT NULL
+    c_observation_id,
+    c_program_id,
+    c_observation_index,
+    c_program_reference,
+    c_observation_reference
+  FROM t_observation
+ WHERE c_program_reference IS NOT NULL
   ORDER BY c_observation_id;
