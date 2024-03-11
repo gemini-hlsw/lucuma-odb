@@ -47,6 +47,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
@@ -126,6 +127,40 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def fetchOid(user: User, obs: ObservationReference): IO[Observation.Id] =
+    query(user, s"""
+      query { observation(observationReference: "${obs.label}") { id } }
+    """).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "id")
+        .as[Observation.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def setProgramReference(user: User, pid: Program.Id, set: String): IO[Option[ProgramReference]] =
+    query(
+      user,
+      s"""
+        mutation {
+          setProgramReference(input: {
+            programId: "$pid"
+            SET: { $set }
+          }) {
+            reference { label }
+          }
+        }
+      """
+    ).flatMap {
+      _.hcursor
+       .downFields("setProgramReference", "reference", "label")
+       .success
+       .traverse(_.as[ProgramReference])
+       .leftMap(f => new RuntimeException(f.message))
+       .liftTo[IO]
+    }
+
 
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.

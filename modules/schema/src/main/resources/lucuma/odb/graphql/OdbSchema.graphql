@@ -327,11 +327,16 @@ input ClassicalInput {
 }
 
 """
-Describes an observation clone operation, making any edits in the `SET` parameter.  The observation status in the cloned observation defaults to NEW.
+Describes an observation clone operation, making any edits in the `SET`
+parameter.  The observation status in the cloned observation defaults to NEW.
+Identify the observation to clone by specifying either its id or reference.  If
+both are specified, they must refer to the same observation.  If neither is
+specified, nothing will be cloned.
 """
 input CloneObservationInput {
-  observationId: ObservationId!
-  SET: ObservationPropertiesInput
+  observationId:        ObservationId
+  observationReference: ObservationReferenceLabel
+  SET:                  ObservationPropertiesInput
 }
 
 """
@@ -7018,6 +7023,17 @@ type Observation {
   existence: Existence!
 
   """
+  Observation reference, if any (requires the existence of a reference for the
+  program itself).
+  """
+  reference: ObservationReference
+
+  """
+  Observation index, relative to other observations in the same program.
+  """
+  index: PosInt!
+
+  """
   Observation title generated from id and targets
   """
   title: String!
@@ -7144,6 +7160,29 @@ type ObservationSelectResult {
   """
   hasMore: Boolean!
 }
+
+"""
+Observation reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type ObservationReference {
+
+  "Formatted observation reference label."
+  label:   ObservationReferenceLabel!
+
+  "The program reference."
+  program: ProgramReference!
+
+  "The observation index relative to its program."
+  index:   PosInt!
+}
+
+"""
+Observation reference, formatted according to the program type, suffixed with
+observation index. For example, G-2024B-1234-Q-0001 where G-2024B-1234-Q is
+the program reference label and the observation index is 1.
+"""
+scalar ObservationReferenceLabel
 
 """
 Each step in a sequence is tagged with an observe class which identifies its
@@ -7831,13 +7870,19 @@ type Query {
   filterTypeMeta: [FilterTypeMeta!]!
 
   """
-  Returns the observation with the given id, if any.
+  Returns the observation with the given id or reference, if any.  Identify the
+  observation by specifying only one of observationId or observationReference.
+  If more than one is provided, all must match.  If neither are set, nothing
+  will match.
   """
   observation(
-    """
-    Observation ID
-    """
-    observationId: ObservationId!
+
+    "Specify to lookup the observation by its ID."
+    observationId: ObservationId
+
+    "Specify to lookup the observation by its reference."
+    observationReference: ObservationReferenceLabel
+
   ): Observation
 
   """
@@ -10391,6 +10436,11 @@ input WhereObservation {
   id: WhereOrderObservationId
 
   """
+  Matches the observation reference, if any.
+  """
+  reference: WhereObservationReference
+
+  """
   Matches the associated program.
   """
   program: WhereProgram
@@ -10411,6 +10461,21 @@ input WhereObservation {
   activeStatus: WhereOrderObsActiveStatus
 }
 
+input WhereObservationReference {
+
+  "Matches if the program reference is not defined."
+  IS_NULL: Boolean
+
+  "Matches the program reference label."
+  label: WhereString
+
+  "Matches the program reference."
+  program: WhereProgramReference
+
+  "Matches the observation index."
+  index: WhereOrderPosInt
+
+}
 
 input WhereGroup {
 

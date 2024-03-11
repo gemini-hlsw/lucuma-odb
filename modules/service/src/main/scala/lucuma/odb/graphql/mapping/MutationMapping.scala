@@ -236,10 +236,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
       services.useTransactionally:
-        observationService.cloneObservation(input).nestMap: oid =>
+        observationService.cloneObservation(input).nestMap: ids =>
           Filter(And(
-            Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
-            Predicates.cloneObservationResult.newObservation.id.eql(oid)
+            Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
+            Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
           ), child)
 
   private lazy val CloneTarget: MutationField =
