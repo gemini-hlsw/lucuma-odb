@@ -139,6 +139,7 @@ object OdbMapping {
           with ObsAttachmentTypeMetaMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
+          with ObservationReferenceMapping[F]
           with ObservingModeMapping[F]
           with ObservationSelectResultMapping[F]
           with OffsetMapping[F]
@@ -293,8 +294,9 @@ object OdbMapping {
               ObsAttachmentTypeMetaMapping,
               ObservationEditMapping,
               ObservationMapping,
-              ObservingModeMapping,
+              ObservationReferenceMapping,
               ObservationSelectResultMapping,
+              ObservingModeMapping,
               OffsetMapping,
               OffsetPMapping,
               OffsetQMapping,
