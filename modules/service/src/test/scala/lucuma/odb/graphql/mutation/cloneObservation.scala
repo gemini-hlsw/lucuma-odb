@@ -420,4 +420,28 @@ class cloneObservation extends OdbSuite {
         )
     } yield ()
   }
+
+  test("fail if the id and reference do not correspond") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      oid <- createObservationAs(pi, pid)
+      oidx = Observation.Id.fromLong(oid.value.value - 1).get
+      _   <- expect(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {
+                observationId: ${oidx.asJson},
+                observationReference: ${oref.asJson}
+              }) {
+                newObservation { id }
+              }
+            }
+          """,
+          expected = List(s"Observation '${oref.label}' (id $oid) does not correspond to observation id $oidx.").asLeft
+        )
+    } yield ()
+  }
 }
