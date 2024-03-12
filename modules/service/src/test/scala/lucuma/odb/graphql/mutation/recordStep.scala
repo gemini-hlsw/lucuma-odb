@@ -795,4 +795,69 @@ class recordStep extends OdbSuite {
 
   }
 
+  test("records step index") {
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val cfg0 = dynamicConfig(mode.instrument)
+    val cfg1 = cfg0.replaceFirst("builtin: LONG_SLIT_0_50", "builtin: LONG_SLIT_1_00")
+    for {
+      pid  <- createProgramAs(service)
+      oid  <- createObservationAs(service, pid, mode.some)
+      vid  <- recordVisitAs(service, mode.instrument, oid)
+      aid  <- recordAtomAs(service, mode.instrument, vid)
+      sid0 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScience)
+      sid1 <- recordStepAs(service, aid, mode.instrument, cfg1, stepConfigScience)
+      sid2 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScience)
+      _    <- expect(service,
+        s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                atomRecords {
+                  matches {
+                    steps {
+                      matches {
+                        id
+                        index
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "observation" : {
+             "execution" : {
+                "atomRecords" : {
+                  "matches" : [
+                    {
+                      "steps" : {
+                        "matches" : [
+                          {
+                            "id": $sid0,
+                            "index": 1
+                          },
+                          {
+                            "id": $sid1,
+                            "index": 2
+                          },
+                          {
+                            "id": $sid2,
+                            "index": 3
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield ()
+
+  }
 }

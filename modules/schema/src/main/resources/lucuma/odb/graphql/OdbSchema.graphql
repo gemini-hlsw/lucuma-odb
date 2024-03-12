@@ -9091,6 +9091,9 @@ type StepRecord {
   "Step ID."
   id: StepId!
 
+  "Step Index, relative to other step records in the observation."
+  index: PosInt!
+
   """
   Instrument associated with the step. This will indicate which of the
   instrument-specific dynamic fields (e.g., `gmosNorth: GmosNorthDynamic`) is
