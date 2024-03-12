@@ -10,6 +10,7 @@ import lucuma.odb.util.Codecs.dataset_qa_state
 import lucuma.odb.util.Codecs.int2_pos
 import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.observation_reference
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.visit_id
@@ -23,6 +24,7 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
 
     val Id: ColumnRef            = col("c_dataset_id", dataset_id)
     val StepId: ColumnRef        = col("c_step_id", step_id)
+    val ObservationReference     = col("c_observation_reference", observation_reference)
     val Index: ColumnRef         = col("c_index",   int2_pos)
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
     val VisitId: ColumnRef       = col("c_visit_id", visit_id)
