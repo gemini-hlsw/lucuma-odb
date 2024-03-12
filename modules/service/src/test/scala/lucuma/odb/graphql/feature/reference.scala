@@ -1055,4 +1055,15 @@ class reference extends OdbSuite {
     } yield ()
   }
 
+  test("observation reference after observation creation") {
+    val pRef = "G-XPL-GMOSN".programReference
+    for {
+      pid <- createProgramAs(pi)
+      o1  <- createObservationAs(pi, pid)
+      o2  <- createObservationAs(pi, pid)
+      ref <- setProgramReference(pi, pid, """example: { instrument: GMOS_NORTH }""")
+      _   <- expectObservationReference(o1, s"${pRef.label}-0001".observationReference)
+      _   <- expectObservationReference(o2, s"${pRef.label}-0002".observationReference)
+    } yield ()
+  }
 }
