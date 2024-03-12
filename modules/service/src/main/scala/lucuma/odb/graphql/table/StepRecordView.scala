@@ -13,8 +13,8 @@ import lucuma.odb.util.Codecs.gcal_filter
 import lucuma.odb.util.Codecs.gcal_shutter
 import lucuma.odb.util.Codecs.guide_state
 import lucuma.odb.util.Codecs.instrument
-import lucuma.odb.util.Codecs.obs_class
 import lucuma.odb.util.Codecs.int4_pos
+import lucuma.odb.util.Codecs.obs_class
 import lucuma.odb.util.Codecs.smart_gcal_type
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type

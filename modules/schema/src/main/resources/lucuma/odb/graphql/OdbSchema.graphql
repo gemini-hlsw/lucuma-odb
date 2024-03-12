@@ -4768,8 +4768,11 @@ type Dataset {
   "The corresponding step."
   step: StepRecord!
 
-  "Dataset index within the step."
+  "Exposure index within the step."
   index: PosShort!
+
+  "Dataset reference, assuming the observation has an observation reference."
+  reference: DatasetReference
 
   "Observation associated with this dataset."
   observation: Observation!
@@ -4851,6 +4854,33 @@ enum DatasetQaState {
   """
   FAIL
 }
+
+"""
+Dataset reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type DatasetReference {
+
+  "Formatted dataset reference label."
+  label: DatasetReferenceLabel!
+
+  "The observation reference."
+  observation: ObservationReference!
+
+  "The step index relative to its observation."
+  stepIndex: PosInt!
+
+  "The exposure index relative to its step."
+  exposureIndex: PosInt!
+}
+
+"""
+Dataset reference, formatted according to the observation, suffixed with
+the step and exposure indices. For example, G-2024B-1234-Q-0001-0002-0003 where
+G-2024B-1234-Q-0001 is the observation reference label, 2 is the step index and
+3 is the exposure index.
+"""
+scalar DatasetReferenceLabel
 
 """
 The matching dataset results, limited to a maximum of 1000 entries.

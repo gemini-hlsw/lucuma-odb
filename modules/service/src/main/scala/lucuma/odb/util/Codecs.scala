@@ -40,6 +40,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.DatasetReference
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -180,6 +181,12 @@ trait Codecs {
 
   val dataset_qa_state: Codec[DatasetQaState] =
     enumerated(Type("e_dataset_qa_state"))
+
+  val dataset_reference: Codec[DatasetReference] =
+    text.eimap(
+      s => DatasetReference.fromString.getOption(s).toRight(s"Invalid dataset reference: $s"))(
+      DatasetReference.fromString.reverseGet
+    )
 
   val dataset_stage: Codec[DatasetStage] =
     enumerated(Type("e_dataset_stage"))
