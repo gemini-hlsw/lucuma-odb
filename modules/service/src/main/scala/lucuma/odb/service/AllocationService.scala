@@ -22,6 +22,12 @@ import skunk.implicits._
 import Services.Syntax.*
 
 trait AllocationService[F[_]] {
+
+  /** 
+   * Set a time allocation according to `input`.
+   * 
+   * **Access Control:** Only Staff, Admin, and Service users can perform this operation. 
+   */
   def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[Result[Unit]]
 }
 
@@ -29,6 +35,8 @@ object AllocationService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
+
+      // Access control verified 12-Mar-42
       def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[Result[Unit]] =
         user.role.access match {
           case Staff | Admin | Service =>
@@ -37,6 +45,7 @@ object AllocationService {
             }
           case _ => OdbError.NotAuthorized(user.id).asFailureF
         }
+
     }
 
   object Statements {
