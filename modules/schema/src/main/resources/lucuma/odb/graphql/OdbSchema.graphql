@@ -4769,7 +4769,7 @@ type Dataset {
   step: StepRecord!
 
   "Exposure index within the step."
-  index: PosShort!
+  index: PosInt!
 
   "Dataset reference, assuming the observation has an observation reference."
   reference: DatasetReference
