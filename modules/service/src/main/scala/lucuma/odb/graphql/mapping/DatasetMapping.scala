@@ -41,8 +41,8 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       fieldMappings = List(
         SqlField("id",           DatasetTable.Id,   key = true),
         SqlObject("step",        Join(DatasetTable.StepId, StepRecordView.Id)),
-        SqlField("index",        DatasetTable.Index),
-        SqlObject("reference",   Join(DatasetReferenceView.Id, DatasetTable.Id)),
+        SqlField("index",        DatasetTable.ExposureIndex),
+        SqlObject("reference",   Join(DatasetTable.Id, DatasetReferenceView.Id)),
         SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
         SqlObject("visit",       Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlObject("events"),

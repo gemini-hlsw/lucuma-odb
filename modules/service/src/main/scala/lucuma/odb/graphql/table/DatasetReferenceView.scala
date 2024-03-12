@@ -19,7 +19,7 @@ trait DatasetReferenceView[F[_]] extends BaseMapping[F] {
     val ObservationId        = col("c_observation_id",        observation_id)
     val ObservationReference = col("c_observation_reference", observation_reference)
     val StepIndex            = col("c_step_index",            int4_pos)
-    val ExposureIndex        = col("c_index",                 int4_pos)
+    val ExposureIndex        = col("c_exposure_index",        int4_pos)
     val DatasetReference     = col("c_dataset_reference",     dataset_reference)
 
     // Used in WhereDatasetReference

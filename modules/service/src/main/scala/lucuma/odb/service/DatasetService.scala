@@ -10,7 +10,7 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.PosShort
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
@@ -87,9 +87,9 @@ object DatasetService {
     ) extends InsertDatasetFailure
 
     case class Success(
-      datasetId: Dataset.Id,
-      stepId:    Step.Id,
-      index:     PosShort
+      datasetId:     Dataset.Id,
+      stepId:        Step.Id,
+      exposureIndex: PosInt
     ) extends InsertDatasetResponse
 
   }
@@ -105,7 +105,7 @@ object DatasetService {
 
         import InsertDatasetResponse.*
 
-        val insert: F[Either[InsertDatasetFailure, (Dataset.Id, Step.Id, PosShort)]] =
+        val insert: F[Either[InsertDatasetFailure, (Dataset.Id, Step.Id, PosInt)]] =
           session
             .unique(Statements.InsertDataset)(stepId, filename, qaState)
             .map(_.asRight[InsertDatasetFailure])
@@ -177,7 +177,7 @@ object DatasetService {
 
   object Statements {
 
-    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), (Dataset.Id, Step.Id, PosShort)] =
+    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), (Dataset.Id, Step.Id, PosInt)] =
       sql"""
         INSERT INTO t_dataset (
           c_step_id,
@@ -193,8 +193,8 @@ object DatasetService {
         RETURNING
           c_dataset_id,
           c_step_id,
-          c_index
-      """.query(dataset_id *: step_id *: int2_pos)
+          c_exposure_index
+      """.query(dataset_id *: step_id *: int4_pos)
 
     def UpdateDatasets(
       SET:   DatasetPropertiesInput,

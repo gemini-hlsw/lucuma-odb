@@ -3,7 +3,27 @@
 -- These will be used to format the dataset reference.
 ALTER TABLE t_dataset
   ADD COLUMN c_observation_reference text,
-  ADD COLUMN c_step_index int4;
+  ADD COLUMN c_step_index     int4 CHECK (c_step_index     >= 1),
+  ADD COLUMN c_exposure_index int4 CHECK (c_exposure_index >= 1);
+
+-- Copy the c_index over to the c_exposure_index.
+UPDATE t_dataset
+   SET c_exposure_index = c_index;
+
+-- Update the trigger that sets the index to use the c_exposure_index column.
+CREATE OR REPLACE FUNCTION set_dataset_index()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.c_exposure_index := COALESCE((SELECT MAX(c_exposure_index) FROM t_dataset WHERE c_step_id = NEW.c_step_id), 0) + 1;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Update the (step, index) index.
+ALTER TABLE t_dataset
+  DROP CONSTRAINT t_dataset_c_step_id_c_index_key,
+  ADD CONSTRAINT t_dataset_c_step_id_c_exposure_index_key UNIQUE (c_step_id, c_exposure_index),
+  DROP COLUMN c_index;
 
 -- Set the observation reference value for existing observations.
 UPDATE t_dataset AS d
@@ -16,6 +36,11 @@ UPDATE t_dataset AS d
    SET c_step_index = s.c_step_index
   FROM t_step_record s
  WHERE d.c_step_id = s.c_step_id;
+
+ -- Guarantee that the indices are not null
+ ALTER TABLE t_dataset
+   ALTER COLUMN c_exposure_index SET NOT NULL,
+   ALTER COLUMN c_step_index     SET NOT NULL;
 
 -- When a new row is inserted into t_dataset, set the observation reference
 -- and the step index.
@@ -44,7 +69,7 @@ EXECUTE FUNCTION set_initial_observation_reference_in_dataset();
 CREATE OR REPLACE FUNCTION update_observation_reference_in_dataset()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.c_observation_reference <> OLD.c_observation_reference THEN
+  IF NEW.c_observation_reference IS DISTINCT FROM OLD.c_observation_reference THEN
     UPDATE t_dataset
     SET c_observation_reference = NEW.c_observation_reference
     WHERE c_observation_id = NEW.c_observation_id;
@@ -65,13 +90,13 @@ RETURNS text AS $$
 BEGIN
     RETURN CASE
         WHEN observation_reference IS NULL THEN NULL
-        ELSE CONCAT(observation_reference, '-', LPAD(step_index::text, 4, '0'), '_', LPAD(exposure_index::text, 4, '0'))
+        ELSE CONCAT(observation_reference, '-', LPAD(step_index::text, 4, '0'), '-', LPAD(exposure_index::text, 4, '0'))
     END;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 ALTER TABLE t_dataset
-  ADD COLUMN c_dataset_reference text GENERATED ALWAYS AS (format_dataset_reference(c_observation_reference, c_step_index, c_index)) STORED UNIQUE;
+  ADD COLUMN c_dataset_reference text GENERATED ALWAYS AS (format_dataset_reference(c_observation_reference, c_step_index, c_exposure_index)) STORED UNIQUE;
 
 
 -- Create a view for the dataset reference, including only datasets with
@@ -82,7 +107,7 @@ CREATE VIEW v_dataset_reference AS
     c_observation_id,
     c_observation_reference,
     c_step_index,
-    c_index,
+    c_exposure_index,
     c_dataset_reference
   FROM t_dataset
   WHERE c_dataset_reference IS NOT NULL

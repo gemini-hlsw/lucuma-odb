@@ -32,7 +32,7 @@ object DatasetReference {
     import ReferenceParsers.*
 
     val dataset: Parser[DatasetReference] =
-      ((observation <* dash) ~ index ~ index).map { case ((obs, step), exposure) =>
+      ((observation <* dash) ~ (index <* dash) ~ index).map { case ((obs, step), exposure) =>
         DatasetReference(obs, step, exposure)
       }
   }

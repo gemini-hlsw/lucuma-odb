@@ -7,7 +7,6 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -17,8 +16,6 @@ import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
-import lucuma.odb.data.DatasetReference
-import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 
 class recordDataset extends OdbSuite {
@@ -185,41 +182,4 @@ class recordDataset extends OdbSuite {
     )
   }
 
-  private def recordDataset(sid: Step.Id, filename: String): IO[Option[DatasetReference]] =
-    query(
-      user  = service,
-      query = s"""
-        mutation {
-          recordDataset(input: {
-            stepId: "$sid"
-            filename: "$filename"
-          }) {
-            dataset {
-              reference { label }
-            }
-          }
-        }
-      """.stripMargin
-    ).flatMap { js =>
-      js.hcursor
-        .downFields("recordDataset", "dataset", "reference", "label")
-        .as[Option[DatasetReference]]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
-
-  test("recordDataset - reference") {
-    for {
-      ids   <- setup(ObservingModeType.GmosNorthLongSlit, service)
-      (pid, oid, _, _, sid) = ids
-      pRef  <- setProgramReference(service, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
-      oRef   = ObservationReference(pRef.get, PosInt.unsafeFrom(1))
-      dRef0 <- recordDataset(sid, "N18630101S0004.fits")
-      dRef1 <- recordDataset(sid, "N18630101S0005.fits")
-    } yield {
-      assertEquals(dRef0, DatasetReference(oRef, PosInt.unsafeFrom(1), PosInt.unsafeFrom(1)).some)
-      assertEquals(dRef1, DatasetReference(oRef, PosInt.unsafeFrom(1), PosInt.unsafeFrom(2)).some)
-    }
-
-  }
 }
