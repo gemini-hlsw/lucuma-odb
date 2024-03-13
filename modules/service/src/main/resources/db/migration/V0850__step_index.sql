@@ -29,8 +29,8 @@ ALTER TABLE t_step_record
 CREATE OR REPLACE FUNCTION prevent_step_index_update()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.c_step_index != OLD.c_step_index THEN
-    RAISE EXCEPTION 'The step index (in column c_step_index) cannot be updated once it is set';
+  IF NEW.c_step_index IS DISTINCT FROM OLD.c_step_index THEN
+    RAISE EXCEPTION 'The step index (in t_step_record(c_step_index)) cannot be updated';
   END IF;
   RETURN NEW;
 END;
@@ -76,30 +76,3 @@ LEFT JOIN t_step_config_smart_gcal m
   ON m.c_step_id = s.c_step_id
 ORDER BY
   s.c_step_id;
-
--- Add the step index to the primary key, and bubble this along to t_dataset.
---ALTER TABLE t_dataset
---  DROP CONSTRAINT t_dataset_c_step_id_fkey,
---  ADD COLUMN c_step_index int4;
-
---ALTER TABLE t_execution_event
---  DROP CONSTRAINT t_execution_event_c_step_id_fkey;
-
---ALTER TABLE t_step_record
---  DROP CONSTRAINT t_step_pkey,
---  ADD CONSTRAINT t_step_pkey PRIMARY KEY (c_step_id, c_step_index);
-
---ALTER TABLE t_execution_event
---  ADD CONSTRAINT t_execution_event_c_step_id_fkey PRIMARY KEY (c_step_id);
-
---UPDATE
---  t_dataset AS d
---SET
---  d.c_step_index = s.c_step_index
---INNER JOIN
---  t_step_record AS s ON s.c_step_id = d.c_step_id;
-
---ALTER TABLE t_dataset
---  ADD CONSTRAINT t_dataset_c_step_id_fkey FOREIGN KEY (c_step_id, c_step_index) REFERENCES t_dataset(c_step_id, c_step_index);
-
- -- Finally add a generated column to holl

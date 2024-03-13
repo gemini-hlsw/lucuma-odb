@@ -1,16 +1,17 @@
--- Add a c_observation_reference and c_step_index that are copis of the
+-- Add a c_observation_reference and c_step_index that are copies of the
 -- corresponding values from t_observation and t_step_record respectively.
 -- These will be used to format the dataset reference.
 ALTER TABLE t_dataset
   ADD COLUMN c_observation_reference text,
-  ADD COLUMN c_step_index     int4 CHECK (c_step_index     >= 1),
-  ADD COLUMN c_exposure_index int4 CHECK (c_exposure_index >= 1);
+  ADD COLUMN c_step_index     int4 CHECK (c_step_index     > 0),
+  ADD COLUMN c_exposure_index int4 CHECK (c_exposure_index > 0);
 
--- Copy the c_index over to the c_exposure_index.
+-- Copy the old c_index over to the new c_exposure_index.
 UPDATE t_dataset
    SET c_exposure_index = c_index;
 
--- Update the trigger that sets the index to use the c_exposure_index column.
+-- Update the trigger that sets the index to use the c_exposure_index column
+-- instead of c_index.
 CREATE OR REPLACE FUNCTION set_dataset_index()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -71,8 +72,8 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.c_observation_reference IS DISTINCT FROM OLD.c_observation_reference THEN
     UPDATE t_dataset
-    SET c_observation_reference = NEW.c_observation_reference
-    WHERE c_observation_id = NEW.c_observation_id;
+       SET c_observation_reference = NEW.c_observation_reference
+     WHERE c_observation_id = NEW.c_observation_id;
   END IF;
 
   RETURN NEW;
