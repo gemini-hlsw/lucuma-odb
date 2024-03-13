@@ -1104,20 +1104,28 @@ class reference extends OdbSuite {
     )
 
   test("dataset reference") {
+    extension (self: Int) {
+      def posInt: PosInt = PosInt.unsafeFrom(self)
+    }
     val mode = ObservingModeType.GmosNorthLongSlit
     val user = service
     for {
       pid  <- createProgramAs(user)
       oid  <- createObservationAs(user, pid, mode.some)
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid  <- recordAtomAs(user, mode.instrument, vid)
-      sid  <- recordStepAs(user, mode.instrument, aid)
       pRef <- setProgramReference(user, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
       oRef  = ObservationReference(pRef.get, PosInt.unsafeFrom(1))
-      did0 <- recordDatasetAs(user, sid, "N18630101S0004.fits")
-      did1 <- recordDatasetAs(user, sid, "N18630101S0005.fits")
-      _    <- expectDatasetReference(user, did0, DatasetReference(oRef, PosInt.unsafeFrom(1), PosInt.unsafeFrom(1)))
-      _    <- expectDatasetReference(user, did1, DatasetReference(oRef, PosInt.unsafeFrom(1), PosInt.unsafeFrom(2)))
+      vid  <- recordVisitAs(user, mode.instrument, oid)
+      aid  <- recordAtomAs(user, mode.instrument, vid)
+      sid0 <- recordStepAs(user, mode.instrument, aid)
+      did0 <- recordDatasetAs(user, sid0, "N18630101S0010.fits")
+      did1 <- recordDatasetAs(user, sid0, "N18630101S0011.fits")
+      sid1 <- recordStepAs(user, mode.instrument, aid)
+      did2 <- recordDatasetAs(user, sid1, "N18630101S0012.fits")
+      did3 <- recordDatasetAs(user, sid1, "N18630101S0013.fits")
+      _    <- expectDatasetReference(user, did0, DatasetReference(oRef, 1.posInt, 1.posInt))
+      _    <- expectDatasetReference(user, did1, DatasetReference(oRef, 1.posInt, 2.posInt))
+      _    <- expectDatasetReference(user, did2, DatasetReference(oRef, 2.posInt, 1.posInt))
+      _    <- expectDatasetReference(user, did3, DatasetReference(oRef, 2.posInt, 2.posInt))
     } yield ()
   }
 
