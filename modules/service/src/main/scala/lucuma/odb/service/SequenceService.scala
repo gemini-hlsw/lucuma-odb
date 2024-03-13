@@ -507,34 +507,6 @@ object SequenceService {
           $time_span
       """.command.contramap { (s, a, i, t, c, d) => (s, a, a, i, t, c, d) }
 
-/*
-      sql"""
-        INSERT INTO t_step_record (
-          c_step_id,
-          c_step_index,
-          c_atom_id,
-          c_instrument,
-          c_step_type,
-          c_observe_class,
-          c_time_estimate
-        ) SELECT
-          $step_id,
-          COALESCE(
-            (SELECT MAX(c_step_index) + 1
-             FROM t_step_record AS s
-             INNER JOIN t_atom_record AS a ON a.c_atom_id = s.c_atom_id
-             WHERE a.observation_id = (SELECT c_observation_id FROM t_atom_record WHERE c_atom_id = $atom_id)
-            ),
-            1
-          ),
-          $atom_id,
-          $instrument,
-          $step_type,
-          $obs_class,
-          $time_span
-      """.command
- */
-
     /**
      * Selects completed step records for a particular observation.  A completed
      * step is one for which the completion time has been set by the reception
