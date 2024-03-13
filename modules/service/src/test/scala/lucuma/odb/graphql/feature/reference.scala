@@ -1146,4 +1146,46 @@ class reference extends OdbSuite {
     } yield ()
   }
 
+  test("lookup via dataset ref") {
+    expect(
+      user  = service,
+      query = s"""
+        query {
+          dataset(datasetReference: "G-2025B-CAL-GMOSN-02-0001-0001-0001") {
+            reference {
+              label
+              observation { label }
+              stepIndex
+              exposureIndex
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "dataset": {
+              "reference": {
+                 "label": "G-2025B-CAL-GMOSN-02-0001-0001-0001",
+                 "observation": {
+                   "label": "G-2025B-CAL-GMOSN-02-0001"
+                 },
+                 "stepIndex": 1,
+                 "exposureIndex": 1
+               }
+            }
+          }
+        """
+      )
+    )
+  }
+
+  test("lookup dataset, no oid, no ref") {
+    expect(
+      user     = pi,
+      query    = s""" query { dataset { reference { label } } } """,
+      expected = json"""{ "dataset": null }""".asRight
+    )
+  }
+
 }

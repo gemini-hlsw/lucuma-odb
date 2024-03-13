@@ -7848,10 +7848,20 @@ type Query {
     includeDeleted: Boolean! = false
   ): ConstraintSetGroupSelectResult!
 
-  "Select the dataset associated with the given id."
+
+  """
+  Returns the dataset with the given id or reference, if any.  Identify the
+  dataset by specifying only one of datasetId or datasetReference. If more than
+  one is provided, all must match.  If neither are set, nothing will match.
+  """
   dataset(
-    "Dataset ID"
-    datasetId: DatasetId!
+
+    "Specify to lookup the dataset by its ID."
+    datasetId: DatasetId
+
+    "Specify to lookup the dataset by its reference."
+    datasetReference: DatasetReferenceLabel
+
   ): Dataset
 
   """
