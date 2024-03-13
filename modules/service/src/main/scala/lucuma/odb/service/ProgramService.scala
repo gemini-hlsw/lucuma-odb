@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.Monad
-import cats.Semigroup
 import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
@@ -251,11 +250,7 @@ object ProgramService {
         Trace[F].span("insertProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
 
-          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, SETʹ.semester, user)).flatTap { pid =>
-            SETʹ.proposal.traverse { proposalInput =>
-              proposalService.insertProposal(proposalInput, pid)
-            }
-          }
+          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, SETʹ.semester, user))
         }
 
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
@@ -313,12 +308,6 @@ object ProgramService {
               UpdateProgramsError.InvalidSemester(SET.semester.toOption).failure
           }
 
-        // Update proposals. This can fail in a few ways.
-        val updateProposals: F[Result[List[Program.Id]]] =
-          SET.proposal.fold(Result(Nil).pure[F]) {
-            proposalService.updateProposals(_)
-          }
-
         // A stable identifier (ie. a `val`) is needed for the enums.
         val enumsVal = enums
 
@@ -373,12 +362,11 @@ object ProgramService {
           )
 
         (for {
-          _    <- ResultT(setup.map(Result.apply))
-          n    <- ResultT(SET.proposalStatus.traverse(tagToProposalStatus).pure[F])
-          _    <- ResultT(validateUpdate(n))
-          ids1 <- ResultT(updatePrograms)
-          ids2 <- ResultT(updateProposals) 
-        } yield (ids1 |+| ids2)).value
+          _   <- ResultT(setup.map(Result.apply))
+          n   <- ResultT(SET.proposalStatus.traverse(tagToProposalStatus).pure[F])
+          _   <- ResultT(validateUpdate(n))
+          ids <- ResultT(updatePrograms)
+        } yield ids).value
 
       }
 

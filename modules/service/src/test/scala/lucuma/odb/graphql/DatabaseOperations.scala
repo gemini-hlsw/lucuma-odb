@@ -171,34 +171,28 @@ trait DatabaseOperations { this: OdbSuite =>
       user = user,
       query = s"""
         mutation {
-          updatePrograms(
+          createProposal(
             input: {
+              programId: "$pid"
               SET: {
-                proposal: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 50
-                    }
+                proposalClass: {
+                  queue: {
+                    minPercentTime: 50
                   }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
                 }
-              }
-              WHERE: {
-                id: {
-                  EQ: "$pid"
-                }
+                category: COSMOLOGY
+                toOActivation: NONE
+                partnerSplits: [
+                  {
+                    partner: US
+                    percent: 100
+                  }
+                ]
               }
             }
           ) {
-            programs {
-              id
+            proposal {
+              toOActivation
             }
           }
         }
@@ -206,12 +200,10 @@ trait DatabaseOperations { this: OdbSuite =>
       expected =
         Right(json"""
           {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "id" : $pid
-                }
-              ]
+            "createProposal": {
+              "proposal": { 
+                "toOActivation" : "NONE"
+               }
             }
           }
         """)
@@ -274,6 +266,12 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createProgramWithProposalAs(user: User, name: String = null): IO[Program.Id] =
+    for {
+      pid <- createProgramAs(user, name)
+      _   <- addProposal(user, pid)
+    } yield pid
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)

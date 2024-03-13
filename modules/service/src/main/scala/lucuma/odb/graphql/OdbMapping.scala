@@ -109,6 +109,7 @@ object OdbMapping {
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
+          with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
           with CreateUserInvitationResultMapping[F]
           with DatasetMapping[F]
@@ -199,6 +200,7 @@ object OdbMapping {
           with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
+          with UpdateProposalResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
           with UserInvitationMapping[F]
@@ -259,6 +261,7 @@ object OdbMapping {
               CreateGroupResultMapping,
               CreateObservationResultMapping,
               CreateProgramResultMapping,
+              CreateProposalResultMapping,
               CreateTargetResultMapping,
               CreateUserInvitationResultMapping,
               DatasetEventMapping,
@@ -374,6 +377,7 @@ object OdbMapping {
               UpdateObsAttachmentsResultMapping,
               UpdateObservationsResultMapping,
               UpdateProgramsResultMapping,
+              UpdateProposalResultMapping,
               UpdateTargetsResultMapping,
               UserMapping,
               UserInvitationMapping,

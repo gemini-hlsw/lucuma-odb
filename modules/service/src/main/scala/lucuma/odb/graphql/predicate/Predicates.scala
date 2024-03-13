@@ -20,6 +20,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val cloneObservationResult        = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult             = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
     val constraintSetGroup            = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
+    val createProposalResult          = CreateProposalResultPredicates(Path.from(CreateProposalResultType))
     val dataset                       = DatasetPredicates(Path.from(DatasetType))
     val datasetEvent                  = ExecutionEventPredicates(Path.from(DatasetEventType))
     val executionEvent                = ExecutionEventPredicates(Path.from(ExecutionEventType))
@@ -48,6 +49,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val target                        = TargetPredicates(Path.from(TargetType))
     val targetEdit                    = TargetEditPredicates(Path.from(TargetEditType))
     val targetGroup                   = TargetGroupPredicates(Path.from(TargetGroupType))
+    val updateProposalResult          = UpdateProposalResultPredicates(Path.from(UpdateProposalResultType))
     val userInvitation                = UserInvitationPredicates(Path.from(UserInvitationType))
     val visit                         = VisitPredicates(Path.from(VisitType))
   }
