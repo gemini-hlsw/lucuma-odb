@@ -541,6 +541,29 @@ type CreateProgramResult {
 }
 
 """
+Input for creating a proposal.  Identify the program to update with one
+of `programId`, `proposalReference` or `programReference`.  If more than one of
+these is specified, all must match.  Use `SET` to specify the new program
+reference properties.
+"""
+input CreateProposalInput {
+  programId:         ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference:  ProgramReferenceLabel
+  SET:               ProposalPropertiesInput!
+}
+
+"""
+The result of creating new proposal
+"""
+type CreateProposalResult {
+  """
+  The newly created proposal.
+  """
+  proposal: Proposal!
+}
+
+"""
 Target creation parameters.  One of programId or programReference is required.
 If both are provided, they must refer to the same program.
 """
@@ -2463,6 +2486,16 @@ type Mutation {
   ): CreateProgramResult!
 
   """
+  Creates a new proposal according to the provided properties
+  """
+  createProposal(
+    """
+    Proposal description
+    """
+    input: CreateProposalInput!
+  ): CreateProposalResult
+
+  """
   Creates a new target according to the provided parameters.  Only one of sidereal or nonsidereal may be specified.
   """
   createTarget(
@@ -2588,12 +2621,25 @@ type Mutation {
     input: UpdateObservationsInput!
   ): UpdateObservationsResult!
 
+  """
+  Updates existing programs.
+  """
   updatePrograms(
     """
     Parameters for updating existing programs.
     """
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
+
+  """
+  Updates an existing proposal.
+  """
+  updateProposal(
+    """
+    Parameters for updating an existing proposal.
+    """
+    input: UpdateProposalInput!
+  ): UpdateProposalResult!
 
   """
   Updates existing targets
@@ -2891,11 +2937,6 @@ input ProgramPropertiesInput {
   proposalStatus: ProposalStatus
 
   """
-  The program proposal is both optional and nullable
-  """
-  proposal: ProposalInput
-
-  """
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
   """
   existence: Existence
@@ -3001,7 +3042,7 @@ input ProposalClassInput {
 """
 Program proposal
 """
-input ProposalInput {
+input ProposalPropertiesInput {
   """
   The title field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -4039,6 +4080,29 @@ type UpdateProgramsResult {
   `true` when there were additional edits that were not returned.
   """
   hasMore: Boolean!
+}
+
+"""
+Input for updating a proposal.  Identify the program to update with one
+of `programId`, `proposalReference` or `programReference`.  If more than one of
+these is specified, all must match.  Use `SET` to specify the new program
+reference properties.
+"""
+input UpdateProposalInput {
+  programId:         ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference:  ProgramReferenceLabel
+  SET:               ProposalPropertiesInput!
+}
+
+"""
+The result of updating a proposal
+"""
+type UpdateProposalResult {
+  """
+  The updated proposal.
+  """
+  proposal: Proposal!
 }
 
 """

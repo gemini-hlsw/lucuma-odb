@@ -14,7 +14,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
-object ProposalInput {
+object ProposalPropertiesInput {
 
   case class Create(
     title: Nullable[NonEmptyString],
