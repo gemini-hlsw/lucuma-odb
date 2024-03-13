@@ -10164,7 +10164,7 @@ input WhereDataset {
   stepId: WhereEqStepId
 
   "Matches the particula dataset index within the step."
-  index: WhereOrderPosShort
+  index: WhereOrderPosInt
 
   "Matches the dataset file name."
   filename: WhereString
@@ -10730,37 +10730,6 @@ input WhereOptionString {
   Set to `true` (the default) for case sensitive matches, `false` to ignore case.
   """
   MATCH_CASE: Boolean = true
-}
-
-"""
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
-"""
-input WhereOrderPosShort {
-  "Matches if the property value is exactly the supplied value."
-  EQ: PosShort
-
-  "Matches if the property value is not the supplied value."
-  NEQ: PosShort
-
-  "Matches if the property value is any of the supplied options."
-  IN: [PosShort!]
-
-  "Matches if the property value is none of the supplied values."
-  NIN: [PosShort!]
-
-  "Matches if the property is ordered after (>) the supplied value."
-  GT: PosShort
-
-  "Matches if the property is ordered before (<) the supplied value."
-  LT: PosShort
-
-  "Matches if the property is ordered after or equal (>=) the supplied value."
-  GTE: PosShort
-
-  "Matches if the property is ordered before or equal (<=) the supplied value."
-  LTE: PosShort
 }
 
 """
