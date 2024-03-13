@@ -99,6 +99,8 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 ALTER TABLE t_dataset
   ADD COLUMN c_dataset_reference text GENERATED ALWAYS AS (format_dataset_reference(c_observation_reference, c_step_index, c_exposure_index)) STORED UNIQUE;
 
+-- Index on the dataset reference.
+CREATE INDEX i_dataset_reference ON t_dataset (c_dataset_reference);
 
 -- Create a view for the dataset reference, including only datasets with
 -- a defined reference.  This makes mapping the reference as optional easier.
