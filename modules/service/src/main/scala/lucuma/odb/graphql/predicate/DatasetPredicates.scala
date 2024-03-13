@@ -6,8 +6,10 @@ package predicate
 
 import grackle.Path
 import lucuma.core.model.sequence.Dataset
+import lucuma.odb.data.DatasetReference
 
 class DatasetPredicates(path: Path) {
-  lazy val id          = LeafPredicates[Dataset.Id](path / "id")
-  lazy val observation = new ObservationPredicates(path / "observation")
+  lazy val id             = LeafPredicates[Dataset.Id](path / "id")
+  lazy val observation    = new ObservationPredicates(path / "observation")
+  lazy val referenceLabel = LeafPredicates[DatasetReference](path / "reference" / "label")
 }

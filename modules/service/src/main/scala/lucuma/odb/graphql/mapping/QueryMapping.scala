@@ -19,6 +19,7 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.model
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
+import lucuma.odb.data.DatasetReference
 import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
@@ -28,6 +29,7 @@ import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTarget
+import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ObservationPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
@@ -140,18 +142,31 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         OrderBy(OrderSelections(List(OrderSelection[Short](ProposalStatusMetaType / "ordinal"))), child)
       }
 
+  private def datasetPredicate(
+    rDid: Result[Option[model.sequence.Dataset.Id]],
+    rRef: Result[Option[DatasetReference]],
+    pred: DatasetPredicates
+  ): Result[Predicate] =
+    (rDid, rRef).parTupled.map { (did, ref) =>
+      and(List(
+        did.map(pred.id.eql).toList,
+        ref.map(r => pred.referenceLabel.eql(r)).toList
+      ).flatten) match {
+        case True => False // neither did nor ref was supplied
+        case p    => p
+      }
+    }
+
   private lazy val Dataset: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "dataset", List(
-      DatasetIdBinding("datasetId", rDid)
+      DatasetIdBinding.Option("datasetId", rDid),
+      DatasetReferenceBinding.Option("datasetReference", rRef)
     )) =>
       Elab.transformChild { child =>
-        rDid.map { did =>
+        datasetPredicate(rDid, rRef, Predicates.dataset).map { dataset =>
           Unique(
             Filter(
-              And(
-                Predicates.dataset.id.eql(did),
-                Predicates.dataset.observation.program.isVisibleTo(user)
-              ),
+              And(dataset, Predicates.dataset.observation.program.isVisibleTo(user)),
               child
             )
           )
@@ -273,7 +288,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         oid.map(pred.id.eql).toList,
         ref.map(r => pred.referenceLabel.eql(r)).toList
       ).flatten) match {
-        case True => False // neither oid nor ref nor pro was supplied
+        case True => False // neither oid nor ref was supplied
         case p    => p
       }
     }
