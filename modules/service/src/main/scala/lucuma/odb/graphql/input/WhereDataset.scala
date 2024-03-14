@@ -5,7 +5,7 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel._
 import eu.timepit.refined.cats.*
-import eu.timepit.refined.types.numeric.PosShort
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate._
@@ -20,7 +20,7 @@ object WhereDataset {
     val WhereOrderDatasetIdBinding = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
     val WhereObservationBinding    = WhereObservation.binding(path / "observation")
     val WhereEqStepIdBinding       = WhereEq.binding[Step.Id](path / "step" / "id", StepIdBinding)
-    val WhereOrderIndexBinding     = WhereOrder.binding[PosShort](path / "index", PosShortBinding)
+    val WhereOrderIndexBinding     = WhereOrder.binding[PosInt](path / "index", PosIntBinding)
     val WhereFilenameBinding       = WhereString.binding(path / "filename")
     val QaStateBinding             = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
 

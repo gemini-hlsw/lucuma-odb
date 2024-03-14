@@ -50,6 +50,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       tpe           = StepRecordType,
       fieldMappings = List(
         SqlField("id",           StepRecordView.Id, key = true),
+        SqlField("index",        StepRecordView.StepIndex),
         SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
         SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
         SqlField("created",      StepRecordView.Created),

@@ -6,6 +6,7 @@ package feature
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
@@ -14,7 +15,10 @@ import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Dataset
+import lucuma.odb.data.DatasetReference
 import lucuma.odb.data.ObservationReference
+import lucuma.odb.data.ObservingModeType
 
 
 class reference extends OdbSuite {
@@ -1066,4 +1070,80 @@ class reference extends OdbSuite {
       _   <- expectObservationReference(o2, s"${pRef.label}-0002".observationReference)
     } yield ()
   }
+
+  def expectDatasetReference(
+    user: User,
+    did:  Dataset.Id,
+    ref:  DatasetReference
+  ): IO[Unit] =
+    expect(user, s"""
+      query {
+        dataset(datasetId: "$did") {
+          reference {
+            label
+            observation { label }
+            stepIndex
+            exposureIndex
+          }
+        }
+      }""",
+      json"""
+        {
+          "dataset": {
+            "reference": {
+              "label": ${ref.label},
+              "observation": {
+                "label": ${ref.observationReference.label}
+              },
+              "stepIndex": ${ref.stepIndex.value},
+              "exposureIndex": ${ref.exposureIndex.value}
+            }
+          }
+        }
+      """.asRight
+    )
+
+  test("dataset reference") {
+    extension (self: Int) {
+      def posInt: PosInt = PosInt.unsafeFrom(self)
+    }
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = service
+    for {
+      pid  <- createProgramAs(user)
+      oid  <- createObservationAs(user, pid, mode.some)
+      pRef <- setProgramReference(user, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      oRef  = ObservationReference(pRef.get, PosInt.unsafeFrom(1))
+      vid  <- recordVisitAs(user, mode.instrument, oid)
+      aid  <- recordAtomAs(user, mode.instrument, vid)
+      sid0 <- recordStepAs(user, mode.instrument, aid)
+      did0 <- recordDatasetAs(user, sid0, "N18630101S0010.fits")
+      did1 <- recordDatasetAs(user, sid0, "N18630101S0011.fits")
+      sid1 <- recordStepAs(user, mode.instrument, aid)
+      did2 <- recordDatasetAs(user, sid1, "N18630101S0012.fits")
+      did3 <- recordDatasetAs(user, sid1, "N18630101S0013.fits")
+      _    <- expectDatasetReference(user, did0, DatasetReference(oRef, 1.posInt, 1.posInt))
+      _    <- expectDatasetReference(user, did1, DatasetReference(oRef, 1.posInt, 2.posInt))
+      _    <- expectDatasetReference(user, did2, DatasetReference(oRef, 2.posInt, 1.posInt))
+      _    <- expectDatasetReference(user, did3, DatasetReference(oRef, 2.posInt, 2.posInt))
+    } yield ()
+  }
+
+  test("no dataset reference") {
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val user = service
+    for {
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid, mode.some)
+      vid <- recordVisitAs(user, mode.instrument, oid)
+      aid <- recordAtomAs(user, mode.instrument, vid)
+      sid <- recordStepAs(user, mode.instrument, aid)
+      did <- recordDatasetAs(user, sid, "N18630101S0006.fits")
+      _   <- expect(user,
+               s"""query { dataset(datasetId: "$did") { reference { label } } }""",
+               json"""{ "dataset": { "reference": null } }""".asRight
+             )
+    } yield ()
+  }
+
 }
