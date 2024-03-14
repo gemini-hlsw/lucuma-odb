@@ -19,12 +19,14 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 
 import table.AtomRecordTable
+import table.DatasetReferenceView
 import table.DatasetTable
 import table.ObservationView
 import table.StepRecordView
 import table.VisitTable
 
 trait DatasetMapping[F[_]] extends DatasetTable[F]
+                              with DatasetReferenceView[F]
                               with AtomRecordTable[F]
                               with ObservationView[F]
                               with Predicates[F]
@@ -37,18 +39,18 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
     ObjectMapping(
       tpe = DatasetType,
       fieldMappings = List(
-        SqlField("id",     DatasetTable.Id,   key = true),
-        SqlObject("step",  Join(DatasetTable.StepId, StepRecordView.Id)),
-        SqlField("index",  DatasetTable.Index),
-
+        SqlField("id",           DatasetTable.Id,   key = true),
+        SqlObject("step",        Join(DatasetTable.StepId, StepRecordView.Id)),
+        SqlField("index",        DatasetTable.ExposureIndex),
+        SqlObject("reference",   Join(DatasetTable.Id, DatasetReferenceView.Id)),
         SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
-        SqlObject("visit", Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
+        SqlObject("visit",       Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlObject("events"),
-        SqlField("filename", DatasetTable.File.Name),
-        SqlField("qaState",  DatasetTable.QaState),
+        SqlField("filename",     DatasetTable.File.Name),
+        SqlField("qaState",      DatasetTable.QaState),
 
-        SqlField("start", DatasetTable.Time.Start, hidden = true),
-        SqlField("end", DatasetTable.Time.End, hidden = true),
+        SqlField("start",        DatasetTable.Time.Start, hidden = true),
+        SqlField("end",          DatasetTable.Time.End, hidden = true),
 
         CursorFieldJson("interval",
            cursor =>

@@ -110,9 +110,10 @@ object OdbMapping {
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
           with CreateUserInvitationResultMapping[F]
-          with DeclinationMapping[F]
           with DatasetMapping[F]
+          with DatasetReferenceMapping[F]
           with DatasetSelectResultMapping[F]
+          with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with ExecutionMapping[F]
           with ExecutionEventMapping[F]
@@ -258,8 +259,9 @@ object OdbMapping {
               CreateProgramResultMapping,
               CreateTargetResultMapping,
               CreateUserInvitationResultMapping,
-              DatasetMapping,
               DatasetEventMapping,
+              DatasetMapping,
+              DatasetReferenceMapping,
               DatasetSelectResultMapping,
               DeclinationMapping,
               EngineeringProgramReferenceMapping,
