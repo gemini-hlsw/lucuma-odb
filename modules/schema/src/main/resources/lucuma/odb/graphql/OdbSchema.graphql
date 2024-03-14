@@ -10167,13 +10167,16 @@ input WhereDataset {
   "Matches indicated dataset(s)."
   id: WhereOrderDatasetId
 
+  "Matches the dataset reference, if any."
+  reference: WhereDatasetReference
+
   "Matches all datasets associated with the observation."
   observation: WhereObservation
 
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
 
-  "Matches the particula dataset index within the step."
+  "Matches the particular dataset index within the step."
   index: WhereOrderPosInt
 
   "Matches the dataset file name."
@@ -10183,6 +10186,24 @@ input WhereDataset {
   qaState: WhereOptionEqQaState
 }
 
+input WhereDatasetReference {
+
+  "Matches if the dataset reference is not defined."
+  IS_NULL: Boolean
+
+  "Matches the dataset reference label."
+  label: WhereString
+
+  "Matches the observation reference."
+  observation: WhereObservationReference
+
+  "Matches the step index."
+  stepIndex: WhereOrderPosInt
+
+  "Matches the exposure index."
+  exposureIndex: WhereOrderPosInt
+
+}
 
 input WhereEqExecutionEventType {
 
@@ -10506,10 +10527,10 @@ input WhereObservation {
 
 input WhereObservationReference {
 
-  "Matches if the program reference is not defined."
+  "Matches if the observation reference is not defined."
   IS_NULL: Boolean
 
-  "Matches the program reference label."
+  "Matches the observation reference label."
   label: WhereString
 
   "Matches the program reference."
