@@ -7,6 +7,7 @@ package feature
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
@@ -40,6 +41,9 @@ class reference extends OdbSuite {
 
     def observationReference: ObservationReference =
       ObservationReference.fromString.unsafeGet(s)
+
+    def datasetReference: DatasetReference =
+      DatasetReference.fromString.unsafeGet(s)
 
     def semester: Semester =
       Semester.unsafeFromString(s)
@@ -117,11 +121,11 @@ class reference extends OdbSuite {
          .liftTo[IO]
       }
 
-  def programRefsWhere(where: String): IO[List[ProgramReference]] =
-    query(pi, s"query { programs(WHERE: $where) { matches { reference { label } } } }")
+  def refsWhere[A: Decoder](name: String, where: String): IO[List[A]] =
+    query(pi, s"query { $name(WHERE: $where) { matches { reference { label } } } }")
       .flatMap {
         _.hcursor
-         .downFields("programs", "matches")
+         .downFields(name, "matches")
          .values
          .toList
          .flatMap(_.toList)
@@ -130,11 +134,14 @@ class reference extends OdbSuite {
             .downFields("reference", "label")
             .success
             .toList
-            .traverse(_.as[ProgramReference])
+            .traverse(_.as[A])
          }
          .leftMap(f => new RuntimeException(f.message))
          .liftTo[IO]
       }
+
+  def programRefsWhere(where: String): IO[List[ProgramReference]] =
+    refsWhere("programs", where)
 
   test("submit proposals") {
     for {
@@ -935,23 +942,7 @@ class reference extends OdbSuite {
   }
 
   def observationRefsWhere(where: String): IO[List[ObservationReference]] =
-    query(pi, s"query { observations(WHERE: $where) { matches { reference { label } } } }")
-      .flatMap {
-        _.hcursor
-         .downFields("observations", "matches")
-         .values
-         .toList
-         .flatMap(_.toList)
-         .flatTraverse {
-           _.hcursor
-            .downFields("reference", "label")
-            .success
-            .toList
-            .traverse(_.as[ObservationReference])
-         }
-         .leftMap(f => new RuntimeException(f.message))
-         .liftTo[IO]
-      }
+    refsWhere("observations", where)
 
   test("select via WHERE observation reference label") {
     assertIO(
@@ -1108,38 +1099,36 @@ class reference extends OdbSuite {
       def posInt: PosInt = PosInt.unsafeFrom(self)
     }
     val mode = ObservingModeType.GmosNorthLongSlit
-    val user = service
     for {
-      pid  <- createProgramAs(user)
-      oid  <- createObservationAs(user, pid, mode.some)
-      pRef <- setProgramReference(user, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      pid  <- createProgramAs(pi)
+      oid  <- createObservationAs(pi, pid, mode.some)
+      pRef <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
       oRef  = ObservationReference(pRef.get, PosInt.unsafeFrom(1))
-      vid  <- recordVisitAs(user, mode.instrument, oid)
-      aid  <- recordAtomAs(user, mode.instrument, vid)
-      sid0 <- recordStepAs(user, mode.instrument, aid)
-      did0 <- recordDatasetAs(user, sid0, "N18630101S0010.fits")
-      did1 <- recordDatasetAs(user, sid0, "N18630101S0011.fits")
-      sid1 <- recordStepAs(user, mode.instrument, aid)
-      did2 <- recordDatasetAs(user, sid1, "N18630101S0012.fits")
-      did3 <- recordDatasetAs(user, sid1, "N18630101S0013.fits")
-      _    <- expectDatasetReference(user, did0, DatasetReference(oRef, 1.posInt, 1.posInt))
-      _    <- expectDatasetReference(user, did1, DatasetReference(oRef, 1.posInt, 2.posInt))
-      _    <- expectDatasetReference(user, did2, DatasetReference(oRef, 2.posInt, 1.posInt))
-      _    <- expectDatasetReference(user, did3, DatasetReference(oRef, 2.posInt, 2.posInt))
+      vid  <- recordVisitAs(service, mode.instrument, oid)
+      aid  <- recordAtomAs(service, mode.instrument, vid)
+      sid0 <- recordStepAs(service, mode.instrument, aid)
+      did0 <- recordDatasetAs(service, sid0, "N18630101S0010.fits")
+      did1 <- recordDatasetAs(service, sid0, "N18630101S0011.fits")
+      sid1 <- recordStepAs(service, mode.instrument, aid)
+      did2 <- recordDatasetAs(service, sid1, "N18630101S0012.fits")
+      did3 <- recordDatasetAs(service, sid1, "N18630101S0013.fits")
+      _    <- expectDatasetReference(pi, did0, DatasetReference(oRef, 1.posInt, 1.posInt))
+      _    <- expectDatasetReference(pi, did1, DatasetReference(oRef, 1.posInt, 2.posInt))
+      _    <- expectDatasetReference(pi, did2, DatasetReference(oRef, 2.posInt, 1.posInt))
+      _    <- expectDatasetReference(pi, did3, DatasetReference(oRef, 2.posInt, 2.posInt))
     } yield ()
   }
 
   test("no dataset reference") {
     val mode = ObservingModeType.GmosNorthLongSlit
-    val user = service
     for {
-      pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-      aid <- recordAtomAs(user, mode.instrument, vid)
-      sid <- recordStepAs(user, mode.instrument, aid)
-      did <- recordDatasetAs(user, sid, "N18630101S0006.fits")
-      _   <- expect(user,
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, mode.some)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid)
+      sid <- recordStepAs(service, mode.instrument, aid)
+      did <- recordDatasetAs(service, sid, "N18630101S0006.fits")
+      _   <- expect(pi,
                s"""query { dataset(datasetId: "$did") { reference { label } } }""",
                json"""{ "dataset": { "reference": null } }""".asRight
              )
@@ -1148,7 +1137,7 @@ class reference extends OdbSuite {
 
   test("lookup via dataset ref") {
     expect(
-      user  = service,
+      user  = pi,
       query = s"""
         query {
           dataset(datasetReference: "G-2025B-CAL-GMOSN-02-0001-0001-0001") {
@@ -1185,6 +1174,63 @@ class reference extends OdbSuite {
       user     = pi,
       query    = s""" query { dataset { reference { label } } } """,
       expected = json"""{ "dataset": null }""".asRight
+    )
+  }
+
+  def datasetRefsWhere(where: String): IO[List[DatasetReference]] =
+    refsWhere("datasets", where)
+
+  test("select via WHERE dataset reference label") {
+    assertIO(
+      datasetRefsWhere( s"""{ reference: { label: { LIKE: "%-0002" } } }"""),
+      List(
+        "G-2025B-CAL-GMOSN-02-0001-0001-0002".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0002".datasetReference
+      )
+    )
+  }
+
+  test("select via WHERE dataset stepIndex") {
+    assertIO(
+      datasetRefsWhere( s"""{ reference: { stepIndex: { EQ: 2 } } }"""),
+      List(
+        "G-2025B-CAL-GMOSN-02-0001-0002-0001".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0002".datasetReference
+      )
+    )
+  }
+
+  test("select via WHERE dataset exposureIndex") {
+    assertIO(
+      datasetRefsWhere( s"""{ reference: { exposureIndex: { EQ: 2 } } }"""),
+      List(
+        "G-2025B-CAL-GMOSN-02-0001-0001-0002".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0002".datasetReference
+      )
+    )
+  }
+
+  test("select via WHERE dataset observation reference") {
+    assertIO(
+      datasetRefsWhere( s"""{ reference: { observation: { label: { LIKE: "G-2025B-CAL-GMOSN-02-0001" } } } }"""),
+      List(
+        "G-2025B-CAL-GMOSN-02-0001-0001-0001".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0001-0002".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0001".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0002".datasetReference
+      )
+    )
+  }
+
+  test("select via WHERE dataset reference IS NOT NULL") {
+    assertIO(
+      datasetRefsWhere( s"""{ reference: { IS_NULL: false } }"""),
+      List(
+        "G-2025B-CAL-GMOSN-02-0001-0001-0001".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0001-0002".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0001".datasetReference,
+        "G-2025B-CAL-GMOSN-02-0001-0002-0002".datasetReference
+      )
     )
   }
 

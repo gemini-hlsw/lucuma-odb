@@ -14,28 +14,31 @@ import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 
-object WhereObservationReference {
+object WhereDatasetReference {
 
   def binding(path: Path): Matcher[Predicate] = {
-    // match observation reference labels on the String value so we can do
-    // comparisons like 'LIKE: "G-2024A-0001-Q-000?"'.
-    val WhereLabel       = WhereString.binding(path / "labelString")
-    val WhereProgramRef  = WhereProgramReference.binding(path / "program")
-    val WhereIndex       = WhereOrder.binding[PosInt](path / "index", PosIntBinding)
+    // match dataset reference labels on the String value so we can do
+    // comparisons like 'LIKE: "G-2024A-0001-Q-0001-%"'.
+    val WhereLabel          = WhereString.binding(path / "labelString")
+    val WhereObservationRef = WhereObservationReference.binding(path / "observation")
+    val WhereStepIndex      = WhereOrder.binding[PosInt](path / "stepIndex", PosIntBinding)
+    val WhereExposureIndex  = WhereOrder.binding[PosInt](path / "exposureIndex", PosIntBinding)
 
     ObjectFieldsBinding.rmap {
       case List(
         BooleanBinding.Option("IS_NULL", rIsNull),
         WhereLabel.Option("label", rRef),
-        WhereProgramRef.Option("program", rProgram),
-        WhereIndex.Option("index", rIndex),
-      ) => (rIsNull, rRef, rProgram, rIndex).parMapN {
-        (isNull, ref, program, index) =>
+        WhereObservationRef.Option("observation", rObservation),
+        WhereStepIndex.Option("stepIndex", rStepIndex),
+        WhereExposureIndex.Option("exposureIndex", rExposureIndex),
+      ) => (rIsNull, rRef, rObservation, rStepIndex, rExposureIndex).parMapN {
+        (isNull, ref, observation, stepIndex, exposureIndex) =>
           and(List(
             isNull.map(IsNull(path / "id", _)),
             ref,
-            program,
-            index
+            observation,
+            stepIndex,
+            exposureIndex
           ).flatten)
       }
     }
