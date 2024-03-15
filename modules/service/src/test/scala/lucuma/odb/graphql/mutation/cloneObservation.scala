@@ -13,9 +13,9 @@ import io.circe.syntax.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
-import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 
 class cloneObservation extends OdbSuite {

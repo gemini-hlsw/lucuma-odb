@@ -27,6 +27,7 @@ import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
@@ -47,7 +48,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.Existence
-import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
