@@ -5,7 +5,7 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import lucuma.core.model.Observation
-import lucuma.odb.data.ObservationReference
+import lucuma.core.model.ObservationReference
 
 class ObservationPredicates(path: Path) {
   lazy val existence      = ExistencePredicates(path / "existence")

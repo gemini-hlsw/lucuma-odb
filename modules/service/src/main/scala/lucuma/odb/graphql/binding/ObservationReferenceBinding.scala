@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ObservationReference
+import lucuma.core.model.ObservationReference
 
 val ObservationReferenceBinding: Matcher[ObservationReference] =
   StringBinding.emap { s =>

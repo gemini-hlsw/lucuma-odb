@@ -11,14 +11,14 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
-import lucuma.odb.data.DatasetReference
-import lucuma.odb.data.ObservationReference
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.ObservingModeType
 
 
