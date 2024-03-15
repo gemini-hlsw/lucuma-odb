@@ -31,6 +31,7 @@ import lucuma.core.model.*
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
@@ -40,13 +41,11 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
-import lucuma.odb.data.DatasetReference
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.data.ObservationReference
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole

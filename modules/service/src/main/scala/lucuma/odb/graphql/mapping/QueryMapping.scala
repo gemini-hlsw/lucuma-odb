@@ -17,10 +17,10 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
-import lucuma.odb.data.DatasetReference
-import lucuma.odb.data.ObservationReference
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding._

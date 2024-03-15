@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.DatasetReference
+import lucuma.core.model.sequence.DatasetReference
 
 val DatasetReferenceBinding: Matcher[DatasetReference] =
   StringBinding.emap { s =>
