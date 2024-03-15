@@ -17,6 +17,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.DatasetReference
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -29,6 +30,14 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 sealed trait DatasetService[F[_]] {
+
+  /**
+   * Finds the dataset id consistent with the given ids (if any).
+   */
+  def resolveDid(
+    did: Option[Dataset.Id],
+    ref: Option[DatasetReference]
+  ): F[Result[Dataset.Id]]
 
   def insertDataset(
     stepId:   Step.Id,
@@ -68,6 +77,14 @@ object DatasetService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): DatasetService[F] =
     new DatasetService[F] with ExecutionUserCheck {
+
+      val resolver = new IdResolver("dataset", Statements.selectDid, _.label)
+
+      override def resolveDid(
+        did: Option[Dataset.Id],
+        ref: Option[DatasetReference]
+      ): F[Result[Dataset.Id]] =
+        resolver.resolve(did, ref)
 
       def insertDataset(
         stepId:   Step.Id,
@@ -133,6 +150,13 @@ object DatasetService {
   }
 
   object Statements {
+
+    val selectDid: Query[DatasetReference, Dataset.Id] =
+      sql"""
+        SELECT c_dataset_id
+          FROM t_dataset
+         WHERE c_dataset_reference = $dataset_reference
+      """.query(dataset_id)
 
     val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), Dataset.Id] =
       sql"""

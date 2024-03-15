@@ -19,6 +19,7 @@ object WhereDataset {
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderDatasetIdBinding = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
     val WhereObservationBinding    = WhereObservation.binding(path / "observation")
+    val WhereReferenceBinding      = WhereDatasetReference.binding(path / "reference")
     val WhereEqStepIdBinding       = WhereEq.binding[Step.Id](path / "step" / "id", StepIdBinding)
     val WhereOrderIndexBinding     = WhereOrder.binding[PosInt](path / "index", PosIntBinding)
     val WhereFilenameBinding       = WhereString.binding(path / "filename")
@@ -33,18 +34,20 @@ object WhereDataset {
         WhereDatasetBinding.Option("NOT", rNOT),
 
         WhereOrderDatasetIdBinding.Option("id", rId),
+        WhereReferenceBinding.Option("reference", rRef),
         WhereObservationBinding.Option("observation", rObs),
         WhereEqStepIdBinding.Option("stepId", rStepId),
         WhereOrderIndexBinding.Option("index", rIndex),
         WhereFilenameBinding.Option("filename", rFile),
         QaStateBinding.Option("qaState", rQa)
       ) =>
-        (rAND, rOR, rNOT, rId, rObs, rStepId, rIndex, rFile, rQa).parMapN { (AND, OR, NOT, id, obs, sid, index, file, qa) =>
+        (rAND, rOR, rNOT, rId, rRef, rObs, rStepId, rIndex, rFile, rQa).parMapN { (AND, OR, NOT, id, ref, obs, sid, index, file, qa) =>
           and(List(
             AND.map(and),
             OR.map(or),
             NOT.map(Not(_)),
             id,
+            ref,
             obs,
             sid,
             index,
