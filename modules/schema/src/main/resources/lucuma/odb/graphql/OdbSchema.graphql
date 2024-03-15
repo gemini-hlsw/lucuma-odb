@@ -45,6 +45,20 @@ type AddSequenceEventResult {
 
 }
 
+"SlewEvent creation parameters."
+input AddSlewEventInput {
+  visitId:   VisitId!
+  slewStage: SlewStage!
+}
+
+"The result of adding a slew event."
+type AddSlewEventResult {
+
+  "The new slew event that was added."
+  event: SlewEvent!
+
+}
+
 "StepEvent creation parameters."
 input AddStepEventInput {
   stepId: StepId!
@@ -699,6 +713,9 @@ input ExchangeInput {
 enum ExecutionEventType {
   "Sequence-level event type."
   SEQUENCE
+
+  "Slew event type."
+  SLEW
 
   "Step-level event type."
   STEP
@@ -2351,6 +2368,19 @@ type Mutation {
     input: AddSequenceEventInput!
 
   ): AddSequenceEventResult!
+
+  """
+  Adds a new slew event associated with the given visit.
+  """
+  addSlewEvent(
+
+    """
+    Describes the slew event to add.  All events are associated with a
+    particular visit (see 'record{InstrumentName}Visit').
+    """
+    input: AddSlewEventInput!
+
+  ): AddSlewEventResult!
 
   """
   Adds a new step event associated with the given step. Multiple events
@@ -8535,6 +8565,42 @@ enum SkyBackground {
 }
 
 """
+Slew events.
+"""
+type SlewEvent implements ExecutionEvent {
+
+  "Event id."
+  id: ExecutionEventId!
+
+  "Visit associated with this event."
+  visit: Visit!
+
+  "Observation whose execution produced this event."
+  observation: Observation!
+
+  "Time at which this event was received."
+  received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Slew event data."
+  slewStage: SlewStage!
+
+}
+
+
+"Slew stage"
+enum SlewStage {
+
+  START_SLEW
+
+  END_SLEW
+
+}
+
+
+"""
 Source profile, exactly one of the fields will be defined
 """
 type SourceProfile {
@@ -8934,17 +9000,27 @@ scalar StepId
 
 "Execution stage or phase of an individual step"
 enum StepStage {
+
+  ABORT
+
+  CONTINUE
+
   END_CONFIGURE
 
   END_OBSERVE
 
   END_STEP
 
+  PAUSE
+
   START_CONFIGURE
 
   START_OBSERVE
 
   START_STEP
+
+  STOP
+
 }
 
 """
@@ -10458,6 +10534,9 @@ input WhereExecutionEvent {
   "Matches on execution event type"
   eventType: WhereEqExecutionEventType
 
+  "Matches the slew stage, for slew events."
+  slewStage: WhereOrderSlewStage
+
   "Matches the sequence command type, for sequence events."
   sequenceCommand: WhereOrderSequenceCommand
 
@@ -11397,6 +11476,54 @@ input WhereOrderSequenceType {
   """
   LTE: SequenceType
 }
+
+"""
+Filters on equality or order comparisons of the SlewStage.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderSlewStage {
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: SlewStage
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: SlewStage
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [SlewStage!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [SlewStage!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: SlewStage
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: SlewStage
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: SlewStage
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: SlewStage
+}
+
 
 """
 Filters on equality or order comparisons of the property.  All supplied

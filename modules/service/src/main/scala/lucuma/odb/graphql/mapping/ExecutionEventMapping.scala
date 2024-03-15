@@ -41,6 +41,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
         // particular interface implementation so this is the best we can do.
         // We can match on fields that appear in the ExecutionEventTable.
         SqlField("_sequenceCommand", ExecutionEventTable.SequenceCommand, hidden = true),
+        SqlField("_slewStage",       ExecutionEventTable.SlewStage,       hidden = true),
         SqlField("_stepId",          ExecutionEventTable.StepId,          hidden = true),
         SqlField("_stepStage",       ExecutionEventTable.StepStage,       hidden = true),
         SqlField("_datasetId",       ExecutionEventTable.DatasetId,       hidden = true),
@@ -56,6 +57,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[lucuma.odb.data.ExecutionEventType]("eventType").map {
           case Sequence => SequenceEventType
+          case Slew     => SlewEventType
           case Step     => StepEventType
           case Dataset  => DatasetEventType
         }
@@ -66,6 +68,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
           case SequenceEventType => mkPredicate(Sequence)
+          case SlewEventType     => mkPredicate(Slew)
           case StepEventType     => mkPredicate(Step)
           case DatasetEventType  => mkPredicate(Dataset)
           case _                 => none
@@ -78,6 +81,15 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       fieldMappings = List(
         SqlField("id",      ExecutionEventTable.Id, key = true),
         SqlField("command", ExecutionEventTable.SequenceCommand)
+      )
+    )
+
+  lazy val SlewEventMapping: ObjectMapping =
+    ObjectMapping(
+      tpe = SlewEventType,
+      fieldMappings = List(
+        SqlField("id",        ExecutionEventTable.Id, key = true),
+        SqlField("slewStage", ExecutionEventTable.SlewStage)
       )
     )
 

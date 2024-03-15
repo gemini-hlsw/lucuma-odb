@@ -151,6 +151,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[Site](SiteType),
       LeafMapping[SkyBackground](SkyBackgroundType),
+      LeafMapping[SlewStage](SlewStageType),
       LeafMapping[SmartGcalType](SmartGcalTypeType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
       LeafMapping[Step.Id](StepIdType),
