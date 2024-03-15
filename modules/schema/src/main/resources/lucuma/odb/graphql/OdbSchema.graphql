@@ -6412,6 +6412,9 @@ type Group {
   "Position of this group in its parent group (or at the top level)."
   parentIndex: NonNegShort!
 
+  "The program in which this group is found."
+  program: Program!
+
   "Optionally, a name"
   name: String
 
@@ -7908,6 +7911,13 @@ type Query {
   Metadata for `enum FilterType`
   """
   filterTypeMeta: [FilterTypeMeta!]!
+
+  """
+  Returns the group indicated by the given groupId, if found.
+  """
+  group(
+    groupId: GroupId!
+  ): Group
 
   """
   Returns the observation with the given id or reference, if any.  Identify the
