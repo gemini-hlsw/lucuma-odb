@@ -28,7 +28,6 @@ class group extends OdbSuite {
      }
 
   test("can select a group by id") {
-
     for {
       pid <- createProgramAs(pi0)
       gex <- createGroupAs(pi0, pid)
@@ -36,7 +35,7 @@ class group extends OdbSuite {
     } yield assertEquals(gob, gex)
   }
 
-  test("group may not be found 2") {
+  test("group may not be found") {
     expect(pi0,
       s"""query { group(groupId: "${Group.Id.fromLong(42L).get}") { id } }""",
       json"""{ "group": null }""".asRight
@@ -52,6 +51,5 @@ class group extends OdbSuite {
                json"""{ "group": null }""".asRight
              )
     } yield ()
-
   }
 }
