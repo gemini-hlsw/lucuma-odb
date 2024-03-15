@@ -333,6 +333,27 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       s.execute(cmd)((e.received, e.observationId, e.visitId, e.command))
     }.void
 
+  def insertSlewEvent(e: SlewEvent): IO[Unit] =
+    withSession { s =>
+      val cmd = sql"""
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_received,
+          c_observation_id,
+          c_visit_id,
+          c_slew_stage
+        )
+        SELECT
+          'slew' :: e_execution_event_type,
+          $core_timestamp,
+          $observation_id,
+          $visit_id,
+          $slew_stage
+      """.command
+
+      s.execute(cmd)((e.received, e.observationId, e.visitId, e.stage))
+    }.void
+
   def insertStepEvent(e: StepEvent): IO[Unit] =
     withSession { s =>
       val cmd = sql"""
@@ -384,7 +405,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   def insertEvents(
     events: List[ExecutionEvent]
   ): IO[Unit] =
-    events.traverse(_.fold(insertSequenceEvent, insertStepEvent, insertDatasetEvent)).void
+    events.traverse(_.fold(insertSlewEvent, insertSequenceEvent, insertStepEvent, insertDatasetEvent)).void
 
   test("timeChargeInvoice (no events)") {
     recordVisit(pi, service, mode, visitTime, 1, 1, 1, 0).flatMap { v =>
