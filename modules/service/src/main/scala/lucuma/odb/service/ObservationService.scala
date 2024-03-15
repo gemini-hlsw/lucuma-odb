@@ -14,7 +14,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
-import grackle.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
@@ -159,42 +158,13 @@ object ObservationService {
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
 
-      private def selectOid(ref: ObservationReference): F[Option[Observation.Id]] =
-        session.option(Statements.selectOid)(ref)
+      val resolver = new IdResolver("observation", Statements.selectOid, _.label)
 
       override def resolveOid(
         oid: Option[Observation.Id],
         ref: Option[ObservationReference]
-      ): F[Result[Observation.Id]] = {
-
-        def noId: OdbError =
-          OdbError.InvalidArgument("One of observationId or observationReference must be provided.".some)
-
-        def notFound(ref: ObservationReference): OdbError =
-          OdbError.InvalidArgument(s"Observation '${ref.label}' was not found.'".some)
-
-        def lookup(ref: ObservationReference): F[Result[Observation.Id]] =
-          selectOid(ref).map(_.fold(notFound(ref).asFailure)(_.success))
-
-        def reconcile(oid: Observation.Id, ref: ObservationReference): F[Result[Observation.Id]] =
-          ResultT(lookup(ref)).flatMap { foundOid =>
-            ResultT(
-              OdbError
-                .InvalidArgument(s"Observation '${ref.label}' (id $foundOid) does not correspond to observation id $oid.".some)
-                .asFailure
-                .unlessA(foundOid === oid)
-                .as(oid)
-                .pure[F]
-            )
-          }.value
-
-        (oid, ref) match {
-          case (None,    None   ) => noId.asFailureF
-          case (Some(o), None   ) => o.success.pure[F]
-          case (None,    Some(r)) => lookup(r)
-          case (Some(o), Some(r)) => reconcile(o, r)
-        }
-      }
+      ): F[Result[Observation.Id]] =
+        resolver.resolve(oid, ref)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
