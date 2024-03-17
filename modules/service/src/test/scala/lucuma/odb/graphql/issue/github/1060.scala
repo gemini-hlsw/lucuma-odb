@@ -12,8 +12,8 @@ import lucuma.core.enums.Instrument
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
-import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 
 
 // Not nullable at List(continuum, stepConfig, matches, steps, matches, atomRecords, matches, visits, execution, observation)
