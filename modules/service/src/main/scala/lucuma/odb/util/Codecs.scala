@@ -238,7 +238,7 @@ trait Codecs {
   val gcal_shutter: Codec[GcalShutter] =
     enumerated[GcalShutter](Type.varchar)
 
-  val guide_state: Codec[GuideState] =
+  val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))
 
   val hour_angle_range_value: Codec[BigDecimal] =

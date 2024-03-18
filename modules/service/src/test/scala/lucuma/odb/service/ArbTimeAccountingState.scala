@@ -22,8 +22,8 @@ import org.scalacheck.cats.implicits.*
 
 trait ArbTimeAccountingState {
 
-  import ArbEnumerated.*
-  import ArbGid.*
+  import ArbEnumerated.given
+  import ArbGid.given
   import ArbTimeAccounting.given
   import ArbTimestampInterval.given
   import ArbUid.given

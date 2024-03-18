@@ -18,10 +18,10 @@ import org.scalacheck.Cogen
 
 trait ArbTimeAccounting {
 
-  import ArbEnumerated.*
-  import ArbGid.*
+  import ArbEnumerated.given
+  import ArbGid.given
   import ArbTimestamp.given
-  import ArbUid.*
+  import ArbUid.given
 
   import TimeAccounting.*
 

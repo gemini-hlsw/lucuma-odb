@@ -111,7 +111,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosYBinning](GmosYBinningType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
-      LeafMapping[GuideState](GuideStateType),
+      LeafMapping[StepGuideState](GuideStateType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),

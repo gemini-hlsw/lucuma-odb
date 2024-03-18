@@ -7,11 +7,12 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.RadialVelocity
-import lucuma.core.math.arb.ArbRadialVelocity.*
+import lucuma.core.math.arb.ArbRadialVelocity
 import munit.DisciplineSuite
 
 abstract class RadialVelocitySuite(using Encoder[RadialVelocity]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbRadialVelocity.given
   import radialvelocity.decoder.given
 
   checkAll("RadialVelocityCodec", CodecTests[RadialVelocity].codec)

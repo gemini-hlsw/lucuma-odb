@@ -10,7 +10,7 @@ import lucuma.core.model.arb.ArbCatalogInfo
 import munit.DisciplineSuite
 
 class CatalogInfoSuite extends DisciplineSuite with ArbitraryInstances {
-  import ArbCatalogInfo.*
+  import ArbCatalogInfo.given
   import cataloginfo.given
 
   checkAll("CatalogInfoCodec", CodecTests[CatalogInfo].codec)
