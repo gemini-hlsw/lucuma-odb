@@ -10,7 +10,7 @@ import lucuma.core.math.arb.ArbEpoch
 import munit.DisciplineSuite
 
 class EpochSuite extends DisciplineSuite with ArbitraryInstances {
-  import ArbEpoch.*
+  import ArbEpoch.given
   import epoch.given
 
   checkAll("EpochCodec", CodecTests[Epoch].codec)

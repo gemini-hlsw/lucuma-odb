@@ -16,7 +16,6 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
-import lucuma.ags.GuideProbe
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
@@ -111,7 +110,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosYBinning](GmosYBinningType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
-      LeafMapping[GuideState](GuideStateType),
+      LeafMapping[StepGuideState](GuideStateType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
@@ -151,6 +150,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[Site](SiteType),
       LeafMapping[SkyBackground](SkyBackgroundType),
+      LeafMapping[SlewStage](SlewStageType),
       LeafMapping[SmartGcalType](SmartGcalTypeType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
       LeafMapping[Step.Id](StepIdType),

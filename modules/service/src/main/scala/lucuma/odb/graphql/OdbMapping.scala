@@ -84,6 +84,7 @@ object OdbMapping {
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
           with AddSequenceEventResultMapping[F]
+          with AddSlewEventResultMapping[F]
           with AddStepEventResultMapping[F]
           with AddTimeChargeCorrectionResultMapping[F]
           with AirMassRangeMapping[F]
@@ -232,6 +233,7 @@ object OdbMapping {
               AddConditionsEntryResultMapping,
               AddDatasetEventResultMapping,
               AddSequenceEventResultMapping,
+              AddSlewEventResultMapping,
               AddStepEventResultMapping,
               AddTimeChargeCorrectionResultMapping,
               AirMassRangeMapping,
@@ -337,6 +339,7 @@ object OdbMapping {
               SetAllocationResultMapping,
               SetProgramReferenceResultMapping,
               SiderealMapping,
+              SlewEventMapping,
               StepConfigMapping,
               StepConfigBiasMapping,
               StepConfigDarkMapping,

@@ -10,6 +10,7 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
@@ -29,6 +30,7 @@ object WhereExecutionEvent {
     val WhereTimestampBinding          = WhereOrder.binding[Timestamp](path / "received", TimestampBinding)
     val WhereExecutionEventTypeBinding = WhereEq.binding(path / "eventType", enumeratedBinding[ExecutionEventType])
 
+    val WhereSlewStageBinding          = WhereOrder.binding(path / "_slewStage", enumeratedBinding[SlewStage])
     val WhereSequenceCommandBinding    = WhereOrder.binding(path / "_sequenceCommand", enumeratedBinding[SequenceCommand])
     val WhereStepIdBinding             = WhereEq.binding(path / "_stepId", uidBinding[Step.Id]("step"))
     val WhereStepStageBinding          = WhereOrder.binding(path / "_stepStage", enumeratedBinding[StepStage])
@@ -47,14 +49,15 @@ object WhereExecutionEvent {
         WhereObservationIdBinding.Option("observationId", rObservationId),
         WhereTimestampBinding.Option("received", rReceived),
         WhereExecutionEventTypeBinding.Option("eventType", rEventType),
+        WhereSlewStageBinding.Option("slewStage", rSlewStage),
         WhereSequenceCommandBinding.Option("sequenceCommand", rSequenceCommand),
         WhereStepIdBinding.Option("stepId", rStepId),
         WhereStepStageBinding.Option("stepStage", rStepStage),
         WhereDatasetIdBinding.Option("datasetId", rDatasetId),
         WhereDatasetStageBinding.Option("datasetStage", rDatasetStage)
 
-      ) => (rAND, rOR, rNOT, rId, rVisitId, rObservationId, rReceived, rEventType, rSequenceCommand, rStepId, rStepStage, rDatasetId, rDatasetStage).parMapN {
-        (AND, OR, NOT, id, vid, oid, received, eventType, sequenceCommand, stepId, stepStage, datasetId, datasetStage) =>
+      ) => (rAND, rOR, rNOT, rId, rVisitId, rObservationId, rReceived, rEventType, rSlewStage, rSequenceCommand, rStepId, rStepStage, rDatasetId, rDatasetStage).parMapN {
+        (AND, OR, NOT, id, vid, oid, received, eventType, slewStage, sequenceCommand, stepId, stepStage, datasetId, datasetStage) =>
           and(List(
             AND.map(and),
             OR.map(or),
@@ -64,6 +67,7 @@ object WhereExecutionEvent {
             oid,
             received,
             eventType,
+            slewStage,
             sequenceCommand,
             stepId,
             stepStage,

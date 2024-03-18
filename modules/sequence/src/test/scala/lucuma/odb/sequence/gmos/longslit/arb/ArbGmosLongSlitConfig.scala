@@ -29,7 +29,7 @@ import org.scalacheck.*
 
 object ArbGmosLongSlitConfig {
 
-  import ArbEnumerated.*
+  import ArbEnumerated.given
   import ArbOffset.given
   import ArbWavelength.given
   import ArbWavelengthDither.given

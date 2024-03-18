@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.GuideProbe
+import lucuma.core.enums.SlewStage
 
-val GuideProbeBinding: Matcher[GuideProbe] =
+val SlewStageBinding: Matcher[SlewStage] =
   enumeratedBinding

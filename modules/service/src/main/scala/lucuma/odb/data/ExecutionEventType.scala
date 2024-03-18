@@ -7,6 +7,7 @@ import lucuma.core.util.Enumerated
 
 enum ExecutionEventType(val dbTag: String):
   case Sequence extends ExecutionEventType("sequence")
+  case Slew     extends ExecutionEventType("slew")
   case Step     extends ExecutionEventType("step")
   case Dataset  extends ExecutionEventType("dataset")
 
@@ -15,6 +16,7 @@ object ExecutionEventType:
   given Enumerated[ExecutionEventType] =
     Enumerated.from(
       Sequence,
+      Slew,
       Step,
       Dataset
     ).withTag(_.dbTag)

@@ -7,11 +7,12 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Parallax
-import lucuma.core.math.arb.ArbParallax.*
+import lucuma.core.math.arb.ArbParallax
 import munit.DisciplineSuite
 
 abstract class ParallaxSuite(using Encoder[Parallax]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbParallax.given
   import parallax.decoder.given
 
   checkAll("ParallaxCodec", CodecTests[Parallax].codec)
