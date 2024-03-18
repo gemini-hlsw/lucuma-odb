@@ -16,7 +16,6 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
-import lucuma.ags.GuideProbe
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
