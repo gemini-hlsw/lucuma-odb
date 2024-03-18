@@ -16,6 +16,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.StepStage
 import lucuma.core.math.Declination
@@ -24,6 +25,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.DatasetEvent
 import lucuma.core.model.ExecutionEvent.SequenceEvent
+import lucuma.core.model.ExecutionEvent.SlewEvent
 import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -830,6 +832,36 @@ trait DatabaseOperations { this: OdbSuite =>
     }
   }
 
+  def addSlewEventAs(
+    user: User,
+    vid:  Visit.Id,
+    stg:  SlewStage
+  ): IO[SlewEvent] = {
+    val q = s"""
+      mutation {
+        addSlewEvent(input: {
+          visitId: "$vid",
+          slewStage: ${stg.tag.toUpperCase}
+        }) {
+          event {
+            id
+            received
+            observation { id }
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).map { json =>
+      val c = json.hcursor.downFields("addSlewEvent", "event")
+      val e = for {
+        i <- c.downField("id").as[ExecutionEvent.Id]
+        r <- c.downField("received").as[Timestamp]
+        o <- c.downFields("observation", "id").as[Observation.Id]
+      } yield SlewEvent(i, r, o, vid, stg)
+      e.fold(f => throw new RuntimeException(f.message), identity)
+    }
+  }
 
   def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] =
     query(
