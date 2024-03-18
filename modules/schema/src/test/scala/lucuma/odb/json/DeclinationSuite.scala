@@ -7,11 +7,12 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Declination
-import lucuma.core.math.arb.ArbDeclination.*
+import lucuma.core.math.arb.ArbDeclination
 import munit.DisciplineSuite
 
 abstract class DeclinationSuite(using Encoder[Declination]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbDeclination.given
   import declination.decoder.given
 
   checkAll("DeclinationCodec", CodecTests[Declination].codec)

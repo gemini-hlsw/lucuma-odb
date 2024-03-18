@@ -12,7 +12,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Prop
 import org.scalacheck.Prop.*
 
-def conversionTest[A: Arbitrary : Decoder : Encoder](keys: Set[String] = Set.empty): Prop =
+def conversionTest[A](keys: Set[String] = Set.empty)(using Arbitrary[A], Decoder[A], Encoder[A]): Prop =
   forAll { (a: A) =>
     Encoder[A].apply(a).asObject.exists { o =>
 

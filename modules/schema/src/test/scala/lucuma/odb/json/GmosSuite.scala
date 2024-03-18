@@ -13,8 +13,8 @@ import munit.DisciplineSuite
 
 class GmosSuite extends DisciplineSuite with ArbitraryInstances {
 
-  import ArbDynamicConfig.*
-  import ArbStaticConfig.*
+  import ArbDynamicConfig.given
+  import ArbStaticConfig.given
   import gmos.given
   import offset.query.given
   import time.query.given
