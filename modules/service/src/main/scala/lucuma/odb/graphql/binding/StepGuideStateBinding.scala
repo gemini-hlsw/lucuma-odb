@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.GuideState
+import lucuma.core.enums.StepGuideState
 
-val GuideStateBinding: Matcher[GuideState] =
+val StepGuideStateBinding: Matcher[StepGuideState] =
   enumeratedBinding

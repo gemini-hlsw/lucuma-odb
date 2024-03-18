@@ -4,9 +4,9 @@
 package lucuma.odb.sequence
 
 import cats.data.State
-import lucuma.core.enums.GuideState.Enabled
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType.Flat
+import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig

@@ -11,7 +11,7 @@ import munit.DisciplineSuite
 
 class StepConfigSuite extends DisciplineSuite with ArbitraryInstances {
 
-  import ArbStepConfig.*
+  import ArbStepConfig.given
 
   import offset.query.given
   import stepconfig.given

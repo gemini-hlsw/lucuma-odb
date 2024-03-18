@@ -8,12 +8,14 @@ import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.arb.ArbWavelength.*
-import lucuma.core.math.arb.ArbWavelengthDither.given
+import lucuma.core.math.arb.ArbWavelength
+import lucuma.core.math.arb.ArbWavelengthDither
 import munit.DisciplineSuite
 
 abstract class WavelengthSuite(using Encoder[Wavelength], Encoder[WavelengthDither]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbWavelength.given
+  import ArbWavelengthDither.given
   import wavelength.decoder.given
 
   checkAll("WavelengthCodec", CodecTests[Wavelength].codec)
