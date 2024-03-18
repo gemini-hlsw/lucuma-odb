@@ -20,7 +20,7 @@ import org.scalacheck.*
 
 trait ArbGeneratorParams {
 
-  import ArbGid.*
+  import ArbGid.given
   import ArbGmosLongSlitConfig.given
   import ArbInstrumentMode.given
   import GeneratorParams.GmosNorthLongSlit
