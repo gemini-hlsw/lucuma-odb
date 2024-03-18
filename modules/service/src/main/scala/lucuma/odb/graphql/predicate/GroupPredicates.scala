@@ -9,4 +9,5 @@ import lucuma.core.model.Group
 class GroupPredicates(path: Path) {
   lazy val id       = LeafPredicates[Group.Id](path / "id")
   lazy val parentId = LeafPredicates[Group.Id](path / "parentId")
+  lazy val program  = ProgramPredicates(path / "program")
 }

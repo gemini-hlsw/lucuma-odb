@@ -53,6 +53,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("datasets"),
         SqlObject("events"),
         SqlObject("filterTypeMeta"),
+        SqlObject("group"),
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
         SqlObject("observations"),
@@ -75,6 +76,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Datasets,
       Events,
       FilterTypeMeta,
+      Group,
       ObsAttachmentTypeMeta,
       Observation,
       Observations,
@@ -276,6 +278,24 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     case (QueryType, "filterTypeMeta", Nil) =>
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
+      }
+
+  private lazy val Group: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "group", List(
+      GroupIdBinding("groupId", rGroup)
+    )) =>
+      Elab.transformChild { child =>
+        rGroup.map { grp =>
+          Unique(
+            Filter(
+              And(
+                Predicates.group.id.eql(grp),
+                Predicates.group.program.isVisibleTo(user)
+              ),
+              child
+            )
+          )
+        }
       }
 
   private def observationPredicate(
