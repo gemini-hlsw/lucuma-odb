@@ -558,7 +558,7 @@ class reference extends OdbSuite {
             }
           }
         """,
-        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'engineering', 'example', 'library', or 'science' expected.").asLeft
+        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring' or 'science' expected.").asLeft
       )
     }
   }
