@@ -77,11 +77,11 @@ object ProgramReferencePropertiesInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramReferencePropertiesCalibrationInput.Binding.Option("calibration", rCal),
-        ProgramReferencePropertiesCalibrationInput.Binding.Option("commissioning", rCom),
+        ProgramReferencePropertiesCommissioningInput.Binding.Option("commissioning", rCom),
         ProgramReferencePropertiesEngineeringInput.Binding.Option("engineering", rEng),
         ProgramReferencePropertiesExampleInput.Binding.Option("example", rXpl),
         ProgramReferencePropertiesLibraryInput.Binding.Option("library", rLib),
-        ProgramReferencePropertiesLibraryInput.Binding.Option("monitoring", rMon),
+        ProgramReferencePropertiesMonitoringInput.Binding.Option("monitoring", rMon),
         ProgramReferencePropertiesScienceInput.Binding.Option("science", rSci)
       ) => (rCal, rCom, rEng, rXpl, rLib, rMon, rSci).parTupled.flatMap {
          case (Some(cal), None, None, None, None, None, None) => ProgramReferencePropertiesInput(cal).success
