@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 
 package mutation
 
-import io.circe.literal._
+import io.circe.literal.*
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError

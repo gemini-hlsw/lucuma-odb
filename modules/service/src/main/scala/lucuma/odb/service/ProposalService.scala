@@ -29,8 +29,8 @@ import lucuma.odb.graphql.input.UpdateProposalInput
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
+import skunk.codec.all.*
 import skunk.syntax.all.*
-import skunk.codec.all._
 
 import Services.Syntax.*
 
