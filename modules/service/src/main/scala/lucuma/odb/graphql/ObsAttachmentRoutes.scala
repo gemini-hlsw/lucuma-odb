@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 
 import cats.effect._
+import cats.effect.implicits._
 import cats.effect.std.UUIDGen
 import cats.implicits._
 import eu.timepit.refined.types.string.NonEmptyString
@@ -99,6 +100,7 @@ object ObsAttachmentRoutes {
             s
               .insertAttachment(user, programId, typeTag, fileName, description, req.body)
               .flatMap(id => Ok(id.toString))
+              .guarantee(req.body.compile.drain)
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
                   BadRequest(s"File too large. Limit of $maxUploadMb MB")
@@ -115,6 +117,7 @@ object ObsAttachmentRoutes {
             s
               .updateAttachment(user, programId, attachmentId, fileName, description, req.body)
               .flatMap(_ => Ok())
+              .guarantee(req.body.compile.drain)
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
                   BadRequest(s"File too large. Limit of $maxUploadMb MB")
