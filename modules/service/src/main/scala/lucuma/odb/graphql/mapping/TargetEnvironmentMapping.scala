@@ -10,7 +10,7 @@ import cats.effect.Temporal
 import cats.syntax.all.*
 import grackle.Env
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
@@ -32,8 +32,8 @@ import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
 import org.http4s.client.Client
 
-import binding._
-import table._
+import binding.*
+import table.*
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F] 

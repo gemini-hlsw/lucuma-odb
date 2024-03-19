@@ -7,23 +7,23 @@ import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Monoid
 import cats.effect.std.Supervisor
-import cats.effect.{Unique => _, _}
-import cats.syntax.all._
+import cats.effect.{Unique as _, *}
+import cats.syntax.all.*
 import com.github.vertical_blank.sqlformatter.SqlFormatter
 import fs2.concurrent.Topic
+import grackle.*
 import grackle.QueryCompiler.SelectElaborator
-import grackle._
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.graphql.mapping._
+import lucuma.odb.graphql.mapping.*
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
-import lucuma.odb.graphql.util._
+import lucuma.odb.graphql.util.*
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services

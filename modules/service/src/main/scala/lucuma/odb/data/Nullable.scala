@@ -3,7 +3,7 @@
 
 package lucuma.odb.data
 
-import cats._
+import cats.*
 
 import scala.annotation.tailrec
 

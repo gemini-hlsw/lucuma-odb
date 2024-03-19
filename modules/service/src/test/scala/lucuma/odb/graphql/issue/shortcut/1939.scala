@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package issue.shortcut
 
-import io.circe.literal._
-import io.circe.syntax._
+import io.circe.literal.*
+import io.circe.syntax.*
 
 // https://app.shortcut.com/lucuma/story/1939
 class Shortcut_1939 extends OdbSuite {

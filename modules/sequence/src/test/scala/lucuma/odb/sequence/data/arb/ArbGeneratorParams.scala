@@ -15,8 +15,8 @@ import lucuma.itc.client.arb.ArbInstrumentMode
 import lucuma.itc.client.arb.ArbIntegrationTimeInput
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
-import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.*
+import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbGeneratorParams {
 

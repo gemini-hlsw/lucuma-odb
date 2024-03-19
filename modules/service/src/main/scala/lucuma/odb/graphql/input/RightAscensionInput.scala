@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.math.RightAscension
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object RightAscensionInput {
 

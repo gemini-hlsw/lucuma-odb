@@ -4,7 +4,7 @@
 package lucuma.odb.service
 
 import cats.MonadThrow
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.io.file.Path
 import lucuma.core.model.GuestUser

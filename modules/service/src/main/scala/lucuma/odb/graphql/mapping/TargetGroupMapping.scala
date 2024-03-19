@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
@@ -17,8 +17,8 @@ import lucuma.core.model.Observation
 import lucuma.odb.graphql.predicate.Predicates
 
 import table.ObservationView
-import binding._
-import table._
+import binding.*
+import table.*
 
 trait TargetGroupMapping[F[_]]
   extends TargetView[F] with ProgramTable[F] with AsterismTargetTable[F] with ObservationView[F]

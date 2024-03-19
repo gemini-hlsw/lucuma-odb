@@ -9,7 +9,7 @@ import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ElevationRange.AirMass
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 final case class ElevationRangeInput(
   airMass:   Option[AirMassRangeInput],

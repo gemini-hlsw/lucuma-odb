@@ -31,10 +31,10 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
-import lucuma.core.model.sequence.gmos.DynamicConfig.{GmosNorth => DynamicGmosNorth}
-import lucuma.core.model.sequence.gmos.DynamicConfig.{GmosSouth => DynamicGmosSouth}
-import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth  => StaticGmosNorth}
-import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth  => StaticGmosSouth}
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as DynamicGmosNorth
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as DynamicGmosSouth
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as StaticGmosNorth
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as StaticGmosSouth
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet

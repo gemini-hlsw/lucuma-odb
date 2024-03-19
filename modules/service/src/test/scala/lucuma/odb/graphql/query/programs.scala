@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
 import lucuma.core.model.Program
 import lucuma.core.model.User
 

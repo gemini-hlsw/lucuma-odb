@@ -4,14 +4,14 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.syntax.all._
+import cats.syntax.all.*
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
-import lucuma.odb.data._
-import lucuma.odb.util.Codecs._
+import lucuma.odb.data.*
+import lucuma.odb.util.Codecs.*
 import natchez.Trace
-import skunk._
-import skunk.syntax.all._
+import skunk.*
+import skunk.syntax.all.*
 
 import Services.Syntax.*
 

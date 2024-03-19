@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.util.Codecs._
+import lucuma.odb.util.Codecs.*
 
 trait ObsAttachmentAssignmentTable[F[_]] extends BaseMapping[F] {
 

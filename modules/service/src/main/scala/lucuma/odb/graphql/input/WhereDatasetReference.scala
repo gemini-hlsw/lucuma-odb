@@ -8,7 +8,7 @@ import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding

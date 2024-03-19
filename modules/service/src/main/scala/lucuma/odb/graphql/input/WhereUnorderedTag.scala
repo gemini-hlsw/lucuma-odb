@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 package input
 
 import cats.Order
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
-import lucuma.odb.graphql.binding._
+import grackle.Predicate.*
+import lucuma.odb.graphql.binding.*
 
 /** For EnumTypes where ordering doesn't make sense */
 object WhereUnorderedTag {

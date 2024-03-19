@@ -4,12 +4,12 @@
 package lucuma.odb.graphql.enums
 
 import cats.Functor
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.EnumType
 import grackle.EnumValueDefinition
-import skunk._
-import skunk.codec.all._
-import skunk.syntax.all._
+import skunk.*
+import skunk.codec.all.*
+import skunk.syntax.all.*
 
 object ObsAttachmentTypeEnumType {
 

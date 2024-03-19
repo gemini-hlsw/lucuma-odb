@@ -6,8 +6,8 @@ package lucuma.odb.service
 import cats.effect.Async
 import cats.effect.Ref
 import cats.effect.Resource
-import cats.syntax.all._
-import eu.timepit.refined._
+import cats.syntax.all.*
+import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.aws.s3.S3
@@ -17,7 +17,7 @@ import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.Program
 import lucuma.odb.Config
-import lucuma.refined._
+import lucuma.refined.*
 import natchez.Trace
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider

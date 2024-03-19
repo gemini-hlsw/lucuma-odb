@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.util
 
 import cats.Semigroup
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.DirectiveDef
 import grackle.EnumType
 import grackle.Mapping

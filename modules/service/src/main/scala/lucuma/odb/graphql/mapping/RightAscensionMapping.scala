@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.RightAscension

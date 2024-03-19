@@ -8,7 +8,7 @@ import cats.syntax.all.*
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 case class CreateGroupInput(
   programId:         Option[Program.Id],

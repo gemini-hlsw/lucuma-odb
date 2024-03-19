@@ -5,13 +5,13 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object WhereProgram {
 
