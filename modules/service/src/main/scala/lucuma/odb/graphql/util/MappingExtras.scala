@@ -5,7 +5,7 @@ package lucuma.odb.graphql.util
 
 import cats.Eq
 import cats.kernel.Order
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Context
 import grackle.Cursor

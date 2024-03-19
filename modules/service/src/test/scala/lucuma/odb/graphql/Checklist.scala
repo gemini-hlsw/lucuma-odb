@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Field
 import grackle.ObjectType
 

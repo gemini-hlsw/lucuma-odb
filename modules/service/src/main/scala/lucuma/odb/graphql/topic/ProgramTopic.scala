@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.topic
 
-import cats.effect._
+import cats.effect.*
 import cats.effect.std.Supervisor
-import cats.implicits._
+import cats.implicits.*
 import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.model.Access.Admin
@@ -18,10 +18,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
-import lucuma.odb.util.Codecs._
+import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
-import skunk._
-import skunk.implicits._
+import skunk.*
+import skunk.implicits.*
 
 object ProgramTopic {
 

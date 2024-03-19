@@ -5,8 +5,8 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
-import lucuma.core.model.Access._
+import grackle.Predicate.*
+import lucuma.core.model.Access.*
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.User

@@ -7,7 +7,7 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table._
+import table.*
 
 trait UserMapping[F[_]]
   extends ProgramTable[F]

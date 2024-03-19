@@ -6,11 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.data.Nested
-import cats.syntax.all._
+import cats.syntax.all.*
 import fs2.Stream
 import grackle.Env
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef

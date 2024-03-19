@@ -7,8 +7,8 @@ package input
 import cats.syntax.parallel.*
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.binding.TargetIdBinding
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.TargetIdBinding
 
 sealed trait TargetEnvironmentInput
 

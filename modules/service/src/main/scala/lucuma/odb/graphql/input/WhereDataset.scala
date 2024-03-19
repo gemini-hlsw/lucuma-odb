@@ -3,16 +3,16 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object WhereDataset {
 

@@ -7,7 +7,7 @@ import cats.Eq
 import cats.Order
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 
 class LeafPredicates[A](path: Path) {
 

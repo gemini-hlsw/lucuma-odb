@@ -8,7 +8,7 @@ import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser

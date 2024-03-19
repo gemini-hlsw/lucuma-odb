@@ -10,7 +10,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 
 trait SubscriptionUtils { self: OdbSuite =>

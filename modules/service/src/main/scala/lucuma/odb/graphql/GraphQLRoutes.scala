@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 
 import cats.data.OptionT
-import cats.effect._
-import cats.implicits._
+import cats.effect.*
+import cats.implicits.*
 import cats.kernel.Order
 import grackle.Operation
 import grackle.Result
@@ -14,7 +14,7 @@ import io.circe.Json
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.HttpRouteHandler
-import lucuma.graphql.routes.{Routes => LucumaGraphQLRoutes}
+import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 import skunk.Session
 import skunk.SqlState
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 object GraphQLRoutes {
 

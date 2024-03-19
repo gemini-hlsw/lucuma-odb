@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql
 
-import cats.effect._
+import cats.effect.*
 import cats.effect.std.UUIDGen
-import cats.implicits._
+import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Program
@@ -18,7 +18,7 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.sso.client.SsoClient
 import natchez.Trace
-import org.http4s._
+import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.middleware.EntityLimiter
 import skunk.Session

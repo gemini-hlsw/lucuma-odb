@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package issue.github
 
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
 
 // https://github.com/gemini-hlsw/lucuma-odb/issues/1
 class GitHub_1 extends OdbSuite {

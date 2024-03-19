@@ -6,7 +6,7 @@ package lucuma.odb.graphql
 package table
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.util.Codecs._
+import lucuma.odb.util.Codecs.*
 
 trait AllocationTable[F[_]] extends BaseMapping[F] {
 
