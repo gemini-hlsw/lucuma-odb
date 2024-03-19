@@ -60,6 +60,7 @@ import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
+import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
@@ -111,6 +112,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RevokeUserInvitation,
       SetAllocation,
       SetProgramReference,
+      SetProposalStatus,
       UpdateAsterisms,
       UpdateDatasets,
       UpdateGroups,
@@ -463,6 +465,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         programService.setProgramReference(input).nestMap: (pid, _) =>
           Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+
+  private lazy val SetProposalStatus =
+    MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
+      services.useTransactionally:
+        proposalService.setProposalStatus(input).nestMap: pid =>
+          Unique(Filter(Predicates.setProposalStatusResult.programId.eql(pid), child))
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`

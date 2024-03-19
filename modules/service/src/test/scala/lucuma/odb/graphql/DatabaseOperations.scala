@@ -110,10 +110,16 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def fetchProposalReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
     query(user, s"""
-      query { program(programId: "$pid") { proposalReference } }
+      query { 
+        program(programId: "$pid") {
+          proposal {
+            reference { label }
+          }
+        }
+      }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "proposalReference")
+        .downFields("program", "proposal", "reference", "label")
         .as[Option[ProposalReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
@@ -142,6 +148,25 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  // Temporary until there is a Call for Proposal mutation that also sets the semester. At that time,
+  // ability to set the semester via updatePrograms will be removed.
+  def setSemester(user: User, pid: Program.Id, semester: Semester): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              WHERE: { id: { EQ: "$pid" } }
+              SET: { semester: "${semester.format}" }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
+
   def setProgramReference(user: User, pid: Program.Id, set: String): IO[Option[ProgramReference]] =
     query(
       user,
@@ -163,7 +188,6 @@ trait DatabaseOperations { this: OdbSuite =>
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
     }
-
 
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.
@@ -210,63 +234,38 @@ trait DatabaseOperations { this: OdbSuite =>
         """)
     )
 
-  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProposalReference] =
-    query(user, s"""
+  def setProposalStatus(user: User, pid: Program.Id, status: String): IO[(Option[ProgramReference], Option[ProposalReference])] =
+    query(user,  s"""
         mutation {
-          updatePrograms(
+          setProposalStatus(
             input: {
-              SET: {
-                proposalStatus: SUBMITTED
-                ${s.map(semster => s""",\nsemester: "${semster.format}"""").getOrElse("")}
-              }
-              WHERE: {
-                id: {
-                  EQ: "$pid"
-                }
-              }
+              programId: "$pid"
+              status: $status
             }
           ) {
-            programs {
+            program {
+              reference { label }
               proposal { reference { label } }
             }
           }
         }
       """
     ).flatMap { js =>
-      js.hcursor
-        .downField("updatePrograms")
-        .downField("programs")
-        .downArray
-        .downFields("proposal", "reference", "label")
-        .as[ProposalReference]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
+      val programCursor = js.hcursor.downFields("setProposalStatus", "program")
+      (for {
+        prog <- programCursor.downFields("reference", "label").success.traverse(_.as[ProgramReference])
+        prop <- programCursor.downFields("proposal", "reference", "label").success.traverse(_.as[ProposalReference])
+      } yield (prog, prop)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
     }
 
+  def submitProposal(user: User, pid: Program.Id): IO[ProposalReference] =
+    setProposalStatus(user, pid, "SUBMITTED").map(_._2.get) // should have a proposal reference now.
+
+  def unsubmitProposal(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
+    setProposalStatus(user, pid, "SUBMITTED").map(_._2)
+
   def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
-    query(user, s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET:   { proposalStatus: ACCEPTED }
-              WHERE: { id: { EQ: "$pid" } }
-            }
-          ) {
-            programs { reference { label } }
-          }
-        }
-      """
-    ).flatMap { js =>
-      js.hcursor
-        .downField("updatePrograms")
-        .downField("programs")
-        .downArray
-        .downFields("reference", "label")
-        .success
-        .traverse(_.as[ProgramReference])
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
+    setProposalStatus(user, pid, "ACCEPTED").map(_._1)
 
   def createProgramWithProposalAs(user: User, name: String = null): IO[Program.Id] =
     for {

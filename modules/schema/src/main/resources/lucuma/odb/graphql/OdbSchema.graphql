@@ -2565,6 +2565,9 @@ type Mutation {
   "Set the program reference."
   setProgramReference(input: SetProgramReferenceInput!): SetProgramReferenceResult!
 
+  "Set the proposal status."
+  setProposalStatus(input: SetProposalStatusInput!): SetProposalStatusResult!
+
   """
   Unlink a user from a program.
   This operation is available only to Admin and Service users.
@@ -2929,12 +2932,6 @@ input ProgramPropertiesInput {
   different index.
   """
   semester: Semester
-
-  """
-  The proposal status, which is both optional and nullable. 
-  This cannot be specified on create.
-  """
-  proposalStatus: ProposalStatus
 
   """
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
@@ -3397,6 +3394,30 @@ Inputs required when updating or switching to a science program.
 input ProgramReferencePropertiesScienceInput {
   semester:       Semester!
   scienceSubtype: ScienceSubtype!
+}
+
+"""
+Input for setting the proposal status.  Identify the program to update with one
+of `programId`, `proposalReference` or `programReference`.  If more than one of
+these is specified, all must match.
+"""
+input SetProposalStatusInput {
+  programId:         ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference:  ProgramReferenceLabel
+  status:            ProposalStatus!
+}
+
+"""
+  The result of setting the proposal status.
+"""
+type SetProposalStatusResult {
+  """
+  The program on which the proposal status was set. Returning the program allows checking
+  the proposal reference, program reference and other values that can be affected by changing
+  the proposal status.
+  """
+  program: Program!
 }
 
 """
