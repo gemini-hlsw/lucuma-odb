@@ -5,15 +5,15 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.all._
-import eu.timepit.refined.cats._
+import cats.syntax.all.*
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import grackle.Term
 import grackle.sql.Like
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object WhereString {
 

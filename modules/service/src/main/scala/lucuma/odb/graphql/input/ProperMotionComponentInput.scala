@@ -5,15 +5,15 @@ package lucuma.odb.graphql
 package input
 
 import cats.data.Nested
-import cats.syntax.all._
-import coulomb._
+import cats.syntax.all.*
+import coulomb.*
 import coulomb.syntax.withUnit
 import grackle.Result
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
-import lucuma.core.math.units._
+import lucuma.core.math.units.*
 import lucuma.core.util.*
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object ProperMotionComponentInput {
 

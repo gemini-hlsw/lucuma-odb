@@ -32,8 +32,8 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth => GmosNorthStatic}
-import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth => GmosSouthStatic}
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError

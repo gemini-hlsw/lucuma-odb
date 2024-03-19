@@ -5,14 +5,14 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object WhereObservation {
 

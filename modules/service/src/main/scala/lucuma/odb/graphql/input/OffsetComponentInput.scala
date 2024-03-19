@@ -4,13 +4,13 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Component
 import lucuma.core.math.Offset.P
 import lucuma.core.math.Offset.Q
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 import monocle.Iso
 
 object OffsetComponentInput {

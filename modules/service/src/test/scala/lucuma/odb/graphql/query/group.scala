@@ -6,7 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import io.circe.literal._
+import io.circe.literal.*
 import lucuma.core.model.Group
 
 class group extends OdbSuite {

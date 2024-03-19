@@ -13,7 +13,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class targetEdit extends OdbSuite {
 

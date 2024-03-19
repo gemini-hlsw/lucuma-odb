@@ -4,10 +4,10 @@
 package lucuma.odb
 
 import cats.Show
-import cats.effect._
-import cats.syntax.all._
-import ciris._
-import ciris.refined._
+import cats.effect.*
+import cats.syntax.all.*
+import ciris.*
+import ciris.refined.*
 import com.comcast.ip4s.Port
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName

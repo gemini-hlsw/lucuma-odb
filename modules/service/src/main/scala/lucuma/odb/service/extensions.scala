@@ -9,7 +9,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
-import skunk._
+import skunk.*
 import skunk.data.Completion
 
 extension [F[_]: MonadCancelThrow](s: Session[F]) def executeCommand(af: AppliedFragment): F[Completion] =

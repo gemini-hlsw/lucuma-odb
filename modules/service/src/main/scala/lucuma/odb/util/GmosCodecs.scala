@@ -30,8 +30,8 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import skunk._
-import skunk.codec.all._
+import skunk.*
+import skunk.codec.all.*
 import skunk.data.Type
 
 trait GmosCodecs {

@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import io.circe.Json
-import io.circe.literal._
-import io.circe.syntax._
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.Partner
 import lucuma.core.model.Semester
 import lucuma.core.model.Target

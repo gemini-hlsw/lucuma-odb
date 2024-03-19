@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 
 package table
 
-import lucuma.odb.util.Codecs._
-import skunk.circe.codec.all._
-import skunk.codec.all._
+import lucuma.odb.util.Codecs.*
+import skunk.circe.codec.all.*
+import skunk.codec.all.*
 
 trait ObservationView[F[_]] extends BaseMapping[F] {
 

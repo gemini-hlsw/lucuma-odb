@@ -3,10 +3,10 @@
 
 package lucuma.odb.util
 
-import cats.effect._
+import cats.effect.*
 import cats.effect.kernel.Ref
 import cats.effect.std.Supervisor
-import cats.implicits._
+import cats.implicits.*
 import cats.kernel.Order
 import org.typelevel.log4cats.Logger
 

@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Value
 
 import scala.util.control.NonFatal

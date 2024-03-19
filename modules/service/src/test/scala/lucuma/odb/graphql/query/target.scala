@@ -4,9 +4,9 @@
 package lucuma.odb.graphql
 package query
 
-import cats.syntax.all._
-import io.circe.literal._
-import io.circe.syntax._
+import cats.syntax.all.*
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 

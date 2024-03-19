@@ -7,7 +7,7 @@ package mutation
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
 import lucuma.core.model.Semester
 
 class createGroup extends OdbSuite {

@@ -8,7 +8,7 @@ package mapping
 import grackle.skunk.SkunkMapping
 import lucuma.odb.data.ObservingModeType
 
-import table._
+import table.*
 
 trait ObservingModeMapping[F[_]]
   extends ObservationView[F]

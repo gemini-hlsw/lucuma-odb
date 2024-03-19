@@ -4,15 +4,15 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.apply._
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.parallel._
+import cats.syntax.apply.*
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.parallel.*
 import eu.timepit.refined.api.Refined.value
 import grackle.Result
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 final case class HourAngleRangeInput(
   minHours: Option[DecimalHour],
