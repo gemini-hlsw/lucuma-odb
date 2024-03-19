@@ -6,9 +6,6 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.model.Access
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -18,19 +15,17 @@ import skunk.syntax.all.*
 import Services.Syntax.*
 
 trait ChronicleService[F[_]]:
-  def addConditionsEntry(input: ConditionsEntryInput): F[Result[Long]]
+  def addConditionsEntry(input: ConditionsEntryInput)(using Services.StaffAccess): F[Result[Long]]
 
 object ChronicleService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): ChronicleService[F] =
     new ChronicleService[F]:
-      def addConditionsEntry(input: ConditionsEntryInput): F[Result[Long]] =
-        if user.role.access < Access.Staff then
-          OdbError.NotAuthorized(user.id, Some(s"This action is restricted to staff users.")).asFailureF
-        else
-          session.prepareR(Statements.InsertConditionsEntry).use { pq =>
-            pq.unique(input).map(Result.success)
-          }
+
+      // AC: entries can be added only by staff; verified 19-Mar-23
+      def addConditionsEntry(input: ConditionsEntryInput)(using Services.StaffAccess): F[Result[Long]] =
+        session.prepareR(Statements.InsertConditionsEntry).use: pq =>
+          pq.unique(input).map(Result.success)
 
   object Statements {
     

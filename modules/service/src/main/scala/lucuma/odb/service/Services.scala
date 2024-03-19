@@ -3,14 +3,20 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
+import grackle.Result
+import lucuma.core.model.Access
+import lucuma.core.model.Access.Service
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -156,14 +162,23 @@ trait Services[F[_]]:
   /** The `UserInvitationService` */
   def userInvitationService: UserInvitationService[F]
 
-
 object Services:
+
+  // Type-level representation of user access. Read <: here as "implies".
+  opaque type GuestAccess                  = Unit
+  opaque type PiAccess      <: GuestAccess = Unit
+  opaque type NgoAccess     <: PiAccess    = Unit
+  opaque type StaffAccess   <: NgoAccess   = Unit
+  opaque type AdminAccess   <: StaffAccess = Unit
+  opaque type ServiceAccess <: AdminAccess = Unit
 
   /**
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]: Concurrent: Trace: UUIDGen](u: User, e: Enums)(s: Session[F]): Services[F[_]] =
+  def forUser[F[_]](u: User, e: Enums)(s: Session[F])(
+    using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F]
+  ): Services[F[_]] =
     new Services[F]:
       val user = u
       val session = s
@@ -259,6 +274,14 @@ object Services:
     def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
+    
+    def requireStaffAccess[F[_], A](fa: Services.StaffAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
+      if user.role.access >= Access.Staff then fa(using ())
+      else OdbError.NotAuthorized(user.id).asFailureF
+
+    def requireServiceAccess[F[_], A](fa: Services.ServiceAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
+      if user.role.access >= Access.Service then fa(using ())
+      else OdbError.NotAuthorized(user.id).asFailureF
 
     // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
     // the service in which you want to use it. Like:

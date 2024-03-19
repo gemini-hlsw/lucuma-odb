@@ -21,7 +21,6 @@ import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
-import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -53,17 +52,17 @@ trait ExecutionEventService[F[_]] {
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
     datasetStage: DatasetStage
-  )(using Transaction[F]): F[Result[ExecutionEvent]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertSequenceEvent(
     visitId: Visit.Id,
     command: SequenceCommand
-  )(using Transaction[F]): F[Result[ExecutionEvent]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertStepEvent(
     stepId:    Step.Id,
     stepStage: StepStage
-  )(using Transaction[F]): F[Result[ExecutionEvent]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
 }
 
@@ -80,9 +79,6 @@ object ExecutionEventService {
   }
 
   object InsertEventResponse {
-    case class NotAuthorized(
-      user: User
-    ) extends InsertEventResponse
 
     case class StepNotFound(
       id: Step.Id
@@ -102,7 +98,7 @@ object ExecutionEventService {
   }
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
-    new ExecutionEventService[F] with ExecutionUserCheck {
+    new ExecutionEventService[F] {
 
       override def atomRange(
         atomId: Atom.Id
@@ -122,7 +118,7 @@ object ExecutionEventService {
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
         datasetStage: DatasetStage
-      )(using xa: Transaction[F]): F[Result[ExecutionEvent]] = {
+      )(using xa: Transaction[F], sa: Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
         import InsertEventResponse.*
 
@@ -136,7 +132,7 @@ object ExecutionEventService {
 
         // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
         // unchanged) if there is an end event but no start or if the end time comes before the
-        // start.
+        // start.9
         def setDatasetTime(t: Timestamp): F[Unit] = {
           def setWith(f: (Dataset.Id, Timestamp) => F[Unit]): F[Unit] =
             for {
@@ -155,7 +151,6 @@ object ExecutionEventService {
         }
 
         (for {
-          _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insertEvent).leftWiden[InsertEventResponse]
           (eid, time, oid, vid, sid) = e
           _ <- EitherT.liftF(setDatasetTime(time))
@@ -166,7 +161,6 @@ object ExecutionEventService {
 
       private def executionEventResponseToResult(r: InsertEventResponse): Result[ExecutionEvent] =
         r match
-          case InsertEventResponse.NotAuthorized(user) => OdbError.NotAuthorized(user.id).asFailure
           case InsertEventResponse.DatasetNotFound(id) => OdbError.InvalidDataset(id, Some(s"Dataset '${id.show}' not found")).asFailure
           case InsertEventResponse.StepNotFound(id)    => OdbError.InvalidStep(id, Some(s"Step '$id' not found")).asFailure
           case InsertEventResponse.VisitNotFound(id)   => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found")).asFailure
@@ -175,7 +169,7 @@ object ExecutionEventService {
       override def insertSequenceEvent(
         visitId: Visit.Id,
         command: SequenceCommand
-      )(using Transaction[F]): F[Result[ExecutionEvent]] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
         import InsertEventResponse.*
 
@@ -188,7 +182,6 @@ object ExecutionEventService {
             }
 
         (for {
-          _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time, oid) = e
         } yield Success(SequenceEvent(eid, time, oid, visitId, command))).merge
@@ -198,7 +191,7 @@ object ExecutionEventService {
       override def insertStepEvent(
         stepId:       Step.Id,
         stepStage:    StepStage
-      )(using Transaction[F]): F[Result[ExecutionEvent]] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
         import InsertEventResponse.*
 
@@ -211,7 +204,6 @@ object ExecutionEventService {
             }
 
         (for {
-          _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           e <- EitherT(insert).leftWiden[InsertEventResponse]
           (eid, time, oid, vid) = e
           _ <- EitherT.liftF(

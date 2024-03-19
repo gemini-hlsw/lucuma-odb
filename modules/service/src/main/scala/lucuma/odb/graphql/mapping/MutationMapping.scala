@@ -211,16 +211,18 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   // We do this a lot
-  extension [F[_]: Functor, G[_]: Functor, A, B](fga: F[G[A]]) def nestMap(fab: A => B): F[G[B]] =
-    fga.map(_.map(fab))
+  extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
+    def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
+    def nestAs[B](b: B): F[G[B]] = fga.map(_.as(b))
 
   // Field definitions
 
   private lazy val AddConditionsEntry: MutationField =
     MutationField("addConditionsEntry", ConditionsEntryInput.Binding): (input, child) =>
       services.useTransactionally:
-        chronicleService.addConditionsEntry(input).nestMap: id =>
-          Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
+        requireStaffAccess:
+          chronicleService.addConditionsEntry(input).nestMap: id =>
+            Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
 
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
@@ -305,25 +307,25 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         Unique(Filter(predicates.id.eql(did), child))
 
   private lazy val RecordDataset: MutationField =
-    MutationField("recordDataset", RecordDatasetInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        datasetService
-          .insertDataset(input.stepId, input.filename, input.qaState)
-          .map(recordDatasetResponseToResult(child, Predicates.recordDatasetResult.dataset))
-      }
-    }
+    MutationField("recordDataset", RecordDatasetInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          datasetService
+            .insertDataset(input.stepId, input.filename, input.qaState)
+            .map(recordDatasetResponseToResult(child, Predicates.recordDatasetResult.dataset))
 
   private def addEvent[I: ClassTag: TypeName](
     fieldName: String,
     matcher:   Matcher[I],
     pred:      ExecutionEventPredicates
   )(
-    insert:    I => (Transaction[F], Services[F]) ?=> F[Result[ExecutionEvent]]
+    insert:    Services.ServiceAccess ?=> I => (Transaction[F], Services[F]) ?=> F[Result[ExecutionEvent]]
   ): MutationField =
     MutationField(fieldName, matcher): (input, child) =>
       services.useTransactionally:
-        insert(input).nestMap: e =>
-          Unique(Filter(pred.id.eql(e.id), child))
+        requireServiceAccess:
+          insert(input).nestMap: e =>
+            Unique(Filter(pred.id.eql(e.id), child))
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>
@@ -349,15 +351,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       Unique(Filter(predicate.eql(aid), child))
 
   private lazy val RecordAtom: MutationField =
-    MutationField("recordAtom", RecordAtomInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        recordAtom(
-          sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
-          Predicates.atomRecord.id,
-          child
-        )
-      }
-    }
+    MutationField("recordAtom", RecordAtomInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordAtom(
+            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
+            Predicates.atomRecord.id,
+            child
+          )
 
   private def recordStep(
     action:    F[Result[Step.Id]],
@@ -368,26 +369,24 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       Unique(Filter(predicate.eql(sid), child))
 
   private lazy val RecordGmosNorthStep: MutationField =
-    MutationField("recordGmosNorthStep", RecordGmosStepInput.GmosNorthBinding) { (input, child) =>
-      services.useTransactionally {
-        recordStep(
-          sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosNorth),
-          Predicates.gmosNorthStep.id,
-          child
-        )
-      }
-    }
+    MutationField("recordGmosNorthStep", RecordGmosStepInput.GmosNorthBinding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordStep(
+            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosNorth),
+            Predicates.gmosNorthStep.id,
+            child
+          )
 
   private lazy val RecordGmosSouthStep: MutationField =
-    MutationField("recordGmosSouthStep", RecordGmosStepInput.GmosSouthBinding) { (input, child) =>
-      services.useTransactionally {
-        recordStep(
-          sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosSouth),
-          Predicates.gmosSouthStep.id,
-          child
-        )
-      }
-    }
+    MutationField("recordGmosSouthStep", RecordGmosStepInput.GmosSouthBinding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordStep(
+            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosSouth),
+            Predicates.gmosSouthStep.id,
+            child
+          )
 
   private def recordVisit(
     response:  F[Result[Visit.Id]],
@@ -397,26 +396,24 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
 
   private lazy val RecordGmosNorthVisit: MutationField =
-    MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding) { (input, child) =>
-      services.useTransactionally {
-        recordVisit(
-          visitService.insertGmosNorth(input.observationId, input.static),
-          Predicates.visit.id,
-          child
-        )
-      }
-    }
+    MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordVisit(
+            visitService.insertGmosNorth(input.observationId, input.static),
+            Predicates.visit.id,
+            child
+          )
 
   private lazy val RecordGmosSouthVisit: MutationField =
-    MutationField("recordGmosSouthVisit", RecordGmosVisitInput.GmosSouthBinding) { (input, child) =>
-      services.useTransactionally {
-        recordVisit(
-          visitService.insertGmosSouth(input.observationId, input.static),
-          Predicates.visit.id,
-          child
-        )
-      }
-    }
+    MutationField("recordGmosSouthVisit", RecordGmosVisitInput.GmosSouthBinding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordVisit(
+            visitService.insertGmosSouth(input.observationId, input.static),
+            Predicates.visit.id,
+            child
+          )
 
   private lazy val RedeemUserInvitation =
     MutationField("redeemUserInvitation", RedeemUserInvitationInput.Binding): (input, child) =>
@@ -435,13 +432,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding): (input, child) =>
       services.useTransactionally:
-        ResultT(allocationService.setAllocation(input))
-          .as:
+        requireStaffAccess:
+          allocationService.setAllocation(input).nestAs:
             Unique(Filter(And(
               Predicates.setAllocationResult.programId.eql(input.programId),
               Predicates.setAllocationResult.partner.eql(input.partner)
             ), child))
-          .value
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

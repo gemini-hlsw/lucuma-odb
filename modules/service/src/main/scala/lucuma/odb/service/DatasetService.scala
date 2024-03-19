@@ -13,7 +13,6 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosShort
 import grackle.Result
 import lucuma.core.enums.DatasetQaState
-import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -23,6 +22,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.DatasetPropertiesInput
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -36,7 +36,7 @@ sealed trait DatasetService[F[_]] {
     stepId:   Step.Id,
     filename: Dataset.Filename,
     qaState:  Option[DatasetQaState]
-  )(using Transaction[F]): F[Result[Dataset.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]]
 
   def updateDatasets(
     SET:   DatasetPropertiesInput,
@@ -74,10 +74,6 @@ object DatasetService {
 
   object InsertDatasetResponse {
 
-    case class NotAuthorized(
-      user: User
-    ) extends InsertDatasetFailure
-
     case class StepNotFound(
       id: Step.Id
     ) extends InsertDatasetFailure
@@ -95,13 +91,13 @@ object DatasetService {
   }
 
   def instantiate[F[_]: Concurrent](using Services[F]): DatasetService[F] =
-    new DatasetService[F] with ExecutionUserCheck {
+    new DatasetService[F] {
 
       def insertDatasetImpl(
         stepId:   Step.Id,
         filename: Dataset.Filename,
         qaState:  Option[DatasetQaState]
-      )(using Transaction[F]): F[InsertDatasetResponse] = {
+      )(using Transaction[F], Services.ServiceAccess): F[InsertDatasetResponse] = {
 
         import InsertDatasetResponse.*
 
@@ -117,19 +113,17 @@ object DatasetService {
             }
 
         (for {
-          _ <- EitherT.fromEither(checkUser(NotAuthorized.apply))
           d <- EitherT(insert).leftWiden[InsertDatasetResponse]
         } yield Success.apply.tupled(d)).merge
       }
 
-      def insertDataset(
+      override def insertDataset(
         stepId:   Step.Id,
         filename: Dataset.Filename,
         qaState:  Option[DatasetQaState]
-      )(using Transaction[F]): F[Result[Dataset.Id]] = 
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = 
         import InsertDatasetResponse.*
         insertDatasetImpl(stepId, filename, qaState).map:
-          case NotAuthorized(user)      => OdbError.NotAuthorized(user.id).asFailure
           case ReusedFilename(filename) => OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
           case StepNotFound(id)         => OdbError.InvalidStep(id, Some(s"Step id '$id' not found")).asFailure
           case Success(did, _, _)       => Result(did)

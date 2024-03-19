@@ -2372,7 +2372,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           for {
             _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-            _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa)
+            _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa, ().asInstanceOf) // shhh
             d <- services.executionDigestService.selectOne(p, o, Md5Hash.Zero)(using xa)
           } yield d.isEmpty
         }
