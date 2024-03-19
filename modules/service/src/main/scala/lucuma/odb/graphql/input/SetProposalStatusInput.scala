@@ -8,7 +8,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 final case class SetProposalStatusInput(
   programId: Option[Program.Id],
