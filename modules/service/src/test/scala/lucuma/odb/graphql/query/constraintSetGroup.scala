@@ -129,7 +129,8 @@ class constraintSetGroup extends OdbSuite {
           create2(ImageQuality.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
           addProposal(user, pid) *>
-          submitProposal(user, pid, Semester.unsafeFromString("2025A").some) *>
+          setSemester(user, pid, Semester.unsafeFromString("2025A")) *>
+          submitProposal(user, pid) *>
           expect(
             user = user,
             query =

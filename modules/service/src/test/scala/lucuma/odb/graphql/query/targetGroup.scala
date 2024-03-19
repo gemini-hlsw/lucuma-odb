@@ -185,7 +185,8 @@ class targetGroup extends OdbSuite {
       for {
         pid  <- createProgramAs(user)
         _    <- addProposal(user, pid)
-        _    <- submitProposal(user, pid, Semester.unsafeFromString("2025A").some)
+        _    <- setSemester(user, pid, Semester.unsafeFromString("2025A"))
+        _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(3)
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))
         oid2 <- createObservationAs(user, pid, tids(1), tids(2))
