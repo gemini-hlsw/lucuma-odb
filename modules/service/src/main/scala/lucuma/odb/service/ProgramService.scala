@@ -283,7 +283,7 @@ object ProgramService {
             }
           }.recover {
             case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
-              UpdateProgramsError.InvalidSemester(SET.semester.toOption).failure
+              UpdateProgramsError.InvalidSemester(SET.semester).failure
           }
 
         (for {
@@ -361,7 +361,7 @@ object ProgramService {
         List(
           SET.existence.map(sql"c_existence = $existence"),
           SET.name.map(sql"c_name = $text_nonempty"),
-          SET.semester.fold(void"c_semester = null".some, none, s => sql"c_semester = $semester"(s).some),
+          SET.semester.map(sql"c_semester = $semester"),
         ).flatten
       )
 

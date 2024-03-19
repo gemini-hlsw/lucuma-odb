@@ -140,13 +140,10 @@ object ProposalService {
           }
 
         (for {
-          pid <- ResultT(
-                   programService.resolvePid(input.programId, input.proposalReference, input.programReference)
-                 )
-          _   <- ResultT(validateProgramType(pid))
-          _   <- ResultT(insert(pid))
-          _   <- ResultT(partnerSplitsService.insertSplits(input.SET.partnerSplits, pid).map(Result.success))
-        } yield pid).value
+          _   <- ResultT(validateProgramType(input.programId))
+          _   <- ResultT(insert(input.programId))
+          _   <- ResultT(partnerSplitsService.insertSplits(input.SET.partnerSplits, input.programId).map(Result.success))
+        } yield input.programId).value
 
       def updateProposal(input: UpdateProposalInput)(using Transaction[F]): F[Result[Program.Id]] = {
         def update(pid: Program.Id): F[Result[Program.Id]] =
