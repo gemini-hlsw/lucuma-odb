@@ -116,6 +116,7 @@ object AsterismService {
         }
       }
 
+      // AC: program must be writable by user; verified 12-Mar-24
       override def insertAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
@@ -132,6 +133,7 @@ object AsterismService {
         }
       }
 
+      // AC: program must be writable by user; verified 12-Mar-24
       override def deleteAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id]
@@ -141,6 +143,7 @@ object AsterismService {
           p.execute(af.argument).as(Result.unit)
         }
 
+      // AC: program must be writable by user; verified 12-Mar-24
       override def setAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
@@ -158,6 +161,7 @@ object AsterismService {
               insertAsterism(programId, observationIds, tids)
         }
 
+      // AC: program must be writable by user; verified 12-Mar-24
       override def updateAsterism(
         observationIds: NonEmptyList[Observation.Id],
         ADD:            Option[NonEmptyList[Target.Id]],
@@ -173,6 +177,7 @@ object AsterismService {
             })
         }.value
 
+      // AC: FAIL
       override def cloneAsterism(
         originalId: Observation.Id,
         newId: Observation.Id,
@@ -182,6 +187,7 @@ object AsterismService {
           ps.execute(clone.argument).void
         }
 
+      // AC: program must be visible user; verified 12-Mar-24
       override def getAsterism(
         programId: Program.Id,
         observationId: Observation.Id
@@ -204,6 +210,7 @@ object AsterismService {
         FROM t_observation
         WHERE """ |+| observationIdIn(observationIds)
 
+    // AC: program must be writable by user; verified 12-Mar-24
     def insertLinksAs(
       user:           User,
       programId:      Program.Id,
@@ -255,6 +262,7 @@ object AsterismService {
         targetIds.map(sql"$target_id").intercalate(void", ") |+|
       void")"
 
+    // AC: program must be writable by user; verified 12-Mar-24
     def deleteLinksAs(
       user:           User,
       programId:      Program.Id,
@@ -267,6 +275,7 @@ object AsterismService {
          void" AND " |+| targetIdIn(targetIds)           |+|
          andWhereUserAccess(user, programId)
 
+    // AC: program must be writable by user; verified 12-Mar-24
     def deleteAllLinksAs(
       user:           User,
       programId:      Program.Id,
@@ -277,6 +286,8 @@ object AsterismService {
         void" AND "  |+| observationIdIn(observationIds) |+|
         andWhereUserAccess(user, programId)
 
+    // AC: FAIL. It's possible for the original and new oids to be in different programs, or in
+    // programs that aren't visible.
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
       sql"""
         INSERT INTO t_asterism_target (
@@ -294,6 +305,7 @@ object AsterismService {
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid, originalOid)
 
+    // AC: program must be readable by user, verified 19-Mar-24
     def getAsterism(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
         select
