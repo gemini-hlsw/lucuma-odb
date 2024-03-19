@@ -6,9 +6,10 @@ package lucuma.odb.graphql
 package mutation
 
 import io.circe.literal._
+import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
-import lucuma.odb.service.ProposalService.UpdateProposalsError
+import lucuma.odb.service.ProposalService.UpdateProposalError
 
 class updateProposal extends OdbSuite {
   
@@ -422,7 +423,7 @@ class updateProposal extends OdbSuite {
             }
           }
         """,
-        expected = Left(List(UpdateProposalsError.InconsistentUpdate(pid).message))
+        expected = Left(List(UpdateProposalError.InconsistentUpdate(pid).message))
       )
     }
   }
@@ -447,7 +448,7 @@ class updateProposal extends OdbSuite {
             }
           }
         """,
-        expected = Left(List(UpdateProposalsError.UpdateFailed(pid).message))
+        expected = Left(List(UpdateProposalError.UpdateFailed(pid).message))
       )
     }
   }
@@ -562,4 +563,29 @@ class updateProposal extends OdbSuite {
     )
   }
   
+  test("Attempt to update proposal in non-science program") {
+    createProgramWithProposalAs(pi).flatMap { pid =>
+      setProgramReference(pi, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                }
+              }
+            ) {
+              proposal {
+                title
+              }
+            }
+          }
+        """,
+        expected = Left(List(UpdateProposalError.InvalidProgramType(pid, ProgramType.Engineering).message))
+      )
+    }
+  }
 }

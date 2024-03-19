@@ -230,6 +230,7 @@ trait BaseMapping[F[_]]
   lazy val SequenceTypeType                    = schema.ref("SequenceType")
   lazy val SetAllocationResultType             = schema.ref("SetAllocationResult")
   lazy val SetProgramReferenceResultType       = schema.ref("SetProgramReferenceResult")
+  lazy val SetProposalStatusResultType         = schema.ref("SetProposalStatusResult")
   lazy val SiderealType                        = schema.ref("Sidereal")
   lazy val SignalToNoiseType                   = schema.ref("SignalToNoise")
   lazy val SiteType                            = schema.ref("Site")

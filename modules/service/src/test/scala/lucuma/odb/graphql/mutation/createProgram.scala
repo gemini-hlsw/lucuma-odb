@@ -163,35 +163,6 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("proposalStatus is disallowed") {
-    expect(
-      user = pi,
-      query =
-        """
-          mutation {
-            createProgram(
-              input: {
-                SET: {
-                  name: "Program name",
-                  proposalStatus: NOT_SUBMITTED
-                }
-              }
-            ) {
-              program {
-                id
-              }
-            }
-          }
-        """,
-      expected =
-        Left(
-          List(
-            "Argument 'input.SET' is invalid: proposalStatus cannot be specified during program creation."
-          )
-        ),
-    )
-  }
-
   test("chronicle auditing") {
     createProgramAs(pi, "Foo").flatMap { pid =>
       assertIO(chronProgramUpdates(pid), List(
