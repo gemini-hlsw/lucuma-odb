@@ -262,7 +262,7 @@ trait DatabaseOperations { this: OdbSuite =>
     setProposalStatus(user, pid, "SUBMITTED").map(_._2.get) // should have a proposal reference now.
 
   def unsubmitProposal(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
-    setProposalStatus(user, pid, "SUBMITTED").map(_._2)
+    setProposalStatus(user, pid, "NOT_SUBMITTED").map(_._2)
 
   def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     setProposalStatus(user, pid, "ACCEPTED").map(_._1)

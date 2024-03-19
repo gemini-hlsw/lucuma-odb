@@ -541,15 +541,10 @@ type CreateProgramResult {
 }
 
 """
-Input for creating a proposal.  Identify the program to update with one
-of `programId`, `proposalReference` or `programReference`.  If more than one of
-these is specified, all must match.  Use `SET` to specify the new program
-reference properties.
+Input for creating a proposal.
 """
 input CreateProposalInput {
-  programId:         ProgramId
-  proposalReference: ProposalReferenceLabel
-  programReference:  ProgramReferenceLabel
+  programId:         ProgramId!
   SET:               ProposalPropertiesInput!
 }
 
@@ -2929,7 +2924,7 @@ input ProgramPropertiesInput {
   """
   The semester associated with the program, if any. If this value is
   subsequently edited it will result in a new reference, with (likely) a
-  different index.
+  different index. Cannot be unset.
   """
   semester: Semester
 

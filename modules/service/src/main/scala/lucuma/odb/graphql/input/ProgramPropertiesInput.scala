@@ -10,7 +10,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.model.Semester
 import lucuma.odb.data.Existence
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 object ProgramPropertiesInput {
@@ -27,31 +26,31 @@ object ProgramPropertiesInput {
 
   case class Edit(
     name:           Option[NonEmptyString],
-    semester:       Nullable[Semester],
+    semester:       Option[Semester],
     existence:      Option[Existence]
   )
 
   object Edit {
     val Empty: Edit =
-      Edit(None, Nullable.Absent, None)
+      Edit(None, None, None)
   }
 
   private val data: Matcher[(
     Option[NonEmptyString],
-    Nullable[Semester],
+    Option[Semester],
     Option[Existence]
   )] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("name", rName),
-        SemesterBinding.Nullable("semester", rSemester),
+        SemesterBinding.Option("semester", rSemester),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
         (rName, rSemester, rExistence).parTupled
     }
 
   val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
-    data.map((n, s, _) => Create(n, s.toOption))
+    data.map((n, s, _) => Create(n, s))
 
   val EditBinding: Matcher[Edit] =
     data.map(Edit.apply)
