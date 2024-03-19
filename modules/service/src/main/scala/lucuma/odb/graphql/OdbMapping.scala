@@ -177,6 +177,7 @@ object OdbMapping {
           with ScienceRequirementsMapping[F]
           with SetAllocationResultMapping[F]
           with SetProgramReferenceResultMapping[F]
+          with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
@@ -341,6 +342,7 @@ object OdbMapping {
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SetProgramReferenceResultMapping,
+              SetProposalStatusResultMapping,
               SiderealMapping,
               SlewEventMapping,
               StepConfigMapping,

@@ -11,7 +11,6 @@ import grackle.Result
 import lucuma.core.model.Semester
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
 object ProgramPropertiesInput {
@@ -29,36 +28,30 @@ object ProgramPropertiesInput {
   case class Edit(
     name:           Option[NonEmptyString],
     semester:       Nullable[Semester],
-    proposalStatus: Option[Tag],
     existence:      Option[Existence]
   )
 
   object Edit {
     val Empty: Edit =
-      Edit(None, Nullable.Absent, None, None)
+      Edit(None, Nullable.Absent, None)
   }
 
   private val data: Matcher[(
     Option[NonEmptyString],
     Nullable[Semester],
-    Option[Tag],
     Option[Existence]
   )] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("name", rName),
         SemesterBinding.Nullable("semester", rSemester),
-        TagBinding.Option("proposalStatus", rPs),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rSemester, rPs, rExistence).parTupled
+        (rName, rSemester, rExistence).parTupled
     }
 
   val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
-    data.rmap {
-      case (n, s, None, _) => Result(Create(n, s.toOption))
-      case _                  => Matcher.validationFailure("proposalStatus cannot be specified during program creation.")
-    }
+    data.map((n, s, _) => Create(n, s.toOption))
 
   val EditBinding: Matcher[Edit] =
     data.map(Edit.apply)

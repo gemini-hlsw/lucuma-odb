@@ -9,21 +9,28 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
+import lucuma.core.model.Access
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CreateProposalInput
 import lucuma.odb.graphql.input.ProposalClassInput
 import lucuma.odb.graphql.input.ProposalPropertiesInput
+import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UpdateProposalInput
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
 import skunk.syntax.all.*
+import skunk.codec.all._
 
 import Services.Syntax.*
 
@@ -38,37 +45,88 @@ private[service] trait ProposalService[F[_]] {
    * Update a proposal associated with the program specified in the `input`.
    */
   def updateProposal(input: UpdateProposalInput)(using Transaction[F]): F[Result[Program.Id]]
+
+  /**
+   * Set the proposal status associated with the program specified in the `input`.
+   */
+  def setProposalStatus(input: SetProposalStatusInput)(using Transaction[F]): F[Result[Program.Id]]
 }
 
 object ProposalService {
 
-  sealed trait UpdateProposalsError extends Product with Serializable {
-    import UpdateProposalsError.*
+  sealed trait UpdateProposalError extends Product with Serializable {
+    import UpdateProposalError.*
     def message: String = this match
-      case CreationFailed(pid)     => 
+      case CreationFailed(pid) => 
         s"Proposal creation failed because program $pid already has a proposal."
-      case UpdateFailed(pid)       =>
+      case UpdateFailed(pid) =>
         s"Proposal update failed because program $pid does not have a proposal."
       case InconsistentUpdate(pid) =>
         s"The specified edits for proposal class do not match the proposal class for program $pid. To change the proposal class you must specify all fields for that class."
+      case InvalidProposalStatus(ps) =>
+        s"Invalid proposal status: ${ps.value}"
+      case NotAuthorizedNewProposalStatus(pid, user, ps) =>
+        s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase} in program $pid."
+      case NotAuthorizedOldProposalStatus(pid, user, ps) =>
+        s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid."
+      case InvalidProgramType(pid, progType) =>
+        s"Program $pid is of type $progType. Only Science programs can have proposals."
+      case NoProposalForStatusChange(pid) =>
+        s"Proposal status in program $pid cannot be changed because it has no proposal."
+      case NoSemesterForSubmittedProposal(pid) =>
+        s"Submitted program $pid must be associated with a semester."
+      case NoScienceSubtypeForSubmittedProposal(pid) =>
+        s"Submitted program $pid must have a science subtype."
 
     def failure = odbError.asFailure
 
     def problem = odbError.asProblem
 
-    def odbError: OdbError = OdbError.InvalidArgument(Some(message))
+    def odbError: OdbError = this match
+      case CreationFailed(_)                             => OdbError.InvalidArgument(Some(message))
+      case UpdateFailed(_)                               => OdbError.InvalidArgument(Some(message))
+      case InconsistentUpdate(_)                         => OdbError.InvalidArgument(Some(message))
+      case InvalidProposalStatus(_)                      => OdbError.InvalidArgument(Some(message))
+      case NotAuthorizedNewProposalStatus(pid, user, ps) => OdbError.NotAuthorized(user.id, Some(message))
+      case NotAuthorizedOldProposalStatus(pid, user, ps) => OdbError.NotAuthorized(user.id, Some(message))
+      case InvalidProgramType(pid, progType)             => OdbError.InvalidProgram(pid, Some(message))
+      case NoProposalForStatusChange(pid)                => OdbError.InvalidProgram(pid, Some(message))
+      case NoSemesterForSubmittedProposal(pid)           => OdbError.InvalidProgram(pid, Some(message))
+      case NoScienceSubtypeForSubmittedProposal(pid)     => OdbError.InvalidProgram(pid, Some(message))
 
   }
   
-  object UpdateProposalsError {
-    case class CreationFailed(pid: Program.Id)     extends UpdateProposalsError
-    case class UpdateFailed(pid: Program.Id)       extends UpdateProposalsError
-    case class InconsistentUpdate(pid: Program.Id) extends UpdateProposalsError
+  object UpdateProposalError {
+    case class CreationFailed(pid: Program.Id) extends UpdateProposalError
+    case class UpdateFailed(pid: Program.Id) extends UpdateProposalError
+    case class InconsistentUpdate(pid: Program.Id) extends UpdateProposalError
+    // we should never get this one, but we are converting between a Tag and a dynamic enum...
+    case class InvalidProposalStatus(ps: Tag) extends UpdateProposalError
+    case class NotAuthorizedNewProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProposalError
+    case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProposalError
+    case class InvalidProgramType(pid: Program.Id, progType: ProgramType) extends UpdateProposalError
+    case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProposalError
+    case class NoSemesterForSubmittedProposal(pid: Program.Id) extends UpdateProposalError
+    // we shouldn't be able to get this either, but I saw it once in development.
+    case class NoScienceSubtypeForSubmittedProposal(pid: Program.Id) extends UpdateProposalError
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProposalService[F] =
     new ProposalService[F] {
+
+      // validates the program type, and also checks to see if the user has access
+      private def validateProgramType(pid: Program.Id): F[Result[Unit]] = 
+        val af = Statements.getProgramType(user, pid)
+        session.prepareR(af.fragment.query(program_type)).use { ps =>
+          ps.option(af.argument)
+            .map {
+              case None                                   => OdbError.InvalidProgram(pid).asFailure
+              case Some(ps) if ps === ProgramType.Science => Result.unit
+              case Some(ps)                               => UpdateProposalError.InvalidProgramType(pid, ps).failure
+            }
+        }
+
 
       def createProposal(input: CreateProposalInput)(using Transaction[F]): F[Result[Program.Id]] =
         def insert(pid: Program.Id): F[Result[Program.Id]] =
@@ -77,27 +135,28 @@ object ProposalService {
             ps.option(af.argument)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid).asProblem  ))
               .recover {
-               case SqlState.UniqueViolation(e) => UpdateProposalsError.CreationFailed(pid).failure
+               case SqlState.UniqueViolation(e) => UpdateProposalError.CreationFailed(pid).failure
               }
           }
 
         (for {
-          p  <- ResultT(
-                  programService.resolvePid(input.programId, input.proposalReference, input.programReference)
-                )
-          _  <- ResultT(insert(p))
-          _  <- ResultT(partnerSplitsService.insertSplits(input.SET.partnerSplits, p).map(Result.success))
-        } yield p).value
+          pid <- ResultT(
+                   programService.resolvePid(input.programId, input.proposalReference, input.programReference)
+                 )
+          _   <- ResultT(validateProgramType(pid))
+          _   <- ResultT(insert(pid))
+          _   <- ResultT(partnerSplitsService.insertSplits(input.SET.partnerSplits, pid).map(Result.success))
+        } yield pid).value
 
       def updateProposal(input: UpdateProposalInput)(using Transaction[F]): F[Result[Program.Id]] = {
         def update(pid: Program.Id): F[Result[Program.Id]] =
-          Statements.updateProposal(input.SET, pid).fold(Result(pid).pure[F]) { af =>
+          Statements.updateProposal(pid, input.SET).fold(Result(pid).pure[F]) { af =>
             session.prepareR(af.fragment.query(program_id)).use { ps =>
-              ps.option(af.argument).map(Result.fromOption(_, UpdateProposalsError.UpdateFailed(pid).problem))
+              ps.option(af.argument).map(Result.fromOption(_, UpdateProposalError.UpdateFailed(pid).problem))
             }
             .recover {
               case SqlState.NotNullViolation(e) if e.columnName == Some("c_class") =>
-                UpdateProposalsError.InconsistentUpdate(pid).failure
+                UpdateProposalError.InconsistentUpdate(pid).failure
             }
           }
         
@@ -106,20 +165,85 @@ object ProposalService {
             partnerSplitsService.updateSplits(ps, pid)
           }.map(Result.success)
 
-        def hasAccess(pid: Program.Id): F[Result[Unit]] =
-          programService.userHasAccess(pid).map(b =>
-            if (b) Result.unit
-            else OdbError.InvalidProgram(pid).asFailure
-          )
+        (for {
+          pid <- ResultT(
+                   programService.resolvePid(input.programId, input.proposalReference, input.programReference)
+                 )
+          _   <- ResultT(validateProgramType(pid))
+          _   <- ResultT(update(pid))
+          _   <- ResultT(replaceSplits(pid))
+        } yield pid).value
+      }
+
+      def setProposalStatus(input: SetProposalStatusInput)(using Transaction[F]): F[Result[Program.Id]] = {
+        // A stable identifier (ie. a `val`) is needed for the enums.
+        val enumsVal = enums
+
+        def tagToProposalStatus(tag: Tag): Result[enumsVal.ProposalStatus] =
+          Enumerated[enumsVal.ProposalStatus]
+            .fromTag(tag.value)
+            .fold(UpdateProposalError.InvalidProposalStatus(tag).failure)(Result.apply)
+
+        def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
+          user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
+
+        case class ProposalInfo(
+          statusTag: Tag,
+          hasProposal: Boolean,
+          programType: ProgramType,
+          semester: Option[Semester],
+          scienceSubtype: Option[ScienceSubtype]
+        ):
+          val status: Result[enumsVal.ProposalStatus] = tagToProposalStatus(statusTag)
+
+        def getInfo(pid: Program.Id): F[Result[ProposalInfo]] =
+          val af = Statements.getCurrentProposalStatusInfo(user, pid)
+          session.prepareR(
+            af.fragment.query(tag *: bool *: program_type *: semester.opt *: science_subtype.opt).to[ProposalInfo]
+            ).use { ps =>
+              ps.option(af.argument)
+                .map(Result.fromOption(_, OdbError.InvalidProgram(pid).asProblem))
+            }
+        
+        def validateProgramReference(pid: Program.Id, info: ProposalInfo, newStatus: enumsVal.ProposalStatus): Result[Unit] =
+          (
+            UpdateProposalError.NoSemesterForSubmittedProposal(pid)
+              .failure.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted || info.semester.isDefined),
+            UpdateProposalError.NoScienceSubtypeForSubmittedProposal(pid)
+              .failure.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted || info.scienceSubtype.isDefined),
+
+          ).tupled.void
+
+        def validate(
+          pid: Program.Id,
+          info: ProposalInfo,
+          oldStatus: enumsVal.ProposalStatus,
+          newStatus: enumsVal.ProposalStatus
+        ): Result[Unit] =
+          for {
+            _ <- UpdateProposalError.InvalidProgramType(pid, info.programType)
+                  .failure.unlessA(info.programType === ProgramType.Science)
+            _ <- UpdateProposalError.NoProposalForStatusChange(pid)
+                  .failure.unlessA(info.hasProposal)
+            _ <- UpdateProposalError.NotAuthorizedNewProposalStatus(pid, user, Tag(newStatus.tag))
+                  .failure.unlessA(userCanChangeProposalStatus(newStatus))
+            _ <- UpdateProposalError.NotAuthorizedOldProposalStatus(pid, user, info.statusTag)
+                  .failure.unlessA(userCanChangeProposalStatus(oldStatus))
+            _ <- validateProgramReference(pid, info, newStatus)
+          } yield ()
+
+        def update(pid: Program.Id, tag: Tag): F[Unit] = 
+          val af = Statements.updateProposalStatus(user, pid, tag)
+          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
         (for {
-          p  <- ResultT(
-                  programService.resolvePid(input.programId, input.proposalReference, input.programReference)
-                )
-          _  <- ResultT(hasAccess(p))
-          _  <- ResultT(update(p))
-          _  <- ResultT(replaceSplits(p))
-        } yield p).value
+          pid       <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
+          info      <- ResultT(getInfo(pid))
+          oldStatus <- ResultT(info.status.pure) // This 'should' be succesful, since it is from the DB
+          newStatus <- ResultT(tagToProposalStatus(input.status).pure)
+          _         <- ResultT(validate(pid, info, oldStatus, newStatus).pure)
+          _         <- ResultT(update(pid, input.status).map(Result.pure))
+        } yield pid).value
       }
     }
 
@@ -184,7 +308,7 @@ object ProposalService {
           }
       }
 
-    def updateProposal(SET: ProposalPropertiesInput.Edit, pid: Program.Id): Option[AppliedFragment] =
+    def updateProposal(pid: Program.Id, SET: ProposalPropertiesInput.Edit): Option[AppliedFragment] =
       updates(SET).map { us =>
         void"""
           UPDATE t_proposal
@@ -233,7 +357,37 @@ object ProposalService {
       void"""
          RETURNING t_proposal.c_program_id
       """
-      
+
+    def getProgramType(user: User, pid: Program.Id): AppliedFragment =
+      sql"""
+        SELECT c_program_type
+        FROM t_program
+        WHERE c_program_id = $program_id
+      """.apply(pid) |+|
+      ProgramService.Statements.andWhereUserAccess(user, pid)
+
+    def getCurrentProposalStatusInfo(user: User, pid: Program.Id): AppliedFragment =
+      sql"""
+        SELECT 
+          prog.c_proposal_status,
+          prop.c_program_id IS NOT NULL,
+          prog.c_program_type,
+          prog.c_semester,
+          prog.c_science_subtype
+        FROM t_program prog
+        LEFT JOIN t_proposal prop
+          ON prog.c_program_id = prop.c_program_id
+        WHERE prog.c_program_id = $program_id
+      """.apply(pid) |+|
+      ProgramService.Statements.andWhereUserAccess(user, pid)
+
+    def updateProposalStatus(user: User, pid: Program.Id, status: Tag): AppliedFragment =
+      sql"""
+        UPDATE t_program
+        SET c_proposal_status = $tag
+        WHERE c_program_id = $program_id
+      """.apply(status, pid) |+|
+      ProgramService.Statements.andWhereUserAccess(user, pid)
   }
 
 }

@@ -6,9 +6,10 @@ package lucuma.odb.graphql
 package mutation
 
 import io.circe.literal._
+import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
-import lucuma.odb.service.ProposalService.UpdateProposalsError
+import lucuma.odb.service.ProposalService.UpdateProposalError
 
 class createProposal extends OdbSuite {
   
@@ -225,7 +226,7 @@ class createProposal extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalsError.CreationFailed(pid).message))
+          Left(List(UpdateProposalError.CreationFailed(pid).message))
         )
     }
   }
@@ -428,5 +429,52 @@ class createProposal extends OdbSuite {
       expected =
         Left(List(OdbError.InvalidProgram(badPid).message))
       )
+  }
+
+  test("Attempt to create proposal in non-science program"){
+    createProgramAs(pi).flatMap { pid =>
+      setProgramReference(pi, pid, """example: { instrument: GMOS_SOUTH }""") >>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Proposal"
+                  proposalClass: {
+                    intensive: {
+                      minPercentTime: 40
+                      minPercentTotalTime: 20
+                      totalTime: {
+                        hours: 1.23
+                      }
+                    }
+                  }
+                  toOActivation: NONE
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 70
+                    },
+                    {
+                      partner: CA
+                      percent: 30
+                    }
+                  ]
+                }
+              }
+            ) {
+              proposal {
+                title
+              }
+            }
+          }
+        """,
+        expected =
+          Left(List(UpdateProposalError.InvalidProgramType(pid, ProgramType.Example).message))
+        )
+    }
   }
 }

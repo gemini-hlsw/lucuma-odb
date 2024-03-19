@@ -24,7 +24,6 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
-import lucuma.core.util.Enumerated
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.input.ProgramPropertiesInput
@@ -133,39 +132,18 @@ object ProgramService {
   sealed trait UpdateProgramsError extends Product with Serializable {
     import UpdateProgramsError.*
     def message: String = this match
-      case InvalidProposalStatus(_, ps)                     =>
-        s"Invalid proposal status: ${ps.value}"
-      case NotAuthorizedNewProposalStatus(user, ps)      =>
-        s"User ${user.id} not authorized to set proposal status to ${ps.value.toUpperCase}."
-      case NotAuthorizedOldProposalStatus(pid, user, ps) =>
-        s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid."
-      case NoProposalForStatusChange(pid)                =>
-        s"Proposal status in program $pid cannot be changed because it has no proposal."
-      case NoSemesterForSubmittedProposal(pid)           =>
-        s"Submitted program $pid must be associated with a semester."
       case InvalidSemester(s)                            =>
         s"The maximum semester is capped at the current year +1${s.fold(".")(" ("+ _.format + " specified).")}"
       case DuplicateReference(r)                         =>
         s"""Program reference${r.fold("")(s => s" '$s'")} already exists."""
 
     def failure = this match
-      case InvalidProposalStatus(user, ps) => OdbError.InvalidArgument(Some(message)).asFailure
-      case NotAuthorizedNewProposalStatus(user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
-      case NotAuthorizedOldProposalStatus(pid, user, ps) => OdbError.NotAuthorized(user.id, Some(message)).asFailure
-      case NoProposalForStatusChange(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
-      case NoSemesterForSubmittedProposal(pid) => OdbError.InvalidProgram(pid, Some(message)).asFailure
       case InvalidSemester(s) => OdbError.InvalidArgument(Some(message)).asFailure
       case DuplicateReference(r) => OdbError.InvalidArgument(Some(message)).asFailure
 
   }
 
   object UpdateProgramsError {
-    // we should never get this one, but we are converting between a Tag and a dynamic enum...
-    case class InvalidProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
-    case class NotAuthorizedNewProposalStatus(user: User, ps: Tag) extends UpdateProgramsError
-    case class NotAuthorizedOldProposalStatus(pid: Program.Id, user: User, ps: Tag) extends UpdateProgramsError
-    case class NoProposalForStatusChange(pid: Program.Id) extends UpdateProgramsError
-    case class NoSemesterForSubmittedProposal(pid: Program.Id) extends UpdateProgramsError
     case class InvalidSemester(s: Option[Semester]) extends UpdateProgramsError
     case class DuplicateReference(ref: Option[String]) extends UpdateProgramsError
   }
@@ -308,63 +286,8 @@ object ProgramService {
               UpdateProgramsError.InvalidSemester(SET.semester.toOption).failure
           }
 
-        // A stable identifier (ie. a `val`) is needed for the enums.
-        val enumsVal = enums
-
-        def tagToProposalStatus(tag: Tag): Result[enumsVal.ProposalStatus] =
-          Enumerated[enumsVal.ProposalStatus]
-            .fromTag(tag.value)
-            .fold(UpdateProgramsError.InvalidProposalStatus(user, tag).failure)(Result.apply)
-
-        def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
-          user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
-
-        def validateStatusUpdate(
-          pid:             Program.Id,
-          oldStatus:       enumsVal.ProposalStatus,
-          newStatusUpdate: Option[enumsVal.ProposalStatus],
-          hasProposal:     Boolean
-        ): Result[Unit] =
-          newStatusUpdate
-            .filter(_ =!= oldStatus) // if they match we're not really trying to update
-            .fold(Result.unit) { newStatus =>
-              (
-                UpdateProgramsError.NoProposalForStatusChange(pid)
-                  .failure.unlessA(hasProposal),
-
-                UpdateProgramsError.NotAuthorizedNewProposalStatus(user, Tag(newStatus.tag))
-                  .failure.unlessA(userCanChangeProposalStatus(newStatus)),
-
-                UpdateProgramsError.NotAuthorizedOldProposalStatus(pid, user, Tag(oldStatus.tag))
-                  .failure.unlessA(userCanChangeProposalStatus(oldStatus))
-
-              ).tupled.void  // do we want all of the errors or would it be annoying?
-            }
-
-        def validateUpdate(newStatusUpdate: Option[enumsVal.ProposalStatus]): F[Result[Unit]] =
-          session.prepareR(Statements.getTempTableData).use(
-            _.stream(Void, chunkSize = 1024)
-             .fold(Result.unit) { case (acc, (pid, oldSemester, psTag, hasProposal)) =>
-               val check: Result[Unit] =
-                 for {
-                   oldStatus <- tagToProposalStatus(psTag)
-                   _         <- validateStatusUpdate(pid, oldStatus, newStatusUpdate, hasProposal)
-                   finalStatus   = newStatusUpdate.getOrElse(oldStatus)
-                   finalSemester = SET.semester.fold(none, oldSemester, _.some)
-                   _         <- UpdateProgramsError.NoSemesterForSubmittedProposal(pid)
-                                  .failure.unlessA(finalStatus === enumsVal.ProposalStatus.NotSubmitted || finalSemester.isDefined)
-                 } yield ()
-
-               (acc, check).parTupled.void
-             }
-             .compile
-             .onlyOrError
-          )
-
         (for {
           _   <- ResultT(setup.map(Result.apply))
-          n   <- ResultT(SET.proposalStatus.traverse(tagToProposalStatus).pure[F])
-          _   <- ResultT(validateUpdate(n))
           ids <- ResultT(updatePrograms)
         } yield ids).value
 
@@ -423,41 +346,21 @@ object ProgramService {
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""
         CREATE TEMPORARY TABLE t_program_update (
-          c_program_id,
-          c_semester,
-          c_proposal_status,
-          c_has_proposal
+          c_program_id
         )
         ON COMMIT DROP
           AS SELECT
-            which.pid,
-            prog.c_semester,
-            prog.c_proposal_status,
-            prop.c_program_id IS NOT NULL
+            which.pid
         FROM (""" |+| whichProgramIds |+| void""") AS which (pid)
         INNER JOIN t_program prog
           ON prog.c_program_id = which.pid
-        LEFT JOIN t_proposal prop
-          ON prop.c_program_id = which.pid
       """
-
-    def getTempTableData: Query[Void, (Program.Id, Option[Semester], Tag, Boolean)] =
-      sql"""
-        SELECT
-           c_program_id,
-           c_semester,
-           c_proposal_status,
-           c_has_proposal
-        FROM t_program_update
-        ORDER BY c_program_id
-      """.query(program_id *: semester.opt *: tag *: bool)
 
     def updates(SET: ProgramPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
           SET.name.map(sql"c_name = $text_nonempty"),
-          SET.proposalStatus.map(sql"c_proposal_status = $tag"),
           SET.semester.fold(void"c_semester = null".some, none, s => sql"c_semester = $semester"(s).some),
         ).flatten
       )
