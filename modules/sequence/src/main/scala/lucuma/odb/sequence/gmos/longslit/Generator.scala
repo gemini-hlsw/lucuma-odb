@@ -8,10 +8,10 @@ import cats.data.NonEmptyList
 import cats.syntax.option.*
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.GmosNorthDetector.{Hamamatsu => HamamatsuNorth}
+import lucuma.core.enums.GmosNorthDetector.Hamamatsu as HamamatsuNorth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthStageMode.FollowXy
-import lucuma.core.enums.GmosSouthDetector.{Hamamatsu => HamamatsuSouth}
+import lucuma.core.enums.GmosSouthDetector.Hamamatsu as HamamatsuSouth
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthStageMode.FollowXyz
 import lucuma.core.enums.MosPreImaging.IsNotMosPreImaging

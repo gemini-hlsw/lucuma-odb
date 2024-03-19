@@ -4,7 +4,7 @@
 package lucuma.odb.json
 
 import cats.data.NonEmptyMap
-import cats.instances.order._
+import cats.instances.order.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
@@ -19,11 +19,11 @@ import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.Json
-import io.circe.refined._
-import io.circe.syntax._
+import io.circe.refined.*
+import io.circe.syntax.*
 import lucuma.core.enums.Band
 import lucuma.core.math.Angle
-import lucuma.core.math.BrightnessUnits._
+import lucuma.core.math.BrightnessUnits.*
 import lucuma.core.math.BrightnessValue
 import lucuma.core.math.FluxDensityContinuumValue
 import lucuma.core.math.LineFluxValue
@@ -47,8 +47,8 @@ import lucuma.core.model.UnnormalizedSED.PowerLaw
 import lucuma.core.model.UnnormalizedSED.Quasar
 import lucuma.core.model.UnnormalizedSED.StellarLibrary
 import lucuma.core.model.UnnormalizedSED.UserDefined
-import lucuma.core.util.Enumerated
 import lucuma.core.util.*
+import lucuma.core.util.Enumerated
 
 import scala.collection.immutable.SortedMap
 

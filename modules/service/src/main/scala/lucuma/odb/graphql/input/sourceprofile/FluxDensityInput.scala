@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 package input
 package sourceprofile
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import grackle.Result
 import lucuma.core.math.Wavelength
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object FluxDensityInput {
 

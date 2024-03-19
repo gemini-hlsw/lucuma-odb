@@ -3,11 +3,11 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
-import lucuma.odb.graphql.binding._
+import grackle.Predicate.*
+import lucuma.odb.graphql.binding.*
 
 object WhereProposal {
 

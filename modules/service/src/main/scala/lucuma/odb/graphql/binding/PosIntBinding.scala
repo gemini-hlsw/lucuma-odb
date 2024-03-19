@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 
 val PosIntBinding: Matcher[PosInt] =

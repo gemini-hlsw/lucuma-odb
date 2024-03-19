@@ -3,11 +3,11 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.DatasetQaState
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 case class DatasetPropertiesInput(
   qaState: Nullable[DatasetQaState]

@@ -6,12 +6,12 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
@@ -23,7 +23,7 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation

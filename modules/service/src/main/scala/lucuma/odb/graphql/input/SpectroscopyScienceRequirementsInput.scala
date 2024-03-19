@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.SpectroscopyCapabilities

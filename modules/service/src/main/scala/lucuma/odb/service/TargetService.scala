@@ -6,7 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.*
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import grackle.Problem
@@ -42,15 +42,15 @@ import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdatesFailed
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
-import lucuma.odb.util.Codecs._
+import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.SqlState
 import skunk.Transaction
 import skunk.Void
-import skunk.circe.codec.all._
-import skunk.codec.all._
-import skunk.implicits._
+import skunk.circe.codec.all.*
+import skunk.codec.all.*
+import skunk.implicits.*
 
 import Services.Syntax.*
 

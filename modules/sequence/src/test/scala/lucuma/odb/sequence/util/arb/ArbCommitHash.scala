@@ -6,8 +6,8 @@ package util
 package arb
 
 import lucuma.core.arb.*
-import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.*
+import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbCommitHash {
 

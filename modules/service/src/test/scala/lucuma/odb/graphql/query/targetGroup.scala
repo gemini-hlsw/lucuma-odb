@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import io.circe.Json
-import io.circe.literal._
-import io.circe.syntax._
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester

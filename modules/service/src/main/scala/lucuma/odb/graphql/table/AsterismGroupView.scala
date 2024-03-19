@@ -6,8 +6,8 @@ package lucuma.odb.graphql
 package table
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.util.Codecs._
-import skunk.circe.codec.all._
+import lucuma.odb.util.Codecs.*
+import skunk.circe.codec.all.*
 
 trait AsterismGroupView[F[_]] extends BaseMapping[F] {
 

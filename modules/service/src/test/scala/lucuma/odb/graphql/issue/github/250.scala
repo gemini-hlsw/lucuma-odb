@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package issue.github
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
 import lucuma.core.model.User

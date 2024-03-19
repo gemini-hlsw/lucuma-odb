@@ -9,7 +9,7 @@ import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosNorthStageMode
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object GmosNorthStaticInput {
 

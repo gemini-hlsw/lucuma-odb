@@ -11,7 +11,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 final case class ConditionsMeasurementInput(
   source: Tag,

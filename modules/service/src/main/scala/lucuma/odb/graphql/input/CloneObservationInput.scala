@@ -11,7 +11,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 final case class CloneObservationInput(
   observationId:  Option[Observation.Id],

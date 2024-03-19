@@ -5,13 +5,13 @@ package lucuma.odb.graphql
 package input
 package sourceprofile
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.math.BrightnessUnits._
+import lucuma.core.math.BrightnessUnits.*
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.SpectralDefinition.EmissionLines
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object SpectralDefinitionInput {
 

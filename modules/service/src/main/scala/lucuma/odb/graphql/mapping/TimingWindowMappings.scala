@@ -13,7 +13,7 @@ import grackle.TypeRef
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.graphql.table.TimingWindowView
 
-import Predicate._
+import Predicate.*
 
 trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
 

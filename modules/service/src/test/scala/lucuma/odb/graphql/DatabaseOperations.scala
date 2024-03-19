@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
@@ -67,7 +67,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import natchez.Trace.Implicits.noop
 import skunk.*
-import skunk.circe.codec.json.{json => jsonCodec}
+import skunk.circe.codec.json.json as jsonCodec
 import skunk.syntax.all.*
 
 import scala.collection.immutable.SortedMap

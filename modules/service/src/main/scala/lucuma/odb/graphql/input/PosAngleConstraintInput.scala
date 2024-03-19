@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 import lucuma.core.math.Angle
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.binding.Matcher

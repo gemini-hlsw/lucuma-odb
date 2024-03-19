@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
 import lucuma.core.model.Group
@@ -14,10 +14,10 @@ import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
-import lucuma.odb.util.Codecs._
-import skunk._
+import lucuma.odb.util.Codecs.*
+import skunk.*
 import skunk.codec.all.*
-import skunk.implicits._
+import skunk.implicits.*
 
 import Services.Syntax.*
 

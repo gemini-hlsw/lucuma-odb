@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.mapping
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Cursor
 import grackle.Cursor.ListTransformCursor
 import grackle.Env

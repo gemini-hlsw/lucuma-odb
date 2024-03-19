@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.circe.literal._
+import cats.syntax.all.*
+import io.circe.literal.*
 import lucuma.core.model.User
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 // N.B. this works locally, most of the time. Need to get it working reliably.
 // @IgnoreSuite

@@ -4,17 +4,17 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
-import cats.syntax.all._
+import cats.syntax.all.*
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
-import lucuma.odb.util.Codecs._
+import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.Command
 import skunk.Session
-import skunk.codec.all._
-import skunk.implicits._
+import skunk.codec.all.*
+import skunk.implicits.*
 
 trait UserService[F[_]] {
   def canonicalizeUser(u: User): F[Unit]

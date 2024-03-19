@@ -3,11 +3,11 @@
 
 package lucuma.odb
 
-import cats._
+import cats.*
 import cats.data.Kleisli
 import cats.data.OptionT
-import cats.effect._
-import cats.implicits._
+import cats.effect.*
+import cats.implicits.*
 import lucuma.core.model.User
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
@@ -19,7 +19,7 @@ import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
 
 import scala.collection.immutable.TreeMap
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 
 /** A module of all the middlewares we apply to the server routes. */

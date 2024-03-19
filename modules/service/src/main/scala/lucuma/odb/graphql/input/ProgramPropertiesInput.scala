@@ -5,14 +5,14 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.model.Semester
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object ProgramPropertiesInput {
 

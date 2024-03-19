@@ -10,7 +10,7 @@ import cats.effect.Resource
 import cats.syntax.functor.*
 import grackle.Env
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef

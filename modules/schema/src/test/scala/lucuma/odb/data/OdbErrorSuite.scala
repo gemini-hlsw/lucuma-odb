@@ -13,8 +13,8 @@ import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.enums.Site
 import lucuma.core.model.*
-import lucuma.core.model.sequence.Dataset.Filename
 import lucuma.core.model.sequence.*
+import lucuma.core.model.sequence.Dataset.Filename
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.Uid
