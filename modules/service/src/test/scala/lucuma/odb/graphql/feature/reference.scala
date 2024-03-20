@@ -558,7 +558,7 @@ class reference extends OdbSuite {
             }
           }
         """,
-        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'engineering', 'example', 'library', or 'science' expected.").asLeft
+        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring' or 'science' expected.").asLeft
       )
     }
   }
@@ -616,6 +616,56 @@ class reference extends OdbSuite {
           "program": {
             "reference": {
               "label": "G-2025B-CAL-GMOSS-01",
+              "semester": "2025B",
+              "instrument": "GMOS_SOUTH",
+              "semesterIndex": 1
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("setProposalReference COM") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """commissioning: { semester: "2025B", instrument: GMOS_SOUTH }""")
+    } yield assertEquals(ref, "G-2025B-COM-GMOSS-01".programReference.some)
+  }
+
+  test("setProposalReference COM, second has increased index") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """commissioning: { semester: "2025B", instrument: GMOS_SOUTH }""")
+    } yield assertEquals(ref, "G-2025B-COM-GMOSS-02".programReference.some)
+  }
+
+  test("setProposalReference COM, different instrument has its own index") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """commissioning: { semester: "2025B", instrument: GMOS_NORTH }""")
+    } yield assertEquals(ref, "G-2025B-COM-GMOSN-01".programReference.some)
+  }
+
+  test("program reference COM fields") {
+    expect(pi, s"""
+      query {
+        program(programReference: "G-2025B-COM-GMOSS-01") {
+          reference {
+            label
+            ... on CommissioningProgramReference {
+              semester
+              instrument
+              semesterIndex
+            }
+          }
+        }
+      }""",
+      json"""
+        {
+          "program": {
+            "reference": {
+              "label": "G-2025B-COM-GMOSS-01",
               "semester": "2025B",
               "instrument": "GMOS_SOUTH",
               "semesterIndex": 1
@@ -774,6 +824,42 @@ class reference extends OdbSuite {
     )
   }
 
+  test("setProposalReference MON") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """monitoring: { semester: "2024A", instrument: GMOS_NORTH }""")
+    } yield assertEquals(ref, "G-2024A-MON-GMOSN-01".programReference.some)
+  }
+
+  test("program reference MON fields") {
+    expect(pi, s"""
+      query {
+        program(programReference: "G-2024A-MON-GMOSN-01") {
+          reference {
+            label
+            ... on MonitoringProgramReference {
+              semester
+              instrument
+              semesterIndex
+            }
+          }
+        }
+      }""",
+      json"""
+        {
+          "program": {
+            "reference": {
+              "label": "G-2024A-MON-GMOSN-01",
+              "semester": "2024A",
+              "instrument": "GMOS_NORTH",
+              "semesterIndex": 1
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
   test("setProposalReference SCI, no proposal") {
     for {
       pid <- createProgramAs(pi)
@@ -805,56 +891,79 @@ class reference extends OdbSuite {
     } yield assertEquals(ref, "G-2025B-0002-Q".programReference.some)
   }
 
-  // Program references created above
-  val ref25BCalGmosSouth01 = "G-2025B-CAL-GMOSS-01".programReference
-  val ref25BCalGmosNorth01 = "G-2025B-CAL-GMOSN-01".programReference
-  val ref25BEngGmosSouth01 = "G-2025B-ENG-GMOSS-01".programReference
-  val ref25BEngGmosSouth02 = "G-2025B-ENG-GMOSS-02".programReference
-  val refXplGmosSouth      = "G-XPL-GMOSS".programReference
-  val refLibGmosSouthFoo   = "G-LIB-GMOSS-FOO".programReference
-  val ref24ASci01C         = "G-2024A-0001-C".programReference
-  val ref24ASci02Q         = "G-2024A-0002-Q".programReference
-  val ref25BSci02Q         = "G-2025B-0002-Q".programReference
-
   test("select via WHERE program reference label LIKE") {
     assertIO(
       programRefsWhere( s"""{ reference: { label: { LIKE: "G-2025B-%" } } }"""),
-      List(ref25BCalGmosSouth01, ref25BCalGmosNorth01, ref25BEngGmosSouth01, ref25BEngGmosSouth02, ref25BSci02Q)
+      List(
+        "G-2025B-CAL-GMOSS-01",
+        "G-2025B-CAL-GMOSN-01",
+        "G-2025B-COM-GMOSS-01",
+        "G-2025B-COM-GMOSS-02",
+        "G-2025B-COM-GMOSN-01",
+        "G-2025B-ENG-GMOSS-01",
+        "G-2025B-ENG-GMOSS-02",
+        "G-2025B-0002-Q"
+      ).map(_.programReference)
     )
   }
 
   test("select via WHERE program reference semester") {
     assertIO(
       programRefsWhere( s"""{ reference: { semester: { EQ: "2025B" } } }"""),
-      List(ref25BCalGmosSouth01, ref25BCalGmosNorth01, ref25BEngGmosSouth01, ref25BEngGmosSouth02, ref25BSci02Q)
+      List(
+        "G-2025B-CAL-GMOSS-01",
+        "G-2025B-CAL-GMOSN-01",
+        "G-2025B-COM-GMOSS-01",
+        "G-2025B-COM-GMOSS-02",
+        "G-2025B-COM-GMOSN-01",
+        "G-2025B-ENG-GMOSS-01",
+        "G-2025B-ENG-GMOSS-02",
+        "G-2025B-0002-Q"
+      ).map(_.programReference)
     )
   }
 
   test("select via WHERE program reference semester, only ENG") {
     assertIO(
       programRefsWhere( s"""{ type: { EQ: ENGINEERING }, reference: { semester: { EQ: "2025B" } } }"""),
-      List(ref25BEngGmosSouth01, ref25BEngGmosSouth02)
+      List(
+        "G-2025B-ENG-GMOSS-01",
+        "G-2025B-ENG-GMOSS-02"
+      ).map(_.programReference)
     )
   }
 
   test("select via WHERE program reference semesterIndex") {
     assertIO(
       programRefsWhere( s"""{ reference: { semesterIndex: { GT: 1 } } }"""),
-      List(ref24ASci02Q, ref25BEngGmosSouth02, ref25BSci02Q)
+      List(
+        "G-2024A-0002-Q",
+        "G-2025B-COM-GMOSS-02",
+        "G-2025B-ENG-GMOSS-02",
+        "G-2025B-0002-Q"
+      ).map(_.programReference)
     )
   }
 
   test("select via WHERE program reference instrument") {
     assertIO(
       programRefsWhere( s"""{ reference: { instrument: { EQ: GMOS_SOUTH } } }"""),
-      List(ref25BCalGmosSouth01, ref25BEngGmosSouth01, ref25BEngGmosSouth02, refXplGmosSouth, refLibGmosSouthFoo)
+      List(
+        "G-2025B-CAL-GMOSS-01",
+        "G-2025B-COM-GMOSS-01",
+        "G-2025B-COM-GMOSS-02",
+        "G-2025B-ENG-GMOSS-01",
+        "G-2025B-ENG-GMOSS-02",
+        "G-XPL-GMOSS",
+        "G-LIB-GMOSS-FOO"
+      ).map(_.programReference)
     )
   }
 
   test("select via WHERE program reference description") {
     assertIO(
       programRefsWhere( s"""{ reference: { description: { EQ: "FOO" } } }"""),
-      List(refLibGmosSouthFoo)
+      List("G-LIB-GMOSS-FOO".programReference)
     )
   }
 
@@ -868,7 +977,7 @@ class reference extends OdbSuite {
   test("select via WHERE program reference science subtype") {
     assertIO(
       programRefsWhere( s"""{ reference: { scienceSubtype: { EQ: CLASSICAL } } }"""),
-      List(ref24ASci01C)
+      List("G-2024A-0001-C".programReference)
     )
   }
 
