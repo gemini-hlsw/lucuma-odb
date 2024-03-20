@@ -139,30 +139,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION format_semester_instrument_reference(ptype e_program_type, semester d_semester, index int4, instrument d_tag)
-RETURNS text AS $$
-DECLARE
-  abbr text;
-  inst text;
-BEGIN
-    SELECT c_abbr           INTO abbr FROM t_program_type WHERE c_type = ptype;
-    SELECT c_reference_name INTO inst FROM t_instrument   WHERE c_tag = instrument;
-    RETURN CONCAT('G-', semester, '-', abbr, '-', inst, '-', LPAD(index::text, 2, '0'));
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+-- Rename the format function because it will now handle CAL, COM, ENG and MON.
+ALTER FUNCTION format_cal_or_eng_reference(e_program_type, d_semester, int4, d_tag)
+  RENAME TO format_semester_instrument_reference;
 
-CREATE OR REPLACE FUNCTION format_cal_or_eng_reference(ptype e_program_type, semester d_semester, index int4, instrument d_tag)
-RETURNS text AS $$
-DECLARE
-  abbr text;
-  inst text;
-BEGIN
-    SELECT c_abbr           INTO abbr FROM t_program_type WHERE c_type = ptype;
-    SELECT c_reference_name INTO inst FROM t_instrument   WHERE c_tag = instrument;
-    RETURN CONCAT('G-', semester, '-', abbr, '-', inst, '-', LPAD(index::text, 2, '0'));
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
+-- Update the entry point for formatting to handle COM and MON
 CREATE OR REPLACE FUNCTION format_program_reference(
   ptype           e_program_type,
   semester        d_semester,
@@ -194,4 +175,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-DROP FUNCTION format_cal_or_eng_reference;
+-- Finally change FLAMINGOS2 to F2 for the reference name.  Apparently that
+-- matches what is written into FITS headers.
+UPDATE t_instrument
+   SET c_reference_name = 'F2'
+ WHERE c_reference_name = 'FLAMINGOS2';
