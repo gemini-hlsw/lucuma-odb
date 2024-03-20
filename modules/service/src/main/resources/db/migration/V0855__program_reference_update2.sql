@@ -65,7 +65,12 @@ BEGIN
         sequence_name := prefix;
     END IF;
 
-    EXECUTE 'CREATE SEQUENCE IF NOT EXISTS ' || sequence_name;
+    BEGIN
+        EXECUTE 'CREATE SEQUENCE IF NOT EXISTS ' || sequence_name;
+    EXCEPTION WHEN unique_violation THEN
+        NULL; -- sequence exists, this was an attempt to create it in parallel
+    END;
+
     RETURN nextval(sequence_name)::INT;
 END;
 $$ LANGUAGE plpgsql;
