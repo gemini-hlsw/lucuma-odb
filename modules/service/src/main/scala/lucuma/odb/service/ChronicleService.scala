@@ -22,7 +22,6 @@ object ChronicleService {
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): ChronicleService[F] =
     new ChronicleService[F]:
 
-      // AC: entries can be added only by staff; verified 19-Mar-23
       def addConditionsEntry(input: ConditionsEntryInput)(using Services.StaffAccess): F[Result[Long]] =
         session.prepareR(Statements.InsertConditionsEntry).use: pq =>
           pq.unique(input).map(Result.success)
