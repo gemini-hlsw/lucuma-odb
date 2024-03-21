@@ -17,6 +17,7 @@ import cats.syntax.show.*
 import grackle.Result
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
@@ -57,6 +58,11 @@ trait ExecutionEventService[F[_]] {
   def insertSequenceEvent(
     visitId: Visit.Id,
     command: SequenceCommand
+  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
+
+  def insertSlewEvent(
+    visitId:   Visit.Id,
+    slewStage: SlewStage
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertStepEvent(
@@ -188,6 +194,28 @@ object ExecutionEventService {
       } .map(executionEventResponseToResult)
         .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
 
+      override def insertSlewEvent(
+        visitId:   Visit.Id,
+        slewStage: SlewStage
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
+
+        import InsertEventResponse.*
+
+        val insert: F[Either[VisitNotFound, (Id, Timestamp, Observation.Id)]] =
+          session
+            .option(Statements.InsertSlewEvent)(visitId, slewStage, visitId)
+            .map(_.toRight(VisitNotFound(visitId)))
+            .recover {
+              case SqlState.ForeignKeyViolation(_) => VisitNotFound(visitId).asLeft
+            }
+
+        (for {
+          e <- EitherT(insert).leftWiden[InsertEventResponse]
+          (eid, time, oid) = e
+        } yield Success(SlewEvent(eid, time, oid, visitId, slewStage))).merge
+      } .map(executionEventResponseToResult)
+        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
+
       override def insertStepEvent(
         stepId:       Step.Id,
         stepStage:    StepStage
@@ -303,6 +331,29 @@ object ExecutionEventService {
           v.c_observation_id,
           $visit_id,
           $sequence_command
+        FROM
+          t_visit v
+        WHERE
+          v.c_visit_id = $visit_id
+        RETURNING
+          c_execution_event_id,
+          c_received,
+          c_observation_id
+      """.query(execution_event_id *: core_timestamp *: observation_id)
+
+    val InsertSlewEvent: Query[(Visit.Id, SlewStage, Visit.Id), (Id, Timestamp, Observation.Id)] =
+      sql"""
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_observation_id,
+          c_visit_id,
+          c_slew_stage
+        )
+        SELECT
+          'slew' :: e_execution_event_type,
+          v.c_observation_id,
+          $visit_id,
+          $slew_stage
         FROM
           t_visit v
         WHERE

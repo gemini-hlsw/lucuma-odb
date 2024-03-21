@@ -7,23 +7,23 @@ import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Monoid
 import cats.effect.std.Supervisor
-import cats.effect.{Unique => _, _}
-import cats.syntax.all._
+import cats.effect.{Unique as _, *}
+import cats.syntax.all.*
 import com.github.vertical_blank.sqlformatter.SqlFormatter
 import fs2.concurrent.Topic
+import grackle.*
 import grackle.QueryCompiler.SelectElaborator
-import grackle._
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.graphql.mapping._
+import lucuma.odb.graphql.mapping.*
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
-import lucuma.odb.graphql.util._
+import lucuma.odb.graphql.util.*
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
@@ -84,6 +84,7 @@ object OdbMapping {
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
           with AddSequenceEventResultMapping[F]
+          with AddSlewEventResultMapping[F]
           with AddStepEventResultMapping[F]
           with AddTimeChargeCorrectionResultMapping[F]
           with AirMassRangeMapping[F]
@@ -110,9 +111,10 @@ object OdbMapping {
           with CreateProgramResultMapping[F]
           with CreateTargetResultMapping[F]
           with CreateUserInvitationResultMapping[F]
-          with DeclinationMapping[F]
           with DatasetMapping[F]
+          with DatasetReferenceMapping[F]
           with DatasetSelectResultMapping[F]
+          with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with ExecutionMapping[F]
           with ExecutionEventMapping[F]
@@ -139,6 +141,7 @@ object OdbMapping {
           with ObsAttachmentTypeMetaMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
+          with ObservationReferenceMapping[F]
           with ObservingModeMapping[F]
           with ObservationSelectResultMapping[F]
           with OffsetMapping[F]
@@ -230,6 +233,7 @@ object OdbMapping {
               AddConditionsEntryResultMapping,
               AddDatasetEventResultMapping,
               AddSequenceEventResultMapping,
+              AddSlewEventResultMapping,
               AddStepEventResultMapping,
               AddTimeChargeCorrectionResultMapping,
               AirMassRangeMapping,
@@ -257,8 +261,9 @@ object OdbMapping {
               CreateProgramResultMapping,
               CreateTargetResultMapping,
               CreateUserInvitationResultMapping,
-              DatasetMapping,
               DatasetEventMapping,
+              DatasetMapping,
+              DatasetReferenceMapping,
               DatasetSelectResultMapping,
               DeclinationMapping,
               EngineeringProgramReferenceMapping,
@@ -293,8 +298,9 @@ object OdbMapping {
               ObsAttachmentTypeMetaMapping,
               ObservationEditMapping,
               ObservationMapping,
-              ObservingModeMapping,
+              ObservationReferenceMapping,
               ObservationSelectResultMapping,
+              ObservingModeMapping,
               OffsetMapping,
               OffsetPMapping,
               OffsetQMapping,
@@ -333,6 +339,7 @@ object OdbMapping {
               SetAllocationResultMapping,
               SetProgramReferenceResultMapping,
               SiderealMapping,
+              SlewEventMapping,
               StepConfigMapping,
               StepConfigBiasMapping,
               StepConfigDarkMapping,

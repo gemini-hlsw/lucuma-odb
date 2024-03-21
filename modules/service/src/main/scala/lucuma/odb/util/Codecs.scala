@@ -25,12 +25,13 @@ import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.*
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
-import lucuma.core.model.*
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
@@ -180,6 +181,12 @@ trait Codecs {
   val dataset_qa_state: Codec[DatasetQaState] =
     enumerated(Type("e_dataset_qa_state"))
 
+  val dataset_reference: Codec[DatasetReference] =
+    text.eimap(
+      s => DatasetReference.fromString.getOption(s).toRight(s"Invalid dataset reference: $s"))(
+      DatasetReference.fromString.reverseGet
+    )
+
   val dataset_stage: Codec[DatasetStage] =
     enumerated(Type("e_dataset_stage"))
 
@@ -231,7 +238,7 @@ trait Codecs {
   val gcal_shutter: Codec[GcalShutter] =
     enumerated[GcalShutter](Type.varchar)
 
-  val guide_state: Codec[GuideState] =
+  val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))
 
   val hour_angle_range_value: Codec[BigDecimal] =
@@ -332,6 +339,12 @@ trait Codecs {
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
 
+  val observation_reference: Codec[ObservationReference] =
+    text.eimap(
+      s => ObservationReference.fromString.getOption(s).toRight(s"Invalid observation reference: $s"))(
+      ObservationReference.fromString.reverseGet
+    )
+
   val proposal_reference: Codec[ProposalReference] =
     text.eimap(
       s => ProposalReference.fromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
@@ -391,6 +404,9 @@ trait Codecs {
 
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
+
+  val slew_stage: Codec[SlewStage] =
+    enumerated(Type("e_slew_stage"))
 
   val smart_gcal_type: Codec[SmartGcalType] =
     enumerated(Type("e_smart_gcal_type"))

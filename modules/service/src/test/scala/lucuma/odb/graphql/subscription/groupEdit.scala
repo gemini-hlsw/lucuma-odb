@@ -16,7 +16,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class groupEdit extends OdbSuite {
 

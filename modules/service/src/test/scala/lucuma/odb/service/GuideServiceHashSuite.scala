@@ -19,12 +19,12 @@ import munit.ScalaCheckSuite
 import org.scalacheck.Prop.*
 
 class GuideServiceHashSuite  extends ScalaCheckSuite {
-  import ArbConstraintSet.*
-  import ArbCoordinates.*
-  import ArbGid.* 
+  import ArbConstraintSet.given
+  import ArbCoordinates.given
+  import ArbGid.given
   import ArbMd5Hash.given
-  import ArbPosAngleConstraint.*
-  import ArbWavelength.*
+  import ArbPosAngleConstraint.given
+  import ArbWavelength.given
 
   test("hashes equal for info equal with different Observation.Id") {
     forAll { (

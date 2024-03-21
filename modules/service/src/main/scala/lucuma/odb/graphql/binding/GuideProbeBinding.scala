@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.ags.GuideProbe
+import lucuma.core.enums.GuideProbe
 
 val GuideProbeBinding: Matcher[GuideProbe] =
   enumeratedBinding

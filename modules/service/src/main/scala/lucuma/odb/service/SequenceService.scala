@@ -31,8 +31,8 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.gmos.StaticConfig.{GmosNorth => GmosNorthStatic}
-import lucuma.core.model.sequence.gmos.StaticConfig.{GmosSouth => GmosSouthStatic}
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
@@ -388,8 +388,8 @@ object SequenceService {
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
         } yield Success(sid)).merge.map:
-          case AtomNotFound(id, instrument)  =>   OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
-          case Success(sid)                  =>   Result(sid)
+          case AtomNotFound(id, instrument)  => OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
+          case Success(sid)                  => Result(sid)
 
       override def insertGmosNorthStepRecord(
         atomId:         Atom.Id,
@@ -471,6 +471,7 @@ object SequenceService {
       sql"""
         INSERT INTO t_step_record (
           c_step_id,
+          c_step_index,
           c_atom_id,
           c_instrument,
           c_step_type,
@@ -478,12 +479,20 @@ object SequenceService {
           c_time_estimate
         ) SELECT
           $step_id,
+          COALESCE(
+            (SELECT MAX(c_step_index) + 1
+             FROM t_step_record AS s
+             INNER JOIN t_atom_record AS a ON a.c_atom_id = s.c_atom_id
+             WHERE a.c_observation_id = (SELECT c_observation_id FROM t_atom_record WHERE c_atom_id = $atom_id)
+            ),
+            1
+          ),
           $atom_id,
           $instrument,
           $step_type,
           $obs_class,
           $time_span
-      """.command
+      """.command.contramap { (s, a, i, t, c, d) => (s, a, a, i, t, c, d) }
 
     /**
      * Selects completed step records for a particular observation.  A completed

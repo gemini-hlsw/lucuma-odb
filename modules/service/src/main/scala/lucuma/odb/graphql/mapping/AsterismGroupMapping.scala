@@ -11,7 +11,7 @@ import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.table._
+import lucuma.odb.graphql.table.*
 
 trait AsterismGroupMapping[F[_]]
   extends AsterismGroupView[F]

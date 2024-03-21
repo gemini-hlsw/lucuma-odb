@@ -54,6 +54,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
         SqlObject("minimumInterval"),
         SqlObject("maximumInterval"),
         SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
+        SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
         EffectField("timeEstimateRange", timeEstimateHandler, List("id"))
       )
     )

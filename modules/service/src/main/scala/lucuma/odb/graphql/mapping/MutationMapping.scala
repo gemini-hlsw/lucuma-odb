@@ -36,9 +36,10 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddDatasetEventInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
+import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
 import lucuma.odb.graphql.input.CloneObservationInput
@@ -86,6 +87,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddConditionsEntry,
       AddDatasetEvent,
       AddSequenceEvent,
+      AddSlewEvent,
       AddStepEvent,
       AddTimeChargeCorrection,
       CloneObservation,
@@ -238,10 +240,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
       services.useTransactionally:
-        observationService.cloneObservation(input).nestMap: oid =>
+        observationService.cloneObservation(input).nestMap: ids =>
           Filter(And(
-            Predicates.cloneObservationResult.originalObservation.id.eql(input.observationId),
-            Predicates.cloneObservationResult.newObservation.id.eql(oid)
+            Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
+            Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
           ), child)
 
   private lazy val CloneTarget: MutationField =
@@ -335,6 +337,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val AddSequenceEvent: MutationField =
     addEvent("addSequenceEvent", AddSequenceEventInput.Binding, Predicates.sequenceEvent) { input =>
       executionEventService.insertSequenceEvent(input.visitId, input.command)
+    }
+
+  private lazy val AddSlewEvent: MutationField =
+    addEvent("addSlewEvent", AddSlewEventInput.Binding, Predicates.slewEvent) { input =>
+      executionEventService.insertSlewEvent(input.visitId, input.slewStage)
     }
 
   private lazy val AddStepEvent: MutationField =

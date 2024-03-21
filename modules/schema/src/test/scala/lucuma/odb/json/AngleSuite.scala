@@ -7,11 +7,12 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Angle
-import lucuma.core.math.arb.ArbAngle.*
+import lucuma.core.math.arb.ArbAngle
 import munit.DisciplineSuite
 
 abstract class AngleSuite(using Encoder[Angle]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbAngle.given
   import angle.decoder.given
 
   checkAll("AngleCodec", CodecTests[Angle].codec)
@@ -35,6 +36,8 @@ abstract class AngleSuite(using Encoder[Angle]) extends DisciplineSuite with Arb
 class AngleQuerySuite extends AngleSuite(using
   angle.query.Encoder_Angle
 ) {
+
+  import ArbAngle.given
 
   val timeKeys: Set[String] =
     Set(

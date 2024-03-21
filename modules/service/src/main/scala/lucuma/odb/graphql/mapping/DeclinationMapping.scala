@@ -8,7 +8,7 @@ import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.Declination
 import lucuma.odb.graphql.table.ObservationView
-import skunk.codec.all._
+import skunk.codec.all.*
 
 import scala.reflect.ClassTag
 

@@ -22,12 +22,12 @@ import lucuma.core.math.arb.ArbOffset
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
 import lucuma.core.util.arb.ArbEnumerated
+import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
-import org.scalacheck._
 
 trait ArbGmosLongSlitInput {
 
-  import ArbEnumerated.*
+  import ArbEnumerated.given
   import ArbOffset.given
   import ArbWavelength.given
   import ArbWavelengthDither.given

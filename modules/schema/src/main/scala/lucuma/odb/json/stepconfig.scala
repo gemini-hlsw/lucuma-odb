@@ -8,14 +8,14 @@ import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.GuideState
 import lucuma.core.enums.SmartGcalType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
@@ -64,7 +64,7 @@ trait StepConfigCodec {
     Decoder.instance { c =>
       for {
         o <- c.downField("offset").as[Offset]
-        g <- c.downField("guiding").as[GuideState]
+        g <- c.downField("guiding").as[StepGuideState]
       } yield StepConfig.Science(o, g)
     }
 

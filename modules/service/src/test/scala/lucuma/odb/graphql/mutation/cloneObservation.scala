@@ -5,13 +5,15 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -351,4 +353,95 @@ class cloneObservation extends OdbSuite {
     }
   }
 
+  private def referenceTest(f: (Observation.Id, ObservationReference) => String): IO[Unit] =
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      oid <- createObservationAs(pi, pid)
+      jsn <- query(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {
+                ${f(oid, oref)}
+              }) {
+                originalObservation { id }
+                newObservation { id }
+              }
+            }
+          """
+        )
+    } yield {
+      assertEquals(
+        jsn.hcursor.downFields("cloneObservation", "originalObservation", "id").require[Observation.Id],
+        oid
+      )
+      assertNotEquals(
+        jsn.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id],
+        oid
+      )
+    }
+
+  test("can specify the observation to clone using its reference") {
+    referenceTest { (oid, ref) =>
+      s"""
+         observationReference: ${ref.asJson}
+      """
+    }
+  }
+
+  test("can specify the observation to clone using both its id and reference") {
+    referenceTest { (oid, ref) =>
+      s"""
+         observationId: ${oid.asJson},
+         observationReference: ${ref.asJson}
+      """
+    }
+  }
+
+  test("fail if no ids are provided") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {}) {
+                originalObservation { id }
+                newObservation { id }
+              }
+            }
+          """,
+          expected = List("One of observationId or observationReference must be provided.").asLeft
+        )
+    } yield ()
+  }
+
+  test("fail if the id and reference do not correspond") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      oid <- createObservationAs(pi, pid)
+      oidx = Observation.Id.fromLong(oid.value.value - 1).get
+      _   <- expect(
+          user = pi,
+          query = s"""
+            mutation {
+              cloneObservation(input: {
+                observationId: ${oidx.asJson},
+                observationReference: ${oref.asJson}
+              }) {
+                newObservation { id }
+              }
+            }
+          """,
+          expected = List(s"Observation '${oref.label}' (id $oid) does not correspond to observation id $oidx.").asLeft
+        )
+    } yield ()
+  }
 }

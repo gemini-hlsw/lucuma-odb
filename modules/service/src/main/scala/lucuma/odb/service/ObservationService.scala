@@ -34,6 +34,7 @@ import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.User
@@ -70,6 +71,14 @@ import Services.Syntax.*
 
 sealed trait ObservationService[F[_]] {
 
+  /**
+   * Finds the observation id consistent with the given ids (if any).
+   */
+  def resolveOid(
+    oid: Option[Observation.Id],
+    ref: Option[ObservationReference]
+  ): F[Result[Observation.Id]]
+
   def createObservation(
     input: CreateObservationInput
   )(using Transaction[F]): F[Result[Observation.Id]]
@@ -89,7 +98,7 @@ sealed trait ObservationService[F[_]] {
 
   def cloneObservation(
     input: CloneObservationInput
-  )(using Transaction[F]): F[Result[Observation.Id]]
+  )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
 
 }
 
@@ -141,8 +150,21 @@ object ObservationService {
       .map(_.message)
       .getOrElse(GenericConstraintViolationMessage(ex.message))
 
+  case class CloneIds(
+    originalId: Observation.Id,
+    cloneId:    Observation.Id
+  )
+
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
+
+      val resolver = new IdResolver("observation", Statements.selectOid, _.label)
+
+      override def resolveOid(
+        oid: Option[Observation.Id],
+        ref: Option[ObservationReference]
+      ): F[Result[Observation.Id]] =
+        resolver.resolve(oid, ref)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
@@ -333,14 +355,15 @@ object ObservationService {
         }
 
       private def cloneObservationImpl(
-        input: CloneObservationInput
+        observationId: Observation.Id,
+        SET:           Option[ObservationPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
         // First we need the pid, observing mode, and grouping information
         val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
-        session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.option(input.observationId)).flatMap {
+        session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.option(observationId)).flatMap {
 
-          case None => Result.failure(s"No such observation: ${input.observationId}").pure[F]
+          case None => Result.failure(s"No such observation: $observationId").pure[F]
 
           case Some((pid, observingMode, gid, gix)) =>
 
@@ -349,7 +372,7 @@ object ObservationService {
 
             // Ok the obs exists, so let's clone its main row in t_observation. If this returns
             // None then it means the user doesn't have permission to see the obs.
-            val cObsStmt = Statements.cloneObservation(pid, input.observationId, user, destGroupIndex)
+            val cObsStmt = Statements.cloneObservation(pid, observationId, user, destGroupIndex)
             val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
 
             // Action to open a hole in the destination program/group after the observation we're cloning
@@ -364,18 +387,18 @@ object ObservationService {
 
               case None =>
                 // User doesn't have permission to see the obs
-                Result.failure(s"No such observation: ${input.observationId}").pure[F]
+                Result.failure(s"No such observation: $observationId").pure[F]
 
               case Some(oid2) =>
 
                 val cloneRelatedItems =
-                  asterismService.cloneAsterism(input.observationId, oid2) >>
-                  observingMode.traverse(observingModeServices.cloneFunction(_)(input.observationId, oid2)) >>
-                  timingWindowService.cloneTimingWindows(input.observationId, oid2) >>
-                  obsAttachmentAssignmentService.cloneAssignments(input.observationId, oid2)
+                  asterismService.cloneAsterism(observationId, oid2) >>
+                  observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
+                  timingWindowService.cloneTimingWindows(observationId, oid2) >>
+                  obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
                 val doUpdate =
-                  input.SET match
+                  SET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
                     case Some(s) =>
                       updateObservations(s, sql"select $observation_id".apply(oid2))
@@ -398,15 +421,23 @@ object ObservationService {
 
       def cloneObservation(
         input: CloneObservationInput
-      )(using Transaction[F]): F[Result[Observation.Id]] =
+      )(using Transaction[F]): F[Result[CloneIds]] =
         (for
-          (pid, oid) <- ResultT(cloneObservationImpl(input))
-          _          <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(oid), input.asterism))
-        yield oid).value
+          origOid       <- ResultT(resolveOid(input.observationId, input.observationRef))
+          (pid, newOid) <- ResultT(cloneObservationImpl(origOid, input.SET))
+          _             <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), input.asterism))
+        yield CloneIds(origOid, newOid)).value
         
     }
 
   object Statements {
+
+    val selectOid: Query[ObservationReference, Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+          FROM t_observation
+         WHERE c_observation_reference = $observation_reference
+      """.query(observation_id)
 
     import ProgramService.Statements.existsUserAccess
     import ProgramService.Statements.whereUserAccess

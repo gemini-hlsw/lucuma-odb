@@ -6,27 +6,31 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereTarget
+import lucuma.odb.graphql.predicate.DatasetPredicates
+import lucuma.odb.graphql.predicate.ObservationPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
@@ -49,6 +53,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("datasets"),
         SqlObject("events"),
         SqlObject("filterTypeMeta"),
+        SqlObject("group"),
         SqlObject("obsAttachmentTypeMeta"),
         SqlObject("observation"),
         SqlObject("observations"),
@@ -71,6 +76,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Datasets,
       Events,
       FilterTypeMeta,
+      Group,
       ObsAttachmentTypeMeta,
       Observation,
       Observations,
@@ -138,18 +144,31 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         OrderBy(OrderSelections(List(OrderSelection[Short](ProposalStatusMetaType / "ordinal"))), child)
       }
 
+  private def datasetPredicate(
+    rDid: Result[Option[model.sequence.Dataset.Id]],
+    rRef: Result[Option[DatasetReference]],
+    pred: DatasetPredicates
+  ): Result[Predicate] =
+    (rDid, rRef).parTupled.map { (did, ref) =>
+      and(List(
+        did.map(pred.id.eql).toList,
+        ref.map(r => pred.referenceLabel.eql(r)).toList
+      ).flatten) match {
+        case True => False // neither did nor ref was supplied
+        case p    => p
+      }
+    }
+
   private lazy val Dataset: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "dataset", List(
-      DatasetIdBinding("datasetId", rDid)
+      DatasetIdBinding.Option("datasetId", rDid),
+      DatasetReferenceBinding.Option("datasetReference", rRef)
     )) =>
       Elab.transformChild { child =>
-        rDid.map { did =>
+        datasetPredicate(rDid, rRef, Predicates.dataset).map { dataset =>
           Unique(
             Filter(
-              And(
-                Predicates.dataset.id.eql(did),
-                Predicates.dataset.observation.program.isVisibleTo(user)
-              ),
+              And(dataset, Predicates.dataset.observation.program.isVisibleTo(user)),
               child
             )
           )
@@ -261,20 +280,48 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
       }
 
-  private lazy val Observation: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (QueryType, "observation", List(
-      ObservationIdBinding("observationId", rOid)
+  private lazy val Group: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "group", List(
+      GroupIdBinding("groupId", rGroup)
     )) =>
       Elab.transformChild { child =>
-        rOid.map { oid =>
+        rGroup.map { grp =>
           Unique(
             Filter(
               And(
-                Predicates.observation.id.eql(oid),
-                Predicates.observation.program.isVisibleTo(user)
+                Predicates.group.id.eql(grp),
+                Predicates.group.program.isVisibleTo(user)
               ),
               child
             )
+          )
+        }
+      }
+
+  private def observationPredicate(
+    rOid: Result[Option[model.Observation.Id]],
+    rRef: Result[Option[ObservationReference]],
+    pred: ObservationPredicates
+  ): Result[Predicate] =
+    (rOid, rRef).parTupled.map { (oid, ref) =>
+      and(List(
+        oid.map(pred.id.eql).toList,
+        ref.map(r => pred.referenceLabel.eql(r)).toList
+      ).flatten) match {
+        case True => False // neither oid nor ref was supplied
+        case p    => p
+      }
+    }
+
+  private lazy val Observation: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "observation", List(
+      ObservationIdBinding.Option("observationId", rOid),
+      ObservationReferenceBinding.Option("observationReference", rRef)
+    )) =>
+      Elab.transformChild { child =>
+        observationPredicate(rOid, rRef, Predicates.observation).map { obs =>
+          Unique(
+            Filter(And(obs, Predicates.observation.program.isVisibleTo(user)), child)
           )
         }
       }

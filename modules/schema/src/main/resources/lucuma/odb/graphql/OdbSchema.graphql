@@ -45,6 +45,20 @@ type AddSequenceEventResult {
 
 }
 
+"SlewEvent creation parameters."
+input AddSlewEventInput {
+  visitId:   VisitId!
+  slewStage: SlewStage!
+}
+
+"The result of adding a slew event."
+type AddSlewEventResult {
+
+  "The new slew event that was added."
+  event: SlewEvent!
+
+}
+
 "StepEvent creation parameters."
 input AddStepEventInput {
   stepId: StepId!
@@ -327,11 +341,16 @@ input ClassicalInput {
 }
 
 """
-Describes an observation clone operation, making any edits in the `SET` parameter.  The observation status in the cloned observation defaults to NEW.
+Describes an observation clone operation, making any edits in the `SET`
+parameter.  The observation status in the cloned observation defaults to NEW.
+Identify the observation to clone by specifying either its id or reference.  If
+both are specified, they must refer to the same observation.  If neither is
+specified, nothing will be cloned.
 """
 input CloneObservationInput {
-  observationId: ObservationId!
-  SET: ObservationPropertiesInput
+  observationId:        ObservationId
+  observationReference: ObservationReferenceLabel
+  SET:                  ObservationPropertiesInput
 }
 
 """
@@ -694,6 +713,9 @@ input ExchangeInput {
 enum ExecutionEventType {
   "Sequence-level event type."
   SEQUENCE
+
+  "Slew event type."
+  SLEW
 
   "Step-level event type."
   STEP
@@ -2346,6 +2368,19 @@ type Mutation {
     input: AddSequenceEventInput!
 
   ): AddSequenceEventResult!
+
+  """
+  Adds a new slew event associated with the given visit.
+  """
+  addSlewEvent(
+
+    """
+    Describes the slew event to add.  All events are associated with a
+    particular visit (see 'record{InstrumentName}Visit').
+    """
+    input: AddSlewEventInput!
+
+  ): AddSlewEventResult!
 
   """
   Adds a new step event associated with the given step. Multiple events
@@ -4763,8 +4798,11 @@ type Dataset {
   "The corresponding step."
   step: StepRecord!
 
-  "Dataset index within the step."
-  index: PosShort!
+  "Exposure index within the step."
+  index: PosInt!
+
+  "Dataset reference, assuming the observation has an observation reference."
+  reference: DatasetReference
 
   "Observation associated with this dataset."
   observation: Observation!
@@ -4846,6 +4884,33 @@ enum DatasetQaState {
   """
   FAIL
 }
+
+"""
+Dataset reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type DatasetReference {
+
+  "Formatted dataset reference label."
+  label: DatasetReferenceLabel!
+
+  "The observation reference."
+  observation: ObservationReference!
+
+  "The step index relative to its observation."
+  stepIndex: PosInt!
+
+  "The exposure index relative to its step."
+  exposureIndex: PosInt!
+}
+
+"""
+Dataset reference, formatted according to the observation, suffixed with
+the step and exposure indices. For example, G-2024B-1234-Q-0001-0002-0003 where
+G-2024B-1234-Q-0001 is the observation reference label, 2 is the step index and
+3 is the exposure index.
+"""
+scalar DatasetReferenceLabel
 
 """
 The matching dataset results, limited to a maximum of 1000 entries.
@@ -6377,6 +6442,9 @@ type Group {
   "Position of this group in its parent group (or at the top level)."
   parentIndex: NonNegShort!
 
+  "The program in which this group is found."
+  program: Program!
+
   "Optionally, a name"
   name: String
 
@@ -7018,6 +7086,17 @@ type Observation {
   existence: Existence!
 
   """
+  Observation reference, if any (requires the existence of a reference for the
+  program itself).
+  """
+  reference: ObservationReference
+
+  """
+  Observation index, relative to other observations in the same program.
+  """
+  index: PosInt!
+
+  """
   Observation title generated from id and targets
   """
   title: String!
@@ -7144,6 +7223,29 @@ type ObservationSelectResult {
   """
   hasMore: Boolean!
 }
+
+"""
+Observation reference type, broken into its constituient parts and including
+a formatted label.
+"""
+type ObservationReference {
+
+  "Formatted observation reference label."
+  label:   ObservationReferenceLabel!
+
+  "The program reference."
+  program: ProgramReference!
+
+  "The observation index relative to its program."
+  index:   PosInt!
+}
+
+"""
+Observation reference, formatted according to the program type, suffixed with
+observation index. For example, G-2024B-1234-Q-0001 where G-2024B-1234-Q is
+the program reference label and the observation index is 1.
+"""
+scalar ObservationReferenceLabel
 
 """
 Each step in a sequence is tagged with an observe class which identifies its
@@ -7779,10 +7881,20 @@ type Query {
     includeDeleted: Boolean! = false
   ): ConstraintSetGroupSelectResult!
 
-  "Select the dataset associated with the given id."
+
+  """
+  Returns the dataset with the given id or reference, if any.  Identify the
+  dataset by specifying only one of datasetId or datasetReference. If more than
+  one is provided, all must match.  If neither are set, nothing will match.
+  """
   dataset(
-    "Dataset ID"
-    datasetId: DatasetId!
+
+    "Specify to lookup the dataset by its ID."
+    datasetId: DatasetId
+
+    "Specify to lookup the dataset by its reference."
+    datasetReference: DatasetReferenceLabel
+
   ): Dataset
 
   """
@@ -7831,13 +7943,26 @@ type Query {
   filterTypeMeta: [FilterTypeMeta!]!
 
   """
-  Returns the observation with the given id, if any.
+  Returns the group indicated by the given groupId, if found.
+  """
+  group(
+    groupId: GroupId!
+  ): Group
+
+  """
+  Returns the observation with the given id or reference, if any.  Identify the
+  observation by specifying only one of observationId or observationReference.
+  If more than one is provided, all must match.  If neither are set, nothing
+  will match.
   """
   observation(
-    """
-    Observation ID
-    """
-    observationId: ObservationId!
+
+    "Specify to lookup the observation by its ID."
+    observationId: ObservationId
+
+    "Specify to lookup the observation by its reference."
+    observationReference: ObservationReferenceLabel
+
   ): Observation
 
   """
@@ -8450,6 +8575,42 @@ enum SkyBackground {
 }
 
 """
+Slew events.
+"""
+type SlewEvent implements ExecutionEvent {
+
+  "Event id."
+  id: ExecutionEventId!
+
+  "Visit associated with this event."
+  visit: Visit!
+
+  "Observation whose execution produced this event."
+  observation: Observation!
+
+  "Time at which this event was received."
+  received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Slew event data."
+  slewStage: SlewStage!
+
+}
+
+
+"Slew stage"
+enum SlewStage {
+
+  START_SLEW
+
+  END_SLEW
+
+}
+
+
+"""
 Source profile, exactly one of the fields will be defined
 """
 type SourceProfile {
@@ -8849,17 +9010,27 @@ scalar StepId
 
 "Execution stage or phase of an individual step"
 enum StepStage {
+
+  ABORT
+
+  CONTINUE
+
   END_CONFIGURE
 
   END_OBSERVE
 
   END_STEP
 
+  PAUSE
+
   START_CONFIGURE
 
   START_OBSERVE
 
   START_STEP
+
+  STOP
+
 }
 
 """
@@ -9045,6 +9216,9 @@ type StepRecord {
 
   "Step ID."
   id: StepId!
+
+  "Step Index, relative to other step records in the observation."
+  index: PosInt!
 
   """
   Instrument associated with the step. This will indicate which of the
@@ -10079,14 +10253,17 @@ input WhereDataset {
   "Matches indicated dataset(s)."
   id: WhereOrderDatasetId
 
+  "Matches the dataset reference, if any."
+  reference: WhereDatasetReference
+
   "Matches all datasets associated with the observation."
   observation: WhereObservation
 
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
 
-  "Matches the particula dataset index within the step."
-  index: WhereOrderPosShort
+  "Matches the particular dataset index within the step."
+  index: WhereOrderPosInt
 
   "Matches the dataset file name."
   filename: WhereString
@@ -10095,6 +10272,24 @@ input WhereDataset {
   qaState: WhereOptionEqQaState
 }
 
+input WhereDatasetReference {
+
+  "Matches if the dataset reference is not defined."
+  IS_NULL: Boolean
+
+  "Matches the dataset reference label."
+  label: WhereString
+
+  "Matches the observation reference."
+  observation: WhereObservationReference
+
+  "Matches the step index."
+  stepIndex: WhereOrderPosInt
+
+  "Matches the exposure index."
+  exposureIndex: WhereOrderPosInt
+
+}
 
 input WhereEqExecutionEventType {
 
@@ -10349,6 +10544,9 @@ input WhereExecutionEvent {
   "Matches on execution event type"
   eventType: WhereEqExecutionEventType
 
+  "Matches the slew stage, for slew events."
+  slewStage: WhereOrderSlewStage
+
   "Matches the sequence command type, for sequence events."
   sequenceCommand: WhereOrderSequenceCommand
 
@@ -10391,6 +10589,11 @@ input WhereObservation {
   id: WhereOrderObservationId
 
   """
+  Matches the observation reference, if any.
+  """
+  reference: WhereObservationReference
+
+  """
   Matches the associated program.
   """
   program: WhereProgram
@@ -10411,6 +10614,21 @@ input WhereObservation {
   activeStatus: WhereOrderObsActiveStatus
 }
 
+input WhereObservationReference {
+
+  "Matches if the observation reference is not defined."
+  IS_NULL: Boolean
+
+  "Matches the observation reference label."
+  label: WhereString
+
+  "Matches the program reference."
+  program: WhereProgramReference
+
+  "Matches the observation index."
+  index: WhereOrderPosInt
+
+}
 
 input WhereGroup {
 
@@ -10632,37 +10850,6 @@ input WhereOptionString {
   Set to `true` (the default) for case sensitive matches, `false` to ignore case.
   """
   MATCH_CASE: Boolean = true
-}
-
-"""
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
-"""
-input WhereOrderPosShort {
-  "Matches if the property value is exactly the supplied value."
-  EQ: PosShort
-
-  "Matches if the property value is not the supplied value."
-  NEQ: PosShort
-
-  "Matches if the property value is any of the supplied options."
-  IN: [PosShort!]
-
-  "Matches if the property value is none of the supplied values."
-  NIN: [PosShort!]
-
-  "Matches if the property is ordered after (>) the supplied value."
-  GT: PosShort
-
-  "Matches if the property is ordered before (<) the supplied value."
-  LT: PosShort
-
-  "Matches if the property is ordered after or equal (>=) the supplied value."
-  GTE: PosShort
-
-  "Matches if the property is ordered before or equal (<=) the supplied value."
-  LTE: PosShort
 }
 
 """
@@ -11299,6 +11486,54 @@ input WhereOrderSequenceType {
   """
   LTE: SequenceType
 }
+
+"""
+Filters on equality or order comparisons of the SlewStage.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderSlewStage {
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: SlewStage
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: SlewStage
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [SlewStage!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [SlewStage!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: SlewStage
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: SlewStage
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: SlewStage
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: SlewStage
+}
+
 
 """
 Filters on equality or order comparisons of the property.  All supplied

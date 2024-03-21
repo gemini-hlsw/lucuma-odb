@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.IntPercent
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object ProposalClassInput {
 

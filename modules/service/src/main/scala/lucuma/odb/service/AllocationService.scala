@@ -4,15 +4,15 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SetAllocationInput
-import lucuma.odb.util.Codecs._
-import skunk._
-import skunk.implicits._
+import lucuma.odb.util.Codecs.*
+import skunk.*
+import skunk.implicits.*
 
 import Services.Syntax.*
 

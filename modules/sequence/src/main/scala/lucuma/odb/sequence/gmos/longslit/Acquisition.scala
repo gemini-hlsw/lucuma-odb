@@ -9,7 +9,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.option.*
 import cats.syntax.order.*
-import eu.timepit.refined._
+import eu.timepit.refined.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.data.Zipper
 import lucuma.core.enums.GmosGratingOrder

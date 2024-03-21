@@ -6,14 +6,14 @@ package input
 package sourceprofile
 
 import cats.data.NonEmptyMap
-import cats.syntax.all._
+import cats.syntax.all.*
 import coulomb.Quantity
 import eu.timepit.refined.types.numeric
 import grackle.Result
+import lucuma.core.enums.*
 import lucuma.core.enums.StellarLibrarySpectrum
-import lucuma.core.enums._
 import lucuma.core.model.UnnormalizedSED
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object UnnormalizedSedInput {
 
