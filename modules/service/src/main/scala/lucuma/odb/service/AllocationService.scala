@@ -25,7 +25,6 @@ object AllocationService {
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
 
-      // AC: user must be staff, admin, or service; verified 12-Mar-24
       def setAllocation(input: SetAllocationInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
         session.prepareR(Statements.SetAllocation.command).use: ps =>
           ps.execute(input.programId, input.partner, input.duration).as(Result.unit)
