@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
 
 val PosBigDecimalBinding: Matcher[PosBigDecimal] =

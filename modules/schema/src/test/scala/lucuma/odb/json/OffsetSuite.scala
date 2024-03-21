@@ -7,11 +7,12 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.Offset
-import lucuma.core.math.arb.ArbOffset.*
+import lucuma.core.math.arb.ArbOffset
 import munit.DisciplineSuite
 
 abstract class OffsetSuite[A](using Encoder[Offset.Component[A]], Encoder[Offset]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbOffset.given
   import offset.decoder.given
 
   checkAll("OffsetCodec",        CodecTests[Offset].codec)

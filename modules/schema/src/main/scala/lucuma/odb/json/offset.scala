@@ -6,7 +6,7 @@ package lucuma.odb.json
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.optics.SplitMono

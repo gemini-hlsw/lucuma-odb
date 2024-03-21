@@ -6,12 +6,12 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
@@ -33,8 +33,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 
 import Services.Syntax.*
-import binding._
-import table._
+import binding.*
+import table.*
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]

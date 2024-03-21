@@ -3,19 +3,18 @@
 
 package lucuma.odb.service
 
-import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
-import cats.syntax.bifunctor.*
-import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.PosShort
 import grackle.Result
+import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
@@ -31,6 +30,14 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 sealed trait DatasetService[F[_]] {
+
+  /**
+   * Finds the dataset id consistent with the given ids (if any).
+   */
+  def resolveDid(
+    did: Option[Dataset.Id],
+    ref: Option[DatasetReference]
+  ): F[Result[Dataset.Id]]
 
   def insertDataset(
     stepId:   Step.Id,
@@ -68,65 +75,38 @@ sealed trait DatasetService[F[_]] {
 
 object DatasetService {
 
-  sealed trait InsertDatasetResponse extends Product with Serializable
-
-  sealed trait InsertDatasetFailure extends InsertDatasetResponse
-
-  object InsertDatasetResponse {
-
-    case class StepNotFound(
-      id: Step.Id
-    ) extends InsertDatasetFailure
-
-    case class ReusedFilename(
-      filename: Dataset.Filename
-    ) extends InsertDatasetFailure
-
-    case class Success(
-      datasetId: Dataset.Id,
-      stepId:    Step.Id,
-      index:     PosShort
-    ) extends InsertDatasetResponse
-
-  }
-
   def instantiate[F[_]: Concurrent](using Services[F]): DatasetService[F] =
     new DatasetService[F] {
 
-      def insertDatasetImpl(
-        stepId:   Step.Id,
-        filename: Dataset.Filename,
-        qaState:  Option[DatasetQaState]
-      )(using Transaction[F], Services.ServiceAccess): F[InsertDatasetResponse] = {
+      val resolver = new IdResolver("dataset", Statements.selectDid, _.label)
 
-        import InsertDatasetResponse.*
-
-        val insert: F[Either[InsertDatasetFailure, (Dataset.Id, Step.Id, PosShort)]] =
-          session
-            .unique(Statements.InsertDataset)(stepId, filename, qaState)
-            .map(_.asRight[InsertDatasetFailure])
-            .recover {
-              case SqlState.UniqueViolation(_)     => ReusedFilename(filename).asLeft
-              case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
-              case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") =>
-                StepNotFound(stepId).asLeft
-            }
-
-        (for {
-          d <- EitherT(insert).leftWiden[InsertDatasetResponse]
-        } yield Success.apply.tupled(d)).merge
-      }
+      override def resolveDid(
+        did: Option[Dataset.Id],
+        ref: Option[DatasetReference]
+      ): F[Result[Dataset.Id]] =
+        resolver.resolve(did, ref)
 
       override def insertDataset(
         stepId:   Step.Id,
         filename: Dataset.Filename,
         qaState:  Option[DatasetQaState]
-      )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = 
-        import InsertDatasetResponse.*
-        insertDatasetImpl(stepId, filename, qaState).map:
-          case ReusedFilename(filename) => OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
-          case StepNotFound(id)         => OdbError.InvalidStep(id, Some(s"Step id '$id' not found")).asFailure
-          case Success(did, _, _)       => Result(did)
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = {
+
+        def stepNotFound: Result[Dataset.Id] =
+          OdbError.InvalidStep(stepId, Some(s"Step id '$stepId' not found")).asFailure
+
+        val insert: F[Result[Dataset.Id]] =
+          session
+            .unique(Statements.InsertDataset)(stepId, filename, qaState)
+            .map(_.success)
+            .recover {
+              case SqlState.UniqueViolation(_)     => OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
+              case SqlState.ForeignKeyViolation(_) => stepNotFound
+              case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound
+            }
+
+        ResultT(insert).value
+      }
 
       override def updateDatasets(
         SET:   DatasetPropertiesInput,
@@ -171,7 +151,14 @@ object DatasetService {
 
   object Statements {
 
-    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), (Dataset.Id, Step.Id, PosShort)] =
+    val selectDid: Query[DatasetReference, Dataset.Id] =
+      sql"""
+        SELECT c_dataset_id
+          FROM t_dataset
+         WHERE c_dataset_reference = $dataset_reference
+      """.query(dataset_id)
+
+    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), Dataset.Id] =
       sql"""
         INSERT INTO t_dataset (
           c_step_id,
@@ -185,10 +172,8 @@ object DatasetService {
           $dataset_filename,
           ${dataset_qa_state.opt}
         RETURNING
-          c_dataset_id,
-          c_step_id,
-          c_index
-      """.query(dataset_id *: step_id *: int2_pos)
+          c_dataset_id
+      """.query(dataset_id)
 
     def UpdateDatasets(
       SET:   DatasetPropertiesInput,

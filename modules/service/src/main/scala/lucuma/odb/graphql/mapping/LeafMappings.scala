@@ -16,7 +16,6 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
-import lucuma.ags.GuideProbe
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
@@ -25,6 +24,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -34,6 +34,7 @@ import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
@@ -67,6 +68,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
+      LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
       LeafMapping[Tag](ConditionsMeasurementSourceType),
       LeafMapping[Tag](ConditionsSourceType),
@@ -108,7 +110,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosYBinning](GmosYBinningType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
-      LeafMapping[GuideState](GuideStateType),
+      LeafMapping[StepGuideState](GuideStateType),
       LeafMapping[ImageQuality](ImageQualityType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
@@ -123,6 +125,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](ObsAttachmentTypeType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
+      LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[Tag](PartnerType),
@@ -147,6 +150,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[Site](SiteType),
       LeafMapping[SkyBackground](SkyBackgroundType),
+      LeafMapping[SlewStage](SlewStageType),
       LeafMapping[SmartGcalType](SmartGcalTypeType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
       LeafMapping[Step.Id](StepIdType),

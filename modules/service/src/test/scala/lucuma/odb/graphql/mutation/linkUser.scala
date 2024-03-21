@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
-import cats.syntax.all._
+import cats.syntax.all.*
 import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*

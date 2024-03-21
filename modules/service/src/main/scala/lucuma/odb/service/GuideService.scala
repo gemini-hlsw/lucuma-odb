@@ -17,11 +17,11 @@ import io.circe.generic.semiauto.*
 import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
-import lucuma.ags.AgsPosition
-import lucuma.ags.GuideProbe
-import lucuma.ags.GuideStarCandidate
 import lucuma.ags.*
+import lucuma.ags.AgsPosition
+import lucuma.ags.GuideStarCandidate
 import lucuma.catalog.votable.*
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site

@@ -4,11 +4,11 @@
 package lucuma.odb.graphql.input
 
 import cats.Eq
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
-import grackle.Predicate._
-import lucuma.odb.graphql.binding._
+import grackle.Predicate.*
+import lucuma.odb.graphql.binding.*
 
 object WhereEq {
 

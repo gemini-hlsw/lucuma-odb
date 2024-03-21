@@ -12,11 +12,12 @@ import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.math.RightAscension
-import lucuma.core.math.arb.ArbRightAscension.*
+import lucuma.core.math.arb.ArbRightAscension
 import munit.DisciplineSuite
 
 abstract class RightAscensionSuite(using Encoder[RightAscension]) extends DisciplineSuite with ArbitraryInstances {
 
+  import ArbRightAscension.given
   import rightascension.decoder.given
 
   checkAll("RightAscensionCodec", CodecTests[RightAscension].codec)
@@ -24,6 +25,7 @@ abstract class RightAscensionSuite(using Encoder[RightAscension]) extends Discip
 
 class RightAscensionQuerySuite extends RightAscensionSuite(using rightascension.query.Encoder_Right_Ascension) {
 
+  import ArbRightAscension.given
   import rightascension.query.given
 
   test("all rightascension encoders produce the same rightascension") {

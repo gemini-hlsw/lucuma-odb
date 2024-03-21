@@ -8,7 +8,7 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Path
 import grackle.Predicate
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 
 //# Input for bulk updating multiple observations.  Select observations

@@ -30,13 +30,13 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances {
 
   import ArbAtom.given
   import ArbDataset.given
-  import ArbDynamicConfig._
-  import ArbGid.*
+  import ArbDynamicConfig.given
+  import ArbGid.given
   import ArbInstrumentExecutionConfig.given
   import ArbExecutionConfig.given
   import ArbExecutionSequence.given
   import ArbSequenceDigest.given
-  import ArbStaticConfig._
+  import ArbStaticConfig.given
   import ArbStep.given
 
   import offset.query.given

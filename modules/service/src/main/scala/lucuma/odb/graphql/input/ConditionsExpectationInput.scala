@@ -8,7 +8,7 @@ package input
 import cats.syntax.all.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 final case class ConditionsExpectationInput(
    tpe: Tag,

@@ -8,7 +8,7 @@ import cats.Semigroup
 import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.syntax.all._
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
@@ -26,19 +26,19 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.odb.data.*
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.odb.data._
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
 import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.service.ProgramService.LinkUserResponse.Success
-import lucuma.odb.util.Codecs._
+import lucuma.odb.util.Codecs.*
 import natchez.Trace
-import skunk._
-import skunk.codec.all._
-import skunk.syntax.all._
+import skunk.*
+import skunk.codec.all.*
+import skunk.syntax.all.*
 
 import OdbErrorExtensions.*
 import Services.Syntax.*

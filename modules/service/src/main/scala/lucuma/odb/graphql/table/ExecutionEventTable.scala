@@ -11,6 +11,7 @@ import lucuma.odb.util.Codecs.execution_event_id
 import lucuma.odb.util.Codecs.execution_event_type
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.sequence_command
+import lucuma.odb.util.Codecs.slew_stage
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_stage
 import lucuma.odb.util.Codecs.visit_id
@@ -27,6 +28,7 @@ trait ExecutionEventTable[F[_]] extends BaseMapping[F] {
     val StepId: ColumnRef          = col("c_step_id",            step_id)
     val DatasetId: ColumnRef       = col("c_dataset_id",         dataset_id)
 
+    val SlewStage: ColumnRef       = col("c_slew_stage",         slew_stage)
     val SequenceCommand: ColumnRef = col("c_sequence_command",   sequence_command)
     val StepStage: ColumnRef       = col("c_step_stage",         step_stage)
     val DatasetStage: ColumnRef    = col("c_dataset_stage",      dataset_stage)

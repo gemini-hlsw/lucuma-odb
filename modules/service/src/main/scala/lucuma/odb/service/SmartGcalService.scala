@@ -28,10 +28,10 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.TimeSpan
-import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ North => GmosNorthSearchKey}
-import lucuma.odb.smartgcal.data.Gmos.SearchKey.{ South => GmosSouthSearchKey}
-import lucuma.odb.smartgcal.data.Gmos.TableRow.{ North  => GmosNorthTableRow}
-import lucuma.odb.smartgcal.data.Gmos.TableRow.{ South  => GmosSouthTableRow}
+import lucuma.odb.smartgcal.data.Gmos.SearchKey.North as GmosNorthSearchKey
+import lucuma.odb.smartgcal.data.Gmos.SearchKey.South as GmosSouthSearchKey
+import lucuma.odb.smartgcal.data.Gmos.TableRow.North as GmosNorthTableRow
+import lucuma.odb.smartgcal.data.Gmos.TableRow.South as GmosSouthTableRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*

@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 case class CreateTargetInput(
   programId:         Option[Program.Id],

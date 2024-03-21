@@ -8,8 +8,8 @@ package sourceprofile
 import coulomb.Quantity
 import lucuma.core.math.BrightnessUnits.LineWidthQuantity
 import lucuma.core.math.LineWidthValue
-import lucuma.core.math.units._
-import lucuma.odb.graphql.binding._
+import lucuma.core.math.units.*
+import lucuma.odb.graphql.binding.*
 
 val LineWidthBinding: Matcher[LineWidthQuantity] =
   BigDecimalBinding.emap { d =>

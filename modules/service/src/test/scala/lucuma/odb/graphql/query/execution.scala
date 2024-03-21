@@ -31,8 +31,8 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.GuideState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepStage
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
@@ -2161,8 +2161,8 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   private val GmosNorthFlat0 = GmosNorthScience0.copy(exposure = OneSecond)
   private val GmosNorthFlat5 = GmosNorthScience5.copy(exposure = OneSecond)
 
-  private val Science00 = StepConfig.Science(Offset.Zero, GuideState.Enabled)
-  private val Science15 = StepConfig.Science(Offset.microarcseconds.reverseGet((0, 15_000_000L)), GuideState.Enabled)
+  private val Science00 = StepConfig.Science(Offset.Zero, StepGuideState.Enabled)
+  private val Science15 = StepConfig.Science(Offset.microarcseconds.reverseGet((0, 15_000_000L)), StepGuideState.Enabled)
   private val Flat      = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
 
   private def setupOneStepGmosNorth(count: Int): IO[(Observation.Id, Step.Id, Dataset.Id)] = {

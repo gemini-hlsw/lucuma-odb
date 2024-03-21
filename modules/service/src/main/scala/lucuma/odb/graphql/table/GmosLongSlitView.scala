@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package table
 
-import lucuma.odb.util.Codecs._
-import lucuma.odb.util.GmosCodecs._
-import skunk.circe.codec.json._
-import skunk.codec.all._
+import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GmosCodecs.*
+import skunk.circe.codec.json.*
+import skunk.codec.all.*
 
 trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
 

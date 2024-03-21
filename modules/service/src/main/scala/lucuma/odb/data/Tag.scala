@@ -4,8 +4,8 @@
 package lucuma.odb.data
 
 import cats.kernel.Order
-import io.circe._
-import lucuma.core.syntax.string._
+import io.circe.*
+import lucuma.core.syntax.string.*
 
 /**
  * A tag, for generic treatment of enumerated types. We assume they are stored in lowercase in the

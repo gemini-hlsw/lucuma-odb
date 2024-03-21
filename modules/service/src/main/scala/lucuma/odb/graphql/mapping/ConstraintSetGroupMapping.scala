@@ -5,11 +5,11 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Predicate
-import grackle.Predicate._
+import grackle.Predicate.*
 import grackle.Query
-import grackle.Query._
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
@@ -19,7 +19,7 @@ import lucuma.odb.graphql.table.ConstraintSetGroupView
 
 import table.ObservationView
 import table.ProgramTable
-import binding._
+import binding.*
 
 trait ConstraintSetGroupMapping[F[_]]
   extends ConstraintSetGroupView[F]

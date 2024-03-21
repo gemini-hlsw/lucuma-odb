@@ -13,8 +13,8 @@ import lucuma.odb.util.Codecs.gcal_filter
 import lucuma.odb.util.Codecs.gcal_shutter
 import lucuma.odb.util.Codecs.guide_state
 import lucuma.odb.util.Codecs.instrument
+import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.obs_class
-import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.smart_gcal_type
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type
@@ -25,7 +25,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F] {
 
   object StepRecordView extends TableDef("v_step_record") {
     val Id: ColumnRef            = col("c_step_id",        step_id)
-    val ObservationId: ColumnRef = col("c_observation_id", observation_id)
+    val StepIndex: ColumnRef     = col("c_step_index",     int4_pos)
     val Instrument: ColumnRef    = col("c_instrument",     instrument)
     val AtomId: ColumnRef        = col("c_atom_id",        atom_id)
     val StepType: ColumnRef      = col("c_step_type",      step_type)
@@ -35,7 +35,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F] {
     val Completed: ColumnRef     = col("c_completed",      core_timestamp.opt)
 
     object Gcal {
-      val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum)
+      val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum.opt)
       val ArArc: ColumnRef     = col("c_gcal_ar_arc",    bool)
       val CuarArc: ColumnRef   = col("c_gcal_cuar_arc",  bool)
       val TharArc: ColumnRef   = col("c_gcal_thar_arc",  bool)

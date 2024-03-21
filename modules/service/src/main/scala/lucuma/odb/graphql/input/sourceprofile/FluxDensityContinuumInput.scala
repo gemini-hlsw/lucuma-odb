@@ -5,13 +5,13 @@ package lucuma.odb.graphql
 package input
 package sourceprofile
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.math.BrightnessUnits._
+import lucuma.core.math.BrightnessUnits.*
 import lucuma.core.math.dimensional.Measure
 import lucuma.core.math.dimensional.Units
 import lucuma.core.util.*
-import lucuma.odb.graphql.binding._
+import lucuma.odb.graphql.binding.*
 
 object FluxDensityContinuumInput {
 

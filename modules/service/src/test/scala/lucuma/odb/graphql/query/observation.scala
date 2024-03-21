@@ -6,7 +6,7 @@ package query
 
 import cats.effect.IO
 import io.circe.Json
-import io.circe.literal._
+import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
