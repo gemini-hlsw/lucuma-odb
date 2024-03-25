@@ -42,6 +42,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
+import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
@@ -75,18 +76,18 @@ trait Codecs {
   def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
     `enum`(ev.tag, ev.fromTag, tpe)
 
-  private def idCodecFromPrism[A](prism: Prism[String, A]): Codec[A] =
+  private def codecFromPrism[A](prism: Prism[String, A], tpe: Type): Codec[A] =
     Codec.simple(
       prism.reverseGet,
       s => prism.getOption(s).toRight(s"Invalid: $s"),
-      Type.varchar
+      tpe
     )
 
   def gid[A](implicit ev: Gid[A]): Codec[A] =
-    idCodecFromPrism(ev.fromString)
+    codecFromPrism(ev.fromString, Type.varchar)
 
   def uid[A](implicit ev: Uid[A]): Codec[A] =
-    idCodecFromPrism(ev.fromString)
+    codecFromPrism(ev.fromString, Type.varchar)
 
   final case class DomainCodec[A](domainName: String, codec: Codec[A]) extends Codec[A]:
     export codec.* // delegate everything!
@@ -611,6 +612,10 @@ trait Codecs {
 
   val user_invitation_status: Codec[UserInvitation.Status] =
     enumerated(Type("e_invitation_status"))
+
+  val email_address: Codec[EmailAddress] =
+    codecFromPrism(EmailAddress.fromString, Type("citext"))
+    
 
 }
 
