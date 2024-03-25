@@ -6793,6 +6793,55 @@ enum Instrument {
   ZORRO
 }
 
+type SpectroscopyConfigOption {
+  name:               String!
+  instrument:         Instrument!
+  site:               Site!
+
+  slitWidth:          Angle!
+  slitLength:         Angle!
+
+  wavelengthMin:      Angle!
+  wavelengthMax:      Angle!
+  wavelengthOptimal:  Angle!
+  wavelengthCoverage: Angle!
+
+  resolution:         PosInt!
+
+  adaptiveOptics:     Boolean!
+
+  capability:         SpectroscopyCapabilities
+
+  fpuLabel:           String! # e.g., '0.25"'
+  disperserLabel:     String! # e.g., 'B1200'
+  filterLabel:        String! # e.g., 'JH'
+
+  """
+  For GMOS North options, the GMOS North configuration.  Null for other
+  instruments.
+  """
+  gmosNorth: SpectroscopyConfigOptionGmosNorth
+
+  """
+  For GMOS South options, the GMOS South configuration.  Null for other
+  instruments.
+  """
+  gmosSouth: SpectroscopyConfigOptionGmosSouth
+
+}
+
+type SpectroscopyConfigOptionGmosNorth {
+  fpu:     GmosNorthBuiltinFpu!
+  grating: GmosNorthGrating!
+  filter:  GmosNorthFilter
+}
+
+type SpectroscopyConfigOptionGmosSouth {
+  fpu:     GmosSouthBuiltinFpu!
+  grating: GmosSouthGrating!
+  filter:  GmosSouthFilter
+}
+
 """
 An 'Int` in the range 0 to 100
 """
