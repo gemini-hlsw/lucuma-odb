@@ -49,6 +49,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
@@ -1180,7 +1181,8 @@ trait DatabaseOperations { this: OdbSuite =>
     pid: Program.Id, 
     role: ProgramUserRole = ProgramUserRole.Coi,
     supportType: Option[ProgramUserSupportType] = None,
-    supportPartner: Option[Tag] = None
+    supportPartner: Option[Tag] = None,
+    recipientEmail: EmailAddress = EmailAddress.fromString.getOption("bob@dobbs.com").get
   ): IO[UserInvitation] =
     query(
       user = user,
@@ -1189,6 +1191,7 @@ trait DatabaseOperations { this: OdbSuite =>
         createUserInvitation(
           input: {
             programId: "$pid"
+            recipientEmail: "$recipientEmail"
             role: ${role.tag.toUpperCase}
             ${supportType.map(_.tag.toUpperCase).foldMap(s => s"supportType: $s")}
             ${supportPartner.map(_.value.toUpperCase).foldMap(s => s"supportPartner: $s")}
