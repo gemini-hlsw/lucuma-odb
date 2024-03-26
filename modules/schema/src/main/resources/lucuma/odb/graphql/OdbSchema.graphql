@@ -12,6 +12,9 @@ enum FilterType { DUMMY }
 enum ProposalAttachmentType { DUMMY }
 enum ProposalStatus { DUMMY }
 
+"""Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
+scalar EmailAddress
+
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
 
@@ -2210,6 +2213,9 @@ input CreateUserInvitationInput {
   "The program to add a user to."
   programId: ProgramId!
 
+  "The recipient to whom the invitation should be sent."
+  recipientEmail: EmailAddress!
+
   "The role this user will play in the program."
   role: ProgramUserRole!
 
@@ -2248,6 +2254,9 @@ type UserInvitation {
 
   "User who issued the invitation."
   issuer: User!
+
+  "Recipient email address."
+  recipientEmail: EmailAddress!
 
   "User who redeemed the invitation, if any."
   redeemer: User

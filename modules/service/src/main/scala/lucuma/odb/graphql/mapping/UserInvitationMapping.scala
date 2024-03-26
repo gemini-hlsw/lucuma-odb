@@ -19,6 +19,7 @@ trait UserInvitationMapping[F[_]] extends ProgramTable[F] with UserTable[F] with
         SqlField("status", UserInvitationTable.Status),
         SqlObject("issuer", Join(UserInvitationTable.IssuerId, UserTable.UserId)),
         SqlObject("program", Join(UserInvitationTable.ProgramId, ProgramTable.Id)),
+        SqlField("recipientEmail", UserInvitationTable.RecipientEmail),
         SqlField("role", UserInvitationTable.Role),
         SqlField("supportType", UserInvitationTable.SupportType),
         SqlField("supportPartner", UserInvitationTable.SupportPartner),

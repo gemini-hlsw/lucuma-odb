@@ -70,6 +70,7 @@ trait BaseMapping[F[_]]
   lazy val DirectorsTimeType                   = schema.ref("DirectorsTime")
   lazy val DmsStringType                       = schema.ref("DmsString")
   lazy val EditTypeType                        = schema.ref("EditType")
+  lazy val EmailAddressType                    = schema.ref("EmailAddress")
   lazy val ElevationRangeType                  = schema.ref("ElevationRange")
   lazy val EngineeringProgramReferenceType     = schema.ref("EngineeringProgramReference")
   lazy val EphemerisKeyTypeType                = schema.ref("EphemerisKeyType")
