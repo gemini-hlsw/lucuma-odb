@@ -19,9 +19,9 @@ class spectroscopyConfigOptions extends OdbSuite {
       query = s"""
         query {
           spectroscopyConfigOptions(
-            requirements: {
-              focalPlane: SINGLE_SLIT
-              resolution: 7000
+            WHERE: {
+              focalPlane: { EQ: SINGLE_SLIT }
+              resolution: { GTE: 7000 }
             }
           ) {
             name
