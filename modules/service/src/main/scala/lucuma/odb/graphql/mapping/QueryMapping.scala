@@ -7,6 +7,7 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all.*
+import eu.timepit.refined.cats.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
@@ -24,6 +25,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
@@ -62,6 +64,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("programs"),
         SqlObject("proposalAttachmentTypeMeta"),
         SqlObject("proposalStatusMeta"),
+        SqlObject("spectroscopyConfigOptions"),
         SqlObject("target"),
         SqlObject("targetGroup"),
         SqlObject("targets"),
@@ -85,6 +88,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Programs,
       ProposalAttachmentTypeMeta,
       ProposalStatusMeta,
+      SpectroscopyConfigOptions,
       Target,
       TargetGroup,
       Targets,
@@ -430,6 +434,30 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
     }
   }
+
+  private lazy val SpectroscopyConfigOptions: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "spectroscopyConfigOptions", List(
+      SpectroscopyScienceRequirementsInput.Binding.Option("requirements", rReq)
+    )) =>
+      Elab.transformChild { child =>
+        rReq.map { req =>
+          Filter(
+            (req.fold(Predicate.True) { r =>
+              and(
+                List(
+                  r.focalPlane.toOption.map { p =>
+                    Predicates.spectroscopyConfigOption.focalPlane.eql(p)
+                  },
+                  r.resolution.toOption.map { r =>
+                    Predicates.spectroscopyConfigOption.resolution.gtEql(r)
+                  }
+                ).flatMap(_.toList)
+              )
+            }),
+            child
+          )
+        }
+      }
 
   private lazy val Target: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "target", List(

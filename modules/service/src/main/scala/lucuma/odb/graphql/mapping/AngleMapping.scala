@@ -9,10 +9,14 @@ import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.util.MappingExtras
 
 
-trait AngleMapping[F[_]] extends ObservationView[F] with ChronConditionsEntryView[F] with MappingExtras[F] {
+trait AngleMapping[F[_]] extends ObservationView[F]
+                            with ChronConditionsEntryView[F]
+                            with SpectroscopyConfigOptionTable[F]
+                            with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
   private val µPerSec: Long   = 1000L * µPerMilli
@@ -23,13 +27,16 @@ trait AngleMapping[F[_]] extends ObservationView[F] with ChronConditionsEntryVie
   private def angleToArc(µas: Long)(a: Angle): BigDecimal = BigDecimal(a.toMicroarcseconds) / µas
 
   private def angleMapping(
-    idColumn: ColumnRef,
-    valueColumn: ColumnRef
+    valueColumn: ColumnRef,
+    idColumns: ColumnRef*
   ): ObjectMapping =
     ObjectMapping(
       tpe = AngleType,
-      fieldMappings = List(
-        SqlField("synthetic_id", idColumn, key = true, hidden = true),
+      fieldMappings =
+       (idColumns.toList.zipWithIndex.map { (ref, idx) =>
+          SqlField(s"synthetic_id$idx", ref, key = true, hidden = true)
+        }) ++
+       List(
         SqlField("value", valueColumn, hidden = true),
         FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
         FieldRef[Angle]("value").as("microseconds",    angleToTime(1L)),
@@ -52,11 +59,20 @@ trait AngleMapping[F[_]] extends ObservationView[F] with ChronConditionsEntryVie
     SwitchMapping(
       AngleType,
       List(
-        PosAngleConstraintType / "angle"                        -> angleMapping(ObservationView.Id, ObservationView.PosAngleConstraint.Angle),
-        SpectroscopyScienceRequirementsType / "focalPlaneAngle" -> angleMapping(Spectroscopy.FocalPlaneAngle.SyntheticId, Spectroscopy.FocalPlaneAngle.Value),
-        ConditionsMeasurementType / "seeing"                    -> angleMapping(ChronConditionsEntryView.Measurement.Seeing.SyntheticId, ChronConditionsEntryView.Measurement.Seeing.Value),
-        ConditionsMeasurementType / "elevation"                 -> angleMapping(ChronConditionsEntryView.Measurement.Pointing.SyntheticId, ChronConditionsEntryView.Measurement.Pointing.Elevation),
-        ConditionsMeasurementType / "azimuth"                   -> angleMapping(ChronConditionsEntryView.Measurement.Pointing.SyntheticId, ChronConditionsEntryView.Measurement.Pointing.Azimuth),
+        PosAngleConstraintType / "angle"                        ->
+          angleMapping(ObservationView.PosAngleConstraint.Angle, ObservationView.Id),
+        SpectroscopyScienceRequirementsType / "focalPlaneAngle" ->
+          angleMapping(Spectroscopy.FocalPlaneAngle.Value, Spectroscopy.FocalPlaneAngle.SyntheticId),
+        ConditionsMeasurementType / "seeing"                    ->
+          angleMapping(ChronConditionsEntryView.Measurement.Seeing.Value, ChronConditionsEntryView.Measurement.Seeing.SyntheticId),
+        ConditionsMeasurementType / "elevation"                 ->
+          angleMapping(ChronConditionsEntryView.Measurement.Pointing.Elevation, ChronConditionsEntryView.Measurement.Pointing.SyntheticId),
+        ConditionsMeasurementType / "azimuth"                   ->
+          angleMapping(ChronConditionsEntryView.Measurement.Pointing.Azimuth, ChronConditionsEntryView.Measurement.Pointing.SyntheticId),
+        SpectroscopyConfigOptionType / "slitWidth"              ->
+          angleMapping(SpectroscopyConfigOptionTable.SlitWidth, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
+        SpectroscopyConfigOptionType / "slitLength"             ->
+          angleMapping(SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index)
       )
     )
 }

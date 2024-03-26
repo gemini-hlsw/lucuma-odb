@@ -9,7 +9,7 @@ import skunk.codec.boolean.bool
 
 trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
 
-  object SpectrsocopyConfigOptionTable extends TableDef("t_spectroscopy_config_option") {
+  object SpectroscopyConfigOptionTable extends TableDef("t_spectroscopy_config_option") {
     val Instrument         = col("c_instrument",  instrument)
     val Index              = col("c_index",       int4_pos)
 
