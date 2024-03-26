@@ -47,12 +47,14 @@ class createUserInvitation extends OdbSuite {
             createUserInvitation(
               input: {
                 programId: "$pid"
+                recipientEmail: "bob@dobbs.com"
                 role: ${pur.tag.toUpperCase}
               }
             ) {
               invitation {
                 status
                 issuer { id }
+                recipientEmail
                 redeemer { id }
                 program { id }
                 role
@@ -71,6 +73,7 @@ class createUserInvitation extends OdbSuite {
                     "issuer" : {
                       "id" : ${pi.id}
                     },
+                    "recipientEmail": "bob@dobbs.com",
                     "redeemer" : null,
                     "program" : {
                       "id" : $pid
@@ -97,6 +100,7 @@ class createUserInvitation extends OdbSuite {
           createUserInvitation(
             input: {
               programId: "$pid"
+              recipientEmail: "bob@dobbs.com"
               role: ${ProgramUserRole.Support.tag.toUpperCase}
               supportType: ${ProgramUserSupportType.Staff.tag.toUpperCase()}
             }
@@ -147,6 +151,7 @@ class createUserInvitation extends OdbSuite {
           createUserInvitation(
             input: {
               programId: "$pid"
+              recipientEmail: "bob@dobbs.com"
               role: ${ProgramUserRole.Support.tag.toUpperCase}
               supportType: ${ProgramUserSupportType.Partner.tag.toUpperCase()}
               supportPartner: CA
@@ -198,6 +203,7 @@ class createUserInvitation extends OdbSuite {
           createUserInvitation(
             input: {
               programId: "$pid"
+              recipientEmail: "bob@dobbs.com"
               role: ${ProgramUserRole.Support.tag.toUpperCase}
               supportType: ${ProgramUserSupportType.Partner.tag.toUpperCase()}
             }
@@ -223,6 +229,7 @@ class createUserInvitation extends OdbSuite {
         createUserInvitation(
           input: {
             programId: "p-ffff"
+            recipientEmail: "bob@dobbs.com"
             role: ${ProgramUserRole.Coi.tag.toUpperCase}
           }
         ) {
@@ -246,6 +253,7 @@ class createUserInvitation extends OdbSuite {
           createUserInvitation(
             input: {
               programId: "$pid"
+              recipientEmail: "bob@dobbs.com"
               role: ${ProgramUserRole.Coi.tag.toUpperCase}
             }
           ) {
@@ -269,6 +277,7 @@ class createUserInvitation extends OdbSuite {
           createUserInvitation(
             input: {
               programId: "$pid"
+              recipientEmail: "bob@dobbs.com"
               role: ${ProgramUserRole.Coi.tag.toUpperCase}
             }
           ) {
@@ -307,6 +316,7 @@ class createUserInvitation extends OdbSuite {
             createUserInvitation(
               input: {
                 programId: "$pid"
+                recipientEmail: "bob@dobbs.com"
                 role: SUPPORT
                 supportType: PARTNER
                 supportPartner: ${partner.tag.toUpperCase}

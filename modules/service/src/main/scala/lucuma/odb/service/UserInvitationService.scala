@@ -15,6 +15,7 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramUserRole
@@ -54,11 +55,11 @@ object UserInvitationService:
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
       
-      def createPiInvitation(pid: Program.Id, role: ProgramUserRole.Coi.type | ProgramUserRole.Observer.type): F[Result[UserInvitation]] =
+      def createPiInvitation(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.Observer.type): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createPiInvitation)
           .use: pq =>
-            pq.option(user, pid, role)
+            pq.option(user, pid, email, role)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or user is not the PI.")).asProblem))
 
       def createSuperUserInvitation(input: CreateUserInvitationInput) =
@@ -68,11 +69,11 @@ object UserInvitationService:
             pq.option(user, input)
               .map(Result.fromOption(_, OdbError.InvalidProgram(input.programId, Some("Specified program does not exist.")).asProblem))
 
-      def createNgoInvitation(pid: Program.Id, partner: Tag): F[Result[UserInvitation]] =
+      def createNgoInvitation(pid: Program.Id, email: EmailAddress, partner: Tag): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createNgoInvitation)
           .use: pq =>
-            pq.option(user, pid, partner)
+            pq.option(user, pid, email, partner)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or has no partner-allocated time.")).asProblem))
 
       def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
@@ -89,15 +90,15 @@ object UserInvitationService:
           // NGO user can only create NGO support invitations
           case StandardRole.Ngo(_, p) =>
             input match
-              case CreateUserInvitationInput.NgoSupportSupport(pid, t) if t.value == p.tag => createNgoInvitation(pid, t)
+              case CreateUserInvitationInput.NgoSupportSupport(pid, t, e) if t.value == p.tag => createNgoInvitation(pid, e, t)
               case _ => OdbError.NotAuthorized(user.id, Some("NGO users can only ngo support invitations, and only for their partner.")).asFailureF
 
           // Science users can only create CoI or Observer invitations, and only if they're the PI
           case StandardRole.Pi(_)     => 
             input match
-              case CreateUserInvitationInput.Coi(pid)      => createPiInvitation(pid, ProgramUserRole.Coi)
-              case CreateUserInvitationInput.Observer(pid) => createPiInvitation(pid, ProgramUserRole.Observer)
-              case _                                       => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
+              case CreateUserInvitationInput.Coi(pid, e)      => createPiInvitation(pid, e, ProgramUserRole.Coi)
+              case CreateUserInvitationInput.Observer(pid, e) => createPiInvitation(pid, e, ProgramUserRole.Observer)
+              case _                                          => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
 
       def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
         user match
@@ -141,6 +142,7 @@ object UserInvitationService:
         select insert_invitation(
           $user_id,
           $program_id,
+          $email_address,
           $program_user_role,
           ${program_user_support_type.opt},
           ${tag.opt}
@@ -149,17 +151,18 @@ object UserInvitationService:
       """
         .query(user_invitation)
         .contramap {
-          case (u, CreateUserInvitationInput.Coi(pid))                  => (u.id, pid, ProgramUserRole.Coi, None, None, pid)
-          case (u, CreateUserInvitationInput.Observer(pid))             => (u.id, pid, ProgramUserRole.Observer, None, None, pid)
-          case (u, CreateUserInvitationInput.NgoSupportSupport(pid, p)) => (u.id, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(p), pid)
-          case (u, CreateUserInvitationInput.StaffSupport(pid))         => (u.id, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff), None, pid)
+          case (u, CreateUserInvitationInput.Coi(pid, e))                  => (u.id, pid, e, ProgramUserRole.Coi, None, None, pid)
+          case (u, CreateUserInvitationInput.Observer(pid, e))             => (u.id, pid, e, ProgramUserRole.Observer, None, None, pid)
+          case (u, CreateUserInvitationInput.NgoSupportSupport(pid, p, e)) => (u.id, pid, e, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(p), pid)
+          case (u, CreateUserInvitationInput.StaffSupport(pid, e))         => (u.id, pid, e, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff), None, pid)
         }
 
-    val createPiInvitation: Query[(User, Program.Id, ProgramUserRole), UserInvitation] =
+    val createPiInvitation: Query[(User, Program.Id, EmailAddress, ProgramUserRole), UserInvitation] =
       sql"""
         select insert_invitation(
           $user_id,
           $program_id,
+          $email_address,
           $program_user_role,
           null,
           null
@@ -168,13 +171,14 @@ object UserInvitationService:
         and c_pi_user_id = $user_id
       """
         .query(user_invitation)
-        .contramap((u, pid, r) => (u.id, pid, r, pid, u.id))
+        .contramap((u, pid, e, r) => (u.id, pid, e, r, pid, u.id))
 
-    val createNgoInvitation: Query[(User, Program.Id, Tag), UserInvitation] =
+    val createNgoInvitation: Query[(User, Program.Id, EmailAddress, Tag), UserInvitation] =
       sql"""
         select insert_invitation(
           $user_id,
           $program_id,
+          $email_address,
           $program_user_role,
           $program_user_support_type,
           $tag
@@ -183,7 +187,7 @@ object UserInvitationService:
         and exists (select * from t_allocation where c_partner = $tag and c_program_id = $program_id and c_duration > '0'::interval)
       """
         .query(user_invitation)
-        .contramap((u, pid, p) => (u.id, pid, ProgramUserRole.Support, ProgramUserSupportType.Partner, p, pid, p, pid))
+        .contramap((u, pid, e, p) => (u.id, pid, e, ProgramUserRole.Support, ProgramUserSupportType.Partner, p, pid, p, pid))
 
     val redeemUserInvitation: Query[(User, UserInvitation.Status, UserInvitation), (ProgramUserRole, Option[ProgramUserSupportType], Option[Tag], Program.Id)] =
       sql"""
