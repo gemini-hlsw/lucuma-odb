@@ -8137,7 +8137,7 @@ type Query {
   # ): ScienceRequirementsGroupSelectResult!
 
   spectroscopyConfigOptions(
-    requirements: SpectroscopyScienceRequirementsInput
+    WHERE: WhereSpectroscopyConfigOption
   ): [SpectroscopyConfigOption!]!
 
   """
@@ -10759,6 +10759,29 @@ input WhereOrderGroupId {
   LTE: GroupId
 }
 
+input WhereEqFocalPlane {
+
+  """
+  Matches if the focal plane option is exactly the supplied value.
+  """
+  EQ: FocalPlane
+
+  """
+  Matches if the focal plane option is not the supplied value.
+  """
+  NEQ: FocalPlane
+
+  """
+  Matches if the focal plane option is any of the supplied values.
+  """
+  IN: [FocalPlane!]
+
+  """
+  Matches if the focal plane option is none of the supplied values.
+  """
+  NIN: [FocalPlane!]
+}
+
 """
 Filters on equality (or not) of the instrument and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
@@ -10849,6 +10872,40 @@ input WhereEqScienceSubtype {
   Matches if the subtype is none of the supplied values.
   """
   NIN: [ScienceSubtype!]
+}
+
+"""
+Filters on equality (or not) of the SpectroscopyCapabilities property. All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionEqSpectroscopyCapabilities {
+
+  """
+  When `true`, matches if the spectroscopy capability value is not defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the spectroscopy capability is the supplied value.
+  """
+  EQ: SpectroscopyCapabilities
+
+  """
+  Matches if the spectroscopy capability is anything other than the supplied
+  value.
+  """
+  NEQ: SpectroscopyCapabilities
+
+  """
+  Matches if the spectroscopy capability is any one of the supplied values.
+  """
+  IN: [SpectroscopyCapabilities!]
+
+  """
+  Matches if the spectroscopy capability is not any one of the supplied values.
+  """
+  NIN: [SpectroscopyCapabilities!]
+
 }
 
 """
@@ -11340,6 +11397,53 @@ input WhereOrderProgramId {
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
   LTE: ProgramId
+}
+
+"""
+Filters on equality or order comparisons of positive doubles.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2.0'.
+"""
+input WhereOrderPosDouble {
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: PosDouble
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: PosDouble
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [PosDouble!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [PosDouble!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: PosDouble
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: PosDouble
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosDouble
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosDouble
 }
 
 """
@@ -11891,6 +11995,34 @@ input WhereProposalPartners {
   Matching based on whether the proposal is a joint (i.e., multi-partner) proposal.
   """
   isJoint: Boolean
+}
+
+input WhereSpectroscopyConfigOption {
+
+  capability: WhereEqSpectroscopyCapabilities
+
+  focalPlane: WhereEqFocalPlane
+
+  instrument: WhereEqInstrument
+
+  resolution: WhereOrderPosInt
+
+  #site: WhereEqSite
+
+  #slitWidth: WhereAngle
+
+  #"""
+  #Matches configuration options that support the provided wavelength. In other
+  #words, those for which the given wavelength falls between the min and max
+  #limits of the configuration.
+  #"""
+  #wavelength: WavelengthInput
+
+  #"""
+  #Matches the configuration options
+  #"""
+  #wavelengthCoverage: WavelengthInput
+
 }
 
 """
