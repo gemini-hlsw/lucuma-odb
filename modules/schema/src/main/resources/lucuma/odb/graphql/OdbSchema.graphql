@@ -6796,11 +6796,15 @@ enum Instrument {
 type SpectroscopyConfigOption {
   name:               String!
   instrument:         Instrument!
-  site:               Site!
 
+  focalPlane:         FocalPlane!
+
+  fpuLabel:           String! # e.g., '0.25"'
   slitWidth:          Angle!
   slitLength:         Angle!
 
+  disperserLabel:     String! # e.g., 'B1200'
+  filterLabel:        String! # e.g., 'JH'
   wavelengthMin:      Angle!
   wavelengthMax:      Angle!
   wavelengthOptimal:  Angle!
@@ -6811,10 +6815,6 @@ type SpectroscopyConfigOption {
   adaptiveOptics:     Boolean!
 
   capability:         SpectroscopyCapabilities
-
-  fpuLabel:           String! # e.g., '0.25"'
-  disperserLabel:     String! # e.g., 'B1200'
-  filterLabel:        String! # e.g., 'JH'
 
   """
   For GMOS North options, the GMOS North configuration.  Null for other
@@ -8135,6 +8135,10 @@ type Query {
   #   # Set to true to include deleted values
   #   includeDeleted: Boolean! = false
   # ): ScienceRequirementsGroupSelectResult!
+
+  spectroscopyConfigOptions(
+    requirements: SpectroscopyScienceRequirementsInput
+  ): [SpectroscopyConfigOption!]!
 
   """
   Retrieves the target with the given id, if it exists
