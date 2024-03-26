@@ -19,7 +19,8 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
         SqlField("fpuLabel",   SpectroscopyConfigOptionTable.FpuLabel),
         SqlObject("slitWidth"),
         SqlObject("slitLength"),
-        SqlField("resolution", SpectroscopyConfigOptionTable.Resolution)
+        SqlField("resolution", SpectroscopyConfigOptionTable.Resolution),
+        SqlField("capability", SpectroscopyConfigOptionTable.Capability)
       )
     )
 
