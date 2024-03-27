@@ -31,6 +31,8 @@ object WhereSpectroscopyConfigOption {
         GtEql(path / "wavelengthMax" / "picometers", Const(w.toPicometers.value))
       ))
     }
+    val WhereOptimal      = WhereWavelength.binding(path / "wavelengthOptimal")
+    val WhereCoverage     = WhereWavelength.binding(path / "wavelengthCoverage")
 
     ObjectFieldsBinding.rmap {
       case List(
@@ -41,10 +43,13 @@ object WhereSpectroscopyConfigOption {
         WhereSite.Option("site", rSte),
         WhereSlitLength.Option("slitLength", rLen),
         WhereSlitWidth.Option("slitWidth", rWid),
-        RangeIncludes.Option("rangeIncludes", rRan)
+        RangeIncludes.Option("rangeIncludes", rRan),
+        WhereOptimal.Option("wavelengthOptimal", rOpt),
+        WhereCoverage.Option("wavelengthCoverage", rCov)
+
       ) =>
-        (rCap, rFoc, rIns, rRes, rSte, rLen, rWid, rRan).parMapN {
-          (cap, foc, ins, res, ste, len, wid, ran) =>
+        (rCap, rFoc, rIns, rRes, rSte, rLen, rWid, rRan, rOpt, rCov).parMapN {
+          (cap, foc, ins, res, ste, len, wid, ran, opt, cov) =>
             and(List(
               cap,
               foc,
@@ -53,7 +58,9 @@ object WhereSpectroscopyConfigOption {
               ste,
               len,
               wid,
-              ran
+              ran,
+              opt,
+              cov
             ).flatten)
         }
     }

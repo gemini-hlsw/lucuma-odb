@@ -11270,48 +11270,47 @@ input WhereOrderTimestamp {
 }
 
 """
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
+Filters on equality or order comparisons of the integer property.  All supplied
+criteria must match, but usually only one is selected.
 """
 input WhereOrderInt {
   """
-  Matches if the property is exactly the supplied value.
+  Matches if the integer is exactly the supplied value.
   """
   EQ: Int
 
   """
-  Matches if the property is not the supplied value.
+  Matches if the integer is not the supplied value.
   """
   NEQ: Int
 
   """
-  Matches if the property value is any of the supplied options.
+  Matches if the integer is any of the supplied options.
   """
   IN: [Int!]
 
   """
-  Matches if the property value is none of the supplied values.
+  Matches if the integer is none of the supplied values.
   """
   NIN: [Int!]
 
   """
-  Matches if the property is ordered after (>) the supplied value.
+  Matches if the integer is ordered after (>) the supplied value.
   """
   GT: Int
 
   """
-  Matches if the property is ordered before (<) the supplied value.
+  Matches if the integer is ordered before (<) the supplied value.
   """
   LT: Int
 
   """
-  Matches if the property is ordered after or equal (>=) the supplied value.
+  Matches if the integer is ordered after or equal (>=) the supplied value.
   """
   GTE: Int
 
   """
-  Matches if the property is ordered before or equal (<=) the supplied value.
+  Matches if the integer is ordered before or equal (<=) the supplied value.
   """
   LTE: Int
 }
@@ -11504,6 +11503,99 @@ input WhereOrderObservationId {
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
   LTE: ObservationId
+}
+
+"""
+Filters on equality or order comparisons of PosBigDecimal properties.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOrderPosBigDecimal {
+
+  """
+  Matches if the PosBigDecimal is exactly the supplied value.
+  """
+  EQ: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is not the supplied value.
+  """
+  NEQ: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is any of the supplied options.
+  """
+  IN: [PosBigDecimal!]
+
+  """
+  Matches if the PosBigDecimal is none of the supplied values.
+  """
+  NIN: [PosBigDecimal!]
+
+  """
+  Matches if the PosBigDecimal is ordered after (>) the supplied value.
+  """
+  GT: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is ordered before (<) the supplied value.
+  """
+  LT: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosBigDecimal
+}
+
+"""
+Filters on equality or order comparisons of the PosInt property.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderPosInt {
+  """
+  Matches if the PosInt is exactly the supplied value.
+  """
+  EQ: PosInt
+
+  """
+  Matches if the PosInt is not the supplied value.
+  """
+  NEQ: PosInt
+
+  """
+  Matches if the PosInt is any of the supplied options.
+  """
+  IN: [PosInt!]
+
+  """
+  Matches if the PosInt is none of the supplied values.
+  """
+  NIN: [PosInt!]
+
+  """
+  Matches if the PosInt is ordered after (>) the supplied value.
+  """
+  GT: PosInt
+
+  """
+  Matches if the PosInt is ordered before (<) the supplied value.
+  """
+  LT: PosInt
+
+  """
+  Matches if the PosInt is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosInt
+
+  """
+  Matches if the PosInt is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosInt
 }
 
 """
@@ -12174,10 +12266,9 @@ input WhereSpectroscopyConfigOption {
   """
   rangeIncludes: WavelengthInput
 
-  #"""
-  #Matches the configuration options
-  #"""
-  #wavelengthCoverage: WavelengthInput
+  wavelengthOptimal:  WhereWavelength
+
+  wavelengthCoverage: WhereWavelength
 
 }
 
@@ -12243,6 +12334,24 @@ input WhereTarget {
   Matches the target name.
   """
   name: WhereString
+}
+
+input WhereWavelength {
+
+  AND: [WhereWavelength!]
+
+  OR: [WhereWavelength!]
+
+  NOT: WhereWavelength
+
+  picometers: WhereOrderPosInt
+
+  angstroms: WhereOrderPosBigDecimal
+
+  nanometers: WhereOrderPosBigDecimal
+
+  micrometers: WhereOrderPosBigDecimal
+
 }
 
 type OffsetQ {
