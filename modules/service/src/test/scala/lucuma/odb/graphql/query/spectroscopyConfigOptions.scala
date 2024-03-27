@@ -142,6 +142,7 @@ class spectroscopyConfigOptions extends OdbSuite {
             slitLength { arcseconds }
 
             disperserLabel
+            filterLabel
 
             wavelengthMin { micrometers }
             wavelengthMax { micrometers }
@@ -171,6 +172,7 @@ class spectroscopyConfigOptions extends OdbSuite {
                 "arcseconds" : 330
               },
               "disperserLabel" : "R150",
+              "filterLabel": null,
               "wavelengthMin" : {
                 "micrometers" : 0.360000
               },
