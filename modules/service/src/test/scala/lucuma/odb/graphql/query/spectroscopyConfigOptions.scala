@@ -87,6 +87,8 @@ class spectroscopyConfigOptions extends OdbSuite {
         )
       }
 
+    def toNameSet(opts: Iterable[ConfigOption]): Set[(Instrument, String)] =
+      opts.map(o => (o.instrument, o.name)).toSet
   }
 
   def optionsWhere(where: String): IO[List[ConfigOption]] = {
@@ -235,14 +237,14 @@ class spectroscopyConfigOptions extends OdbSuite {
     )
   }
 
-  test("Wavelength (too small)") {
+  test("rangeIncludes (too small)") {
     expect(
       user = pi,
       query = s"""
         query {
           spectroscopyConfigOptions(
             WHERE: {
-              wavelength: { micrometers: 0.35 }
+              rangeIncludes: { micrometers: 0.35 }
             }
           ) {
             name
@@ -258,14 +260,14 @@ class spectroscopyConfigOptions extends OdbSuite {
     )
   }
 
-  test("Wavelength (in range)") {
+  test("rangeIncludes (in range)") {
     val w      = Wavelength.unsafeFromIntPicometers(463_000)
     val expect = optionsWhere("").map(_.filter(o => o.wavelengthMin < w && w < o.wavelengthMax))
-    val actual = optionsWhere(s"""wavelength: { micrometers: 0.463 }""")
+    val actual = optionsWhere(s"""rangeIncludes: { micrometers: 0.463 }""")
     assertIOBoolean(
       for {
-        es <- expect.map(_.map(o => (o.instrument, o.name)).toSet)
-        as <- actual.map(_.map(o => (o.instrument, o.name)).toSet)
+        es <- expect.map(ConfigOption.toNameSet)
+        as <- actual.map(ConfigOption.toNameSet)
       } yield es == as
     )
   }

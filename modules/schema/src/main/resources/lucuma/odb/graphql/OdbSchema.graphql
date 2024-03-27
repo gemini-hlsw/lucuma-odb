@@ -12172,7 +12172,7 @@ input WhereSpectroscopyConfigOption {
   words, those for which the given wavelength falls between the min and max
   limits of the configuration.
   """
-  wavelength: WavelengthInput
+  rangeIncludes: WavelengthInput
 
   #"""
   #Matches the configuration options
