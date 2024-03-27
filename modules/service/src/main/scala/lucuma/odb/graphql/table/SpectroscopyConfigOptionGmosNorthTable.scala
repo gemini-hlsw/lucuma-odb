@@ -9,7 +9,7 @@ import lucuma.odb.util.GmosCodecs.*
 
 trait SpectroscopyConfigOptionGmosNorthTable[F[_]] extends BaseMapping[F] {
 
-  object SpectrsocopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option") {
+  object SpectrsocopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
