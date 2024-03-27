@@ -39,7 +39,7 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
         SqlField("index",      SpectrsocopyConfigOptionGmosNorthTable.Index, key = true, hidden = true),
 
         SqlField("fpu",        SpectrsocopyConfigOptionGmosNorthTable.Fpu),
-        SqlField("grating",    SpectrsocopyConfigOptionGmosNorthTable.Disperser),
+        SqlField("grating",    SpectrsocopyConfigOptionGmosNorthTable.Grating),
         SqlField("filter",     SpectrsocopyConfigOptionGmosNorthTable.Filter)
       )
     )

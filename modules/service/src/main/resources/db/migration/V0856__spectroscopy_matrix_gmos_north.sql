@@ -8,16 +8,16 @@ CREATE TABLE t_spectroscopy_config_option_gmos_north (
   FOREIGN KEY (c_instrument, c_index) REFERENCES t_spectroscopy_config_option (c_instrument, c_index),
 
   c_fpu        d_tag NOT NULL REFERENCES t_gmos_north_fpu(c_tag),
-  c_disperser  d_tag NOT NULL REFERENCES t_gmos_north_disperser(c_tag),
+  c_grating    d_tag NOT NULL REFERENCES t_gmos_north_disperser(c_tag),
   c_filter     d_tag          REFERENCES t_gmos_north_filter(c_tag)
 );
 
 SELECT create_spectroscopy_config_option_temp_table(
   'gmos_north_temp',
   ARRAY[
-    'c_fpu       d_tag',
-    'c_disperser d_tag',
-    'c_filter    d_tag'
+    'c_fpu     d_tag',
+    'c_grating d_tag',
+    'c_filter  d_tag'
   ]
 );
 
@@ -74,13 +74,13 @@ INSERT INTO t_spectroscopy_config_option_gmos_north (
   c_instrument,
   c_index,
   c_fpu,
-  c_disperser,
+  c_grating,
   c_filter
 ) SELECT
   c_instrument,
   c_index,
   c_fpu,
-  c_disperser,
+  c_grating,
   c_filter
 FROM gmos_north_temp;
 
