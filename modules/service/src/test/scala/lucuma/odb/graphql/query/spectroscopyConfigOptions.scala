@@ -119,6 +119,7 @@ class spectroscopyConfigOptions extends OdbSuite {
         query {
           spectroscopyConfigOptions(
             WHERE: {
+              capability: { IS_NULL: true }
               focalPlane: { EQ: SINGLE_SLIT }
               instrument: { EQ: GMOS_NORTH }
               resolution: { LT: 500 }
