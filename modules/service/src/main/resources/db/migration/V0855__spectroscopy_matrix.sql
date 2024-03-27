@@ -24,7 +24,9 @@ CREATE TABLE t_spectroscopy_config_option (
 
   c_ao                   boolean         NOT NULL DEFAULT false,
 
-  c_capability           d_tag           DEFAULT NULL REFERENCES t_spectroscopy_capabilities(c_tag)
+  c_capability           d_tag           DEFAULT NULL REFERENCES t_spectroscopy_capabilities(c_tag),
+
+  c_site                 e_site          NOT NULL
 
 );
 COMMENT ON TABLE t_spectroscopy_config_option IS 'Spectroscopy Configuration Option';
@@ -41,7 +43,7 @@ DECLARE
   create_table_sql       TEXT;
 BEGIN
   -- All temporary tables will have the columns from t_spectroscopy_config_option
-  SELECT string_agg(column_name || ' ' || data_type, ', ' ORDER BY ordinal_position)
+  SELECT string_agg(column_name || ' ' || udt_name, ', ' ORDER BY ordinal_position)
   INTO common_columns_sql
   FROM information_schema.columns
   WHERE table_name = 't_spectroscopy_config_option';
