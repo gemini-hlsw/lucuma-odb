@@ -4,14 +4,137 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.order.*
+import cats.syntax.traverse.*
+import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
+
+import lucuma.core.enums.Instrument
+import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.Site
+import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.math.Angle
+import lucuma.core.math.Wavelength
 
 class spectroscopyConfigOptions extends OdbSuite {
 
   val pi = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
+
+  case class ConfigOption(
+    name:               String,
+    instrument:         Instrument,
+    focalPlane:         FocalPlane,
+    fpuLabel:           String,
+    slitWidth:          Angle,
+    slitLength:         Angle,
+    disperserLabel:     String,
+    filterLabel:        Option[String],
+    wavelengthMin:      Wavelength,
+    wavelengthMax:      Wavelength,
+    wavelengthOptimal:  Wavelength,
+    wavelengthCoverage: Wavelength,
+    resolution:         Int,
+    ao:                 Boolean,
+    capability:         Option[SpectroscopyCapabilities],
+    site:               Site
+  )
+
+  object ConfigOption {
+
+    import lucuma.odb.json.angle.decoder.given
+    import lucuma.odb.json.wavelength.decoder.given
+
+    given Decoder[ConfigOption] =
+      Decoder.instance { c =>
+        for {
+          name     <- c.downField("name").as[String]
+          inst     <- c.downField("instrument").as[Instrument]
+          fplane   <- c.downField("focalPlane").as[FocalPlane]
+          fpuLabel <- c.downField("fpuLabel").as[String]
+          sWidth   <- c.downField("slitWidth").as[Angle]
+          sLength  <- c.downField("slitLength").as[Angle]
+          disLabel <- c.downField("disperserLabel").as[String]
+          filLabel <- c.downField("filterLabel").as[Option[String]]
+          waveMin  <- c.downField("wavelengthMin").as[Wavelength]
+          waveMax  <- c.downField("wavelengthMax").as[Wavelength]
+          waveOpt  <- c.downField("wavelengthOptimal").as[Wavelength]
+          waveCov  <- c.downField("wavelengthCoverage").as[Wavelength]
+          res      <- c.downField("resolution").as[Int]
+          ao       <- c.downField("adaptiveOptics").as[Boolean]
+          cap      <- c.downField("capability").as[Option[SpectroscopyCapabilities]]
+          site     <- c.downField("site").as[Site]
+        } yield ConfigOption(
+          name,
+          inst,
+          fplane,
+          fpuLabel,
+          sWidth,
+          sLength,
+          disLabel,
+          filLabel,
+          waveMin,
+          waveMax,
+          waveOpt,
+          waveCov,
+          res,
+          ao,
+          cap,
+          site
+        )
+      }
+
+  }
+
+  def optionsWhere(where: String): IO[List[ConfigOption]] = {
+
+    query(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              $where
+            }
+          ) {
+            name
+            instrument
+
+            focalPlane
+
+            fpuLabel
+            slitWidth { arcseconds }
+            slitLength { arcseconds }
+
+            disperserLabel
+            filterLabel
+
+            wavelengthMin { micrometers }
+            wavelengthMax { micrometers }
+            wavelengthOptimal { micrometers }
+            wavelengthCoverage { micrometers }
+
+            resolution
+            adaptiveOptics
+            capability
+            site
+          }
+        }
+      """
+    ).flatMap {
+      _.hcursor
+       .downField("spectroscopyConfigOptions")
+       .values
+       .toList
+       .flatMap(_.toList)
+       .traverse(_.as[ConfigOption])
+       .leftMap(f => new RuntimeException(f.message))
+       .liftTo[IO]
+    }
+  }
 
   test("simple query") {
     expect(
@@ -109,6 +232,41 @@ class spectroscopyConfigOptions extends OdbSuite {
           ]
         }
       """.asRight
+    )
+  }
+
+  test("Wavelength (too small)") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              wavelength: { micrometers: 0.35 }
+            }
+          ) {
+            name
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("Wavelength (in range)") {
+    val w      = Wavelength.unsafeFromIntPicometers(463_000)
+    val expect = optionsWhere("").map(_.filter(o => o.wavelengthMin < w && w < o.wavelengthMax))
+    val actual = optionsWhere(s"""wavelength: { micrometers: 0.463 }""")
+    assertIOBoolean(
+      for {
+        es <- expect.map(_.map(o => (o.instrument, o.name)).toSet)
+        as <- actual.map(_.map(o => (o.instrument, o.name)).toSet)
+      } yield es == as
     )
   }
 
