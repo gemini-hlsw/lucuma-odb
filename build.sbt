@@ -32,8 +32,8 @@ val pprintVersion              = "0.8.1"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
 ThisBuild / tlBaseVersion      := "0.11"
-ThisBuild / scalaVersion       := "3.4.0"
-ThisBuild / crossScalaVersions := Seq("3.4.0")
+ThisBuild / scalaVersion       := "3.4.1"
+ThisBuild / crossScalaVersions := Seq("3.4.1")
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
