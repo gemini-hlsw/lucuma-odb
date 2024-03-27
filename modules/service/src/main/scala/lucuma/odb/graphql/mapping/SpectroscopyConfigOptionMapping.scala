@@ -5,8 +5,10 @@ package lucuma.odb.graphql
 package mapping
 
 import table.SpectroscopyConfigOptionTable
+import table.SpectroscopyConfigOptionGmosNorthTable
 
-trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTable[F] {
+trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTable[F]
+                                               with SpectroscopyConfigOptionGmosNorthTable[F] {
 
   lazy val SpectroscopyConfigOptionMapping: ObjectMapping =
     ObjectMapping(
@@ -20,9 +22,28 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
         SqlObject("slitWidth"),
         SqlObject("slitLength"),
         SqlField("resolution", SpectroscopyConfigOptionTable.Resolution),
-        SqlField("capability", SpectroscopyConfigOptionTable.Capability)
+        SqlField("capability", SpectroscopyConfigOptionTable.Capability),
+
+        SqlObject("gmosNorth", Join(List(
+          SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosNorthTable.Instrument,
+          SpectroscopyConfigOptionTable.Index      -> SpectrsocopyConfigOptionGmosNorthTable.Index
+        )))
       )
     )
+
+  lazy val SpectroscopyConfigOptionGmosNorthMapping: ObjectMapping =
+    ObjectMapping(
+      tpe           = SpectroscopyConfigOptionGmosNorthType,
+      fieldMappings = List(
+        SqlField("instrument", SpectrsocopyConfigOptionGmosNorthTable.Instrument, key = true),
+        SqlField("index",      SpectrsocopyConfigOptionGmosNorthTable.Index, key = true, hidden = true),
+
+        SqlField("fpu",        SpectrsocopyConfigOptionGmosNorthTable.Fpu),
+        SqlField("grating",    SpectrsocopyConfigOptionGmosNorthTable.Disperser),
+        SqlField("filter",     SpectrsocopyConfigOptionGmosNorthTable.Filter)
+      )
+    )
+
 
 /*
   name:               String!

@@ -337,6 +337,7 @@ object OdbMapping {
               ScienceRequirementsMapping,
               SequenceEventMapping,
               SpectroscopyConfigOptionMapping,
+              SpectroscopyConfigOptionGmosNorthMapping,
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SetProgramReferenceResultMapping,
