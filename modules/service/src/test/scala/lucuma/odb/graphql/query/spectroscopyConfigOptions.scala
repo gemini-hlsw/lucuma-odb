@@ -32,14 +32,88 @@ class spectroscopyConfigOptions extends OdbSuite {
         {
           "spectroscopyConfigOptions": [
             {
-              "name": "B1200 0.25"
+              "name": "B1200 0.25\""
             },
             {
-              "name": "R831 0.25"
+              "name": "R831 0.25\""
             }
           ]
         }
       """.asRight
     )
   }
+
+  test("""331" < SlitWidth """) {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              slitLength: { microarcseconds: { GTE: 331000000 } }
+            }
+          ) {
+            name
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("""1" < SlitWidth < 2"""") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              slitWidth: {
+                AND: [
+                  {
+                    arcseconds: { GT: 1.0 }
+                  },
+                  {
+                    arcseconds: { LT: 2.0 }
+                  }
+                ]
+              }
+            }
+          ) {
+            name
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "B600 1.5\""
+            },
+            {
+              "name" : "R831 1.5\""
+            },
+            {
+              "name" : "B480 1.5\""
+            },
+            {
+              "name" : "R400 1.5\""
+            },
+            {
+              "name" : "R150 1.5\""
+            },
+            {
+              "name" : "B1200 1.5\""
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
 }
