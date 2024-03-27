@@ -25,6 +25,12 @@ object WhereSpectroscopyConfigOption {
     val WhereSite         = WhereEq.binding[Site](path / "site", SiteBinding)
     val WhereSlitLength   = WhereAngle.binding(path / "slitLength")
     val WhereSlitWidth    = WhereAngle.binding(path / "slitWidth")
+//    val Wavelength        = WavelengthInput.Binding.map { w =>
+//      and(List(
+//        GtEql(path / "wavelengthMin", Const(w)),
+//        LtEql(path / "wavelengthMax", Const(w))
+//      ))
+//    }
 
     ObjectFieldsBinding.rmap {
       case List(
@@ -50,9 +56,5 @@ object WhereSpectroscopyConfigOption {
         }
     }
   }
-
-//  site: WhereEqSite
-//  wavelength: WavelengthInput
-//  wavelengthCoverage: WavelengthInput
 
 }

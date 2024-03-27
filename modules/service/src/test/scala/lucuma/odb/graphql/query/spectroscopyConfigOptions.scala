@@ -133,6 +133,26 @@ class spectroscopyConfigOptions extends OdbSuite {
             }
           ) {
             name
+            instrument
+
+            focalPlane
+
+            fpuLabel
+            slitWidth { arcseconds }
+            slitLength { arcseconds }
+
+            disperserLabel
+
+            wavelengthMin { micrometers }
+            wavelengthMax { micrometers }
+            wavelengthOptimal { micrometers }
+            wavelengthCoverage { micrometers }
+
+            resolution
+            adaptiveOptics
+            capability
+            site
+
           }
         }
       """,
@@ -140,7 +160,33 @@ class spectroscopyConfigOptions extends OdbSuite {
         {
           "spectroscopyConfigOptions": [
             {
-              "name" : "R150 1.5\""
+              "name" : "R150 1.5\"",
+              "instrument": "GMOS_NORTH",
+              "focalPlane" : "SINGLE_SLIT",
+              "fpuLabel" : "1.5\"",
+              "slitWidth" : {
+                "arcseconds" : 1.5
+              },
+              "slitLength" : {
+                "arcseconds" : 330
+              },
+              "disperserLabel" : "R150",
+              "wavelengthMin" : {
+                "micrometers" : 0.360000
+              },
+              "wavelengthMax" : {
+                "micrometers" : 1.030000
+              },
+              "wavelengthOptimal" : {
+                "micrometers" : 0.717000
+              },
+              "wavelengthCoverage" : {
+                "micrometers" : 1.219000
+              },
+              "resolution" : 210,
+              "adaptiveOptics" : false,
+              "capability" : null,
+              "site" : "GN"
             }
           ]
         }
