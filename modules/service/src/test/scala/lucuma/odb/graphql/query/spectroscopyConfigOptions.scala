@@ -11,9 +11,8 @@ import cats.syntax.traverse.*
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
-
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle

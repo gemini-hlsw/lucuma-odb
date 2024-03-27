@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package predicate
 
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.SpectroscopyCapabilities
-import lucuma.core.enums.FocalPlane
 import grackle.Path
+import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.SpectroscopyCapabilities
 
 class SpectroscopyConfigOptionPredicates(path: Path) {
 
