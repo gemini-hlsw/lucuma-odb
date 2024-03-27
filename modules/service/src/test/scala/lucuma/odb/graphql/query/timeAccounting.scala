@@ -51,6 +51,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   val pi         = TestUsers.Standard.pi(1, 30)
   val service    = TestUsers.service(2)
+  val staff      = TestUsers.Standard.staff(3, 33)
   val mode       = ObservingModeType.GmosSouthLongSlit
 
   val EventId    = ExecutionEvent.Id.fromLong(1).get  // we'll just share one
@@ -73,7 +74,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       NonEmptyString.from(s).toOption
   }
 
-  val validUsers = List(pi, service)
+  val validUsers = List(pi, service, staff)
 
   def invoiceQuery(oid: Observation.Id): String =
     s"""
@@ -536,7 +537,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 2, 1, 1, 300)
       es = events(v)
       _ <- insertEvents(es)
-      _ <- updateDatasets(pi, DatasetQaState.Fail, v.atoms.last.steps.head.dids)
+      _ <- updateDatasets(staff, DatasetQaState.Fail, v.atoms.last.steps.head.dids)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
     } yield ()

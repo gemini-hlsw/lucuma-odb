@@ -201,7 +201,7 @@ class addConditionsEntry extends OdbSuite {
         }
       """,
       expected = Left(List(
-        s"This action is restricted to staff users."
+        s"User ${pi.id} is not authorized to perform this operation."
       ))
     )
   }

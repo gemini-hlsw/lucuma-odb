@@ -10,16 +10,18 @@ import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.OdbError
 
 class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
   val service = TestUsers.service(3)
+  val staff   = TestUsers.Standard.staff(4, 44)
 
   val mode    = ObservingModeType.GmosNorthLongSlit
 
-  val validUsers = List(pi, pi2, service).toList
+  val validUsers = List(pi, pi2, service, staff)
 
   test("updateDatasets") {
     recordDatasets(mode, pi, service, 0, 2, 3).flatMap {
@@ -56,7 +58,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
           )
         ).asRight
 
-        expect(pi, q, e)
+        expect(staff, q, e)
     }
   }
 
@@ -93,7 +95,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
         )
       ).asRight
 
-      expect(pi, q, e)
+      expect(staff, q, e)
   }
 
   test("updateDatasets - subset select") {
@@ -131,7 +133,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
           )
         ).asRight
 
-        expect(pi, q, e)
+        expect(staff, q, e)
     }
   }
 
@@ -155,14 +157,9 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
           }
         }
       """
-
-      val e = Json.obj(
-        "updateDatasets" -> Json.obj(
-          "datasets"     -> List.empty[Json].asJson
-        )
-      ).asRight
-
-      expect(pi2, q, e)
+      expectOdbError(pi, q, {
+        case OdbError.NotAuthorized(pi.id, _) => () // expected
+      })
   }
 
   test("updateDatasets - LIMIT") {
@@ -200,6 +197,6 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
         )
       ).asRight
 
-      expect(pi, q, e)
+      expect(staff, q, e)
   }
 }

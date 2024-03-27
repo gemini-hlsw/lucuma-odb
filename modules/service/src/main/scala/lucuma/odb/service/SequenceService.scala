@@ -24,7 +24,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
-import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
@@ -76,7 +75,7 @@ trait SequenceService[F[_]] {
     instrument:   Instrument,
     stepCount:    NonNegShort,
     sequenceType: SequenceType
-  )(using Transaction[F]): F[Result[Atom.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
 
   def insertGmosNorthStepRecord(
     atomId:         Atom.Id,
@@ -84,7 +83,7 @@ trait SequenceService[F[_]] {
     step:           StepConfig,
     observeClass:   ObserveClass,
     timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-  )(using Transaction[F]): F[Result[Step.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
   def insertGmosSouthStepRecord(
     atomId:         Atom.Id,
@@ -92,7 +91,7 @@ trait SequenceService[F[_]] {
     step:           StepConfig,
     observeClass:   ObserveClass,
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-  )(using Transaction[F]): F[Result[Step.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
 }
 
@@ -101,10 +100,6 @@ object SequenceService {
   sealed trait InsertAtomResponse extends Product with Serializable
 
   object InsertAtomResponse {
-
-    case class NotAuthorized(
-      user: User
-    ) extends InsertAtomResponse
 
     case class VisitNotFound(
       vid:        Visit.Id,
@@ -121,10 +116,6 @@ object SequenceService {
 
   object InsertStepResponse {
 
-    case class NotAuthorized(
-      user: User
-    ) extends InsertStepResponse
-
     case class AtomNotFound(
       aid:        Atom.Id,
       instrument: Instrument
@@ -136,7 +127,7 @@ object SequenceService {
   }
 
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
-    new SequenceService[F] with ExecutionUserCheck {
+    new SequenceService[F] {
 
       override def selectGmosNorthCompletedAtomMap(
         observationId: Observation.Id
@@ -346,10 +337,9 @@ object SequenceService {
         instrument:   Instrument,
         stepCount:    NonNegShort,
         sequenceType: SequenceType
-      )(using Transaction[F]): F[InsertAtomResponse] =
+      )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
+        val v = visitService.select(visitId).map(_.filter(_.instrument === instrument))
         (for {
-          _   <- EitherT.fromEither(checkUser(InsertAtomResponse.NotAuthorized.apply))
-          v    = visitService.select(visitId).map(_.filter(_.instrument === instrument))
           inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
           _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType))
@@ -360,9 +350,8 @@ object SequenceService {
         instrument:   Instrument,
         stepCount:    NonNegShort,
         sequenceType: SequenceType
-      )(using Transaction[F]): F[Result[Atom.Id]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]] =
         insertAtomRecordImpl(visitId, instrument, stepCount, sequenceType).map:
-          case InsertAtomResponse.NotAuthorized(user)           => OdbError.NotAuthorized(user.id).asFailure
           case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
           case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
@@ -387,11 +376,10 @@ object SequenceService {
         timeEstimate:        (S, EstimatorState[D]) => StepEstimate,
         estimatorState:      Observation.Id => F[Option[(S, EstimatorState[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
-      )(using Transaction[F]): F[Result[Step.Id]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
+        val foo = session.option(Statements.SelectObservationId)((atomId, instrument))
+        val fos = OptionT(foo).flatMap(o => OptionT(estimatorState(o))).value
         (for {
-          _   <- EitherT.fromEither(checkUser(NotAuthorized.apply))
-          foo  = session.option(Statements.SelectObservationId)((atomId, instrument))
-          fos  = OptionT(foo).flatMap(o => OptionT(estimatorState(o))).value
           sid <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
           es  <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
           _   <- EitherT.right(session.execute(Statements.InsertStep)(
@@ -400,7 +388,6 @@ object SequenceService {
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
         } yield Success(sid)).merge.map:
-          case NotAuthorized(user)           => OdbError.NotAuthorized(user.id).asFailure
           case AtomNotFound(id, instrument)  => OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
           case Success(sid)                  => Result(sid)
 
@@ -410,7 +397,7 @@ object SequenceService {
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
         timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
-      )(using Transaction[F]): F[Result[Step.Id]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
@@ -427,7 +414,7 @@ object SequenceService {
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
         timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
-      )(using Transaction[F]): F[Result[Step.Id]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,

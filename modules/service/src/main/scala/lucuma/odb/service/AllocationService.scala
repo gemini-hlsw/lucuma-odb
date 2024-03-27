@@ -6,13 +6,8 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.model.Access.Admin
-import lucuma.core.model.Access.Service
-import lucuma.core.model.Access.Staff
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs.*
@@ -22,21 +17,18 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait AllocationService[F[_]] {
-  def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[Result[Unit]]
+  def setAllocation(input: SetAllocationInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
 }
 
 object AllocationService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
-      def setAllocation(input: SetAllocationInput)(using Transaction[F]): F[Result[Unit]] =
-        user.role.access match {
-          case Staff | Admin | Service =>
-            session.prepareR(Statements.SetAllocation.command).use { ps =>
-              ps.execute(input.programId, input.partner, input.duration).as(Result.success(()))
-            }
-          case _ => OdbError.NotAuthorized(user.id).asFailureF
-        }
+
+      def setAllocation(input: SetAllocationInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
+        session.prepareR(Statements.SetAllocation.command).use: ps =>
+          ps.execute(input.programId, input.partner, input.duration).as(Result.unit)
+
     }
 
   object Statements {
