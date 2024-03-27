@@ -48,7 +48,7 @@ sealed trait DatasetService[F[_]] {
   def updateDatasets(
     SET:   DatasetPropertiesInput,
     which: AppliedFragment
-  )(using Transaction[F]): F[List[Dataset.Id]]
+  )(using Transaction[F], Services.StaffAccess): F[List[Dataset.Id]]
 
   def setStartTime(
     datasetId: Dataset.Id,
@@ -111,7 +111,7 @@ object DatasetService {
       override def updateDatasets(
         SET:   DatasetPropertiesInput,
         which: AppliedFragment
-      )(using Transaction[F]): F[List[Dataset.Id]] =
+      )(using Transaction[F], Services.StaffAccess): F[List[Dataset.Id]] =
         Statements.UpdateDatasets(SET, which).toList.flatTraverse { af =>
           session.prepareR(af.fragment.query(dataset_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList
