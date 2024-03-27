@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import skunk.codec.boolean.bool
 
 trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
@@ -31,6 +32,15 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Resolution         = col("c_resolution", int4_pos)
     val Ao                 = col("c_ao",         bool)
     val Capability         = col("c_capability", spectroscopy_capabilities.opt)
+  }
+
+  object SpectrsocopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Fpu        = col("c_fpu",     gmos_north_fpu)
+    val Grating    = col("c_grating", gmos_north_grating)
+    val Filter     = col("c_filter",  gmos_north_filter.opt)
   }
 
 }

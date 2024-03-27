@@ -5,10 +5,8 @@ package lucuma.odb.graphql
 package mapping
 
 import table.SpectroscopyConfigOptionTable
-import table.SpectroscopyConfigOptionGmosNorthTable
 
-trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTable[F]
-                                               with SpectroscopyConfigOptionGmosNorthTable[F] {
+trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTable[F] {
 
   lazy val SpectroscopyConfigOptionMapping: ObjectMapping =
     ObjectMapping(
