@@ -12167,12 +12167,12 @@ input WhereSpectroscopyConfigOption {
 
   slitWidth:  WhereAngle
 
-  #"""
-  #Matches configuration options that support the provided wavelength. In other
-  #words, those for which the given wavelength falls between the min and max
-  #limits of the configuration.
-  #"""
-  #wavelength: WavelengthInput
+  """
+  Matches configuration options that support the provided wavelength. In other
+  words, those for which the given wavelength falls between the min and max
+  limits of the configuration.
+  """
+  wavelength: WavelengthInput
 
   #"""
   #Matches the configuration options
