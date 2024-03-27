@@ -508,19 +508,21 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val UpdateDatasets: MutationField =
     MutationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
       services.useTransactionally {
-        // Our predicate for selecting datasets to update
-        val filterPredicate = and(List(
-          Predicates.dataset.observation.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
+        requireStaffAccess {
+          // Our predicate for selecting datasets to update
+          val filterPredicate = and(List(
+            Predicates.dataset.observation.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
 
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("datasets"), List("datasets"), List(DatasetType))).flatMap(_.fragment)
+          val idSelect: Result[AppliedFragment] =
+            MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("datasets"), List("datasets"), List(DatasetType))).flatMap(_.fragment)
 
-        idSelect.flatTraverse { which =>
-          datasetService
-            .updateDatasets(input.SET, which)
-            .map(datasetResultSubquery(_, input.LIMIT, child))
+          idSelect.flatTraverse { which =>
+            datasetService
+              .updateDatasets(input.SET, which)
+              .map(datasetResultSubquery(_, input.LIMIT, child))
+          }
         }
       }
     }
