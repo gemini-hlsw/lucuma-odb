@@ -33,24 +33,24 @@ trait AngleMapping[F[_]] extends ObservationView[F]
     ObjectMapping(
       tpe = AngleType,
       fieldMappings =
-       (idColumns.toList.zipWithIndex.map { (ref, idx) =>
+        (idColumns.toList.zipWithIndex.map { (ref, idx) =>
           SqlField(s"synthetic_id$idx", ref, key = true, hidden = true)
         }) ++
-       List(
-        SqlField("value", valueColumn, hidden = true),
-        FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
-        FieldRef[Angle]("value").as("microseconds",    angleToTime(1L)),
-        FieldRef[Angle]("value").as("milliarcseconds", angleToArc(µPerMilli)),
-        FieldRef[Angle]("value").as("milliseconds",    angleToTime(µPerMilli)),
-        FieldRef[Angle]("value").as("arcseconds",      angleToArc(µPerSec)),
-        FieldRef[Angle]("value").as("seconds",         angleToTime(µPerSec)),
-        FieldRef[Angle]("value").as("arcminutes",      angleToArc(µPerMin)),
-        FieldRef[Angle]("value").as("minutes",         angleToTime(µPerMin)),
-        FieldRef[Angle]("value").as("degrees",         angleToArc(µPerUnit)),
-        FieldRef[Angle]("value").as("hours",           angleToTime(µPerUnit)),
-        FieldRef[Angle]("value").as("dms", c => Angle.dms.get(c).format),
-        FieldRef[Angle]("value").as("hms", c => HourAngle.fromStringHMS.reverseGet(Angle.hourAngle.get(c)))
-      )
+        List(
+          SqlField("value", valueColumn, hidden = true),
+          FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
+          FieldRef[Angle]("value").as("microseconds",    angleToTime(1L)),
+          FieldRef[Angle]("value").as("milliarcseconds", angleToArc(µPerMilli)),
+          FieldRef[Angle]("value").as("milliseconds",    angleToTime(µPerMilli)),
+          FieldRef[Angle]("value").as("arcseconds",      angleToArc(µPerSec)),
+          FieldRef[Angle]("value").as("seconds",         angleToTime(µPerSec)),
+          FieldRef[Angle]("value").as("arcminutes",      angleToArc(µPerMin)),
+          FieldRef[Angle]("value").as("minutes",         angleToTime(µPerMin)),
+          FieldRef[Angle]("value").as("degrees",         angleToArc(µPerUnit)),
+          FieldRef[Angle]("value").as("hours",           angleToTime(µPerUnit)),
+          FieldRef[Angle]("value").as("dms", c => Angle.dms.get(c).format),
+          FieldRef[Angle]("value").as("hms", c => HourAngle.fromStringHMS.reverseGet(Angle.hourAngle.get(c)))
+        )
     )
 
   import ObservationView.ScienceRequirements.Spectroscopy

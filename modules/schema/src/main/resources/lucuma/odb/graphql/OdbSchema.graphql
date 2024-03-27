@@ -6805,10 +6805,11 @@ type SpectroscopyConfigOption {
 
   disperserLabel:     String! # e.g., 'B1200'
   filterLabel:        String! # e.g., 'JH'
-  wavelengthMin:      Angle!
-  wavelengthMax:      Angle!
-  wavelengthOptimal:  Angle!
-  wavelengthCoverage: Angle!
+
+  wavelengthMin:      Wavelength!
+  wavelengthMax:      Wavelength!
+  wavelengthOptimal:  Wavelength!
+  wavelengthCoverage: Wavelength!
 
   resolution:         PosInt!
 
