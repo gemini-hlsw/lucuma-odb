@@ -6804,7 +6804,7 @@ type SpectroscopyConfigOption {
   slitLength:         Angle!
 
   disperserLabel:     String! # e.g., 'B1200'
-  filterLabel:        String! # e.g., 'JH'
+  filterLabel:        String  # e.g., 'JH'
 
   wavelengthMin:      Wavelength!
   wavelengthMax:      Wavelength!
