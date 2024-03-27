@@ -25,7 +25,7 @@ object WhereSpectroscopyConfigOption {
     val WhereSite         = WhereEq.binding[Site](path / "site", SiteBinding)
     val WhereSlitLength   = WhereAngle.binding(path / "slitLength")
     val WhereSlitWidth    = WhereAngle.binding(path / "slitWidth")
-    val Wavelength        = WavelengthInput.Binding.map { w =>
+    val RangeIncludes     = WavelengthInput.Binding.map { w =>
       and(List(
         LtEql(path / "wavelengthMin" / "picometers", Const(w.toPicometers.value)),
         GtEql(path / "wavelengthMax" / "picometers", Const(w.toPicometers.value))
@@ -41,10 +41,10 @@ object WhereSpectroscopyConfigOption {
         WhereSite.Option("site", rSte),
         WhereSlitLength.Option("slitLength", rLen),
         WhereSlitWidth.Option("slitWidth", rWid),
-        Wavelength.Option("wavelength", rWav)
+        RangeIncludes.Option("rangeIncludes", rRan)
       ) =>
-        (rCap, rFoc, rIns, rRes, rSte, rLen, rWid, rWav).parMapN {
-          (cap, foc, ins, res, ste, len, wid, wav) =>
+        (rCap, rFoc, rIns, rRes, rSte, rLen, rWid, rRan).parMapN {
+          (cap, foc, ins, res, ste, len, wid, ran) =>
             and(List(
               cap,
               foc,
@@ -53,7 +53,7 @@ object WhereSpectroscopyConfigOption {
               ste,
               len,
               wid,
-              wav
+              ran
             ).flatten)
         }
     }
