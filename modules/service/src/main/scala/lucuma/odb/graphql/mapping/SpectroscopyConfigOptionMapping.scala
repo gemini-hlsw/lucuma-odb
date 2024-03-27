@@ -12,16 +12,27 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
     ObjectMapping(
       tpe           = SpectroscopyConfigOptionType,
       fieldMappings = List(
-        SqlField("instrument", SpectroscopyConfigOptionTable.Instrument, key = true),
-        SqlField("index",      SpectroscopyConfigOptionTable.Index, key = true, hidden = true),
-        SqlField("name",       SpectroscopyConfigOptionTable.Name),
-        SqlField("focalPlane", SpectroscopyConfigOptionTable.FocalPlane),
-        SqlField("fpuLabel",   SpectroscopyConfigOptionTable.FpuLabel),
+        SqlField("instrument",     SpectroscopyConfigOptionTable.Instrument, key = true),
+        SqlField("index",          SpectroscopyConfigOptionTable.Index, key = true, hidden = true),
+        SqlField("name",           SpectroscopyConfigOptionTable.Name),
+        SqlField("focalPlane",     SpectroscopyConfigOptionTable.FocalPlane),
+
+        SqlField("fpuLabel",       SpectroscopyConfigOptionTable.FpuLabel),
         SqlObject("slitWidth"),
         SqlObject("slitLength"),
-        SqlField("resolution", SpectroscopyConfigOptionTable.Resolution),
-        SqlField("capability", SpectroscopyConfigOptionTable.Capability),
-        SqlField("site",       SpectroscopyConfigOptionTable.Site),
+
+        SqlField("disperserLabel", SpectroscopyConfigOptionTable.DisperserLabel),
+        SqlField("filterLabel",    SpectroscopyConfigOptionTable.FilterLabel),
+
+        SqlObject("wavelengthMin"),
+        SqlObject("wavelengthMax"),
+        SqlObject("wavelengthOptimal"),
+        SqlObject("wavelengthCoverage"),
+
+        SqlField("resolution",     SpectroscopyConfigOptionTable.Resolution),
+        SqlField("adaptiveOptics", SpectroscopyConfigOptionTable.Ao),
+        SqlField("capability",     SpectroscopyConfigOptionTable.Capability),
+        SqlField("site",           SpectroscopyConfigOptionTable.Site),
 
         SqlObject("gmosNorth", Join(List(
           SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosNorthTable.Instrument,
