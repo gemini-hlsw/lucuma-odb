@@ -20,10 +20,11 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
   val service = TestUsers.service(3)
+  val staff   = TestUsers.Standard.staff(4, 44)
 
   val mode    = ObservingModeType.GmosNorthLongSlit
 
-  val validUsers = List(pi, pi2, service).toList
+  val validUsers = List(pi, pi2, service, staff).toList
 
   def qaQuery(on: ObservationNode): String =
     s"""
@@ -77,7 +78,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
   test("qaState - one set") {
     for {
       on <- recordAll(pi, service, mode, offset = 10, datasetCount = 2)
-      _  <- setQaState(pi, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0011.fits")
+      _  <- setQaState(staff, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0011.fits")
       _  <- expect(pi, qaQuery(on), qaExpected(DatasetQaState.Usable.some))
     } yield ()
   }
@@ -85,8 +86,8 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
   test("qaState - two set") {
     for {
       on <- recordAll(pi, service, mode, offset = 20, datasetCount = 2)
-      _  <- setQaState(pi, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0021.fits")
-      _  <- setQaState(pi, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0022.fits")
+      _  <- setQaState(staff, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0021.fits")
+      _  <- setQaState(staff, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0022.fits")
       _  <- expect(pi, qaQuery(on), qaExpected(DatasetQaState.Usable.some))
     } yield ()
   }
@@ -119,10 +120,10 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
     for {
       on <- recordAll(pi, service, mode, offset = 30, stepCount = 2, datasetCount = 2)
-      _  <- setQaState(pi, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0031.fits")
-      _  <- setQaState(pi, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0032.fits")
-      _  <- setQaState(pi, DatasetQaState.Fail,   s"${DatasetFilenamePrefix}0033.fits")
-      _  <- setQaState(pi, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0034.fits")
+      _  <- setQaState(staff, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0031.fits")
+      _  <- setQaState(staff, DatasetQaState.Usable, s"${DatasetFilenamePrefix}0032.fits")
+      _  <- setQaState(staff, DatasetQaState.Fail,   s"${DatasetFilenamePrefix}0033.fits")
+      _  <- setQaState(staff, DatasetQaState.Pass,   s"${DatasetFilenamePrefix}0034.fits")
       _  <- expect(pi, qaQuery(on), expected)
     } yield ()
   }
