@@ -10171,6 +10171,36 @@ type WavelengthDither {
   micrometers: BigDecimal!
 }
 
+input WhereAngle {
+
+  AND: [WhereAngle!]
+
+  OR: [WhereAngle!]
+
+  NOT: WhereAngle
+
+  microarcseconds: WhereOrderLong
+  
+  microseconds: WhereOrderBigDecimal
+
+  milliarcseconds: WhereOrderBigDecimal
+
+  milliseconds: WhereOrderBigDecimal
+
+  arcseconds: WhereOrderBigDecimal
+
+  seconds: WhereOrderBigDecimal
+
+  arcminutes: WhereOrderBigDecimal
+
+  minutes: WhereOrderBigDecimal
+
+  degrees: WhereOrderBigDecimal
+
+  hours: WhereOrderBigDecimal
+
+}
+
 """
 ObsAttachment filter options. All specified items must match.
 """
@@ -10972,6 +11002,54 @@ input WhereOptionString {
 }
 
 """
+Filters on equality or order comparisons of BigDecimal properties.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderBigDecimal {
+
+  """
+  Matches if the BigDecimal is exactly the supplied value.
+  """
+  EQ: BigDecimal
+
+  """
+  Matches if the BigDecimal is not the supplied value.
+  """
+  NEQ: BigDecimal
+
+  """
+  Matches if the BigDecimal is any of the supplied options.
+  """
+  IN: [BigDecimal!]
+
+  """
+  Matches if the BigDecimal is none of the supplied values.
+  """
+  NIN: [BigDecimal!]
+
+  """
+  Matches if the BigDecimal is ordered after (>) the supplied value.
+  """
+  GT: BigDecimal
+
+  """
+  Matches if the BigDecimal is ordered before (<) the supplied value.
+  """
+  LT: BigDecimal
+
+  """
+  Matches if the BigDecimal is ordered after or equal (>=) the supplied value.
+  """
+  GTE: BigDecimal
+
+  """
+  Matches if the BigDecimal is ordered before or equal (<=) the supplied value.
+  """
+  LTE: BigDecimal
+}
+
+
+"""
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
@@ -11207,6 +11285,53 @@ input WhereOrderInt {
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
   LTE: Int
+}
+
+"""
+Filters on equality or order comparisons of long property.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderLong {
+
+  """
+  Matches if the Long is exactly the supplied value.
+  """
+  EQ: Long
+
+  """
+  Matches if the Long is not the supplied value.
+  """
+  NEQ: Long
+
+  """
+  Matches if the Long is any of the supplied options.
+  """
+  IN: [Long!]
+
+  """
+  Matches if the Long is none of the supplied values.
+  """
+  NIN: [Long!]
+
+  """
+  Matches if the Long is ordered after (>) the supplied value.
+  """
+  GT: Long
+
+  """
+  Matches if the Long is ordered before (<) the supplied value.
+  """
+  LT: Long
+
+  """
+  Matches if the Long is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Long
+
+  """
+  Matches if the Long is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Long
 }
 
 """
@@ -12009,7 +12134,9 @@ input WhereSpectroscopyConfigOption {
 
   #site: WhereEqSite
 
-  #slitWidth: WhereAngle
+  slitLength: WhereAngle
+
+  slitWidth:  WhereAngle
 
   #"""
   #Matches configuration options that support the provided wavelength. In other

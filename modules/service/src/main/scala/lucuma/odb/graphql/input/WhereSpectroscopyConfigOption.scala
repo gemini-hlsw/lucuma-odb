@@ -21,27 +21,33 @@ object WhereSpectroscopyConfigOption {
     val WhereFocalPlane   = WhereEq.binding[FocalPlane](path / "focalPlane", FocalPlaneBinding)
     val WhereInstrument   = WhereEq.binding[Instrument](path / "instrument", InstrumentBinding)
     val WhereResolution   = WhereOrder.binding[PosInt](path / "resolution", PosIntBinding)
+    val WhereSlitLength   = WhereAngle.binding(path / "slitLength")
+    val WhereSlitWidth    = WhereAngle.binding(path / "slitWidth")
 
     ObjectFieldsBinding.rmap {
       case List(
         WhereCapabilities.Option("capability", rCap),
         WhereFocalPlane.Option("focalPlane", rFoc),
         WhereInstrument.Option("instrument", rIns),
-        WhereResolution.Option("resolution", rRes)
+        WhereResolution.Option("resolution", rRes),
+        WhereSlitLength.Option("slitLength", rLen),
+        WhereSlitWidth.Option("slitWidth", rWid)
       ) =>
-        (rCap, rFoc, rIns, rRes).parMapN { (cap, foc, ins, res) =>
-          and(List(
-            cap,
-            foc,
-            ins,
-            res
-          ).flatten)
+        (rCap, rFoc, rIns, rRes, rLen, rWid).parMapN {
+          (cap, foc, ins, res, len, wid) =>
+            and(List(
+              cap,
+              foc,
+              ins,
+              res,
+              len,
+              wid
+            ).flatten)
         }
     }
   }
 
 //  site: WhereEqSite
-//  slitWidth: WhereAngle
 //  wavelength: WavelengthInput
 //  wavelengthCoverage: WavelengthInput
 
