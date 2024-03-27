@@ -12152,7 +12152,7 @@ input WhereProposalPartners {
 
 input WhereSpectroscopyConfigOption {
 
-  capability: WhereEqSpectroscopyCapabilities
+  capability: WhereOptionEqSpectroscopyCapabilities
 
   focalPlane: WhereEqFocalPlane
 
