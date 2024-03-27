@@ -21,6 +21,7 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
         SqlObject("slitLength"),
         SqlField("resolution", SpectroscopyConfigOptionTable.Resolution),
         SqlField("capability", SpectroscopyConfigOptionTable.Capability),
+        SqlField("site",       SpectroscopyConfigOptionTable.Site),
 
         SqlObject("gmosNorth", Join(List(
           SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosNorthTable.Instrument,

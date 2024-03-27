@@ -6816,6 +6816,8 @@ type SpectroscopyConfigOption {
 
   capability:         SpectroscopyCapabilities
 
+  site:               Site!
+
   """
   For GMOS North options, the GMOS North configuration.  Null for other
   instruments.
@@ -10517,6 +10519,32 @@ input WhereEqProposalStatus {
 }
 
 """
+Filters on equality (or not) of the site property. All supplied criteria must
+match, but usually only one is selected.
+"""
+input WhereEqSite {
+  """
+  Matches if the site is exactly the supplied value.
+  """
+  EQ: Site
+
+  """
+  Matches if the site is not the supplied value.
+  """
+  NEQ: Site
+
+  """
+  Matches if the site is any of the supplied options.
+  """
+  IN: [Site!]
+
+  """
+  Matches if the site is none of the supplied values.
+  """
+  NIN: [Site!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -12132,7 +12160,7 @@ input WhereSpectroscopyConfigOption {
 
   resolution: WhereOrderPosInt
 
-  #site: WhereEqSite
+  site: WhereEqSite
 
   slitLength: WhereAngle
 

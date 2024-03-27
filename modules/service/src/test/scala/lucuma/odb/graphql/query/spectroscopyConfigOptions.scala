@@ -122,6 +122,7 @@ class spectroscopyConfigOptions extends OdbSuite {
               focalPlane: { EQ: SINGLE_SLIT }
               instrument: { EQ: GMOS_NORTH }
               resolution: { LT: 500 }
+              site: { EQ: GN }
               slitWidth: {
                 AND: [
                   { arcseconds: { GT: 1.0 } },
