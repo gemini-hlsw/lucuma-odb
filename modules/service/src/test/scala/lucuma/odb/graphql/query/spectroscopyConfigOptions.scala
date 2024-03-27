@@ -75,12 +75,8 @@ class spectroscopyConfigOptions extends OdbSuite {
             WHERE: {
               slitWidth: {
                 AND: [
-                  {
-                    arcseconds: { GT: 1.0 }
-                  },
-                  {
-                    arcseconds: { LT: 2.0 }
-                  }
+                  { arcseconds: { GT: 1.0 } },
+                  { arcseconds: { LT: 2.0 } }
                 ]
               }
             }
@@ -116,4 +112,37 @@ class spectroscopyConfigOptions extends OdbSuite {
     )
   }
 
+  test("Combined") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              focalPlane: { EQ: SINGLE_SLIT }
+              instrument: { EQ: GMOS_NORTH }
+              resolution: { LT: 500 }
+              slitWidth: {
+                AND: [
+                  { arcseconds: { GT: 1.0 } },
+                  { arcseconds: { LT: 2.0 } }
+                ]
+              }
+            }
+          ) {
+            name
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "R150 1.5\""
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
 }
