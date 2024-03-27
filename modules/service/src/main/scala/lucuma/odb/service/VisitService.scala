@@ -33,12 +33,12 @@ trait VisitService[F[_]] {
   def insertGmosNorth(
     observationId: Observation.Id,
     static:        GmosNorth
-  )(using Transaction[F]): F[Result[Visit.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def insertGmosSouth(
     observationId: Observation.Id,
     static:        GmosSouth
-  )(using Transaction[F]): F[Result[Visit.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
 }
 
@@ -52,7 +52,7 @@ object VisitService {
   )
 
   def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
-    new VisitService[F] with ExecutionUserCheck {
+    new VisitService[F] {
 
       override def select(
         visitId: Visit.Id
@@ -63,7 +63,7 @@ object VisitService {
         observationId: Observation.Id,
         instrument:    Instrument,
         insertStatic:  Option[Visit.Id] => F[Long]
-      ): F[Result[Visit.Id]] = {
+      )(using Services.ServiceAccess): F[Result[Visit.Id]] = {
 
         val insertVisit: F[Result[Visit.Id]] =
           session
@@ -74,7 +74,6 @@ object VisitService {
                 OdbError.InvalidObservation(observationId, Some(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")).asFailure
  
         val rt = for 
-          _ <- ResultT.fromResult(checkUser2)
           v <- ResultT(insertVisit)
           _ <- ResultT.success(insertStatic(v.some).void)
         yield v
@@ -86,13 +85,13 @@ object VisitService {
       override def insertGmosNorth(
         observationId: Observation.Id,
         static:        GmosNorth
-      )(using Transaction[F]): F[Result[Visit.Id]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         insert(observationId, Instrument.GmosNorth, gmosSequenceService.insertGmosNorthStatic(observationId, _, static))
 
       override def insertGmosSouth(
         observationId: Observation.Id,
         static:        GmosSouth
-      )(using Transaction[F]): F[Result[Visit.Id]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         insert(observationId, Instrument.GmosSouth, gmosSequenceService.insertGmosSouthStatic(observationId, _, static))
 
     }

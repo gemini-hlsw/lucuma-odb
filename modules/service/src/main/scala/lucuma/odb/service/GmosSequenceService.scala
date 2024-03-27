@@ -29,7 +29,7 @@ trait GmosSequenceService[F[_]] {
   def insertGmosNorthDynamic(
     stepId:  Step.Id,
     dynamic: DynamicConfig.GmosNorth
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
    * Selects the static configuration corresponding to the given visit.
@@ -56,12 +56,12 @@ trait GmosSequenceService[F[_]] {
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
     static:        StaticConfig.GmosNorth
-  )(using Transaction[F]): F[Long]
+  )(using Transaction[F], Services.ServiceAccess): F[Long]
 
   def insertGmosSouthDynamic(
     stepId:  Step.Id,
     dynamic: DynamicConfig.GmosSouth
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
    * Selects the static configuration corresponding to the given visit.
@@ -88,7 +88,7 @@ trait GmosSequenceService[F[_]] {
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
     static:        StaticConfig.GmosSouth
-  )(using Transaction[F]): F[Long]
+  )(using Transaction[F], Services.ServiceAccess): F[Long]
 
 }
 
@@ -101,7 +101,7 @@ object GmosSequenceService {
       override def insertGmosNorthDynamic(
         stepId:  Step.Id,
         dynamic: DynamicConfig.GmosNorth
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertGmosNorthDynamic)(stepId, dynamic).void
 
       override def selectGmosNorthStatic(
@@ -123,7 +123,7 @@ object GmosSequenceService {
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
         static:        StaticConfig.GmosNorth
-      )(using Transaction[F]): F[Long] =
+      )(using Transaction[F], Services.ServiceAccess): F[Long] =
         session.unique(Statements.InsertGmosNorthStatic)(
           observationId,
           visitId,
@@ -133,7 +133,7 @@ object GmosSequenceService {
       override def insertGmosSouthDynamic(
         stepId:  Step.Id,
         dynamic: DynamicConfig.GmosSouth
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertGmosSouthDynamic)(stepId, dynamic).void
 
       override def selectGmosSouthStatic(
@@ -155,7 +155,7 @@ object GmosSequenceService {
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
         static:        StaticConfig.GmosSouth
-      )(using Transaction[F]): F[Long] =
+      )(using Transaction[F], Services.ServiceAccess): F[Long] =
         session.unique(Statements.InsertGmosSouthStatic)(
           observationId,
           visitId,

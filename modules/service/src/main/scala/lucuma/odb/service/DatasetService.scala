@@ -5,7 +5,6 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import grackle.Result
@@ -22,6 +21,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.DatasetPropertiesInput
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -43,12 +43,12 @@ sealed trait DatasetService[F[_]] {
     stepId:   Step.Id,
     filename: Dataset.Filename,
     qaState:  Option[DatasetQaState]
-  )(using Transaction[F]): F[Result[Dataset.Id]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]]
 
   def updateDatasets(
     SET:   DatasetPropertiesInput,
     which: AppliedFragment
-  )(using Transaction[F]): F[List[Dataset.Id]]
+  )(using Transaction[F], Services.StaffAccess): F[List[Dataset.Id]]
 
   def setStartTime(
     datasetId: Dataset.Id,
@@ -76,7 +76,7 @@ sealed trait DatasetService[F[_]] {
 object DatasetService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): DatasetService[F] =
-    new DatasetService[F] with ExecutionUserCheck {
+    new DatasetService[F] {
 
       val resolver = new IdResolver("dataset", Statements.selectDid, _.label)
 
@@ -86,11 +86,11 @@ object DatasetService {
       ): F[Result[Dataset.Id]] =
         resolver.resolve(did, ref)
 
-      def insertDataset(
+      override def insertDataset(
         stepId:   Step.Id,
         filename: Dataset.Filename,
         qaState:  Option[DatasetQaState]
-      )(using Transaction[F]): F[Result[Dataset.Id]] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = {
 
         def stepNotFound: Result[Dataset.Id] =
           OdbError.InvalidStep(stepId, Some(s"Step id '$stepId' not found")).asFailure
@@ -105,13 +105,13 @@ object DatasetService {
               case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound
             }
 
-        (ResultT.fromResult(checkUser2) *> ResultT(insert)).value
+        ResultT(insert).value
       }
 
       override def updateDatasets(
         SET:   DatasetPropertiesInput,
         which: AppliedFragment
-      )(using Transaction[F]): F[List[Dataset.Id]] =
+      )(using Transaction[F], Services.StaffAccess): F[List[Dataset.Id]] =
         Statements.UpdateDatasets(SET, which).toList.flatTraverse { af =>
           session.prepareR(af.fragment.query(dataset_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList

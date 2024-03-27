@@ -277,6 +277,7 @@ object AsterismService {
         void" AND "  |+| observationIdIn(observationIds) |+|
         andWhereUserAccess(user, programId)
 
+    // programs that aren't visible.
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
       sql"""
         INSERT INTO t_asterism_target (
