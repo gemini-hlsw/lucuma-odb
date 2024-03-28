@@ -317,6 +317,33 @@ class spectroscopyConfigOptions extends OdbSuite {
     } yield assertEquals(es, as)
   }
 
+  test("AND") {
+    val expect = allOptions.map(_.filter(o => o.resolution > 3000 && o.resolution < 4000))
+    val actual = optionsWhere(s"""AND: [ { resolution: { GT: 3000 } }, { resolution: { LT: 4000 } }]""")
+    for {
+      es <- expect.map(ConfigOption.toNameSet)
+      as <- actual.map(ConfigOption.toNameSet)
+    } yield assertEquals(es, as)
+  }
+
+  test("OR") {
+    val expect = allOptions.map(_.filter(o => o.resolution < 500 || o.resolution > 5000))
+    val actual = optionsWhere(s"""OR: [ { resolution: { LT: 500 } }, { resolution: { GT: 5000 } }]""")
+    for {
+      es <- expect.map(ConfigOption.toNameSet)
+      as <- actual.map(ConfigOption.toNameSet)
+    } yield assertEquals(es, as)
+  }
+
+  test("NOT") {
+    val expect = allOptions.map(_.filter(_.resolution >= 500))
+    val actual = optionsWhere(s"""NOT: { resolution: { LT: 500 } }""")
+    for {
+      es <- expect.map(ConfigOption.toNameSet)
+      as <- actual.map(ConfigOption.toNameSet)
+    } yield assertEquals(es, as)
+  }
+
   test("Combined") {
     expect(
       user = pi,

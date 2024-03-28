@@ -8143,6 +8143,9 @@ type Query {
   #   includeDeleted: Boolean! = false
   # ): ScienceRequirementsGroupSelectResult!
 
+  """
+  Spectroscopy configuration options matching the WHERE parameter.
+  """
   spectroscopyConfigOptions(
     WHERE: WhereSpectroscopyConfigOption
   ): [SpectroscopyConfigOption!]!
@@ -12205,6 +12208,12 @@ properties of interest and pass it to the 'spectroscopyConfigOptions' query
 to find the corresponding configuration options.
 """
 input WhereSpectroscopyConfigOption {
+
+  AND: [WhereSpectroscopyConfigOption!]
+
+  OR: [WhereSpectroscopyConfigOption!]
+
+  NOT: WhereSpectroscopyConfigOption
 
   capability: WhereOptionEqSpectroscopyCapabilities
 
