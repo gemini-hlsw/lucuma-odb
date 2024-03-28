@@ -165,12 +165,16 @@ trait Services[F[_]]:
 object Services:
 
   // Type-level representation of user access. Read <: here as "implies".
-  opaque type GuestAccess                  = Unit
-  opaque type PiAccess      <: GuestAccess = Unit
-  opaque type NgoAccess     <: PiAccess    = Unit
-  opaque type StaffAccess   <: NgoAccess   = Unit
-  opaque type AdminAccess   <: StaffAccess = Unit
-  opaque type ServiceAccess <: AdminAccess = Unit
+  opaque type GuestAccess                    = Unit
+  opaque type PiAccess        <: GuestAccess = Unit
+  opaque type NgoAccess       <: PiAccess    = Unit
+  opaque type StaffAccess     <: NgoAccess   = Unit
+  opaque type AdminAccess     <: StaffAccess = Unit
+  opaque type ServiceAccess   <: AdminAccess = Unit
+  opaque type SuperUserAccess <: ServiceAccess = Unit
+
+  def asSuperUser[A](f: SuperUserAccess ?=> A): A =
+    f(using ())
 
   /**
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
