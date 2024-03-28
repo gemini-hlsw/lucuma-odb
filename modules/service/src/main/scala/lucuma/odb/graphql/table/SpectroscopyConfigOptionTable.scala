@@ -45,4 +45,13 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Filter     = col("c_filter",  gmos_north_filter.opt)
   }
 
+  object SpectrsocopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south") {
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Fpu        = col("c_fpu",     gmos_south_fpu)
+    val Grating    = col("c_grating", gmos_south_grating)
+    val Filter     = col("c_filter",  gmos_south_filter.opt)
+  }
+
 }
