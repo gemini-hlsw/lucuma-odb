@@ -19,6 +19,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
@@ -95,7 +96,7 @@ object GraphQLRoutes {
 
                       // If the user has never hit the ODB using http then there will be no user
                       // entry in the database. So go ahead and [re]canonicalize here to be sure.
-                      _    <- OptionT.liftF(userSvc.canonicalizeUser(user).retryOnInvalidCursorName)
+                      _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                       _    <- OptionT.liftF(info(user, s"New service instance."))
                       map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
