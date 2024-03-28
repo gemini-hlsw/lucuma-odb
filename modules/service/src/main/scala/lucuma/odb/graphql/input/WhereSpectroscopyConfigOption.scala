@@ -34,8 +34,14 @@ object WhereSpectroscopyConfigOption {
     val WhereOptimal      = WhereWavelength.binding(path / "wavelengthOptimal")
     val WhereCoverage     = WhereWavelength.binding(path / "wavelengthCoverage")
 
+    lazy val WhereConfigBinding = binding(path)
+
     ObjectFieldsBinding.rmap {
       case List(
+        WhereConfigBinding.List.Option("AND", rAND),
+        WhereConfigBinding.List.Option("OR", rOR),
+        WhereConfigBinding.Option("NOT", rNOT),
+
         WhereCapabilities.Option("capability", rCap),
         WhereFocalPlane.Option("focalPlane", rFoc),
         WhereInstrument.Option("instrument", rIns),
@@ -48,9 +54,12 @@ object WhereSpectroscopyConfigOption {
         WhereCoverage.Option("wavelengthCoverage", rCov)
 
       ) =>
-        (rCap, rFoc, rIns, rRes, rSte, rLen, rWid, rRan, rOpt, rCov).parMapN {
-          (cap, foc, ins, res, ste, len, wid, ran, opt, cov) =>
+        (rAND, rOR, rNOT, rCap, rFoc, rIns, rRes, rSte, rLen, rWid, rRan, rOpt, rCov).parMapN {
+          (AND, OR, NOT, cap, foc, ins, res, ste, len, wid, ran, opt, cov) =>
             and(List(
+              AND.map(and),
+              OR.map(or),
+              NOT.map(Not(_)),
               cap,
               foc,
               ins,
