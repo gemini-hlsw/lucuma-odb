@@ -1,3 +1,5 @@
+-- Creates the GMOS North configuration options table with GMOS north features.
+-- Each row references the corresponding row in t_spectroscopy_config_option.
 CREATE TABLE t_spectroscopy_config_option_gmos_north (
   c_instrument d_tag NOT NULL DEFAULT ('GmosNorth'),
   CHECK (c_instrument = 'GmosNorth'),
@@ -12,6 +14,7 @@ CREATE TABLE t_spectroscopy_config_option_gmos_north (
   c_filter     d_tag          REFERENCES t_gmos_north_filter(c_tag)
 );
 
+-- Make the combined common + GMOS North specific table for bulk copy.
 SELECT create_spectroscopy_config_option_temp_table(
   'gmos_north_temp',
   ARRAY[
@@ -67,8 +70,10 @@ GmosNorth,42,R150 5.0",single_slit,5.0",5000000,330000000,R150,\N,360000,1030000
 \.
 
 
+-- Update the common table with the corresponding values from the temp table.
 SELECT insert_into_spectroscopy_config_option('gmos_north_temp');
 
+-- Finally update the instrument-specific table.
 INSERT INTO t_spectroscopy_config_option_gmos_north (
   c_instrument,
   c_index,

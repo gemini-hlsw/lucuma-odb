@@ -32,6 +32,9 @@ CREATE TABLE t_spectroscopy_config_option (
 COMMENT ON TABLE t_spectroscopy_config_option IS 'Spectroscopy Configuration Option';
 
 
+-- Creates a temp table combining all the common columns from the table defined
+-- above with the instrument-specific columns.  The temp table thus defined is
+-- "easy" to use for bulk inserting data.
 CREATE OR REPLACE FUNCTION create_spectroscopy_config_option_temp_table(
   temp_table_name    TEXT,
   instrument_columns TEXT[]
@@ -57,14 +60,13 @@ BEGIN
                         instrument_columns_sql  ||
                       ');';
 
-  RAISE NOTICE '%', create_table_sql;
-
   EXECUTE create_table_sql;
 END;
 $$ LANGUAGE plpgsql;
 
 
-
+-- Given the temporary table, insert its values into
+-- t_spectroscopy_config_option (ignoring the instrument-specific data).
 CREATE OR REPLACE FUNCTION insert_into_spectroscopy_config_option(
   temp_table_name TEXT
 )
