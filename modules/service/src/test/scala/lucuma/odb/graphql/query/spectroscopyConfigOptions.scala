@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.Order
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.order.*
@@ -137,6 +138,9 @@ class spectroscopyConfigOptions extends OdbSuite {
     }
   }
 
+  val allOptions: IO[List[ConfigOption]] =
+    optionsWhere("")
+
   test("simple query") {
     expect(
       user = pi,
@@ -144,6 +148,7 @@ class spectroscopyConfigOptions extends OdbSuite {
         query {
           spectroscopyConfigOptions(
             WHERE: {
+              instrument: { EQ: GMOS_NORTH }
               focalPlane: { EQ: SINGLE_SLIT }
               resolution: { GTE: 7000 }
             }
@@ -240,6 +245,7 @@ class spectroscopyConfigOptions extends OdbSuite {
         query {
           spectroscopyConfigOptions(
             WHERE: {
+              instrument: { EQ: GMOS_NORTH }
               slitLength: { microarcseconds: { GTE: 331000000 } }
             }
           ) {
@@ -257,49 +263,25 @@ class spectroscopyConfigOptions extends OdbSuite {
   }
 
   test("""1" < SlitWidth < 2"""") {
-    expect(
-      user = pi,
-      query = s"""
-        query {
-          spectroscopyConfigOptions(
-            WHERE: {
+    given Order[Angle] = Angle.AngleOrder
+    val min    = Angle.fromMicroarcseconds(1_000_000L)
+    val max    = Angle.fromMicroarcseconds(2_000_000L)
+    val expect = allOptions.map(_.filter(o => o.slitWidth > min && o.slitWidth < max))
+    val actual = optionsWhere {
+      """
               slitWidth: {
                 AND: [
                   { arcseconds: { GT: 1.0 } },
                   { arcseconds: { LT: 2.0 } }
                 ]
               }
-            }
-          ) {
-            name
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "spectroscopyConfigOptions": [
-            {
-              "name" : "B600 1.5\""
-            },
-            {
-              "name" : "R831 1.5\""
-            },
-            {
-              "name" : "B480 1.5\""
-            },
-            {
-              "name" : "R400 1.5\""
-            },
-            {
-              "name" : "R150 1.5\""
-            },
-            {
-              "name" : "B1200 1.5\""
-            }
-          ]
-        }
-      """.asRight
-    )
+      """
+    }
+
+    for {
+      es <- expect.map(ConfigOption.toNameSet)
+      as <- actual.map(ConfigOption.toNameSet)
+    } yield assertEquals(es, as)
   }
 
   test("rangeIncludes (too small)") {
@@ -327,14 +309,12 @@ class spectroscopyConfigOptions extends OdbSuite {
 
   test("rangeIncludes (in range)") {
     val w      = Wavelength.unsafeFromIntPicometers(463_000)
-    val expect = optionsWhere("").map(_.filter(o => o.wavelengthMin < w && w < o.wavelengthMax))
+    val expect = allOptions.map(_.filter(o => o.wavelengthMin < w && w < o.wavelengthMax))
     val actual = optionsWhere(s"""rangeIncludes: { micrometers: 0.463 }""")
-    assertIOBoolean(
-      for {
-        es <- expect.map(ConfigOption.toNameSet)
-        as <- actual.map(ConfigOption.toNameSet)
-      } yield es == as
-    )
+    for {
+      es <- expect.map(ConfigOption.toNameSet)
+      as <- actual.map(ConfigOption.toNameSet)
+    } yield assertEquals(es, as)
   }
 
   test("Combined") {
@@ -455,6 +435,48 @@ class spectroscopyConfigOptions extends OdbSuite {
               "gmosNorth": {
                 "fpu": "LONG_SLIT_1_50",
                 "grating": "R150_G5308"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("GmosSouth") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              focalPlane: { EQ: SINGLE_SLIT }
+              instrument: { EQ: GMOS_SOUTH }
+              resolution: { LT: 500 }
+              slitWidth: {
+                AND: [
+                  { arcseconds: { GT: 1.0 } },
+                  { arcseconds: { LT: 2.0 } }
+                ]
+              }
+            }
+          ) {
+            name
+            gmosSouth {
+              fpu
+              grating
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "R150 1.5\"",
+              "gmosSouth": {
+                "fpu": "LONG_SLIT_1_50",
+                "grating": "R150_G5326"
               }
             }
           ]

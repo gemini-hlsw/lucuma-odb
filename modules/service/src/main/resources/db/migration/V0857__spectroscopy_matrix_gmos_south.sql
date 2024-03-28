@@ -1,0 +1,86 @@
+CREATE TABLE t_spectroscopy_config_option_gmos_south (
+  c_instrument d_tag NOT NULL DEFAULT ('GmosSouth'),
+  CHECK (c_instrument = 'GmosSouth'),
+
+  c_index      int4  NOT NULL,
+
+  PRIMARY KEY (c_instrument, c_index),
+  FOREIGN KEY (c_instrument, c_index) REFERENCES t_spectroscopy_config_option (c_instrument, c_index),
+
+  c_fpu        d_tag NOT NULL REFERENCES t_gmos_south_fpu(c_tag),
+  c_grating    d_tag NOT NULL REFERENCES t_gmos_south_disperser(c_tag),
+  c_filter     d_tag          REFERENCES t_gmos_south_filter(c_tag)
+);
+
+SELECT create_spectroscopy_config_option_temp_table(
+  'gmos_south_temp',
+  ARRAY[
+    'c_fpu     d_tag',
+    'c_grating d_tag',
+    'c_filter  d_tag'
+  ]
+);
+
+COPY gmos_south_temp FROM STDIN WITH (DELIMITER ',', FORMAT csv, NULL '\N', QUOTE '$');
+GmosSouth,1,B1200 0.25",single_slit,25",250000,330000000,B1200,\N,360000,1030000,463000,159000,7488,false,\N,gs,LongSlit_0_25,B1200_G5321,\N
+GmosSouth,2,B1200 0.50",single_slit,50",500000,330000000,B1200,\N,360000,1030000,463000,159000,3744,false,\N,gs,LongSlit_0_50,B1200_G5321,\N
+GmosSouth,3,B1200 0.75",single_slit,75",750000,330000000,B1200,\N,360000,1030000,463000,159000,2496,false,\N,gs,LongSlit_0_75,B1200_G5321,\N
+GmosSouth,4,B1200 1.0",single_slit,1.0",1000000,330000000,B1200,\N,360000,1030000,463000,159000,1872,false,\N,gs,LongSlit_1_00,B1200_G5321,\N
+GmosSouth,5,B1200 1.5",single_slit,1.5",1500000,330000000,B1200,\N,360000,1030000,463000,159000,1248,false,\N,gs,LongSlit_1_50,B1200_G5321,\N
+GmosSouth,6,B1200 2.0",single_slit,2.0",2000000,330000000,B1200,\N,360000,1030000,463000,159000,936,false,\N,gs,LongSlit_2_00,B1200_G5321,\N
+GmosSouth,7,B1200 5.0",single_slit,5.0",5000000,330000000,B1200,\N,360000,1030000,463000,159000,374,false,\N,gs,LongSlit_5_00,B1200_G5321,\N
+GmosSouth,8,B600 0.25",single_slit,25",250000,330000000,B600,\N,360000,1030000,461000,307000,3376,false,\N,gs,LongSlit_0_25,B600_G5323,\N
+GmosSouth,9,B600 0.50",single_slit,50",500000,330000000,B600,\N,360000,1030000,461000,307000,1688,false,\N,gs,LongSlit_0_50,B600_G5323,\N
+GmosSouth,10,B600 0.75",single_slit,75",750000,330000000,B600,\N,360000,1030000,461000,307000,1125,false,\N,gs,LongSlit_0_75,B600_G5323,\N
+GmosSouth,11,B600 1.0",single_slit,1.0",1000000,330000000,B600,\N,360000,1030000,461000,307000,844,false,\N,gs,LongSlit_1_00,B600_G5323,\N
+GmosSouth,12,B600 1.5",single_slit,1.5",1500000,330000000,B600,\N,360000,1030000,461000,307000,563,false,\N,gs,LongSlit_1_50,B600_G5323,\N
+GmosSouth,13,B600 2.0",single_slit,2.0",2000000,330000000,B600,\N,360000,1030000,461000,307000,422,false,\N,gs,LongSlit_2_00,B600_G5323,\N
+GmosSouth,14,B600 5.0",single_slit,5.0",5000000,330000000,B600,\N,360000,1030000,461000,307000,169,false,\N,gs,LongSlit_5_00,B600_G5323,\N
+GmosSouth,15,R831 0.25",single_slit,25",250000,330000000,R831,\N,360000,1030000,757000,230000,8792,false,\N,gs,LongSlit_0_25,R831_G5322,\N
+GmosSouth,16,R831 0.50",single_slit,50",500000,330000000,R831,\N,360000,1030000,757000,230000,4396,false,\N,gs,LongSlit_0_50,R831_G5322,\N
+GmosSouth,17,R831 0.75",single_slit,75",750000,330000000,R831,\N,360000,1030000,757000,230000,2931,false,\N,gs,LongSlit_0_75,R831_G5322,\N
+GmosSouth,18,R831 1.0",single_slit,1.0",1000000,330000000,R831,\N,360000,1030000,757000,230000,2198,false,\N,gs,LongSlit_1_00,R831_G5322,\N
+GmosSouth,19,R831 1.5",single_slit,1.5",1500000,330000000,R831,\N,360000,1030000,757000,230000,1465,false,\N,gs,LongSlit_1_50,R831_G5322,\N
+GmosSouth,20,R831 2.0",single_slit,2.0",2000000,330000000,R831,\N,360000,1030000,757000,230000,1099,false,\N,gs,LongSlit_2_00,R831_G5322,\N
+GmosSouth,21,R831 5.0",single_slit,5.0",5000000,330000000,R831,\N,360000,1030000,757000,230000,440,false,\N,gs,LongSlit_5_00,R831_G5322,\N
+GmosSouth,22,B480 0.25",single_slit,25",250000,330000000,B480,\N,360000,1030000,422000,390000,3040,false,\N,gs,LongSlit_0_25,B480_G5327,\N
+GmosSouth,23,B480 0.50",single_slit,50",500000,330000000,B480,\N,360000,1030000,422000,390000,1520,false,\N,gs,LongSlit_0_50,B480_G5327,\N
+GmosSouth,24,B480 0.75",single_slit,75",750000,330000000,B480,\N,360000,1030000,422000,390000,1013,false,\N,gs,LongSlit_0_75,B480_G5327,\N
+GmosSouth,25,B480 1.0",single_slit,1.0",1000000,330000000,B480,\N,360000,1030000,422000,390000,760,false,\N,gs,LongSlit_1_00,B480_G5327,\N
+GmosSouth,26,B480 1.5",single_slit,1.5",1500000,330000000,B480,\N,360000,1030000,422000,390000,507,false,\N,gs,LongSlit_1_50,B480_G5327,\N
+GmosSouth,27,B480 2.0",single_slit,2.0",2000000,330000000,B480,\N,360000,1030000,422000,390000,380,false,\N,gs,LongSlit_2_00,B480_G5327,\N
+GmosSouth,28,B480 5.0",single_slit,5.0",5000000,330000000,B480,\N,360000,1030000,422000,390000,152,false,\N,gs,LongSlit_5_00,B480_G5327,\N
+GmosSouth,29,R400 0.25",single_slit,25",250000,330000000,R400,\N,360000,1030000,764000,462000,3836,false,\N,gs,LongSlit_0_25,R400_G5325,\N
+GmosSouth,30,R400 0.50",single_slit,50",500000,330000000,R400,\N,360000,1030000,764000,462000,1918,false,\N,gs,LongSlit_0_50,R400_G5325,\N
+GmosSouth,31,R400 0.75",single_slit,75",750000,330000000,R400,\N,360000,1030000,764000,462000,1279,false,\N,gs,LongSlit_0_75,R400_G5325,\N
+GmosSouth,32,R400 1.0",single_slit,1.0",1000000,330000000,R400,\N,360000,1030000,764000,462000,959,false,\N,gs,LongSlit_1_00,R400_G5325,\N
+GmosSouth,33,R400 1.5",single_slit,1.5",1500000,330000000,R400,\N,360000,1030000,764000,462000,639,false,\N,gs,LongSlit_1_50,R400_G5325,\N
+GmosSouth,34,R400 2.0",single_slit,2.0",2000000,330000000,R400,\N,360000,1030000,764000,462000,480,false,\N,gs,LongSlit_2_00,R400_G5325,\N
+GmosSouth,35,R400 5.0",single_slit,5.0",5000000,330000000,R400,\N,360000,1030000,764000,462000,192,false,\N,gs,LongSlit_5_00,R400_G5325,\N
+GmosSouth,36,R150 0.25",single_slit,25",250000,330000000,R150,\N,360000,1030000,717000,1190000,1262,false,\N,gs,LongSlit_0_25,R150_G5326,\N
+GmosSouth,37,R150 0.50",single_slit,50",500000,330000000,R150,\N,360000,1030000,717000,1190000,631,false,\N,gs,LongSlit_0_50,R150_G5326,\N
+GmosSouth,38,R150 0.75",single_slit,75",750000,330000000,R150,\N,360000,1030000,717000,1190000,421,false,\N,gs,LongSlit_0_75,R150_G5326,\N
+GmosSouth,39,R150 1.0",single_slit,1.0",1000000,330000000,R150,\N,360000,1030000,717000,1190000,316,false,\N,gs,LongSlit_1_00,R150_G5326,\N
+GmosSouth,40,R150 1.5",single_slit,1.5",1500000,330000000,R150,\N,360000,1030000,717000,1190000,210,false,\N,gs,LongSlit_1_50,R150_G5326,\N
+GmosSouth,41,R150 2.0",single_slit,2.0",2000000,330000000,R150,\N,360000,1030000,717000,1190000,158,false,\N,gs,LongSlit_2_00,R150_G5326,\N
+GmosSouth,42,R150 5.0",single_slit,5.0",5000000,330000000,R150,\N,360000,1030000,717000,1190000,63,false,\N,gs,LongSlit_5_00,R150_G5326,\N
+\.
+
+
+SELECT insert_into_spectroscopy_config_option('gmos_south_temp');
+
+INSERT INTO t_spectroscopy_config_option_gmos_south (
+  c_instrument,
+  c_index,
+  c_fpu,
+  c_grating,
+  c_filter
+) SELECT
+  c_instrument,
+  c_index,
+  c_fpu,
+  c_grating,
+  c_filter
+FROM gmos_south_temp;
+
+DROP TABLE gmos_south_temp;

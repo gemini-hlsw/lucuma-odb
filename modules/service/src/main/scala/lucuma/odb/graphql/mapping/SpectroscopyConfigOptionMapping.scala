@@ -37,6 +37,11 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
         SqlObject("gmosNorth", Join(List(
           SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosNorthTable.Instrument,
           SpectroscopyConfigOptionTable.Index      -> SpectrsocopyConfigOptionGmosNorthTable.Index
+        ))),
+
+        SqlObject("gmosSouth", Join(List(
+          SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosSouthTable.Instrument,
+          SpectroscopyConfigOptionTable.Index      -> SpectrsocopyConfigOptionGmosSouthTable.Index
         )))
       )
     )
@@ -54,41 +59,17 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       )
     )
 
+  lazy val SpectroscopyConfigOptionGmosSouthMapping: ObjectMapping =
+    ObjectMapping(
+      tpe           = SpectroscopyConfigOptionGmosSouthType,
+      fieldMappings = List(
+        SqlField("instrument", SpectrsocopyConfigOptionGmosSouthTable.Instrument, key = true),
+        SqlField("index",      SpectrsocopyConfigOptionGmosSouthTable.Index, key = true, hidden = true),
 
-/*
-  name:               String!
-  instrument:         Instrument!
-  site:               Site!
+        SqlField("fpu",        SpectrsocopyConfigOptionGmosSouthTable.Fpu),
+        SqlField("grating",    SpectrsocopyConfigOptionGmosSouthTable.Grating),
+        SqlField("filter",     SpectrsocopyConfigOptionGmosSouthTable.Filter)
+      )
+    )
 
-  focalPlane:         FocalPlane!
-
-  fpuLabel:           String! # e.g., '0.25"'
-  slitWidth:          Angle!
-  slitLength:         Angle!
-
-  disperserLabel:     String! # e.g., 'B1200'
-  filterLabel:        String! # e.g., 'JH'
-  wavelengthMin:      Angle!
-  wavelengthMax:      Angle!
-  wavelengthOptimal:  Angle!
-  wavelengthCoverage: Angle!
-
-  resolution:         PosInt!
-
-  adaptiveOptics:     Boolean!
-
-  capability:         SpectroscopyCapabilities
-
-  """
-  For GMOS North options, the GMOS North configuration.  Null for other
-  instruments.
-  """
-  gmosNorth: SpectroscopyConfigOptionGmosNorth
-
-  """
-  For GMOS South options, the GMOS South configuration.  Null for other
-  instruments.
-  """
-  gmosSouth: SpectroscopyConfigOptionGmosSouth
- */
 }

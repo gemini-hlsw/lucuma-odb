@@ -6793,6 +6793,9 @@ enum Instrument {
   ZORRO
 }
 
+"""
+Describes an instrument configuration option for spectroscopy.
+"""
 type SpectroscopyConfigOption {
   name:               String!
   instrument:         Instrument!
@@ -6815,6 +6818,7 @@ type SpectroscopyConfigOption {
 
   adaptiveOptics:     Boolean!
 
+  "A special capability (if any) that the configuration may have."
   capability:         SpectroscopyCapabilities
 
   site:               Site!
@@ -12195,6 +12199,11 @@ input WhereProposalPartners {
   isJoint: Boolean
 }
 
+"""
+Spectroscopy instrument configuration option matcher.  Configure with the
+properties of interest and pass it to the 'spectroscopyConfigOptions' query
+to find the corresponding configuration options.
+"""
 input WhereSpectroscopyConfigOption {
 
   capability: WhereOptionEqSpectroscopyCapabilities
