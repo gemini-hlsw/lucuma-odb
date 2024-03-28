@@ -344,6 +344,21 @@ class spectroscopyConfigOptions extends OdbSuite {
     } yield assertEquals(es, as)
   }
 
+  test("adaptiveOptics false") {
+    val expect = allOptions  // for now, all are AO-free
+    val actual = optionsWhere(s"""adaptiveOptics: { EQ: false }""")
+    for {
+      es <- expect.map(ConfigOption.toNameSet)
+      as <- actual.map(ConfigOption.toNameSet)
+    } yield assertEquals(es, as)
+  }
+
+  test("adaptiveOptics true") {
+    optionsWhere(s"""adaptiveOptics: { EQ: true }""").map { a =>
+      assertEquals(List.empty[ConfigOption], a) // for now, there are none
+    }
+  }
+
   test("Combined") {
     expect(
       user = pi,

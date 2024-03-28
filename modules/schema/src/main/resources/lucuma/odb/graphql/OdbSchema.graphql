@@ -10211,6 +10211,15 @@ input WhereAngle {
 
 }
 
+input WhereBoolean {
+
+  """
+  Matches if the boolean is the provided value.
+  """
+  EQ: Boolean
+
+}
+
 """
 ObsAttachment filter options. All specified items must match.
 """
@@ -12214,6 +12223,8 @@ input WhereSpectroscopyConfigOption {
   OR: [WhereSpectroscopyConfigOption!]
 
   NOT: WhereSpectroscopyConfigOption
+
+  adaptiveOptics: WhereBoolean
 
   capability: WhereOptionEqSpectroscopyCapabilities
 
