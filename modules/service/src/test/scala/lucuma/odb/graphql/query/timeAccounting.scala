@@ -159,7 +159,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           "seconds": ${c.amount.toSeconds}
         },
         "user": {
-          "id": ${pi.id.toString}
+          "id": ${staff.id.toString}
         },
         "comment": ${c.comment.map(_.value).asJson}
       }
@@ -566,7 +566,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(es)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
-      _ <- corrections.traverse_ { c => addTimeChargeCorrection(pi, v.vid, c) }
+      _ <- corrections.traverse_ { c => addTimeChargeCorrection(staff, v.vid, c) }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, corrections))
     } yield ()
   }
@@ -622,7 +622,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     for {
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 900)
-      _ <- addTimeChargeCorrection(pi, v.vid, correction)
+      _ <- addTimeChargeCorrection(staff, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
   }
@@ -635,7 +635,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     for {
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1000)
-      _ <- addTimeChargeCorrection(pi, v.vid, correction)
+      _ <- addTimeChargeCorrection(staff, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
     } yield ()
   }
@@ -762,7 +762,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
       _ <- insertEvents(es1)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
-      _ <- addTimeChargeCorrection(pi, v1.vid, correction)
+      _ <- addTimeChargeCorrection(staff, v1.vid, correction)
 
       _ <- expect(pi, observationQuery(oid), observationExpectedCharge(expected))
     } yield ()
