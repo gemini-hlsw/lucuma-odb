@@ -167,6 +167,72 @@ class spectroscopyConfigOptions extends OdbSuite {
     )
   }
 
+  test("wavelengthOptimal") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              wavelengthOptimal: {
+                AND: [
+                  { nanometers: { GT: 760.0 } }
+                  { nanometers: { LT: 770.0 } }
+                ]
+              }
+              instrument: { EQ: GMOS_NORTH }
+              slitWidth: { arcseconds: { EQ: 1.0 } }
+            }
+          ) {
+            name
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name": "R400 1.0\""
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("wavelengthCoverage") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              wavelengthCoverage: {
+                AND: [
+                  { nanometers: { GT: 350.0 } }
+                  { nanometers: { LT: 400.0 } }
+                ]
+              }
+              instrument: { EQ: GMOS_NORTH }
+              slitWidth: { arcseconds: { EQ: 1.0 } }
+            }
+          ) {
+            name
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name": "B480 1.0\""
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
   test("""331" < SlitWidth """) {
     expect(
       user = pi,
