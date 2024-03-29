@@ -48,13 +48,13 @@ trait UserInvitationService[F[_]]:
 object UserInvitationService:
 
   // temporary
-  extension (self: OdbError.InvitationError.type) 
+  extension (self: OdbError.InvitationError.type)
     def apply(id: UserInvitation.Id, detail: Option[String]): OdbError.InvitationError =
       OdbError.InvitationError(UserInvitation.Id.fromString.reverseGet(id), detail)
- 
+
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
-      
+
       def createPiInvitation(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.Observer.type): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createPiInvitation)
@@ -85,7 +85,7 @@ object UserInvitationService:
           // Superusers can do anything
           case ServiceRole(_)        => createSuperUserInvitation(input)
           case StandardRole.Staff(_) => createSuperUserInvitation(input)
-          case StandardRole.Admin(_) => createSuperUserInvitation(input)  
+          case StandardRole.Admin(_) => createSuperUserInvitation(input)
 
           // NGO user can only create NGO support invitations
           case StandardRole.Ngo(_, p) =>
@@ -94,7 +94,7 @@ object UserInvitationService:
               case _ => OdbError.NotAuthorized(user.id, Some("NGO users can only ngo support invitations, and only for their partner.")).asFailureF
 
           // Science users can only create CoI or Observer invitations, and only if they're the PI
-          case StandardRole.Pi(_)     => 
+          case StandardRole.Pi(_)     =>
             input match
               case CreateUserInvitationInput.Coi(pid, e)      => createPiInvitation(pid, e, ProgramUserRole.Coi)
               case CreateUserInvitationInput.Observer(pid, e) => createPiInvitation(pid, e, ProgramUserRole.Observer)
@@ -104,7 +104,7 @@ object UserInvitationService:
         user match
           case GuestUser(_)                      => OdbError.NotAuthorized(user.id, Some("Guest users cannot redeem user invitations.")).asFailureF
           case ServiceUser(_, _)                 => OdbError.NotAuthorized(user.id, Some("Service users cannot redeem user invitations.")).asFailureF
-          case StandardUser(_, _, _, c_duration) =>                  
+          case StandardUser(_, _, _, c_duration) =>
             val status = if input.accept then UserInvitation.Status.Redeemed else UserInvitation.Status.Declined
             session
               .prepareR(Statements.redeemUserInvitation)
@@ -119,10 +119,10 @@ object UserInvitationService:
                       .use(_.execute(pid, user.id, r, ot, op))
                       .as(Result(input.key.id))
                       .recoverWith:
-                        case SqlState.UniqueViolation(_) => 
+                        case SqlState.UniqueViolation(_) =>
                           xa.rollback(sp).as:
                             OdbError.NoAction(Some("You are already in the specified role; no action taken.")).asWarning(input.key.id)
-                    
+
       def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
         user.role.access match
           case Access.Guest => OdbError.NotAuthorized(user.id, Some("Guest users cannot revoke invitations.")).asFailureF
