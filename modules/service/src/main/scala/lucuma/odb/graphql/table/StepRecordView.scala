@@ -21,7 +21,6 @@ import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type
 import lucuma.odb.util.Codecs.time_span
 import skunk.codec.boolean.bool
-import skunk.codec.text.text
 
 trait StepRecordView[F[_]] extends BaseMapping[F] {
 
