@@ -243,6 +243,9 @@ type AtomRecord {
 
   ): StepRecordSelectResult!
 
+  "Atom ID from the generated atom, if any, that produced this atom record."
+  generatedId: AtomId
+
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
@@ -3681,6 +3684,7 @@ input RecordAtomInput {
   instrument: Instrument!
   sequenceType: SequenceType!
   stepCount: NonNegShort!
+  generatedId: AtomId
 }
 
 "The result of recording an atom."
@@ -3716,6 +3720,7 @@ input RecordGmosNorthStepInput {
   gmosNorth:    GmosNorthDynamicInput!
   stepConfig:   StepConfigInput!
   observeClass: ObserveClass!
+  generatedId:  StepId
 }
 
 """
@@ -3754,6 +3759,7 @@ input RecordGmosSouthStepInput {
   gmosSouth:    GmosSouthDynamicInput!
   stepConfig:   StepConfigInput!
   observeClass: ObserveClass!
+  generatedId:  StepId
 }
 
 """
@@ -9972,6 +9978,9 @@ type StepRecord {
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  "Step ID of the generated step, if any, that produced this step record."
+  generatedId: StepId
 
   """
   GMOS North instrument configuration for this step, if any.  This will be null
