@@ -446,7 +446,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordAtom(
-            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType),
+            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType, input.generatedId),
             Predicates.atomRecord.id,
             child
           )
@@ -464,7 +464,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
-            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosNorth),
+            sequenceService.insertGmosNorthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, input.generatedId, timeEstimateCalculator.gmosNorth),
             Predicates.gmosNorthStep.id,
             child
           )
@@ -474,7 +474,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
-            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, timeEstimateCalculator.gmosSouth),
+            sequenceService.insertGmosSouthStepRecord(input.atomId, input.instrument, input.step, input.observeClass, input.generatedId, timeEstimateCalculator.gmosSouth),
             Predicates.gmosSouthStep.id,
             child
           )

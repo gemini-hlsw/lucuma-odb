@@ -21,6 +21,7 @@ import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type
 import lucuma.odb.util.Codecs.time_span
 import skunk.codec.boolean.bool
+import skunk.codec.text.text
 
 trait StepRecordView[F[_]] extends BaseMapping[F] {
 
@@ -35,6 +36,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F] {
     val Created: ColumnRef        = col("c_created",         core_timestamp)
     val Completed: ColumnRef      = col("c_completed",       core_timestamp.opt)
     val ExecutionState: ColumnRef = col("c_execution_state", step_execution_state)
+    val GeneratedId: ColumnRef    = col("c_generated_id",    step_id.opt)
 
     object Gcal {
       val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum.opt)
