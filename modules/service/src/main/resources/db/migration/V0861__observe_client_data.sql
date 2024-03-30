@@ -1,11 +1,11 @@
 
 ALTER TABLE t_atom_record
-  ADD COLUMN c_generated_id atom_id;
+  ADD COLUMN c_generated_id d_atom_id;
 
 COMMENT ON COLUMN t_atom_record.c_generated_id IS 'Generated, original source atom id, if any.';
 
 ALTER TABLE t_step_record
-  ADD COLUMN c_generated_id step_id;
+  ADD COLUMN c_generated_id d_step_id;
 
 COMMENT ON COLUMN t_step_record.c_generated_id IS 'Generated, original step id, if any.';
 
