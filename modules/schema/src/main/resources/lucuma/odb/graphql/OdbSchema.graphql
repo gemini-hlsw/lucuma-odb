@@ -3289,11 +3289,13 @@ Properties for the chosen program reference type.  Supply the value for exactly
 one of the inputs.
 """
 input ProgramReferencePropertiesInput {
-  calibration: ProgramReferencePropertiesCalibrationInput
-  engineering: ProgramReferencePropertiesEngineeringInput
-  example:     ProgramReferencePropertiesExampleInput
-  library:     ProgramReferencePropertiesLibraryInput
-  science:     ProgramReferencePropertiesScienceInput
+  calibration:   ProgramReferencePropertiesCalibrationInput
+  commissioning: ProgramReferencePropertiesCommissioningInput
+  engineering:   ProgramReferencePropertiesEngineeringInput
+  example:       ProgramReferencePropertiesExampleInput
+  library:       ProgramReferencePropertiesLibraryInput
+  monitoring:    ProgramReferencePropertiesMonitoringInput
+  science:       ProgramReferencePropertiesScienceInput
 }
 
 type SetProgramReferenceResult {
@@ -3305,6 +3307,14 @@ type SetProgramReferenceResult {
 Inputs required when updating or switching to a calibration program.
 """
 input ProgramReferencePropertiesCalibrationInput {
+  semester:   Semester!
+  instrument: Instrument!
+}
+
+"""
+Inputs required when updating or switching to a commissioning program.
+"""
+input ProgramReferencePropertiesCommissioningInput {
   semester:   Semester!
   instrument: Instrument!
 }
@@ -3330,6 +3340,14 @@ Inputs required when updating or switching to a library program.
 input ProgramReferencePropertiesLibraryInput {
   instrument:  Instrument!
   description: NonEmptyString!
+}
+
+"""
+Inputs required when updating or switching to a monitoring program.
+"""
+input ProgramReferencePropertiesMonitoringInput {
+  semester:   Semester!
+  instrument: Instrument!
 }
 
 """
@@ -7611,6 +7629,14 @@ type CalibrationProgramReference implements ProgramReference {
   semesterIndex: PosInt!
 }
 
+type CommissioningProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+  instrument:    Instrument!
+  semester:      Semester!
+  semesterIndex: PosInt!
+}
+
 type EngineeringProgramReference implements ProgramReference {
   label:         ProgramReferenceLabel!
   type:          ProgramType!
@@ -7630,6 +7656,14 @@ type LibraryProgramReference implements ProgramReference {
   type:          ProgramType!
   description:   NonEmptyString!
   instrument:    Instrument!
+}
+
+type MonitoringProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+  instrument:    Instrument!
+  semester:      Semester!
+  semesterIndex: PosInt!
 }
 
 type ScienceProgramReference implements ProgramReference {
