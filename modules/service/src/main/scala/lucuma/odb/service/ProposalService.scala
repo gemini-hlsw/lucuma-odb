@@ -139,10 +139,15 @@ object ProposalService {
               }
           }
 
+        def insertSplits(pid: Program.Id, optSplits: Option[Map[Tag, IntPercent]]): F[Unit] =
+          optSplits.fold(().pure[F])(splits => 
+            if (splits.isEmpty) ().pure[F] else partnerSplitsService.insertSplits(splits, pid)
+          )
+
         (for {
           _   <- ResultT(validateProgramType(input.programId))
           _   <- ResultT(insert(input.programId))
-          _   <- ResultT(partnerSplitsService.insertSplits(input.SET.partnerSplits, input.programId).map(Result.success))
+          _   <- ResultT(insertSplits(input.programId, input.SET.partnerSplits).map(Result.success))
         } yield input.programId).value
 
       def updateProposal(input: UpdateProposalInput)(using Transaction[F]): F[Result[Program.Id]] = {
