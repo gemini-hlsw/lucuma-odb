@@ -282,6 +282,39 @@ enum Breakpoint {
   DISABLED
 }
 
+type CallForProposals {
+  id:          CfpId!
+  status:      CfpStatus!
+  type:        CfpType!
+  semester:    Semester!
+  activeStart: Timestamp!
+  activeEnd:   Timestamp!
+  partners:    [CfpPartner!]!
+}
+
+scalar CfpId
+
+type CfpPartner {
+  cfpId:    CfpId!
+  partner:  Partner!
+  deadline: Timestamp!
+}
+
+enum CfpStatus {
+  OPEN
+  CLOSED
+}
+
+enum CfpType {
+  DEMO_SCIENCE
+  DIRECTORS_TIME
+  FAST_TURNAROUND
+  LARGE_PROGRAM
+  POOR_WEATHER
+  REGULAR_SEMESTER
+  SYSTEM_VERIFICATION
+}
+
 """
 Catalog id consisting of catalog name, string identifier and an optional object type
 """
