@@ -82,7 +82,7 @@ object ProposalPropertiesInput {
       if splits.length != map.size
       then Matcher.validationFailure("Each partner may only appear once.")
       else
-        if splits.nonEmpty && splits.foldMap(_.percent.value) != 100
+        if splits.foldMap(_.percent.value) != 100
         then Matcher.validationFailure("Percentages must sum to exactly 100.")
         else Result(map)
     }

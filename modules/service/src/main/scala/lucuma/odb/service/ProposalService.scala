@@ -140,9 +140,7 @@ object ProposalService {
           }
 
         def insertSplits(pid: Program.Id, optSplits: Option[Map[Tag, IntPercent]]): F[Unit] =
-          optSplits.fold(().pure[F])(splits => 
-            if (splits.isEmpty) ().pure[F] else partnerSplitsService.insertSplits(splits, pid)
-          )
+          optSplits.fold(().pure[F])(splits => partnerSplitsService.insertSplits(splits, pid))
 
         (for {
           _   <- ResultT(validateProgramType(input.programId))
