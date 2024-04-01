@@ -335,7 +335,7 @@ class createProposal extends OdbSuite {
     }
   }
 
-  test("partner splits can be missing"){
+  test("partner splits cannot be empty"){
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -356,6 +356,7 @@ class createProposal extends OdbSuite {
                     }
                   }
                   toOActivation: NONE
+                  partnerSplits: []
                 }
               }
             ) {
@@ -383,34 +384,12 @@ class createProposal extends OdbSuite {
           }
         """,
         expected =
-          Right(
-            json"""
-              {
-                "createProposal" : {
-                  "proposal" : {
-                    "title" : "My Proposal",
-                    "proposalClass" : {
-                      "__typename" : "Intensive",
-                      "minPercentTime" : 40,
-                      "minPercentTotalTime" : 20,
-                      "totalTime" : {
-                        "hours" : 1.230000,
-                        "iso" : "PT1H13M48S"
-                      }
-                    },
-                    "category" : null,
-                    "toOActivation" : "NONE",
-                    "partnerSplits" : []
-                  }
-                }
-              }
-          """
-          )
+          Left(List("Argument 'input.SET.partnerSplits' is invalid: Percentages must sum to exactly 100."))
       )
     }
   }
 
-  test("partner splits can be empty"){
+  test("partner splits can be missing"){
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -431,7 +410,6 @@ class createProposal extends OdbSuite {
                     }
                   }
                   toOActivation: NONE
-                  partnerSplits: []
                 }
               }
             ) {
