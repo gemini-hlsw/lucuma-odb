@@ -231,7 +231,7 @@ class createProposal extends OdbSuite {
     }
   }
   
-  test("attempt create with insufficient information") {
+  test("attempt create without proposal class") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -242,6 +242,7 @@ class createProposal extends OdbSuite {
                 programId: "$pid"
                 SET: {
                   title: "My Proposal"
+                  toOActivation: NONE
                 }
               }
             ) {
@@ -252,13 +253,44 @@ class createProposal extends OdbSuite {
           }
         """,
         expected = 
-          Left(List("Argument 'input.SET' is invalid: All of proposalClass, toOActivation, and partnerSplits are required on creation."))
+          Left(List("Argument 'input.SET' is invalid: Both proposalClass and toOActivation are required on creation."))
+      )
+    }
+  }
+
+  test("attempt create without toOActivation") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Proposal"
+                  proposalClass: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                title
+              }
+            }
+          }
+        """,
+        expected = 
+          Left(List("Argument 'input.SET' is invalid: Both proposalClass and toOActivation are required on creation."))
       )
     }
   }
 
   test("partner splits must sum to 100"){
-    createProgramWithProposalAs(pi).flatMap { pid =>
+    createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -303,8 +335,83 @@ class createProposal extends OdbSuite {
     }
   }
 
-  test("partner splits cannot be empty"){
-    createProgramWithProposalAs(pi).flatMap { pid =>
+  test("partner splits can be missing"){
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Proposal"
+                  proposalClass: {
+                    intensive: {
+                      minPercentTime: 40
+                      minPercentTotalTime: 20
+                      totalTime: {
+                        hours: 1.23
+                      }
+                    }
+                  }
+                  toOActivation: NONE
+                }
+              }
+            ) {
+              proposal {
+                title
+                proposalClass {
+                  __typename
+                  ... on Intensive {
+                    minPercentTime
+                    minPercentTotalTime
+                    totalTime {
+                      hours
+                      iso
+                    }
+                  }
+                }
+                category
+                toOActivation
+                partnerSplits {
+                  partner
+                  percent
+                }
+              }
+            }
+          }
+        """,
+        expected =
+          Right(
+            json"""
+              {
+                "createProposal" : {
+                  "proposal" : {
+                    "title" : "My Proposal",
+                    "proposalClass" : {
+                      "__typename" : "Intensive",
+                      "minPercentTime" : 40,
+                      "minPercentTotalTime" : 20,
+                      "totalTime" : {
+                        "hours" : 1.230000,
+                        "iso" : "PT1H13M48S"
+                      }
+                    },
+                    "category" : null,
+                    "toOActivation" : "NONE",
+                    "partnerSplits" : []
+                  }
+                }
+              }
+          """
+          )
+      )
+    }
+  }
+
+  test("partner splits can be empty"){
+    createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -330,13 +437,52 @@ class createProposal extends OdbSuite {
             ) {
               proposal {
                 title
+                proposalClass {
+                  __typename
+                  ... on Intensive {
+                    minPercentTime
+                    minPercentTotalTime
+                    totalTime {
+                      hours
+                      iso
+                    }
+                  }
+                }
+                category
+                toOActivation
+                partnerSplits {
+                  partner
+                  percent
+                }
               }
             }
           }
         """,
         expected =
-          Left(List("Argument 'input.SET.partnerSplits' is invalid: Percentages must sum to exactly 100."))
-        )
+          Right(
+            json"""
+              {
+                "createProposal" : {
+                  "proposal" : {
+                    "title" : "My Proposal",
+                    "proposalClass" : {
+                      "__typename" : "Intensive",
+                      "minPercentTime" : 40,
+                      "minPercentTotalTime" : 20,
+                      "totalTime" : {
+                        "hours" : 1.230000,
+                        "iso" : "PT1H13M48S"
+                      }
+                    },
+                    "category" : null,
+                    "toOActivation" : "NONE",
+                    "partnerSplits" : []
+                  }
+                }
+              }
+          """
+          )
+      )
     }
   }
 

@@ -22,7 +22,7 @@ object ProposalPropertiesInput {
     category: Nullable[Tag],
     toOActivation: ToOActivation,
     abstrakt: Nullable[NonEmptyString],
-    partnerSplits: Map[Tag, IntPercent],
+    partnerSplits: Option[Map[Tag, IntPercent]],
   )
 
   case class Edit(
@@ -38,8 +38,8 @@ object ProposalPropertiesInput {
         case Left(a) => a.asCreate.map(_.asLeft)
         case Right(b) => b.asCreate.map(_.asRight)
       }
-      (proposalClassʹ, toOActivation, partnerSplits).mapN { (pc, too, splits) =>
-        Create(title, pc, category, too, abstrakt, splits)
+      (proposalClassʹ, toOActivation).mapN { (pc, too) =>
+        Create(title, pc, category, too, abstrakt, partnerSplits)
       }
     }
 
@@ -69,8 +69,8 @@ object ProposalPropertiesInput {
 
   val CreateBinding: Matcher[Create] =
     data(ProposalClassInput.CreateBinding).rmap {
-      case (title, Some(propClass), cat, Some(too), abs, Some(splits)) => Result(Create(title, propClass, cat, too, abs, splits))
-      case _ => Matcher.validationFailure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
+      case (title, Some(propClass), cat, Some(too), abs, splits) => Result(Create(title, propClass, cat, too, abs, splits))
+      case _ => Matcher.validationFailure("Both proposalClass and toOActivation are required on creation.")
     }
 
   val EditBinding: Matcher[Edit] =
@@ -82,34 +82,10 @@ object ProposalPropertiesInput {
       if splits.length != map.size
       then Matcher.validationFailure("Each partner may only appear once.")
       else
-        if splits.foldMap(_.percent.value) != 100
+        if splits.nonEmpty && splits.foldMap(_.percent.value) != 100
         then Matcher.validationFailure("Percentages must sum to exactly 100.")
         else Result(map)
     }
-
-  // private def binding(
-  //   proposalClass: Matcher[ProposalClassInput]
-  // ): Matcher[ProposalInput] =
-  //   ObjectFieldsBinding.rmap {
-  //     case List(
-  //       NonEmptyStringBinding.Nullable("title", rTitle),
-  //       proposalClass.Option("proposalClass", rProposalClass),
-  //       TagBinding.Nullable("category", rCategory),
-  //       ToOActivationBinding.Option("toOActivation", rToOActivation),
-  //       NonEmptyStringBinding.Nullable("abstract", rAbstract),
-  //       PartnerSplitsInput.Option("partnerSplits", rSplits),
-  //     ) =>
-  //       (rTitle, rProposalClass, rCategory, rToOActivation, rAbstract, rSplits).parMapN(apply)
-  //   }
-
-  // val CreateBinding: Matcher[ProposalInput] =
-  //   binding(ProposalClassInput.CreateBinding).rmap {
-  //     case ok @ ProposalInput(_, Some(_), _, Some(_), _, Some(_)) => Result(ok)
-  //     case _ => Matcher.validationFailure("All of proposalClass, toOActivation, and partnerSplits are required on creation.")
-  //   }
-
-  // val EditBinding: Matcher[ProposalInput] =
-  //   binding(ProposalClassInput.EditBinding)
 
 }
 
