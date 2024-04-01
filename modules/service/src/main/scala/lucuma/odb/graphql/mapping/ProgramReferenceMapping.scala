@@ -43,11 +43,13 @@ trait ProgramReferenceMapping[F[_]]
 
       override def discriminate(c: Cursor): Result[Type] =
         c.fieldAs[PT]("type").flatMap {
-          case PT.Calibration => Result(CalibrationProgramReferenceType)
-          case PT.Engineering => Result(EngineeringProgramReferenceType)
-          case PT.Example     => Result(ExampleProgramReferenceType)
-          case PT.Library     => Result(LibraryProgramReferenceType)
-          case PT.Science     => Result(ScienceProgramReferenceType)
+          case PT.Calibration   => Result(CalibrationProgramReferenceType)
+          case PT.Commissioning => Result(CommissioningProgramReferenceType)
+          case PT.Engineering   => Result(EngineeringProgramReferenceType)
+          case PT.Example       => Result(ExampleProgramReferenceType)
+          case PT.Library       => Result(LibraryProgramReferenceType)
+          case PT.Monitoring    => Result(MonitoringProgramReferenceType)
+          case PT.Science       => Result(ScienceProgramReferenceType)
         }
 
       private def mkPredicate(tpe: PT): Option[Predicate] =
@@ -55,18 +57,20 @@ trait ProgramReferenceMapping[F[_]]
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
         tpe match {
-          case CalibrationProgramReferenceType => mkPredicate(PT.Calibration)
-          case EngineeringProgramReferenceType => mkPredicate(PT.Engineering)
-          case ExampleProgramReferenceType     => mkPredicate(PT.Example)
-          case LibraryProgramReferenceType     => mkPredicate(PT.Library)
-          case ScienceProgramReferenceType     => mkPredicate(PT.Science)
-          case _                               => none
+          case CalibrationProgramReferenceType   => mkPredicate(PT.Calibration)
+          case CommissioningProgramReferenceType => mkPredicate(PT.Commissioning)
+          case EngineeringProgramReferenceType   => mkPredicate(PT.Engineering)
+          case ExampleProgramReferenceType       => mkPredicate(PT.Example)
+          case LibraryProgramReferenceType       => mkPredicate(PT.Library)
+          case MonitoringProgramReferenceType    => mkPredicate(PT.Monitoring)
+          case ScienceProgramReferenceType       => mkPredicate(PT.Science)
+          case _                                 => none
         }
     }
 
-  lazy val CalibrationProgramReferenceMapping: ObjectMapping =
+  private def semesterInstrumentReferenceMapping(tpe: Type): ObjectMapping =
     ObjectMapping(
-      tpe = CalibrationProgramReferenceType,
+      tpe = tpe,
       fieldMappings = List(
         SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
         SqlField("instrument",    ProgramReferenceView.Instrument),
@@ -75,16 +79,14 @@ trait ProgramReferenceMapping[F[_]]
       )
     )
 
+  lazy val CalibrationProgramReferenceMapping: ObjectMapping =
+    semesterInstrumentReferenceMapping(CalibrationProgramReferenceType)
+
+  lazy val CommissioningProgramReferenceMapping: ObjectMapping =
+    semesterInstrumentReferenceMapping(CommissioningProgramReferenceType)
+
   lazy val EngineeringProgramReferenceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = EngineeringProgramReferenceType,
-      fieldMappings = List(
-        SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
-        SqlField("instrument",    ProgramReferenceView.Instrument),
-        SqlField("semester",      ProgramReferenceView.Semester),
-        SqlField("semesterIndex", ProgramReferenceView.SemesterIndex)
-      )
-    )
+    semesterInstrumentReferenceMapping(EngineeringProgramReferenceType)
 
   lazy val ExampleProgramReferenceMapping: ObjectMapping =
     ObjectMapping(
@@ -104,6 +106,9 @@ trait ProgramReferenceMapping[F[_]]
         SqlField("instrument",    ProgramReferenceView.Instrument)
       )
     )
+
+  lazy val MonitoringProgramReferenceMapping: ObjectMapping =
+    semesterInstrumentReferenceMapping(MonitoringProgramReferenceType)
 
   lazy val ScienceProgramReferenceMapping: ObjectMapping =
     ObjectMapping(
