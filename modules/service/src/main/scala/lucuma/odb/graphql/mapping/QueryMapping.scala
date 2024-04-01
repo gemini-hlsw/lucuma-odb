@@ -28,6 +28,7 @@ import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
+import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
 import lucuma.odb.graphql.input.WhereTarget
 import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ObservationPredicates
@@ -62,6 +63,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         SqlObject("programs"),
         SqlObject("proposalAttachmentTypeMeta"),
         SqlObject("proposalStatusMeta"),
+        SqlObject("spectroscopyConfigOptions"),
         SqlObject("target"),
         SqlObject("targetGroup"),
         SqlObject("targets"),
@@ -85,6 +87,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Programs,
       ProposalAttachmentTypeMeta,
       ProposalStatusMeta,
+      SpectroscopyConfigOptions,
       Target,
       TargetGroup,
       Targets,
@@ -426,6 +429,20 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 child = q
               )
             }
+          }
+        }
+    }
+  }
+
+  private lazy val SpectroscopyConfigOptions: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    val WhereOptions = WhereSpectroscopyConfigOption.binding(Path.from(SpectroscopyConfigOptionType))
+    {
+      case (QueryType, "spectroscopyConfigOptions", List(
+        WhereOptions.Option("WHERE", rWHERE)
+      )) =>
+        Elab.transformChild { child =>
+          rWHERE.map { where =>
+            Filter(where.getOrElse(True), child)
           }
         }
     }
