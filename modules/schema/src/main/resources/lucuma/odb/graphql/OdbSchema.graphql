@@ -11695,53 +11695,6 @@ input WhereOrderProgramId {
   LTE: ProgramId
 }
 
-"""
-Filters on equality or order comparisons of positive doubles.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2.0'.
-"""
-input WhereOrderPosDouble {
-
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: PosDouble
-
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: PosDouble
-
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [PosDouble!]
-
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [PosDouble!]
-
-  """
-  Matches if the property is ordered after (>) the supplied value.
-  """
-  GT: PosDouble
-
-  """
-  Matches if the property is ordered before (<) the supplied value.
-  """
-  LT: PosDouble
-
-  """
-  Matches if the property is ordered after or equal (>=) the supplied value.
-  """
-  GTE: PosDouble
-
-  """
-  Matches if the property is ordered before or equal (<=) the supplied value.
-  """
-  LTE: PosDouble
-}
-
 input WhereProposalReference {
 
   "Matches if the proposal reference is not defined."
