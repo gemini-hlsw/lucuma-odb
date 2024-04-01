@@ -6794,6 +6794,62 @@ enum Instrument {
 }
 
 """
+Describes an instrument configuration option for spectroscopy.
+"""
+type SpectroscopyConfigOption {
+  name:               String!
+  instrument:         Instrument!
+
+  focalPlane:         FocalPlane!
+
+  fpuLabel:           String! # e.g., '0.25"'
+  slitWidth:          Angle!
+  slitLength:         Angle!
+
+  disperserLabel:     String! # e.g., 'B1200'
+  filterLabel:        String  # e.g., 'JH'
+
+  wavelengthMin:      Wavelength!
+  wavelengthMax:      Wavelength!
+  wavelengthOptimal:  Wavelength!
+  wavelengthCoverage: Wavelength!
+
+  resolution:         PosInt!
+
+  adaptiveOptics:     Boolean!
+
+  "A special capability (if any) that the configuration may have."
+  capability:         SpectroscopyCapabilities
+
+  site:               Site!
+
+  """
+  For GMOS North options, the GMOS North configuration.  Null for other
+  instruments.
+  """
+  gmosNorth: SpectroscopyConfigOptionGmosNorth
+
+  """
+  For GMOS South options, the GMOS South configuration.  Null for other
+  instruments.
+  """
+  gmosSouth: SpectroscopyConfigOptionGmosSouth
+
+}
+
+type SpectroscopyConfigOptionGmosNorth {
+  fpu:     GmosNorthBuiltinFpu!
+  grating: GmosNorthGrating!
+  filter:  GmosNorthFilter
+}
+
+type SpectroscopyConfigOptionGmosSouth {
+  fpu:     GmosSouthBuiltinFpu!
+  grating: GmosSouthGrating!
+  filter:  GmosSouthFilter
+}
+
+"""
 An 'Int` in the range 0 to 100
 """
 scalar IntPercent
@@ -8086,6 +8142,13 @@ type Query {
   #   # Set to true to include deleted values
   #   includeDeleted: Boolean! = false
   # ): ScienceRequirementsGroupSelectResult!
+
+  """
+  Spectroscopy configuration options matching the WHERE parameter.
+  """
+  spectroscopyConfigOptions(
+    WHERE: WhereSpectroscopyConfigOption
+  ): [SpectroscopyConfigOption!]!
 
   """
   Retrieves the target with the given id, if it exists
@@ -10118,6 +10181,45 @@ type WavelengthDither {
   micrometers: BigDecimal!
 }
 
+input WhereAngle {
+
+  AND: [WhereAngle!]
+
+  OR: [WhereAngle!]
+
+  NOT: WhereAngle
+
+  microarcseconds: WhereOrderLong
+  
+  microseconds: WhereOrderBigDecimal
+
+  milliarcseconds: WhereOrderBigDecimal
+
+  milliseconds: WhereOrderBigDecimal
+
+  arcseconds: WhereOrderBigDecimal
+
+  seconds: WhereOrderBigDecimal
+
+  arcminutes: WhereOrderBigDecimal
+
+  minutes: WhereOrderBigDecimal
+
+  degrees: WhereOrderBigDecimal
+
+  hours: WhereOrderBigDecimal
+
+}
+
+input WhereBoolean {
+
+  """
+  Matches if the boolean is the provided value.
+  """
+  EQ: Boolean
+
+}
+
 """
 ObsAttachment filter options. All specified items must match.
 """
@@ -10434,6 +10536,32 @@ input WhereEqProposalStatus {
 }
 
 """
+Filters on equality (or not) of the site property. All supplied criteria must
+match, but usually only one is selected.
+"""
+input WhereEqSite {
+  """
+  Matches if the site is exactly the supplied value.
+  """
+  EQ: Site
+
+  """
+  Matches if the site is not the supplied value.
+  """
+  NEQ: Site
+
+  """
+  Matches if the site is any of the supplied options.
+  """
+  IN: [Site!]
+
+  """
+  Matches if the site is none of the supplied values.
+  """
+  NIN: [Site!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -10706,6 +10834,29 @@ input WhereOrderGroupId {
   LTE: GroupId
 }
 
+input WhereEqFocalPlane {
+
+  """
+  Matches if the focal plane option is exactly the supplied value.
+  """
+  EQ: FocalPlane
+
+  """
+  Matches if the focal plane option is not the supplied value.
+  """
+  NEQ: FocalPlane
+
+  """
+  Matches if the focal plane option is any of the supplied values.
+  """
+  IN: [FocalPlane!]
+
+  """
+  Matches if the focal plane option is none of the supplied values.
+  """
+  NIN: [FocalPlane!]
+}
+
 """
 Filters on equality (or not) of the instrument and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
@@ -10799,6 +10950,40 @@ input WhereEqScienceSubtype {
 }
 
 """
+Filters on equality (or not) of the SpectroscopyCapabilities property. All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionEqSpectroscopyCapabilities {
+
+  """
+  When `true`, matches if the spectroscopy capability value is not defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the spectroscopy capability is the supplied value.
+  """
+  EQ: SpectroscopyCapabilities
+
+  """
+  Matches if the spectroscopy capability is anything other than the supplied
+  value.
+  """
+  NEQ: SpectroscopyCapabilities
+
+  """
+  Matches if the spectroscopy capability is any one of the supplied values.
+  """
+  IN: [SpectroscopyCapabilities!]
+
+  """
+  Matches if the spectroscopy capability is not any one of the supplied values.
+  """
+  NIN: [SpectroscopyCapabilities!]
+
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".  Defining, `EQ`,
@@ -10860,6 +11045,54 @@ input WhereOptionString {
   """
   MATCH_CASE: Boolean = true
 }
+
+"""
+Filters on equality or order comparisons of BigDecimal properties.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderBigDecimal {
+
+  """
+  Matches if the BigDecimal is exactly the supplied value.
+  """
+  EQ: BigDecimal
+
+  """
+  Matches if the BigDecimal is not the supplied value.
+  """
+  NEQ: BigDecimal
+
+  """
+  Matches if the BigDecimal is any of the supplied options.
+  """
+  IN: [BigDecimal!]
+
+  """
+  Matches if the BigDecimal is none of the supplied values.
+  """
+  NIN: [BigDecimal!]
+
+  """
+  Matches if the BigDecimal is ordered after (>) the supplied value.
+  """
+  GT: BigDecimal
+
+  """
+  Matches if the BigDecimal is ordered before (<) the supplied value.
+  """
+  LT: BigDecimal
+
+  """
+  Matches if the BigDecimal is ordered after or equal (>=) the supplied value.
+  """
+  GTE: BigDecimal
+
+  """
+  Matches if the BigDecimal is ordered before or equal (<=) the supplied value.
+  """
+  LTE: BigDecimal
+}
+
 
 """
 Filters on equality or order comparisons of the property.  All supplied
@@ -11053,50 +11286,96 @@ input WhereOrderTimestamp {
 }
 
 """
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
+Filters on equality or order comparisons of the integer property.  All supplied
+criteria must match, but usually only one is selected.
 """
 input WhereOrderInt {
   """
-  Matches if the property is exactly the supplied value.
+  Matches if the integer is exactly the supplied value.
   """
   EQ: Int
 
   """
-  Matches if the property is not the supplied value.
+  Matches if the integer is not the supplied value.
   """
   NEQ: Int
 
   """
-  Matches if the property value is any of the supplied options.
+  Matches if the integer is any of the supplied options.
   """
   IN: [Int!]
 
   """
-  Matches if the property value is none of the supplied values.
+  Matches if the integer is none of the supplied values.
   """
   NIN: [Int!]
 
   """
-  Matches if the property is ordered after (>) the supplied value.
+  Matches if the integer is ordered after (>) the supplied value.
   """
   GT: Int
 
   """
-  Matches if the property is ordered before (<) the supplied value.
+  Matches if the integer is ordered before (<) the supplied value.
   """
   LT: Int
 
   """
-  Matches if the property is ordered after or equal (>=) the supplied value.
+  Matches if the integer is ordered after or equal (>=) the supplied value.
   """
   GTE: Int
 
   """
-  Matches if the property is ordered before or equal (<=) the supplied value.
+  Matches if the integer is ordered before or equal (<=) the supplied value.
   """
   LTE: Int
+}
+
+"""
+Filters on equality or order comparisons of long property.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderLong {
+
+  """
+  Matches if the Long is exactly the supplied value.
+  """
+  EQ: Long
+
+  """
+  Matches if the Long is not the supplied value.
+  """
+  NEQ: Long
+
+  """
+  Matches if the Long is any of the supplied options.
+  """
+  IN: [Long!]
+
+  """
+  Matches if the Long is none of the supplied values.
+  """
+  NIN: [Long!]
+
+  """
+  Matches if the Long is ordered after (>) the supplied value.
+  """
+  GT: Long
+
+  """
+  Matches if the Long is ordered before (<) the supplied value.
+  """
+  LT: Long
+
+  """
+  Matches if the Long is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Long
+
+  """
+  Matches if the Long is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Long
 }
 
 """
@@ -11243,6 +11522,99 @@ input WhereOrderObservationId {
 }
 
 """
+Filters on equality or order comparisons of PosBigDecimal properties.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOrderPosBigDecimal {
+
+  """
+  Matches if the PosBigDecimal is exactly the supplied value.
+  """
+  EQ: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is not the supplied value.
+  """
+  NEQ: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is any of the supplied options.
+  """
+  IN: [PosBigDecimal!]
+
+  """
+  Matches if the PosBigDecimal is none of the supplied values.
+  """
+  NIN: [PosBigDecimal!]
+
+  """
+  Matches if the PosBigDecimal is ordered after (>) the supplied value.
+  """
+  GT: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is ordered before (<) the supplied value.
+  """
+  LT: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosBigDecimal
+
+  """
+  Matches if the PosBigDecimal is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosBigDecimal
+}
+
+"""
+Filters on equality or order comparisons of the PosInt property.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderPosInt {
+  """
+  Matches if the PosInt is exactly the supplied value.
+  """
+  EQ: PosInt
+
+  """
+  Matches if the PosInt is not the supplied value.
+  """
+  NEQ: PosInt
+
+  """
+  Matches if the PosInt is any of the supplied options.
+  """
+  IN: [PosInt!]
+
+  """
+  Matches if the PosInt is none of the supplied values.
+  """
+  NIN: [PosInt!]
+
+  """
+  Matches if the PosInt is ordered after (>) the supplied value.
+  """
+  GT: PosInt
+
+  """
+  Matches if the PosInt is ordered before (<) the supplied value.
+  """
+  LT: PosInt
+
+  """
+  Matches if the PosInt is ordered after or equal (>=) the supplied value.
+  """
+  GTE: PosInt
+
+  """
+  Matches if the PosInt is ordered before or equal (<=) the supplied value.
+  """
+  LTE: PosInt
+}
+
+"""
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
@@ -11290,51 +11662,50 @@ input WhereOrderProgramId {
 }
 
 """
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
+Filters on equality or order comparisons of positive doubles.  All supplied
+criteria must match, but usually only one is selected.  E.g., 'GT = 2.0'.
 """
-input WhereOrderPosInt {
+input WhereOrderPosDouble {
 
   """
   Matches if the property is exactly the supplied value.
   """
-  EQ: PosInt
+  EQ: PosDouble
 
   """
   Matches if the property is not the supplied value.
   """
-  NEQ: PosInt
+  NEQ: PosDouble
 
   """
   Matches if the property value is any of the supplied options.
   """
-  IN: [PosInt!]
+  IN: [PosDouble!]
 
   """
   Matches if the property value is none of the supplied values.
   """
-  NIN: [PosInt!]
+  NIN: [PosDouble!]
 
   """
   Matches if the property is ordered after (>) the supplied value.
   """
-  GT: PosInt
+  GT: PosDouble
 
   """
   Matches if the property is ordered before (<) the supplied value.
   """
-  LT: PosInt
+  LT: PosDouble
 
   """
   Matches if the property is ordered after or equal (>=) the supplied value.
   """
-  GTE: PosInt
+  GTE: PosDouble
 
   """
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
-  LTE: PosInt
+  LTE: PosDouble
 }
 
 input WhereProposalReference {
@@ -11841,6 +12212,48 @@ input WhereProposalPartners {
 }
 
 """
+Spectroscopy instrument configuration option matcher.  Configure with the
+properties of interest and pass it to the 'spectroscopyConfigOptions' query
+to find the corresponding configuration options.
+"""
+input WhereSpectroscopyConfigOption {
+
+  AND: [WhereSpectroscopyConfigOption!]
+
+  OR: [WhereSpectroscopyConfigOption!]
+
+  NOT: WhereSpectroscopyConfigOption
+
+  adaptiveOptics: WhereBoolean
+
+  capability: WhereOptionEqSpectroscopyCapabilities
+
+  focalPlane: WhereEqFocalPlane
+
+  instrument: WhereEqInstrument
+
+  resolution: WhereOrderPosInt
+
+  site: WhereEqSite
+
+  slitLength: WhereAngle
+
+  slitWidth:  WhereAngle
+
+  """
+  Matches configuration options that support the provided wavelength. In other
+  words, those for which the given wavelength falls between the min and max
+  limits of the configuration.
+  """
+  rangeIncludes: WavelengthInput
+
+  wavelengthOptimal:  WhereWavelength
+
+  wavelengthCoverage: WhereWavelength
+
+}
+
+"""
 String matching options.
 """
 input WhereString {
@@ -11902,6 +12315,24 @@ input WhereTarget {
   Matches the target name.
   """
   name: WhereString
+}
+
+input WhereWavelength {
+
+  AND: [WhereWavelength!]
+
+  OR: [WhereWavelength!]
+
+  NOT: WhereWavelength
+
+  picometers: WhereOrderPosInt
+
+  angstroms: WhereOrderPosBigDecimal
+
+  nanometers: WhereOrderPosBigDecimal
+
+  micrometers: WhereOrderPosBigDecimal
+
 }
 
 type OffsetQ {
