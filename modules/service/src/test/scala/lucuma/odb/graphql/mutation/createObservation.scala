@@ -157,7 +157,8 @@ class createObservation extends OdbSuite {
   test("[general] can create observation with a program reference") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
-      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      submitProposal(pi, pid) *>
       query(pi,
         s"""
           mutation {
@@ -188,7 +189,8 @@ class createObservation extends OdbSuite {
   test("[general] can create an observation when both ref and pid are supplied if they correspond") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
-      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      submitProposal(pi, pid) *>
       query(pi,
         s"""
           mutation {
@@ -220,7 +222,8 @@ class createObservation extends OdbSuite {
   test("[general] cannot create an observation when both ref and pid are supplied if they do not correspond") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
-      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      submitProposal(pi, pid) *>
       expect(
         pi,
         s"""
@@ -248,7 +251,8 @@ class createObservation extends OdbSuite {
   test("[general] cannot create an observation without a ref or pid") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
-      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      submitProposal(pi, pid) *>
       expect(
         pi,
         s"""

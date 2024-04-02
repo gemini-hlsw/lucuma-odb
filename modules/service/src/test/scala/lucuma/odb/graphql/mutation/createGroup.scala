@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
@@ -150,7 +149,8 @@ class createGroup extends OdbSuite {
   test("create group with a proposal reference") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
-      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      submitProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
