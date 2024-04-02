@@ -39,17 +39,17 @@ private[service] trait ProposalService[F[_]] {
   /**
    * Create a proposal associated with the program specified in `input`.
    */
-  def createProposal(input: CreateProposalInput)(using Transaction[F]): F[Result[Program.Id]]
+  def createProposal(input: CreateProposalInput)(using Transaction[F], Services.PiAccess): F[Result[Program.Id]]
 
   /**
    * Update a proposal associated with the program specified in the `input`.
    */
-  def updateProposal(input: UpdateProposalInput)(using Transaction[F]): F[Result[Program.Id]]
+  def updateProposal(input: UpdateProposalInput)(using Transaction[F], Services.PiAccess): F[Result[Program.Id]]
 
   /**
    * Set the proposal status associated with the program specified in the `input`.
    */
-  def setProposalStatus(input: SetProposalStatusInput)(using Transaction[F]): F[Result[Program.Id]]
+  def setProposalStatus(input: SetProposalStatusInput)(using Transaction[F], Services.PiAccess): F[Result[Program.Id]]
 }
 
 object ProposalService {
@@ -128,7 +128,7 @@ object ProposalService {
         }
 
 
-      def createProposal(input: CreateProposalInput)(using Transaction[F]): F[Result[Program.Id]] =
+      def createProposal(input: CreateProposalInput)(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] =
         def insert(pid: Program.Id): F[Result[Program.Id]] =
           val af = Statements.insertProposal(user, pid, input.SET)
           session.prepareR(af.fragment.query(program_id)).use { ps =>
@@ -148,7 +148,7 @@ object ProposalService {
           _   <- ResultT(insertSplits(input.programId, input.SET.partnerSplits).map(Result.success))
         } yield input.programId).value
 
-      def updateProposal(input: UpdateProposalInput)(using Transaction[F]): F[Result[Program.Id]] = {
+      def updateProposal(input: UpdateProposalInput)(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
         def update(pid: Program.Id): F[Result[Program.Id]] =
           Statements.updateProposal(pid, input.SET).fold(Result(pid).pure[F]) { af =>
             session.prepareR(af.fragment.query(program_id)).use { ps =>
@@ -175,7 +175,7 @@ object ProposalService {
         } yield pid).value
       }
 
-      def setProposalStatus(input: SetProposalStatusInput)(using Transaction[F]): F[Result[Program.Id]] = {
+      def setProposalStatus(input: SetProposalStatusInput)(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
         // A stable identifier (ie. a `val`) is needed for the enums.
         val enumsVal = enums
 
@@ -185,7 +185,7 @@ object ProposalService {
             .fold(UpdateProposalError.InvalidProposalStatus(tag).failure)(Result.apply)
 
         def userCanChangeProposalStatus(ps: enumsVal.ProposalStatus): Boolean =
-          user.role.access =!= Access.Guest && (ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo)
+          ps <= enumsVal.ProposalStatus.Submitted || user.role.access >= Access.Ngo
 
         case class ProposalInfo(
           statusTag: Tag,
