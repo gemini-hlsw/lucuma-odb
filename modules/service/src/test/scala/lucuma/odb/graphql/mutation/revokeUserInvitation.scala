@@ -9,9 +9,6 @@ import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.UserInvitation
-import cats.effect.IO
-import io.circe.JsonObject
-import io.circe.Json
 
 class revokeUserInvitation extends OdbSuite {
 
