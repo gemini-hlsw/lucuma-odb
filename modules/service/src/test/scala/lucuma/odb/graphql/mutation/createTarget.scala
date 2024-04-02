@@ -242,7 +242,8 @@ class createTarget extends OdbSuite {
   test("[general] can create a target with a proposal reference") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
-      submitProposal(pi, pid, Semester.unsafeFromString("2025A").some) *>
+      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      submitProposal(pi, pid) *>
       query(pi,
         s"""
           mutation {
