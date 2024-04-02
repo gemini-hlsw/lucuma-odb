@@ -9,6 +9,9 @@ import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.UserInvitation
+import cats.effect.IO
+import io.circe.JsonObject
+import io.circe.Json
 
 class revokeUserInvitation extends OdbSuite {
 
@@ -74,6 +77,56 @@ class revokeUserInvitation extends OdbSuite {
             }
           """)
         )
+      }
+    }
+  }
+
+  test("create, query, then revoke an invitation") {
+    createProgramAs(pi).flatMap { pid =>
+      createUserInvitationAs(pi, pid) >>
+      query(
+        user = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              userInvitations {
+                id
+              }
+            }
+          }
+        """
+      ).flatMap { json =>
+
+        val id = json
+          .hcursor
+          .downField("program")
+          .downField("userInvitations")
+          .downArray
+          .downField("id")
+          .require[UserInvitation.Id]
+
+        expect(
+          user = pi,
+          query = revoke(id),
+          expected = Right(json"""
+            {
+              "revokeUserInvitation" : {
+                "invitation" : {
+                  "id" : ${UserInvitation.Id.fromString.reverseGet(id)},
+                  "status" : ${UserInvitation.Status.Revoked},
+                  "issuer" : {
+                    "id" : ${pi.id}
+                  },
+                  "redeemer" : null,
+                  "program" : {
+                    "users" : []
+                  }                
+                }
+              }
+            }
+          """)
+        )
+        
       }
     }
   }
