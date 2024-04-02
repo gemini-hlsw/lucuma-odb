@@ -15,8 +15,9 @@ class createProposal extends OdbSuite {
   
   val pi       = TestUsers.Standard.pi(1, 101)
   val pi2      = TestUsers.Standard.pi(2, 102)
+  val guest    = TestUsers.guest(3)
 
-  val validUsers = List(pi, pi2)
+  val validUsers = List(pi, pi2, guest)
 
   test("successful create type A") {
     createProgramAs(pi).flatMap { pid =>
@@ -461,6 +462,52 @@ class createProposal extends OdbSuite {
           """
           )
       )
+    }
+  }
+
+  test("guest cannot not create proposal"){
+    createProgramAs(guest).flatMap { pid =>
+      expect(
+        user = guest,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Proposal"
+                  proposalClass: {
+                    intensive: {
+                      minPercentTime: 40
+                      minPercentTotalTime: 20
+                      totalTime: {
+                        hours: 1.23
+                      }
+                    }
+                  }
+                  toOActivation: NONE
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 70
+                    },
+                    {
+                      partner: CA
+                      percent: 30
+                    }
+                  ]
+                }
+              }
+            ) {
+              proposal {
+                title
+              }
+            }
+          }
+        """,
+        expected =
+          Left(List(OdbError.NotAuthorized(guest.id).message))
+        )
     }
   }
 

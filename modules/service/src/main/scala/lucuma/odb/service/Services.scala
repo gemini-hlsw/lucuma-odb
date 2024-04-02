@@ -275,6 +275,10 @@ object Services:
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
     
+    def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
+      if user.role.access >= Access.Pi then fa(using ())
+      else OdbError.NotAuthorized(user.id).asFailureF
+
     def requireStaffAccess[F[_], A](fa: Services.StaffAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Staff then fa(using ())
       else OdbError.NotAuthorized(user.id).asFailureF

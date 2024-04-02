@@ -15,8 +15,9 @@ class updateProposal extends OdbSuite {
   
   val pi       = TestUsers.Standard.pi(1, 101)
   val pi2      = TestUsers.Standard.pi(2, 102)
+  val guest    = TestUsers.guest(3)
 
-  val validUsers = List(pi, pi2)
+  val validUsers = List(pi, pi2, guest)
 
   test("update proposal (non-class properties)") {
     createProgramAs(pi).flatMap { pid =>
@@ -535,6 +536,32 @@ class updateProposal extends OdbSuite {
           }
         """,
         expected = Left(List(OdbError.InvalidProgram(pid).message))
+      )
+    }
+  }
+  
+  test("guest cannot update proposal") {
+    createProgramWithProposalAs(pi).flatMap { pid =>
+      // the non-guest requirement gets caught before it even gets to the service.
+      expect(
+        user = guest,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                }
+              }
+            ) {
+              proposal {
+                title
+              }
+            }
+          }
+        """,
+        expected = Left(List(OdbError.NotAuthorized(guest.id).message))
       )
     }
   }
