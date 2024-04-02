@@ -77,8 +77,9 @@ class setProposalStatus extends OdbSuite {
   }
 
   test("edit proposal status (guests cannot submit proposals)") {
-    createProgramAs(guest).flatMap { pid =>
-      addProposal(guest, pid) >>
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) >>
+      // the non-guest requirement gets caught before it even gets to the service.
       expect(
         user = guest,
         query = s"""
@@ -97,7 +98,7 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NotAuthorizedNewProposalStatus(pid, guest, Tag("submitted")).message))
+          Left(List(OdbError.NotAuthorized(guest.id).message))
       )
     }
   }

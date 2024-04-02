@@ -283,12 +283,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CreateProposal =
-    MutationField("createProposal", CreateProposalInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        proposalService.createProposal(input).nestMap: pid =>
-          Unique(Filter(Predicates.createProposalResult.programId.eql(pid), child))
-      }
-  }
+    MutationField("createProposal", CreateProposalInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requirePiAccess: 
+          proposalService.createProposal(input).nestMap: pid =>
+            Unique(Filter(Predicates.createProposalResult.programId.eql(pid), child))
 
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding): (input, child) =>
@@ -469,8 +468,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
       services.useTransactionally:
-        proposalService.setProposalStatus(input).nestMap: pid =>
-          Unique(Filter(Predicates.setProposalStatusResult.programId.eql(pid), child))
+        requirePiAccess:
+          proposalService.setProposalStatus(input).nestMap: pid =>
+            Unique(Filter(Predicates.setProposalStatusResult.programId.eql(pid), child))
 
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
@@ -628,10 +628,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateProposal =
     MutationField("updateProposal", UpdateProposalInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        proposalService.updateProposal(input).nestMap: pid =>
-          Unique(Filter(Predicates.updateProposalResult.programId.eql(pid), child))
-      }
+      services.useTransactionally:
+        requirePiAccess:
+          proposalService.updateProposal(input).nestMap: pid =>
+            Unique(Filter(Predicates.updateProposalResult.programId.eql(pid), child))
   }
 
   def targetResultSubquery(pids: List[Target.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
