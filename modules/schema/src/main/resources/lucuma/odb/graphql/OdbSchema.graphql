@@ -9419,7 +9419,12 @@ type StepRecord {
   "The step was created by Observe at this time."
   created: Timestamp!
 
-  "Time interval during which this step executed."
+  """
+  Time interval during which this step executed.  This measures the range of
+  time from the first event to the last, whether or not the step ever
+  actually completed.  A 'null' result means there are no events associated
+  with this step.
+  """
   interval: TimestampInterval
 
   """
