@@ -7,14 +7,16 @@ package mapping
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.Declination
+import lucuma.odb.graphql.table.CallForProposalsTable
 import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.TargetView
 import skunk.codec.all.*
 
 import scala.reflect.ClassTag
 
-import table.TargetView
-
-trait DeclinationMapping[F[_]] extends ObservationView[F] with TargetView[F] {
+trait DeclinationMapping[F[_]] extends CallForProposalsTable[F]
+                                  with ObservationView[F]
+                                  with TargetView[F] {
 
   private def declinationMapping(
     idColumn:    ColumnRef,
@@ -35,6 +37,8 @@ trait DeclinationMapping[F[_]] extends ObservationView[F] with TargetView[F] {
     SwitchMapping(
       DeclinationType,
       List(
+        CallForProposalsType / "decLimitStart" -> declinationMapping(CallForProposalsTable.Id, CallForProposalsTable.DecStart),
+        CallForProposalsType / "decLimitEnd"   -> declinationMapping(CallForProposalsTable.Id, CallForProposalsTable.DecEnd),
         CoordinatesType / "dec" -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
         SiderealType / "dec"    -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
       )

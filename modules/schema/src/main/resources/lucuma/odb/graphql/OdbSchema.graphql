@@ -283,29 +283,71 @@ enum Breakpoint {
 }
 
 type CallForProposals {
-  id:          CfpId!
-  status:      CfpStatus!
-  type:        CfpType!
-  semester:    Semester!
-  activeStart: Timestamp!
-  activeEnd:   Timestamp!
-  partners:    [CfpPartner!]!
+  id:            CallForProposalsId!
+  status:        CallForProposalsStatus!
+  type:          CallForProposalsType!
+  semester:      Semester!
+
+  raLimitStart:  RightAscension
+  raLimitEnd:    RightAscension
+
+  decLimitStart: Declination
+  decLimitEnd:   Declination
+
+  activeStart:  Timestamp!
+  activeEnd:    Timestamp!
+
+  partners:     [CallForProposalsPartner!]!
+
+  includeInstruments: [Instrument!]
+  excludeInstruments: [Instrument!]
+
+  existence:    Existence!
 }
 
-scalar CfpId
+scalar CallForProposalsId
 
-type CfpPartner {
-  cfpId:    CfpId!
+input CallForProposalsPropertiesInput {
+  status:        CallForProposalsStatus
+  type:          CallForProposalsType
+  semester:      Semester
+
+  raLimitStart:  RightAscensionInput
+  raLimitEnd:    RightAscensionInput
+
+  decLimitStart: DeclinationInput
+  decLimitEnd:   DeclinationInput
+
+  activeStart:   Timestamp
+  activeEnd:     Timestamp
+  partners:      [CallForProposalsPartnerInput!]
+  restrictedTo:  [Instrument!]
+
+  "DELETED or PRESENT"
+  existence: Existence
+}
+
+type CallForProposalsPartner {
   partner:  Partner!
   deadline: Timestamp!
 }
 
-enum CfpStatus {
+input CallForProposalsPartnerInput {
+  partner:  Partner
+  deadline: Timestamp
+}
+
+type CallForProposalsSelectResult {
+  matches: [CallForProposals!]!
+  hasMore: Boolean!
+}
+
+enum CallForProposalsStatus {
   OPEN
   CLOSED
 }
 
-enum CfpType {
+enum CallForProposalsType {
   DEMO_SCIENCE
   DIRECTORS_TIME
   FAST_TURNAROUND
@@ -533,6 +575,14 @@ Absolute coordinates relative base epoch
 input CoordinatesInput {
   ra: RightAscensionInput
   dec: DeclinationInput
+}
+
+input CreateCallForProposalsInput {
+  SET: CallForProposalsPropertiesInput
+}
+
+type CreateCallForProposalsResult {
+  callForProposals: CallForProposals!
 }
 
 """
@@ -2486,6 +2536,10 @@ type Mutation {
     """
     input: CloneTargetInput!
   ): CloneTargetResult!
+
+  createCallForProposals(
+    input: CreateCallForProposalsInput!
+  ): CreateCallForProposalsResult!
 
   "Creates a new observation according to provided parameters."
   createGroup(
@@ -8075,6 +8129,16 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): AsterismGroupSelectResult!
+
+  callForProposals(
+    OFFSET: CallForProposalsId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include deleted values"
+    includeDeleted: Boolean! = false
+  ): CallForProposalsSelectResult!
 
   """
   Metadata for `enum ObsAttachmentType`

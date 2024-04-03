@@ -49,6 +49,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       tpe = QueryType,
       fieldMappings = List(
         SqlObject("asterismGroup"),
+        SqlObject("callForProposals"),
         SqlObject("constraintSetGroup"),
         SqlObject("dataset"),
         SqlObject("datasets"),
@@ -73,6 +74,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   lazy val QueryElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     List(
       AsterismGroup,
+      CallForProposals,
       ConstraintSetGroup,
       Dataset,
       Datasets,
@@ -120,6 +122,35 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                   ))
                 ),
                 oss = None,
+                offset = None,
+                limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+            }
+          }
+        }
+    }
+
+  private lazy val CallForProposals: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    {
+      case (QueryType, "callForProposals", List(
+        CallForProposalsIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      )) =>
+        Elab.transformChild { child =>
+          (rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (OFFSET, LIMIT, includeDeleted) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  OFFSET.map(Predicates.callForProposals.id.gtEql).getOrElse(True),
+//                  WHERE.getOrElse(True),
+                  Predicates.callForProposals.existence.includeDeleted(includeDeleted),
+                ))),
+                oss = Some(List(
+                  OrderSelection[lucuma.odb.data.CallForProposals.Id](CallForProposalsType / "id")
+                )),
                 offset = None,
                 limit = Some(limit + 1), // Select one extra row here.
                 child = q
