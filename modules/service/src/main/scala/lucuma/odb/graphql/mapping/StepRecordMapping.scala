@@ -54,6 +54,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
         SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
         SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
         SqlField("created",      StepRecordView.Created),
+        EffectField("executionState", executionStateHandler, List("id")),
         EffectField("interval",  intervalHandler, List("id")),
         SqlObject("stepConfig"),
         SqlField("observeClass", StepRecordView.ObserveClass),
@@ -82,31 +83,44 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
 
   }
 
+  private trait SimpleHandler extends EffectHandler[F] {
+    def calculate(id: Step.Id): F[Result[Json]]
+
+    override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+      (for {
+        ids  <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Step.Id]("id")}.pure[F])
+        jsns <- ids.distinct.traverse(id => ResultT(calculate(id)).tupleLeft(id))
+        res  <- ResultT(
+                  ids
+                    .flatMap { id => jsns.find(r => r._1 === id).map(_._2).toList }
+                    .zip(queries)
+                    .traverse { case (result, (query, parentCursor)) =>
+                      Query.childContext(parentCursor.context, query).map { childContext =>
+                        CirceCursor(childContext, result, Some(parentCursor), parentCursor.fullEnv)
+                      }
+                    }.pure[F]
+                )
+      } yield res).value
+
+  }
+
+  private lazy val executionStateHandler: EffectHandler[F] =
+    new SimpleHandler {
+      override def calculate(id:  Step.Id): F[Result[Json]] =
+        services.useTransactionally {
+          executionEventService.selectStepExecutionState(id).map(_.asJson.success)
+        }
+    }
+
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
 
   private lazy val qaStateHandler: EffectHandler[F] =
-    new EffectHandler[F] {
-      def calculateQaState(id: Step.Id): F[Result[Json]] =
+    new SimpleHandler {
+      override def calculate(id:  Step.Id): F[Result[Json]] =
         services.useTransactionally {
           datasetService.selectStepQaState(id).map(_.asJson.success)
         }
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          ids  <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[Step.Id]("id")}.pure[F])
-          jsns <- ids.distinct.traverse(id => ResultT(calculateQaState(id)).tupleLeft(id))
-          res  <- ResultT(
-                    ids
-                      .flatMap { id => jsns.find(r => r._1 === id).map(_._2).toList }
-                      .zip(queries)
-                      .traverse { case (result, (query, parentCursor)) =>
-                        Query.childContext(parentCursor.context, query).map { childContext =>
-                          CirceCursor(childContext, result, Some(parentCursor), parentCursor.fullEnv)
-                        }
-                      }.pure[F]
-                  )
-        } yield res).value
     }
 
 }

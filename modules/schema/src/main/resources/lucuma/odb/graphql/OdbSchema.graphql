@@ -3615,6 +3615,27 @@ input StepConfigSmartGcalInput {
 }
 
 """
+Execution state of a recorded step.
+"""
+enum StepExecutionState {
+
+  "No events have been received since the step was recorded."
+  NOT_STARTED
+
+  "Events have been received, but no terminal `Abort`, `EndStep` or `Stop` events."
+  ONGOING
+
+  "An event with an 'ABORT' 'StepStage' was received."
+  ABORTED
+
+  "An event with an 'END_STEP' 'StepStage' was received."
+  COMPLETED
+
+  "An event with a 'STOP' 'StepStage' was received."
+  STOPPED
+}
+
+"""
 Step type
 """
 enum StepType {
@@ -9418,6 +9439,12 @@ type StepRecord {
 
   "The step was created by Observe at this time."
   created: Timestamp!
+
+  """
+  The execution state of this step, according to events received (if any) from
+  Observe.
+  """
+  executionState: StepExecutionState!
 
   """
   Time interval during which this step executed.  This measures the range of

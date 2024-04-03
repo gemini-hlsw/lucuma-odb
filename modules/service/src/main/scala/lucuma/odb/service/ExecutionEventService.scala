@@ -30,6 +30,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.StepExecutionState
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -43,7 +44,7 @@ trait ExecutionEventService[F[_]] {
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def stepRange(
-    visitId: Step.Id
+    stepId: Step.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def visitRange(
@@ -69,6 +70,10 @@ trait ExecutionEventService[F[_]] {
     stepId:    Step.Id,
     stepStage: StepStage
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
+
+  def selectStepExecutionState(
+    stepId: Step.Id
+  )(using Transaction[F]): F[StepExecutionState]
 
 }
 
@@ -245,6 +250,18 @@ object ExecutionEventService {
       } .map(executionEventResponseToResult)
         .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
 
+      override def selectStepExecutionState(
+        stepId: Step.Id
+      )(using Transaction[F]): F[StepExecutionState] =
+        session
+          .option(Statements.SelectMaxStepStage)(stepId)
+          .map {
+            case None                    => StepExecutionState.NotStarted
+            case Some(StepStage.EndStep) => StepExecutionState.Completed
+            case Some(StepStage.Abort)   => StepExecutionState.Aborted
+            case Some(StepStage.Stop)    => StepExecutionState.Stopped
+            case _                       => StepExecutionState.Ongoing
+          }
     }
 
   object Statements {
@@ -390,6 +407,15 @@ object ExecutionEventService {
           c_observation_id,
           c_visit_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id)
+
+    val SelectMaxStepStage: Query[Step.Id, StepStage] =
+      sql"""
+        SELECT c_step_stage
+          FROM t_execution_event
+         WHERE c_step_id = $step_id
+           AND c_received = (SELECT MAX(c_received) FROM t_execution_event WHERE c_step_id = $step_id)
+      """.query(step_stage).contramap(s => (s, s))
+
   }
 
 }

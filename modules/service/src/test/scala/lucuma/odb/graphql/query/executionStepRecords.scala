@@ -4,15 +4,19 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.core.model.sequence.Step
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.StepExecutionState
 
 class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
   import ExecutionQuerySetupOperations.ObservationNode
@@ -128,7 +132,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
     } yield ()
   }
 
-  test("interval ") {
+  test("interval") {
     def query(on: ObservationNode): String =
       s"""
         query {
@@ -188,6 +192,15 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
     } yield ()
   }
 
+  def noEventSetup: IO[(Observation.Id, Step.Id)] =
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, mode.some)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid)
+      sid <- recordStepAs(service, mode.instrument, aid)
+    } yield (oid, sid)
+
   test("empty interval in step") {
     def query(oid: Observation.Id): String =
       s"""
@@ -235,12 +248,88 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
     // Set up visit and record the atom and steps, but no events
     for {
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
-      sid <- recordStepAs(service, mode.instrument, aid)
-      _   <- expect(pi, query(oid), expected)
+      (o, _) <- noEventSetup
+      _      <- expect(pi, query(o), expected)
     } yield ()
+  }
+
+
+  def executionState(oid: Observation.Id): IO[StepExecutionState] =
+    query(
+      user = pi,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              atomRecords {
+                matches {
+                  steps {
+                    matches {
+                      executionState
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "execution", "atomRecords", "matches")
+        .downArray
+        .downFields("steps", "matches")
+        .downArray
+        .downField("executionState")
+        .as[StepExecutionState]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  test("execution state - not started") {
+    val res = for {
+      (o, _) <- noEventSetup
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, StepExecutionState.NotStarted)
+  }
+
+  test("execution state - ongoing") {
+    val res = for {
+      (o, s) <- noEventSetup
+      _      <- addStepEventAs(service, s, StepStage.StartStep)
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, StepExecutionState.Ongoing)
+  }
+
+  test("execution state - abort") {
+    val res = for {
+      (o, s) <- noEventSetup
+      _      <- addStepEventAs(service, s, StepStage.StartStep)
+      _      <- addStepEventAs(service, s, StepStage.Abort)
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, StepExecutionState.Aborted)
+  }
+
+  test("execution state - completed") {
+    val res = for {
+      (o, s) <- noEventSetup
+      _      <- addStepEventAs(service, s, StepStage.StartStep)
+      _      <- addStepEventAs(service, s, StepStage.EndStep)
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, StepExecutionState.Completed)
+  }
+
+  test("execution state - stopped") {
+    val res = for {
+      (o, s) <- noEventSetup
+      _      <- addStepEventAs(service, s, StepStage.StartStep)
+      _      <- addStepEventAs(service, s, StepStage.Stop)
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, StepExecutionState.Stopped)
   }
 }
