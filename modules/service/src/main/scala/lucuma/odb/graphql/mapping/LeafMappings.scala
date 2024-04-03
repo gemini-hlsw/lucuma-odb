@@ -47,6 +47,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType
@@ -156,6 +157,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[SmartGcalType](SmartGcalTypeType),
       LeafMapping[SpectroscopyCapabilities](SpectroscopyCapabilitiesType),
       LeafMapping[Step.Id](StepIdType),
+      LeafMapping[StepExecutionState](StepExecutionStateType),
       LeafMapping[StepStage](StepStageType),
       LeafMapping[StepType](StepTypeType),
       LeafMapping[String](DmsStringType),

@@ -246,6 +246,7 @@ trait BaseMapping[F[_]]
   lazy val SpectroscopyScienceRequirementsType   = schema.ref("SpectroscopyScienceRequirements")
   lazy val StepConfigType                      = schema.ref("StepConfig")
   lazy val StepEventType                       = schema.ref("StepEvent")
+  lazy val StepExecutionStateType              = schema.ref("StepExecutionState")
   lazy val StepIdType                          = schema.ref("StepId")
   lazy val StepRecordType                      = schema.ref("StepRecord")
   lazy val StepRecordSelectResultType          = schema.ref("StepRecordSelectResult")
