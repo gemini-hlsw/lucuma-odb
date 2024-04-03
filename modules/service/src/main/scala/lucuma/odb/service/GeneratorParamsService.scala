@@ -233,8 +233,8 @@ object GeneratorParamsService {
         mode:       InstrumentMode,
         wavelength: Wavelength
       ): ValidatedNel[Error, (Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
-        val targetBand = params.sourceProfile.flatMap(_.nearestBand(wavelength)).map(_._1)
-
+        val sourceProf = params.sourceProfile.map(_.gaiaFree)
+        val targetBand = sourceProf.flatMap(_.nearestBand(wavelength)).map(_._1)
         (params.signalToNoise.toValidNel(Error.missing("signal to noise")),
          params.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
          params.targetId.toValidNel(Error.missing("target"))
@@ -242,7 +242,7 @@ object GeneratorParamsService {
           // these are dependent on having a target in the first place
           (targetBand.toValidNel(Error.targetMissing(tid, "brightness measure")),
            params.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity")),
-           params.sourceProfile.toValidNel(Error.targetMissing(tid, "source profile"))
+           sourceProf.toValidNel(Error.targetMissing(tid, "source profile"))
           ).mapN { case (b, rv, sp) =>
             tid ->
             (

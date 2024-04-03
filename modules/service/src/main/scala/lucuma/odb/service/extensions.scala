@@ -9,6 +9,8 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.Band
+import lucuma.core.model.SourceProfile
 import skunk.*
 import skunk.data.Completion
 
@@ -23,3 +25,18 @@ class FromResultPartiallyApplied[F[_]]:
   def apply[A](result: Result[A])(using F: Applicative[F]): ResultT[F, A] =
     ResultT(F.pure(result))
 
+extension (self: SourceProfile)
+  def gaiaBands: Set[Band] =
+    Set(Band.Gaia, Band.GaiaBP, Band.GaiaRP)
+
+  // Remove GAIA bands until the ITC supports them.
+  def gaiaFree: SourceProfile =
+    SourceProfile
+      .integratedBrightnesses
+      .modifyOption(_.removedAll(gaiaBands))(self)
+      .orElse(
+        SourceProfile
+          .surfaceBrightnesses
+          .modifyOption(_.removedAll(gaiaBands))(self)
+      )
+      .getOrElse(self)
