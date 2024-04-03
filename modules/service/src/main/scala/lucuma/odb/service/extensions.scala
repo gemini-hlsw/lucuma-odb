@@ -25,10 +25,10 @@ class FromResultPartiallyApplied[F[_]]:
   def apply[A](result: Result[A])(using F: Applicative[F]): ResultT[F, A] =
     ResultT(F.pure(result))
 
-extension (self: SourceProfile)
-  def gaiaBands: Set[Band] =
-    Set(Band.Gaia, Band.GaiaBP, Band.GaiaRP)
+private val gaiaBands: Set[Band] =
+  Set(Band.Gaia, Band.GaiaBP, Band.GaiaRP)
 
+extension (self: SourceProfile)
   // Remove GAIA bands until the ITC supports them.
   def gaiaFree: SourceProfile =
     SourceProfile
