@@ -30,6 +30,14 @@ trait BaseMapping[F[_]]
   lazy val BiasType                            = schema.ref("Bias")
   lazy val BigDecimalType                      = schema.ref("BigDecimal")
   lazy val CalibrationProgramReferenceType     = schema.ref("CalibrationProgramReference")
+
+  lazy val CallForProposalsType                = schema.ref("CallForProposals")
+  lazy val CallForProposalsIdType              = schema.ref("CallForProposalsId")
+  lazy val CallForProposalsPartnerType         = schema.ref("CallForProposalsPartner")
+  lazy val CallForProposalsSelectResultType    = schema.ref("CallForProposalsSelectResult")
+  lazy val CallForProposalsStatusType          = schema.ref("CallForProposalsStatusType")
+  lazy val CallForProposalsTypeType            = schema.ref("CallForProposalsType")
+
   lazy val CategorizedTimeType                 = schema.ref("CategorizedTime")
   lazy val CatalogInfoType                     = schema.ref("CatalogInfo")
   lazy val CatalogNameType                     = schema.ref("CatalogName")
@@ -51,6 +59,7 @@ trait BaseMapping[F[_]]
   lazy val ConstraintSetGroupType              = schema.ref("ConstraintSetGroup")
   lazy val ConstraintSetGroupSelectResultType  = schema.ref("ConstraintSetGroupSelectResult")
   lazy val CoordinatesType                     = schema.ref("Coordinates")
+  lazy val CreateCallForProposalsResultType    = schema.ref("CreateCallForProposalsResult")
   lazy val CreateGroupResultType               = schema.ref("CreateGroupResult")
   lazy val CreateObservationResultType         = schema.ref("CreateObservationResult")
   lazy val CreateProgramResultType             = schema.ref("CreateProgramResult")

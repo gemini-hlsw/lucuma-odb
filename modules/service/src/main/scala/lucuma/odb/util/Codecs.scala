@@ -43,6 +43,9 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.CallForProposals
+import lucuma.odb.data.CallForProposalsStatus
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -134,6 +137,36 @@ trait Codecs {
     )
   }
 
+  val tsrange: Codec[TimestampInterval] = {
+    Codec.simple(
+      { ti =>
+        val start = timestamp.encode(ti.start.toLocalDateTime).head.get
+        val end   = timestamp.encode(ti.end.toLocalDateTime).head.get
+        s"[$start,$end)"
+      },
+      { s =>
+        def parseTimestamp(s: String): Option[Timestamp] =
+          timestamp
+            .decode(0, List(s.some))
+            .toOption
+            .flatMap(Timestamp.fromLocalDateTime)
+
+        val StartEnd = raw"\[([^,]+),([^,]+)\)".r
+        val ti = s match {
+          case StartEnd(s, e) =>
+            for {
+              start <- parseTimestamp(s)
+              end   <- parseTimestamp(e)
+            } yield TimestampInterval.between(start, end)
+          case _              =>
+            none
+        }
+        ti.toRight(s"Invalid TimestampInterval: $s")
+      },
+      Type.tsrange
+    )
+  }
+
   val air_mass_range_value: Codec[PosBigDecimal] =
     numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
 
@@ -163,6 +196,15 @@ trait Codecs {
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
+
+  val cfp_id: Codec[CallForProposals.Id] =
+    gid[CallForProposals.Id]
+
+  val cfp_status: Codec[CallForProposalsStatus] =
+    enumerated(Type("e_cfp_status"))
+
+  val cfp_type: Codec[CallForProposalsType] =
+    enumerated(Type("e_cfp_type"))
 
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
