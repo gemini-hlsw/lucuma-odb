@@ -111,20 +111,20 @@ class revokeUserInvitation extends OdbSuite {
               "revokeUserInvitation" : {
                 "invitation" : {
                   "id" : ${UserInvitation.Id.fromString.reverseGet(id)},
-                  "status" : ${UserInvitation.Status.Revoked},
+                  "status" : ${InvitationStatus.Revoked},
                   "issuer" : {
                     "id" : ${pi.id}
                   },
                   "redeemer" : null,
                   "program" : {
                     "users" : []
-                  }                
+                  }
                 }
               }
             }
           """)
         )
-        
+
       }
     }
   }
