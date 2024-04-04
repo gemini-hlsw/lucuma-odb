@@ -78,6 +78,56 @@ class revokeUserInvitation extends OdbSuite {
     }
   }
 
+  test("create, query, then revoke an invitation") {
+    createProgramAs(pi).flatMap { pid =>
+      createUserInvitationAs(pi, pid) >>
+      query(
+        user = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              userInvitations {
+                id
+              }
+            }
+          }
+        """
+      ).flatMap { json =>
+
+        val id = json
+          .hcursor
+          .downField("program")
+          .downField("userInvitations")
+          .downArray
+          .downField("id")
+          .require[UserInvitation.Id]
+
+        expect(
+          user = pi,
+          query = revoke(id),
+          expected = Right(json"""
+            {
+              "revokeUserInvitation" : {
+                "invitation" : {
+                  "id" : ${UserInvitation.Id.fromString.reverseGet(id)},
+                  "status" : ${UserInvitation.Status.Revoked},
+                  "issuer" : {
+                    "id" : ${pi.id}
+                  },
+                  "redeemer" : null,
+                  "program" : {
+                    "users" : []
+                  }                
+                }
+              }
+            }
+          """)
+        )
+        
+      }
+    }
+  }
+
   def badInvitation(u: User): PartialFunction[OdbError, Unit] =
     case OdbError.InvitationError(_, Some("Invitation does not exist, is no longer pending, or was issued by someone else.")) => ()
 
