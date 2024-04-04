@@ -137,36 +137,6 @@ trait Codecs {
     )
   }
 
-  val tsrange: Codec[TimestampInterval] = {
-    Codec.simple(
-      { ti =>
-        val start = timestamp.encode(ti.start.toLocalDateTime).head.get
-        val end   = timestamp.encode(ti.end.toLocalDateTime).head.get
-        s"[$start,$end)"
-      },
-      { s =>
-        def parseTimestamp(s: String): Option[Timestamp] =
-          timestamp
-            .decode(0, List(s.some))
-            .toOption
-            .flatMap(Timestamp.fromLocalDateTime)
-
-        val StartEnd = raw"\[([^,]+),([^,]+)\)".r
-        val ti = s match {
-          case StartEnd(s, e) =>
-            for {
-              start <- parseTimestamp(s)
-              end   <- parseTimestamp(e)
-            } yield TimestampInterval.between(start, end)
-          case _              =>
-            none
-        }
-        ti.toRight(s"Invalid TimestampInterval: $s")
-      },
-      Type.tsrange
-    )
-  }
-
   val air_mass_range_value: Codec[PosBigDecimal] =
     numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
 
@@ -630,6 +600,33 @@ trait Codecs {
     (core_timestamp *: core_timestamp).imap { case (min, max) =>
       TimestampInterval.between(min, max)
     } { interval => (interval.start, interval.end) }
+
+  val timestamp_interval_tsrange: Codec[TimestampInterval] = {
+    Codec.simple(
+      { ti =>
+        val start = core_timestamp.encode(ti.start).head.get
+        val end   = core_timestamp.encode(ti.end).head.get
+        s"[$start,$end)"
+      },
+      { s =>
+        def parseTimestamp(s: String): Option[Timestamp] =
+          core_timestamp.decode(0, List(s.some)).toOption
+
+        val StartEnd = raw"\[\"([^,]+)\",\"([^,]+)\"\)".r
+        val ti = s match {
+          case StartEnd(s, e) =>
+            for {
+              start <- parseTimestamp(s)
+              end   <- parseTimestamp(e)
+            } yield TimestampInterval.between(start, end)
+          case _              =>
+            none
+        }
+        ti.toRight(s"Invalid TimestampInterval: $s")
+      },
+      Type.tsrange
+    )
+  }
 
   val void: Codec[Unit] =
     val rightUnit = Right(())

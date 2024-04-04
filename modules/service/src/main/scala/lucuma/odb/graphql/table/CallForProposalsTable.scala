@@ -14,7 +14,7 @@ import lucuma.odb.util.Codecs.instrument
 import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.right_ascension
 import lucuma.odb.util.Codecs.semester
-import lucuma.odb.util.Codecs.tsrange
+import lucuma.odb.util.Codecs.timestamp_interval_tsrange
 
 
 trait CallForProposalsTable[F[_]] extends BaseMapping[F] {
@@ -31,7 +31,7 @@ trait CallForProposalsTable[F[_]] extends BaseMapping[F] {
     val DecStart = col("c_dec_start",  declination.embedded)
     val DecEnd   = col("c_dec_end",    declination.embedded)
 
-    val Active   = col("c_active",     tsrange)
+    val Active   = col("c_active",     timestamp_interval_tsrange)
 
     val Existence = col("c_existence", existence)
   }

@@ -4,12 +4,15 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.order.*
 import cats.syntax.parallel.*
+import grackle.Result
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Semester
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.CallForProposalsStatus
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.Existence
@@ -25,12 +28,10 @@ object CallForProposalsPropertiesInput {
     raLimitEnd:    Option[RightAscension],
     decLimitStart: Option[Declination],
     decLimitEnd:   Option[Declination],
-    activeStart:   Timestamp,
-    activeEnd:     Timestamp,
+    active:        TimestampInterval,
     partners:      List[CallForProposalsPartnerInput],
     include:       List[Instrument],
-    exclude:       List[Instrument],
-    existence:     Option[Existence]
+    existence:     Existence
   )
 
   object Create {
@@ -38,7 +39,7 @@ object CallForProposalsPropertiesInput {
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          CallForProposalsStatusBinding("status", rStatus),
+          CallForProposalsStatusBinding.Option("status", rStatus),
           CallForProposalsTypeBinding("type", rType),
           SemesterBinding("semester", rSemester),
           RightAscensionInput.Binding.Option("raLimitStart", rRaStart),
@@ -47,25 +48,30 @@ object CallForProposalsPropertiesInput {
           DeclinationInput.Binding.Option("decLimitEnd",     rDecEnd),
           TimestampBinding("activeStart", rActiveStart),
           TimestampBinding("activeEnd",   rActiveEnd),
-          CallForProposalsPartnerInput.Binding.List("partners", rPartners),
-          InstrumentBinding.List("includeInstruments", rInclude),
-          InstrumentBinding.List("excludeInstruments", rExclude),
+          CallForProposalsPartnerInput.Binding.List.Option("partners", rPartners),
+          InstrumentBinding.List.Option("includeInstruments", rInclude),
           ExistenceBinding.Option("existence", rExistence)
-        ) => (
-          rStatus,
-          rType,
-          rSemester,
-          rRaStart,
-          rRaEnd,
-          rDecStart,
-          rDecEnd,
-          rActiveStart,
-          rActiveEnd,
-          rPartners,
-          rInclude,
-          rExclude,
-          rExistence
-        ).parMapN(Create.apply)
+        ) => {
+          val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap { (start, end) =>
+            Result.fromOption(
+              Option.when(start <= end)(TimestampInterval.between(start, end)),
+              Matcher.validationProblem("activeStart must be before activeEnd")
+            )
+          }
+          (
+            rStatus.map(_.getOrElse(CallForProposalsStatus.Closed)),
+            rType,
+            rSemester,
+            rRaStart,
+            rRaEnd,
+            rDecStart,
+            rDecEnd,
+            rActive,
+            rPartners.map(_.toList.flatten),
+            rInclude.map(_.toList.flatten),
+            rExistence.map(_.getOrElse(Existence.Present))
+          ).parMapN(Create.apply)
+        }
       }
 
   }
