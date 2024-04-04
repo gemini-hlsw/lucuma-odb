@@ -6,7 +6,7 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.data.UserInvitation
+import lucuma.core.model.UserInvitation
 
 import table.UserInvitationTable
 

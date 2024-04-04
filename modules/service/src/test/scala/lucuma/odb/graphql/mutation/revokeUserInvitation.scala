@@ -5,10 +5,11 @@ package lucuma.odb.graphql
 package mutation
 
 import io.circe.literal.*
+import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Partner
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.UserInvitation
 
 class revokeUserInvitation extends OdbSuite {
 
@@ -27,7 +28,7 @@ class revokeUserInvitation extends OdbSuite {
   def revoke(id: UserInvitation.Id): String =
     s"""
       mutation {
-        revokeUserInvitation(input: { 
+        revokeUserInvitation(input: {
           id: "${UserInvitation.Id.fromString.reverseGet(id)}"
         }) {
           invitation {
@@ -61,14 +62,14 @@ class revokeUserInvitation extends OdbSuite {
               "revokeUserInvitation" : {
                 "invitation" : {
                   "id" : ${UserInvitation.Id.fromString.reverseGet(inv.id)},
-                  "status" : ${UserInvitation.Status.Revoked},
+                  "status" : ${InvitationStatus.Revoked},
                   "issuer" : {
                     "id" : ${pi.id}
                   },
                   "redeemer" : null,
                   "program" : {
                     "users" : []
-                  }                
+                  }
                 }
               }
             }
@@ -131,8 +132,8 @@ class revokeUserInvitation extends OdbSuite {
   def badInvitation(u: User): PartialFunction[OdbError, Unit] =
     case OdbError.InvitationError(_, Some("Invitation does not exist, is no longer pending, or was issued by someone else.")) => ()
 
-  List(true, false).foreach { accept => 
-    test(s"can't revoke an invitation that was already ${if accept then "accepted" else "delined"}") {    
+  List(true, false).foreach { accept =>
+    test(s"can't revoke an invitation that was already ${if accept then "accepted" else "delined"}") {
       createProgramAs(pi).flatMap { pid =>
         createUserInvitationAs(pi, pid).flatMap { inv =>
           redeemUserInvitationAs(pi2, inv, accept) >>
@@ -146,7 +147,7 @@ class revokeUserInvitation extends OdbSuite {
     }
   }
 
-  test("can't revoke an invitation twice") {    
+  test("can't revoke an invitation twice") {
     createProgramAs(pi).flatMap { pid =>
       createUserInvitationAs(pi, pid).flatMap { inv =>
         revokeUserInvitationAs(pi, inv.id) >>

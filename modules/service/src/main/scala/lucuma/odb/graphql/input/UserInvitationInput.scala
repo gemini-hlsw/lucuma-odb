@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.input
 
-import lucuma.odb.data.UserInvitation
+import lucuma.core.model.UserInvitation
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.StringBinding
 
@@ -11,4 +11,3 @@ object UserInvitationInput:
   val Binding: Matcher[UserInvitation] =
     StringBinding.emap: s =>
       UserInvitation.fromString.getOption(s).toRight(s"Invalid user invitation key: $s")
-      

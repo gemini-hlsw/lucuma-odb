@@ -9,10 +9,10 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.data.UserInvitation
 
 class program extends OdbSuite {
 
@@ -115,7 +115,7 @@ class program extends OdbSuite {
                   "name": $name,
                   "userInvitations": [
                     {
-                      "status": ${UserInvitation.Status.Pending},
+                      "status": ${InvitationStatus.Pending},
                       "issuer": {
                         "id": ${user.id}
                       },
@@ -215,7 +215,7 @@ class program extends OdbSuite {
       createObservationAs(pi, pid).replicateA(3).flatMap { oids =>
         expect(
           user = pi,
-          query = 
+          query =
              s"""
               query {
                 program(programId: "$pid") {
@@ -241,7 +241,7 @@ class program extends OdbSuite {
                 }
               """
             )
-        )      
+        )
       }
     }
   }
@@ -251,7 +251,7 @@ class program extends OdbSuite {
       createObservationAs(pi, pid).replicateA(3).flatMap { oids =>
         expect(
           user = pi,
-          query = 
+          query =
              s"""
               query {
                 program(programId: "$pid") {
@@ -277,7 +277,7 @@ class program extends OdbSuite {
                 }
               """
             )
-        )      
+        )
       }
     }
   }
