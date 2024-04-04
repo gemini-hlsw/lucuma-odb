@@ -14,6 +14,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
@@ -28,6 +29,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.*
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
+import lucuma.core.model.UserInvitation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
@@ -42,7 +44,6 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.EditType
-import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
@@ -55,7 +56,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType
 import monocle.Prism
 import skunk.*
@@ -153,7 +153,7 @@ trait Codecs {
 
   val _angle_µas: Codec[Arr[Angle]] =
     Codec.array(
-      a => Angle.microarcseconds.get(a).toString, 
+      a => Angle.microarcseconds.get(a).toString,
       safe(s => Angle.microarcseconds.reverseGet(s.toLong)),
       Type("_d_angle_µas", List(Type("d_angle_µas")))
     )
@@ -610,12 +610,12 @@ trait Codecs {
       fromString.reverseGet
     )
 
-  val user_invitation_status: Codec[UserInvitation.Status] =
+  val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
 
   val email_address: Codec[EmailAddress] =
-    codecFromPrism(EmailAddress.fromString, Type("citext"))
-    
+    codecFromPrism(EmailAddress.from, Type("citext"))
+
 
 }
 

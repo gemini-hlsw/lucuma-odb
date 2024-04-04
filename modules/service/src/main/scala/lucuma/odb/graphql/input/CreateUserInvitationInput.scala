@@ -5,8 +5,8 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
-import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
@@ -48,4 +48,4 @@ object CreateUserInvitationInput:
           case (pid, recip, ProgramUserRole.Observer, None, None)              => Result(Observer(pid, recip))
           case (pid, recip, ProgramUserRole.Support, Some(Staff), None)        => Result(StaffSupport(pid, recip))
           case (pid, recip, ProgramUserRole.Support, Some(Partner), Some(tag)) => Result(NgoSupportSupport(pid, tag, recip))
-          case _                                                        => Matcher.validationFailure("Invalid combination of role, support type, and partner.")
+          case _                                                               => Matcher.validationFailure("Invalid combination of role, support type, and partner.")

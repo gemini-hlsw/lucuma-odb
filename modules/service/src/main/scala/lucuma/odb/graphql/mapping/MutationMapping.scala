@@ -10,6 +10,7 @@ import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Context
 import grackle.Env
@@ -285,7 +286,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateProposal =
     MutationField("createProposal", CreateProposalInput.Binding): (input, child) =>
       services.useTransactionally:
-        requirePiAccess: 
+        requirePiAccess:
           proposalService.createProposal(input).nestMap: pid =>
             Unique(Filter(Predicates.createProposalResult.programId.eql(pid), child))
 
@@ -301,7 +302,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         userInvitationService.createUserInvitation(input).map: rInv =>
           rInv.map: inv =>
             Environment(
-              Env("inv" -> inv), 
+              Env("inv" -> inv),
               Unique(Filter(Predicates.userInvitation.id.eql(inv.id), child))
             )
 
@@ -318,7 +319,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     child:        Query,
     predicates:   DatasetPredicates
   ): Result[Dataset.Id] => Result[Query] = r =>
-      r.map: did => 
+      r.map: did =>
         Unique(Filter(predicates.id.eql(did), child))
 
   private lazy val RecordDataset: MutationField =
@@ -440,14 +441,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         userInvitationService.redeemUserInvitation(input).map: rId =>
           rId.map: id =>
-            Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
+            Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 
   private lazy val RevokeUserInvitation =
     MutationField("revokeUserInvitation", RevokeUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
         userInvitationService.revokeUserInvitation(input).map: rId =>
           rId.map: id =>
-            Unique(Filter(Predicates.userInvitation.id.eql(id), child))            
+            Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 
   private lazy val SetAllocation =
     MutationField("setAllocation", SetAllocationInput.Binding): (input, child) =>
@@ -694,7 +695,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         idSelect.flatTraverse: which =>
           groupService.updateGroups(input.SET, which).map: r =>
             r.flatMap: selected =>
-              groupResultSubquery(selected, input.LIMIT, child)          
+              groupResultSubquery(selected, input.LIMIT, child)
 
       }
     }

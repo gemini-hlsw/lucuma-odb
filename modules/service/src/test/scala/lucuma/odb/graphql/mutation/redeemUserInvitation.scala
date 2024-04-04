@@ -6,10 +6,11 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.literal.*
+import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Partner
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.UserInvitation
 
 class redeemUserInvitation extends OdbSuite {
 
@@ -28,7 +29,7 @@ class redeemUserInvitation extends OdbSuite {
   def redeem(inv: UserInvitation, accept: Boolean = true): String =
     s"""
       mutation {
-        redeemUserInvitation(input: { 
+        redeemUserInvitation(input: {
           key: "${UserInvitation.fromString.reverseGet(inv)}"
           accept: $accept
         }) {
@@ -63,7 +64,7 @@ class redeemUserInvitation extends OdbSuite {
               "redeemUserInvitation" : {
                 "invitation" : {
                   "id" : ${UserInvitation.Id.fromString.reverseGet(inv.id)},
-                  "status" : ${UserInvitation.Status.Redeemed},
+                  "status" : ${InvitationStatus.Redeemed},
                   "issuer" : {
                     "id" : ${pi.id}
                   },
@@ -77,7 +78,7 @@ class redeemUserInvitation extends OdbSuite {
                         "userId" : ${pi2.id}
                       }
                     ]
-                  }                
+                  }
                 }
               }
             }
