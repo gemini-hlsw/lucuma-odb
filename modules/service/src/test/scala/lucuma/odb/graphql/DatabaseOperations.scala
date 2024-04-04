@@ -191,7 +191,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.
-  def addProposal(user: User, pid: Program.Id): IO[Unit] =
+  def addProposal(user: User, pid: Program.Id, title: String = "my proposal"): IO[Unit] =
     expect(
       user = user,
       query = s"""
@@ -200,6 +200,7 @@ trait DatabaseOperations { this: OdbSuite =>
             input: {
               programId: "$pid"
               SET: {
+                title: "$title"
                 proposalClass: {
                   queue: {
                     minPercentTime: 50
@@ -207,12 +208,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 }
                 category: COSMOLOGY
                 toOActivation: NONE
-                partnerSplits: [
-                  {
-                    partner: US
-                    percent: 100
-                  }
-                ]
               }
             }
           ) {
