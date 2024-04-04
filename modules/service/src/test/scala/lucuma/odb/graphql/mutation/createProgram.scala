@@ -20,7 +20,7 @@ class createProgram extends OdbSuite {
   val guest    = TestUsers.guest(5)
   val service  = TestUsers.service(6)
 
-  val validUsers = List(pi, ngo, staff, admin, guest, service).toList
+  val validUsers = List(pi, ngo, staff, admin, guest, service)
 
   test("empty 'name' is disallowed") {
     expect(

@@ -308,22 +308,59 @@ type CallForProposals {
 scalar CallForProposalsId
 
 input CallForProposalsPropertiesInput {
+
+  "Open/closed status.  On create defaults to CLOSED."
   status:        CallForProposalsStatus
+
+  "Type of the call. Required on create."
   type:          CallForProposalsType
+
+  "Semester associated with the call. Required on create."
   semester:      Semester
 
+  "Optional RA limit start RA. Required only if raLimitEnd is specified."
   raLimitStart:  RightAscensionInput
+
+  "Optional RA limit end RA. Required only if raLimitStart is specified."
   raLimitEnd:    RightAscensionInput
 
+  """
+  Optional declination limit start declination. Required only if decLimitEnd is
+  specified.
+  """
   decLimitStart: DeclinationInput
+
+  """
+  Optional declination limit end declination. Required only if decLimitStart is
+  specified.
+  """
   decLimitEnd:   DeclinationInput
 
+  """
+  Active period start time for this call.  Required on create.  Must be before
+  the activeEnd time.
+  """
   activeStart:   Timestamp
-  activeEnd:     Timestamp
-  partners:      [CallForProposalsPartnerInput!]
-  restrictedTo:  [Instrument!]
 
-  "DELETED or PRESENT"
+  """
+  Active period end time for this call.  Required on create.  Must be after
+  the activeStart time.
+  """
+  activeEnd:     Timestamp
+
+  """
+  Partners that may participate in the call along with their respective
+  deadlines.
+  """
+  partners:      [CallForProposalsPartnerInput!]
+
+  """
+  When specified, the call is limited to the listed instruments.  When not
+  specified, all otherwise available instruments may be used.
+  """
+  includeInstruments:  [Instrument!]
+
+  "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence
 }
 
