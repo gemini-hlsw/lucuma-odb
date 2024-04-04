@@ -370,8 +370,8 @@ type CallForProposalsPartner {
 }
 
 input CallForProposalsPartnerInput {
-  partner:  Partner
-  deadline: Timestamp
+  partner:  Partner!
+  deadline: Timestamp!
 }
 
 type CallForProposalsSelectResult {
