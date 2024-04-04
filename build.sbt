@@ -2,12 +2,12 @@ val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.6"
 val cirisVersion               = "3.5.0"
-val clueVersion                = "0.35.1"
+val clueVersion                = "0.35.2"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
-val fs2AwsVersion              = "6.1.1"
-val fs2Version                 = "3.10.0"
+val fs2AwsVersion              = "6.1.2"
+val fs2Version                 = "3.10.2"
 val grackleVersion             = "0.18.1"
 val http4sBlazeVersion         = "0.23.16"
 val http4sEmberVersion         = "0.23.26"
@@ -15,11 +15,11 @@ val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.3"
 val log4catsVersion            = "2.6.0"
-val lucumaCatalogVersion       = "0.45.0"
-val lucumaItcVersion           = "0.21.6"
-val lucumaCoreVersion          = "0.94.0"
+val lucumaCatalogVersion       = "0.45.1"
+val lucumaItcVersion           = "0.21.7"
+val lucumaCoreVersion          = "0.95.0"
 val lucumaGraphQLRoutesVersion = "0.8.7"
-val lucumaSsoVersion           = "0.6.14"
+val lucumaSsoVersion           = "0.6.15"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -32,8 +32,8 @@ val pprintVersion              = "0.8.1"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
 ThisBuild / tlBaseVersion      := "0.11"
-ThisBuild / scalaVersion       := "3.4.0"
-ThisBuild / crossScalaVersions := Seq("3.4.0")
+ThisBuild / scalaVersion       := "3.4.1"
+ThisBuild / crossScalaVersions := Seq("3.4.1")
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
@@ -135,7 +135,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.682"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.691"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,

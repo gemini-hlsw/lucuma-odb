@@ -177,6 +177,7 @@ object OdbMapping {
           with SetAllocationResultMapping[F]
           with SetProgramReferenceResultMapping[F]
           with SiderealMapping[F]
+          with SpectroscopyConfigOptionMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
           with StepRecordMapping[F]
@@ -248,6 +249,7 @@ object OdbMapping {
               CategorizedTimeMapping,
               CloneObservationResultMapping,
               CloneTargetResultMapping,
+              CommissioningProgramReferenceMapping,
               ConditionsEntryMapping,
               ConditionsExpectationMapping,
               ConditionsIntuitionMapping,
@@ -291,6 +293,7 @@ object OdbMapping {
               HourAngleRangeMapping,
               LibraryProgramReferenceMapping,
               LinkUserResultMapping,
+              MonitoringProgramReferenceMapping,
               MutationMapping,
               NonsiderealMapping,
               ObsAttachmentMapping,
@@ -335,6 +338,9 @@ object OdbMapping {
               ScienceProgramReferenceMapping,
               ScienceRequirementsMapping,
               SequenceEventMapping,
+              SpectroscopyConfigOptionMapping,
+              SpectroscopyConfigOptionGmosNorthMapping,
+              SpectroscopyConfigOptionGmosSouthMapping,
               SpectroscopyScienceRequirementsMapping,
               SetAllocationResultMapping,
               SetProgramReferenceResultMapping,

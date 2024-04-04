@@ -13,7 +13,7 @@ extension (self: EmailAddress) def value: String = self
 object EmailAddress:
 
   // N.B. this is the same pattern used in the database constraint; if we change one we need to change the other.
-  private val Pat = """^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$""".r
+  private val Pat = """^[a-zA-Z0-9_+&-]+(?:.[a-zA-Z0-9_+&-]+)*@(?:[a-zA-Z0-9-]+.)+[a-zA-Z]{2,7}$""".r
 
   def fromString: Prism[String, EmailAddress] =
     Prism((s: String) => Option.when(Pat.matches(s))(s))(identity)

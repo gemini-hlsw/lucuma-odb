@@ -1662,6 +1662,9 @@ class updateObservations extends OdbSuite
       """
     ).void
 
+  def oidElementSet(os: Observation.Id*): Set[Either[Group.Id, Observation.Id]] =
+    os.map(_.asRight[Group.Id]).toSet
+
   test("grouping: move observations into a group (at end)") {
     for {
       pid <- createProgramAs(pi)
@@ -1672,8 +1675,8 @@ class updateObservations extends OdbSuite
       _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), None)
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
-      assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
-      assertEquals(es.drop(1).toSet, Set(Right(o2), Right(o1)))
+      assertEquals(es.toSet, oidElementSet(o2, o1, o3))
+      assertEquals(es.drop(1).toSet, oidElementSet(o2, o1))
     }
   }
 
@@ -1687,8 +1690,8 @@ class updateObservations extends OdbSuite
       _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(0)))
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
-      assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3)))
-      assertEquals(es.dropRight(1).toSet, Set(Right(o2), Right(o1)))
+      assertEquals(es.toSet, oidElementSet(o2, o1, o3))
+      assertEquals(es.dropRight(1).toSet, oidElementSet(o2, o1))
     }
   }
 
@@ -1703,8 +1706,8 @@ class updateObservations extends OdbSuite
       _   <- moveObservationsAs(pi, List(o1, o2), Some(gid), Some(NonNegShort.unsafeFrom(1)))
       es  <- groupElementsAs(pi, pid, Some(gid))
     } yield {
-      assertEquals(es.toSet, Set(Right(o2), Right(o1), Right(o3), Right(o4)))
-      assertEquals(es.drop(1).dropRight(1).toSet, Set(Right(o2), Right(o1)))
+      assertEquals(es.toSet, oidElementSet(o2, o1, o3, o4))
+      assertEquals(es.drop(1).dropRight(1).toSet, oidElementSet(o2, o1))
     }
   }
 
@@ -1719,7 +1722,7 @@ class updateObservations extends OdbSuite
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es.take(2), List(Left(gid), Right(o1)))
-      assertEquals(es.drop(2).toSet, Set(Right(o2), Right(o3)))
+      assertEquals(es.drop(2).toSet, oidElementSet(o2, o3))
     }
   }
 
@@ -1733,7 +1736,7 @@ class updateObservations extends OdbSuite
       _   <- moveObservationsAs(pi, List(o2, o3), None, Some(NonNegShort.unsafeFrom(0)))
       es  <- groupElementsAs(pi, pid, None)
     } yield {
-      assertEquals(es.take(2).toSet, Set(Right(o2), Right(o3)))
+      assertEquals(es.take(2).toSet, oidElementSet(o2, o3))
       assertEquals(es.drop(2), List(Left(gid), Right(o1)))
     }
   }
@@ -1749,7 +1752,7 @@ class updateObservations extends OdbSuite
       es  <- groupElementsAs(pi, pid, None)
     } yield {
       assertEquals(es(0), Left(gid))
-      assertEquals(es.drop(1).take(2).toSet, Set(Right(o2), Right(o3)))
+      assertEquals(es.drop(1).take(2).toSet, oidElementSet(o2, o3))
       assertEquals(es(3), Right(o1))
     }
   }
@@ -1767,7 +1770,7 @@ class updateObservations extends OdbSuite
       e2  <- groupElementsAs(pi, pid, Some(g2))
     } yield {
       assertEquals(e1, List(Right(o1)))
-      assertEquals(e2.toSet, Set(Right(o2), Right(o3)))
+      assertEquals(e2.toSet, oidElementSet(o2, o3))
     }
   }
 
