@@ -4,10 +4,10 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
-import lucuma.odb.data.UserInvitation
+import lucuma.core.model.UserInvitation
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.Matcher
-import lucuma.odb.graphql.binding.ObjectFieldsBinding 
+import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 final case class RedeemUserInvitationInput(key: UserInvitation, accept: Boolean)
 

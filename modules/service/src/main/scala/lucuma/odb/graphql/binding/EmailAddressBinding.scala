@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.EmailAddress
+import lucuma.core.data.EmailAddress
 
 val EmailAddressBinding: Matcher[EmailAddress] =
   StringBinding.emap: s =>
-    EmailAddress.fromString.getOption(s).toRight(s"Invalid email address: $s")
+    EmailAddress.from.getOption(s).toRight(s"Invalid email address: $s")

@@ -16,6 +16,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
+import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
@@ -31,6 +32,7 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -39,7 +41,6 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EditType
-import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
@@ -49,7 +50,6 @@ import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.data.UserType
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
@@ -171,7 +171,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[User.Id](UserIdType),
       LeafMapping[String](UserInvitationKeyType),
       LeafMapping[UserInvitation.Id](UserInvitationIdType),
-      LeafMapping[UserInvitation.Status](UserInvitationStatusType),
+      LeafMapping[InvitationStatus](UserInvitationStatusType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType),
