@@ -15,7 +15,7 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsTable[F] {
       tpe = CallForProposalsPartnerType,
       fieldMappings = List(
         SqlField("id",       CallForProposalsPartnerTable.CfpId, hidden = true, key = true),
-        SqlField("partner",  CallForProposalsPartnerTable.Partner),
+        SqlField("partner",  CallForProposalsPartnerTable.Partner, key = true),
         SqlField("deadline", CallForProposalsPartnerTable.Deadline)
       )
     )
