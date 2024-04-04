@@ -6,6 +6,8 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.data.EmailAddress
+import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
@@ -15,13 +17,12 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
-import lucuma.odb.data.EmailAddress
+import lucuma.core.model.UserInvitation
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
@@ -105,7 +106,7 @@ object UserInvitationService:
           case GuestUser(_)                      => OdbError.NotAuthorized(user.id, Some("Guest users cannot redeem user invitations.")).asFailureF
           case ServiceUser(_, _)                 => OdbError.NotAuthorized(user.id, Some("Service users cannot redeem user invitations.")).asFailureF
           case StandardUser(_, _, _, c_duration) =>
-            val status = if input.accept then UserInvitation.Status.Redeemed else UserInvitation.Status.Declined
+            val status = if input.accept then InvitationStatus.Redeemed else InvitationStatus.Declined
             session
               .prepareR(Statements.redeemUserInvitation)
               .use(_.option(user, status, input.key))
@@ -189,7 +190,7 @@ object UserInvitationService:
         .query(user_invitation)
         .contramap((u, pid, e, p) => (u.id, pid, e, ProgramUserRole.Support, ProgramUserSupportType.Partner, p, pid, p, pid))
 
-    val redeemUserInvitation: Query[(User, UserInvitation.Status, UserInvitation), (ProgramUserRole, Option[ProgramUserSupportType], Option[Tag], Program.Id)] =
+    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Option[ProgramUserSupportType], Option[Tag], Program.Id)] =
       sql"""
         update t_invitation
         set c_status = $user_invitation_status, c_redeemer_id = $user_id

@@ -6,6 +6,7 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.literal.*
+import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -13,7 +14,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
-import lucuma.odb.data.UserInvitation
 
 class createUserInvitation extends OdbSuite {
 
@@ -69,7 +69,7 @@ class createUserInvitation extends OdbSuite {
               {
                 "createUserInvitation" : {
                   "invitation" : {
-                    "status" : ${UserInvitation.Status.Pending},
+                    "status" : ${InvitationStatus.Pending},
                     "issuer" : {
                       "id" : ${pi.id}
                     },
@@ -122,7 +122,7 @@ class createUserInvitation extends OdbSuite {
             {
               "createUserInvitation" : {
                 "invitation" : {
-                  "status" : ${UserInvitation.Status.Pending},
+                  "status" : ${InvitationStatus.Pending},
                   "issuer" : {
                     "id" : ${staff.id}
                   },
@@ -174,7 +174,7 @@ class createUserInvitation extends OdbSuite {
             {
               "createUserInvitation" : {
                 "invitation" : {
-                  "status" : ${UserInvitation.Status.Pending},
+                  "status" : ${InvitationStatus.Pending},
                   "issuer" : {
                     "id" : ${admin.id}
                   },
@@ -329,8 +329,8 @@ class createUserInvitation extends OdbSuite {
         expected = Left(List(
           "Specified program does not exist, or has no partner-allocated time."
         ))
-      )      
+      )
     }
   }
-    
+
 }
