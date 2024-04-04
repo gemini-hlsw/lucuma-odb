@@ -7,8 +7,8 @@ package subscription
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
-import lucuma.core.model.User
-import lucuma.odb.data.EmailAddress
+import lucuma.core.data.EmailAddress
+import lucuma.core.model.UserInvitation
 
 import scala.concurrent.duration.*
 
@@ -388,7 +388,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           for {
             pid <- createProgram(pi, "foo")
             _   <- IO.sleep(1.second)
-            inv <- createUserInvitationAs(pi, pid, recipientEmail = EmailAddress.fromString.getOption("here@there.com").get)
+            inv <- createUserInvitationAs(pi, pid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
             _   <- IO.sleep(1.second)
             _   <- revokeUserInvitationAs(pi, inv.id)
           } yield ()
