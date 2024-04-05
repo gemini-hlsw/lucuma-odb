@@ -14,6 +14,27 @@ class createCallForProposals extends OdbSuite {
 
   val validUsers = List(pi, staff)
 
+  test("failure - only staff may create calls") {
+    expect(
+      user = pi,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2025-02-31 14:00:00"
+                activeEnd:   "2025-07-31 14:00:00"
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("User u-1 is not authorized to perform this operation.").asLeft
+    )
+  }
+
   test("success - simple with defaults") {
 
     // status    defaults to CLOSED
