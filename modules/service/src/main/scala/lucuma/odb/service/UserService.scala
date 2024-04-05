@@ -17,7 +17,7 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 trait UserService[F[_]] {
-  def canonicalizeUser(u: User): F[Unit]
+  def canonicalizeUser(u: User)(using Services.SuperUserAccess): F[Unit]
 }
 
 object UserService {
@@ -26,7 +26,7 @@ object UserService {
     new UserService[F] {
       import Statements._
 
-      def canonicalizeUser(u: User): F[Unit] =
+      def canonicalizeUser(u: User)(using Services.SuperUserAccess): F[Unit] =
         Trace[F].span("canonicalizeUser") {
           u match {
             case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)

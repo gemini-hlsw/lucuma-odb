@@ -60,7 +60,7 @@ trait TimeAccountingService[F[_]] {
   def addCorrection(
     visitId:    Visit.Id,
     correction: TimeChargeCorrectionInput
-  )(using Transaction[F]): F[Long]
+  )(using Transaction[F], Services.StaffAccess): F[Long]
 
   /**
    * Sums the final time accounting result for all visits of an observation.
@@ -241,7 +241,7 @@ object TimeAccountingService {
       def addCorrection(
         visitId: Visit.Id,
         input:   TimeChargeCorrectionInput
-      )(using Transaction[F]): F[Long] =
+      )(using Transaction[F], Services.StaffAccess): F[Long] =
         for {
           id <- session.unique(StoreCorrection)(visitId, input, user.id)
           _  <- session.execute(PerformCorrection)(visitId, input).void
