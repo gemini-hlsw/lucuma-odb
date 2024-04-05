@@ -271,6 +271,9 @@ trait Codecs {
   val image_quality: Codec[ImageQuality] =
     enumerated[ImageQuality](Type.varchar)
 
+  val _instrument: Codec[Arr[Instrument]] =
+    Codec.array(_.tag, s => Instrument.fromTag(s).toRight(s"Invalid Instrument tag: $s"), Type("_d_tag", List(Type("d_tag"))))
+
   val instrument: Codec[Instrument] =
     enumerated[Instrument](Type.varchar)
 

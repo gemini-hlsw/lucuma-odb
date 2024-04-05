@@ -299,8 +299,7 @@ type CallForProposals {
 
   partners:     [CallForProposalsPartner!]!
 
-  includeInstruments: [Instrument!]
-  excludeInstruments: [Instrument!]
+  instruments:  [Instrument!]!
 
   existence:    Existence!
 }
@@ -358,7 +357,7 @@ input CallForProposalsPropertiesInput {
   When specified, the call is limited to the listed instruments.  When not
   specified, all otherwise available instruments may be used.
   """
-  includeInstruments:  [Instrument!]
+  instruments:  [Instrument!]
 
   "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence

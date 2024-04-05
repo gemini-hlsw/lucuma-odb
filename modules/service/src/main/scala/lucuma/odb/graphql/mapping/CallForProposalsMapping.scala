@@ -6,9 +6,9 @@ package mapping
 
 import io.circe.syntax.*
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.graphql.table.CallForProposalsTable
+import lucuma.odb.graphql.table.CallForProposalsView
 
-trait CallForProposalsMapping[F[_]] extends CallForProposalsTable[F] {
+trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
 
   lazy val CallForProposalsPartnerMapping: TypeMapping =
     ObjectMapping(
@@ -24,16 +24,16 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsTable[F] {
     ObjectMapping(
       tpe = CallForProposalsType,
       fieldMappings = List(
-        SqlField("id",       CallForProposalsTable.Id, key = true),
-        SqlField("status",   CallForProposalsTable.Status),
-        SqlField("type",     CallForProposalsTable.Type),
-        SqlField("semester", CallForProposalsTable.Semester),
+        SqlField("id",       CallForProposalsView.Id, key = true),
+        SqlField("status",   CallForProposalsView.Status),
+        SqlField("type",     CallForProposalsView.Type),
+        SqlField("semester", CallForProposalsView.Semester),
         SqlObject("raLimitStart"),
         SqlObject("raLimitEnd"),
         SqlObject("decLimitStart"),
         SqlObject("decLimitEnd"),
 
-        SqlField("_active", CallForProposalsTable.Active, hidden = true),
+        SqlField("_active", CallForProposalsView.Active, hidden = true),
 
         CursorFieldJson(
           "activeStart",
@@ -47,11 +47,11 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsTable[F] {
           List("_active")
         ),
 
-        SqlObject("partners", Join(CallForProposalsTable.Id, CallForProposalsPartnerTable.CfpId)),
+        SqlObject("partners", Join(CallForProposalsView.Id, CallForProposalsPartnerTable.CfpId)),
 
-        // instruments?
+        SqlField("instruments", CallForProposalsView.Instruments),
 
-        SqlField("existence", CallForProposalsTable.Existence)
+        SqlField("existence", CallForProposalsView.Existence)
       )
     )
 }

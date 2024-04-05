@@ -4,15 +4,15 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table.CallForProposalsTable
+import lucuma.odb.graphql.table.CallForProposalsView
 
-trait CreateCallForProposalsResultMapping[F[_]] extends CallForProposalsTable[F] {
+trait CreateCallForProposalsResultMapping[F[_]] extends CallForProposalsView[F] {
 
   lazy val CreateCallForProposalsResultMapping =
     ObjectMapping(
       tpe = CreateCallForProposalsResultType,
       fieldMappings = List(
-        SqlField("id", CallForProposalsTable.Id, key = true, hidden = true),
+        SqlField("id", CallForProposalsView.Id, key = true, hidden = true),
         SqlObject("callForProposals")
       )
     )

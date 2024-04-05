@@ -61,12 +61,31 @@ CREATE TABLE t_cfp_partner (
 );
 COMMENT ON TABLE t_cfp_partner IS 'Call for Proposal partner deadline.';
 
+-- Tracks the instruments, if any, to which the CfP is limited.
 CREATE TABLE t_cfp_instrument (
   c_cfp_id     d_cfp_id NOT NULL REFERENCES t_cfp(c_cfp_id)     ON DELETE CASCADE,
   c_instrument d_tag    NOT NULL REFERENCES t_instrument(c_tag) ON DELETE CASCADE,
   PRIMARY KEY (c_cfp_id, c_instrument)
 );
 COMMENT ON TABLE t_cfp_instrument IS 'Call for Proposal instruments.';
+
+-- A view to repackage the instruments as an array value so Grackle can digest
+-- it. Also, adds synthetic nullable ids for the nullable RA and Dec since
+-- Grackle needs those as well.
+CREATE VIEW v_cfp AS
+  SELECT
+    c.*,
+    CASE WHEN c.c_ra_start  IS NOT NULL THEN c.c_cfp_id END AS c_ra_start_id,
+    CASE WHEN c.c_ra_end    IS NOT NULL THEN c.c_cfp_id END AS c_ra_end_id,
+    CASE WHEN c.c_dec_start IS NOT NULL THEN c.c_cfp_id END AS c_dec_start_id,
+    CASE WHEN c.c_dec_end   IS NOT NULL THEN c.c_cfp_id END AS c_dec_end_id,
+    array_remove(array_agg(i.c_instrument ORDER BY i.c_instrument), NULL) AS c_instruments
+  FROM
+    t_cfp c
+  LEFT JOIN
+    t_cfp_instrument i ON c.c_cfp_id = i.c_cfp_id
+  GROUP BY
+    c.c_cfp_id;
 
 CREATE EXTENSION btree_gist;
 
