@@ -190,4 +190,127 @@ class createCallForProposals extends OdbSuite {
       """.asRight
     )
   }
+
+  test("success - with ra") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:         REGULAR_SEMESTER
+                semester:     "2025A"
+                activeStart:  "2026-02-01 14:00:00"
+                activeEnd:    "2026-07-31 14:00:00"
+                raLimitStart: { hms: "12:00:00" }
+                raLimitEnd:   { hms: "18:00:00" }
+              }
+            }
+          ) {
+             callForProposals {
+               id
+               raLimitStart { hms }
+               raLimitEnd { hms }
+             }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "id": "c-103",
+              "raLimitStart": { "hms": "12:00:00.000000" },
+              "raLimitEnd":   { "hms": "18:00:00.000000" }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("failure - missing ra end") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:         REGULAR_SEMESTER
+                semester:     "2025A"
+                activeStart:  "2025-02-31 14:00:00"
+                activeEnd:    "2025-07-31 14:00:00"
+                raLimitStart: { hms: "12:00:00" }
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: Supply both raLimitStart and raLimitEnd or neither").asLeft
+    )
+  }
+
+  test("success - with dec") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:         REGULAR_SEMESTER
+                semester:     "2025A"
+                activeStart:  "2026-02-01 14:00:00"
+                activeEnd:    "2026-07-31 14:00:00"
+                decLimitStart: { dms: "45:00:00" }
+                decLimitEnd:   { dms: "-45:00:00" }
+              }
+            }
+          ) {
+             callForProposals {
+               id
+               decLimitStart { dms }
+               decLimitEnd { dms }
+             }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "id": "c-104",
+              "decLimitStart": { "dms": "+45:00:00.000000" },
+              "decLimitEnd":   { "dms": "-45:00:00.000000" }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("failure - missing dec start") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2025-02-31 14:00:00"
+                activeEnd:   "2025-07-31 14:00:00"
+                decLimitEnd: { dms: "12:00:00" }
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: Supply both decLimitStart and decLimitEnd or neither").asLeft
+    )
+  }
+
 }

@@ -62,6 +62,10 @@ object CallForProposalsService {
           c_status,
           c_type,
           c_semester,
+          c_ra_start,
+          c_ra_end,
+          c_dec_start,
+          c_dec_end,
           c_active,
           c_existence
         )
@@ -69,6 +73,10 @@ object CallForProposalsService {
           $cfp_status,
           $cfp_type,
           $semester,
+          ${right_ascension.opt},
+          ${right_ascension.opt},
+          ${declination.opt},
+          ${declination.opt},
           $timestamp_interval_tsrange,
           $existence
         RETURNING
@@ -77,6 +85,10 @@ object CallForProposalsService {
         input.status,
         input.cfpType,
         input.semester,
+        input.raLimit.map(_._1),
+        input.raLimit.map(_._2),
+        input.decLimit.map(_._1),
+        input.decLimit.map(_._2),
         input.active,
         input.existence
       )}
