@@ -53,12 +53,12 @@ sealed trait DatasetService[F[_]] {
   def setStartTime(
     datasetId: Dataset.Id,
     time:      Timestamp
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def setEndTime(
     datasetId: Dataset.Id,
     time:      Timestamp
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def hasDatasets(
     visitId: Visit.Id
@@ -121,13 +121,13 @@ object DatasetService {
       override def setStartTime(
         datasetId: Dataset.Id,
         time:      Timestamp
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.SetStartTime)(time, datasetId).void
 
       override def setEndTime(
         datasetId: Dataset.Id,
         time:      Timestamp
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.SetEndTime)(time, datasetId).void
 
       override def hasDatasets(

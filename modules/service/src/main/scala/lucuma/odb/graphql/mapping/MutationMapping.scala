@@ -234,15 +234,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
 
   private lazy val AddTimeChargeCorrection: MutationField =
-    MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        timeAccountingService.addCorrection(input.visitId, input.correction).as {
-          Result(
-            Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
-          )
-        }
-      }
-    }
+    MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          timeAccountingService.addCorrection(input.visitId, input.correction).as:
+            Result(
+              Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
+            )
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
