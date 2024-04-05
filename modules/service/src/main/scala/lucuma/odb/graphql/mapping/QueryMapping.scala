@@ -17,6 +17,7 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -164,11 +165,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
                   OFFSET.map(Predicates.callForProposals.id.gtEql).getOrElse(True),
-//                  WHERE.getOrElse(True),
                   Predicates.callForProposals.existence.includeDeleted(includeDeleted),
                 ))),
                 oss = Some(List(
-                  OrderSelection[lucuma.odb.data.CallForProposals.Id](CallForProposalsType / "id")
+                  OrderSelection[lucuma.core.model.CallForProposals.Id](CallForProposalsType / "id")
                 )),
                 offset = None,
                 limit = Some(limit + 1), // Select one extra row here.

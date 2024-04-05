@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.CallForProposals
+import lucuma.core.model.CallForProposals
 
 val CallForProposalsIdBinding: Matcher[CallForProposals.Id] =
   gidBinding("callForProposals")
