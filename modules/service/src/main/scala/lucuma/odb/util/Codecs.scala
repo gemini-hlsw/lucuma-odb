@@ -43,7 +43,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
-import lucuma.odb.data.CallForProposals
 import lucuma.odb.data.CallForProposalsStatus
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType

@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.odb.data.CallForProposals
+import lucuma.core.model.CallForProposals
 
 class CallForProposalsPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")

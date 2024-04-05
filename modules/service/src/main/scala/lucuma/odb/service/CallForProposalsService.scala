@@ -10,7 +10,7 @@ import cats.syntax.functor.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
-import lucuma.odb.data.CallForProposals
+import lucuma.core.model.CallForProposals
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput

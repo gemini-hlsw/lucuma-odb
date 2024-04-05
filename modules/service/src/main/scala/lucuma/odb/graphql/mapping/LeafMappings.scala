@@ -20,6 +20,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.IntPercent
@@ -40,7 +41,6 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.CallForProposals
 import lucuma.odb.data.CallForProposalsStatus
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
