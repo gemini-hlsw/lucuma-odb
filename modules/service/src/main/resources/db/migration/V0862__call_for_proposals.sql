@@ -103,16 +103,3 @@ CREATE VIEW v_cfp AS
     t_cfp_instrument i ON c.c_cfp_id = i.c_cfp_id
   GROUP BY
     c.c_cfp_id;
-
-CREATE EXTENSION btree_gist;
-
--- Simple "resource" starting point for instruments.
-CREATE TABLE t_instrument_avail (
-  c_id          SERIAL  PRIMARY KEY,
-  c_instrument  d_tag   NOT NULL REFERENCES t_instrument(c_tag) ON DELETE CASCADE,
-  c_active      tsrange NOT NULL,
-
-  -- Prevent overlapping active periods for the same instrument
-  EXCLUDE USING GIST (c_instrument WITH =, c_active WITH &&)
-);
-COMMENT ON TABLE t_instrument_avail IS 'Instrument availability periods.';
