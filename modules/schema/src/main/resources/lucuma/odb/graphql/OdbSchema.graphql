@@ -373,7 +373,7 @@ input CallForProposalsPartnerInput {
   deadline: Timestamp!
 }
 
-type CallForProposalsSelectResult {
+type CallsForProposalsSelectResult {
   matches: [CallForProposals!]!
   hasMore: Boolean!
 }
@@ -8166,7 +8166,17 @@ type Query {
     includeDeleted: Boolean! = false
   ): AsterismGroupSelectResult!
 
+  """
+  Select a single Call for Proposals by id.
+  """
   callForProposals(
+    callForProposalsId: CallForProposalsId!
+  ): CallForProposals
+
+  """
+  Select all Calls for Proposals.
+  """
+  callsForProposals(
     OFFSET: CallForProposalsId
 
     "Limits the result to at most this number of matches (but never more than 1000)."
@@ -8174,7 +8184,7 @@ type Query {
 
     "Set to true to include deleted values"
     includeDeleted: Boolean! = false
-  ): CallForProposalsSelectResult!
+  ): CallsForProposalsSelectResult!
 
   """
   Metadata for `enum ObsAttachmentType`

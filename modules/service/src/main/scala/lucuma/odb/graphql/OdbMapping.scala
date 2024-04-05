@@ -95,7 +95,7 @@ object OdbMapping {
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
           with CallForProposalsMapping[F]
-          with CallForProposalsSelectResultMapping[F]
+          with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
           with CloneObservationResultMapping[F]
@@ -253,7 +253,7 @@ object OdbMapping {
               CalibrationProgramReferenceMapping,
               CallForProposalsMapping,
               CallForProposalsPartnerMapping,
-              CallForProposalsSelectResultMapping,
+              CallsForProposalsSelectResultMapping,
               CatalogInfoMapping,
               CategorizedTimeMapping,
               CloneObservationResultMapping,
