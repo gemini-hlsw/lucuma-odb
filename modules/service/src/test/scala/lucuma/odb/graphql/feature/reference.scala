@@ -65,29 +65,9 @@ class reference extends OdbSuite {
   val sem2025B   = "2025B".semester
   val ref2025B1  = "G-2025B-0001".proposalReference
   val ref2025B2  = "G-2025B-0002".proposalReference
-
-  def createProgramWithSemester(semester: String): IO[Program.Id] =
-    query(pi,
-      s"""
-        mutation {
-          createProgram(
-            input: {
-               SET: {
-                  semester: "$semester"
-               }
-            }
-          ) {
-            program { id }
-          }
-        }
-      """
-    ).flatMap { js =>
-      js.hcursor
-        .downFields("createProgram", "program", "id")
-        .as[Program.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
+  
+  val sem2010A   = "2010A".semester
+  val ref2010A1  = "G-2010A-0001".proposalReference
 
   def pidsWhere(where: String): IO[List[Program.Id]] =
     query(pi, s"query { programs(WHERE: $where) { matches { id } } }")
@@ -147,15 +127,18 @@ class reference extends OdbSuite {
     for {
       pid0 <- createProgramAs(pi)
       _    <- addProposal(pi, pid0)
-      ref0 <- submitProposal(pi, pid0, sem2024B.some)
+      _    <- setSemester(pi, pid0, sem2024B)
+      ref0 <- submitProposal(pi, pid0)
 
       pid1 <- createProgramAs(pi)
       _    <- addProposal(pi, pid1)
-      ref1 <- submitProposal(pi, pid1, sem2024B.some)
+      _    <- setSemester(pi, pid1, sem2024B)
+      ref1 <- submitProposal(pi, pid1)
 
       pid2 <- createProgramAs(pi)
       _    <- addProposal(pi, pid2)
-      ref2 <- submitProposal(pi, pid2, sem2025A.some)
+      _    <- setSemester(pi, pid2, sem2025A)
+      ref2 <- submitProposal(pi, pid2)
     } yield {
       assertEquals(ref0, ref2024B1)
       assertEquals(ref1, ref2024B2)
@@ -221,8 +204,10 @@ class reference extends OdbSuite {
 
   test("select via WHERE proposal IS_NULL = true") {
     for {
-      pid0 <- createProgramWithSemester("2020A")
-      pid1 <- createProgramWithSemester("2020A")
+      pid0 <- createProgramAs(pi)
+      pid1 <- createProgramAs(pi)
+      _    <- setSemester(pi, pid0, "2020A".semester)
+      _    <- setSemester(pi, pid1, "2020A".semester)
       _    <- addProposal(pi, pid1)
       res0 <- pidsWhere("{ proposal: { IS_NULL: true } }")
       res1 <- pidsWhere("{ proposal: { reference: { IS_NULL: true } } }")
@@ -267,154 +252,22 @@ class reference extends OdbSuite {
     )
   }
 
-  val ref2010A1 = "G-2010A-0001".proposalReference
-
-  // TODO: proposal status mutations
-  // I think we want to remove semester as an independently settable property.
-  // It should instead be required on proposal submission.
-  test("TEMP: set semester on create, then submit") {
-    val res = for {
-      pid <- createProgramWithSemester("2010A")
-      _   <- addProposal(pi, pid)
-      ref <- submitProposal(pi, pid, none) // no semester
-    } yield ref
-
-    assertIO(res, ref2010A1)
-  }
-
-  // TODO: proposal status mutations
-  // I think we want to remove semester as an independently settable property.
-  test("TEMP: cannot unset semester after submit") {
-    fetchPid(pi, ref2010A1).flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-            mutation {
-              updatePrograms(
-                input: {
-                  SET: {
-                    semester: null
-                  }
-                  WHERE: {
-                    proposal: {
-                      reference: {
-                        semester: {
-                          EQ: "2010A"
-                        }
-                      }
-                    }
-                  }
-                }
-              ) {
-                programs {
-                  proposal {
-                    reference {
-                      label
-                    }
-                  }
-                }
-              }
-            }
-        """,
-        expected = Left(List(
-          s"Submitted program $pid must be associated with a semester."
-        ))
-      )
+  test("submit, unsubmit, resubmit, same reference") {
+    for {
+      pid  <- createProgramAs(pi)
+      _    <- addProposal(pi, pid)
+      _    <- setSemester(pi, pid, sem2010A)
+      ref0 <- submitProposal(pi, pid)
+      _    <- unsubmitProposal(pi, pid)
+      ref1 <- submitProposal(pi, pid)
+    } yield {
+      assertEquals(ref0, ref2010A1)
+      assertEquals(ref1, ref2010A1)
     }
   }
 
-  // TODO: proposal status mutations
-  // I think this interaction used in this test will be removed.  When submitting
-  // you'll need to supply the semester.
-  test("TEMP: unsubmit, resubmit, same reference") {
-    expect(
-      user = pi,
-      query = s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET: {
-                proposalStatus: NOT_SUBMITTED
-              }
-              WHERE: {
-                proposal: {
-                  reference: {
-                    label: {
-                      EQ: "${ref2010A1.label}"
-                    }
-                  }
-                }
-              }
-            }
-          ) {
-            programs {
-              proposalStatus
-            }
-          }
-        }
-        """,
-      expected = Right(
-        json"""
-          {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "proposalStatus": "NOT_SUBMITTED"
-                }
-              ]
-            }
-          }
-        """
-      )
-    ) >>
-    expect(
-      user = pi,
-      query = s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET: {
-                proposalStatus: SUBMITTED
-              }
-              WHERE: {
-                proposal: {
-                  reference: {
-                    label: {
-                      EQ: "${ref2010A1.label}"
-                    }
-                  }
-                }
-              }
-            }
-          ) {
-            programs {
-              proposal { reference { label } }
-            }
-          }
-        }
-      """,
-      expected = Right(
-        json"""
-          {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "proposal": {
-                    "reference": {
-                      "label": ${ref2010A1.label}
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        """
-      )
-    )
-  }
-
-  // TODO: proposal status mutations
-  // You won't be able to change the semester without first unsubmitting.
+  // You won't be able to change the semester without first unsubmitting, and changing
+  // the semester will be via setProgramReference or a new setCallForProposal mutation.
   test("TEMP: change semester, changes reference") {
     // G-2010A-0001 -> assign semester 2024B
     // G-2024B-0001 and 00002 already taken, so we get G-2024B-0003
@@ -468,9 +321,11 @@ class reference extends OdbSuite {
     for {
       pid  <- createProgramAs(pi)
       _    <- addProposal(pi, pid)
-      _    <- submitProposal(pi, pid, sem2024A.some)
+      _    <- setSemester(pi, pid, sem2024A)
+      _    <- submitProposal(pi, pid)
       ref0 <- fetchProgramReference(pi, pid)
-      ref1 <- acceptProposal(staff, pid)
+       _   <- acceptProposal(staff, pid)
+      ref1 <- fetchProgramReference(pi, pid)
     } yield {
       assert(ref0.isEmpty)
       assertEquals(ref1, ref2024A1Q.some)
@@ -481,7 +336,8 @@ class reference extends OdbSuite {
     for {
       pid <- createProgramAs(pi)
       _   <- addProposal(pi, pid)
-      _   <- submitProposal(pi, pid, sem2024A.some)
+      _    <- setSemester(pi, pid, sem2024A)
+      _   <- submitProposal(pi, pid)
       _   <- acceptProposal(staff, pid)
       _   <- expect(pi, s"""
           query {
@@ -513,24 +369,22 @@ class reference extends OdbSuite {
     } yield ()
   }
 
-  test("change propsal class in accepted proposal") {
+  test("change proposal class in accepted proposal") {
     def toClassical(pid: Program.Id): IO[Json] =
       query(
         pi,
         s"""
           mutation {
-            updatePrograms(
+            updateProposal (
               input: {
+                programId: "$pid"
                 SET: {
-                  proposal: {
-                    proposalClass: {
-                      classical: { minPercentTime: 50 }
-                    }
+                  proposalClass: {
+                    classical: { minPercentTime: 50 }
                   }
                 }
-                WHERE: { id: { EQ: "$pid" } }
               }
-            ) { programs { id } }
+            ) { proposal { category } }
           }
         """
       )
@@ -869,7 +723,8 @@ class reference extends OdbSuite {
 
   test("setProposalReference SCI, yes proposal") {
     for {
-      pid <- createProgramWithSemester("2025B")
+      pid <- createProgramAs(pi)
+      _   <- setSemester(pi, pid, sem2025B)
       _   <- addProposal(pi, pid)
       _   <- acceptProposal(staff, pid)
       ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
