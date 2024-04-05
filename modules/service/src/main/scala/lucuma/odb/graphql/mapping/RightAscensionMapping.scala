@@ -11,6 +11,7 @@ import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
+
 import scala.reflect.ClassTag
 
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
