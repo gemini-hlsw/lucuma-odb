@@ -40,8 +40,25 @@ CREATE TABLE t_cfp (
   -- RA and Dec range limits, if any.
   c_ra_start     d_angle_µas  NULL DEFAULT NULL,
   c_ra_end       d_angle_µas  NULL DEFAULT NULL,
+
+  CONSTRAINT both_ra_limits_or_neither CHECK (
+    (
+      c_ra_start IS NULL AND c_ra_end IS NULL
+    ) OR (
+      c_ra_start IS NOT NULL AND c_ra_end IS NOT NULL
+    )
+  ),
+
   c_dec_start    d_angle_µas  NULL DEFAULT NULL,
   c_dec_end      d_angle_µas  NULL DEFAULT NULL,
+
+  CONSTRAINT both_dec_limits_or_neither CHECK (
+    (
+      c_dec_start IS NULL AND c_dec_end IS NULL
+    ) OR (
+      c_dec_start IS NOT NULL AND c_dec_end IS NOT NULL
+    )
+  ),
 
   -- Active period for this CFP
   c_active       tsrange      NOT NULL,

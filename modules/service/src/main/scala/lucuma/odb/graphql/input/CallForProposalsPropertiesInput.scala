@@ -7,6 +7,7 @@ package input
 import cats.syntax.order.*
 import cats.syntax.parallel.*
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -21,20 +22,30 @@ import lucuma.odb.graphql.binding.*
 object CallForProposalsPropertiesInput {
 
   case class Create(
-    status:        CallForProposalsStatus,
-    cfpType:       CallForProposalsType,
-    semester:      Semester,
-    raLimitStart:  Option[RightAscension],
-    raLimitEnd:    Option[RightAscension],
-    decLimitStart: Option[Declination],
-    decLimitEnd:   Option[Declination],
-    active:        TimestampInterval,
-    partners:      List[CallForProposalsPartnerInput],
-    instruments:   List[Instrument],
-    existence:     Existence
+    status:      CallForProposalsStatus,
+    cfpType:     CallForProposalsType,
+    semester:    Semester,
+    raLimit:     Option[(RightAscension, RightAscension)],
+    decLimit:    Option[(Declination, Declination)],
+    active:      TimestampInterval,
+    partners:    List[CallForProposalsPartnerInput],
+    instruments: List[Instrument],
+    existence:   Existence
   )
 
   object Create {
+
+    private def bothOrNeither[A](
+      ra: Result[Option[A]],
+      rb: Result[Option[A]],
+      na: String,
+      nb: String
+    ): Result[Option[(A, A)]] =
+      (ra, rb).parFlatMapN {
+        case (Some(a), Some(b)) => Some((a, b)).success
+        case (None, None)       => None.success
+        case _                  => Result.failure(s"Supply both $na and $nb or neither")
+      }
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -52,6 +63,10 @@ object CallForProposalsPropertiesInput {
           InstrumentBinding.List.Option("instruments", rInstruments),
           ExistenceBinding.Option("existence", rExistence)
         ) => {
+          // Check that both (or neither) limits are supplied.
+          val rRaLimit  = bothOrNeither(rRaStart,  rRaEnd,  "raLimitStart",  "raLimitEnd")
+          val rDecLimit = bothOrNeither(rDecStart, rDecEnd, "decLimitStart", "decLimitEnd")
+          // Check that active start comes before end.
           val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap { (start, end) =>
             Result.fromOption(
               Option.when(start <= end)(TimestampInterval.between(start, end)),
@@ -62,10 +77,8 @@ object CallForProposalsPropertiesInput {
             rStatus.map(_.getOrElse(CallForProposalsStatus.Closed)),
             rType,
             rSemester,
-            rRaStart,
-            rRaEnd,
-            rDecStart,
-            rDecEnd,
+            rRaLimit,
+            rDecLimit,
             rActive,
             rPartners.map(_.toList.flatten),
             rInstruments.map(_.toList.flatten),
