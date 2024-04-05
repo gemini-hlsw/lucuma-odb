@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.mapping
 
-trait CallForProposalsSelectResultMapping[F[_]] extends ResultMapping[F] {
+trait CallsForProposalsSelectResultMapping[F[_]] extends ResultMapping[F] {
 
-  lazy val CallForProposalsSelectResultMapping: ObjectMapping =
-    topLevelSelectResultMapping(CallForProposalsSelectResultType)
+  lazy val CallsForProposalsSelectResultMapping: ObjectMapping =
+    topLevelSelectResultMapping(CallsForProposalsSelectResultType)
 
 }

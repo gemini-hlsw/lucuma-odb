@@ -50,6 +50,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       fieldMappings = List(
         SqlObject("asterismGroup"),
         SqlObject("callForProposals"),
+        SqlObject("callsForProposals"),
         SqlObject("constraintSetGroup"),
         SqlObject("dataset"),
         SqlObject("datasets"),
@@ -75,6 +76,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     List(
       AsterismGroup,
       CallForProposals,
+      CallsForProposals,
       ConstraintSetGroup,
       Dataset,
       Datasets,
@@ -134,6 +136,23 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   private lazy val CallForProposals: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     {
       case (QueryType, "callForProposals", List(
+        CallForProposalsIdBinding("callForProposalsId", rCid)
+      )) =>
+        Elab.transformChild { child =>
+          rCid.map { cid =>
+            Unique(
+              Filter(
+                Predicates.callForProposals.id.eql(cid),
+                child
+              )
+            )
+          }
+        }
+    }
+
+  private lazy val CallsForProposals: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    {
+      case (QueryType, "callsForProposals", List(
         CallForProposalsIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
