@@ -191,7 +191,8 @@ class asterismGroup extends OdbSuite {
       for {
         pid  <- createProgramAs(user)
         _    <- addProposal(user, pid)
-        _    <- submitProposal(user, pid, Semester.unsafeFromString("2025A").some)
+        _    <- setSemester(user, pid, Semester.unsafeFromString("2025A"))
+        _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(5)
         oid0 <- createObservationAs(user, pid, tids(3))
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))

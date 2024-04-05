@@ -10,6 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.data.EmailAddress
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
@@ -40,6 +41,7 @@ import lucuma.core.model.SpectralDefinition.*
 import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED.*
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -49,14 +51,12 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
-import lucuma.odb.data.EmailAddress
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
-import lucuma.odb.data.UserInvitation
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
@@ -110,10 +110,16 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def fetchProposalReference(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
     query(user, s"""
-      query { program(programId: "$pid") { proposalReference } }
+      query {
+        program(programId: "$pid") {
+          proposal {
+            reference { label }
+          }
+        }
+      }
     """).flatMap { js =>
       js.hcursor
-        .downFields("program", "proposalReference")
+        .downFields("program", "proposal", "reference", "label")
         .as[Option[ProposalReference]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
@@ -142,6 +148,25 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  // Temporary until there is a Call for Proposal mutation that also sets the semester. At that time,
+  // ability to set the semester via updatePrograms will be removed.
+  def setSemester(user: User, pid: Program.Id, semester: Semester): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              WHERE: { id: { EQ: "$pid" } }
+              SET: { semester: "${semester.format}" }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
+
   def setProgramReference(user: User, pid: Program.Id, set: String): IO[Option[ProgramReference]] =
     query(
       user,
@@ -164,42 +189,30 @@ trait DatabaseOperations { this: OdbSuite =>
        .liftTo[IO]
     }
 
-
   // For proposal tests where it doesn't matter what the proposal is, just that
   // there is one.
-  def addProposal(user: User, pid: Program.Id): IO[Unit] =
+  def addProposal(user: User, pid: Program.Id, title: String = "my proposal"): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
-          updatePrograms(
+          createProposal(
             input: {
+              programId: "$pid"
               SET: {
-                proposal: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 50
-                    }
+                title: "$title"
+                proposalClass: {
+                  queue: {
+                    minPercentTime: 50
                   }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
                 }
-              }
-              WHERE: {
-                id: {
-                  EQ: "$pid"
-                }
+                category: COSMOLOGY
+                toOActivation: NONE
               }
             }
           ) {
-            programs {
-              id
+            proposal {
+              toOActivation
             }
           }
         }
@@ -207,74 +220,53 @@ trait DatabaseOperations { this: OdbSuite =>
       expected =
         Right(json"""
           {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "id" : $pid
-                }
-              ]
+            "createProposal": {
+              "proposal": {
+                "toOActivation" : "NONE"
+               }
             }
           }
         """)
     )
 
-  def submitProposal(user: User, pid: Program.Id, s: Option[Semester]): IO[ProposalReference] =
-    query(user, s"""
+  def setProposalStatus(user: User, pid: Program.Id, status: String): IO[(Option[ProgramReference], Option[ProposalReference])] =
+    query(user,  s"""
         mutation {
-          updatePrograms(
+          setProposalStatus(
             input: {
-              SET: {
-                proposalStatus: SUBMITTED
-                ${s.map(semster => s""",\nsemester: "${semster.format}"""").getOrElse("")}
-              }
-              WHERE: {
-                id: {
-                  EQ: "$pid"
-                }
-              }
+              programId: "$pid"
+              status: $status
             }
           ) {
-            programs {
+            program {
+              reference { label }
               proposal { reference { label } }
             }
           }
         }
       """
     ).flatMap { js =>
-      js.hcursor
-        .downField("updatePrograms")
-        .downField("programs")
-        .downArray
-        .downFields("proposal", "reference", "label")
-        .as[ProposalReference]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
+      val programCursor = js.hcursor.downFields("setProposalStatus", "program")
+      (for {
+        prog <- programCursor.downFields("reference", "label").success.traverse(_.as[ProgramReference])
+        prop <- programCursor.downFields("proposal", "reference", "label").success.traverse(_.as[ProposalReference])
+      } yield (prog, prop)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
     }
 
+  def submitProposal(user: User, pid: Program.Id): IO[ProposalReference] =
+    setProposalStatus(user, pid, "SUBMITTED").map(_._2.get) // should have a proposal reference now.
+
+  def unsubmitProposal(user: User, pid: Program.Id): IO[Option[ProposalReference]] =
+    setProposalStatus(user, pid, "NOT_SUBMITTED").map(_._2)
+
   def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
-    query(user, s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET:   { proposalStatus: ACCEPTED }
-              WHERE: { id: { EQ: "$pid" } }
-            }
-          ) {
-            programs { reference { label } }
-          }
-        }
-      """
-    ).flatMap { js =>
-      js.hcursor
-        .downField("updatePrograms")
-        .downField("programs")
-        .downArray
-        .downFields("reference", "label")
-        .success
-        .traverse(_.as[ProgramReference])
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-    }
+    setProposalStatus(user, pid, "ACCEPTED").map(_._1)
+
+  def createProgramWithProposalAs(user: User, name: String = null): IO[Program.Id] =
+    for {
+      pid <- createProgramAs(user, name)
+      _   <- addProposal(user, pid)
+    } yield pid
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)
@@ -1177,12 +1169,12 @@ trait DatabaseOperations { this: OdbSuite =>
     )
 
   def createUserInvitationAs(
-    user: User, 
-    pid: Program.Id, 
+    user: User,
+    pid: Program.Id,
     role: ProgramUserRole = ProgramUserRole.Coi,
     supportType: Option[ProgramUserSupportType] = None,
     supportPartner: Option[Tag] = None,
-    recipientEmail: EmailAddress = EmailAddress.fromString.getOption("bob@dobbs.com").get
+    recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get
   ): IO[UserInvitation] =
     query(
       user = user,
@@ -1212,7 +1204,7 @@ trait DatabaseOperations { this: OdbSuite =>
       user = u,
       query = s"""
         mutation {
-          redeemUserInvitation(input: { 
+          redeemUserInvitation(input: {
             key: "${UserInvitation.fromString.reverseGet(inv)}"
             accept: $accept
           }) {
@@ -1228,7 +1220,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }
-      """     
+      """
     ).map { j =>
       j.hcursor.downFields("redeemUserInvitation", "invitation", "id").require[UserInvitation.Id]
     }
@@ -1238,7 +1230,7 @@ trait DatabaseOperations { this: OdbSuite =>
       user = u,
       query = s"""
         mutation {
-          revokeUserInvitation(input: { 
+          revokeUserInvitation(input: {
             id: "${UserInvitation.Id.fromString.reverseGet(id)}"
           }) {
             invitation {
@@ -1253,7 +1245,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }
-      """     
+      """
     ).map { j =>
       j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
     }
