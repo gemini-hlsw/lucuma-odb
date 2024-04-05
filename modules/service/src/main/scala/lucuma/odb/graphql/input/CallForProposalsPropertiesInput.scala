@@ -30,7 +30,7 @@ object CallForProposalsPropertiesInput {
     decLimitEnd:   Option[Declination],
     active:        TimestampInterval,
     partners:      List[CallForProposalsPartnerInput],
-    include:       List[Instrument],
+    instruments:   List[Instrument],
     existence:     Existence
   )
 
@@ -49,7 +49,7 @@ object CallForProposalsPropertiesInput {
           TimestampBinding("activeStart", rActiveStart),
           TimestampBinding("activeEnd",   rActiveEnd),
           CallForProposalsPartnerInput.Binding.List.Option("partners", rPartners),
-          InstrumentBinding.List.Option("includeInstruments", rInclude),
+          InstrumentBinding.List.Option("instruments", rInstruments),
           ExistenceBinding.Option("existence", rExistence)
         ) => {
           val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap { (start, end) =>
@@ -68,7 +68,7 @@ object CallForProposalsPropertiesInput {
             rDecEnd,
             rActive,
             rPartners.map(_.toList.flatten),
-            rInclude.map(_.toList.flatten),
+            rInstruments.map(_.toList.flatten),
             rExistence.map(_.getOrElse(Existence.Present))
           ).parMapN(Create.apply)
         }

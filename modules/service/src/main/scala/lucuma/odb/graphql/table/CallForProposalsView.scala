@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package table
 
+import lucuma.odb.util.Codecs._instrument
 import lucuma.odb.util.Codecs.cfp_id
 import lucuma.odb.util.Codecs.cfp_status
 import lucuma.odb.util.Codecs.cfp_type
@@ -17,23 +18,28 @@ import lucuma.odb.util.Codecs.tag
 import lucuma.odb.util.Codecs.timestamp_interval_tsrange
 
 
-trait CallForProposalsTable[F[_]] extends BaseMapping[F] {
+trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
-  object CallForProposalsTable extends TableDef("t_cfp") {
+  object CallForProposalsView extends TableDef("v_cfp") {
     val Id       = col("c_cfp_id",     cfp_id)
     val Status   = col("c_status",     cfp_status)
     val Type     = col("c_type",       cfp_type)
     val Semester = col("c_semester",   semester)
 
-    val RaStart  = col("c_ra_start",   right_ascension.embedded)
-    val RaEnd    = col("c_ra_end",     right_ascension.embedded)
-
-    val DecStart = col("c_dec_start",  declination.embedded)
-    val DecEnd   = col("c_dec_end",    declination.embedded)
+    val RaStartId  = col("c_ra_start_id",  cfp_id.embedded)
+    val RaStart    = col("c_ra_start",     right_ascension.embedded)
+    val RaEndId    = col("c_ra_end_id",    cfp_id.embedded)
+    val RaEnd      = col("c_ra_end",       right_ascension.embedded)
+    val DecStartId = col("c_dec_start_id", cfp_id.embedded)
+    val DecStart   = col("c_dec_start",    declination.embedded)
+    val DecEndId   = col("c_dec_end_id",   cfp_id.embedded)
+    val DecEnd     = col("c_dec_end",      declination.embedded)
 
     val Active   = col("c_active",     timestamp_interval_tsrange)
 
     val Existence = col("c_existence", existence)
+
+    val Instruments = col("c_instruments", _instrument)
   }
 
   object CallForProposalsPartnerTable extends TableDef("t_cfp_partner") {

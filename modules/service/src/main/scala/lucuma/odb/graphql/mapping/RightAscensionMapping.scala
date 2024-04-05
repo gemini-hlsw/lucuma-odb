@@ -8,12 +8,12 @@ import cats.syntax.all.*
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.RightAscension
-import lucuma.odb.graphql.table.CallForProposalsTable
+import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 import scala.reflect.ClassTag
 
-trait RightAscensionMapping[F[_]] extends CallForProposalsTable[F]
+trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
                                      with ObservationView[F]
                                      with TargetView[F] {
 
@@ -38,8 +38,8 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsTable[F]
     SwitchMapping(
       RightAscensionType,
       List(
-        CallForProposalsType / "raLimitStart" -> rightAscensionMapping(CallForProposalsTable.Id, CallForProposalsTable.RaStart),
-        CallForProposalsType / "raLimitEnd"   -> rightAscensionMapping(CallForProposalsTable.Id, CallForProposalsTable.RaEnd),
+        CallForProposalsType / "raLimitStart" -> rightAscensionMapping(CallForProposalsView.RaStartId, CallForProposalsView.RaStart),
+        CallForProposalsType / "raLimitEnd"   -> rightAscensionMapping(CallForProposalsView.RaEndId, CallForProposalsView.RaEnd),
         CoordinatesType / "ra" -> rightAscensionMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
         SiderealType / "ra"    -> rightAscensionMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
       )

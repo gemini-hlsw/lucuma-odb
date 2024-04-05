@@ -18,7 +18,6 @@ class createCallForProposals extends OdbSuite {
 
     // status    defaults to CLOSED
     // existence defaults to PRESENT
-
     expect(
       user = staff,
       query = """
@@ -34,11 +33,20 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
             callForProposals {
+              id
               status
               type
               semester
+              raLimitStart { hms }
+              raLimitEnd { hms }
+              decLimitStart { dms }
+              decLimitEnd { dms }
               activeStart
               activeEnd
+              partners {
+                partner
+              }
+              instruments
               existence
             }
           }
@@ -48,12 +56,19 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "status":      "CLOSED",
-              "type":        "REGULAR_SEMESTER",
-              "semester":    "2025A",
-              "activeStart": "2025-02-01 14:00:00",
-              "activeEnd":   "2025-07-31 14:00:00",
-              "existence":   "PRESENT"
+              "id":            "c-100",
+              "status":        "CLOSED",
+              "type":          "REGULAR_SEMESTER",
+              "semester":      "2025A",
+              "raLimitStart":  null,
+              "raLimitEnd":    null,
+              "decLimitStart": null,
+              "decLimitEnd":   null,
+              "activeStart":   "2025-02-01 14:00:00",
+              "activeEnd":     "2025-07-31 14:00:00",
+              "partners":      [],
+              "instruments":   [],
+              "existence":     "PRESENT"
             }
           }
         }
@@ -108,6 +123,7 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
+               id
                partners {
                  partner
                  deadline
@@ -120,6 +136,7 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
+              "id": "c-101",
               "partners": [
                 {
                   "partner": "CA",
@@ -137,4 +154,40 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
+  test("success - with instruments") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2026-02-01 14:00:00"
+                activeEnd:   "2026-07-31 14:00:00"
+                instruments: [GMOS_SOUTH, GMOS_NORTH]
+              }
+            }
+          ) {
+             callForProposals {
+               id
+               instruments
+             }
+          }
+        }
+      """,
+      // sorted by instrument name
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "id": "c-102",
+              "instruments": [ "GMOS_NORTH", "GMOS_SOUTH" ]
+            }
+          }
+        }
+      """.asRight
+    )
+  }
 }
