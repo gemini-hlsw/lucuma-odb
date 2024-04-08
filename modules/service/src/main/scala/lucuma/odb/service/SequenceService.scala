@@ -49,9 +49,11 @@ import Services.Syntax.*
 
 trait SequenceService[F[_]] {
 
+  import SequenceService.CompletionState
+
   def selectGmosNorthCompletionState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]]
+  )(using Transaction[F]): F[CompletionState[GmosNorth]]
 
   def selectGmosNorthSteps(
     observationId: Observation.Id
@@ -59,7 +61,7 @@ trait SequenceService[F[_]] {
 
   def selectGmosSouthCompletionState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]]
+  )(using Transaction[F]): F[CompletionState[GmosSouth]]
 
   def selectGmosSouthSteps(
     observationId: Observation.Id
@@ -135,32 +137,43 @@ object SequenceService {
   object CompletionState {
 
     case class Builder[D](
-      acqMap: CompletedAtomMap.Builder[D],
-      acqCnt: Int,
-      sciMap: CompletedAtomMap.Builder[D]
+      acqBuild: CompletedAtomMap.Builder[D],
+      prevAcqCount: Int,
+      curAcqCount: Int,
+      sciBuild: CompletedAtomMap.Builder[D]
     ) {
+
+      def reset: Builder[D] =
+        Builder(CompletedAtomMap.Builder.init[D], prevAcqCount + curAcqCount, 0, sciBuild.reset)
+
       def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: CompletedAtomMap.StepMatch[D]): Builder[D] =
         sequenceType match {
           case SequenceType.Acquisition =>
             Builder(
-              acqMap.next(aid, count, sequenceType, step),
-              acqCnt+1,
-              sciMap
+              acqBuild.next(aid, count, step),
+              prevAcqCount,
+              curAcqCount+1,
+              sciBuild
             )
 
           case SequenceType.Science     =>
             Builder(
               CompletedAtomMap.Builder.init[D],
-              acqCnt,
-              sciMap.next(aid, count, sequenceType, step)
+              prevAcqCount + curAcqCount,
+              0,
+              sciBuild.next(aid, count, step)
             )
         }
+
+      def build: CompletionState[D] =
+        CompletionState(acqBuild.build, prevAcqCount, sciBuild.build)
     }
 
     object Builder {
       def init[D]: Builder[D] =
         Builder(
           CompletedAtomMap.Builder.init[D],
+          0,
           0,
           CompletedAtomMap.Builder.init[D]
         )
@@ -172,26 +185,26 @@ object SequenceService {
 
       override def selectGmosNorthCompletionState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]] =
-        selectCompletedAtomMap(
+      )(using Transaction[F]): F[CompletionState[GmosNorth]] =
+        selectCompletionState(
           observationId,
           gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
         )
 
       override def selectGmosSouthCompletionState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]] =
-        selectCompletedAtomMap(
+      )(using Transaction[F]): F[CompletionState[GmosSouth]] =
+        selectCompletionState(
           observationId,
           gmosSequenceService.selectGmosSouthDynamicForObs(observationId)
         )
 
-      private def selectCompletedAtomMap[D](
+      private def selectCompletionState[D](
         observationId:  Observation.Id,
         dynamicConfigs: Stream[F, (Step.Id, D)]
-      )(using Transaction[F]): F[CompletedAtomMap[D]] =
+      )(using Transaction[F]): F[CompletionState[D]] =
         stepRecordMap(observationId, dynamicConfigs)
-          .flatMap(completedAtomMap(observationId))
+          .flatMap(completionState(observationId))
 
       def selectGmosNorthSteps(
         observationId: Observation.Id
@@ -300,17 +313,17 @@ object SequenceService {
 
       // Want a map from atom configuration to completed count that can be
       // matched against the generated atoms.
-      private def completedAtomMap[D](
+      private def completionState[D](
         observationId: Observation.Id
       )(
         stepMap: Map[Step.Id, (D, StepConfig)]
-      )(using Transaction[F]): F[CompletedAtomMap[D]] =
+      )(using Transaction[F]): F[CompletionState[D]] =
 
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
-          .fold(CompletedAtomMap.Builder.init[D]) { case (state, (aid, cnt, seqType, sid)) =>
+          .fold(CompletionState.Builder.init[D]) { case (state, (aid, cnt, seqType, sid)) =>
             stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, seqType, _))
           }
           .compile
