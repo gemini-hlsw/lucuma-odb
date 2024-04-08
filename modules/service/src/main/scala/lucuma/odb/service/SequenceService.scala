@@ -136,7 +136,17 @@ object SequenceService {
 
   object CompletionState {
 
+    /**
+     * @param prevVid  ID of the previous visit, if any.  When we switch to a
+     *                 new visit, any atoms are no longer continued
+     * @param prevType type of the previous sequence, if any. switching to a
+     *                 new acquisition sequence also discontinues any ongoing
+     *                 atoms
+     * @param acqCount count of acquisition sequence, regardless of how many
+     *                 atoms/steps they may contain
+     */
     case class Builder[D](
+      prevVid:  Option[Visit.Id],
       prevType: Option[SequenceType],
       acqBuild: CompletedAtomMap.Builder[D],
       acqCount: Int,
@@ -145,24 +155,28 @@ object SequenceService {
 
       def reset: Builder[D] =
         Builder(
+          prevVid,
           prevType,
           CompletedAtomMap.Builder.init[D],
           acqCount,
           sciBuild.reset
         )
 
-      def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: CompletedAtomMap.StepMatch[D]): Builder[D] =
+      def next(vid: Visit.Id, aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: CompletedAtomMap.StepMatch[D]): Builder[D] =
         sequenceType match {
           case SequenceType.Acquisition =>
+            val incr = if (prevVid.exists(_ === vid) && prevType.exists(_ === SequenceType.Acquisition)) 0 else 1
             Builder(
+              vid.some,
               SequenceType.Acquisition.some,
               acqBuild.next(aid, count, step),
-              acqCount + (if (prevType.exists(_ === SequenceType.Acquisition)) 0 else 1),
+              acqCount + incr,
               sciBuild
             )
 
           case SequenceType.Science     =>
             Builder(
+              vid.some,
               SequenceType.Science.some,
               CompletedAtomMap.Builder.init[D],
               acqCount,
@@ -177,6 +191,7 @@ object SequenceService {
     object Builder {
       def init[D]: Builder[D] =
         Builder(
+          none,
           none,
           CompletedAtomMap.Builder.init[D],
           0,
@@ -328,8 +343,8 @@ object SequenceService {
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
-          .fold(CompletionState.Builder.init[D]) { case (state, (aid, cnt, seqType, sid)) =>
-            stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, seqType, _))
+          .fold(CompletionState.Builder.init[D]) { case (state, (vid, aid, cnt, seqType, sid)) =>
+            stepMap.get(sid).fold(state.reset)(state.next(vid, aid, cnt, seqType, _))
           }
           .compile
           .onlyOrError
@@ -510,9 +525,10 @@ object SequenceService {
      * of an EndStep step event and for which there are no pending datasets or
      * datasets which have a QA state set to anything other than Pass.
      */
-    val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Atom.Id, NonNegShort, SequenceType, Step.Id)] =
+    val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Visit.Id, Atom.Id, NonNegShort, SequenceType, Step.Id)] =
       (sql"""
         SELECT
+          a.c_visit_id,
           a.c_atom_id,
           a.c_step_count,
           a.c_sequence_type,
@@ -534,7 +550,7 @@ object SequenceService {
               )
           )
         ORDER BY s.c_completed
-      """).query(atom_id *: int2_nonneg *: sequence_type *: step_id)
+      """).query(visit_id *: atom_id *: int2_nonneg *: sequence_type *: step_id)
 
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
