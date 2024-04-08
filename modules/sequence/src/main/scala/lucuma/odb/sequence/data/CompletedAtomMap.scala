@@ -105,11 +105,9 @@ object CompletedAtomMap {
         if (aid === inProgressAtomId) addStep(step)    // continue existing atom
         else InProgress(aid, count, List(step), build) // start a new atom
 
-      private def inProgressKey: AtomMatch[D] = inProgressSteps.reverse
-
       override def build: CompletedAtomMap[D] =
         if (inProgressSteps.sizeIs != inProgressCount.value) completed
-        else completed.increment(inProgressKey)
+        else completed.increment(inProgressSteps.reverse)
 
     }
 

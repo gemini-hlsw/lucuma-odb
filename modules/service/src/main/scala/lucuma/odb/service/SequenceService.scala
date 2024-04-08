@@ -130,50 +130,55 @@ object SequenceService {
 
   case class CompletionState[D](
     completedAcq: CompletedAtomMap[D],
-    acqStepCount: Int,
+    acqAtomCount: Int,
     completedSci: CompletedAtomMap[D]
   )
 
   object CompletionState {
 
     case class Builder[D](
+      prevType: Option[SequenceType],
       acqBuild: CompletedAtomMap.Builder[D],
-      prevAcqCount: Int,
-      curAcqCount: Int,
+      acqCount: Int,
       sciBuild: CompletedAtomMap.Builder[D]
     ) {
 
       def reset: Builder[D] =
-        Builder(CompletedAtomMap.Builder.init[D], prevAcqCount + curAcqCount, 0, sciBuild.reset)
+        Builder(
+          prevType,
+          CompletedAtomMap.Builder.init[D],
+          acqCount,
+          sciBuild.reset
+        )
 
       def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: CompletedAtomMap.StepMatch[D]): Builder[D] =
         sequenceType match {
           case SequenceType.Acquisition =>
             Builder(
+              SequenceType.Acquisition.some,
               acqBuild.next(aid, count, step),
-              prevAcqCount,
-              curAcqCount+1,
+              acqCount + (if (prevType.exists(_ === SequenceType.Acquisition)) 0 else 1),
               sciBuild
             )
 
           case SequenceType.Science     =>
             Builder(
+              SequenceType.Science.some,
               CompletedAtomMap.Builder.init[D],
-              prevAcqCount + curAcqCount,
-              0,
+              acqCount,
               sciBuild.next(aid, count, step)
             )
         }
 
       def build: CompletionState[D] =
-        CompletionState(acqBuild.build, prevAcqCount, sciBuild.build)
+        CompletionState(acqBuild.build, acqCount, sciBuild.build)
     }
 
     object Builder {
       def init[D]: Builder[D] =
         Builder(
+          none,
           CompletedAtomMap.Builder.init[D],
-          0,
           0,
           CompletedAtomMap.Builder.init[D]
         )
