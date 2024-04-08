@@ -49,7 +49,7 @@ import Services.Syntax.*
 
 trait SequenceService[F[_]] {
 
-  def selectGmosNorthCompletedAtomMap(
+  def selectGmosNorthCompletionState(
     observationId: Observation.Id
   )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]]
 
@@ -57,7 +57,7 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id
   )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]]
 
-  def selectGmosSouthCompletedAtomMap(
+  def selectGmosSouthCompletionState(
     observationId: Observation.Id
   )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]]
 
@@ -126,10 +126,51 @@ object SequenceService {
     ) extends InsertStepResponse
   }
 
+  case class CompletionState[D](
+    completedAcq: CompletedAtomMap[D],
+    acqStepCount: Int,
+    completedSci: CompletedAtomMap[D]
+  )
+
+  object CompletionState {
+
+    case class Builder[D](
+      acqMap: CompletedAtomMap.Builder[D],
+      acqCnt: Int,
+      sciMap: CompletedAtomMap.Builder[D]
+    ) {
+      def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: CompletedAtomMap.StepMatch[D]): Builder[D] =
+        sequenceType match {
+          case SequenceType.Acquisition =>
+            Builder(
+              acqMap.next(aid, count, sequenceType, step),
+              acqCnt+1,
+              sciMap
+            )
+
+          case SequenceType.Science     =>
+            Builder(
+              CompletedAtomMap.Builder.init[D],
+              acqCnt,
+              sciMap.next(aid, count, sequenceType, step)
+            )
+        }
+    }
+
+    object Builder {
+      def init[D]: Builder[D] =
+        Builder(
+          CompletedAtomMap.Builder.init[D],
+          0,
+          CompletedAtomMap.Builder.init[D]
+        )
+    }
+  }
+
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
 
-      override def selectGmosNorthCompletedAtomMap(
+      override def selectGmosNorthCompletionState(
         observationId: Observation.Id
       )(using Transaction[F]): F[CompletedAtomMap[GmosNorth]] =
         selectCompletedAtomMap(
@@ -137,7 +178,7 @@ object SequenceService {
           gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
         )
 
-      override def selectGmosSouthCompletedAtomMap(
+      override def selectGmosSouthCompletionState(
         observationId: Observation.Id
       )(using Transaction[F]): F[CompletedAtomMap[GmosSouth]] =
         selectCompletedAtomMap(

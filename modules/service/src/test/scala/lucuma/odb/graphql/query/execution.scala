@@ -2074,7 +2074,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthCompletedAtomMap(oid)(using xa)
+            .selectGmosNorthCompletionState(oid)(using xa)
         }
       }
     }.map(m => assert(m.isEmpty))
@@ -2224,7 +2224,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthCompletedAtomMap(o)(using xa)
+            .selectGmosNorthCompletionState(o)(using xa)
         }
       }
     }
@@ -2243,7 +2243,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           services.session.transaction.use { xa =>
             services
               .sequenceService
-              .selectGmosNorthCompletedAtomMap(o)(using xa)
+              .selectGmosNorthCompletionState(o)(using xa)
           }
         }
       } yield m
@@ -2261,7 +2261,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           services.session.transaction.use { xa =>
             services
               .sequenceService
-              .selectGmosNorthCompletedAtomMap(o)(using xa)
+              .selectGmosNorthCompletionState(o)(using xa)
           }
         }
       } yield m
@@ -2280,7 +2280,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           services.session.transaction.use { xa =>
             services
               .sequenceService
-              .selectGmosNorthCompletedAtomMap(o)(using xa)
+              .selectGmosNorthCompletionState(o)(using xa)
           }
         }
       } yield m
@@ -2344,7 +2344,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthCompletedAtomMap(o)(using xa)
+            .selectGmosNorthCompletionState(o)(using xa)
         }
       }
     }
