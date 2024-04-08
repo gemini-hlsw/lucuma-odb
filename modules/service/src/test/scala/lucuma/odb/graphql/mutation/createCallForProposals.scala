@@ -133,11 +133,11 @@ class createCallForProposals extends OdbSuite {
                 partners:    [
                   {
                     partner: CA
-                    deadline: "2025-07-31 10:00:00"
+                    submissionDeadline: "2025-07-31 10:00:00"
                   },
                   {
                     partner: US
-                    deadline: "2025-07-31 10:00:01"
+                    submissionDeadline: "2025-07-31 10:00:01"
                   }
                 ]
               }
@@ -147,7 +147,7 @@ class createCallForProposals extends OdbSuite {
                id
                partners {
                  partner
-                 deadline
+                 submissionDeadline
                }
              }
           }
@@ -161,11 +161,11 @@ class createCallForProposals extends OdbSuite {
               "partners": [
                 {
                   "partner": "CA",
-                  "deadline": "2025-07-31 10:00:00"
+                  "submissionDeadline": "2025-07-31 10:00:00"
                 },
                 {
                   "partner": "US",
-                  "deadline": "2025-07-31 10:00:01"
+                  "submissionDeadline": "2025-07-31 10:00:01"
                 }
               ]
             }

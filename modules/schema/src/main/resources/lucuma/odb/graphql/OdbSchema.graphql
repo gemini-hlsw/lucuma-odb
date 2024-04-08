@@ -433,12 +433,12 @@ Groups a partner with its submission deadline.
 """
 type CallForProposalsPartner {
   partner:  Partner!
-  deadline: Timestamp!
+  submissionDeadline: Timestamp!
 }
 
 input CallForProposalsPartnerInput {
   partner:  Partner!
-  deadline: Timestamp!
+  submissionDeadline: Timestamp!
 }
 
 type CallsForProposalsSelectResult {
