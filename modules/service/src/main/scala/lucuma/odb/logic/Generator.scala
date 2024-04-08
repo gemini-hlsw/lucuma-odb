@@ -276,14 +276,14 @@ object Generator {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletedAtomMap(ctx.oid) })
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
               r <- executionDigest(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), calculator.gmosNorth.estimateSetup)
             } yield r
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletedAtomMap(ctx.oid) })
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
               r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), calculator.gmosSouth.estimateSetup)
             } yield r
         }
@@ -306,14 +306,14 @@ object Generator {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletedAtomMap(ctx.oid) })
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
               r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), ctx.namespace, lim)
             } yield InstrumentExecutionConfig.GmosNorth(r)
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletedAtomMap(ctx.oid) })
+              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
               r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), ctx.namespace, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }
