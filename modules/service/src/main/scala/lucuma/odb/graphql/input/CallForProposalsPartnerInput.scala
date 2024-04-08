@@ -21,7 +21,7 @@ object CallForProposalsPartnerInput {
   val Binding = ObjectFieldsBinding.rmap {
     case List(
       TagBinding("partner", rPartner),
-      TimestampBinding("deadline", rDeadline)
+      TimestampBinding("submissionDeadline", rDeadline)
     ) =>
       (rPartner, rDeadline).parMapN(apply)
   }

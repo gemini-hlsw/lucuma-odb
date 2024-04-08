@@ -14,9 +14,9 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
     ObjectMapping(
       tpe = CallForProposalsPartnerType,
       fieldMappings = List(
-        SqlField("id",       CallForProposalsPartnerTable.CfpId, hidden = true, key = true),
-        SqlField("partner",  CallForProposalsPartnerTable.Partner, key = true),
-        SqlField("deadline", CallForProposalsPartnerTable.Deadline)
+        SqlField("id",                 CallForProposalsPartnerTable.CfpId, hidden = true, key = true),
+        SqlField("partner",            CallForProposalsPartnerTable.Partner, key = true),
+        SqlField("submissionDeadline", CallForProposalsPartnerTable.Deadline)
       )
     )
 
