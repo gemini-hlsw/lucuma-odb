@@ -263,68 +263,19 @@ object SequenceService {
         observationId: Observation.Id
       )(
         stepMap: Map[Step.Id, (D, StepConfig)]
-      )(using Transaction[F]): F[CompletedAtomMap[D]] = {
-
-        import CompletedAtomMap.AtomMatch
-        import CompletedAtomMap.StepMatch
-
-        trait State {
-          def reset: State
-          def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: StepMatch[D]): State
-          def finalized: CompletedAtomMap[D]
-        }
-
-        case class Reset(completed: CompletedAtomMap[D]) extends State {
-          override def reset: State = this
-
-          override def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: StepMatch[D]): State =
-            InProgress(aid, count, sequenceType, List(step), completed)
-
-          override def finalized: CompletedAtomMap[D] = completed
-        }
-
-        object Reset {
-          lazy val init: State = Reset(CompletedAtomMap.Empty)
-        }
-
-        case class InProgress(
-          inProgressAtomId:       Atom.Id,
-          inProgressCount:        NonNegShort,
-          inProgressSequenceType: SequenceType,
-          inProgressSteps:        AtomMatch[D],
-          completed:              CompletedAtomMap[D]
-        ) extends State {
-
-          override def reset: State = Reset(completed)
-
-          private def addStep(step: StepMatch[D]): InProgress =
-            copy(inProgressSteps = step :: inProgressSteps)
-
-          override def next(aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: StepMatch[D]): State =
-            if (aid === inProgressAtomId) addStep(step) // continue existing atom
-            else InProgress(aid, count, sequenceType, List(step), finalized) // start a new atom
-
-          private def inProgressKey: CompletedAtomMap.Key[D] =
-            CompletedAtomMap.Key(inProgressSequenceType, inProgressSteps.reverse)
-
-          override def finalized: CompletedAtomMap[D] =
-            if (inProgressSteps.sizeIs != inProgressCount.value) completed
-            else completed.increment(inProgressKey)
-
-        }
+      )(using Transaction[F]): F[CompletedAtomMap[D]] =
 
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
-          .fold(Reset.init) { case (state, (aid, cnt, seqType, sid)) =>
+          .fold(CompletedAtomMap.Builder.init[D]) { case (state, (aid, cnt, seqType, sid)) =>
             stepMap.get(sid).fold(state.reset)(state.next(aid, cnt, seqType, _))
           }
           .compile
           .onlyOrError
-          .map(_.finalized)
+          .map(_.build)
 
-      }
 
       override def setStepCompleted(
         stepId: Step.Id,
