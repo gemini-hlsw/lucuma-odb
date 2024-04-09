@@ -14,7 +14,6 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model.Semester
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.CallForProposalsStatus
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding.*
@@ -22,7 +21,6 @@ import lucuma.odb.graphql.binding.*
 object CallForProposalsPropertiesInput {
 
   case class Create(
-    status:      CallForProposalsStatus,
     cfpType:     CallForProposalsType,
     semester:    Semester,
     raLimit:     Option[(RightAscension, RightAscension)],
@@ -50,7 +48,6 @@ object CallForProposalsPropertiesInput {
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          CallForProposalsStatusBinding.Option("status", rStatus),
           CallForProposalsTypeBinding("type", rType),
           SemesterBinding("semester", rSemester),
           RightAscensionInput.Binding.Option("raLimitStart", rRaStart),
@@ -74,7 +71,6 @@ object CallForProposalsPropertiesInput {
             )
           }
           (
-            rStatus.map(_.getOrElse(CallForProposalsStatus.Closed)),
             rType,
             rSemester,
             rRaLimit,

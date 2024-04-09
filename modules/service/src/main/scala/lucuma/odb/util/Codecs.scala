@@ -43,7 +43,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
-import lucuma.odb.data.CallForProposalsStatus
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
@@ -168,9 +167,6 @@ trait Codecs {
 
   val cfp_id: Codec[CallForProposals.Id] =
     gid[CallForProposals.Id]
-
-  val cfp_status: Codec[CallForProposalsStatus] =
-    enumerated(Type("e_cfp_status"))
 
   val cfp_type: Codec[CallForProposalsType] =
     enumerated(Type("e_cfp_type"))

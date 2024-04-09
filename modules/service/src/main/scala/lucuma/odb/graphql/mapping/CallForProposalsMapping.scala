@@ -25,7 +25,6 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
       tpe = CallForProposalsType,
       fieldMappings = List(
         SqlField("id",       CallForProposalsView.Id, key = true),
-        SqlField("status",   CallForProposalsView.Status),
         SqlField("type",     CallForProposalsView.Type),
         SqlField("semester", CallForProposalsView.Semester),
         SqlObject("raLimitStart"),

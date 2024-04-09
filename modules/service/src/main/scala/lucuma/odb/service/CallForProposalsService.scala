@@ -59,7 +59,6 @@ object CallForProposalsService {
     val InsertCallForProposals: Query[CallForProposalsPropertiesInput.Create, CallForProposals.Id] =
       sql"""
         INSERT INTO t_cfp (
-          c_status,
           c_type,
           c_semester,
           c_ra_start,
@@ -70,7 +69,6 @@ object CallForProposalsService {
           c_existence
         )
         SELECT
-          $cfp_status,
           $cfp_type,
           $semester,
           ${right_ascension.opt},
@@ -82,7 +80,6 @@ object CallForProposalsService {
         RETURNING
           c_cfp_id
       """.query(cfp_id).contramap { input => (
-        input.status,
         input.cfpType,
         input.semester,
         input.raLimit.map(_._1),

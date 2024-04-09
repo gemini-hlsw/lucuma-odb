@@ -6,7 +6,6 @@ package table
 
 import lucuma.odb.util.Codecs._instrument
 import lucuma.odb.util.Codecs.cfp_id
-import lucuma.odb.util.Codecs.cfp_status
 import lucuma.odb.util.Codecs.cfp_type
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.declination
@@ -22,7 +21,6 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
   object CallForProposalsView extends TableDef("v_cfp") {
     val Id       = col("c_cfp_id",     cfp_id)
-    val Status   = col("c_status",     cfp_status)
     val Type     = col("c_type",       cfp_type)
     val Semester = col("c_semester",   semester)
 

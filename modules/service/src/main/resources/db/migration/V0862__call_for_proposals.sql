@@ -23,17 +23,8 @@ CREATE TYPE e_cfp_type AS ENUM (
 );
 COMMENT ON TYPE e_cfp_type IS 'Call for Proposals types.';
 
--- Whether the call is open for more proposals (independent of individual
--- partner deadlines).
-CREATE TYPE e_cfp_status AS ENUM (
-  'open',
-  'closed'
-);
-COMMENT ON TYPE e_cfp_status IS 'Call for Proposals open/closed status.';
-
 CREATE TABLE t_cfp (
   c_cfp_id       d_cfp_id     PRIMARY KEY DEFAULT 'c-' || to_hex(nextval('s_cfp_id')),
-  c_status       e_cfp_status NOT NULL,
   c_type         e_cfp_type   NOT NULL,
   c_semester     d_semester   NOT NULL,
 
