@@ -124,12 +124,22 @@ object Completion {
     atomMap:    AtomMap[D]
   )
 
+  object Sequence {
+
+    def Empty[D]: Sequence[D] =
+      Sequence(0, AtomMap.Empty)
+
+  }
+
   case class State[D](
     acq: Sequence[D],
     sci: Sequence[D]
   )
 
   object State {
+
+    def Empty[D]: State[D] =
+      State(Sequence.Empty, Sequence.Empty)
 
     case class Builder[D](
       previousVisit: Option[Visit.Id],
@@ -157,22 +167,22 @@ object Completion {
         count:   NonNegShort,
         step:    StepMatch[D]
       ): Builder[D] = {
-        val mk: (Int, AtomMap.Builder[D], Int, AtomMap.Builder[D]) => Builder[D] =
-          Builder(vid.some, seqType.some, _, _, _, _)
+        val isNewCycle = previousVisit.forall(_ =!= vid) || previousType.forall(_ =!= seqType)
 
-        (seqType, previousVisit.forall(_ =!= vid) || previousType.forall(_ =!= seqType)) match {
-          case (SequenceType.Acquisition, true ) =>
-            mk(acqCycles + 1, AtomMap.Builder.init[D].next(aid, count, step), sciCycles, sciBuild)
-
-          case (SequenceType.Acquisition, false) =>
-            mk(acqCycles, acqBuild.next(aid, count, step), sciCycles, sciBuild)
-
-          case (SequenceType.Science,     true ) =>
-            mk(acqCycles, AtomMap.Builder.init[D], sciCycles + 1, sciBuild.reset.next(aid, count, step))
-
-          case (SequenceType.Science,     false) =>
-            mk(acqCycles, AtomMap.Builder.init[D], sciCycles, sciBuild.next(aid, count, step))
+        val (acqCyclesʹ, sciCyclesʹ) = (previousType, isNewCycle) match {
+          case (Some(SequenceType.Acquisition), true) => (acqCycles + 1, sciCycles)
+          case (Some(SequenceType.Science),     true) => (acqCycles, sciCycles + 1)
+          case _                                      => (acqCycles, sciCycles)
         }
+
+        val (acqBuildʹ, sciBuildʹ) = (seqType, isNewCycle) match {
+          case (SequenceType.Acquisition, true ) => (AtomMap.Builder.init[D].next(aid, count, step), sciBuild)
+          case (SequenceType.Acquisition, false) => (acqBuild.next(aid, count, step), sciBuild)
+          case (SequenceType.Science,     true ) => (AtomMap.Builder.init[D], sciBuild.reset.next(aid, count, step))
+          case (SequenceType.Science,     false) => (AtomMap.Builder.init[D], sciBuild.next(aid, count, step))
+        }
+
+        Builder(vid.some, seqType.some, acqCyclesʹ, acqBuildʹ, sciCyclesʹ, sciBuildʹ)
       }
 
       def build: State[D] =
