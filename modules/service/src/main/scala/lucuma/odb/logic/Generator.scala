@@ -34,7 +34,7 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.sequence.data.CompletedAtomMap
+import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
@@ -45,7 +45,6 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.NoTransaction
-import lucuma.odb.service.SequenceService.CompletionState
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
@@ -341,14 +340,14 @@ object Generator {
         proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
         expander: SmartGcalExpander[F, K, D],
         calc:     TimeEstimateCalculator[S, D],
-        comState: CompletionState[D]
+        comState: Completion.State[D]
       ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] = {
 
         // Given a SequenceType produces a Pipe from a SimpleAtom to a smart-gcal
         // expanded, estimated, indexed atom with executed steps filtered out.
         def pipe(
           sequenceType: SequenceType,
-          compMap:      CompletedAtomMap[D]
+          compMap:      Completion.AtomMap[D]
         ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
             // Do smart-gcal expansion
           _.through(expander.expand)
@@ -376,7 +375,7 @@ object Generator {
             // Add step estimates
            .through(calc.estimateSequence[F](proto.static))
 
-        proto.mapSequences(pipe(SequenceType.Acquisition, comState.completedAcq), pipe(SequenceType.Science, comState.completedSci))
+        proto.mapSequences(pipe(SequenceType.Acquisition, comState.acq.atomMap), pipe(SequenceType.Science, comState.sci.atomMap))
       }
 
 
