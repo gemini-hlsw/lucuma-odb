@@ -307,14 +307,14 @@ object Generator {
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
               m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
-              r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), ctx.namespace, lim)
+              r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), ctx.namespace, m, lim)
             } yield InstrumentExecutionConfig.GmosNorth(r)
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
               m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
-              r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), ctx.namespace, lim)
+              r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), ctx.namespace, m, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }
 
@@ -331,7 +331,7 @@ object Generator {
         EitherT.fromEither[F](
           generator.generate(acquisitionItc, scienceItc, config) match {
             case Left(msg)    => InvalidData(oid, msg).asLeft
-            case Right(proto) => proto.mapSequences(_.take(1), _.take(scienceItc.exposures.value)).asRight[Error]
+            case Right(proto) => ProtoExecutionConfig(proto.static, proto.acquisition, proto.science.take(scienceItc.exposures.value)).asRight
           }
         )
 
@@ -375,7 +375,10 @@ object Generator {
             // Add step estimates
            .through(calc.estimateSequence[F](proto.static))
 
-        proto.mapSequences(pipe(SequenceType.Acquisition, comState.acq.atomMap), pipe(SequenceType.Science, comState.sci.atomMap))
+        proto.mapSequences(
+          pipe(SequenceType.Acquisition, comState.acq.atomMap),
+          pipe(SequenceType.Science,     comState.sci.atomMap)
+        )
       }
 
 
@@ -406,7 +409,8 @@ object Generator {
           }.compile.onlyOrError
 
         for {
-          a <- EitherT(sequenceDigest(proto.acquisition.map(_.map(_._1)))) // strip the atom index and compute seq digest
+          // strip the atom index and compute seq digest
+          a <- EitherT(sequenceDigest(proto.acquisition.take(1).map(_.map(_._1))))
           s <- EitherT(sequenceDigest(proto.science.map(_.map(_._1))))
         } yield ExecutionDigest(setupTime, a, s)
 
@@ -415,14 +419,16 @@ object Generator {
       private def executionConfig[S, D](
         proto:       ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
         namespace:   UUID,
+        compState:   Completion.State[D],
         futureLimit: FutureLimit
       ): EitherT[F, Error, ExecutionConfig[S, D]] = {
 
         def executionSequence(
           s: Stream[F, Either[String, (EstimatedAtom[D], Long)]],
-          t: SequenceType
+          t: SequenceType,
+          c: Int
         ): F[Either[Error, Option[ExecutionSequence[D]]]] =
-          s.map(_.map(_.map(SequenceIds.atomId(namespace, t, _)))) // turn the Long into an AtomId
+          s.map(_.map(_.map(SequenceIds.atomId(namespace, t, c, _)))) // turn the Long into an AtomId
            .map {
              _.bimap(
                missingSmartGcalDef,
@@ -448,8 +454,8 @@ object Generator {
            })
 
         for {
-          a <- EitherT(executionSequence(proto.acquisition, SequenceType.Acquisition))
-          s <- EitherT(executionSequence(proto.science, SequenceType.Science))
+          a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, compState.acq.cycleCount))
+          s <- EitherT(executionSequence(proto.science, SequenceType.Science, compState.sci.cycleCount))
         } yield ExecutionConfig(proto.static, a, s)
       }
     }

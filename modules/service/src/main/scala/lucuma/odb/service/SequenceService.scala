@@ -276,7 +276,6 @@ object SequenceService {
           .onlyOrError
           .map(_.build)
 
-
       override def setStepCompleted(
         stepId: Step.Id,
         time:   Option[Timestamp]
