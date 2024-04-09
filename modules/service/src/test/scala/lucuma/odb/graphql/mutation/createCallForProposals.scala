@@ -37,7 +37,6 @@ class createCallForProposals extends OdbSuite {
 
   test("success - simple with defaults") {
 
-    // status    defaults to CLOSED
     // existence defaults to PRESENT
     expect(
       user = staff,
@@ -55,7 +54,6 @@ class createCallForProposals extends OdbSuite {
           ) {
             callForProposals {
               id
-              status
               type
               semester
               raLimitStart { hms }
@@ -78,7 +76,6 @@ class createCallForProposals extends OdbSuite {
           "createCallForProposals": {
             "callForProposals": {
               "id":            "c-100",
-              "status":        "CLOSED",
               "type":          "REGULAR_SEMESTER",
               "semester":      "2025A",
               "raLimitStart":  null,

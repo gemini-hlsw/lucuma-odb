@@ -293,12 +293,6 @@ type CallForProposals {
   id: CallForProposalsId!
 
   """
-  Open/closed status of this Call. Submissions are only accepted when the Call
-  is OPEN.
-  """
-  status: CallForProposalsStatus!
-
-  """
   Describes which type of proposals are being accepted.
   """
   type: CallForProposalsType!
@@ -373,9 +367,6 @@ The properties of a Call for Proposal in an input for creation and editing.
 """
 input CallForProposalsPropertiesInput {
 
-  "Open/closed status.  On create defaults to CLOSED."
-  status: CallForProposalsStatus
-
   "Type of the call. Required on create."
   type: CallForProposalsType
 
@@ -444,15 +435,6 @@ input CallForProposalsPartnerInput {
 type CallsForProposalsSelectResult {
   matches: [CallForProposals!]!
   hasMore: Boolean!
-}
-
-"""
-A CallForProposals may be OPEN or CLOSED.  Submissions are only accepted when
-OPEN regardless of each partner's submission deadline.
-"""
-enum CallForProposalsStatus {
-  OPEN
-  CLOSED
 }
 
 enum CallForProposalsType {
