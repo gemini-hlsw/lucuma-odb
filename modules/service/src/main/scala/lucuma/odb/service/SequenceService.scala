@@ -39,7 +39,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.EstimatorState
 import lucuma.odb.logic.TimeEstimateCalculator
-import lucuma.odb.sequence.data.CompletedAtomMap
+import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -49,11 +49,9 @@ import Services.Syntax.*
 
 trait SequenceService[F[_]] {
 
-  import SequenceService.CompletionState
-
   def selectGmosNorthCompletionState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[CompletionState[GmosNorth]]
+  )(using Transaction[F]): F[Completion.State[GmosNorth]]
 
   def selectGmosNorthSteps(
     observationId: Observation.Id
@@ -61,7 +59,7 @@ trait SequenceService[F[_]] {
 
   def selectGmosSouthCompletionState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[CompletionState[GmosSouth]]
+  )(using Transaction[F]): F[Completion.State[GmosSouth]]
 
   def selectGmosSouthSteps(
     observationId: Observation.Id
@@ -128,84 +126,12 @@ object SequenceService {
     ) extends InsertStepResponse
   }
 
-  case class CompletionState[D](
-    completedAcq: CompletedAtomMap[D],
-    acqAtomCount: Int,
-    completedSci: CompletedAtomMap[D]
-  )
-
-  object CompletionState {
-
-    /**
-     * @param prevVid  ID of the previous visit, if any.  When we switch to a
-     *                 new visit, any atoms are no longer continued
-     * @param prevType type of the previous sequence, if any. switching to a
-     *                 new acquisition sequence also discontinues any ongoing
-     *                 atoms
-     * @param acqCount count of acquisition sequence, regardless of how many
-     *                 atoms/steps they may contain
-     */
-    case class Builder[D](
-      prevVid:  Option[Visit.Id],
-      prevType: Option[SequenceType],
-      acqBuild: CompletedAtomMap.Builder[D],
-      acqCount: Int,
-      sciBuild: CompletedAtomMap.Builder[D]
-    ) {
-
-      def reset: Builder[D] =
-        Builder(
-          prevVid,
-          prevType,
-          CompletedAtomMap.Builder.init[D],
-          acqCount,
-          sciBuild.reset
-        )
-
-      def next(vid: Visit.Id, aid: Atom.Id, count: NonNegShort, sequenceType: SequenceType, step: CompletedAtomMap.StepMatch[D]): Builder[D] =
-        sequenceType match {
-          case SequenceType.Acquisition =>
-            val incr = if (prevVid.exists(_ === vid) && prevType.exists(_ === SequenceType.Acquisition)) 0 else 1
-            Builder(
-              vid.some,
-              SequenceType.Acquisition.some,
-              acqBuild.next(aid, count, step),
-              acqCount + incr,
-              sciBuild
-            )
-
-          case SequenceType.Science     =>
-            Builder(
-              vid.some,
-              SequenceType.Science.some,
-              CompletedAtomMap.Builder.init[D],
-              acqCount,
-              sciBuild.next(aid, count, step)
-            )
-        }
-
-      def build: CompletionState[D] =
-        CompletionState(acqBuild.build, acqCount, sciBuild.build)
-    }
-
-    object Builder {
-      def init[D]: Builder[D] =
-        Builder(
-          none,
-          none,
-          CompletedAtomMap.Builder.init[D],
-          0,
-          CompletedAtomMap.Builder.init[D]
-        )
-    }
-  }
-
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
 
       override def selectGmosNorthCompletionState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[CompletionState[GmosNorth]] =
+      )(using Transaction[F]): F[Completion.State[GmosNorth]] =
         selectCompletionState(
           observationId,
           gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
@@ -213,7 +139,7 @@ object SequenceService {
 
       override def selectGmosSouthCompletionState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[CompletionState[GmosSouth]] =
+      )(using Transaction[F]): F[Completion.State[GmosSouth]] =
         selectCompletionState(
           observationId,
           gmosSequenceService.selectGmosSouthDynamicForObs(observationId)
@@ -222,7 +148,7 @@ object SequenceService {
       private def selectCompletionState[D](
         observationId:  Observation.Id,
         dynamicConfigs: Stream[F, (Step.Id, D)]
-      )(using Transaction[F]): F[CompletionState[D]] =
+      )(using Transaction[F]): F[Completion.State[D]] =
         stepRecordMap(observationId, dynamicConfigs)
           .flatMap(completionState(observationId))
 
@@ -337,14 +263,14 @@ object SequenceService {
         observationId: Observation.Id
       )(
         stepMap: Map[Step.Id, (D, StepConfig)]
-      )(using Transaction[F]): F[CompletionState[D]] =
+      )(using Transaction[F]): F[Completion.State[D]] =
 
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
-          .fold(CompletionState.Builder.init[D]) { case (state, (vid, aid, cnt, seqType, sid)) =>
-            stepMap.get(sid).fold(state.reset)(state.next(vid, aid, cnt, seqType, _))
+          .fold(Completion.State.Builder.init[D]) { case (state, (vid, aid, cnt, seqType, sid)) =>
+            stepMap.get(sid).fold(state.reset)(state.next(vid, seqType, aid, cnt, _))
           }
           .compile
           .onlyOrError
