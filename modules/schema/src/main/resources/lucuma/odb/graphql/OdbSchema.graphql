@@ -283,6 +283,171 @@ enum Breakpoint {
 }
 
 """
+A single Call for Proposals definition.
+"""
+type CallForProposals {
+
+  """
+  The unique Call for Proposals id associated with this Call.
+  """
+  id: CallForProposalsId!
+
+  """
+  Describes which type of proposals are being accepted.
+  """
+  type: CallForProposalsType!
+
+  """
+  The semester associated with the Call.  Some types may have multiple Calls
+  per semester.
+  """
+  semester: Semester!
+
+  """
+  When specified specified, the start limit defines the beginning (inclusive) of
+  an RA range in which observations will be accepted.
+  """
+  raLimitStart: RightAscension
+
+  """
+  When specified specified, the end limit defines the end (inclusive) of an RA
+  range in which observations will be accepted.
+  """
+  raLimitEnd: RightAscension
+
+  """
+  When specified specified, the start limit defines the beginning (inclusive) of
+  a declination range in which observations will be accepted.
+  """
+  decLimitStart: Declination
+
+  """
+  When specified specified, the end limit defines the end (inclusive) of
+  a declination range in which observations will be accepted.
+  """
+  decLimitEnd: Declination
+
+  """
+  The start time (inclusive) when the observations accepted for this Call may be
+  observed.
+  """
+  activeStart: Timestamp!
+
+  """
+  The end time (exclusive) when the observations accepted for this Call may be
+  observed.
+  """
+  activeEnd: Timestamp!
+
+  """
+  Partners that may participate in this Call.
+  """
+  partners: [CallForProposalsPartner!]!
+
+  """
+  When specified, the observations executed in this Call will only use these
+  instruments.  When not specified, all otherwise available instruments may be
+  used.
+  """
+  instruments: [Instrument!]!
+
+  """
+  Whether this Call is PRESENT or has been DELETED.
+  """
+  existence: Existence!
+}
+
+"""
+Defines a unique ID for each Call for Proposals.
+"""
+scalar CallForProposalsId
+
+"""
+The properties of a Call for Proposal in an input for creation and editing.
+"""
+input CallForProposalsPropertiesInput {
+
+  "Type of the call. Required on create."
+  type: CallForProposalsType
+
+  "Semester associated with the call. Required on create."
+  semester: Semester
+
+  "Optional RA limit start RA. Required only if raLimitEnd is specified."
+  raLimitStart: RightAscensionInput
+
+  "Optional RA limit end RA. Required only if raLimitStart is specified."
+  raLimitEnd: RightAscensionInput
+
+  """
+  Optional declination limit start declination. Required only if decLimitEnd is
+  specified.
+  """
+  decLimitStart: DeclinationInput
+
+  """
+  Optional declination limit end declination. Required only if decLimitStart is
+  specified.
+  """
+  decLimitEnd: DeclinationInput
+
+  """
+  Active period start time for this call.  Required on create.  Must be before
+  the activeEnd time.
+  """
+  activeStart: Timestamp
+
+  """
+  Active period end time for this call.  Required on create.  Must be after
+  the activeStart time.
+  """
+  activeEnd: Timestamp
+
+  """
+  Partners that may participate in the call along with their respective
+  deadlines.
+  """
+  partners: [CallForProposalsPartnerInput!]
+
+  """
+  When specified, the call is limited to the listed instruments.  When not
+  specified, all otherwise available instruments may be used.
+  """
+  instruments: [Instrument!]
+
+  "DELETED or PRESENT.  On create defaults to PRESENT."
+  existence: Existence
+}
+
+"""
+Groups a partner with its submission deadline.
+"""
+type CallForProposalsPartner {
+  partner:  Partner!
+  submissionDeadline: Timestamp!
+}
+
+input CallForProposalsPartnerInput {
+  partner:  Partner!
+  submissionDeadline: Timestamp!
+}
+
+type CallsForProposalsSelectResult {
+  matches: [CallForProposals!]!
+  hasMore: Boolean!
+}
+
+enum CallForProposalsType {
+  DEMO_SCIENCE
+  DIRECTORS_TIME
+  FAST_TURNAROUND
+  LARGE_PROGRAM
+  POOR_WEATHER
+  REGULAR_SEMESTER
+  SYSTEM_VERIFICATION
+}
+
+"""
 Catalog id consisting of catalog name, string identifier and an optional object type
 """
 input CatalogInfoInput {
@@ -500,6 +665,14 @@ Absolute coordinates relative base epoch
 input CoordinatesInput {
   ra: RightAscensionInput
   dec: DeclinationInput
+}
+
+input CreateCallForProposalsInput {
+  SET: CallForProposalsPropertiesInput
+}
+
+type CreateCallForProposalsResult {
+  callForProposals: CallForProposals!
 }
 
 """
@@ -2453,6 +2626,10 @@ type Mutation {
     """
     input: CloneTargetInput!
   ): CloneTargetResult!
+
+  createCallForProposals(
+    input: CreateCallForProposalsInput!
+  ): CreateCallForProposalsResult!
 
   "Creates a new observation according to provided parameters."
   createGroup(
@@ -8042,6 +8219,26 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): AsterismGroupSelectResult!
+
+  """
+  Select a single Call for Proposals by id.
+  """
+  callForProposals(
+    callForProposalsId: CallForProposalsId!
+  ): CallForProposals
+
+  """
+  Select all Calls for Proposals.
+  """
+  callsForProposals(
+    OFFSET: CallForProposalsId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include deleted values"
+    includeDeleted: Boolean! = false
+  ): CallsForProposalsSelectResult!
 
   """
   Metadata for `enum ObsAttachmentType`

@@ -43,6 +43,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -164,6 +165,12 @@ trait Codecs {
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
+  val cfp_id: Codec[CallForProposals.Id] =
+    gid[CallForProposals.Id]
+
+  val cfp_type: Codec[CallForProposalsType] =
+    enumerated(Type("e_cfp_type"))
+
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
 
@@ -258,6 +265,9 @@ trait Codecs {
 
   val image_quality: Codec[ImageQuality] =
     enumerated[ImageQuality](Type.varchar)
+
+  val _instrument: Codec[Arr[Instrument]] =
+    Codec.array(_.tag, s => Instrument.fromTag(s).toRight(s"Invalid Instrument tag: $s"), Type("_d_tag", List(Type("d_tag"))))
 
   val instrument: Codec[Instrument] =
     enumerated[Instrument](Type.varchar)
@@ -588,6 +598,33 @@ trait Codecs {
     (core_timestamp *: core_timestamp).imap { case (min, max) =>
       TimestampInterval.between(min, max)
     } { interval => (interval.start, interval.end) }
+
+  val timestamp_interval_tsrange: Codec[TimestampInterval] = {
+    Codec.simple(
+      { ti =>
+        val start = core_timestamp.encode(ti.start).head.get
+        val end   = core_timestamp.encode(ti.end).head.get
+        s"[$start,$end)"
+      },
+      { s =>
+        def parseTimestamp(s: String): Option[Timestamp] =
+          core_timestamp.decode(0, List(s.some)).toOption
+
+        val StartEnd = raw"\[\"([^,]+)\",\"([^,]+)\"\)".r
+        val ti = s match {
+          case StartEnd(s, e) =>
+            for {
+              start <- parseTimestamp(s)
+              end   <- parseTimestamp(e)
+            } yield TimestampInterval.between(start, end)
+          case _              =>
+            none
+        }
+        ti.toRight(s"Invalid TimestampInterval: $s")
+      },
+      Type.tsrange
+    )
+  }
 
   val void: Codec[Unit] =
     val rightUnit = Right(())

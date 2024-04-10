@@ -46,6 +46,7 @@ import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
+import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -96,6 +97,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddTimeChargeCorrection,
       CloneObservation,
       CloneTarget,
+      CreateCallForProposals,
       CreateGroup,
       CreateObservation,
       CreateProgram,
@@ -259,6 +261,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
             Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
           ), child)
+
+  private lazy val CreateCallForProposals: MutationField =
+    MutationField("createCallForProposals", CreateCallForProposalsInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        requireStaffAccess {
+          callForProposalsService.createCallForProposals(input).nestMap { gid =>
+            Unique(Filter(Predicates.callForProposals.id.eql(gid), child))
+          }
+        }
+      }
+    }
 
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding): (input, child) =>
