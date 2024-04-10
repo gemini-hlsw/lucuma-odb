@@ -2038,7 +2038,7 @@ class execution extends ExecutionTestSupport {
         }
       }
     }
-    assertIO(m, Completion.State.Empty)
+    assertIO(m, Completion.State.idBase(1))
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - FAIL") {
@@ -2057,7 +2057,7 @@ class execution extends ExecutionTestSupport {
         }
       } yield m
 
-    assertIO(m, Completion.State.Empty)
+    assertIO(m, Completion.State.idBase(1))
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - NULL QA") {
@@ -2075,7 +2075,7 @@ class execution extends ExecutionTestSupport {
         }
       } yield m
 
-    assertIO(m, scienceSingleAtomCompletionState((GmosNorthScience0, ScienceP00Q00)))
+    assertIO(m, scienceSingleAtomCompletionState(1, (GmosNorthScience0, ScienceP00Q00)))
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - Pass") {
@@ -2094,7 +2094,7 @@ class execution extends ExecutionTestSupport {
         }
       } yield m
 
-    assertIO(m, scienceSingleAtomCompletionState((GmosNorthScience0, ScienceP00Q00)))
+    assertIO(m, scienceSingleAtomCompletionState(1, (GmosNorthScience0, ScienceP00Q00)))
   }
 
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
@@ -2158,7 +2158,7 @@ class execution extends ExecutionTestSupport {
       }
     }
 
-    assertIO(m, scienceSingleAtomCompletionState((GmosNorthScience0, ScienceP00Q00), (GmosNorthFlat0, Flat)))
+    assertIO(m, scienceSingleAtomCompletionState(1, (GmosNorthScience0, ScienceP00Q00), (GmosNorthFlat0, Flat)))
   }
 
   test("clear execution digest") {
@@ -2201,8 +2201,8 @@ class execution extends ExecutionTestSupport {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
         s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
@@ -2227,8 +2227,8 @@ class execution extends ExecutionTestSupport {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
         s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
         _      <- addEndStepEvent(s0)
@@ -2256,8 +2256,8 @@ class execution extends ExecutionTestSupport {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
         s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
@@ -2281,8 +2281,8 @@ class execution extends ExecutionTestSupport {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
         s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)

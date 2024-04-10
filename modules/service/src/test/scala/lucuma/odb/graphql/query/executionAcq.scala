@@ -14,7 +14,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.odb.json.all.transport.given
 
-class executionAcqSequences extends ExecutionTestSupport {
+class executionAcq extends ExecutionTestSupport {
 
   test("initial generation") {
     val setup: IO[Observation.Id] =
@@ -301,4 +301,81 @@ class executionAcqSequences extends ExecutionTestSupport {
     }
   }
 
+  test("execute acquisition, make a new visit, back to acquisition") {
+    val setup: IO[Observation.Id] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o  <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        v0 <- recordVisitAs(user, Instrument.GmosNorth, o)
+
+        // Acquisition Sequence
+        a0 <- recordAtomAs(user, Instrument.GmosNorth, v0, SequenceType.Acquisition, stepCount = 3)
+        s0 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s0)
+        s1 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s1)
+        s2 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s2)
+        a1 <- recordAtomAs(user, Instrument.GmosNorth, v0, SequenceType.Acquisition, stepCount = 1)
+        s3 <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s3)
+
+        // Record a new visit, but don't execute anything
+        _  <- recordVisitAs(user, Instrument.GmosNorth, o)
+
+        // Now when we ask for acquisition, we should expect to take it from the top.
+      } yield o
+
+    setup.flatMap { oid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     gmosNorth {
+                       acquisition {
+                         nextAtom {
+                           $GmosScienceAtomQuery
+                         }
+                         possibleFuture {
+                           $GmosScienceAtomQuery
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "config": {
+                    "gmosNorth": {
+                      "acquisition": {
+                        "nextAtom": {
+                          "steps": [
+                            ${StepConfigScienceP00Q00Json.deepMerge(GmosNorthAcq0Json)},
+                            ${StepConfigScienceP10Q00Json.deepMerge(GmosNorthAcq1Json)},
+                            ${StepConfigScienceP00Q00Json.deepMerge(GmosNorthAcq2Json)}
+                          ]
+                        },
+                        "possibleFuture": []
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
 }

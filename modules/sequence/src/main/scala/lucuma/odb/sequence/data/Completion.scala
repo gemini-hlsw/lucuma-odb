@@ -120,14 +120,17 @@ object Completion {
   }
 
   case class Sequence[D](
-    cycleCount: Int,
-    atomMap:    AtomMap[D]
+    idBase:  Int,
+    atomMap: AtomMap[D]
   )
 
   object Sequence {
 
+    def idBase[D](b: Int): Sequence[D] =
+      Sequence(b, AtomMap.Empty)
+
     def Empty[D]: Sequence[D] =
-      Sequence(0, AtomMap.Empty)
+      idBase(0)
 
   }
 
@@ -138,15 +141,18 @@ object Completion {
 
   object State {
 
+    def idBase[D](b: Int): State[D] =
+      State(Sequence.idBase(b), Sequence.idBase(b))
+
     def Empty[D]: State[D] =
-      State(Sequence.Empty, Sequence.Empty)
+      idBase(0)
 
     case class Builder[D](
       previousVisit: Option[Visit.Id],
       previousType:  Option[SequenceType],
-      acqCycles:     Int,
+      acqIdBase:     Int,
       acqBuild:      AtomMap.Builder[D],
-      sciCycles:     Int,
+      sciIdBase:     Int,
       sciBuild:      AtomMap.Builder[D]
     ) {
 
@@ -154,39 +160,54 @@ object Completion {
         Builder(
           previousVisit,
           previousType,
-          acqCycles,
+          acqIdBase,
           AtomMap.Builder.init[D],
-          sciCycles,
+          sciIdBase,
           sciBuild.reset
         )
 
-      def next(
+      def nextVisit(
+        vid: Visit.Id
+      ): Builder[D] =
+        if (previousVisit.exists(_ === vid))
+          this
+        else
+          Builder(
+            vid.some,
+            previousType,
+            acqIdBase + 1,
+            AtomMap.Builder.init[D],
+            sciIdBase + 1,
+            sciBuild.reset
+          )
+
+      def nextStep(
         vid:     Visit.Id,
         seqType: SequenceType,
         aid:     Atom.Id,
         count:   NonNegShort,
         step:    StepMatch[D]
       ): Builder[D] = {
-        val isNewCycle = previousVisit.forall(_ =!= vid) || previousType.forall(_ =!= seqType)
+        val isNewBase = previousVisit.forall(_ =!= vid) || previousType.forall(_ =!= seqType)
 
-        val (acqCyclesʹ, sciCyclesʹ) = (previousType, isNewCycle) match {
-          case (Some(SequenceType.Acquisition), true) => (acqCycles + 1, sciCycles)
-          case (Some(SequenceType.Science),     true) => (acqCycles, sciCycles + 1)
-          case _                                      => (acqCycles, sciCycles)
+        val (acqIdBaseʹ, sciIdBaseʹ) = (previousType, isNewBase) match {
+          case (Some(SequenceType.Acquisition), true) => (acqIdBase + 1, sciIdBase)
+          case (Some(SequenceType.Science),     true) => (acqIdBase, sciIdBase + 1)
+          case _                                      => (acqIdBase, sciIdBase)
         }
 
-        val (acqBuildʹ, sciBuildʹ) = (seqType, isNewCycle) match {
+        val (acqBuildʹ, sciBuildʹ) = (seqType, isNewBase) match {
           case (SequenceType.Acquisition, true ) => (AtomMap.Builder.init[D].next(aid, count, step), sciBuild)
           case (SequenceType.Acquisition, false) => (acqBuild.next(aid, count, step), sciBuild)
           case (SequenceType.Science,     true ) => (AtomMap.Builder.init[D], sciBuild.reset.next(aid, count, step))
           case (SequenceType.Science,     false) => (AtomMap.Builder.init[D], sciBuild.next(aid, count, step))
         }
 
-        Builder(vid.some, seqType.some, acqCyclesʹ, acqBuildʹ, sciCyclesʹ, sciBuildʹ)
+        Builder(vid.some, seqType.some, acqIdBaseʹ, acqBuildʹ, sciIdBaseʹ, sciBuildʹ)
       }
 
       def build: State[D] =
-        State(Sequence(acqCycles, acqBuild.build), Sequence(sciCycles, sciBuild.build))
+        State(Sequence(acqIdBase, acqBuild.build), Sequence(sciIdBase, sciBuild.build))
     }
 
     object Builder {

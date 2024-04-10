@@ -454,8 +454,8 @@ object Generator {
            })
 
         for {
-          a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, compState.acq.cycleCount))
-          s <- EitherT(executionSequence(proto.science, SequenceType.Science, compState.sci.cycleCount))
+          a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, compState.acq.idBase))
+          s <- EitherT(executionSequence(proto.science, SequenceType.Science, compState.sci.idBase))
         } yield ExecutionConfig(proto.static, a, s)
       }
     }
