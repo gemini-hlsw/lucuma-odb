@@ -268,9 +268,11 @@ object SequenceService {
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
-          .stream(Statements.SelectCompletedStepRecordsForObs)(observationId, 1024)
-          .fold(Completion.State.Builder.init[D]) { case (state, (vid, aid, cnt, seqType, sid)) =>
-            stepMap.get(sid).fold(state.reset)(state.next(vid, seqType, aid, cnt, _))
+          .stream(Statements.SelectCompletionRows)(observationId, 1024)
+          .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) => ///aid, cnt, seqType, sid)) =>
+            stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
+              stepMap.get(sid).fold(state.reset)(state.nextStep(vid, seqType, aid, cnt, _))
+            }
           }
           .compile
           .onlyOrError
@@ -450,6 +452,7 @@ object SequenceService {
      * of an EndStep step event and for which there are no pending datasets or
      * datasets which have a QA state set to anything other than Pass.
      */
+/*
     val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Visit.Id, Atom.Id, NonNegShort, SequenceType, Step.Id)] =
       (sql"""
         SELECT
@@ -476,6 +479,61 @@ object SequenceService {
           )
         ORDER BY s.c_completed
       """).query(visit_id *: atom_id *: int2_nonneg *: sequence_type *: step_id)
+*/
+    /**
+     * Selects completed step records for a particular observation, folding in
+     * visit records to capture when the visit changes.  A completed step is one
+     * for which the completion time has been set by the reception of an EndStep
+     * step event and for which there are no pending datasets or datasets which
+     * have a QA state set to anything other than Pass.
+     */
+    val SelectCompletionRows: Query[Observation.Id, (Visit.Id, Option[(Atom.Id, NonNegShort, SequenceType, Step.Id)])] =
+      (sql"""
+        SELECT
+          a.c_visit_id,
+          a.c_atom_id,
+          a.c_step_count,
+          a.c_sequence_type,
+          s.c_step_id,
+          s.c_completed AS c_timestamp
+        FROM
+          t_step_record s
+        INNER JOIN
+          t_atom_record a
+        ON a.c_atom_id = s.c_atom_id
+        WHERE  a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM   t_dataset d
+            WHERE
+              d.c_step_id = s.c_step_id
+              AND (
+                d.c_end_time IS NULL
+                OR (d.c_qa_state IS NOT NULL AND d.c_qa_state <> 'Pass'::e_dataset_qa_state)
+              )
+          )
+
+        UNION ALL
+
+        SELECT
+          c_visit_id,
+          NULL :: d_atom_id       AS c_atom_id,
+          NULL :: int2            AS c_step_count,
+          NULL :: e_sequence_type AS c_sequence_type,
+          NULL :: d_step_id       AS c_step_id,
+          c_created               AS c_timestamp
+        FROM
+          t_visit
+        WHERE
+          c_observation_id = $observation_id
+
+        ORDER BY c_timestamp
+      """).query(visit_id *: atom_id.opt *: int2_nonneg.opt *: sequence_type.opt *: step_id.opt *: core_timestamp)
+          .dimap[Observation.Id, (Visit.Id, Option[(Atom.Id, NonNegShort, SequenceType, Step.Id)])] {
+            o => (o, o)
+          } {
+            case (v, a, c, t, s, _) => (v, (a, c, t, s).tupled)
+          }
 
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")

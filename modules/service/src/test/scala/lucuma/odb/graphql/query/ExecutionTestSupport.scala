@@ -394,10 +394,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val StepConfigScienceP10Q00Json = stepConfigScienceJson(P10Q00)
   val StepConfigScienceP00Q15Json = stepConfigScienceJson(P00Q15)
 
-  def scienceSingleAtomCompletionState[D](steps: Completion.StepMatch[D]*): Completion.State[D] =
+  def scienceSingleAtomCompletionState[D](idBase: Int, steps: Completion.StepMatch[D]*): Completion.State[D] =
     Completion.State(
-      Completion.Sequence.Empty,
-      Completion.Sequence(0, Completion.AtomMap.from(steps.toList -> PosInt.unsafeFrom(1)))
+      Completion.Sequence.idBase(idBase),
+      Completion.Sequence(idBase, Completion.AtomMap.from(steps.toList -> PosInt.unsafeFrom(1)))
     )
 
   def genGmosNorthSequence(oid: Observation.Id, seqType: SequenceType, futureLimit: Int): IO[List[Atom.Id]] =
