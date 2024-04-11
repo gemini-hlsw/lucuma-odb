@@ -269,7 +269,7 @@ object SequenceService {
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletionRows)(observationId, 1024)
-          .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) => ///aid, cnt, seqType, sid)) =>
+          .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) =>
             stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
               stepMap.get(sid).fold(state.reset)(state.nextStep(vid, seqType, aid, cnt, _))
             }
@@ -446,40 +446,6 @@ object SequenceService {
           $time_span
       """.command.contramap { (s, a, i, t, c, d) => (s, a, a, i, t, c, d) }
 
-    /**
-     * Selects completed step records for a particular observation.  A completed
-     * step is one for which the completion time has been set by the reception
-     * of an EndStep step event and for which there are no pending datasets or
-     * datasets which have a QA state set to anything other than Pass.
-     */
-/*
-    val SelectCompletedStepRecordsForObs: Query[Observation.Id, (Visit.Id, Atom.Id, NonNegShort, SequenceType, Step.Id)] =
-      (sql"""
-        SELECT
-          a.c_visit_id,
-          a.c_atom_id,
-          a.c_step_count,
-          a.c_sequence_type,
-          s.c_step_id
-        FROM
-          t_step_record s
-        INNER JOIN
-          t_atom_record a
-        ON a.c_atom_id = s.c_atom_id
-        WHERE """ ~> sql"""a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL""" <~ sql"""
-          AND NOT EXISTS (
-            SELECT 1
-            FROM   t_dataset d
-            WHERE
-              d.c_step_id = s.c_step_id
-              AND (
-                d.c_end_time IS NULL
-                OR (d.c_qa_state IS NOT NULL AND d.c_qa_state <> 'Pass'::e_dataset_qa_state)
-              )
-          )
-        ORDER BY s.c_completed
-      """).query(visit_id *: atom_id *: int2_nonneg *: sequence_type *: step_id)
-*/
     /**
      * Selects completed step records for a particular observation, folding in
      * visit records to capture when the visit changes.  A completed step is one
