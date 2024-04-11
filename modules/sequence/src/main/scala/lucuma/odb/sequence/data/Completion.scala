@@ -14,8 +14,9 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 
 /**
- * Structures required for tracking completion state in an observation.  The
- * Completion.State is built up completed step by completed step.
+ * Internal structures required for completion state tracking in an observation.
+ * The Completion.State is built up completed step by completed step using a
+ * Completion.State.Builder.
  */
 object Completion {
 
@@ -156,7 +157,8 @@ object Completion {
       def init[D] = Acquisition(0, AtomMap.Builder.init[D])
 
     // Science sequence matching keeps any progress that has been made when
-    // reset.  Also don't need to generate new ids.
+    // reset.  Science sequences don't need to generate distinct ids since the
+    // steps are not repeated so there is no "id base".
     case class Science[D](atomMap: AtomMap.Builder[D]):
       def reset = Science(atomMap.reset)
       def build = SequenceMatch(0, atomMap.build)
@@ -206,7 +208,8 @@ object Completion {
         val ctxʹ = MatchContext.fromVisitId(vid)
         if (ctxʹ === ctx) this else Builder(ctxʹ, acq.reset, sci.reset)
 
-      // Handle the next completed step.
+      // Handle the next completed step, updating the appropriate AtomMap for
+      // the sequence type.
       def nextStep(
         vid:     Visit.Id,
         seqType: SequenceType,
