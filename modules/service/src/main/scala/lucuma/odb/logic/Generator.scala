@@ -392,7 +392,7 @@ object Generator {
         // Compute the sequence digest from the stream by folding over the steps
         // if possible. Missing smart gcal definitions may prevent it.
         def sequenceDigest(
-          s: Stream[F, Either[String, ProtoAtom[ProtoStep[(D, StepEstimate)]]]]
+          s: Stream[F, Either[String, EstimatedAtom[D]]]
         ): F[Either[Error, SequenceDigest]] =
           s.fold(SequenceDigest.Zero.asRight[Error]) { (eDigest, eAtom) =>
             eDigest.flatMap { digest =>
@@ -409,7 +409,10 @@ object Generator {
           }.compile.onlyOrError
 
         for {
-          // strip the atom index and compute seq digest
+          // Compute the SequenceDigests.  We don't need the atom indices for
+          // this so we drop them, keeping only the EstimatedAtom.  For the
+          // acquisition sequence (which is infinite) we assume only the next
+          // step will be executed.
           a <- EitherT(sequenceDigest(proto.acquisition.take(1).map(_.map(_._1))))
           s <- EitherT(sequenceDigest(proto.science.map(_.map(_._1))))
         } yield ExecutionDigest(setupTime, a, s)
@@ -454,6 +457,8 @@ object Generator {
            })
 
         for {
+          // For acquisitions, take only the first step of the infinite sequence.
+          // We always assume we only need one more step.
           a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, compState.acq.idBase))
           s <- EitherT(executionSequence(proto.science, SequenceType.Science, compState.sci.idBase))
         } yield ExecutionConfig(proto.static, a, s)
