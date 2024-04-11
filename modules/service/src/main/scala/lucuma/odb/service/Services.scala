@@ -15,6 +15,7 @@ import lucuma.core.model.Access.Service
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
@@ -163,7 +164,9 @@ trait Services[F[_]]:
   def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode): GuideService[F]
   
   /** The `UserInvitationService` */
-  def userInvitationService: UserInvitationService[F]
+  def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]): UserInvitationService[F]
+
+  def emailService(emailConfig: Config.Email, httpClient: Client[F]): EmailService[F]
 
 object Services:
 
@@ -230,7 +233,7 @@ object Services:
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       lazy val visitService = VisitService.instantiate
-      lazy val userInvitationService = UserInvitationService.instantiate
+      def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]) = UserInvitationService.instantiate(emailConfig, httpClient)
 
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
@@ -241,6 +244,7 @@ object Services:
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
       def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, itcClient, ptc)
       def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode) = GuideService.instantiate(httpClient, itcClient, commitHash, ptc)
+      def emailService(emailConfig: Config.Email, httpClient: Client[F]) = EmailService.fromConfigAndClient(emailConfig, httpClient)
 
 
   /**
@@ -282,7 +286,8 @@ object Services:
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
     def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
-    def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
+    def userInvitationService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService(emailConfig, httpClient)
+    def emailService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]) = summon[Services[F]].emailService(emailConfig, httpClient)
     
     def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Pi then fa(using ())

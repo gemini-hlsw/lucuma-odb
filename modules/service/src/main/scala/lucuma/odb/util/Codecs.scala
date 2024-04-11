@@ -45,6 +45,8 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
+import lucuma.odb.data.EmailId
+import lucuma.odb.data.EmailStatus
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
@@ -206,6 +208,15 @@ trait Codecs {
 
   val edit_type: Codec[EditType] =
     enumerated(Type("e_edit_type"))
+
+  val email_address: Codec[EmailAddress] =
+    codecFromPrism(EmailAddress.from, Type("citext"))
+
+  val email_id: Codec[EmailId] =
+    text.eimap(EmailId.fromString)(_.value.value)
+
+  val email_status: Codec[EmailStatus] =
+    enumerated(Type("e_email_status"))
 
   val ephemeris_key_type: Codec[EphemerisKeyType] =
     enumerated(Type("e_ephemeris_key_type"))
@@ -649,10 +660,6 @@ trait Codecs {
 
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
-
-  val email_address: Codec[EmailAddress] =
-    codecFromPrism(EmailAddress.from, Type("citext"))
-
 
 }
 

@@ -39,6 +39,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddDatasetEventInput
@@ -84,6 +85,7 @@ import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -143,6 +145,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   def services: Resource[F, Services[F]]
   def user: User
   def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  val httpClient: Client[F]
+  def emailConfig: Config.Email
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
@@ -339,7 +343,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateUserInvitation =
     MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
-        userInvitationService.createUserInvitation(input).map: rInv =>
+        userInvitationService(emailConfig, httpClient).createUserInvitation(input).map: rInv =>
           rInv.map: inv =>
             Environment(
               Env("inv" -> inv),
@@ -486,14 +490,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val RedeemUserInvitation =
     MutationField("redeemUserInvitation", RedeemUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
-        userInvitationService.redeemUserInvitation(input).map: rId =>
+        userInvitationService(emailConfig, httpClient).redeemUserInvitation(input).map: rId =>
           rId.map: id =>
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 
   private lazy val RevokeUserInvitation =
     MutationField("revokeUserInvitation", RevokeUserInvitationInput.Binding): (input, child) =>
       services.useTransactionally:
-        userInvitationService.revokeUserInvitation(input).map: rId =>
+        userInvitationService(emailConfig, httpClient).revokeUserInvitation(input).map: rId =>
           rId.map: id =>
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 

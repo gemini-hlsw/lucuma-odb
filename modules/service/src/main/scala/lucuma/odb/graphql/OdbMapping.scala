@@ -17,6 +17,7 @@ import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.*
 import lucuma.odb.graphql.topic.GroupTopic
@@ -69,15 +70,16 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Trace: Logger](
-    database:    Resource[F, Session[F]],
-    monitor:     SkunkMonitor[F],
-    user0:       User,
-    topics0:     Topics[F],
-    itcClient0:  ItcClient[F],
-    commitHash0: CommitHash,
-    enums:       Enums,
-    tec:         TimeEstimateCalculator.ForInstrumentMode,
-    httpClient0:  Client[F]
+    database:     Resource[F, Session[F]],
+    monitor:      SkunkMonitor[F],
+    user0:        User,
+    topics0:      Topics[F],
+    itcClient0:   ItcClient[F],
+    commitHash0:  CommitHash,
+    enums:        Enums,
+    tec:          TimeEstimateCalculator.ForInstrumentMode,
+    httpClient0:  Client[F],
+    emailConfig0: Config.Email
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
@@ -120,6 +122,7 @@ object OdbMapping {
           with DatasetSelectResultMapping[F]
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
+          with EmailMapping[F]
           with ExecutionMapping[F]
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
@@ -235,6 +238,7 @@ object OdbMapping {
           override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums))
           override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
+          override val emailConfig: Config.Email = emailConfig0
 
           // Our combined type mappings
           override val typeMappings: List[TypeMapping] =
@@ -281,6 +285,7 @@ object OdbMapping {
               DatasetReferenceMapping,
               DatasetSelectResultMapping,
               DeclinationMapping,
+              EmailMapping,
               EngineeringProgramReferenceMapping,
               ElevationRangeMapping,
               ExampleProgramReferenceMapping,

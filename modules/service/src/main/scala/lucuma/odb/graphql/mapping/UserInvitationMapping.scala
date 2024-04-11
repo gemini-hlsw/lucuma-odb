@@ -9,7 +9,11 @@ import grackle.skunk.SkunkMapping
 
 import table.*
 
-trait UserInvitationMapping[F[_]] extends ProgramTable[F] with UserTable[F] with UserInvitationTable[F] {
+trait UserInvitationMapping[F[_]]
+  extends ProgramTable[F]
+  with UserTable[F]
+  with UserInvitationTable[F]
+  with EmailTable[F] {
 
   lazy val UserInvitationMapping =
     ObjectMapping(
@@ -24,6 +28,7 @@ trait UserInvitationMapping[F[_]] extends ProgramTable[F] with UserTable[F] with
         SqlField("supportType", UserInvitationTable.SupportType),
         SqlField("supportPartner", UserInvitationTable.SupportPartner),
         SqlObject("redeemer", Join(UserInvitationTable.RedeemerId, UserTable.UserId)),
+        SqlObject("email", Join(UserInvitationTable.EmailId, EmailTable.EmailId))
       )
     )
 

@@ -831,6 +831,52 @@ input ElevationRangeInput {
   hourAngle: HourAngleRangeInput
 }
 
+type Email {
+  "Sender email address"
+  senderEmail: EmailAddress!
+
+  "Recipient email address"
+  recipientEmail: EmailAddress!
+
+  "Email subject"
+  subject: NonEmptyString!
+
+  "Text format message"
+  textMessage: NonEmptyString!
+
+  "Html format message"
+  htmlMessage: NonEmptyString
+
+  "Original time of the email sending attempt"
+  originalTime: Timestamp!
+
+  "The status of the email"
+  status: EmailStatus!
+
+  "The time of the last status update"
+  statusTime: Timestamp!
+}
+
+enum EmailStatus {
+  "Mail provider has queued the message"
+  QUEUED
+
+  "Mail provider has rejected the message"
+  REJECTED
+
+  "Mail provider has accepted the message"
+  ACCEPTED
+
+  "The message has been accepted by the recipient email server"
+  DELIVERED
+
+  "The message is not deliverable"
+  PERMANENT_FAILURE
+
+  "The message could not be delivered, but may be deliverable later"
+  TEMPORARY_FAILURE
+}
+
 """
 Create or edit an emission line with integrated line flux units.  When creating a new value, all fields are required.
 """
@@ -2466,6 +2512,8 @@ type UserInvitation {
   "Null unless 'supportType' is PARTNER"
   supportPartner: Partner
 
+  "The email sent for the invitation"
+  email: Email
 }
 
 type CreateUserInvitationResult {
@@ -2504,9 +2552,6 @@ type RevokeUserInvitationResult {
   invitation: UserInvitation!
 
 }
-
-
-
 
 type LinkUserResult {
   user: ProgramUser!
