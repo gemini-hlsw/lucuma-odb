@@ -54,6 +54,7 @@ enum OdbError:
   case UpdateFailed(detail: Option[String] = None)         
   case ItcError(detail: Option[String] = None)             
   case GuideEnvironmentError(detail: Option[String] = None)
+  case EmailSendError(detail: Option[String] = None)
 
 object OdbError:
 
@@ -78,6 +79,7 @@ object OdbError:
     case UpdateFailed           extends Tag("update_failed")
     case ItcError               extends Tag("itc_error")
     case GuideEnvironmentError  extends Tag("guide_environment_error")
+    case EmailSendError         extends Tag("email_send_error")
 
   private[data]  object Tag:
 
@@ -108,6 +110,7 @@ object OdbError:
       case OdbError.UpdateFailed(_)              => Tag.UpdateFailed
       case OdbError.ItcError(_)                  => Tag.ItcError
       case OdbError.GuideEnvironmentError(_)     => Tag.GuideEnvironmentError
+      case OdbError.EmailSendError(_)            => Tag.EmailSendError
 
   private def defaultMessage(e: OdbError): String =
     e match
@@ -130,6 +133,7 @@ object OdbError:
       case UpdateFailed(_)               => "The specified operation could not be completed."
       case ItcError(_)                   => "The requested ITC operation could not be completed."
       case GuideEnvironmentError(_)      => "The guide environment as configured is ineligible for the requested operation."
+      case EmailSendError(_)             => "Unable to send the email."
 
   private def data(e: OdbError): JsonObject =
     e match
@@ -152,6 +156,7 @@ object OdbError:
       case UpdateFailed(_)               => JsonObject()
       case ItcError(_)                   => JsonObject()
       case GuideEnvironmentError(_)      => JsonObject()
+      case EmailSendError(_)             => JsonObject()
     
   private def decode(d: Tag, detail: Option[String], c: ACursor): Decoder.Result[OdbError] =
     d match
@@ -174,6 +179,7 @@ object OdbError:
       case Tag.UpdateFailed           => UpdateFailed(detail).asRight
       case Tag.ItcError               => ItcError(detail).asRight
       case Tag.GuideEnvironmentError  => GuideEnvironmentError(detail).asRight
+      case Tag.EmailSendError         => EmailSendError(detail).asRight
     
   private object Field:
     private val Prefix = "odb_error"

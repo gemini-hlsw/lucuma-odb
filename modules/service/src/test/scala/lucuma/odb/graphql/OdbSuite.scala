@@ -215,6 +215,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       fileUploadMaxMb = 5
     )
 
+  protected def emailConfig: Config.Email =
+    Config.Email(
+      apiKey            = "apkKey".refined,
+      domain            = "domain".refined,
+      webhookSigningKey = "webhookKey".refined
+    )
+
   // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
     S3FileService.s3AsyncClientOpsResource[IO](awsConfig)
@@ -226,6 +233,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
+      emailConfig,
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
@@ -245,7 +253,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculator.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient)
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def server: Resource[IO, Server] =

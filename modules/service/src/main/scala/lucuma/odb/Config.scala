@@ -13,6 +13,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
+import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
@@ -26,6 +27,7 @@ import natchez.http4s.NatchezMiddleware
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 
 import java.net.URI
@@ -42,6 +44,7 @@ case class Config(
   honeycomb:  Config.Honeycomb, // Honeycomb config
   database:   Config.Database,  // Database config
   aws:        Config.Aws,       // AWS config
+  email:      Config.Email,     // Mailgun config
   domain:     String,           // Domain, for CORS headers
   commitHash: CommitHash        // From Heroku Dyno Metadata
 ) {
@@ -213,6 +216,27 @@ object Config {
     ).parMapN(Aws.apply)
   }
 
+  case class Email(
+    apiKey:            NonEmptyString,
+    domain:            NonEmptyString,
+    webhookSigningKey: NonEmptyString
+  ) {
+    // add to environment?
+    lazy val baseUri = uri"https://api.mailgun.net/v3"
+    lazy val sendMessageUri = baseUri / domain.value / "messages"
+    lazy val eventsUri = baseUri / domain.value / "events"
+
+    lazy val invitationFrom: EmailAddress = EmailAddress.unsafeFrom(s"gpp@$domain")
+  }
+
+  object Email {
+    lazy val fromCirrus: ConfigValue[Effect, Email] = (
+      envOrProp("MAILGUN_API_KEY").as[NonEmptyString],
+      envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
+      envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").as[NonEmptyString]
+    ).parMapN(Email.apply)
+  }
+
   private implicit val publicKey: ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key") { s =>
       GpgPublicKeyReader.publicKey(s).toOption
@@ -240,6 +264,7 @@ object Config {
     Honeycomb.fromCiris,
     Database.fromCiris,
     Aws.fromCiris,
+    Email.fromCirrus,
     envOrProp("ODB_DOMAIN"),
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
   ).parMapN(Config.apply)
