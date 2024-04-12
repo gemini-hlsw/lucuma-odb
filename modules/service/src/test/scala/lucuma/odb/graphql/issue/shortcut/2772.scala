@@ -119,7 +119,7 @@ class ShortCut_2772 extends OdbSuite with ObservingModeSetupOperations {
                  }
                },
                sourceProfile: {
-                 uniform: {
+                 point: {
                    bandNormalized: {
                      sed: {
                        stellarLibrary: O5_V
@@ -128,12 +128,12 @@ class ShortCut_2772 extends OdbSuite with ObservingModeSetupOperations {
                        {
                          band: J,
                          value: 14.74,
-                         units: VEGA_MAG_PER_ARCSEC_SQUARED
+                         units: VEGA_MAGNITUDE
                        },
                        {
                          band: V,
                          value: 18.1,
-                         units: VEGA_MAG_PER_ARCSEC_SQUARED
+                         units: VEGA_MAGNITUDE
                        }
                      ]
                    }
