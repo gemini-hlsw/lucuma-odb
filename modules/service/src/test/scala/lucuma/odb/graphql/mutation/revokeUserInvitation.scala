@@ -25,6 +25,8 @@ class revokeUserInvitation extends OdbSuite {
 
   val validUsers = List(pi, pi2, guest, staff, admin, service, ngo).toList
 
+  override val httpRequestHandler = invitationEmailRequestHandler
+
   def revoke(id: UserInvitation.Id): String =
     s"""
       mutation {

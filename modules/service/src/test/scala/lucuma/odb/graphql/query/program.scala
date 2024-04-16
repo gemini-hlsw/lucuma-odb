@@ -13,6 +13,7 @@ import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.EmailStatus
 
 class program extends OdbSuite {
 
@@ -21,6 +22,8 @@ class program extends OdbSuite {
   val service  = TestUsers.service(3)
 
   val validUsers = List(pi, guest, service)
+
+  override val httpRequestHandler = invitationEmailRequestHandler
 
   test("any user can read their own programs") {
     List(guest, pi, service).traverse { user =>
@@ -103,6 +106,9 @@ class program extends OdbSuite {
                     program {
                       id
                     }
+                    email {
+                      status
+                    }
                   }
                 }
               }
@@ -121,6 +127,9 @@ class program extends OdbSuite {
                       },
                       "program": {
                         "id": $id
+                      },
+                      "email": {
+                        "status": ${EmailStatus.Queued}
                       }
                     }
                   ]
