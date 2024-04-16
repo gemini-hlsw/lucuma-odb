@@ -108,7 +108,7 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
   }
 
   // increased the proper motion of the second candidate so we could get multiple availabilities.
-  val gaiaReponseString = 
+  val gaiaResponseString = 
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
@@ -202,7 +202,7 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
-  val gaiaEmptyReponseString = 
+  val gaiaEmptyResponseString = 
   """<?xml version="1.0" encoding="UTF-8"?>
   |<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
   |    <RESOURCE type="results">
@@ -333,8 +333,8 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
   override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
       val respStr =
-        if (req.uri.renderString.contains("20-0.10166")) gaiaEmptyReponseString
-        else gaiaReponseString
+        if (req.uri.renderString.contains("20-0.10166")) gaiaEmptyResponseString
+        else gaiaResponseString
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
 

@@ -94,7 +94,7 @@ object EmailWebhookRoutes {
     emailConfig: Config.Email
   ): HttpRoutes[F] = {
     val dsl = Http4sDsl[F]
-    import dsl._
+    import dsl.*
 
     def updateStatus(data: EventData): F[Unit] =
       pool.use(session =>

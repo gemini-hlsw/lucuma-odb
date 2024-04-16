@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 import cats.data.Ior
 import cats.effect.*
 import cats.effect.std.Supervisor
+import cats.effect.std.UUIDGen
 import cats.effect.unsafe.IORuntime
 import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
@@ -21,12 +22,15 @@ import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.PosInt
+import fs2.Stream
+import fs2.text.utf8
 import grackle.Mapping
 import grackle.skunk.SkunkMonitor
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.JsonObject
+import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
@@ -193,6 +197,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   // override in tests that need an http client
   protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
+
+  // tests that require successfully sending invitations can assign this to httpRequestHandler
+  protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] = 
+    req => {
+      val sio = UUIDGen[IO].randomUUID.map(uuid => 
+        Json.obj(
+          "id"      -> s"<$uuid>".asJson,
+          "message" -> "Queued".asJson
+        ).toString
+      )
+      Resource.eval(IO.pure(Response(body = Stream.eval(sio).through(utf8.encode))))
+    }
   
   private def httpClient: Client[IO] = Client.apply(httpRequestHandler)
 
@@ -217,8 +233,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   protected def emailConfig: Config.Email =
     Config.Email(
-      apiKey            = "apkKey".refined,
-      domain            = "domain".refined,
+      apiKey            = "apiKey".refined,
+      domain            = "gpp.com".refined,
       webhookSigningKey = "webhookKey".refined
     )
 

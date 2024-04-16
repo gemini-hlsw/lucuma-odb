@@ -16,6 +16,8 @@ import scala.concurrent.duration.*
 // @IgnoreSuite
 class programEdit extends OdbSuite with SubscriptionUtils {
 
+  override val httpRequestHandler = invitationEmailRequestHandler
+
   object Group1 {
     val pi       = TestUsers.Standard.pi(11, 110)
     val guest    = TestUsers.guest(12)

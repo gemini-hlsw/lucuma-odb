@@ -99,7 +99,7 @@ object EmailService {
             .map(r => Result(r.id))
             .recover {
               case u @ UnexpectedStatus(status, _, _) =>
-                OdbError.EmailSendError(s"Unexpected status ${u.status} while attempting to send email.".some).asFailure
+                OdbError.EmailSendError(s"Unexpected status '${u.status}' while attempting to send email.".some).asFailure
             }
         }
 
