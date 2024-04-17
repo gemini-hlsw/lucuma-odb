@@ -8,12 +8,14 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.model.CallForProposals
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.graphql.binding.*
 
 object WhereCallForProposals {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereIdBinding = WhereOrder.binding[CallForProposals.Id](path / "id", CallForProposalsIdBinding)
+    val WhereIdBinding   = WhereOrder.binding[CallForProposals.Id](path / "id", CallForProposalsIdBinding)
+    val WhereTypeBinding = WhereEq.binding[CallForProposalsType](path / "type", CallForProposalsTypeBinding)
 
     lazy val WhereCfpBinding = binding(path)
 
@@ -24,14 +26,17 @@ object WhereCallForProposals {
         WhereCfpBinding.Option("NOT", rNOT),
 
         WhereIdBinding.Option("id", rId),
+        WhereTypeBinding.Option("type", rType)
       ) =>
-        (rAND, rOR, rNOT, rId).parMapN { (AND, OR, NOT, id) =>
-          and(List(
-            AND.map(and),
-            OR.map(or),
-            NOT.map(Not(_)),
-            id,
-          ).flatten)
+        (rAND, rOR, rNOT, rId, rType).parMapN {
+          (AND, OR, NOT, id, cfpType) =>
+            and(List(
+              AND.map(and),
+              OR.map(or),
+              NOT.map(Not(_)),
+              id,
+              cfpType
+            ).flatten)
         }
     }
   }
