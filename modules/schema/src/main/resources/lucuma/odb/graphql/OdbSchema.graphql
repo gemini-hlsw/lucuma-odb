@@ -10585,6 +10585,10 @@ input WhereCallForProposals {
   """
   id: WhereOrderCallForProposalsId
 
+  """
+  Matches the call for proposals type.
+  """
+  type: WhereEqCallForProposalsType
 }
 
 """
@@ -10766,6 +10770,34 @@ input WhereDatasetReference {
 
   "Matches the exposure index."
   exposureIndex: WhereOrderPosInt
+
+}
+
+"""
+Filters on equality (or not) of the call for proposals type.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereEqCallForProposalsType {
+
+  """
+  Matches if the call for proposals type is exactly the supplied value.
+  """
+  EQ: CallForProposalsType
+
+  """
+  Matches if the call for proposals type is not the supplied value.
+  """
+  NEQ: CallForProposalsType
+
+  """
+  Matches if the call for proposals type is any of the supplied options.
+  """
+  IN: [CallForProposalsType!]
+
+  """
+  Matches if the call for proposals type is none of the supplied values.
+  """
+  NIN: [CallForProposalsType!]
 
 }
 
