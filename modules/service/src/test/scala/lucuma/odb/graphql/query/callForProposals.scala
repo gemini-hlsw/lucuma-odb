@@ -46,7 +46,7 @@ class callForProposals extends OdbSuite {
        .liftTo[IO]
     }
 
-  test("callForProposals - null") {
+  test("null result") {
     expect(
       user  = pi,
       query = s"""
@@ -64,7 +64,7 @@ class callForProposals extends OdbSuite {
     )
   }
 
-  test("callForProposals - lookup") {
+  test("not null result") {
     createCall.flatMap { cid =>
       expect(
         user  = pi,

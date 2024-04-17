@@ -4,8 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import io.circe.syntax.*
-import lucuma.core.util.TimestampInterval
 import lucuma.odb.graphql.table.CallForProposalsView
 
 trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
@@ -32,19 +30,8 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
         SqlObject("decLimitStart"),
         SqlObject("decLimitEnd"),
 
-        SqlField("_active", CallForProposalsView.Active, hidden = true),
-
-        CursorFieldJson(
-          "activeStart",
-          _.fieldAs[TimestampInterval]("_active").map(_.start.asJson),
-          List("_active")
-        ),
-
-        CursorFieldJson(
-          "activeEnd",
-          _.fieldAs[TimestampInterval]("_active").map(_.end.asJson),
-          List("_active")
-        ),
+        SqlField("activeStart", CallForProposalsView.ActiveStart),
+        SqlField("activeEnd",   CallForProposalsView.ActiveEnd),
 
         SqlObject("partners", Join(CallForProposalsView.Id, CallForProposalsPartnerTable.CfpId)),
 

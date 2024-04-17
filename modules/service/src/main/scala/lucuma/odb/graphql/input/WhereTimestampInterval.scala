@@ -17,6 +17,9 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.graphql.binding.*
 
 
+// TODO: DELETE ME?
+
+
 object WhereTimestampInterval {
 
   case class Compare(x: Term[TimestampInterval])(f: TimestampInterval => Boolean) extends Predicate {

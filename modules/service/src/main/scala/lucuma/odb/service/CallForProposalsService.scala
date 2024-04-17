@@ -65,7 +65,8 @@ object CallForProposalsService {
           c_ra_end,
           c_dec_start,
           c_dec_end,
-          c_active,
+          c_active_start,
+          c_active_end,
           c_existence
         )
         SELECT
@@ -75,7 +76,8 @@ object CallForProposalsService {
           ${right_ascension.opt},
           ${declination.opt},
           ${declination.opt},
-          $timestamp_interval_tsrange,
+          $core_timestamp,
+          $core_timestamp,
           $existence
         RETURNING
           c_cfp_id
@@ -86,7 +88,8 @@ object CallForProposalsService {
         input.raLimit.map(_._2),
         input.decLimit.map(_._1),
         input.decLimit.map(_._2),
-        input.active,
+        input.active.start,
+        input.active.end,
         input.existence
       )}
 

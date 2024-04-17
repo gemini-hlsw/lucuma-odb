@@ -17,8 +17,8 @@ object WhereCallForProposals {
     val WhereIdBinding       = WhereOrder.binding(path / "id",          CallForProposalsIdBinding)
     val WhereTypeBinding     = WhereEq.binding(   path / "type",        CallForProposalsTypeBinding)
     val WhereSemesterBinding = WhereOrder.binding(path / "semester",    SemesterBinding)
-    val WhereStartBinding    = WhereTimestampInterval.bindingStart(path / "_active")
-    val WhereEndBinding      = WhereTimestampInterval.bindingEnd(path / "_active")
+    val WhereStartBinding    = WhereOrder.binding(path / "activeStart", TimestampBinding)
+    val WhereEndBinding      = WhereOrder.binding(path / "activeEnd",   TimestampBinding)
 
     lazy val WhereCfpBinding = binding(path)
 
