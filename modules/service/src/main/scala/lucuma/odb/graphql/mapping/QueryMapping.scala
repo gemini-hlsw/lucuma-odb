@@ -25,6 +25,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
@@ -152,20 +153,23 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CallsForProposals: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereCallForProposalsBinding = WhereCallForProposals.binding(Path.from(CallForProposalsType))
     {
       case (QueryType, "callsForProposals", List(
+        WhereCallForProposalsBinding.Option("WHERE", rWHERE),
         CallForProposalsIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (OFFSET, LIMIT, includeDeleted) =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
                   OFFSET.map(Predicates.callForProposals.id.gtEql).getOrElse(True),
                   Predicates.callForProposals.existence.includeDeleted(includeDeleted),
+                  WHERE.getOrElse(True)
                 ))),
                 oss = Some(List(
                   OrderSelection[lucuma.core.model.CallForProposals.Id](CallForProposalsType / "id")
