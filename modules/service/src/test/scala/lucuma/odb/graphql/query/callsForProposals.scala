@@ -132,4 +132,37 @@ class callsForProposals extends OdbSuite {
       )
     }
   }
+
+  test("WHERE semester") {
+    createCall(s"""
+      type:        REGULAR_SEMESTER
+      semester:    "2024B"
+      activeStart: "2025-02-01 14:00:00"
+      activeEnd:   "2025-07-31 14:00:00"
+    """.stripMargin
+    ).flatMap { id =>
+      expect(pi,
+        s"""
+          query {
+            callsForProposals(WHERE: { semester: { LT: "2025A" } }) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "callsForProposals": {
+              "matches": [
+                {
+                  "id": $id
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
 }

@@ -10597,6 +10597,12 @@ input WhereCallForProposals {
   Matches the call for proposals type.
   """
   type: WhereEqCallForProposalsType
+
+  """
+  Matches the call for proposals semester.
+  """
+  semester: WhereOrderSemester
+
 }
 
 """
