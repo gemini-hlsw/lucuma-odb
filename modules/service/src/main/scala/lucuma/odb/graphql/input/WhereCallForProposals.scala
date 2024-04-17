@@ -14,9 +14,11 @@ import lucuma.odb.graphql.binding.*
 object WhereCallForProposals {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereIdBinding       = WhereOrder.binding(path / "id", CallForProposalsIdBinding)
-    val WhereTypeBinding     = WhereEq.binding(path / "type", CallForProposalsTypeBinding)
-    val WhereSemesterBinding = WhereOrder.binding(path / "semester", SemesterBinding)
+    val WhereIdBinding       = WhereOrder.binding(path / "id",          CallForProposalsIdBinding)
+    val WhereTypeBinding     = WhereEq.binding(   path / "type",        CallForProposalsTypeBinding)
+    val WhereSemesterBinding = WhereOrder.binding(path / "semester",    SemesterBinding)
+    val WhereStartBinding    = WhereTimestampInterval.bindingStart(path / "_active")
+    val WhereEndBinding      = WhereTimestampInterval.bindingEnd(path / "_active")
 
     lazy val WhereCfpBinding = binding(path)
 
@@ -28,17 +30,21 @@ object WhereCallForProposals {
 
         WhereIdBinding.Option("id", rId),
         WhereTypeBinding.Option("type", rType),
-        WhereSemesterBinding.Option("semester", rSemester)
+        WhereSemesterBinding.Option("semester", rSemester),
+        WhereStartBinding.Option("activeStart", rStart),
+        WhereEndBinding.Option("activeEnd", rEnd)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rSemester).parMapN {
-          (AND, OR, NOT, id, cfpType, semester) =>
+        (rAND, rOR, rNOT, rId, rType, rSemester, rStart, rEnd).parMapN {
+          (AND, OR, NOT, id, cfpType, semester, start, end) =>
             and(List(
               AND.map(and),
               OR.map(or),
               NOT.map(Not(_)),
               id,
               cfpType,
-              semester
+              semester,
+              start,
+              end
             ).flatten)
         }
     }

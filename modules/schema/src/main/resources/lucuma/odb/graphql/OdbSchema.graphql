@@ -10595,6 +10595,16 @@ input WhereCallForProposals {
   """
   semester: WhereOrderSemester
 
+  """
+  Matches the active period start.
+  """
+  activeStart: WhereOrderTimestamp
+
+  """
+  Matches the active period end.
+  """
+  activeEnd: WhereOrderTimestamp
+
 }
 
 """
