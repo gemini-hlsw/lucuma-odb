@@ -16,12 +16,6 @@ class callsForProposals extends OdbSuite {
   val staff = TestUsers.Standard.staff(3, 103)
 
   override val validUsers = List(pi, staff)
-  /*
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2025-02-01 14:00:00"
-                activeEnd:   "2025-07-31 14:00:00"
-   */
 
   def createCall(set: String): IO[CallForProposals.Id] =
     query(
@@ -49,7 +43,7 @@ class callsForProposals extends OdbSuite {
        .liftTo[IO]
     }
 
-  test("callsForProposals - empty") {
+  test("empty") {
     expect(
       user  = pi,
       query = s"""
@@ -106,4 +100,36 @@ class callsForProposals extends OdbSuite {
     }
   }
 
+  test("WHERE type") {
+    createCall(s"""
+      type:        FAST_TURNAROUND
+      semester:    "2025A"
+      activeStart: "2025-02-01 14:00:00"
+      activeEnd:   "2025-07-31 14:00:00"
+    """.stripMargin
+    ).flatMap { id =>
+      expect(pi,
+        s"""
+          query {
+            callsForProposals(WHERE: { type: { EQ: FAST_TURNAROUND } }) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "callsForProposals": {
+              "matches": [
+                {
+                  "id": $id
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
 }
