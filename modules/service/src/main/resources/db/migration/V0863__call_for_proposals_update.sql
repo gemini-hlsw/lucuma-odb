@@ -16,12 +16,14 @@ CREATE OR REPLACE VIEW v_cfp AS
     (SELECT COUNT(*)
       FROM t_cfp_partner
      WHERE t_cfp_partner.c_cfp_id = c.c_cfp_id
-       AND t_cfp_partner.c_deadline > CURRENT_TIMESTAMP
+       AND t_cfp_partner.c_deadline > thyme.c_now
     ) > 0 AS c_is_open
   FROM
     t_cfp c
+  CROSS JOIN
+    (SELECT CURRENT_TIMESTAMP AS c_now) AS thyme
   LEFT JOIN
     t_cfp_instrument i ON c.c_cfp_id = i.c_cfp_id
   GROUP BY
-    c.c_cfp_id;
+    c.c_cfp_id, thyme.c_now;
 
