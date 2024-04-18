@@ -13,11 +13,15 @@ import io.circe.literal.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.math.Angle
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionDigest
@@ -572,6 +576,64 @@ class execution extends ExecutionTestSupport {
             }
           """
         )
+      )
+    }
+
+  }
+
+  test("ITC failure") {
+    // Creates an observation with a central wavelength of 666, which prompts
+    // the test ITC to produce an error instead of a result. (See OdbSuite
+    // itcClient.)
+    def createObservation(
+      user: User,
+      pid:  Program.Id,
+      tids: List[Target.Id]
+    ): IO[Observation.Id] =
+      createObservationWithModeAs(
+        user,
+        pid,
+        tids,
+        """
+          gmosNorthLongSlit: {
+            grating: R831_G5302,
+            fpu: LONG_SLIT_0_50,
+            centralWavelength: { nanometers: 666 }
+          }
+        """,
+        ObsStatus.Approved,
+        ObsActiveStatus.Active
+      )
+
+    val setup: IO[(Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservation(user, p, List(t))
+      } yield (o, t)
+
+    setup.flatMap { case (oid, tid) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           steps { instrumentConfig { exposure { seconds } } }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+          expected = List(s"ITC returned errors: Target '$tid': Artifical exception for test cases.").asLeft
       )
     }
 
