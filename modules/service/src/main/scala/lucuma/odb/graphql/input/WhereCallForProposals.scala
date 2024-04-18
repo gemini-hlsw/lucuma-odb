@@ -19,6 +19,7 @@ object WhereCallForProposals {
     val WhereSemesterBinding = WhereOrder.binding(path / "semester",         SemesterBinding)
     val WhereStartBinding    = WhereOrder.binding(path / "active" / "start", TimestampBinding)
     val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",   TimestampBinding)
+    val WhereIsOpenBinding   = WhereBoolean.binding(path / "_isOpen",        BooleanBinding)
 
     lazy val WhereCfpBinding = binding(path)
 
@@ -32,10 +33,11 @@ object WhereCallForProposals {
         WhereTypeBinding.Option("type", rType),
         WhereSemesterBinding.Option("semester", rSemester),
         WhereStartBinding.Option("activeStart", rStart),
-        WhereEndBinding.Option("activeEnd", rEnd)
+        WhereEndBinding.Option("activeEnd", rEnd),
+        WhereIsOpenBinding.Option("isOpen", rIsOpen)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rSemester, rStart, rEnd).parMapN {
-          (AND, OR, NOT, id, cfpType, semester, start, end) =>
+        (rAND, rOR, rNOT, rId, rType, rSemester, rStart, rEnd, rIsOpen).parMapN {
+          (AND, OR, NOT, id, cfpType, semester, start, end, isOpen) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -44,7 +46,8 @@ object WhereCallForProposals {
               cfpType,
               semester,
               start,
-              end
+              end,
+              isOpen
             ).flatten)
         }
     }

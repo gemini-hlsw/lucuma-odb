@@ -29,14 +29,12 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
         SqlObject("raLimitEnd"),
         SqlObject("decLimitStart"),
         SqlObject("decLimitEnd"),
-
         SqlObject("active"),
 
-        SqlObject("partners", Join(CallForProposalsView.Id, CallForProposalsPartnerTable.CfpId)),
-
+        SqlObject("partners",   Join(CallForProposalsView.Id, CallForProposalsPartnerTable.CfpId)),
         SqlField("instruments", CallForProposalsView.Instruments),
-
-        SqlField("existence", CallForProposalsView.Existence)
+        SqlField("existence",   CallForProposalsView.Existence),
+        SqlField("_isOpen",     CallForProposalsView.IsOpen, hidden = true)
       )
     )
 }
