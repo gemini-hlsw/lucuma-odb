@@ -201,4 +201,103 @@ class callsForProposals extends OdbSuite {
       )
     }
   }
+
+  test("WHERE isOpen (none)") {
+    expect(pi,
+      s"""
+        query {
+          callsForProposals(WHERE: { isOpen: { EQ: true } } ) {
+            matches {
+              id
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "callsForProposals": {
+            "matches": []
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("WHERE isOpen (no partners)") {
+    expect(pi,
+      s"""
+        query {
+          callsForProposals(WHERE: { isOpen: { EQ: false } } ) {
+            matches {
+              id
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "callsForProposals": {
+            "matches": [
+              {
+                "id": "c-100"
+              },
+              {
+                "id": "c-101"
+              },
+              {
+                "id": "c-102"
+              },
+              {
+                "id": "c-103"
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("WHERE isOpen (active partner)") {
+    createCall(s"""
+      type:        DEMO_SCIENCE
+      semester:    "2025B"
+      activeStart: "2025-02-02 14:00:00"
+      activeEnd:   "9999-07-30 14:00:00"
+      partners:    [
+        {
+          partner: CA
+          submissionDeadline: "3000-01-01 00:00:00"
+        },
+        {
+          partner: US
+          submissionDeadline: "2000-01-01 00:00:00"
+        }
+      ]
+    """.stripMargin
+    ).flatMap { id =>
+      expect(pi,
+        s"""
+          query {
+            callsForProposals(WHERE: { isOpen: { EQ: true } }) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "callsForProposals": {
+              "matches": [
+                {
+                  "id": $id
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
 }
