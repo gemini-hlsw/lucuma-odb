@@ -6,8 +6,8 @@ package mapping
 
 import io.circe.syntax.*
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.json.time.query.given
 import lucuma.odb.graphql.table.CallForProposalsView
+import lucuma.odb.json.time.query.given
 
 trait TimestampIntervalMapping[F[_]] extends CallForProposalsView[F] {
 
