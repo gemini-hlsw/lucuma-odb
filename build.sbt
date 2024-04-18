@@ -145,7 +145,7 @@ lazy val service = project
       "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
       "org.typelevel"  %% "paiges-core"                        % paigesVersion,
-      "com.github.vertical-blank" % "sql-formatter" % "2.0.4",
+      "com.github.vertical-blank" % "sql-formatter" % "2.0.5",
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs       += "serve"
