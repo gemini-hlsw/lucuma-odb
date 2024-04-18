@@ -328,16 +328,10 @@ type CallForProposals {
   decLimitEnd: Declination
 
   """
-  The start time (inclusive) when the observations accepted for this Call may be
+  The active period during which accepted observations for this call may be
   observed.
   """
-  activeStart: Timestamp!
-
-  """
-  The end time (exclusive) when the observations accepted for this Call may be
-  observed.
-  """
-  activeEnd: Timestamp!
+  active: TimestampInterval!
 
   """
   Partners that may participate in this Call.

@@ -60,8 +60,11 @@ class createCallForProposals extends OdbSuite {
               raLimitEnd { hms }
               decLimitStart { dms }
               decLimitEnd { dms }
-              activeStart
-              activeEnd
+              active {
+                start
+                end
+                duration { hours }
+              }
               partners {
                 partner
               }
@@ -82,8 +85,11 @@ class createCallForProposals extends OdbSuite {
               "raLimitEnd":    null,
               "decLimitStart": null,
               "decLimitEnd":   null,
-              "activeStart":   "2025-02-01 14:00:00",
-              "activeEnd":     "2025-07-31 14:00:00",
+              "active": {
+                "start": "2025-02-01 14:00:00",
+                "end": "2025-07-31 14:00:00",
+                "duration": { "hours": 4320.000000 }
+              },
               "partners":      [],
               "instruments":   [],
               "existence":     "PRESENT"

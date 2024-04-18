@@ -14,11 +14,11 @@ import lucuma.odb.graphql.binding.*
 object WhereCallForProposals {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereIdBinding       = WhereOrder.binding(path / "id",          CallForProposalsIdBinding)
-    val WhereTypeBinding     = WhereEq.binding(   path / "type",        CallForProposalsTypeBinding)
-    val WhereSemesterBinding = WhereOrder.binding(path / "semester",    SemesterBinding)
-    val WhereStartBinding    = WhereTimestampInterval.bindingStart(path / "_active")
-    val WhereEndBinding      = WhereTimestampInterval.bindingEnd(path / "_active")
+    val WhereIdBinding       = WhereOrder.binding(path / "id",               CallForProposalsIdBinding)
+    val WhereTypeBinding     = WhereEq.binding(   path / "type",             CallForProposalsTypeBinding)
+    val WhereSemesterBinding = WhereOrder.binding(path / "semester",         SemesterBinding)
+    val WhereStartBinding    = WhereOrder.binding(path / "active" / "start", TimestampBinding)
+    val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",   TimestampBinding)
 
     lazy val WhereCfpBinding = binding(path)
 
