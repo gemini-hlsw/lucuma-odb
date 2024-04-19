@@ -5,14 +5,20 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.CallForProposals
+import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
@@ -20,6 +26,7 @@ import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
+import skunk.SqlState
 import skunk.Transaction
 import skunk.implicits.*
 
@@ -34,13 +41,13 @@ trait CallForProposalsService[F[_]] {
   def updateCallsForProposals(
     SET:   CallForProposalsPropertiesInput.Edit,
     which: AppliedFragment
-  )(using Transaction[F], Services.StaffAccess): F[List[CallForProposals.Id]]
+  )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]]
 
 }
 
 object CallForProposalsService {
 
-  def instantiate[F[_]: Concurrent](using Services[F]): CallForProposalsService[F] =
+  def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): CallForProposalsService[F] =
     new CallForProposalsService[F] {
 
       override def createCallForProposals(
@@ -64,10 +71,16 @@ object CallForProposalsService {
       override def updateCallsForProposals(
         SET:   CallForProposalsPropertiesInput.Edit,
         which: AppliedFragment
-      )(using Transaction[F], Services.StaffAccess): F[List[CallForProposals.Id]] = {
+      )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]] = {
         val af = Statements.UpdateCallsForProposals(SET, which)
         session.prepareR(af.fragment.query(cfp_id)).use { pq =>
-          pq.stream(af.argument, chunkSize = 1024).compile.toList
+          pq.stream(af.argument, chunkSize = 1024)
+            .compile
+            .toList
+            .map(_.success)
+            .recover { case SqlState.DataException(_) =>
+              OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
+            }
         }
       }
 
@@ -146,12 +159,19 @@ object CallForProposalsService {
       SET:   CallForProposalsPropertiesInput.Edit,
       which: AppliedFragment
     ): AppliedFragment = {
+      val upActive = SET.active.map(_.fold(
+        sql"c_active = tsrange($core_timestamp, upper(c_active))",
+        sql"c_active = tsrange(lower(c_active), $core_timestamp)",
+        (s, e) => sql"c_active = $timestamp_interval_tsrange"(TimestampInterval.between(s, e))
+      ))
+
       val upExistence = sql"c_existence = $existence"
       val upSemester  = sql"c_semester  = $semester"
       val upType      = sql"c_type      = $cfp_type"
 
       val ups: Option[NonEmptyList[AppliedFragment]] =
         NonEmptyList.fromList(List(
+          upActive,
           SET.existence.map(upExistence),
           SET.semester.map(upSemester),
           SET.cfpType.map(upType)
