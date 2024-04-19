@@ -85,4 +85,35 @@ object CallForProposalsPropertiesInput {
 
   }
 
+  case class Edit(
+    cfpType:   Option[CallForProposalsType],
+    semester:  Option[Semester],
+    existence: Option[Existence]
+  )
+
+  object Edit {
+
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          CallForProposalsTypeBinding.NonNullable("type", rType),
+          SemesterBinding.NonNullable("semester", rSemester),
+          RightAscensionInput.Binding.Nullable("raLimitStart", rRaStart),
+          RightAscensionInput.Binding.Nullable("raLimitEnd",   rRaEnd),
+          DeclinationInput.Binding.Nullable("decLimitStart",   rDecStart),
+          DeclinationInput.Binding.Nullable("decLimitEnd",     rDecEnd),
+          TimestampBinding.NonNullable("activeStart", rActiveStart),
+          TimestampBinding.NonNullable("activeEnd",   rActiveEnd),
+          CallForProposalsPartnerInput.Binding.List.NonNullable("partners", rPartners),
+          InstrumentBinding.List.NonNullable("instruments", rInstruments),
+          ExistenceBinding.NonNullable("existence", rExistence)
+        ) => (
+          rType,
+          rSemester,
+          rExistence
+        ).parMapN(Edit.apply)
+      }
+
+  }
+
 }
