@@ -27,6 +27,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -67,6 +68,7 @@ import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
@@ -121,6 +123,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       SetProposalStatus,
       UnlinkUser,
       UpdateAsterisms,
+      UpdateCallsForProposals,
       UpdateDatasets,
       UpdateGroups,
       UpdateObsAttachments,
@@ -192,6 +195,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         child = q
       )
     }
+
+  def callForProposalsResultSubquery(cids: List[CallForProposals.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
+    mutationResultSubquery(
+      predicate       = Predicates.callForProposals.id.in(cids),
+      order           = OrderSelection[CallForProposals.Id](CallForProposalsType / "id"),
+      limit           = limit,
+      collectionField = "callsForProposals",
+      child
+    )
 
   def datasetResultSubquery(dids: List[Dataset.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
@@ -558,6 +570,30 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           _     <- transaction.rollback.unlessA(query.hasValue)
         } yield query
 
+      }
+    }
+
+  private lazy val UpdateCallsForProposals: MutationField =
+    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))) { (input, child) =>
+      services.useTransactionally {
+        requireStaffAccess {
+          val p = and(List(
+            Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True)
+          ))
+
+          val idSelect: Result[AppliedFragment] =
+            MappedQuery(
+              Filter(p, Select("id", None, Empty)),
+              Context(QueryType, List("callsForProposals"), List("callsForProposals"), List(CallForProposalsType))
+            ).flatMap(_.fragment)
+
+          idSelect.flatTraverse { which =>
+            callForProposalsService
+              .updateCallsForProposals(input.SET, which)
+              .map(callForProposalsResultSubquery(_, input.LIMIT, child))
+          }
+        }
       }
     }
 

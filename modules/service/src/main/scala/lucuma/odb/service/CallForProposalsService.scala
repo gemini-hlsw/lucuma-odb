@@ -3,9 +3,11 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import grackle.Result
 import grackle.syntax.*
@@ -15,6 +17,7 @@ import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.util.Codecs.*
+import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
 import skunk.Transaction
@@ -27,6 +30,11 @@ trait CallForProposalsService[F[_]] {
   def createCallForProposals(
     input: CreateCallForProposalsInput
   )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]]
+
+  def updateCallsForProposals(
+    SET:   CallForProposalsPropertiesInput.Edit,
+    which: AppliedFragment
+  )(using Transaction[F], Services.StaffAccess): F[List[CallForProposals.Id]]
 
 }
 
@@ -52,6 +60,17 @@ object CallForProposalsService {
                    .whenA(instruments.nonEmpty)
         } yield cid).map(_.success)
       }
+
+      override def updateCallsForProposals(
+        SET:   CallForProposalsPropertiesInput.Edit,
+        which: AppliedFragment
+      )(using Transaction[F], Services.StaffAccess): F[List[CallForProposals.Id]] = {
+        val af = Statements.UpdateCallsForProposals(SET, which)
+        session.prepareR(af.fragment.query(cfp_id)).use { pq =>
+          pq.stream(af.argument, chunkSize = 1024).compile.toList
+        }
+      }
+
     }
 
   object Statements {
@@ -122,5 +141,34 @@ object CallForProposalsService {
          .contramap {
            case (cid, instruments) => instruments.tupleLeft(cid)
          }
+
+    def UpdateCallsForProposals(
+      SET:   CallForProposalsPropertiesInput.Edit,
+      which: AppliedFragment
+    ): AppliedFragment = {
+      val upExistence = sql"c_existence = $existence"
+      val upSemester  = sql"c_semester  = $semester"
+      val upType      = sql"c_type      = $cfp_type"
+
+      val ups: Option[NonEmptyList[AppliedFragment]] =
+        NonEmptyList.fromList(List(
+          SET.existence.map(upExistence),
+          SET.semester.map(upSemester),
+          SET.cfpType.map(upType)
+        ).flatten)
+
+      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
+        void"UPDATE t_cfp "                                      |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" "    |+|
+          void"WHERE t_cfp.c_cfp_id IN (" |+| which |+| void") " |+|
+          void"RETURNING t_cfp.c_cfp_id"
+
+       def selectOnly: AppliedFragment =
+         void"SELECT c.c_cfp_id " |+|
+           void"FROM t_cfp c "    |+|
+           void"WHERE c.c_cfp_id IN (" |+| which |+| void")"
+
+      ups.fold(selectOnly)(update)
+    }
   }
 }

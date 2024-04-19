@@ -2749,7 +2749,13 @@ type Mutation {
     Bulk update asterism
     """
     input: UpdateAsterismsInput!
- ): UpdateAsterismsResult!
+  ): UpdateAsterismsResult!
+
+  "Update existing calls for proposals."
+  updateCallsForProposals(
+    "Parameters for editing existing calls for proposals."
+    input: UpdateCallsForProposalsInput!
+  ): UpdateCallsForProposalsResult!
 
   updateDatasets(
     """
@@ -4130,6 +4136,48 @@ type UpdateObsAttachmentsResult {
   """
   `true` when there were additional edits that were not returned.
   """
+  hasMore: Boolean!
+}
+
+"""
+Call for proposals selection and update description.  Use `SET` to specify the
+changes, `WHERE` to select the calls to update, and `LIMIT` to control the
+size of the return value.
+"""
+input UpdateCallsForProposalsInput {
+
+  "Describes the call for proposals properties to modify."
+  SET: CallForProposalsPropertiesInput!
+
+  """
+  Filters the calls to be updated according to those that match the given
+  constraints.
+  """
+  WHERE: WhereCallForProposals
+
+  """
+  Caps the number of results returned to the given value (if additional calls
+  match the WHERE clause they will be updated but not returned).
+  """
+  LIMIT: NonNegInt
+
+  "Set to `true` to include deleted calls."
+  includeDeleted: Boolean = false
+}
+
+"""
+The result of updating the selected calls for proposals, up to `LIMIT` or the
+maximum of 1000.  If `hasMore` is true, additional calls were modified and not
+included here.
+"""
+type UpdateCallsForProposalsResult {
+  """
+  The edited observations, up to the specified LIMIT or the default maximum of
+  1000.
+  """
+  callsForProposals: [CallForProposals!]!
+
+  "`true` when there were additional edits that were not returned."
   hasMore: Boolean!
 }
 
