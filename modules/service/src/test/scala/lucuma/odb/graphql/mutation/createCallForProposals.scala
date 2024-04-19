@@ -117,7 +117,7 @@ class createCallForProposals extends OdbSuite {
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: activeStart must be before activeEnd").asLeft
+      expected = List("Argument 'input.SET' is invalid: activeStart must come before activeEnd").asLeft
     )
   }
 

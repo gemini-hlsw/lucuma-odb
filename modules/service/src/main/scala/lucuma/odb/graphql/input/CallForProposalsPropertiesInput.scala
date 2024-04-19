@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.order.*
-import cats.syntax.parallel.*
+import cats.data.Ior
+import cats.syntax.all.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
@@ -67,7 +67,7 @@ object CallForProposalsPropertiesInput {
           val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap { (start, end) =>
             Result.fromOption(
               Option.when(start <= end)(TimestampInterval.between(start, end)),
-              Matcher.validationProblem("activeStart must be before activeEnd")
+              Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
           (
@@ -88,6 +88,7 @@ object CallForProposalsPropertiesInput {
   case class Edit(
     cfpType:   Option[CallForProposalsType],
     semester:  Option[Semester],
+    active:    Option[Ior[Timestamp, Timestamp]],
     existence: Option[Existence]
   )
 
@@ -107,11 +108,22 @@ object CallForProposalsPropertiesInput {
           CallForProposalsPartnerInput.Binding.List.NonNullable("partners", rPartners),
           InstrumentBinding.List.NonNullable("instruments", rInstruments),
           ExistenceBinding.NonNullable("existence", rExistence)
-        ) => (
-          rType,
-          rSemester,
-          rExistence
-        ).parMapN(Edit.apply)
+        ) => {
+          // If both start and end are specified, they should be in order.
+          val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap {
+            case (Some(start), Some(end)) if start > end =>
+              Matcher.validationFailure("activeStart must come before activeEnd")
+            case (s, e)                                  =>
+              Result(Ior.fromOptions(s, e))
+          }
+
+          (
+            rType,
+            rSemester,
+            rActive,
+            rExistence
+          ).parMapN(Edit.apply)
+        }
       }
 
   }

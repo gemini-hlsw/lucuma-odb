@@ -116,6 +116,218 @@ class updateCallsForProposals extends OdbSuite {
     }
   }
 
+  test("active - start and end") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeStart: "2024-12-31 14:00:00"
+                activeEnd:   "2026-01-01 14:00:00"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "active": {
+                    "start": "2024-12-31 14:00:00",
+                    "end":   "2026-01-01 14:00:00"
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+
+      )
+    }
+  }
+
+  test("active - start only") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeStart: "2024-12-31 14:00:00"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "active": {
+                    "start": "2024-12-31 14:00:00",
+                    "end":   "2025-07-31 14:00:00"
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+
+      )
+    }
+  }
+
+  test("active - end only") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeEnd: "2025-06-01 14:00:00"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "active": {
+                    "start": "2025-02-01 14:00:00",
+                    "end":   "2025-06-01 14:00:00"
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+
+      )
+    }
+  }
+
+  test("active - end before start, both specified") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeStart: "2025-12-31 14:00:00"
+                activeEnd:   "2025-01-01 14:00:00"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: activeStart must come before activeEnd").asLeft
+      )
+    }
+  }
+
+    test("active - end before start, start moved") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeStart: "2026-01-01 14:00:00"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        List("Requested update to the active period is invalid: activeStart must come before activeEnd").asLeft
+      )
+    }
+  }
+
+    test("active - end before start, end moved") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeEnd: "2020-01-01 14:00:00"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        List("Requested update to the active period is invalid: activeStart must come before activeEnd").asLeft
+      )
+    }
+  }
+
   test("existence") {
     createCall.flatMap { id =>
       expect(

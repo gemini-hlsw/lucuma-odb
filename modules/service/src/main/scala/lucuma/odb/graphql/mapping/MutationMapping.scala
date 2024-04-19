@@ -591,7 +591,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           idSelect.flatTraverse { which =>
             callForProposalsService
               .updateCallsForProposals(input.SET, which)
-              .map(callForProposalsResultSubquery(_, input.LIMIT, child))
+              .map(_.flatMap(callForProposalsResultSubquery(_, input.LIMIT, child)))
           }
         }
       }
