@@ -16,6 +16,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 object CallForProposalsPropertiesInput {
@@ -86,10 +87,11 @@ object CallForProposalsPropertiesInput {
   }
 
   case class Edit(
-    cfpType:   Option[CallForProposalsType],
-    semester:  Option[Semester],
-    active:    Option[Ior[Timestamp, Timestamp]],
-    existence: Option[Existence]
+    cfpType:     Option[CallForProposalsType],
+    semester:    Option[Semester],
+    active:      Option[Ior[Timestamp, Timestamp]],
+    instruments: Nullable[List[Instrument]],
+    existence:   Option[Existence]
   )
 
   object Edit {
@@ -105,8 +107,8 @@ object CallForProposalsPropertiesInput {
           DeclinationInput.Binding.Nullable("decLimitEnd",     rDecEnd),
           TimestampBinding.NonNullable("activeStart", rActiveStart),
           TimestampBinding.NonNullable("activeEnd",   rActiveEnd),
-          CallForProposalsPartnerInput.Binding.List.NonNullable("partners", rPartners),
-          InstrumentBinding.List.NonNullable("instruments", rInstruments),
+          CallForProposalsPartnerInput.Binding.List.Nullable("partners", rPartners),
+          InstrumentBinding.List.Nullable("instruments", rInstruments),
           ExistenceBinding.NonNullable("existence", rExistence)
         ) => {
           // If both start and end are specified, they should be in order.
@@ -121,6 +123,7 @@ object CallForProposalsPropertiesInput {
             rType,
             rSemester,
             rActive,
+            rInstruments,
             rExistence
           ).parMapN(Edit.apply)
         }

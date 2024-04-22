@@ -29,6 +29,7 @@ class updateCallsForProposals extends OdbSuite {
                 semester:    "2025A"
                 activeStart: "2025-02-01 14:00:00"
                 activeEnd:   "2025-07-31 14:00:00"
+                instruments: [GMOS_NORTH]
               }
             }
           ) {
@@ -300,7 +301,7 @@ class updateCallsForProposals extends OdbSuite {
     }
   }
 
-    test("active - end before start, end moved") {
+  test("active - end before start, end moved") {
     createCall.flatMap { id =>
       expect(
         staff,
@@ -324,6 +325,79 @@ class updateCallsForProposals extends OdbSuite {
           }
         """,
         List("Requested update to the active period is invalid: activeStart must come before activeEnd").asLeft
+      )
+    }
+  }
+
+  test("instruments") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                instruments: [GMOS_NORTH, GMOS_SOUTH]
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                instruments
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "instruments": [
+                    "GMOS_NORTH",
+                    "GMOS_SOUTH"
+                  ]
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("instruments - delete") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                instruments: null
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                instruments
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "instruments": []
+                }
+              ]
+            }
+          }
+        """.asRight
       )
     }
   }
