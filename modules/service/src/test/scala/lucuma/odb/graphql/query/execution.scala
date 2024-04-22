@@ -8,38 +8,19 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
-import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
-import lucuma.core.enums.GcalBaselineType
-import lucuma.core.enums.GcalContinuum
-import lucuma.core.enums.GcalDiffuser
-import lucuma.core.enums.GcalFilter
-import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.GmosAmpCount
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosDtax
-import lucuma.core.enums.GmosGratingOrder
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.StepGuideState
+import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.math.Angle
-import lucuma.core.math.BoundedInterval
-import lucuma.core.math.Offset
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -48,101 +29,10 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.gmos.GmosCcdMode
-import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.model.sequence.gmos.GmosGratingConfig
-import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.sequence.data.CompletedAtomMap
-import lucuma.odb.service.Services
-import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
-import lucuma.odb.smartgcal.data.Gmos.TableKey
-import lucuma.odb.smartgcal.data.Gmos.TableRow
-import lucuma.odb.smartgcal.data.SmartGcalValue
-import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
-import natchez.Trace.Implicits.noop
-import skunk.Session
+import lucuma.odb.sequence.data.Completion
 
-class execution extends OdbSuite with ObservingModeSetupOperations {
-
-  val pi: User   = TestUsers.Standard.pi(1, 30)
-  val user: User = TestUsers.service(3)
-
-  override val validUsers: List[User] =
-    List(pi, user)
-
-  val createProgram: IO[Program.Id] =
-    createProgramAs(user, "Sequence Testing")
-
-  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRow1: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_0_50.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
-        ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
-        )
-      )
-    val tableRow2: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_5_00.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
-        ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
-        )
-      )
-
-    Enums.load(s).flatMap { e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e)(s)
-      services.transactionally {
-        services.smartGcalService.insertGmosNorth(1, tableRow1) *>
-        services.smartGcalService.insertGmosNorth(2, tableRow2)
-      }
-    }
-  }
+class execution extends ExecutionTestSupport {
 
   test("digest") {
     val setup: IO[Observation.Id] =
@@ -520,6 +410,9 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                readout {
                                  xBin
                                  yBin
+                                 ampCount
+                                 ampGain
+                                 ampReadMode
                                }
                                dtax
                                roi
@@ -586,7 +479,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                 },
                                 "readout": {
                                   "xBin": "TWO",
-                                  "yBin": "TWO"
+                                  "yBin": "TWO",
+                                  "ampCount": "TWELVE",
+                                  "ampGain": "LOW",
+                                  "ampReadMode": "FAST"
                                 },
                                 "dtax": "ZERO",
                                 "roi": "CCD2",
@@ -613,7 +509,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                 },
                                 "readout": {
                                   "xBin": "ONE",
-                                  "yBin": "ONE"
+                                  "yBin": "ONE",
+                                  "ampCount": "TWELVE",
+                                  "ampGain": "LOW",
+                                  "ampReadMode": "FAST"
                                 },
                                 "dtax": "ZERO",
                                 "roi": "CENTRAL_STAMP",
@@ -642,7 +541,10 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
                                 },
                                 "readout": {
                                   "xBin": "ONE",
-                                  "yBin": "ONE"
+                                  "yBin": "ONE",
+                                  "ampCount": "TWELVE",
+                                  "ampGain": "LOW",
+                                  "ampReadMode": "FAST"
                                 },
                                 "dtax": "ZERO",
                                 "roi": "CENTRAL_STAMP",
@@ -674,6 +576,64 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             }
           """
         )
+      )
+    }
+
+  }
+
+  test("ITC failure") {
+    // Creates an observation with a central wavelength of 666, which prompts
+    // the test ITC to produce an error instead of a result. (See OdbSuite
+    // itcClient.)
+    def createObservation(
+      user: User,
+      pid:  Program.Id,
+      tids: List[Target.Id]
+    ): IO[Observation.Id] =
+      createObservationWithModeAs(
+        user,
+        pid,
+        tids,
+        """
+          gmosNorthLongSlit: {
+            grating: R831_G5302,
+            fpu: LONG_SLIT_0_50,
+            centralWavelength: { nanometers: 666 }
+          }
+        """,
+        ObsStatus.Approved,
+        ObsActiveStatus.Active
+      )
+
+    val setup: IO[(Observation.Id, Target.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservation(user, p, List(t))
+      } yield (o, t)
+
+    setup.flatMap { case (oid, tid) =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           steps { instrumentConfig { exposure { seconds } } }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+          expected = List(s"ITC returned errors: Target '$tid': Artifical exception for test cases.").asLeft
       )
     }
 
@@ -2069,101 +2029,18 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
   }
 
   test("zero gmos north dynamic steps - SequenceService atom counts") {
-    SetupZeroStepsGmosNorth.flatMap { oid =>
+    val m = SetupZeroStepsGmosNorth.flatMap { oid =>
       withServices(user) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthCompletedAtomMap(oid)(using xa)
+            .selectGmosNorthCompletionState(oid)(using xa)
         }
       }
-    }.map(m => assert(m.isEmpty))
+    }
+
+    assertIO(m, Completion.State.Empty)
   }
-
-  private def addEndStepEvent(sid: Step.Id): IO[Unit] = {
-    val q = s"""
-      mutation {
-        addStepEvent(input: {
-          stepId: "$sid",
-          stepStage: END_STEP
-        }) {
-          event {
-            step {
-              id
-            }
-          }
-        }
-      }
-    """
-
-    query(user, q).void
-  }
-
-  private def addDatasetEvent(did: Dataset.Id, stage: DatasetStage): IO[Unit] = {
-    val q = s"""
-      mutation {
-        addDatasetEvent(input: {
-          datasetId:    "$did",
-          datasetStage: ${stage.tag.toUpperCase}
-        }) {
-          event {
-            id
-          }
-        }
-      }
-    """
-
-    query(user, q).void
-  }
-
-  private def setQaState(did: Dataset.Id, qa: DatasetQaState): IO[Unit] = {
-    val q = s"""
-        mutation {
-          updateDatasets(input: {
-            SET: {
-              qaState: ${qa.tag.toUpperCase}
-            },
-            WHERE: {
-              id: { EQ: "$did" }
-            }
-          }) {
-            datasets {
-              id
-            }
-          }
-        }
-    """
-
-    query(user, q).void
-  }
-
-  private val OneSecond      = TimeSpan.unsafeFromMicroseconds( 1_000_000L)
-  private val TenSeconds     = TimeSpan.unsafeFromMicroseconds(10_000_000L)
-
-  private val GmosNorthScience0: GmosNorth =
-    GmosNorth(
-      TenSeconds,
-      GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
-      GmosDtax.Zero,
-      GmosRoi.FullFrame,
-      GmosGratingConfig.North(GmosNorthGrating.R831_G5302, GmosGratingOrder.One, Wavelength.decimalNanometers.unsafeGet(BigDecimal("500.0"))).some,
-      GmosNorthFilter.RPrime.some,
-      GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
-    )
-
-  private val GmosNorthScience5: GmosNorth =
-    GmosNorthScience0.copy(
-      gratingConfig = GmosNorthScience0.gratingConfig.map(_.copy(
-        wavelength = Wavelength.decimalNanometers.unsafeGet(BigDecimal("505.0"))
-      ))
-    )
-
-  private val GmosNorthFlat0 = GmosNorthScience0.copy(exposure = OneSecond)
-  private val GmosNorthFlat5 = GmosNorthScience5.copy(exposure = OneSecond)
-
-  private val Science00 = StepConfig.Science(Offset.Zero, StepGuideState.Enabled)
-  private val Science15 = StepConfig.Science(Offset.microarcseconds.reverseGet((0, 15_000_000L)), StepGuideState.Enabled)
-  private val Flat      = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
 
   private def setupOneStepGmosNorth(count: Int): IO[(Observation.Id, Step.Id, Dataset.Id)] = {
     import lucuma.odb.json.all.transport.given
@@ -2174,7 +2051,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v)
-      s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, Science00)
+      s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
       d <- recordDatasetAs(user, s, f"N18630101S$count%04d.fits")
       _ <- addDatasetEvent(d, DatasetStage.StartExpose)
       _ <- addDatasetEvent(d, DatasetStage.EndExpose)
@@ -2184,11 +2061,6 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       _ <- addEndStepEvent(s)
     } yield (o, s, d)
   }
-
-  private def scienceSingleAtom[D](steps: CompletedAtomMap.StepMatch[D]*): CompletedAtomMap[D] =
-    CompletedAtomMap.from(
-      CompletedAtomMap.Key.science(steps*) -> PosInt.unsafeFrom(1)
-    )
 
   test("one gmos north dynamic step - GmosSequenceService") {
     setupOneStepGmosNorth(1).flatMap { case (o, s, _) =>
@@ -2213,7 +2085,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             .selectGmosNorthSteps(o)(using xa)
         }
       }.map { m =>
-        assertEquals(m, Map(s -> (GmosNorthScience0, Science00)))
+        assertEquals(m, Map(s -> (GmosNorthScience0, ScienceP00Q00)))
       }
     }
   }
@@ -2224,12 +2096,11 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthCompletedAtomMap(o)(using xa)
+            .selectGmosNorthCompletionState(o)(using xa)
         }
       }
     }
-
-    assertIO(m, CompletedAtomMap.Empty)
+    assertIO(m.map(_.sci.atomMap), Completion.AtomMap.Empty)
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - FAIL") {
@@ -2243,12 +2114,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           services.session.transaction.use { xa =>
             services
               .sequenceService
-              .selectGmosNorthCompletedAtomMap(o)(using xa)
+              .selectGmosNorthCompletionState(o)(using xa)
           }
         }
       } yield m
 
-    assertIO(m, CompletedAtomMap.Empty)
+    assertIO(m.map(_.sci.atomMap), Completion.AtomMap.Empty)
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - NULL QA") {
@@ -2261,12 +2132,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           services.session.transaction.use { xa =>
             services
               .sequenceService
-              .selectGmosNorthCompletedAtomMap(o)(using xa)
+              .selectGmosNorthCompletionState(o)(using xa)
           }
         }
       } yield m
 
-    assertIO(m, scienceSingleAtom((GmosNorthScience0, Science00)))
+    assertIO(m.map(_.sci.atomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - Pass") {
@@ -2280,12 +2151,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
           services.session.transaction.use { xa =>
             services
               .sequenceService
-              .selectGmosNorthCompletedAtomMap(o)(using xa)
+              .selectGmosNorthCompletionState(o)(using xa)
           }
         }
       } yield m
 
-    assertIO(m, scienceSingleAtom((GmosNorthScience0, Science00)))
+    assertIO(m.map(_.sci.atomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
   }
 
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
@@ -2298,7 +2169,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
       v <- recordVisitAs(user, Instrument.GmosNorth, o)
       a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
 
-      sSci  <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, Science00)
+      sSci  <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
       _     <- addEndStepEvent(sSci)
 
       sFlat <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthFlat0,    Flat)
@@ -2333,7 +2204,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
             .selectGmosNorthSteps(o)(using xa)
         }
       }.map { m =>
-        assertEquals(m, Map(sSci -> (GmosNorthScience0, Science00), sFlat -> (GmosNorthFlat0, Flat)))
+        assertEquals(m, Map(sSci -> (GmosNorthScience0, ScienceP00Q00), sFlat -> (GmosNorthFlat0, Flat)))
       }
     }
   }
@@ -2344,12 +2215,12 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         services.session.transaction.use { xa =>
           services
             .sequenceService
-            .selectGmosNorthCompletedAtomMap(o)(using xa)
+            .selectGmosNorthCompletionState(o)(using xa)
         }
       }
     }
 
-    assertIO(m, scienceSingleAtom((GmosNorthScience0, Science00), (GmosNorthFlat0, Flat)))
+    assertIO(m.map(_.sci.atomMap), atomMap1((GmosNorthScience0, ScienceP00Q00), (GmosNorthFlat0, Flat)))
   }
 
   test("clear execution digest") {
@@ -2363,7 +2234,7 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         v <- recordVisitAs(user, Instrument.GmosNorth, o)
         a <- recordAtomAs(user, Instrument.GmosNorth, v)
-        s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, Science00)
+        s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
       } yield (p, o, s)
     }
 
@@ -2382,36 +2253,6 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
     assertIOBoolean(isEmpty, "The execution digest should be removed")
   }
 
-  def genGmosNorthSequence(oid: Observation.Id, futureLimit: Int): IO[List[Atom.Id]] =
-    query(
-      user = user,
-      query = s"""
-        query {
-          observation(observationId: "$oid") {
-            execution {
-              config(futureLimit: $futureLimit) {
-                gmosNorth {
-                  science {
-                    nextAtom {
-                      id
-                    }
-                    possibleFuture {
-                      id
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map { json =>
-      val sci = json.hcursor.downFields("observation", "execution", "config", "gmosNorth", "science")
-      val n   = sci.downFields("nextAtom", "id").require[Atom.Id]
-      val fs  = sci.downFields("possibleFuture").values.toList.flatMap(_.toList.map(_.hcursor.downField("id").require[Atom.Id]))
-      n :: fs
-    }
-
   test("execute the first step") {
 
     import lucuma.odb.json.all.transport.given
@@ -2422,14 +2263,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, Science00)
+        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
         s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
         _      <- addEndStepEvent(s1)
-        after  <- genGmosNorthSequence(o, 4)
+        after  <- genGmosNorthSequence(o, SequenceType.Science, 4)
       } yield (before, after)
 
     // The tail of `before` should equal `after` since the first atom has been executed.
@@ -2448,14 +2289,14 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
         s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
         _      <- addEndStepEvent(s0)
-        s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience5, Science15)
+        s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
         _      <- addEndStepEvent(s1)
-        after  <- genGmosNorthSequence(o, 4)
+        after  <- genGmosNorthSequence(o, SequenceType.Science, 4)
       } yield (before, after)
 
     // `after` should be the same as `before` with atom at index 1 removed, since
@@ -2477,15 +2318,15 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, Science00)
+        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
         a1     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s1     <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthScience5, Science15)
+        s1     <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
         _      <- addEndStepEvent(s1)
-        after  <- genGmosNorthSequence(o, 5)
+        after  <- genGmosNorthSequence(o, SequenceType.Science, 5)
       } yield (before, after)
 
     // No atoms have been completed, just the first steps of two different atoms
@@ -2502,16 +2343,16 @@ class execution extends OdbSuite with ObservingModeSetupOperations {
         p      <- createProgram
         t      <- createTargetWithProfileAs(user, p)
         o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        before <- genGmosNorthSequence(o, 5)
         v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
         a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, Science00)
+        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
         s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
         _      <- addEndStepEvent(s1)
         s2     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
         _      <- addEndStepEvent(s2)
-        after  <- genGmosNorthSequence(o, 5)
+        after  <- genGmosNorthSequence(o, SequenceType.Science, 5)
       } yield (before, after)
 
     // The first atom is broken by another step, so nothing has been successfully completed
