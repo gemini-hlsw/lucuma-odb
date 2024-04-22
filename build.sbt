@@ -13,11 +13,11 @@ val http4sBlazeVersion         = "0.23.16"
 val http4sEmberVersion         = "0.23.26"
 val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.5.3"
+val logbackVersion             = "1.5.6"
 val log4catsVersion            = "2.6.0"
-val lucumaCatalogVersion       = "0.45.2"
+val lucumaCatalogVersion       = "0.45.3"
 val lucumaItcVersion           = "0.21.8"
-val lucumaCoreVersion          = "0.96.0"
+val lucumaCoreVersion          = "0.96.1"
 val lucumaGraphQLRoutesVersion = "0.8.7"
 val lucumaSsoVersion           = "0.6.16"
 val munitVersion               = "0.7.29"
@@ -28,7 +28,7 @@ val natchezVersion             = "0.3.5"
 val paigesVersion              = "0.4.3"
 val postgresVersion            = "42.7.3"
 val skunkVersion               = "0.6.3"
-val pprintVersion              = "0.8.1"
+val pprintVersion              = "0.9.0"
 val testcontainersScalaVersion = "0.40.14" // N.B. 0.40.15 causes java.lang.NoClassDefFoundError: munit/Test
 
 ThisBuild / tlBaseVersion      := "0.11"
@@ -135,7 +135,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.691"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.703"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
@@ -145,7 +145,7 @@ lazy val service = project
       "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
       "org.typelevel"  %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
       "org.typelevel"  %% "paiges-core"                        % paigesVersion,
-      "com.github.vertical-blank" % "sql-formatter" % "2.0.4",
+      "com.github.vertical-blank" % "sql-formatter" % "2.0.5",
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs       += "serve"

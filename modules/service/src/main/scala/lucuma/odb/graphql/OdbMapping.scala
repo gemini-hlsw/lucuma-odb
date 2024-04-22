@@ -94,6 +94,8 @@ object OdbMapping {
           with AsterismGroupSelectResultMapping[F]
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
+          with CallForProposalsMapping[F]
+          with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
           with CloneObservationResultMapping[F]
@@ -106,6 +108,7 @@ object OdbMapping {
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
           with CoordinatesMapping[F]
+          with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
           with CreateProgramResultMapping[F]
@@ -248,6 +251,9 @@ object OdbMapping {
               AtomRecordMapping,
               AtomRecordSelectResultMapping,
               CalibrationProgramReferenceMapping,
+              CallForProposalsMapping,
+              CallForProposalsPartnerMapping,
+              CallsForProposalsSelectResultMapping,
               CatalogInfoMapping,
               CategorizedTimeMapping,
               CloneObservationResultMapping,
@@ -261,6 +267,7 @@ object OdbMapping {
               ConstraintSetGroupSelectResultMapping,
               ConstraintSetMapping,
               CoordinatesMapping,
+              CreateCallForProposalsResultMapping,
               CreateGroupResultMapping,
               CreateObservationResultMapping,
               CreateProgramResultMapping,
