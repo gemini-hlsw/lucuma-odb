@@ -51,6 +51,8 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.EmailId
+import lucuma.odb.data.EmailStatus
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
@@ -1267,5 +1269,17 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { j =>
       j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
     }
+
+  def getEmailIdForInvitation(id: UserInvitation.Id): IO[Option[EmailId]] = {
+    val query = sql"select c_email_id from t_invitation where c_invitation_id = $user_invitation_id".query(email_id)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.option(id)))
+  }
+
+  def updateEmailStatus(id: EmailId, status: EmailStatus): IO[Unit] = {
+    val command = sql"update t_email set c_status = $email_status where c_email_id = $email_id".command
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(command).use(_.execute(status, id).void))
+  }
 
 }

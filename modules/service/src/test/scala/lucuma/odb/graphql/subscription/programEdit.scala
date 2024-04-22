@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.UserInvitation
+import lucuma.odb.data.EmailStatus
 
 import scala.concurrent.duration.*
 
@@ -400,6 +401,47 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "recipientEmail": "here@there.com" } ] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "REVOKED", "recipientEmail": "here@there.com" } ] } } }"""
+        )
+    )
+  }
+
+    test("edit event should show up for updating an invitation's email status") {
+    import Group2.pi
+    subscriptionExpect(
+      user = pi,
+      query =
+        """
+          subscription {
+            programEdit {
+              editType
+              value {
+                name
+                userInvitations {
+                  status
+                  email {
+                    status
+                  }
+                }
+              }
+            }
+          }
+        """,
+      mutations =
+        Right(
+          for {
+            pid <- createProgram(pi, "foo")
+            _   <- IO.sleep(1.second)
+            inv <- createUserInvitationAs(pi, pid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
+            _   <- IO.sleep(1.second)
+            eid <- getEmailIdForInvitation(inv.id)
+            _   <- updateEmailStatus(eid.get, EmailStatus.Accepted)
+          } yield ()
+        ),
+      expected =
+        List(
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "userInvitations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "email": { "status": "QUEUED"}} ] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "email": { "status": "ACCEPTED"}} ] } } }"""
         )
     )
   }
