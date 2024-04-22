@@ -2567,15 +2567,7 @@ type Mutation {
   Unlink a user from a program.
   This operation is available only to Admin and Service users.
   """
-  unlinkUser(
-
-    "The program to unlink the user from."
-    programId: ProgramId!
-
-    "The user to unlink."
-    userId: UserId!
-
-  ): UnlinkUserResult!
+  unlinkUser(input: UnlinkUserInput!): UnlinkUserResult!
 
   """
   Update asterisms, adding or deleting targets, in (potentially) multiple
@@ -10116,11 +10108,11 @@ enum ToOActivation {
 
 input UnlinkUserInput {
 
-    "The program to unlink the user from."
-    programId: ProgramId!
+  "The program to unlink the user from."
+  programId: ProgramId!
 
-    "The user to unlink."
-    userId: UserId!
+  "The user to unlink."
+  userId: UserId!
 
 }
 
