@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 
 import cats.effect.Async
-import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
@@ -13,13 +12,12 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.EmailStatus
-import lucuma.odb.service.EmailService
+import lucuma.odb.service.EmailWebhookService
 import org.http4s.*
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 import scodec.bits.ByteVector
-import skunk.Session
 
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -90,16 +88,14 @@ object EmailWebhookRoutes {
     )
 
   def apply[F[_]: Async: Logger](
-    pool:        Resource[F, Session[F]],
+    webhookService: EmailWebhookService[F],
     emailConfig: Config.Email
   ): HttpRoutes[F] = {
     val dsl = Http4sDsl[F]
     import dsl.*
 
     def updateStatus(data: EventData): F[Unit] =
-      pool.use(session =>
-        EmailService.updateStatus(session, data.messageId, data.emailStatus, data.timestamp)
-      )
+      webhookService.updateStatus(data.messageId, data.emailStatus, data.timestamp)
 
     def validateSignature(event: WebhookEvent): F[Unit] =
       if (event.signature.isValid(emailConfig.webhookSigningKey)) Async[F].unit
