@@ -25,6 +25,8 @@ import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -62,6 +64,7 @@ import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
+import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
@@ -114,6 +117,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       SetAllocation,
       SetProgramReference,
       SetProposalStatus,
+      UnlinkUser,
       UpdateAsterisms,
       UpdateDatasets,
       UpdateGroups,
@@ -160,6 +164,19 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               rInput.map(input => Environment(Env("input" -> input), child))
             }
       }
+
+    /** A mutation that yields a Json result. */
+    def json[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: I => F[Result[Json]]) =
+      new MutationField {
+        val FieldMapping =
+          RootEffect.computeJson(fieldName): (_, env) =>
+            Nested(env.getR[I]("input").flatTraverse(i => f(i))).value
+        val elaborator =
+          case (MutationType, `fieldName`, List(inputBinding("input", rInput))) =>
+            Elab.liftR(rInput).flatMap: i =>
+              Elab.env("input" -> i)
+      }
+
   }
 
   def mutationResultSubquery[A: Order](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
@@ -312,6 +329,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Predicates.linkUserResult.programId.eql(pid),
             Predicates.linkUserResult.userId.eql(uid),
           ), child))
+
+  private lazy val UnlinkUser =
+    MutationField.json("unlinkUser", UnlinkUserInput.Binding): input =>
+      services.useTransactionally:
+        requirePiAccess:
+          programService.unlinkUser(input).nestMap: b =>
+            Json.obj("result" -> b.asJson)
 
   private def recordDatasetResponseToResult(
     child:        Query,

@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import grackle.circe.CirceMappingLike
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
 import lucuma.odb.graphql.util.SchemaSemigroup
@@ -10,7 +11,8 @@ import lucuma.odb.graphql.util.SchemaSemigroup
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
      with SchemaSemigroup[F]
-     with MappingExtras[F] {
+     with MappingExtras[F]
+     with CirceMappingLike[F] {
 
   // TODO: auto-generate this
   lazy val AddConditionsEntryResultType        = schema.ref("AddConditionsEntryResult")
@@ -278,6 +280,7 @@ trait BaseMapping[F[_]]
   lazy val TimingWindowRepeatType              = schema.ref("TimingWindowRepeat")
   lazy val TimingWindowType                    = schema.ref("TimingWindow")
   lazy val ToOActivationType                   = schema.ref("ToOActivation")
+  lazy val UnlinkUserResultType                = schema.ref("UnlinkUserResult")
   lazy val UpdateAsterismsResultType           = schema.ref("UpdateAsterismsResult")
   lazy val UpdateDatasetsResultType            = schema.ref("UpdateDatasetsResult")
   lazy val UpdateGroupsResultType              = schema.ref("UpdateGroupsResult")
