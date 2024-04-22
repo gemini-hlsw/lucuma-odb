@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
@@ -12,7 +11,6 @@ import grackle.ResultT
 import io.circe.Decoder
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
-import lucuma.core.util.Timestamp
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.EmailStatus
@@ -24,7 +22,6 @@ import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.client.*
 import org.http4s.headers.Authorization
 import skunk.AppliedFragment
-import skunk.Session
 import skunk.Transaction
 import skunk.implicits.*
 
@@ -42,19 +39,6 @@ trait EmailService[F[_]] {
 }
 
 object EmailService {
-
-  // This is called from the EmailWebhookRoutes, which doesn't have access to the Services
-  def updateStatus[F[_]: MonadCancelThrow](
-    session: Session[F],
-    emailId: EmailId,
-    status: EmailStatus,
-    timestamp: Timestamp
-  ): F[Unit] = {
-    val af = Statements.updateStatus(emailId, status, timestamp)
-    
-    session.prepareR(af.fragment.command)
-      .use(_.execute(af.argument).void)
-  }
 
   def fromConfigAndClient[F[_]: Concurrent](
     config:  Config.Email,
@@ -151,13 +135,5 @@ object EmailService {
         htmlMessage,
         EmailStatus.Queued
       )
-
-    def updateStatus(emailId: EmailId, status: EmailStatus, timestamp: Timestamp): AppliedFragment =
-      sql"""
-        update t_email
-        set c_status = $email_status,
-            c_status_time = $core_timestamp
-        where c_email_id = $email_id
-      """.apply(status, timestamp, emailId)
 
 }

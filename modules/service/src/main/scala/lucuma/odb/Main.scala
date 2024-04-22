@@ -25,6 +25,7 @@ import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.EmailWebhookService
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
@@ -242,11 +243,12 @@ object FMain extends MainParams {
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
       metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
+      webhookService    <- pool.map(EmailWebhookService.fromSession(_))
     } yield { wsb =>
       val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
       val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
       val metadataRoutes = GraphQLRoutes.enumMetadata(metadataService)
-      val emailWebhookRoutes = EmailWebhookRoutes(pool, emailConfig)
+      val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
       middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes <+> metadataRoutes <+> emailWebhookRoutes)
     }
 
