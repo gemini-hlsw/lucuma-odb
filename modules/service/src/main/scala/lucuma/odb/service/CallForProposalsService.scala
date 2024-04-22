@@ -8,15 +8,18 @@ import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import grackle.Result
+import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.CallForProposals
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
@@ -57,21 +60,22 @@ object CallForProposalsService {
         val instruments = input.SET.instruments
         (for {
           cid <- session.unique(Statements.InsertCallForProposals)(input.SET)
+          cids = List(cid)
           _   <- session
-                   .prepareR(Statements.InsertPartners(partners))
-                   .use(_.execute(cid, partners))
+                   .prepareR(Statements.InsertPartners(cids, partners))
+                   .use(_.execute(cids, partners))
                    .whenA(partners.nonEmpty)
           _   <- session
-                   .prepareR(Statements.InsertInstruments(instruments))
-                   .use(_.execute(cid, instruments))
+                   .prepareR(Statements.InsertInstruments(cids, instruments))
+                   .use(_.execute(cids, instruments))
                    .whenA(instruments.nonEmpty)
         } yield cid).map(_.success)
       }
 
-      override def updateCallsForProposals(
+      private def updateCfpTable(
         SET:   CallForProposalsPropertiesInput.Edit,
         which: AppliedFragment
-      )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]] = {
+      ): F[Result[List[CallForProposals.Id]]] = {
         val af = Statements.UpdateCallsForProposals(SET, which)
         session.prepareR(af.fragment.query(cfp_id)).use { pq =>
           pq.stream(af.argument, chunkSize = 1024)
@@ -83,6 +87,33 @@ object CallForProposalsService {
             }
         }
       }
+
+      private def updateInstruments(
+        cids:        List[CallForProposals.Id],
+        instruments: Nullable[List[Instrument]]
+      ): F[Result[Unit]] =
+        instruments.fold(
+          session
+            .executeCommand(Statements.DeleteInstruments(cids))
+            .void,
+          Concurrent[F].unit,
+          instruments =>
+            session.executeCommand(Statements.DeleteInstruments(cids)) *>
+            session
+              .prepareR(Statements.InsertInstruments(cids, instruments))
+              .use(_.execute(cids, instruments))
+              .whenA(instruments.nonEmpty)
+              .void
+        ).map(_.success)
+
+      override def updateCallsForProposals(
+        SET:   CallForProposalsPropertiesInput.Edit,
+        which: AppliedFragment
+      )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]] =
+        (for {
+          cids <- ResultT(updateCfpTable(SET, which))
+          _    <- ResultT(updateInstruments(cids, SET.instruments))
+        } yield cids).value
 
     }
 
@@ -123,8 +154,9 @@ object CallForProposalsService {
       )}
 
     def InsertPartners(
+      cids:     List[CallForProposals.Id],
       partners: List[CallForProposalsPartnerInput]
-    ): Command[(CallForProposals.Id, partners.type)] =
+    ): Command[(cids.type, partners.type)] =
       sql"""
         INSERT INTO t_cfp_partner (
           c_cfp_id,
@@ -134,26 +166,33 @@ object CallForProposalsService {
           cfp_id  *:
           tag     *:
           core_timestamp
-        ).values.list(partners.length)}
+        ).values.list(cids.length * partners.length)}
       """.command
          .contramap {
-           case (cid, partners) => partners.map { p =>
-             (cid, p.partner, p.deadline)
+           case (cids, partners) => cids.flatMap { cid =>
+             partners.map { p => (cid, p.partner, p.deadline) }
            }
          }
 
     def InsertInstruments(
+      cids:        List[CallForProposals.Id],
       instruments: List[Instrument]
-    ): Command[(CallForProposals.Id, instruments.type)] =
+    ): Command[(cids.type, instruments.type)] =
       sql"""
         INSERT INTO t_cfp_instrument (
           c_cfp_id,
           c_instrument
-        ) VALUES ${(cfp_id *: instrument).values.list(instruments.length)}
+        ) VALUES ${(cfp_id *: instrument).values.list(cids.length * instruments.length)}
       """.command
          .contramap {
-           case (cid, instruments) => instruments.tupleLeft(cid)
+           case (cids, instruments) => cids.flatMap(instruments.tupleLeft(_))
          }
+
+    def DeleteInstruments(cids: List[CallForProposals.Id]): AppliedFragment =
+      sql"""
+        DELETE FROM t_cfp_instrument
+          WHERE c_cfp_id IN ${cfp_id.list(cids.length).values}
+      """.apply(cids)
 
     def UpdateCallsForProposals(
       SET:   CallForProposalsPropertiesInput.Edit,
