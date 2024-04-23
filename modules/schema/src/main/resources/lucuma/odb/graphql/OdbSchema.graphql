@@ -367,45 +367,53 @@ input CallForProposalsPropertiesInput {
   "Semester associated with the call. Required on create."
   semester: Semester
 
-  "Optional RA limit start RA. Required only if raLimitEnd is specified."
+  """
+  Optional RA limit start RA. Required only if raLimitEnd is specified. Nullable
+  on edit if raLimitEnd is also set to 'null'.
+  """
   raLimitStart: RightAscensionInput
 
-  "Optional RA limit end RA. Required only if raLimitStart is specified."
+  """
+  Optional RA limit end RA. Required only if raLimitStart is specified. Nullable
+  on edit if raLimitStart is also set to 'null'.
+  """
   raLimitEnd: RightAscensionInput
 
   """
   Optional declination limit start declination. Required only if decLimitEnd is
-  specified.
+  specified.  Nullable on edit if decLimitEnd is also set to 'null'.
   """
   decLimitStart: DeclinationInput
 
   """
   Optional declination limit end declination. Required only if decLimitStart is
-  specified.
+  specified.  Nullable on edit if decLimitStart is also set to 'null'.
   """
   decLimitEnd: DeclinationInput
 
   """
   Active period start time for this call.  Required on create.  Must be before
-  the activeEnd time.
+  the activeEnd time.  Not nullable.
   """
   activeStart: Timestamp
 
   """
   Active period end time for this call.  Required on create.  Must be after
-  the activeStart time.
+  the activeStart time.  Not nullable.
   """
   activeEnd: Timestamp
 
   """
   Partners that may participate in the call along with their respective
-  deadlines.
+  deadlines.  When editing, supply the entire list of all partners.  Nullable
+  on edit.
   """
   partners: [CallForProposalsPartnerInput!]
 
   """
   When specified, the call is limited to the listed instruments.  When not
-  specified, all otherwise available instruments may be used.
+  specified, all otherwise available instruments may be used.  When editing,
+  supply the entire list of instruments to set.  Nullable on edit.
   """
   instruments: [Instrument!]
 
