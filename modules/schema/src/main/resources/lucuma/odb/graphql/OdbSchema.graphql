@@ -328,16 +328,10 @@ type CallForProposals {
   decLimitEnd: Declination
 
   """
-  The start time (inclusive) when the observations accepted for this Call may be
+  The active period during which accepted observations for this call may be
   observed.
   """
-  activeStart: Timestamp!
-
-  """
-  The end time (exclusive) when the observations accepted for this Call may be
-  observed.
-  """
-  activeEnd: Timestamp!
+  active: TimestampInterval!
 
   """
   Partners that may participate in this Call.
@@ -8223,6 +8217,11 @@ type Query {
   Select all Calls for Proposals.
   """
   callsForProposals(
+
+    "Filters the selection of calls for proposals."
+    WHERE: WhereCallForProposals
+
+    "Starts the result set at (or after if not existent) the given id."
     OFFSET: CallForProposalsId
 
     "Limits the result to at most this number of matches (but never more than 1000)."
@@ -10555,6 +10554,45 @@ input WhereBoolean {
 
 }
 
+input WhereCallForProposals {
+
+  """
+  A list of nested call for proposals filters that all must match in order for
+  the AND group as a whole to match.
+  """
+  AND: [WhereCallForProposals!]
+
+  """
+  A list of nested call for proposals filters where any one match causes the
+  entire OR group as a whole to match.
+  """
+  OR: [WhereCallForProposals!]
+
+  """
+  A nested call for proposals filter that must not match in order for the NOT
+  itself to match.
+  """
+  NOT: WhereCallForProposals
+
+  "Matches the call for propsals id."
+  id: WhereOrderCallForProposalsId
+
+  "Matches the call for proposals type."
+  type: WhereEqCallForProposalsType
+
+  "Matches the call for proposals semester."
+  semester: WhereOrderSemester
+
+  "Matches the active period start."
+  activeStart: WhereOrderTimestamp
+
+  "Matches the active period end."
+  activeEnd: WhereOrderTimestamp
+
+  "Matches whether the call is still open for some partner."
+  isOpen: WhereBoolean
+}
+
 """
 ObsAttachment filter options. All specified items must match.
 """
@@ -10734,6 +10772,34 @@ input WhereDatasetReference {
 
   "Matches the exposure index."
   exposureIndex: WhereOrderPosInt
+
+}
+
+"""
+Filters on equality (or not) of the call for proposals type.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereEqCallForProposalsType {
+
+  """
+  Matches if the call for proposals type is exactly the supplied value.
+  """
+  EQ: CallForProposalsType
+
+  """
+  Matches if the call for proposals type is not the supplied value.
+  """
+  NEQ: CallForProposalsType
+
+  """
+  Matches if the call for proposals type is any of the supplied options.
+  """
+  IN: [CallForProposalsType!]
+
+  """
+  Matches if the call for proposals type is none of the supplied values.
+  """
+  NIN: [CallForProposalsType!]
 
 }
 
@@ -11428,6 +11494,53 @@ input WhereOrderBigDecimal {
   LTE: BigDecimal
 }
 
+"""
+Filters on equality or order comparisons of call for proposals ids.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOrderCallForProposalsId {
+
+  """
+  Matches if the id is exactly the supplied value.
+  """
+  EQ: CallForProposalsId
+
+  """
+  Matches if the id is not the supplied value.
+  """
+  NEQ: CallForProposalsId
+
+  """
+  Matches if the id is any of the supplied options.
+  """
+  IN: [CallForProposalsId!]
+
+  """
+  Matches if the id is none of the supplied options.
+  """
+  NIN: [CallForProposalsId!]
+
+  """
+  Matches if the id is ordered after (>) the supplied value.
+  """
+  GT: CallForProposalsId
+
+  """
+  Matches if the id is ordered before (<) the supplied value.
+  """
+  LT: CallForProposalsId
+
+  """
+  Matches if the id is ordered after or equal (>=) the supplied value.
+  """
+  GTE: CallForProposalsId
+
+  """
+  Matches if the id is ordered before or equal (<=) the supplied value.
+  """
+  LTE: CallForProposalsId
+
+}
 
 """
 Filters on equality or order comparisons of the property.  All supplied

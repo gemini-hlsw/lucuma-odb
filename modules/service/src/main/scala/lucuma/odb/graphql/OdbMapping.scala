@@ -198,6 +198,7 @@ object OdbMapping {
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
+          with TimestampIntervalMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateDatasetsResultMapping[F]
@@ -386,6 +387,7 @@ object OdbMapping {
               TimingWindowMapping,
               TimingWindowRepeatMapping,
               TimeSpanMapping,
+              TimestampIntervalMapping,
               UpdateAsterismsResultMapping,
               UpdateDatasetsResultMapping,
               UpdateGroupsResultMapping,
