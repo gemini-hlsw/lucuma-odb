@@ -4,6 +4,8 @@
 package lucuma.odb.data
 
 import cats.*
+import cats.syntax.applicative.*
+import cats.syntax.functor.*
 
 import scala.annotation.tailrec
 
@@ -47,8 +49,8 @@ object Nullable {
   case object Absent               extends Nullable[Nothing]
   case class  NonNull[A](value: A) extends Nullable[A]
 
-  implicit val NullableInstances: Monad[Nullable] & SemigroupK[Nullable] =
-    new Monad[Nullable] with SemigroupK[Nullable] {
+  implicit val NullableInstances: Monad[Nullable] & Traverse[Nullable] & SemigroupK[Nullable] =
+    new Monad[Nullable] with Traverse[Nullable] with SemigroupK[Nullable] {
       override def map[A, B](fa: Nullable[A])(fab: A => B): Nullable[B] = fa.map(fab)
       def flatMap[A, B](fa: Nullable[A])(f: A => Nullable[B]): Nullable[B] = fa.flatMap(f)
       def pure[A](x: A): Nullable[A] = NonNull(x)
@@ -60,6 +62,15 @@ object Nullable {
           case NonNull(Right(value)) => NonNull(value)
           case NonNull(Left(value))  => tailRecM(value)(f)
         }
+
+      def traverse[G[_]: Applicative, A, B](fa: Nullable[A])(f: A => G[B]): G[Nullable[B]] =
+        fa.fold(Null.pure[G], Absent.pure[G], a => f(a).map(NonNull(_)))
+
+      def foldLeft[A, B](fa: Nullable[A], b: B)(f: (B, A) => B): B =
+        fa.fold(b, b, a => f(b, a))
+
+      def foldRight[A, B](fa: Nullable[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+        fa.fold(lb, lb, a => f(a, lb))
     }
 
   def orNull[A](opt: Option[A]): Nullable[A] =

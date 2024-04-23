@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Traverse
 import cats.data.Ior
 import cats.syntax.all.*
 import grackle.Result
@@ -12,6 +13,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Semester
+import lucuma.core.syntax.string.*
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.CallForProposalsType
@@ -33,18 +35,6 @@ object CallForProposalsPropertiesInput {
   )
 
   object Create {
-
-    private def bothOrNeither[A](
-      ra: Result[Option[A]],
-      rb: Result[Option[A]],
-      na: String,
-      nb: String
-    ): Result[Option[(A, A)]] =
-      (ra, rb).parFlatMapN {
-        case (Some(a), Some(b)) => Some((a, b)).success
-        case (None, None)       => None.success
-        case _                  => Result.failure(s"Supply both $na and $nb or neither")
-      }
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -71,14 +61,16 @@ object CallForProposalsPropertiesInput {
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
+          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase).map(_.toList.flatten)
+          val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
             rType,
             rSemester,
             rRaLimit,
             rDecLimit,
             rActive,
-            rPartners.map(_.toList.flatten),
-            rInstruments.map(_.toList.flatten),
+            rPartnersʹ,
+            rInstrumentsʹ,
             rExistence.map(_.getOrElse(Existence.Present))
           ).parMapN(Create.apply)
         }
@@ -90,6 +82,7 @@ object CallForProposalsPropertiesInput {
     cfpType:     Option[CallForProposalsType],
     semester:    Option[Semester],
     active:      Option[Ior[Timestamp, Timestamp]],
+    partners:    Nullable[List[CallForProposalsPartnerInput]],
     instruments: Nullable[List[Instrument]],
     existence:   Option[Existence]
   )
@@ -118,12 +111,14 @@ object CallForProposalsPropertiesInput {
             case (s, e)                                  =>
               Result(Ior.fromOptions(s, e))
           }
-
+          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase)
+          val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase)
           (
             rType,
             rSemester,
             rActive,
-            rInstruments,
+            rPartnersʹ,
+            rInstrumentsʹ,
             rExistence
           ).parMapN(Edit.apply)
         }
@@ -131,4 +126,31 @@ object CallForProposalsPropertiesInput {
 
   }
 
+  private def bothOrNeither[A](
+    ra: Result[Option[A]],
+    rb: Result[Option[A]],
+    na: String,
+    nb: String
+  ): Result[Option[(A, A)]] =
+    (ra, rb).parFlatMapN {
+      case (Some(a), Some(b)) => Some((a, b)).success
+      case (None, None)       => None.success
+      case _                  => Result.failure(s"Supply both $na and $nb or neither")
+    }
+
+  private def dedup[F[_]: Traverse, A, B](
+    name: String,
+    in:   Result[F[List[A]]]
+  )(
+    f: A => B,
+    p: B => String
+  ): Result[F[List[A]]] =
+    in.flatMap { fas =>
+      fas.traverse { as =>
+        val bs   = as.map(f)
+        val dups = bs.diff(bs.distinct)
+        if (dups.isEmpty) as.success
+        else Matcher.validationFailure(s"duplicate '$name' specified: ${dups.map(p).mkString(", ")}")
+      }
+   }
 }
