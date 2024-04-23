@@ -10,6 +10,7 @@ import cats.effect.std.UUIDGen
 import cats.effect.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.data.EmailAddress
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.EmailStatus
@@ -26,11 +27,13 @@ class emailWebhookRoutes extends OdbSuite {
   val pi = TestUsers.Standard.pi(1, 101)
   val validUsers = List(pi)
 
-  private val emailConfig = 
+  // match the signing key to the test message below
+  override val emailConfig = 
     Config.Email(
       apiKey            = "apiKey".refined,
       domain            = "gpp.com".refined,
-      webhookSigningKey = "55484a8372da2cf84445b8a65d674511".refined
+      webhookSigningKey = "55484a8372da2cf84445b8a65d674511".refined,
+      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com")
     )
 
   private given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
