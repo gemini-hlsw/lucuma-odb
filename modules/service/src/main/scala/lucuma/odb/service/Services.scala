@@ -288,6 +288,10 @@ object Services:
       if user.role.access >= Access.Pi then fa(using ())
       else OdbError.NotAuthorized(user.id).asFailureF
 
+    def requireNgoAccess[F[_], A](fa: Services.NgoAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
+      if user.role.access >= Access.Ngo then fa(using ())
+      else OdbError.NotAuthorized(user.id).asFailureF
+
     def requireStaffAccess[F[_], A](fa: Services.StaffAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Staff then fa(using ())
       else OdbError.NotAuthorized(user.id).asFailureF

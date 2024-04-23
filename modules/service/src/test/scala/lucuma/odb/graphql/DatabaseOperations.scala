@@ -497,6 +497,24 @@ trait DatabaseOperations { this: OdbSuite =>
       """.asRight
     )
 
+  enum Link(
+    val role:        ProgramUserRole,
+    val supportType: Option[ProgramUserSupportType] = None,
+    val partner:     Option[Partner] = None
+  ):
+    case Coi extends Link(ProgramUserRole.Coi)
+    case Observer extends Link(ProgramUserRole.Observer)
+    case StaffSupport extends Link(ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
+    case PartnerSupport(p: Partner) extends Link(ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(p))
+
+  def linkAs(
+    user: User,
+    uid: User.Id,
+    pid: Program.Id,
+    link: Link
+  ): IO[Unit] =
+    linkAs(user, uid, pid, link.role, link.supportType, link.partner)
+
   def linkCoiAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
     linkAs(user, uid, pid, ProgramUserRole.Coi)
 
