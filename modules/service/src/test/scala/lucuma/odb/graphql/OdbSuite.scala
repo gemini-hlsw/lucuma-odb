@@ -32,6 +32,7 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.User
@@ -235,7 +236,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Config.Email(
       apiKey            = "apiKey".refined,
       domain            = "gpp.com".refined,
-      webhookSigningKey = "webhookKey".refined
+      webhookSigningKey = "webhookKey".refined,
+      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com")
     )
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.
