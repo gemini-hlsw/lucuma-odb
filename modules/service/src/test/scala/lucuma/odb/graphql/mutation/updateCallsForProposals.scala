@@ -30,6 +30,16 @@ class updateCallsForProposals extends OdbSuite {
                 activeStart: "2025-02-01 14:00:00"
                 activeEnd:   "2025-07-31 14:00:00"
                 instruments: [GMOS_NORTH]
+                partners:    [
+                  {
+                    partner: CA
+                    submissionDeadline: "2025-07-31 10:00:00"
+                  },
+                  {
+                    partner: US
+                    submissionDeadline: "2025-07-31 10:00:01"
+                  }
+                ]
               }
             }
           ) {
@@ -398,6 +408,156 @@ class updateCallsForProposals extends OdbSuite {
             }
           }
         """.asRight
+      )
+    }
+  }
+
+  test("instruments - duplicate") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                instruments: [GMOS_SOUTH, GMOS_SOUTH]
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                instruments
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
+      )
+    }
+  }
+
+  test("partners") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                partners: [
+                  {
+                    partner: BR
+                    submissionDeadline: "2025-08-15 04:00:00"
+                  },
+                  {
+                    partner: AR
+                    submissionDeadline: "2025-08-15 04:00:00"
+                  }
+                ]
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                partners {
+                  partner
+                  submissionDeadline
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "partners": [
+                    {
+                      "partner": "AR",
+                      "submissionDeadline": "2025-08-15 04:00:00"
+                    },
+                    {
+                      "partner": "BR",
+                      "submissionDeadline": "2025-08-15 04:00:00"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("partners - delete") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                partners: null
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                partners { partner }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "partners": []
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("partners - duplicate") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                partners: [
+                  {
+                    partner: BR
+                    submissionDeadline: "2025-08-15 04:00:00"
+                  },
+                  {
+                    partner: BR
+                    submissionDeadline: "2025-08-15 04:00:00"
+                  }
+                ]
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                instruments
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: duplicate 'partners' specified: BR").asLeft
       )
     }
   }

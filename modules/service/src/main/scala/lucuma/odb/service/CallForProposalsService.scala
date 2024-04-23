@@ -88,23 +88,43 @@ object CallForProposalsService {
         }
       }
 
+      private def updatePartners(
+        cids:     List[CallForProposals.Id],
+        partners: Nullable[List[CallForProposalsPartnerInput]]
+      ): F[Result[Unit]] = {
+        val delete =
+          session.executeCommand(Statements.DeletePartners(cids)).void
+
+        def insert(vals: List[CallForProposalsPartnerInput]) =
+          session
+            .prepareR(Statements.InsertPartners(cids, vals))
+            .use(_.execute(cids, vals))
+            .whenA(vals.nonEmpty)
+            .void
+
+        partners
+          .fold(delete, Concurrent[F].unit, is => delete *> insert(is))
+          .map(_.success)
+      }
+
       private def updateInstruments(
         cids:        List[CallForProposals.Id],
         instruments: Nullable[List[Instrument]]
-      ): F[Result[Unit]] =
-        instruments.fold(
+      ): F[Result[Unit]] = {
+        val delete =
+          session.executeCommand(Statements.DeleteInstruments(cids)).void
+
+        def insert(vals: List[Instrument]) =
           session
-            .executeCommand(Statements.DeleteInstruments(cids))
-            .void,
-          Concurrent[F].unit,
-          instruments =>
-            session.executeCommand(Statements.DeleteInstruments(cids)) *>
-            session
-              .prepareR(Statements.InsertInstruments(cids, instruments))
-              .use(_.execute(cids, instruments))
-              .whenA(instruments.nonEmpty)
-              .void
-        ).map(_.success)
+            .prepareR(Statements.InsertInstruments(cids, vals))
+            .use(_.execute(cids, vals))
+            .whenA(vals.nonEmpty)
+            .void
+
+        instruments
+          .fold(delete, Concurrent[F].unit, is => delete *> insert(is))
+          .map(_.success)
+      }
 
       override def updateCallsForProposals(
         SET:   CallForProposalsPropertiesInput.Edit,
@@ -112,6 +132,7 @@ object CallForProposalsService {
       )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]] =
         (for {
           cids <- ResultT(updateCfpTable(SET, which))
+          _    <- ResultT(updatePartners(cids, SET.partners))
           _    <- ResultT(updateInstruments(cids, SET.instruments))
         } yield cids).value
 
@@ -173,6 +194,12 @@ object CallForProposalsService {
              partners.map { p => (cid, p.partner, p.deadline) }
            }
          }
+
+    def DeletePartners(cids: List[CallForProposals.Id]): AppliedFragment =
+      sql"""
+        DELETE FROM t_cfp_partner
+          WHERE c_cfp_id IN ${cfp_id.list(cids.length).values}
+      """.apply(cids)
 
     def InsertInstruments(
       cids:        List[CallForProposals.Id],
