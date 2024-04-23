@@ -411,6 +411,7 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 AtomRecordElaborator,
+                CallForProposalsElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,
