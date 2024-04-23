@@ -225,6 +225,13 @@ object CallForProposalsService {
       SET:   CallForProposalsPropertiesInput.Edit,
       which: AppliedFragment
     ): AppliedFragment = {
+      val upRaDec = List(
+        SET.raLimit.map(_._1).foldPresent(sql"c_ra_start   = ${right_ascension.opt}"),
+        SET.raLimit.map(_._2).foldPresent(sql"c_ra_end     = ${right_ascension.opt}"),
+        SET.decLimit.map(_._1).foldPresent(sql"c_dec_start = ${declination.opt}"),
+        SET.decLimit.map(_._2).foldPresent(sql"c_dec_end   = ${declination.opt}")
+      ).flatMap(_.toList)
+
       val upActive = SET.active.map(_.fold(
         sql"c_active = tsrange($core_timestamp, upper(c_active))",
         sql"c_active = tsrange(lower(c_active), $core_timestamp)",
@@ -236,7 +243,7 @@ object CallForProposalsService {
       val upType      = sql"c_type      = $cfp_type"
 
       val ups: Option[NonEmptyList[AppliedFragment]] =
-        NonEmptyList.fromList(List(
+        NonEmptyList.fromList(upRaDec ++ List(
           upActive,
           SET.existence.map(upExistence),
           SET.semester.map(upSemester),

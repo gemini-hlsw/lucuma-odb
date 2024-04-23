@@ -81,6 +81,8 @@ object CallForProposalsPropertiesInput {
   case class Edit(
     cfpType:     Option[CallForProposalsType],
     semester:    Option[Semester],
+    raLimit:     Nullable[(RightAscension, RightAscension)],
+    decLimit:    Nullable[(Declination, Declination)],
     active:      Option[Ior[Timestamp, Timestamp]],
     partners:    Nullable[List[CallForProposalsPartnerInput]],
     instruments: Nullable[List[Instrument]],
@@ -104,6 +106,10 @@ object CallForProposalsPropertiesInput {
           InstrumentBinding.List.Nullable("instruments", rInstruments),
           ExistenceBinding.NonNullable("existence", rExistence)
         ) => {
+          // Check that both (or neither) limits are supplied.
+          val rRaLimit  = bothOrNeitherNullable(rRaStart,  rRaEnd,  "raLimitStart",  "raLimitEnd")
+          val rDecLimit = bothOrNeitherNullable(rDecStart, rDecEnd, "decLimitStart", "decLimitEnd")
+
           // If both start and end are specified, they should be in order.
           val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap {
             case (Some(start), Some(end)) if start > end =>
@@ -116,6 +122,8 @@ object CallForProposalsPropertiesInput {
           (
             rType,
             rSemester,
+            rRaLimit,
+            rDecLimit,
             rActive,
             rPartnersʹ,
             rInstrumentsʹ,
@@ -136,6 +144,19 @@ object CallForProposalsPropertiesInput {
       case (Some(a), Some(b)) => Some((a, b)).success
       case (None, None)       => None.success
       case _                  => Result.failure(s"Supply both $na and $nb or neither")
+    }
+
+  private def bothOrNeitherNullable[A](
+    ra: Result[Nullable[A]],
+    rb: Result[Nullable[A]],
+    na: String,
+    nb: String
+  ): Result[Nullable[(A, A)]] =
+    (ra, rb).parFlatMapN {
+      case (Nullable.Null,       Nullable.Null      ) => Nullable.Null.success
+      case (Nullable.Absent,     Nullable.Absent    ) => Nullable.Absent.success
+      case (Nullable.NonNull(a), Nullable.NonNull(b)) => Nullable.NonNull((a, b)).success
+      case _                                          => Result.failure(s"Supply both $na and $nb or neither")
     }
 
   private def dedup[F[_]: Traverse, A, B](

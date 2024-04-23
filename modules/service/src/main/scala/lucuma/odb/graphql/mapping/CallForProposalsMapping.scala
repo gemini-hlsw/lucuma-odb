@@ -4,6 +4,13 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Query.Binding
+import grackle.Query.OrderBy
+import grackle.Query.OrderSelection
+import grackle.Query.OrderSelections
+import grackle.QueryCompiler.Elab
+import grackle.TypeRef
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.table.CallForProposalsView
 
 trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
@@ -37,4 +44,19 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
         SqlField("_isOpen",     CallForProposalsView.IsOpen, hidden = true)
       )
     )
+
+  lazy val CallForProposalsElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (CallForProposalsType, "partners", Nil) =>
+      Elab.transformChild { child =>
+        OrderBy(
+          OrderSelections(
+            List(
+              OrderSelection[Tag](CallForProposalsPartnerType / "partner")
+            )
+          ),
+          child
+        )
+      }
+  }
+
 }

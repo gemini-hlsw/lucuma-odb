@@ -25,12 +25,16 @@ class updateCallsForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2025-02-01 14:00:00"
-                activeEnd:   "2025-07-31 14:00:00"
-                instruments: [GMOS_NORTH]
-                partners:    [
+                type:          REGULAR_SEMESTER
+                semester:      "2025A"
+                raLimitStart:  { hms: "12:00:00" }
+                raLimitEnd:    { hms: "18:00:00" }
+                decLimitStart: { dms: "45:00:00" }
+                decLimitEnd:   { dms: "-45:00:00" }
+                activeStart:   "2025-02-01 14:00:00"
+                activeEnd:     "2025-07-31 14:00:00"
+                instruments:   [GMOS_NORTH]
+                partners:      [
                   {
                     partner: CA
                     submissionDeadline: "2025-07-31 10:00:00"
@@ -123,6 +127,268 @@ class updateCallsForProposals extends OdbSuite {
             }
           }
         """.asRight
+      )
+    }
+  }
+
+  test("RA limits - both") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                raLimitStart: { hms: "00:00:00" }
+                raLimitEnd:   { hms: "06:00:00" }
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                raLimitStart { hms }
+                raLimitEnd { hms }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "raLimitStart": { "hms": "00:00:00.000000" },
+                  "raLimitEnd":   { "hms": "06:00:00.000000" }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+
+  }
+
+  test("RA limits - delete") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                raLimitStart: null
+                raLimitEnd:   null
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                raLimitStart { hms }
+                raLimitEnd { hms }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "raLimitStart": null,
+                  "raLimitEnd":   null
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+
+  }
+
+  test("RA limits - start only") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                raLimitStart: { hms: "00:00:00" }
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                raLimitStart { hms }
+                raLimitEnd { hms }
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: Supply both raLimitStart and raLimitEnd or neither").asLeft
+      )
+    }
+  }
+
+  test("RA limits - end only") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                raLimitStart: null
+                raLimitEnd:   { hms: "00:00:00" }
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                raLimitStart { hms }
+                raLimitEnd { hms }
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: Supply both raLimitStart and raLimitEnd or neither").asLeft
+      )
+    }
+  }
+
+  test("Dec limits - both") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                decLimitStart: { dms: "00:00:00" }
+                decLimitEnd:   { dms: "00:00:01" }
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                decLimitStart { dms }
+                decLimitEnd { dms }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "decLimitStart": { "dms": "+00:00:00.000000" },
+                  "decLimitEnd":   { "dms": "+00:00:01.000000" }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+
+  }
+
+  test("Dec limits - delete") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                decLimitStart:  null
+                decLimitEnd:    null
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                decLimitStart { dms }
+                decLimitEnd { dms }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "decLimitStart": null,
+                  "decLimitEnd":   null
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+
+  }
+
+  test("Dec limits - start only") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                decLimitStart: { dms: "00:00:00" }
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                decLimitStart { dms }
+                decLimitEnd { dms }
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: Supply both decLimitStart and decLimitEnd or neither").asLeft
+      )
+    }
+  }
+
+  test("Dec limits - end only") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                decLimitStart: null
+                decLimitEnd:   { dms: "00:00:00" }
+              }
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                decLimitStart { dms }
+                decLimitEnd { dms }
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET' is invalid: Supply both decLimitStart and decLimitEnd or neither").asLeft
       )
     }
   }
