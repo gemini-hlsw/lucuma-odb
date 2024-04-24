@@ -201,6 +201,7 @@ object OdbMapping {
           with TimestampIntervalMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
+          with UpdateCallsForProposalsResultMapping[F]
           with UpdateDatasetsResultMapping[F]
           with UpdateGroupsResultMapping[F]
           with UpdateObsAttachmentsResultMapping[F]
@@ -389,6 +390,7 @@ object OdbMapping {
               TimeSpanMapping,
               TimestampIntervalMapping,
               UpdateAsterismsResultMapping,
+              UpdateCallsForProposalsResultMapping,
               UpdateDatasetsResultMapping,
               UpdateGroupsResultMapping,
               UpdateObsAttachmentsResultMapping,
@@ -409,6 +411,7 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 AtomRecordElaborator,
+                CallForProposalsElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,
