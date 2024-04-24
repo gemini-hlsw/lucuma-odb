@@ -117,7 +117,7 @@ class createCallForProposals extends OdbSuite {
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: activeStart must be before activeEnd").asLeft
+      expected = List("Argument 'input.SET' is invalid: activeStart must come before activeEnd").asLeft
     )
   }
 
@@ -178,6 +178,45 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
+  test("failure - with duplicate partners") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2026-02-01 14:00:00"
+                activeEnd:   "2026-07-31 14:00:00"
+                partners:    [
+                  {
+                    partner: US
+                    submissionDeadline: "2025-07-31 10:00:00"
+                  },
+                  {
+                    partner: US
+                    submissionDeadline: "2025-07-31 10:00:01"
+                  }
+                ]
+              }
+            }
+          ) {
+             callForProposals {
+               id
+               partners {
+                 partner
+                 submissionDeadline
+               }
+             }
+          }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: duplicate 'partners' specified: US").asLeft
+    )
+  }
+
   test("success - with instruments") {
     expect(
       user = staff,
@@ -212,6 +251,33 @@ class createCallForProposals extends OdbSuite {
           }
         }
       """.asRight
+    )
+  }
+
+  test("failure - with duplicate instruments") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2026-02-01 14:00:00"
+                activeEnd:   "2026-07-31 14:00:00"
+                instruments: [GMOS_SOUTH, GMOS_SOUTH]
+              }
+            }
+          ) {
+             callForProposals {
+               id
+               instruments
+             }
+          }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
     )
   }
 
