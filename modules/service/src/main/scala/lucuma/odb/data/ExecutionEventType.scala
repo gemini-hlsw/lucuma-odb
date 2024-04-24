@@ -5,18 +5,9 @@ package lucuma.odb.data
 
 import lucuma.core.util.Enumerated
 
-enum ExecutionEventType(val dbTag: String):
+enum ExecutionEventType(val tag: String) derives Enumerated:
   case Sequence extends ExecutionEventType("sequence")
   case Slew     extends ExecutionEventType("slew")
+  case Atom     extends ExecutionEventType("atom")
   case Step     extends ExecutionEventType("step")
   case Dataset  extends ExecutionEventType("dataset")
-
-object ExecutionEventType:
-
-  given Enumerated[ExecutionEventType] =
-    Enumerated.from(
-      Sequence,
-      Slew,
-      Step,
-      Dataset
-    ).withTag(_.dbTag)

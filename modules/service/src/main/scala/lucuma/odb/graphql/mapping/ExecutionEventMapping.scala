@@ -13,6 +13,7 @@ import grackle.Result
 import grackle.Type
 import grackle.TypeRef
 
+import table.AtomRecordTable
 import table.DatasetTable
 import table.ExecutionEventTable
 import table.ObservationView
@@ -20,6 +21,7 @@ import table.StepRecordView
 import table.VisitTable
 
 trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
+                                     with AtomRecordTable[F]
                                      with DatasetTable[F]
                                      with ObservationView[F]
                                      with StepRecordView[F]
@@ -40,6 +42,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
         // appears to be no good way to create a predicate that matches on a
         // particular interface implementation so this is the best we can do.
         // We can match on fields that appear in the ExecutionEventTable.
+        SqlField("_atomId",          ExecutionEventTable.AtomId,          hidden = true),
         SqlField("_sequenceCommand", ExecutionEventTable.SequenceCommand, hidden = true),
         SqlField("_slewStage",       ExecutionEventTable.SlewStage,       hidden = true),
         SqlField("_stepId",          ExecutionEventTable.StepId,          hidden = true),
@@ -58,6 +61,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
         c.fieldAs[lucuma.odb.data.ExecutionEventType]("eventType").map {
           case Sequence => SequenceEventType
           case Slew     => SlewEventType
+          case Atom     => AtomEventType
           case Step     => StepEventType
           case Dataset  => DatasetEventType
         }
@@ -69,6 +73,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
         tpe match {
           case SequenceEventType => mkPredicate(Sequence)
           case SlewEventType     => mkPredicate(Slew)
+          case AtomEventType     => mkPredicate(Atom)
           case StepEventType     => mkPredicate(Step)
           case DatasetEventType  => mkPredicate(Dataset)
           case _                 => none
@@ -90,6 +95,16 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       fieldMappings = List(
         SqlField("id",        ExecutionEventTable.Id, key = true),
         SqlField("slewStage", ExecutionEventTable.SlewStage)
+      )
+    )
+
+  lazy val AtomEventMapping: ObjectMapping =
+    ObjectMapping(
+      tpe = AtomEventType,
+      fieldMappings = List(
+        SqlField("id",        ExecutionEventTable.Id, key = true),
+        SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+        SqlField("atomStage", ExecutionEventTable.AtomStage)
       )
     )
 
