@@ -401,7 +401,7 @@ object ProgramService {
           c_program_id = $program_id
         AND
           c_user_id = $user_id
-      """.apply(pid, uid) |+| existsUserAccess(user, pid).foldMap(void"AND (" |+| _ |+| void")")
+      """.apply(pid, uid) |+| existsUserAccess(user, pid).foldMap(void"AND " |+| _)
 
     val UnlinkUnconditionally: Command[(Program.Id, User.Id)] =
       sql"""
@@ -525,7 +525,7 @@ object ProgramService {
     ): Option[AppliedFragment] =
       user.role match {
         case GuestRole             => existsUserAsPi(programId, user.id).some
-        case Pi(_)                 => (existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id)).some
+        case Pi(_)                 => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void")").some
         case Ngo(_, partner)       => existsAllocationForPartner(programId, Tag(partner.tag)).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |
