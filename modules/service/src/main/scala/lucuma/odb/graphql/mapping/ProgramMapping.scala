@@ -154,10 +154,11 @@ trait ProgramMapping[F[_]]
     }
 
   private val timeChargeHandler: EffectHandler[F] =
-    keyValueEffectHandler[Program.Id, CategorizedTime]("id") { pid =>
-      services.useTransactionally {
-        timeAccountingService.selectProgram(pid)
-      }
+    keyValueEffectHandler[Program.Id, CategorizedTime]("id") { _ =>
+      throw Exception("Catch me if you can!!!")
+      // services.useTransactionally {
+      //   timeAccountingService.selectProgram(pid)
+      // }
     }
 
 }
