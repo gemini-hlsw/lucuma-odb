@@ -44,6 +44,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.AtomStage
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
@@ -163,6 +164,9 @@ trait Codecs {
 
   val atom_id: Codec[Atom.Id] =
     uid[Atom.Id]
+
+  val atom_stage: Codec[AtomStage] =
+    enumerated(Type("e_atom_stage"))
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))

@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package table
 
+import lucuma.odb.util.Codecs.atom_id
+import lucuma.odb.util.Codecs.atom_stage
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.dataset_stage
@@ -25,11 +27,13 @@ trait ExecutionEventTable[F[_]] extends BaseMapping[F] {
 
     val ObservationId: ColumnRef   = col("c_observation_id",     observation_id)
     val VisitId: ColumnRef         = col("c_visit_id",           visit_id)
+    val AtomId: ColumnRef          = col("c_atom_id",            atom_id)
     val StepId: ColumnRef          = col("c_step_id",            step_id)
     val DatasetId: ColumnRef       = col("c_dataset_id",         dataset_id)
 
     val SlewStage: ColumnRef       = col("c_slew_stage",         slew_stage)
     val SequenceCommand: ColumnRef = col("c_sequence_command",   sequence_command)
+    val AtomStage: ColumnRef       = col("c_atom_stage",         atom_stage)
     val StepStage: ColumnRef       = col("c_step_stage",         step_stage)
     val DatasetStage: ColumnRef    = col("c_dataset_stage",      dataset_stage)
   }

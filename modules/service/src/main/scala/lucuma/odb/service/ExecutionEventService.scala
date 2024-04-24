@@ -28,6 +28,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.AtomStage
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
@@ -50,6 +51,11 @@ trait ExecutionEventService[F[_]] {
   def visitRange(
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
+
+//  def insertAtomEvent(
+//    atomId:    Atom.Id,
+//    atomStage: AtomStage
+//  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
