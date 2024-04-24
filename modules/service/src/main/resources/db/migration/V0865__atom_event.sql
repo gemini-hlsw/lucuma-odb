@@ -12,5 +12,5 @@ ALTER TYPE e_execution_event_type ADD VALUE 'atom' BEFORE 'step';
 
 -- Add a column for the atom stage
 ALTER TABLE t_execution_event
-  ADD COLUMN c_atom_id    d_atom_id    NULL,
+  ADD COLUMN c_atom_id    d_atom_id    NULL REFERENCES t_atom_record(c_atom_id),
   ADD COLUMN c_atom_stage e_atom_stage NULL;
