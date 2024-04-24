@@ -3,18 +3,16 @@
 
 package lucuma.odb.service
 
-import cats.data.EitherT
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
-import cats.syntax.bifunctor.*
-import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import cats.syntax.show.*
 import grackle.Result
+import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
@@ -28,7 +26,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.AtomStage
+//import lucuma.odb.data.AtomStage
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
@@ -84,34 +82,9 @@ trait ExecutionEventService[F[_]] {
 }
 
 object ExecutionEventService {
-
-  sealed trait InsertEventResponse extends Product with Serializable {
-
-    def asSuccess: Option[InsertEventResponse.Success] =
-      this match {
-        case s@InsertEventResponse.Success(_) => s.some
-        case _                                => none
-      }
-
-  }
-
-  object InsertEventResponse {
-
-    case class StepNotFound(
-      id: Step.Id
-    ) extends InsertEventResponse
-
-    case class DatasetNotFound(
-      id: Dataset.Id
-    ) extends InsertEventResponse
-
-    case class VisitNotFound(
-      id: Visit.Id
-    ) extends InsertEventResponse
-
-    case class Success(
-      event: ExecutionEvent
-    ) extends InsertEventResponse
+  extension (x: ResultT.type) {
+    def liftF[F[_], A](fa: F[A])(implicit F: cats.Functor[F]): ResultT[F, A] =
+      ResultT(fa.map(_.success))
   }
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
@@ -137,19 +110,20 @@ object ExecutionEventService {
         datasetStage: DatasetStage
       )(using xa: Transaction[F], sa: Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
-        import InsertEventResponse.*
+        def invalidDataset: OdbError.InvalidDataset =
+          OdbError.InvalidDataset(datasetId, Some(s"Dataset '${datasetId.show}' not found"))
 
-        val insertEvent: F[Either[DatasetNotFound, (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)]] =
+        val insertEvent: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Step.Id)]] =
           session
             .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, datasetId)
-            .map(_.toRight(DatasetNotFound(datasetId)))
-            .recover {
-              case SqlState.ForeignKeyViolation(_) => DatasetNotFound(datasetId).asLeft
+            .map(_.toResult(invalidDataset.asProblem))
+            .recoverWith {
+              case SqlState.ForeignKeyViolation(_) => invalidDataset.asFailureF
             }
 
         // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
         // unchanged) if there is an end event but no start or if the end time comes before the
-        // start.9
+        // start.
         def setDatasetTime(t: Timestamp): F[Unit] = {
           def setWith(f: (Dataset.Id, Timestamp) => F[Unit]): F[Unit] =
             for {
@@ -168,93 +142,87 @@ object ExecutionEventService {
         }
 
         (for {
-          e <- EitherT(insertEvent).leftWiden[InsertEventResponse]
+          e <- ResultT(insertEvent)
           (eid, time, oid, vid, sid) = e
-          _ <- EitherT.liftF(setDatasetTime(time))
-        } yield Success(DatasetEvent(eid, time, oid, vid, sid, datasetId, datasetStage))).merge
-
-      } .map(executionEventResponseToResult)
-        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
-
-      private def executionEventResponseToResult(r: InsertEventResponse): Result[ExecutionEvent] =
-        r match
-          case InsertEventResponse.DatasetNotFound(id) => OdbError.InvalidDataset(id, Some(s"Dataset '${id.show}' not found")).asFailure
-          case InsertEventResponse.StepNotFound(id)    => OdbError.InvalidStep(id, Some(s"Step '$id' not found")).asFailure
-          case InsertEventResponse.VisitNotFound(id)   => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found")).asFailure
-          case InsertEventResponse.Success(e)          => Result(e)
+          _ <- ResultT.liftF(setDatasetTime(time))
+          _ <- ResultT.liftF(timeAccountingService.update(vid))
+        } yield DatasetEvent(eid, time, oid, vid, sid, datasetId, datasetStage)).value
+      }
 
       override def insertSequenceEvent(
         visitId: Visit.Id,
         command: SequenceCommand
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
-        import InsertEventResponse.*
+        def invalidVisit: OdbError.InvalidVisit =
+          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
 
-        val insert: F[Either[VisitNotFound, (Id, Timestamp, Observation.Id)]] =
+        val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
           session
             .option(Statements.InsertSequenceEvent)(visitId, command, visitId)
-            .map(_.toRight(VisitNotFound(visitId)))
-            .recover {
-              case SqlState.ForeignKeyViolation(_) => VisitNotFound(visitId).asLeft
+            .map(_.toResult(invalidVisit.asProblem))
+            .recoverWith {
+              case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
             }
 
         (for {
-          e <- EitherT(insert).leftWiden[InsertEventResponse]
+          e <- ResultT(insert)
           (eid, time, oid) = e
-        } yield Success(SequenceEvent(eid, time, oid, visitId, command))).merge
-      } .map(executionEventResponseToResult)
-        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
+          _ <- ResultT.liftF(timeAccountingService.update(visitId))
+        } yield SequenceEvent(eid, time, oid, visitId, command)).value
+      }
 
       override def insertSlewEvent(
         visitId:   Visit.Id,
         slewStage: SlewStage
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
-        import InsertEventResponse.*
+        def invalidVisit: OdbError.InvalidVisit =
+          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
 
-        val insert: F[Either[VisitNotFound, (Id, Timestamp, Observation.Id)]] =
+        val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
           session
             .option(Statements.InsertSlewEvent)(visitId, slewStage, visitId)
-            .map(_.toRight(VisitNotFound(visitId)))
-            .recover {
-              case SqlState.ForeignKeyViolation(_) => VisitNotFound(visitId).asLeft
+            .map(_.toResult(invalidVisit.asProblem))
+            .recoverWith {
+              case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
             }
 
         (for {
-          e <- EitherT(insert).leftWiden[InsertEventResponse]
+          e <- ResultT(insert)
           (eid, time, oid) = e
-        } yield Success(SlewEvent(eid, time, oid, visitId, slewStage))).merge
-      } .map(executionEventResponseToResult)
-        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
+          _ <- ResultT.liftF(timeAccountingService.update(visitId))
+        } yield SlewEvent(eid, time, oid, visitId, slewStage)).value
+      }
 
       override def insertStepEvent(
         stepId:       Step.Id,
         stepStage:    StepStage
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
-        import InsertEventResponse.*
+        def invalidStep: OdbError.InvalidStep =
+          OdbError.InvalidStep(stepId, Some(s"Step '$stepId' not found"))
 
-        val insert: F[Either[StepNotFound, (Id, Timestamp, Observation.Id, Visit.Id)]] =
+        val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id)]] =
           session
             .option(Statements.InsertStepEvent)(stepId, stepStage, stepId)
-            .map(_.toRight(StepNotFound(stepId)))
-            .recover {
-              case SqlState.ForeignKeyViolation(_) => StepNotFound(stepId).asLeft
+            .map(_.toResult(invalidStep.asProblem))
+            .recoverWith {
+              case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
             }
 
+        def setStepCompleted(time: Timestamp): F[Unit] =
+          services
+            .sequenceService
+            .setStepCompleted(stepId, Option.when(stepStage === StepStage.EndStep)(time))
+
         (for {
-          e <- EitherT(insert).leftWiden[InsertEventResponse]
+          e <- ResultT(insert)
           (eid, time, oid, vid) = e
-          _ <- EitherT.liftF(
-              // N.B. This is probably too simplistic. We'll need to examine
-              // datasets as well I believe.
-              services
-                .sequenceService
-                .setStepCompleted(stepId, Option.when(stepStage === StepStage.EndStep)(time))
-          )
-        } yield Success(StepEvent(eid, time, oid, vid, stepId, stepStage))).merge
-      } .map(executionEventResponseToResult)
-        .flatTap(_.traverse(e => timeAccountingService.update(e.visitId)))
+          _ <- ResultT.liftF(setStepCompleted(time))
+          _ <- ResultT.liftF(timeAccountingService.update(vid))
+        } yield StepEvent(eid, time, oid, vid, stepId, stepStage)).value
+      }
 
       override def selectStepExecutionState(
         stepId: Step.Id
