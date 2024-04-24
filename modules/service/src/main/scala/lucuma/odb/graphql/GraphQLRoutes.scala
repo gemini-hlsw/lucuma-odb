@@ -74,8 +74,8 @@ object GraphQLRoutes {
       def info(user: User, message: String): F[Unit] =
         Logger[F].info(s"${user.id}/${user.displayName}: $message")
 
-      def warn(user: User, message: String): F[Unit] =
-        Logger[F].warn(s"${user.id}/${user.displayName}: $message")
+      def error(user: User, message: String, t: Throwable): F[Unit] =
+        Logger[F].error(t)(s"${user.id}/${user.displayName}: $message")
 
       def debug(user: User, message: String): F[Unit] =
         Logger[F].debug(s"${user.id}/${user.displayName}: $message")
@@ -102,10 +102,12 @@ object GraphQLRoutes {
                       map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
                       svc   = new GraphQLService(map) {
                         override def query(request: Operation): F[Result[Json]] =
-                          super.query(request).retryOnInvalidCursorName.flatTap {
-                            case Result.InternalError(t)  => warn(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}")
-                            case _ => debug(user, s"Query (success).")
-                          }
+                          super.query(request).retryOnInvalidCursorName
+                            .handleError(Result.InternalError.apply)
+                            .flatTap {
+                              case Result.InternalError(t)  => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                              case _ => debug(user, s"Query (success).")
+                            }
                       }
                     } yield svc
                   } .widen[GraphQLService[F]]
