@@ -16,6 +16,7 @@ import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.EmailStatus
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
@@ -46,7 +47,6 @@ import lucuma.core.util.Uid
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction

@@ -9,11 +9,11 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.data.EmailStatus
 
 class program extends OdbSuite {
 

@@ -8,8 +8,8 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.EmailStatus
 import lucuma.core.model.UserInvitation
-import lucuma.odb.data.EmailStatus
 
 import scala.concurrent.duration.*
 

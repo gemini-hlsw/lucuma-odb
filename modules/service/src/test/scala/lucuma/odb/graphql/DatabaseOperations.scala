@@ -13,6 +13,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceCommand
@@ -52,7 +53,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
