@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 import cats.data.Ior
 import cats.effect.*
 import cats.effect.std.Supervisor
+import cats.effect.std.UUIDGen
 import cats.effect.unsafe.IORuntime
 import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
@@ -21,13 +22,17 @@ import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.PosInt
+import fs2.Stream
+import fs2.text.utf8
 import grackle.Mapping
 import grackle.skunk.SkunkMonitor
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.JsonObject
+import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.User
@@ -193,6 +198,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   // override in tests that need an http client
   protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
+
+  // tests that require successfully sending invitations can assign this to httpRequestHandler
+  protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] = 
+    req => {
+      val sio = UUIDGen[IO].randomUUID.map(uuid => 
+        Json.obj(
+          "id"      -> s"<$uuid>".asJson,
+          "message" -> "Queued".asJson
+        ).toString
+      )
+      Resource.eval(IO.pure(Response(body = Stream.eval(sio).through(utf8.encode))))
+    }
   
   private def httpClient: Client[IO] = Client.apply(httpRequestHandler)
 
@@ -215,6 +232,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       fileUploadMaxMb = 5
     )
 
+  protected def emailConfig: Config.Email =
+    Config.Email(
+      apiKey            = "apiKey".refined,
+      domain            = "gpp.com".refined,
+      webhookSigningKey = "webhookKey".refined,
+      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com")
+    )
+
   // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
     S3FileService.s3AsyncClientOpsResource[IO](awsConfig)
@@ -226,6 +251,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
+      emailConfig,
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
@@ -245,7 +271,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculator.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient)
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def server: Resource[IO, Server] =

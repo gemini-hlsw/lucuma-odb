@@ -16,6 +16,7 @@ import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.HttpRouteHandler
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
@@ -50,16 +51,17 @@ object GraphQLRoutes {
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
   def apply[F[_]: Async: Trace: Logger](
-    itcClient:  ItcClient[F],
-    commitHash: CommitHash,
-    ssoClient:  SsoClient[F, User],
-    pool:       Resource[F, Session[F]],
-    monitor:    SkunkMonitor[F],
-    ttl:        FiniteDuration,
-    userSvc:    UserService[F],
-    enums:      Enums,
-    ptc:        TimeEstimateCalculator.ForInstrumentMode,
-    httpClient: Client[F]
+    itcClient:   ItcClient[F],
+    commitHash:  CommitHash,
+    ssoClient:   SsoClient[F, User],
+    pool:        Resource[F, Session[F]],
+    monitor:     SkunkMonitor[F],
+    ttl:         FiniteDuration,
+    userSvc:     UserService[F],
+    enums:       Enums,
+    ptc:         TimeEstimateCalculator.ForInstrumentMode,
+    httpClient:  Client[F],
+    emailConfig: Config.Email
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -99,7 +101,7 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                       _    <- OptionT.liftF(info(user, s"New service instance."))
-                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient)
+                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient, emailConfig)
                       svc   = new GraphQLService(map) {
                         override def query(request: Operation): F[Result[Json]] =
                           super.query(request).retryOnInvalidCursorName

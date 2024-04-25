@@ -13,6 +13,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceCommand
@@ -51,6 +52,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
@@ -63,6 +65,7 @@ import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.service.EmailService
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
@@ -1267,5 +1270,38 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { j =>
       j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
     }
+
+  def getEmailIdForInvitation(id: UserInvitation.Id): IO[Option[EmailId]] = {
+    val query = sql"select c_email_id from t_invitation where c_invitation_id = $user_invitation_id".query(email_id)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.option(id)))
+  }
+
+  // email will be inserted with a status of Queued
+  def insertEmail(
+    emailId: EmailId,
+    programId: Program.Id,
+    from: EmailAddress = EmailAddress.unsafeFrom("me@us.com"),
+    to: EmailAddress = EmailAddress.unsafeFrom("bob@dobbs.com"),
+    subject: NonEmptyString = "A subject of interest".refined,
+    textMessage: NonEmptyString = "And the message is...".refined,
+    htmlMessage: Option[NonEmptyString] = None,
+  ): IO[Unit] = {
+    val af = EmailService.Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(af.fragment.command).use(_.execute(af.argument).void))
+  }
+
+  def getEmailStatus(id: EmailId): IO[EmailStatus] = {
+    val query = sql"select c_status from t_email where c_email_id = $email_id".query(email_status)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.unique(id)))
+  }
+
+  def updateEmailStatus(id: EmailId, status: EmailStatus): IO[Unit] = {
+    val command = sql"update t_email set c_status = $email_status where c_email_id = $email_id".command
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(command).use(_.execute(status, id).void))
+  }
 
 }

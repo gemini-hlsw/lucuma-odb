@@ -83,6 +83,8 @@ trait BaseMapping[F[_]]
   lazy val DmsStringType                       = schema.ref("DmsString")
   lazy val EditTypeType                        = schema.ref("EditType")
   lazy val EmailAddressType                    = schema.ref("EmailAddress")
+  lazy val EmailStatusType                     = schema.ref("EmailStatus")
+  lazy val EmailType                           = schema.ref("Email")
   lazy val ElevationRangeType                  = schema.ref("ElevationRange")
   lazy val EngineeringProgramReferenceType     = schema.ref("EngineeringProgramReference")
   lazy val EphemerisKeyTypeType                = schema.ref("EphemerisKeyType")

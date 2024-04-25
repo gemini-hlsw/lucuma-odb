@@ -26,6 +26,8 @@ class redeemUserInvitation extends OdbSuite {
 
   val validUsers = List(pi, pi2, guest, staff, admin, service, ngo).toList
 
+  override val httpRequestHandler = invitationEmailRequestHandler
+
   def redeem(inv: UserInvitation, accept: Boolean = true): String =
     s"""
       mutation {
