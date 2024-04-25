@@ -174,7 +174,7 @@ enum AtomExecutionState {
   "No events have been received since the atom was recorded."
   NOT_STARTED
 
-  "Events have been received, but no 'EndAtom'.
+  "Events have been received, but no 'EndAtom'."
   ONGOING
 
   "An event with an 'END_ATOM' 'AtomStage' was received."

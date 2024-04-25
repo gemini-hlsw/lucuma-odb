@@ -286,6 +286,7 @@ object ExecutionEventService {
           c_event_type,
           c_observation_id,
           c_visit_id,
+          c_atom_id,
           c_step_id,
           c_dataset_id,
           c_dataset_stage
@@ -294,11 +295,14 @@ object ExecutionEventService {
           'dataset' :: e_execution_event_type,
           d.c_observation_id,
           d.c_visit_id,
+          s.c_atom_id,
           d.c_step_id,
           $dataset_id,
           $dataset_stage
         FROM
           t_dataset d
+        INNER JOIN
+          t_step_record s ON s.c_step_id = d.c_step_id
         WHERE
           d.c_dataset_id = $dataset_id
         RETURNING
@@ -361,6 +365,7 @@ object ExecutionEventService {
           c_event_type,
           c_observation_id,
           c_visit_id,
+          c_atom_id,
           c_step_id,
           c_step_stage
         )
@@ -368,11 +373,12 @@ object ExecutionEventService {
           'step' :: e_execution_event_type,
           a.c_observation_id,
           a.c_visit_id,
+          s.c_atom_id,
           $step_id,
           $step_stage
         FROM
           t_step_record s
-        LEFT JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
         WHERE
           s.c_step_id = $step_id
         RETURNING
