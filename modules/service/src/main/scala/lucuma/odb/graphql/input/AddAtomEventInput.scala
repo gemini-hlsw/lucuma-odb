@@ -4,8 +4,8 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
+import lucuma.core.enums.AtomStage
 import lucuma.core.model.sequence.Atom
-import lucuma.odb.data.AtomStage
 import lucuma.odb.graphql.binding.*
 
 case class AddAtomEventInput(
