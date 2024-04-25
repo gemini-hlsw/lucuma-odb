@@ -5,9 +5,9 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import lucuma.core.enums.EmailStatus
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EmailId
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Session

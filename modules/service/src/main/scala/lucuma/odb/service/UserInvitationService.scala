@@ -61,10 +61,6 @@ object UserInvitationService:
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
       
-      // TODO: move to UserInvitation class?
-      extension(invitation: UserInvitation)
-        def token: String = s"${invitation.id}.${invitation.body}"
-
       def sendInvitation(input: CreateUserInvitationInput, invitation: UserInvitation)(
         using Transaction[F]): F[Result[EmailId]] = {
         val subject: NonEmptyString = NonEmptyString.unsafeFrom(

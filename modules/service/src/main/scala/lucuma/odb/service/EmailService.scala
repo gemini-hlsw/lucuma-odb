@@ -10,10 +10,10 @@ import grackle.Result
 import grackle.ResultT
 import io.circe.Decoder
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.EmailStatus
 import lucuma.core.model.Program
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*

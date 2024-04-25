@@ -25,8 +25,7 @@ trait EmailMapping[F[_]]
         SqlField("htmlMessage", EmailTable.HtmlMessage),
         SqlField("originalTime", EmailTable.OriginalTime),
         SqlField("status", EmailTable.Status),
-        SqlField("statusTime", EmailTable.StatusTime),
-        // SqlObject("program", Join(EmailTable.ProgramId, ProgramTable.Id)) // do we want this here?
+        SqlField("statusTime", EmailTable.StatusTime)
       )
     )
   

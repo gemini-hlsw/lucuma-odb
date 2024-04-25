@@ -15,12 +15,12 @@ import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag

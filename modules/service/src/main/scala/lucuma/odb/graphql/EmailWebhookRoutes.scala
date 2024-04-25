@@ -7,11 +7,11 @@ import cats.effect.Async
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
+import lucuma.core.enums.EmailStatus
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.service.EmailWebhookService
 import org.http4s.*
 import org.http4s.circe.CirceEntityCodec.*

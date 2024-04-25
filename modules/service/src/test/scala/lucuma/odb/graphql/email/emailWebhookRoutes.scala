@@ -11,9 +11,9 @@ import cats.effect.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.EmailStatus
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
-import lucuma.odb.data.EmailStatus
 import lucuma.odb.service.EmailWebhookService
 import lucuma.refined.*
 import org.http4s.*
