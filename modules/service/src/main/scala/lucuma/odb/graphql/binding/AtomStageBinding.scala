@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.AtomStage
+import lucuma.core.enums.AtomStage
 
 val AtomStageBinding: Matcher[AtomStage] =
   enumeratedBinding

@@ -13,6 +13,7 @@ import cats.syntax.show.*
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.AtomStage
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
@@ -26,7 +27,6 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-//import lucuma.odb.data.AtomStage
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
@@ -50,10 +50,10 @@ trait ExecutionEventService[F[_]] {
     visitId: Visit.Id
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
-//  def insertAtomEvent(
-//    atomId:    Atom.Id,
-//    atomStage: AtomStage
-//  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
+  def insertAtomEvent(
+    atomId:    Atom.Id,
+    atomStage: AtomStage
+  )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertDatasetEvent(
     datasetId:    Dataset.Id,
@@ -104,6 +104,28 @@ object ExecutionEventService {
         visitId: Visit.Id
       )(using Transaction[F]): F[Option[TimestampInterval]] =
         session.unique(Statements.SelectVisitRange)(visitId)
+
+      def insertAtomEvent(
+        atomId:    Atom.Id,
+        atomStage: AtomStage
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
+        def invalidAtom: OdbError.InvalidAtom =
+          OdbError.InvalidAtom(atomId, Some(s"Atom '$atomId' not found"))
+
+        val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id)]] =
+          session
+            .option(Statements.InsertAtomEvent)(atomId, atomStage, atomId)
+            .map(_.toResult(invalidAtom.asProblem))
+            .recoverWith {
+              case SqlState.ForeignKeyViolation(_) => invalidAtom.asFailureF
+            }
+
+        (for {
+          e <- ResultT(insert)
+          (eid, time, oid, vid) = e
+          _ <- ResultT.liftF(timeAccountingService.update(vid))
+        } yield AtomEvent(eid, time, oid, vid, atomId, atomStage)).value
+      }
 
       override def insertDatasetEvent(
         datasetId:    Dataset.Id,
@@ -279,6 +301,32 @@ object ExecutionEventService {
         WHERE
           c_visit_id = $visit_id
       """.query(timestamp_interval.opt)
+
+    val InsertAtomEvent: Query[(Atom.Id, AtomStage, Atom.Id), (Id,  Timestamp, Observation.Id, Visit.Id)] =
+      sql"""
+        INSERT INTO t_execution_event (
+          c_event_type,
+          c_observation_id,
+          c_visit_id,
+          c_atom_id,
+          c_atom_stage
+        )
+        SELECT
+          'atom' :: e_execution_event_type,
+          a.c_observation_id,
+          a.c_visit_id,
+          $atom_id,
+          $atom_stage
+        FROM
+          t_atom_record a
+        WHERE
+          a.c_atom_id = $atom_id
+        RETURNING
+          c_execution_event_id,
+          c_received,
+          c_observation_id,
+          c_visit_id
+      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id)
 
     val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
       sql"""
