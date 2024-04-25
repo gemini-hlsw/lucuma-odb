@@ -18,6 +18,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.EmailStatus
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.CallForProposals
@@ -83,6 +84,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[DatasetStage](DatasetStageType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EmailAddress](EmailAddressType),
+      LeafMapping[EmailStatus](EmailStatusType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),

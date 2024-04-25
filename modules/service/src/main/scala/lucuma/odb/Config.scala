@@ -13,6 +13,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
 import fs2.io.net.Network
+import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
@@ -26,6 +27,7 @@ import natchez.http4s.NatchezMiddleware
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 
 import java.net.URI
@@ -42,6 +44,7 @@ case class Config(
   honeycomb:  Config.Honeycomb, // Honeycomb config
   database:   Config.Database,  // Database config
   aws:        Config.Aws,       // AWS config
+  email:      Config.Email,     // Mailgun config
   domain:     String,           // Domain, for CORS headers
   commitHash: CommitHash        // From Heroku Dyno Metadata
 ) {
@@ -147,16 +150,16 @@ object Config {
         case _ => None
       }
 
-    private implicit val uri: ConfigDecoder[String, URI] =
+    private given ConfigDecoder[String, URI] =
       ConfigDecoder[String].mapOption("URI") { s =>
         try Some(new URI(s))
         catch { case _: URISyntaxException => None }
       }
 
-    private implicit val ShowURI: Show[URI] =
+    private given Show[URI] =
       Show.fromToString
 
-    private implicit val ConfigDecoderDatabaseConfig: ConfigDecoder[URI, Database] =
+    private given ConfigDecoder[URI, Database] =
       ConfigDecoder[URI].mapOption("Database")(Database.fromHerokuUri)
 
     lazy val fromCiris: ConfigValue[Effect, Database] =
@@ -182,19 +185,19 @@ object Config {
   }
 
   object Aws {
-    private implicit val showPath: Show[Uri.Path] = Show.fromToString
+    private given Show[Uri.Path] = Show.fromToString
 
-    private implicit val uriPath: ConfigDecoder[Uri, Uri.Path] =
+    private given ConfigDecoder[Uri, Uri.Path] =
       ConfigDecoder[Uri].mapOption("Path")(_.path.some)
 
     // The basePath must be nonEmpty
-    private implicit val pathNES: ConfigDecoder[Uri.Path, NonEmptyString] =
+    private given ConfigDecoder[Uri.Path, NonEmptyString] =
       ConfigDecoder[Uri.Path].mapOption("NonEmptyPath"){ p =>
         val str = p.segments.map(_.encoded).mkString("/")
         NonEmptyString.from(str).toOption
       }
 
-    private implicit val bucketName: ConfigDecoder[Uri, BucketName] =
+    private given ConfigDecoder[Uri, BucketName] =
       ConfigDecoder[Uri].mapOption("BucketName"){ uri =>
         uri.host.flatMap{ h =>
           h.value.split("\\.").headOption
@@ -213,20 +216,46 @@ object Config {
     ).parMapN(Aws.apply)
   }
 
-  private implicit val publicKey: ConfigDecoder[String, PublicKey] =
+  case class Email(
+    apiKey:            NonEmptyString,
+    domain:            NonEmptyString,
+    webhookSigningKey: NonEmptyString,
+    invitationFrom:    EmailAddress
+  ) {
+    // add to environment?
+    lazy val baseUri = uri"https://api.mailgun.net/v3"
+    lazy val sendMessageUri = baseUri / domain.value / "messages"
+    lazy val eventsUri = baseUri / domain.value / "events"
+  }
+
+  object Email {
+    lazy val fromCirrus: ConfigValue[Effect, Email] = (
+      envOrProp("MAILGUN_API_KEY").as[NonEmptyString],
+      envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
+      envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").as[NonEmptyString],
+      envOrProp("INVITATION_SENDER_EMAIL").as[EmailAddress]
+    ).parMapN(Email.apply)
+
+    private given ConfigDecoder[String, EmailAddress] =
+      ConfigDecoder[String].mapOption("Email Address") { s =>
+        EmailAddress.from(s).toOption
+      }
+  }
+
+  private given ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key") { s =>
       GpgPublicKeyReader.publicKey(s).toOption
     }
 
-  private implicit val uri: ConfigDecoder[String, Uri] =
+  private given ConfigDecoder[String, Uri] =
     ConfigDecoder[String].mapOption("URI") { s =>
       Uri.fromString(s).toOption
     }
 
-  private implicit val port: ConfigDecoder[Int, Port] =
+  private given ConfigDecoder[Int, Port] =
     ConfigDecoder[Int].mapOption("Port")(Port.fromInt)
 
-  private implicit val commitHash: ConfigDecoder[String, CommitHash] =
+  private given ConfigDecoder[String, CommitHash] =
     ConfigDecoder[String].mapOption("CommitHash")(CommitHash.FromString.getOption)
 
   private def envOrProp(name: String): ConfigValue[Effect, String] =
@@ -240,6 +269,7 @@ object Config {
     Honeycomb.fromCiris,
     Database.fromCiris,
     Aws.fromCiris,
+    Email.fromCirrus,
     envOrProp("ODB_DOMAIN"),
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
   ).parMapN(Config.apply)

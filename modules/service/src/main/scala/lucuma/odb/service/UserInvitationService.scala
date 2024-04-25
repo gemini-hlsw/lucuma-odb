@@ -5,7 +5,9 @@ package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import grackle.ResultT
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Access
@@ -18,6 +20,8 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
+import lucuma.odb.Config
+import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramUserRole
@@ -27,6 +31,7 @@ import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
 import skunk.Query
 import skunk.SqlState
 import skunk.Transaction
@@ -53,8 +58,31 @@ object UserInvitationService:
     def apply(id: UserInvitation.Id, detail: Option[String]): OdbError.InvitationError =
       OdbError.InvitationError(UserInvitation.Id.fromString.reverseGet(id), detail)
 
-  def instantiate[F[_]: MonadCancelThrow](using Services[F]): UserInvitationService[F] =
+  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
+      
+      def sendInvitation(input: CreateUserInvitationInput, invitation: UserInvitation)(
+        using Transaction[F]): F[Result[EmailId]] = {
+        val subject: NonEmptyString = NonEmptyString.unsafeFrom(
+          s"Invitation to collaborate from ${user.displayName}"
+        )
+      
+        val textMessage: NonEmptyString = NonEmptyString.unsafeFrom(
+          s"Here is your token: ${invitation.token}"
+        )
+
+        val htmlMessage: NonEmptyString = NonEmptyString.unsafeFrom(
+          s"<html><body><h1>Join Us!!</h1><p>Here is your token: ${invitation.token}</p></body></html>"
+        )
+        emailService(emailConfig, httpClient)
+          .send(input.programId, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, htmlMessage.some)
+      }
+
+      def updateEmailId(invitationId: UserInvitation.Id, emailId: EmailId): F[Result[Unit]] =
+        session
+          .prepareR(Statements.updateEmailId)
+          .use: pq =>
+            pq.unique(emailId, invitationId).as(Result.unit)
 
       def createPiInvitation(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.Observer.type): F[Result[UserInvitation]] =
         session
@@ -77,7 +105,7 @@ object UserInvitationService:
             pq.option(user, pid, email, partner)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or has no partner-allocated time.")).asProblem))
 
-      def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
+      def createUserInvitationImpl(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
         user.role match
 
           // Guest can't create invitations
@@ -100,6 +128,13 @@ object UserInvitationService:
               case CreateUserInvitationInput.Coi(pid, e)      => createPiInvitation(pid, e, ProgramUserRole.Coi)
               case CreateUserInvitationInput.Observer(pid, e) => createPiInvitation(pid, e, ProgramUserRole.Observer)
               case _                                          => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
+
+      def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
+        (for {
+          invitation <- ResultT(createUserInvitationImpl(input))
+          emailId    <- ResultT(sendInvitation(input, invitation))
+          _          <- ResultT(updateEmailId(invitation.id, emailId))
+        } yield invitation).value
 
       def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
         user match
@@ -218,5 +253,13 @@ object UserInvitationService:
         set c_status = 'revoked'
         where c_invitation_id = $user_invitation_id
         and c_status = 'pending'
+        returning c_invitation_id
+      """.query(user_invitation_id)
+
+    val updateEmailId: Query[(EmailId, UserInvitation.Id), UserInvitation.Id] =
+      sql"""
+        update t_invitation
+        set c_email_id = $email_id
+        where c_invitation_id = $user_invitation_id
         returning c_invitation_id
       """.query(user_invitation_id)
