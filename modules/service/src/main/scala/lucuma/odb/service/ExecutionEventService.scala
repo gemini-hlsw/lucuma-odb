@@ -27,6 +27,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
@@ -74,6 +75,10 @@ trait ExecutionEventService[F[_]] {
     stepId:    Step.Id,
     stepStage: StepStage
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
+
+  def selectAtomExecutionState(
+    atomId: Atom.Id
+  )(using Transaction[F]): F[AtomExecutionState]
 
   def selectStepExecutionState(
     stepId: Step.Id
@@ -245,6 +250,17 @@ object ExecutionEventService {
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield StepEvent(eid, time, oid, vid, aid, stepId, stepStage)).value
       }
+
+      override def selectAtomExecutionState(
+        atomId: Atom.Id
+      )(using Transaction[F]): F[AtomExecutionState] =
+        session
+          .option(Statements.SelectMaxAtomStage)(atomId)
+          .map {
+            case None                    => AtomExecutionState.NotStarted
+            case Some(AtomStage.EndAtom) => AtomExecutionState.Completed
+            case _                       => AtomExecutionState.Ongoing
+          }
 
       override def selectStepExecutionState(
         stepId: Step.Id
@@ -438,13 +454,25 @@ object ExecutionEventService {
           c_atom_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id)
 
+    val SelectMaxAtomStage: Query[Atom.Id, AtomStage] =
+      sql"""
+        SELECT c_atom_stage
+          FROM t_execution_event
+         WHERE c_atom_id = $atom_id
+           AND c_atom_stage IS NOT NULL
+         ORDER BY c_received DESC
+         LIMIT 1
+      """.query(atom_stage)
+
     val SelectMaxStepStage: Query[Step.Id, StepStage] =
       sql"""
         SELECT c_step_stage
           FROM t_execution_event
          WHERE c_step_id = $step_id
-           AND c_received = (SELECT MAX(c_received) FROM t_execution_event WHERE c_step_id = $step_id)
-      """.query(step_stage).contramap(s => (s, s))
+           AND c_step_stage IS NOT NULL
+         ORDER BY c_received DESC
+         LIMIT 1
+      """.query(step_stage)
 
   }
 
