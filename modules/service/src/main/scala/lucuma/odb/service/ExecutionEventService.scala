@@ -119,7 +119,7 @@ object ExecutionEventService {
 
         val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id)]] =
           session
-            .option(Statements.InsertAtomEvent)(atomId, atomStage, atomId)
+            .option(Statements.InsertAtomEvent)(atomId, atomStage)
             .map(_.toResult(invalidAtom.asProblem))
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) => invalidAtom.asFailureF
@@ -142,7 +142,7 @@ object ExecutionEventService {
 
         val insertEvent: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)]] =
           session
-            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, datasetId)
+            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage)
             .map(_.toResult(invalidDataset.asProblem))
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) => invalidDataset.asFailureF
@@ -186,7 +186,7 @@ object ExecutionEventService {
 
         val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
           session
-            .option(Statements.InsertSequenceEvent)(visitId, command, visitId)
+            .option(Statements.InsertSequenceEvent)(visitId, command)
             .map(_.toResult(invalidVisit.asProblem))
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
@@ -209,7 +209,7 @@ object ExecutionEventService {
 
         val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
           session
-            .option(Statements.InsertSlewEvent)(visitId, slewStage, visitId)
+            .option(Statements.InsertSlewEvent)(visitId, slewStage)
             .map(_.toResult(invalidVisit.asProblem))
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
@@ -232,7 +232,7 @@ object ExecutionEventService {
 
         val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id)]] =
           session
-            .option(Statements.InsertStepEvent)(stepId, stepStage, stepId)
+            .option(Statements.InsertStepEvent)(stepId, stepStage)
             .map(_.toResult(invalidStep.asProblem))
             .recoverWith {
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
@@ -318,7 +318,7 @@ object ExecutionEventService {
           c_visit_id = $visit_id
       """.query(timestamp_interval.opt)
 
-    val InsertAtomEvent: Query[(Atom.Id, AtomStage, Atom.Id), (Id,  Timestamp, Observation.Id, Visit.Id)] =
+    val InsertAtomEvent: Query[(Atom.Id, AtomStage), (Id,  Timestamp, Observation.Id, Visit.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -343,8 +343,9 @@ object ExecutionEventService {
           c_observation_id,
           c_visit_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id)
+         .contramap((a, s) => (a, s, a))
 
-    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)] =
+    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage), (Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -377,8 +378,9 @@ object ExecutionEventService {
           c_atom_id,
           c_step_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id *: step_id)
+         .contramap((d, s) => (d, s, d))
 
-    val InsertSequenceEvent: Query[(Visit.Id, SequenceCommand, Visit.Id), (Id, Timestamp, Observation.Id)] =
+    val InsertSequenceEvent: Query[(Visit.Id, SequenceCommand), (Id, Timestamp, Observation.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -400,8 +402,9 @@ object ExecutionEventService {
           c_received,
           c_observation_id
       """.query(execution_event_id *: core_timestamp *: observation_id)
+         .contramap((v, s) => (v, s, v))
 
-    val InsertSlewEvent: Query[(Visit.Id, SlewStage, Visit.Id), (Id, Timestamp, Observation.Id)] =
+    val InsertSlewEvent: Query[(Visit.Id, SlewStage), (Id, Timestamp, Observation.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -423,8 +426,9 @@ object ExecutionEventService {
           c_received,
           c_observation_id
       """.query(execution_event_id *: core_timestamp *: observation_id)
+         .contramap((v, s) => (v, s, v))
 
-    val InsertStepEvent: Query[(Step.Id, StepStage, Step.Id), (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id)] =
+    val InsertStepEvent: Query[(Step.Id, StepStage), (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -453,6 +457,7 @@ object ExecutionEventService {
           c_visit_id,
           c_atom_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id)
+         .contramap((s, t) => (s, t, s))
 
     val SelectMaxAtomStage: Query[Atom.Id, AtomStage] =
       sql"""
