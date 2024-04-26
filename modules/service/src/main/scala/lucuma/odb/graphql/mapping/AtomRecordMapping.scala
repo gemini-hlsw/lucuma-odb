@@ -11,6 +11,7 @@ import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.predicate.Predicates
@@ -23,6 +24,7 @@ import table.VisitTable
 
 trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
                                  with EventRangeEffectHandler[F]
+                                 with KeyValueEffectHandler[F]
                                  with Predicates[F]
                                  with SelectSubquery
                                  with StepRecordView[F]
@@ -38,6 +40,7 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
         SqlField("instrument",   AtomRecordTable.Instrument),
         SqlObject("visit",       Join(AtomRecordTable.VisitId, VisitTable.Id)),
         SqlField("created",      AtomRecordTable.Created),
+        EffectField("executionState", executionStateHandler, List("id")),
         EffectField("interval",  intervalHandler, List("id")),
         SqlField("sequenceType", AtomRecordTable.SequenceType),
         SqlField("stepCount",    AtomRecordTable.StepCount),
@@ -54,6 +57,13 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
       selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "created", Predicates.stepRecord.created, Predicates.stepRecord.atomRecord.visit.observation.program)
 
   }
+
+  private lazy val executionStateHandler: EffectHandler[F] =
+    keyValueEffectHandler[Atom.Id, AtomExecutionState]("id") { aid =>
+      services.useTransactionally {
+        executionEventService.selectAtomExecutionState(aid)
+      }
+    }
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Atom.Id]("id", services, executionEventService.atomRange)
