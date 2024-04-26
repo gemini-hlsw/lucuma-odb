@@ -999,6 +999,7 @@ trait DatabaseOperations { this: OdbSuite =>
             received
             observation { id }
             visit { id }
+            atom { id }
           }
         }
       }
@@ -1011,7 +1012,8 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-      } yield StepEvent(i, r, o, v, sid, stage)
+        a <- c.downFields("atom", "id").as[Atom.Id]
+      } yield StepEvent(i, r, o, v, a, sid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1056,6 +1058,7 @@ trait DatabaseOperations { this: OdbSuite =>
             received
             observation { id }
             visit { id }
+            atom { id }
             step { id }
           }
         }
@@ -1069,8 +1072,9 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
+        a <- c.downFields("atom", "id").as[Atom.Id]
         s <- c.downFields("step", "id").as[Step.Id]
-      } yield DatasetEvent(i, r, o, v, s, did, stage)
+      } yield DatasetEvent(i, r, o, v, a, s, did, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }

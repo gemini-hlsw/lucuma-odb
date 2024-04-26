@@ -271,14 +271,14 @@ object TimeAccountingService {
 
     private object codec {
 
-      val step_context: Decoder[TimeAccounting.StepContext] =
-        (atom_id *: step_id).to[TimeAccounting.StepContext]
+      val atom_context: Decoder[TimeAccounting.AtomContext] =
+        (atom_id *: step_id.opt).to[TimeAccounting.AtomContext]
 
       val context: Decoder[TimeAccounting.Context] =
         (
           visit_id                     *:
           obs_class.map(_.chargeClass) *:
-          step_context.opt
+          atom_context.opt
         ).to[TimeAccounting.Context]
 
       val event: Decoder[TimeAccounting.Event] =
@@ -382,7 +382,7 @@ object TimeAccountingService {
           e.c_received,
           e.c_visit_id,
           COALESCE(s.c_observe_class, $obs_class),
-          s.c_atom_id,
+          e.c_atom_id,
           e.c_step_id
         FROM
           t_execution_event e

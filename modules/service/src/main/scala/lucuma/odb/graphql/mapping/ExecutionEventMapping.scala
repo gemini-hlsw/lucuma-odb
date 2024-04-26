@@ -113,6 +113,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       tpe = StepEventType,
       fieldMappings = List(
         SqlField("id",        ExecutionEventTable.Id, key = true),
+        SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
         SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
         SqlField("stepStage", ExecutionEventTable.StepStage)
       )
@@ -123,6 +124,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       tpe = DatasetEventType,
       fieldMappings = List(
         SqlField("id",           ExecutionEventTable.Id, key = true),
+        SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
         SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
         SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
         SqlField("datasetStage", ExecutionEventTable.DatasetStage)

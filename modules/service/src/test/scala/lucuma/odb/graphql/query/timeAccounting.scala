@@ -14,6 +14,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
@@ -386,6 +387,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           c_received,
           c_observation_id,
           c_visit_id,
+          c_atom_id,
           c_step_id,
           c_step_stage
         )
@@ -394,11 +396,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           $core_timestamp,
           $observation_id,
           $visit_id,
+          $atom_id,
           $step_id,
           $step_stage
       """.command
 
-      s.execute(cmd)((e.received, e.observationId, e.visitId, e.stepId, e.stage))
+      s.execute(cmd)((e.received, e.observationId, e.visitId, e.atomId, e.stepId, e.stage))
     }.void
 
   def insertDatasetEvent(e: DatasetEvent): IO[Unit] =
@@ -409,6 +412,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           c_received,
           c_observation_id,
           c_visit_id,
+          c_atom_id,
           c_step_id,
           c_dataset_id,
           c_dataset_stage
@@ -418,12 +422,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           $core_timestamp,
           $observation_id,
           $visit_id,
+          $atom_id,
           $step_id,
           $dataset_id,
           $dataset_stage
       """.command
 
-      s.execute(cmd)((e.received, e.observationId, e.visitId, e.stepId, e.datasetId, e.stage))
+      s.execute(cmd)((e.received, e.observationId, e.visitId, e.atomId, e.stepId, e.datasetId, e.stage))
     }.void
 
   def insertEvents(
@@ -524,36 +529,44 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("timeChargeInvoice (qa discount)") {
 
-    val ts = (0 until 8).map(_.fromNightStart)
+    val ts = (0 until 12).map(_.fromNightStart)
 
     def events(v: VisitNode): List[ExecutionEvent] = {
+
+      val aid0 = v.atoms.head.aid
       val sid0 = v.atoms.head.steps.head.sid
       val did0 = v.atoms.head.steps.head.dids.head
+
+      val aid1 = v.atoms.last.aid
       val sid1 = v.atoms.last.steps.head.sid
       val did1 = v.atoms.last.steps.head.dids.head
 
       List(
-        StepEvent(   EventId, ts(0), v.oid, v.vid, sid0,       StepStage.StartStep),
-        DatasetEvent(EventId, ts(1), v.oid, v.vid, sid0, did0, DatasetStage.StartExpose),
-        DatasetEvent(EventId, ts(2), v.oid, v.vid, sid0, did0, DatasetStage.EndWrite),
-        StepEvent(   EventId, ts(3), v.oid, v.vid, sid0,       StepStage.EndStep),
+        AtomEvent(   EventId, ts( 0), v.oid, v.vid, aid0,             AtomStage.StartAtom),
+        StepEvent(   EventId, ts( 1), v.oid, v.vid, aid0, sid0,       StepStage.StartStep),
+        DatasetEvent(EventId, ts( 2), v.oid, v.vid, aid0, sid0, did0, DatasetStage.StartExpose),
+        DatasetEvent(EventId, ts( 3), v.oid, v.vid, aid0, sid0, did0, DatasetStage.EndWrite),
+        StepEvent(   EventId, ts( 4), v.oid, v.vid, aid0, sid0,       StepStage.EndStep),
+        AtomEvent(   EventId, ts( 5), v.oid, v.vid, aid0,             AtomStage.EndAtom),
 
-        StepEvent(   EventId, ts(4), v.oid, v.vid, sid1,       StepStage.StartStep),
-        DatasetEvent(EventId, ts(5), v.oid, v.vid, sid1, did1, DatasetStage.StartExpose),
-        DatasetEvent(EventId, ts(6), v.oid, v.vid, sid1, did1, DatasetStage.EndWrite),
-        StepEvent(   EventId, ts(7), v.oid, v.vid, sid1,       StepStage.EndStep)
+        AtomEvent(   EventId, ts( 6), v.oid, v.vid, aid1,             AtomStage.StartAtom),
+        StepEvent(   EventId, ts( 7), v.oid, v.vid, aid1, sid1,       StepStage.StartStep),
+        DatasetEvent(EventId, ts( 8), v.oid, v.vid, aid1, sid1, did1, DatasetStage.StartExpose),
+        DatasetEvent(EventId, ts( 9), v.oid, v.vid, aid1, sid1, did1, DatasetStage.EndWrite),
+        StepEvent(   EventId, ts(10), v.oid, v.vid, aid1, sid1,       StepStage.EndStep),
+        AtomEvent(   EventId, ts(11), v.oid, v.vid, aid1,             AtomStage.EndAtom)
       )
     }
 
-    val expExecution   = CategorizedTime(ChargeClass.Program -> 7.sec)
+    val expExecution   = CategorizedTime(ChargeClass.Program -> 11.sec)
     val discount       = TimeCharge.Discount(
-      TimestampInterval.between(ts(4), ts(7)),
+      TimestampInterval.between(ts(6), ts(11)),
       TimeSpan.Zero,
-      3.sec,
+      5.sec,
       TimeAccounting.comment.Qa
     )
     def qaEntry(v: VisitNode) = TimeCharge.DiscountEntry.Qa(discount, v.atoms.last.steps.head.dids.toSet)
-    val expFinalCharge        = CategorizedTime(ChargeClass.Program -> 4.sec)
+    val expFinalCharge        = CategorizedTime(ChargeClass.Program -> 6.sec)
     def invoice(v: VisitNode) = TimeCharge.Invoice(expExecution, List(qaEntry(v)), expFinalCharge)
 
     for {
@@ -879,4 +892,5 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
   }
+
 }

@@ -135,7 +135,7 @@ object ExecutionEventService {
         def invalidDataset: OdbError.InvalidDataset =
           OdbError.InvalidDataset(datasetId, Some(s"Dataset '${datasetId.show}' not found"))
 
-        val insertEvent: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Step.Id)]] =
+        val insertEvent: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)]] =
           session
             .option(Statements.InsertDatasetEvent)(datasetId, datasetStage, datasetId)
             .map(_.toResult(invalidDataset.asProblem))
@@ -165,10 +165,10 @@ object ExecutionEventService {
 
         (for {
           e <- ResultT(insertEvent)
-          (eid, time, oid, vid, sid) = e
+          (eid, time, oid, vid, aid, sid) = e
           _ <- ResultT.liftF(setDatasetTime(time))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
-        } yield DatasetEvent(eid, time, oid, vid, sid, datasetId, datasetStage)).value
+        } yield DatasetEvent(eid, time, oid, vid, aid, sid, datasetId, datasetStage)).value
       }
 
       override def insertSequenceEvent(
@@ -225,7 +225,7 @@ object ExecutionEventService {
         def invalidStep: OdbError.InvalidStep =
           OdbError.InvalidStep(stepId, Some(s"Step '$stepId' not found"))
 
-        val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id)]] =
+        val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id)]] =
           session
             .option(Statements.InsertStepEvent)(stepId, stepStage, stepId)
             .map(_.toResult(invalidStep.asProblem))
@@ -240,10 +240,10 @@ object ExecutionEventService {
 
         (for {
           e <- ResultT(insert)
-          (eid, time, oid, vid) = e
+          (eid, time, oid, vid, aid) = e
           _ <- ResultT.liftF(setStepCompleted(time))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
-        } yield StepEvent(eid, time, oid, vid, stepId, stepStage)).value
+        } yield StepEvent(eid, time, oid, vid, aid, stepId, stepStage)).value
       }
 
       override def selectStepExecutionState(
@@ -328,7 +328,7 @@ object ExecutionEventService {
           c_visit_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id)
 
-    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Step.Id)] =
+    val InsertDatasetEvent: Query[(Dataset.Id, DatasetStage, Dataset.Id), (Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -358,8 +358,9 @@ object ExecutionEventService {
           c_received,
           c_observation_id,
           c_visit_id,
+          c_atom_id,
           c_step_id
-      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: step_id)
+      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id *: step_id)
 
     val InsertSequenceEvent: Query[(Visit.Id, SequenceCommand, Visit.Id), (Id, Timestamp, Observation.Id)] =
       sql"""
@@ -407,7 +408,7 @@ object ExecutionEventService {
           c_observation_id
       """.query(execution_event_id *: core_timestamp *: observation_id)
 
-    val InsertStepEvent: Query[(Step.Id, StepStage, Step.Id), (Id,  Timestamp, Observation.Id, Visit.Id)] =
+    val InsertStepEvent: Query[(Step.Id, StepStage, Step.Id), (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -433,8 +434,9 @@ object ExecutionEventService {
           c_execution_event_id,
           c_received,
           c_observation_id,
-          c_visit_id
-      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id)
+          c_visit_id,
+          c_atom_id
+      """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id)
 
     val SelectMaxStepStage: Query[Step.Id, StepStage] =
       sql"""

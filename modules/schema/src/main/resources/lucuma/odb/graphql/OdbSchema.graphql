@@ -5329,6 +5329,9 @@ type DatasetEvent implements ExecutionEvent {
   "Event type."
   eventType: ExecutionEventType!
 
+  "Atom associated with this event."
+  atom: AtomRecord!
+
   "The associated step."
   step: StepRecord!
 
@@ -9578,6 +9581,9 @@ type StepEvent implements ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
+
+  "Atom associated with this event."
+  atom: AtomRecord!
 
   "Step associated with this event."
   step: StepRecord!
