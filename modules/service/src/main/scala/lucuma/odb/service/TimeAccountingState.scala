@@ -143,7 +143,7 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    */
   def allAtoms: SortedSet[Atom.Id] =
     toMap.foldLeft(SortedSet.empty[Atom.Id]) { case (atoms, (_, ctx)) =>
-      ctx.step.fold(atoms) { stepContext => atoms + stepContext.atomId }
+      ctx.atom.fold(atoms) { atomContext => atoms + atomContext.atomId }
     }
 
   /**
@@ -152,14 +152,14 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    */
   def atomsIntersecting(interval: TimestampInterval): SortedSet[Atom.Id] =
     if (interval.nonEmpty) between(interval).allAtoms
-    else SortedSet.from(contextAt(interval.start).flatMap(_.step).map(_.atomId))
+    else SortedSet.from(contextAt(interval.start).flatMap(_.atom).map(_.atomId))
 
   /**
    * The minimal interval containing all the given atoms, if any.
    */
   def intervalContaining(atoms: Set[Atom.Id]): Option[TimestampInterval] =
     toMap.foldLeft(none[TimestampInterval]) { case (result, (interval, ctx)) =>
-      if (!ctx.step.map(_.atomId).exists(atoms)) result
+      if (!ctx.atom.map(_.atomId).exists(atoms)) result
       else result.fold(interval.some)(_.span(interval).some)
     }
 
@@ -197,7 +197,7 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
    */
   def partitionOnAtom(atom: Atom.Id): (TimeAccountingState, TimeAccountingState) = {
     val (in, out) = toMap.foldLeft((Empty.toMap, Empty.toMap)) { case ((in, out), (interval, ctx)) =>
-      if (ctx.step.exists(_.atomId === atom)) (in + (interval -> ctx), out)
+      if (ctx.atom.exists(_.atomId === atom)) (in + (interval -> ctx), out)
       else (in, out + (interval -> ctx))
     }
     (new TimeAccountingState(in), new TimeAccountingState(out))
@@ -239,7 +239,7 @@ object TimeAccountingState {
       .toList
       .head
 
-  /**
+    /**
    * A pipe that processes the event stream into a single-element stream
    * containing the corresponding `TimeAccountingState`.
    */
@@ -248,48 +248,63 @@ object TimeAccountingState {
     visitId: Visit.Id
   ): Pipe[F, TimeAccounting.Event, TimeAccountingState] = {
 
-    // The events must be presented in order or this won't work.
-    val validateSortOrder: Pipe[F, TimeAccounting.Event, TimeAccounting.Event] =
-      _.zipWithNext
+    import TimeAccounting.AtomContext
+    import TimeAccounting.Context
+    import TimeAccounting.Event
+
+    // Clean the event stream to make it easier to process.
+    // * We don't need sequence level events, except at the beginning and end if
+    //   present there
+    // * Contiguous events with the same context can be collapsed into just the
+    //   first and last ones
+    val cleanEvents: Pipe[F, Event, Event] =
+      _.zipWithPreviousAndNext
        .flatMap {
-         case (cur, Some(next)) if (cur.timestamp > next.timestamp) => throw new RuntimeException("Events out of order!")
-         case (cur, _)                                              => Stream.emit(cur)
+         case (None, cur, _   ) => Stream.emit(cur)
+         case (_,    cur, None) => Stream.emit(cur)
+         case (_,    cur, _   ) => if (cur.context.atom.isDefined) Stream.emit(cur)
+                                   else Stream.empty
+       }
+       .groupAdjacentBy(_.context)
+       .flatMap { case (ctx, events) =>
+         if (events.size <= 1) Stream.fromOption(events.head)
+         else Stream.emits((events.head, events.last).mapN((s, e) => List(s,e)).toList.flatten)
        }
 
-    // Pipe that turns time accounting events into interval -> context pairs
-    // so that they can be used to create TimeAccountingState.  We merge all
-    // the adjacent ones with the same context into a single entry covering
-    // the entire time.
-    val entriesPipe: Pipe[F, TimeAccounting.Event, (TimestampInterval, TimeAccounting.Context)] =
-      _.groupAdjacentBy(_.context)
-       .map { case (ctx, events) =>
-         val head     = events.head.map(_.timestamp)
-         val last     = events.last.map(_.timestamp)
-         val interval =
-           (head, last).mapN(TimestampInterval.between)
-                       .getOrElse(sys.error("Stream.groupAdjacentBy produced an empty Chunk!"))
-
-         interval -> ctx
-       }.filter { case (interval, _) => interval.nonEmpty }
-
-    // Pipe that fills in the gaps between steps with an interval -> context
-    // pair (albeit with a None step context).
-    val contiguousPipe: Pipe[F, (TimestampInterval, TimeAccounting.Context), (TimestampInterval, TimeAccounting.Context)] =
+    val makeEntries: Pipe[F, Event, (TimestampInterval, Context)] =
       _.zipWithNext
        .flatMap {
-         case ((interval0, ctx0), None)                  =>
-           Stream.emit(interval0 -> ctx0)
-         case ((interval0, ctx0), Some(interval1, ctx1)) =>
-           if (interval0.abuts(interval1)) Stream.emit(interval0 -> ctx0)
-           else Stream(
-             interval0 -> ctx0,
-             TimestampInterval.between(interval0.end, interval1.start) -> TimeAccounting.Context(visitId, chargeClass, None)
+         case (cur, Some(next)) if cur.timestamp > next.timestamp =>
+           throw new RuntimeException("Events out of order!")
+
+         case (cur, Some(next)) if cur.context === next.context =>
+           Stream.emit(
+             cur.timestamp.intervalUntil(next.timestamp) -> cur.context
            )
+
+         case (cur, Some(next)) if cur.context.atom.map(_.atomId) === next.context.atom.map(_.atomId) =>
+           // Time within an atom, but not in any particular step.
+           val ac  = cur.context.atom.map(AtomContext.stepId.replace(None))
+           val ctx = Context(visitId, chargeClass, ac)
+           Stream.emit(
+             cur.timestamp.intervalUntil(next.timestamp) -> ctx
+           )
+
+         case (cur, Some(next)) =>
+           // Time not in any particular atom.
+           Stream.emit(
+             cur.timestamp.intervalUntil(next.timestamp) -> Context(visitId, chargeClass, None)
+           )
+
+         case (cur, None) =>
+           // Last event has already been taken into account.
+           Stream.empty
        }
 
-    _.through(validateSortOrder)
-     .through(entriesPipe)
-     .through(contiguousPipe)
+
+    _.through(cleanEvents)
+     .through(makeEntries)
+     .filter { case (interval, _) => interval.nonEmpty }
      .fold(Empty.toMap) { case (state, (interval, ctx)) =>
        state + (interval -> ctx)
      }
