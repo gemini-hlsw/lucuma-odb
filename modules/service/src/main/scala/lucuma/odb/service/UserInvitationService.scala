@@ -68,14 +68,16 @@ object UserInvitationService:
         )
       
         val textMessage: NonEmptyString = NonEmptyString.unsafeFrom(
-          s"Here is your token: ${invitation.token}"
+          s"""${user.displayName} has invited you to collaborate on a Gemini proposal. To accept this invitation go to ${emailConfig.exploreUrl} to log in, then from the upper right menu select "Redeem Invitations" and enter the following key:
+          |
+          |${invitation.token}
+          |
+          |If you have any trouble or questions please submit a Gemini help desk ticket: https://www.gemini.edu/observing/helpdesk/submit-general-helpdesk-request""".stripMargin
         )
 
-        val htmlMessage: NonEmptyString = NonEmptyString.unsafeFrom(
-          s"<html><body><h1>Join Us!!</h1><p>Here is your token: ${invitation.token}</p></body></html>"
-        )
+        // A different message could be sent for html clients
         emailService(emailConfig, httpClient)
-          .send(input.programId, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, htmlMessage.some)
+          .send(input.programId, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, none)
       }
 
       def updateEmailId(invitationId: UserInvitation.Id, emailId: EmailId): F[Result[Unit]] =
