@@ -220,7 +220,8 @@ object Config {
     apiKey:            NonEmptyString,
     domain:            NonEmptyString,
     webhookSigningKey: NonEmptyString,
-    invitationFrom:    EmailAddress
+    invitationFrom:    EmailAddress, 
+    exploreUrl:        Uri
   ) {
     // add to environment?
     lazy val baseUri = uri"https://api.mailgun.net/v3"
@@ -233,7 +234,8 @@ object Config {
       envOrProp("MAILGUN_API_KEY").as[NonEmptyString],
       envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
       envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").as[NonEmptyString],
-      envOrProp("INVITATION_SENDER_EMAIL").as[EmailAddress]
+      envOrProp("INVITATION_SENDER_EMAIL").as[EmailAddress],
+      envOrProp("EXPLORE_URL").as[Uri]
     ).parMapN(Email.apply)
 
     private given ConfigDecoder[String, EmailAddress] =

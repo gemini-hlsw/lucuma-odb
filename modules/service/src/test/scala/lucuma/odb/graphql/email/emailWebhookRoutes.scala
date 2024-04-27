@@ -33,7 +33,8 @@ class emailWebhookRoutes extends OdbSuite {
       apiKey            = "apiKey".refined,
       domain            = "gpp.com".refined,
       webhookSigningKey = "55484a8372da2cf84445b8a65d674511".refined,
-      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com")
+      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
+      exploreUrl = Uri.fromString("https://nonsense.kom").toOption.get
     )
 
   private given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
