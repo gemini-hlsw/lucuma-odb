@@ -1,3 +1,17 @@
+CREATE TYPE e_step_execution_state AS ENUM(
+  'not_started',
+  'ongoing',
+  'aborted',
+  'completed',
+  'stopped'
+);
+
+CREATE TYPE e_atom_execution_state AS ENUM(
+  'not_started',
+  'ongoing',
+  'completed'
+);
+
 CREATE TYPE e_atom_stage AS ENUM(
   'end_atom',
   'start_atom'

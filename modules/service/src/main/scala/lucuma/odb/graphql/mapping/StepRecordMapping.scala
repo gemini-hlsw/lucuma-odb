@@ -14,7 +14,6 @@ import grackle.TypeRef
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
-import lucuma.odb.data.StepExecutionState
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
@@ -42,21 +41,21 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
     ObjectMapping(
       tpe           = StepRecordType,
       fieldMappings = List(
-        SqlField("id",           StepRecordView.Id, key = true),
-        SqlField("index",        StepRecordView.StepIndex),
-        SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
-        SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
-        SqlField("created",      StepRecordView.Created),
-        EffectField("executionState", executionStateHandler, List("id")),
-        EffectField("interval",  intervalHandler, List("id")),
+        SqlField("id",             StepRecordView.Id, key = true),
+        SqlField("index",          StepRecordView.StepIndex),
+        SqlField("instrument",     StepRecordView.Instrument, discriminator = true),
+        SqlObject("atom",          Join(StepRecordView.AtomId, AtomRecordTable.Id)),
+        SqlField("created",        StepRecordView.Created),
+        SqlField("executionState", StepRecordView.ExecutionState),
+        EffectField("interval",    intervalHandler, List("id")),
         SqlObject("stepConfig"),
-        SqlField("observeClass", StepRecordView.ObserveClass),
+        SqlField("observeClass",   StepRecordView.ObserveClass),
         SqlObject("estimate"),
-        EffectField("qaState", qaStateHandler, List("id")),
+        EffectField("qaState",     qaStateHandler, List("id")),
         SqlObject("datasets"),
         SqlObject("events"),
-        SqlObject("gmosNorth", Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
-        SqlObject("gmosSouth", Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
+        SqlObject("gmosNorth",     Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
+        SqlObject("gmosSouth",     Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
       )
     )
 
@@ -75,13 +74,6 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
 
   }
-
-  private lazy val executionStateHandler: EffectHandler[F] =
-    keyValueEffectHandler[Step.Id, StepExecutionState]("id") { sid =>
-      services.useTransactionally {
-        executionEventService.selectStepExecutionState(sid)
-      }
-    }
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
