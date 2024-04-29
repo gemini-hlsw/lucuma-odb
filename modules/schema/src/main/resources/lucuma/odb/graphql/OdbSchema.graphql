@@ -363,6 +363,9 @@ type CallForProposals {
   """
   id: CallForProposalsId!
 
+  "The title of this Call for Proposals."
+  title: NonEmptyString!
+
   """
   Describes which type of proposals are being accepted.
   """
