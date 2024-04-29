@@ -16,6 +16,7 @@ import lucuma.odb.util.Codecs.instrument
 import lucuma.odb.util.Codecs.int4_pos
 import lucuma.odb.util.Codecs.obs_class
 import lucuma.odb.util.Codecs.smart_gcal_type
+import lucuma.odb.util.Codecs.step_execution_state
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_type
 import lucuma.odb.util.Codecs.time_span
@@ -24,15 +25,16 @@ import skunk.codec.boolean.bool
 trait StepRecordView[F[_]] extends BaseMapping[F] {
 
   object StepRecordView extends TableDef("v_step_record") {
-    val Id: ColumnRef            = col("c_step_id",        step_id)
-    val StepIndex: ColumnRef     = col("c_step_index",     int4_pos)
-    val Instrument: ColumnRef    = col("c_instrument",     instrument)
-    val AtomId: ColumnRef        = col("c_atom_id",        atom_id)
-    val StepType: ColumnRef      = col("c_step_type",      step_type)
-    val ObserveClass: ColumnRef  = col("c_observe_class",  obs_class)
-    val TimeEstimate: ColumnRef  = col("c_time_estimate",  time_span)
-    val Created: ColumnRef       = col("c_created",        core_timestamp)
-    val Completed: ColumnRef     = col("c_completed",      core_timestamp.opt)
+    val Id: ColumnRef             = col("c_step_id",         step_id)
+    val StepIndex: ColumnRef      = col("c_step_index",      int4_pos)
+    val Instrument: ColumnRef     = col("c_instrument",      instrument)
+    val AtomId: ColumnRef         = col("c_atom_id",         atom_id)
+    val StepType: ColumnRef       = col("c_step_type",       step_type)
+    val ObserveClass: ColumnRef   = col("c_observe_class",   obs_class)
+    val TimeEstimate: ColumnRef   = col("c_time_estimate",   time_span)
+    val Created: ColumnRef        = col("c_created",         core_timestamp)
+    val Completed: ColumnRef      = col("c_completed",       core_timestamp.opt)
+    val ExecutionState: ColumnRef = col("c_execution_state", step_execution_state)
 
     object Gcal {
       val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum.opt)

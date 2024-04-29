@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.show.*
@@ -27,10 +26,8 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.StepExecutionState
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -76,14 +73,6 @@ trait ExecutionEventService[F[_]] {
     stepStage: StepStage
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
-  def selectAtomExecutionState(
-    atomId: Atom.Id
-  )(using Transaction[F]): F[AtomExecutionState]
-
-  def selectStepExecutionState(
-    stepId: Step.Id
-  )(using Transaction[F]): F[StepExecutionState]
-
 }
 
 object ExecutionEventService {
@@ -128,6 +117,7 @@ object ExecutionEventService {
         (for {
           e <- ResultT(insert)
           (eid, time, oid, vid) = e
+          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(atomId, atomStage))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield AtomEvent(eid, time, oid, vid, atomId, atomStage)).value
       }
@@ -238,42 +228,14 @@ object ExecutionEventService {
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
             }
 
-        def setStepCompleted(time: Timestamp): F[Unit] =
-          services
-            .sequenceService
-            .setStepCompleted(stepId, Option.when(stepStage === StepStage.EndStep)(time))
-
         (for {
           e <- ResultT(insert)
           (eid, time, oid, vid, aid) = e
-          _ <- ResultT.liftF(setStepCompleted(time))
+          _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(stepId, stepStage, time))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield StepEvent(eid, time, oid, vid, aid, stepId, stepStage)).value
       }
 
-      override def selectAtomExecutionState(
-        atomId: Atom.Id
-      )(using Transaction[F]): F[AtomExecutionState] =
-        session
-          .option(Statements.SelectMaxAtomStage)(atomId)
-          .map {
-            case None                    => AtomExecutionState.NotStarted
-            case Some(AtomStage.EndAtom) => AtomExecutionState.Completed
-            case _                       => AtomExecutionState.Ongoing
-          }
-
-      override def selectStepExecutionState(
-        stepId: Step.Id
-      )(using Transaction[F]): F[StepExecutionState] =
-        session
-          .option(Statements.SelectMaxStepStage)(stepId)
-          .map {
-            case None                    => StepExecutionState.NotStarted
-            case Some(StepStage.EndStep) => StepExecutionState.Completed
-            case Some(StepStage.Abort)   => StepExecutionState.Aborted
-            case Some(StepStage.Stop)    => StepExecutionState.Stopped
-            case _                       => StepExecutionState.Ongoing
-          }
     }
 
   object Statements {
@@ -458,26 +420,6 @@ object ExecutionEventService {
           c_atom_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id)
          .contramap((s, t) => (s, t, s))
-
-    val SelectMaxAtomStage: Query[Atom.Id, AtomStage] =
-      sql"""
-        SELECT c_atom_stage
-          FROM t_execution_event
-         WHERE c_atom_id = $atom_id
-           AND c_atom_stage IS NOT NULL
-         ORDER BY c_received DESC
-         LIMIT 1
-      """.query(atom_stage)
-
-    val SelectMaxStepStage: Query[Step.Id, StepStage] =
-      sql"""
-        SELECT c_step_stage
-          FROM t_execution_event
-         WHERE c_step_id = $step_id
-           AND c_step_stage IS NOT NULL
-         ORDER BY c_received DESC
-         LIMIT 1
-      """.query(step_stage)
 
   }
 
