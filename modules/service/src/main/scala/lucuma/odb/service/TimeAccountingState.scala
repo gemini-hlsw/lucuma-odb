@@ -239,7 +239,7 @@ object TimeAccountingState {
       .toList
       .head
 
-    /**
+  /**
    * A pipe that processes the event stream into a single-element stream
    * containing the corresponding `TimeAccountingState`.
    */
