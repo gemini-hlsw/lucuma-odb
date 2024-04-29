@@ -439,7 +439,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       """
 
       val events: List[Json] =
-         on.allEvents.collect { case StepEvent(id, _, _, _, `sid`, _) =>
+         on.allEvents.collect { case StepEvent(id, _, _, _, _, `sid`, _) =>
            Json.obj(
              "id" -> id.asJson,
              "step" -> Json.obj(
@@ -482,7 +482,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       """
 
       val events: List[Json] =
-         on.allEvents.collect { case StepEvent(id, _, _, _, _, StepStage.EndStep) => Json.obj("id" -> id.asJson) }
+         on.allEvents.collect { case StepEvent(id, _, _, _, _, _, StepStage.EndStep) => Json.obj("id" -> id.asJson) }
 
       val e = json"""
       {
@@ -517,7 +517,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
 
       val didsContains = dids.toSet
       val events: List[Json] =
-         on.allEvents.collect { case DatasetEvent(id, _, _, _, _, did, _) if didsContains(did) => Json.obj("id" -> id.asJson) }
+         on.allEvents.collect { case DatasetEvent(id, _, _, _, _, _, did, _) if didsContains(did) => Json.obj("id" -> id.asJson) }
 
       val e = json"""
       {
@@ -553,7 +553,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
       """
 
       val events: List[Json] =
-         on.allEvents.collect { case DatasetEvent(id, _, _, _, _, _, DatasetStage.EndWrite) => Json.obj("id" -> id.asJson) }
+         on.allEvents.collect { case DatasetEvent(id, _, _, _, _, _, _, DatasetStage.EndWrite) => Json.obj("id" -> id.asJson) }
 
       val e = json"""
       {

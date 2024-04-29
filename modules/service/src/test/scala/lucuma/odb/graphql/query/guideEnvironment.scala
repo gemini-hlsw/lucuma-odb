@@ -369,7 +369,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
                       "bandNormalized": {
                         "brightnesses": [
                           {
-                            "band": "GAIA"
+                            "band": "GAIA_RP"
                           }
                         ]
                       }
@@ -430,7 +430,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
                       "bandNormalized": {
                         "brightnesses": [
                           {
-                            "band": "GAIA"
+                            "band": "GAIA_RP"
                           }
                         ]
                       }
@@ -491,7 +491,7 @@ class guideEnvironment extends OdbSuite with ObservingModeSetupOperations {
                       "bandNormalized": {
                         "brightnesses": [
                           {
-                            "band": "GAIA"
+                            "band": "GAIA_RP"
                           }
                         ]
                       }

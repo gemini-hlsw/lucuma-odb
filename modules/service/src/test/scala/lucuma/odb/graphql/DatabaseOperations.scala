@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.AtomStage
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EmailStatus
@@ -25,6 +26,7 @@ import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RightAscension
 import lucuma.core.model.ExecutionEvent
+import lucuma.core.model.ExecutionEvent.AtomEvent
 import lucuma.core.model.ExecutionEvent.DatasetEvent
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.ExecutionEvent.SlewEvent
@@ -999,6 +1001,7 @@ trait DatabaseOperations { this: OdbSuite =>
             received
             observation { id }
             visit { id }
+            atom { id }
           }
         }
       }
@@ -1011,7 +1014,41 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-      } yield StepEvent(i, r, o, v, sid, stage)
+        a <- c.downFields("atom", "id").as[Atom.Id]
+      } yield StepEvent(i, r, o, v, a, sid, stage)
+      e.fold(f => throw new RuntimeException(f.message), identity)
+    }
+  }
+
+  def addAtomEventAs(
+    user:  User,
+    aid:   Atom.Id,
+    stage: AtomStage
+  ): IO[AtomEvent] = {
+    val q = s"""
+      mutation {
+        addAtomEvent(input: {
+          atomId:    "$aid",
+          atomStage: ${stage.tag.toUpperCase}
+        }) {
+          event {
+            id
+            received
+            observation { id }
+            visit { id }
+          }
+        }
+      }
+    """
+
+    query(user = user, query = q).map { json =>
+      val c = json.hcursor.downFields("addAtomEvent", "event")
+      val e = for {
+        i <- c.downField("id").as[ExecutionEvent.Id]
+        r <- c.downField("received").as[Timestamp]
+        o <- c.downFields("observation", "id").as[Observation.Id]
+        v <- c.downFields("visit", "id").as[Visit.Id]
+      } yield AtomEvent(i, r, o, v, aid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1056,6 +1093,7 @@ trait DatabaseOperations { this: OdbSuite =>
             received
             observation { id }
             visit { id }
+            atom { id }
             step { id }
           }
         }
@@ -1069,8 +1107,9 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
+        a <- c.downFields("atom", "id").as[Atom.Id]
         s <- c.downFields("step", "id").as[Step.Id]
-      } yield DatasetEvent(i, r, o, v, s, did, stage)
+      } yield DatasetEvent(i, r, o, v, a, s, did, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }

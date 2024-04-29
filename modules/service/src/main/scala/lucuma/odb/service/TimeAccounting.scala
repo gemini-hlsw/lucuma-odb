@@ -63,17 +63,17 @@ object TimeAccounting {
    * accounting is performed for each visit so there's always a `Visit.Id`.
    * The `ChargeClass` will come either from the associated step (if any) or
    * else the default charge class for the visit. For time spent executing steps
-   * there will be a `StepContext` as well.
+   * there will be an `AtomContext` as well.
    */
   case class Context(
     visitId:     Visit.Id,
     chargeClass: ChargeClass,
-    step:        Option[StepContext]
+    atom:        Option[AtomContext]
   )
 
   object Context {
     given Eq[Context] =
-      Eq.by { a => (a.visitId, a.chargeClass, a.step) }
+      Eq.by { a => (a.visitId, a.chargeClass, a.atom) }
 
     val visitId: Lens[Context, Visit.Id] =
       Focus[Context](_.visitId)
@@ -81,28 +81,29 @@ object TimeAccounting {
     val chargeClass: Lens[Context, ChargeClass] =
       Focus[Context](_.chargeClass)
 
-    val step: Lens[Context, Option[StepContext]] =
-      Focus[Context](_.step)
+    val atom: Lens[Context, Option[AtomContext]] =
+      Focus[Context](_.atom)
   }
 
+
   /**
-   * Step context. We keep up with the atom so that we can discount time for an
+   * Atom context. We keep up with the atom so that we can discount time for an
    * entire atom when necessary.
    */
-  case class StepContext(
-    atomId:      Atom.Id,
-    stepId:      Step.Id
+  case class AtomContext(
+    atomId: Atom.Id,
+    stepId: Option[Step.Id]
   )
 
-  object StepContext {
-    given Eq[StepContext] =
+  object AtomContext {
+    given Eq[AtomContext] =
       Eq.by { a => (a.atomId, a.stepId) }
 
-    val atomId: Lens[StepContext, Atom.Id] =
-      Focus[StepContext](_.atomId)
+    val atomId: Lens[AtomContext, Atom.Id] =
+      Focus[AtomContext](_.atomId)
 
-    val stepId: Lens[StepContext, Step.Id] =
-      Focus[StepContext](_.stepId)
+    val stepId: Lens[AtomContext, Option[Step.Id]] =
+      Focus[AtomContext](_.stepId)
   }
 
 }
