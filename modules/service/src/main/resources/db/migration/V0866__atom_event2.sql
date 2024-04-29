@@ -30,6 +30,7 @@ DROP VIEW v_step_record;
 CREATE VIEW v_step_record AS
 SELECT
   s.c_step_id,
+  s.c_step_index,
   s.c_atom_id,
   s.c_instrument,
   s.c_step_type,
