@@ -34,13 +34,14 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
     ObjectMapping(
       tpe           = AtomRecordType,
       fieldMappings = List(
-        SqlField("id",           AtomRecordTable.Id, key = true),
-        SqlField("instrument",   AtomRecordTable.Instrument),
-        SqlObject("visit",       Join(AtomRecordTable.VisitId, VisitTable.Id)),
-        SqlField("created",      AtomRecordTable.Created),
-        EffectField("interval",  intervalHandler, List("id")),
-        SqlField("sequenceType", AtomRecordTable.SequenceType),
-        SqlField("stepCount",    AtomRecordTable.StepCount),
+        SqlField("id",             AtomRecordTable.Id, key = true),
+        SqlField("instrument",     AtomRecordTable.Instrument),
+        SqlObject("visit",         Join(AtomRecordTable.VisitId, VisitTable.Id)),
+        SqlField("created",        AtomRecordTable.Created),
+        SqlField("executionState", AtomRecordTable.ExecutionState),
+        EffectField("interval",    intervalHandler, List("id")),
+        SqlField("sequenceType",   AtomRecordTable.SequenceType),
+        SqlField("stepCount",      AtomRecordTable.StepCount),
         SqlObject("steps")
       )
     )

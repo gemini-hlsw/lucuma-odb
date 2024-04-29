@@ -15,6 +15,20 @@ enum ProposalStatus { DUMMY }
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
 scalar EmailAddress
 
+"AtomEvent creation parameters."
+input AddAtomEventInput {
+  atomId: AtomId!
+  atomStage: AtomStage!
+}
+
+"The result of adding a atom event."
+type AddAtomEventResult {
+
+  "The new atom event that was added."
+  event: AtomEvent!
+
+}
+
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
 
@@ -128,9 +142,60 @@ input AngleInput {
 }
 
 """
+Atom-level events.  The execution of a single atom will generate multiple events.
+"""
+type AtomEvent implements ExecutionEvent {
+
+  "Event id"
+  id: ExecutionEventId!
+
+  "Visit associated with this event."
+  visit: Visit!
+
+  "Observation whose execution produced this event."
+  observation: Observation!
+
+  "Time at which this event was received"
+  received: Timestamp!
+
+  "Event type."
+  eventType: ExecutionEventType!
+
+  "Atom associated with this event."
+  atom: AtomRecord!
+
+  "Atom execution stage."
+  atomStage: AtomStage!
+
+}
+
+enum AtomExecutionState {
+
+  "No events have been received since the atom was recorded."
+  NOT_STARTED
+
+  "Events have been received, but no 'EndAtom'."
+  ONGOING
+
+  "An event with an 'END_ATOM' 'AtomStage' was received."
+  COMPLETED
+
+}
+
+"""
 AtomId id formatted as `a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
 """
 scalar AtomId
+
+"Execution stage or phase of an individual atom"
+enum AtomStage {
+
+  END_ATOM
+
+  START_ATOM
+
+}
+
 
 "An atom as recorded by Observe."
 type AtomRecord {
@@ -146,6 +211,12 @@ type AtomRecord {
 
   "Created by Observe at this time."
   created: Timestamp!
+
+  """
+  The execution state of this atom, according to events received (if any) from
+  Observe.
+  """
+  executionState: AtomExecutionState!
 
   "Time interval during which this atom executed."
   interval: TimestampInterval
@@ -958,6 +1029,9 @@ enum ExecutionEventType {
 
   "Slew event type."
   SLEW
+
+  "Atom-level event type."
+  ATOM
 
   "Step-level event type."
   STEP
@@ -2583,6 +2657,19 @@ type Mutation {
   ): AddConditionsEntryResult!
 
   """
+  Adds a new atom event.
+  """
+  addAtomEvent(
+    """
+    Describes the atom event to add.  All events are associated with a
+    particular visit (see 'record{InstrumentName}Visit').  Atom events are
+    further associated with an an observation id and an atom id. Each atom event
+    identifies the stage through which the atom execution is passing.
+    """
+    input: AddAtomEventInput!
+  ): AddAtomEventResult!
+
+  """
   Adds a new dataset event associated with the given visit.  The
   generation of a single dataset will produce multiple events as it
   transitions through the observe, readout and write stages.
@@ -2638,9 +2725,8 @@ type Mutation {
 
     """
     Describes the step event to add.  All events are associated with a
-    particular step (see 'record{InstrumentName}Step'. Each step event
-    identifies the sequence type (acquisition or science) and the stage
-    through which the step execution is passing.
+    particular step (see 'record{InstrumentName}Step'). Each step event
+    identifies the stage through which the step execution is passing.
     """
     input: AddStepEventInput!
 
@@ -5242,6 +5328,9 @@ type DatasetEvent implements ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
+
+  "Atom associated with this event."
+  atom: AtomRecord!
 
   "The associated step."
   step: StepRecord!
@@ -9492,6 +9581,9 @@ type StepEvent implements ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
+
+  "Atom associated with this event."
+  atom: AtomRecord!
 
   "Step associated with this event."
   step: StepRecord!

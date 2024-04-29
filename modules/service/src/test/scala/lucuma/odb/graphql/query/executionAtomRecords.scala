@@ -10,12 +10,14 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.AtomStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.ObservingModeType
 
 class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
@@ -27,6 +29,14 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   val mode    = ObservingModeType.GmosNorthLongSlit
 
   val validUsers = List(pi, pi2, service).toList
+
+  def noEventSetup: IO[(Observation.Id, Atom.Id)] =
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, mode.some)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid)
+    } yield (oid, aid)
 
   test("observation -> execution -> atomRecords") {
     recordAll(pi, service, mode, offset = 0, visitCount = 2, atomCount = 2).flatMap { on =>
@@ -452,5 +462,58 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
       sid <- recordStepAs(service, mode.instrument, aid)
       _   <- expect(pi, query(oid), expected)
     } yield ()
+  }
+
+  def executionState(oid: Observation.Id): IO[AtomExecutionState] =
+    query(
+      user = pi,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              atomRecords {
+                matches {
+                  executionState
+                }
+              }
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "execution", "atomRecords", "matches")
+        .downArray
+        .downField("executionState")
+        .as[AtomExecutionState]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  test("execution state - not started") {
+    val res = for {
+      (o, _) <- noEventSetup
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, AtomExecutionState.NotStarted)
+  }
+
+  test("execution state - ongoing") {
+    val res = for {
+      (o, a) <- noEventSetup
+      _      <- addAtomEventAs(service, a, AtomStage.StartAtom)
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, AtomExecutionState.Ongoing)
+  }
+
+  test("execution state - completed") {
+    val res = for {
+      (o, a) <- noEventSetup
+      _      <- addAtomEventAs(service, a, AtomStage.StartAtom)
+      _      <- addAtomEventAs(service, a, AtomStage.EndAtom)
+      es     <- executionState(o)
+    } yield es
+    assertIO(res, AtomExecutionState.Completed)
   }
 }

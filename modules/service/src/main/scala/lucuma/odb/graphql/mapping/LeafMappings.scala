@@ -42,6 +42,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
@@ -69,6 +70,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[Long](ChronicleIdType),
       LeafMapping[Atom.Id](AtomIdType),
+      LeafMapping[AtomExecutionState](AtomExecutionStateType),
+      LeafMapping[AtomStage](AtomStageType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
       LeafMapping[CatalogName](CatalogNameType),
