@@ -74,3 +74,44 @@ the database with data from the dev environment with `./populate-db-from-dev.sh`
 the app and see verify that it comes up and looks ok. Note that you will need Heroku and Postgres
 tools installed locally.
 
+## Mailgun
+
+We are using the Mailgun heroku addon for sending and tracking emails.
+
+If you need to install Mailgun in a new app, you can do so via:
+
+`heroku addons:create mailgun:Starter --app <APP NAME>`
+
+The addon manages the mailgun users so that anyone with access to the app on heroku can go to
+the mailgun dashboard by clicking on `Mailgun` in the app resources. It also sets some of the 
+required config variables. However, some will need to be added/updated as described below.
+
+The setup a custom domain in mailgun, go to the mailgun dashboard and navigate to `Sending > Domains`,
+click the `Add Domain` button and follow the directions. Note that only the `TXT` records (`SPF` and `DKIM`)
+need to be set as we are not receiving mail or trying to track user opens and clicks.
+
+You will need to change the `MAILGUN_DOMAIN` config variable to point to the new domain. Like:
+
+`MAILGUN_DOMAIN=mail.odb-dev.lucuma.xyz`
+
+In order to receive the webhook events that track the status of the email (Accepted, Delivered, Permanent Failure, Temporary Failure), do the following:
+
+- In the mailgun dashboard go to `Sending > Webhooks` and create a new webhook signing key.
+- Set the `MAILGUN_WEBHOOK_SIGNING_KEY` config variable in the herok app to the key you created.
+- Back in the dashboard, with the proper domain selected in the upper right, use the `Add webhook` button to add webhooks for `accepted`, `delivered`, `permanent_fail`, and `temporary_fail`. The url is the url for the heroku app, plus `/mailgun`. For example `https://lucuma-postgres-odb-dev.herokuapp.com/mailgun`.
+
+Two more config variables are required:
+
+- INVITATION_SENDER_EMAIL - this should be some user in the MAILGUN_DOMAIN. For example `explore@mail.odb-dev.lucuma.xyz`. This will be the sender of the invitation emails.
+- EXPLORE_URL - The url of the Explore instance for this version of the ODB. For example `https://explore-dev.lucuma.xyz`. This is used to put a link to explore in the invitation emails.
+
+To run the odb locally, the environment variables in this section must be set or the odb will fail when
+loading the configuration. Here is the complete list with some example values.
+
+- MAILGUN_API_KEY=<Any string> (A valid key can be obtained from the heroku app if you want to be able to send email)
+- MAILGUN_DOMAIN=mail.odb-dev.lucuma.xyz
+- MAILGUN_WEBHOOK_SIGNING_KEY=<Any string> (Can be anything, since webhooks won't be received locally)
+- INVITATION_SENDER_EMAIL=explore@mail.odb-dev.lucuma.xyz
+- EXPLORE_URL=https://explore-dev.lucuma.xyz
+
+Mailgun sets other variables in the Heroku app, but they are for things we are not using.
