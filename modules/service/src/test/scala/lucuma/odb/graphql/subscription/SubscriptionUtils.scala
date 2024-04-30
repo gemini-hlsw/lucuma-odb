@@ -16,7 +16,7 @@ import scala.concurrent.duration.*
 trait SubscriptionUtils { self: OdbSuite =>
 
   // try to behave nicely on weak CI machines
-  private val sleep: IO[Unit] =
+  protected val sleep: IO[Unit] =
     IO.sleep(500.millis)
 
   def createProgram(user: User, name: String): IO[Program.Id] =
