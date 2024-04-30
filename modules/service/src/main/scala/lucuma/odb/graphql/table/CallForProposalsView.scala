@@ -14,6 +14,7 @@ import lucuma.odb.util.Codecs.instrument
 import lucuma.odb.util.Codecs.right_ascension
 import lucuma.odb.util.Codecs.semester
 import lucuma.odb.util.Codecs.tag
+import lucuma.odb.util.Codecs.text_nonempty
 import lucuma.odb.util.Codecs.timestamp_interval_tsrange
 import skunk.codec.boolean.bool
 
@@ -21,6 +22,7 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
   object CallForProposalsView extends TableDef("v_cfp") {
     val Id       = col("c_cfp_id",     cfp_id)
+    val Title    = col("c_title",      text_nonempty)
     val Type     = col("c_type",       cfp_type)
     val Semester = col("c_semester",   semester)
 
