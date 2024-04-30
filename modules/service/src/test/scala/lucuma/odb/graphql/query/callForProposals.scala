@@ -139,10 +139,6 @@ class callForProposals extends OdbSuite {
     assertIO(getTitle(CallForProposalsType.RegularSemester), "2025A Regular Semester")
   }
 
-  test("system verification") {
-    assertIO(getTitle(CallForProposalsType.SystemVerification), "2025A System Verification")
-  }
-
   test("fast turnaround") {
     val title = query(
       user = staff,
@@ -175,4 +171,75 @@ class callForProposals extends OdbSuite {
     assertIO(title, "2025 August Fast Turnaround")
   }
 
+  test("system verification - no instruments") {
+    assertIO(getTitle(CallForProposalsType.SystemVerification), "2025A System Verification")
+  }
+
+  test("system verification - one instrument") {
+    val title = query(
+      user = staff,
+      query = s"""
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        SYSTEM_VERIFICATION
+                semester:    "2025A"
+                activeStart: "2025-08-01 14:00:00"
+                activeEnd:   "2025-08-31 14:00:00"
+                instruments: [GMOS_NORTH]
+              }
+            }
+          ) {
+            callForProposals {
+              title
+            }
+          }
+        }
+      """
+    ).flatMap {
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "title")
+       .as[String]
+       .leftMap(f => new RuntimeException(f.message))
+       .liftTo[IO]
+    }
+
+    assertIO(title, "2025A GMOS North System Verification")
+
+  }
+
+  test("system verification - two instruments") {
+    val title = query(
+      user = staff,
+      query = s"""
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        SYSTEM_VERIFICATION
+                semester:    "2025A"
+                activeStart: "2025-08-01 14:00:00"
+                activeEnd:   "2025-08-31 14:00:00"
+                instruments: [GMOS_SOUTH, GMOS_NORTH]
+              }
+            }
+          ) {
+            callForProposals {
+              title
+            }
+          }
+        }
+      """
+    ).flatMap {
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "title")
+       .as[String]
+       .leftMap(f => new RuntimeException(f.message))
+       .liftTo[IO]
+    }
+
+    assertIO(title, "2025A GMOS North, GMOS South System Verification")
+
+  }
 }
