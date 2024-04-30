@@ -1,4 +1,10 @@
 
+-- Add the atom id to step and dataset events.
+UPDATE t_execution_event AS e
+   SET c_atom_id = s.c_atom_id
+  FROM t_step_record AS s
+ WHERE e.c_step_id = s.c_step_id AND e.c_atom_id IS NULL;
+
 -- Update the event type constraint
 ALTER TABLE t_execution_event
   ADD CONSTRAINT check_event_type_conditions CHECK (
