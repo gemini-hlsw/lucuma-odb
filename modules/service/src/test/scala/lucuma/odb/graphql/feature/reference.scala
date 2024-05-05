@@ -1198,4 +1198,17 @@ class reference extends OdbSuite {
     )
   }
 
+  test("change subtype to P, index remains the same") {
+    for {
+      pid <- fetchPid(pi, "G-2025B-0002-Q".programReference)
+      ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: POOR_WEATHER }""")
+    } yield assertEquals(ref, "G-2025B-0002-P".programReference.some)
+  }
+
+  test("select via WHERE program reference science subtype POOR_WEATHER") {
+    assertIO(
+      programRefsWhere( s"""{ reference: { scienceSubtype: { EQ: POOR_WEATHER } } }"""),
+      List("G-2025B-0002-P".programReference)
+    )
+  }
 }
