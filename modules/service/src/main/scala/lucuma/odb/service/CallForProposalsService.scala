@@ -18,7 +18,9 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.Semester
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -37,6 +39,10 @@ import Services.Syntax.*
 
 trait CallForProposalsService[F[_]] {
 
+  def typeAndSemesterOf(
+    cid: CallForProposals.Id
+  )(using Transaction[F]): F[Option[(CallForProposalsType, Semester)]]
+
   def createCallForProposals(
     input: CreateCallForProposalsInput
   )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]]
@@ -52,6 +58,11 @@ object CallForProposalsService {
 
   def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): CallForProposalsService[F] =
     new CallForProposalsService[F] {
+
+      override def typeAndSemesterOf(
+        cid: CallForProposals.Id
+      )(using Transaction[F]): F[Option[(CallForProposalsType, Semester)]] =
+        session.option(Statements.SelectTypeAndSemester)(cid)
 
       override def createCallForProposals(
         input: CreateCallForProposalsInput
@@ -139,6 +150,13 @@ object CallForProposalsService {
     }
 
   object Statements {
+
+    val SelectTypeAndSemester: Query[CallForProposals.Id, (CallForProposalsType, Semester)] =
+      sql"""
+        SELECT c_type, c_semester
+          FROM t_cfp
+         WHERE c_cfp_id = $cfp_id AND c_existence = 'present'::e_existence
+      """.query(cfp_type *: semester)
 
     val InsertCallForProposals: Query[CallForProposalsPropertiesInput.Create, CallForProposals.Id] =
       sql"""

@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
@@ -19,6 +20,7 @@ import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.ObservingModeType
 
 
@@ -125,19 +127,20 @@ class reference extends OdbSuite {
 
   test("submit proposals") {
     for {
+      cid0 <- createCallForProposalsAs(staff, semester = sem2024B)
       pid0 <- createProgramAs(pi)
-      _    <- addProposal(pi, pid0)
+      _    <- addQueueProposal(pi, pid0, cid0)
       _    <- setSemester(pi, pid0, sem2024B)
       ref0 <- submitProposal(pi, pid0)
 
       pid1 <- createProgramAs(pi)
-      _    <- addProposal(pi, pid1)
+      _    <- addQueueProposal(pi, pid1, cid0)
       _    <- setSemester(pi, pid1, sem2024B)
       ref1 <- submitProposal(pi, pid1)
 
+      cid1 <- createCallForProposalsAs(staff, semester = sem2025A)
       pid2 <- createProgramAs(pi)
-      _    <- addProposal(pi, pid2)
-      _    <- setSemester(pi, pid2, sem2025A)
+      _    <- addQueueProposal(pi, pid2, cid1)
       ref2 <- submitProposal(pi, pid2)
     } yield {
       assertEquals(ref0, ref2024B1)
@@ -254,9 +257,9 @@ class reference extends OdbSuite {
 
   test("submit, unsubmit, resubmit, same reference") {
     for {
+      cid  <- createCallForProposalsAs(staff, semester = sem2010A)
       pid  <- createProgramAs(pi)
-      _    <- addProposal(pi, pid)
-      _    <- setSemester(pi, pid, sem2010A)
+      _    <- addQueueProposal(pi, pid, cid)
       ref0 <- submitProposal(pi, pid)
       _    <- unsubmitProposal(pi, pid)
       ref1 <- submitProposal(pi, pid)
@@ -319,9 +322,9 @@ class reference extends OdbSuite {
 
   test("accept proposal") {
     for {
+      cid  <- createCallForProposalsAs(staff, semester = sem2024A)
       pid  <- createProgramAs(pi)
-      _    <- addProposal(pi, pid)
-      _    <- setSemester(pi, pid, sem2024A)
+      _    <- addQueueProposal(pi, pid, cid)
       _    <- submitProposal(pi, pid)
       ref0 <- fetchProgramReference(pi, pid)
        _   <- acceptProposal(staff, pid)
@@ -334,9 +337,9 @@ class reference extends OdbSuite {
 
   test("program reference SCI fields") {
     for {
+      cid <- createCallForProposalsAs(staff, semester = sem2024A)
       pid <- createProgramAs(pi)
-      _   <- addProposal(pi, pid)
-      _    <- setSemester(pi, pid, sem2024A)
+      _   <- addQueueProposal(pi, pid, cid)
       _   <- submitProposal(pi, pid)
       _   <- acceptProposal(staff, pid)
       _   <- expect(pi, s"""
@@ -370,17 +373,26 @@ class reference extends OdbSuite {
   }
 
   test("change proposal class in accepted proposal") {
-    def toClassical(pid: Program.Id): IO[Json] =
+    def toClassical(pid: Program.Id, cid: CallForProposals.Id): IO[Json] =
       query(
-        pi,
+        staff,
         s"""
           mutation {
             updateProposal (
               input: {
                 programId: "$pid"
                 SET: {
-                  proposalClass: {
-                    classical: { minPercentTime: 50 }
+                  callProperties: {
+                    classical: {
+                      callId: "$cid"
+                      minPercentTime: 50
+                      partnerSplits: [
+                        {
+                          partner: CA,
+                          percent: 100
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -390,8 +402,9 @@ class reference extends OdbSuite {
       )
 
     for {
+      cid  <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester, sem2024A)
       pid  <- fetchPid(pi, ref2024A1)
-      _    <- toClassical(pid)
+      _    <- toClassical(pid, cid)
       prog <- fetchProgramReference(pi, pid)
     } yield assertEquals(prog, ref2024A1C.some)
   }
@@ -723,9 +736,9 @@ class reference extends OdbSuite {
 
   test("setProposalReference SCI, yes proposal") {
     for {
+      cid <- createCallForProposalsAs(staff, semester = sem2025B)
       pid <- createProgramAs(pi)
-      _   <- setSemester(pi, pid, sem2025B)
-      _   <- addProposal(pi, pid)
+      _   <- addQueueProposal(pi, pid, cid)
       _   <- acceptProposal(staff, pid)
       ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
     } yield assertEquals(ref, "G-2025B-0001-Q".programReference.some)

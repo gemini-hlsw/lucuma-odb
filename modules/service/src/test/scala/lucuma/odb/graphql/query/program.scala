@@ -43,27 +43,7 @@ class program extends OdbSuite {
                   proposal {
                     title
                     category
-                    toOActivation
                     abstract
-                    partnerSplits {
-                      partner
-                      percent
-                    }
-                    proposalClass {
-                      minPercentTime
-                      ... on LargeProgram {
-                        minPercentTotalTime
-                        totalTime {
-                          iso
-                        }
-                      }
-                      ... on Intensive {
-                        minPercentTotalTime
-                        totalTime {
-                          iso
-                        }
-                      }
-                    }
                   }
                 }
               }

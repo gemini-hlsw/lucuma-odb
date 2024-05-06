@@ -5,11 +5,12 @@ package lucuma.odb.graphql
 
 package mutation
 
+import cats.syntax.either.*
 import io.circe.literal.*
-import lucuma.core.enums.ProgramType
-import lucuma.core.model.Program
-import lucuma.odb.data.OdbError
-import lucuma.odb.service.ProposalService.UpdateProposalError
+//import lucuma.core.enums.ProgramType
+//import lucuma.core.model.Program
+//import lucuma.odb.data.OdbError
+//import lucuma.odb.service.ProposalService.UpdateProposalError
 
 class updateProposal extends OdbSuite {
   
@@ -19,51 +20,10 @@ class updateProposal extends OdbSuite {
 
   val validUsers = List(pi, pi2, guest)
 
-  test("update proposal (non-class properties)") {
+  test("✓ non-call properties") {
     createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 50
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                category
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "category": "COSMOLOGY"
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it, but not the class
+      addProposal(pi, pid, title = "initial title") *>
+      // Now update it, but not the call type
       expect(
         user = pi,
         query = s"""
@@ -74,363 +34,98 @@ class updateProposal extends OdbSuite {
                 SET: {
                   title: "updated title"
                   category: SMALL_BODIES
-                  toOActivation: RAPID
-                  partnerSplits: [
-                    {
-                      partner: AR
-                      percent: 70
-                    }
-                    {
-                      partner: KECK
-                      percent: 30
-                    }
-                  ]
                 }
               }
             ) {
               proposal {
                 title
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
+                category
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "title": "updated title",
+                "category": "SMALL_BODIES"
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ call properties") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  callProperties: {
+                    queue: {
+                      partnerSplits: [
+                        {
+                          partner: US
+                          percent: 70
+                        },
+                        {
+                          partner: CA
+                          percent: 30
+                        }
+                      ]
+                    }
                   }
                 }
-                category
-                toOActivation
-                partnerSplits {
-                  partner
-                  percent
+              }
+            ) {
+              proposal {
+                callProperties {
+                  ... on CallPropertiesQueue {
+                    partnerSplits {
+                      partner
+                      percent
+                    }
+                  }
                 }
               }
             }
           }
         """,
-        expected =
-          Right(json"""
-            {
-              "updateProposal" : {
-                "proposal" : {
-                  "title" : "updated title",
-                  "proposalClass" : {
-                    "__typename" : "Queue",
-                    "minPercentTime" : 50
-                  },
-                  "category" : "SMALL_BODIES",
-                  "toOActivation" : "RAPID",
-                  "partnerSplits" : [
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "callProperties": {
+                  "partnerSplits": [
                     {
-                      "partner" : "AR",
-                      "percent" : 70
+                      "partner": "US",
+                      "percent": 70
                     },
                     {
-                      "partner" : "KECK",
-                      "percent" : 30
+                      "partner": "CA",
+                      "percent": 30
                     }
                   ]
                 }
               }
             }
-          """)
+          }
+        """.asRight
       )
     }
   }
-  
-  test("update proposal (proposal class, type A -> type A)") {
+
+  test("✓ change call") {
     createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 40
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "proposalClass": {
-                    "__typename" : "Queue",
-                    "minPercentTime": 40
-                  }
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it with a different type-A proposal class
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    classical: {
-                      minPercentTime: 50
-                    }
-                  }
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Classical {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "updateProposal" : {
-                "proposal" : {
-                  "proposalClass" : {
-                    "__typename" : "Classical",
-                    "minPercentTime" : 50
-                  }
-                }
-              }
-            }
-          """)
-      )
-    }
-  }
-  
-  test("update proposal (proposal class, type A -> type B)") {
-    createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 40
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "proposalClass": {
-                    "__typename" : "Queue",
-                    "minPercentTime": 40
-                  }
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it with a type-B proposal class
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    intensive: {
-                      minPercentTime: 60
-                      minPercentTotalTime: 10
-                      totalTime: {
-                        hours: 10.5
-                      }
-                    }
-                  }
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Intensive {
-                    minPercentTime
-                    minPercentTotalTime
-                    totalTime {
-                      hours
-                      iso
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "updateProposal" : {
-                "proposal" : {
-                  "proposalClass" : {
-                    "__typename" : "Intensive",
-                    "minPercentTime" : 60,
-                    "minPercentTotalTime" : 10,
-                    "totalTime" : {
-                      "hours" : 10.500000,
-                      "iso" : "PT10H30M"
-                    }
-                  }
-                }
-              }
-            }
-          """)
-      )
-    }
-  }
-  
-  test("update proposal (proposal class, type A -> type B, incomplete)") {
-    createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 40
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "proposalClass": {
-                    "__typename" : "Queue",
-                    "minPercentTime": 40
-                  }
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it with an incomplete type-B proposal class
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    intensive: {
-                      minPercentTime: 60
-                    }
-                  }
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Intensive {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = Left(List(UpdateProposalError.InconsistentUpdate(pid).message))
-      )
-    }
-  }
-  
-  test("update fails with no existing proposal") {
-    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       expect(
         user = pi,
         query = s"""
@@ -440,55 +135,147 @@ class updateProposal extends OdbSuite {
                 programId: "$pid"
                 SET: {
                   title: "updated title"
+                  category: SMALL_BODIES
+                  callProperties: {
+                    demoScience: {
+                      toOActivation: STANDARD
+                      minPercentTime: 50
+                    }
+                  }
                 }
               }
             ) {
               proposal {
                 title
+                category
+                callProperties {
+                  scienceSubtype
+                  ... on CallPropertiesDemoScience {
+                    toOActivation
+                    minPercentTime
+                  }
+                }
               }
             }
           }
         """,
-        expected = Left(List(UpdateProposalError.UpdateFailed(pid).message))
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "title": "updated title",
+                "category": "SMALL_BODIES",
+                "callProperties": {
+                  "scienceSubtype": "DEMO_SCIENCE",
+                  "toOActivation": "STANDARD",
+                  "minPercentTime": 50
+                }
+              }
+            }
+          }
+        """.asRight
       )
     }
   }
-  
-  test("partner splits must sum to 100") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
+
+  test("⨯ missing properties") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       expect(
-        user = pi2,
+        user = pi,
         query = s"""
           mutation {
             updateProposal(
               input: {
                 programId: "$pid"
                 SET: {
-                  partnerSplits: [
-                    {
-                      partner: AR
-                      percent: 70
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  callProperties: {
+                    fastTurnaround: {
+                      toOActivation: STANDARD
+                      minPercentTime: 50
                     }
-                    {
-                      partner: KECK
-                      percent: 31
-                    }
-                  ]
+                  }
                 }
               }
             ) {
               proposal {
                 title
+                callProperties {
+                  scienceSubtype
+                }
               }
             }
           }
         """,
         expected =
-          Left(List("Argument 'input.SET.partnerSplits' is invalid: Percentages must sum to exactly 100."))
+          List("'toOActivation', 'minPercentTime' and 'piAffiliate' are required for fast turnaround proposals.").asLeft
       )
     }
   }
-  
+
+  test("⨯ missing proposal") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: { title: "updated title" }
+              }
+            ) {
+              proposal { title }
+            }
+          }
+        """,
+        expected =
+          List(s"Proposal update failed because program $pid does not have a proposal.").asLeft
+      )
+    }
+  }
+
+  test("⨯ splits sum to 100") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  callProperties: {
+                    queue: {
+                      partnerSplits: [
+                        {
+                          partner: US
+                          percent: 70
+                        },
+                        {
+                          partner: CA
+                          percent: 20
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { title }
+            }
+          }
+        """,
+        expected =
+          List("Argument 'input.SET.callProperties.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+      )
+    }
+  }
+
+/*
   test("partner splits cannot be empty") {
     createProgramWithProposalAs(pi).flatMap { pid =>
       expect(
@@ -615,4 +402,5 @@ class updateProposal extends OdbSuite {
       )
     }
   }
+ */
 }

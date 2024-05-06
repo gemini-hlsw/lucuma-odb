@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import lucuma.core.model.IntPercent
@@ -33,30 +34,30 @@ object PartnerSplitsService {
     new PartnerSplitsService[F] {
 
       def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
-        session.prepareR(Statements.insertSplits(splits)).use(_.execute(pid, splits)).void
+        NonEmptyList.fromList(splits.toList).traverse_ { lst =>
+          session.prepareR(Statements.insertSplits(lst)).use(_.execute(pid, lst)).void
+        }
 
-      def updateSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] = {
-
-        // First delete all the splits for this program.
-        val delete: F[Unit] =
-          session.prepareR(Statements.DeleteSplits).use(_.execute(pid)).void
-
+      def updateSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
         for {
-          _ <- delete
+          _ <- deleteSplits(pid)
           _ <- insertSplits(splits, pid)
         } yield ()
-      }
+
+      private def deleteSplits(pid: Program.Id)(using Transaction[F]): F[Unit] =
+        session.prepareR(Statements.DeleteSplits).use(_.execute(pid)).void
+
     }
 
   private object Statements {
 
-    def insertSplits(splits: Map[Tag, IntPercent]): Command[(Program.Id, splits.type)] =
+    def insertSplits(splits: NonEmptyList[(Tag, IntPercent)]): Command[(Program.Id, splits.type)] =
       sql"""
          INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
          VALUES ${(program_id *: tag *: int_percent).values.list(splits.size)}
       """.command
          .contramap {
-          case (pid, splits) => splits.toList.map { case (t, p) => (pid, t, p) }
+           case (pid, splits) => splits.toList.map { case (t, p) => (pid, t, p) }
          }
 
     val DeleteSplits: Command[Program.Id] =

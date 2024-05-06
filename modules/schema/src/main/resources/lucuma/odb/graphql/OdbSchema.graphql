@@ -3178,8 +3178,50 @@ with this proposal.
 """
 interface CallProperties {
 
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
+
+}
+
+"""
+Proposal properties for Regular Semester (Classical) CallForProposals.
+"""
+type CallPropertiesClassical implements CallProperties {
+
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Minimum percentage of observing time (first semester) required to consider this
+  proposal successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Describes how time for the program will be apportioned across partners.
+  """
+  partnerSplits: [PartnerSplit!]!
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+  # TODO: Visitors?
 
 }
 
@@ -3188,8 +3230,16 @@ Proposal properties for Demo Science CallForProposals.
 """
 type CallPropertiesDemoScience implements CallProperties {
 
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
 
   """
   Whether (and how) the observations in this proposal are available for Target
@@ -3210,8 +3260,16 @@ Proposal properties for Director's Time CallForProposals.
 """
 type CallPropertiesDirectorsTime implements CallProperties {
 
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
 
   """
   Whether (and how) the observations in this proposal are available for Target
@@ -3232,8 +3290,16 @@ Proposal properties for Fast Turnaround CallForProposals.
 """
 type CallPropertiesFastTurnaround implements CallProperties {
 
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
 
   """
   Whether (and how) the observations in this proposal are available for Target
@@ -3260,8 +3326,16 @@ Proposal properties for Large Program CallForProposals.
 """
 type CallPropertiesLargeProgram implements CallProperties {
 
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
 
   """
   Whether (and how) the observations in this proposal are available for Target
@@ -3295,57 +3369,45 @@ type CallPropertiesLargeProgram implements CallProperties {
 Proposal properties for Regular Semester (Poor Weather) CallForProposals.
 """
 type CallPropertiesPoorWeather implements CallProperties {
-
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
-
-}
-
-"""
-Proposal properties for Regular Semester (Classical) CallForProposals.
-"""
-type CallPropertiesRegularClassical implements CallProperties {
-
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
 
   """
-  Minimum percentage of observing time (first semester) required to consider this
-  proposal successful.
+  The science type of this Call for Proposals.
   """
-  minPercentTime: IntPercent!
-
-  """
-  Describes how time for the program will be apportioned across partners.
-  """
-  partnerSplits: [PartnerSplit!]!
-
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
-  # TODO: Visitors?
-
+  scienceSubtype: ScienceSubtype!
 }
 
 """
 Proposal properties for Regular Semester (Queue) CallForProposals.
 """
-type CallPropertiesRegularQueue implements CallProperties {
-
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+type CallPropertiesQueue implements CallProperties {
 
   """
-  Minimum percentage of observing time (first semester) required to consider this
-  proposal successful.
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
   """
-  minPercentTime: IntPercent!
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
 
   """
   Whether (and how) the observations in this proposal are available for Target
   of Opportunity triggering.
   """
   toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time (first semester) required to consider this
+  proposal successful.
+  """
+  minPercentTime: IntPercent!
 
   """
   Describes how time for the program will be apportioned across partners.
@@ -3364,8 +3426,16 @@ Proposal properties for System Verification CallForProposals.
 """
 type CallPropertiesSystemVerification implements CallProperties {
 
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  The science type of this Call for Proposals.
+  """
+  scienceSubtype: ScienceSubtype!
 
   """
   Whether (and how) the observations in this proposal are available for Target
@@ -3381,17 +3451,13 @@ type CallPropertiesSystemVerification implements CallProperties {
 
 }
 
+"""
+Properties associated with particular Call for Proposals types.  Exactly one of
+these should be set upon creation or editing.
+"""
 input CallPropertiesInput {
 
-  """
-  Sets the associated Call for Proposals.  This is required when creating a new
-  instance, but optional when editing.  Upon creation, additional properties
-  must be set, depending on the call type.  For example, for a REGULAR_SEMESTER
-  request for queue time, specify 'regularQueue' and leave 'demoScience',
-  etc. unset.  If the call properties do not match the call type upon
-  submission, the creation or update will terminate in an error.
-  """
-  callId: CallForProposalsId
+  classical: CallPropertiesClassicalInput
 
   demoScience: CallPropertiesDemoScienceInput
 
@@ -3403,15 +3469,48 @@ input CallPropertiesInput {
 
   poorWeather: CallPropertiesPoorWeatherInput
 
-  regularClassical: CallPropertiesRegularClassicalInput
-
-  regularQueue: CallPropertiesRegularQueueInput
+  queue: CallPropertiesQueueInput
 
   systemVerification: CallPropertiesSystemVerificationInput
 
 }
 
+input CallPropertiesClassicalInput {
+
+  """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Regular Semester Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
+
+  """
+  The minPercentTime field is required when creating a new instance, but
+  optional when editing.
+  """
+  minPercentTime: IntPercent
+
+  """
+  The partnerSplits field is required when creating a new instance of proposal,
+  but optional when editing. When specified, must sum to 100%.
+  """
+  partnerSplits: [PartnerSplitInput!]
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+  # TODO: Visitors?
+
+}
+
 input CallPropertiesDemoScienceInput {
+
+  """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Demo Science Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3430,6 +3529,13 @@ input CallPropertiesDemoScienceInput {
 input CallPropertiesDirectorsTimeInput {
 
   """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Director's Time Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
+
+  """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
   """
@@ -3446,6 +3552,13 @@ input CallPropertiesDirectorsTimeInput {
 input CallPropertiesFastTurnaroundInput {
 
   """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Fast Turnaround Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
+
+  """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
   """
@@ -3458,7 +3571,8 @@ input CallPropertiesFastTurnaroundInput {
   minPercentTime: IntPercent
 
   """
-  Partner associated with this FT proposal.
+  Partner associated with this FT proposal. This field is required when
+  creating a new instance, but optional when editing.
   """
   piAffiliation: Partner
 
@@ -3467,6 +3581,13 @@ input CallPropertiesFastTurnaroundInput {
 }
 
 input CallPropertiesLargeProgramInput {
+
+  """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Large Program Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3498,36 +3619,22 @@ input CallPropertiesLargeProgramInput {
 }
 
 input CallPropertiesPoorWeatherInput {
+  """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Poor Weather Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
 }
 
-input CallPropertiesRegularClassicalInput {
+input CallPropertiesQueueInput {
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a Regular Semester Call for Proposals.
+  Required for a successful submission.
   """
-  minPercentTime: IntPercent
-
-  """
-  The partnerSplits field is required when creating a new instance of proposal,
-  but optional when editing. When specified, must sum to 100%.
-  """
-  partnerSplits: [PartnerSplitInput!]
-
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
-  # TODO: Visitors?
-
-}
-
-input CallPropertiesRegularQueueInput {
-
-  """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
-  """
-  minPercentTime: IntPercent
+  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3536,8 +3643,15 @@ input CallPropertiesRegularQueueInput {
   toOActivation: ToOActivation
 
   """
-  The partnerSplits field is required when creating a new instance of proposal,
-  but optional when editing When specified, must sum to 100%.
+  The minPercentTime field is required when creating a new instance, but
+  optional when editing.
+  """
+  minPercentTime: IntPercent
+
+  """
+  The partnerSplits field is optional when creating a new instance of proposal
+  or editing an existing instance, but when specified, must sum to 100%.  On
+  submit partner splits must be present.
   """
   partnerSplits: [PartnerSplitInput!]
 
@@ -3549,6 +3663,13 @@ input CallPropertiesRegularQueueInput {
 }
 
 input CallPropertiesSystemVerificationInput {
+
+  """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  upon when set it must refer to a System Verification Call for Proposals.
+  Required for a successful submission.
+  """
+  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3585,9 +3706,11 @@ input ProposalPropertiesInput {
   abstract: NonEmptyString
 
   """
-  Specifies the Call for Proposals for which time is requested, and associated
-  properties that depend on the call type.  This is required on proposal
-  creation, but optional on editing.
+  Specifies the properties that depend on the call type. If not set on creation,
+  a regular semester queue proposal is assumed.  The selected call properties
+  must match the call or a submission attempt will fail with an error. Call
+  properties can be edited, but when switching the call type itself, all
+  properties required for that type must be included.
   """
   callProperties: CallPropertiesInput
 

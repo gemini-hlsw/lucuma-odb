@@ -99,6 +99,7 @@ object OdbMapping {
           with AtomRecordSelectResultMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
+          with CallPropertiesMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
           with CloneObservationResultMapping[F]
@@ -168,7 +169,6 @@ object OdbMapping {
           with ProposalMapping[F]
           with ProposalAttachmentMapping[F]
           with ProposalAttachmentTypeMetaMapping[F]
-          with ProposalClassMapping[F]
           with ProposalReferenceMapping[F]
           with ProposalStatusMetaMapping[F]
           with QueryMapping[F]
@@ -262,6 +262,15 @@ object OdbMapping {
                 CallForProposalsMapping,
                 CallForProposalsPartnerMapping,
                 CallsForProposalsSelectResultMapping,
+                CallPropertiesClassicalMapping,
+                CallPropertiesDemoScienceMapping,
+                CallPropertiesDirectorsTimeMapping,
+                CallPropertiesFastTurnaroundMapping,
+                CallPropertiesLargeProgramMapping,
+                CallPropertiesMapping,
+                CallPropertiesPoorWeatherMapping,
+                CallPropertiesQueueMapping,
+                CallPropertiesSystemVerificationMapping,
                 CatalogInfoMapping,
                 CloneObservationResultMapping,
                 CloneTargetResultMapping,
@@ -410,7 +419,6 @@ object OdbMapping {
                 OffsetMappings,
                 OffsetPMappings,
                 OffsetQMappings,
-                ProposalClassMappings,
                 RightAscensionMappings,
                 TimeSpanMappings,
                 TimestampIntervalMappings,
@@ -426,6 +434,7 @@ object OdbMapping {
                 AsterismGroupElaborator,
                 AtomRecordElaborator,
                 CallForProposalsElaborator,
+                CallPropertiesElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,
@@ -433,7 +442,6 @@ object OdbMapping {
                 MutationElaborator,
                 ObservationElaborator,
                 ProgramElaborator,
-                ProposalElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
