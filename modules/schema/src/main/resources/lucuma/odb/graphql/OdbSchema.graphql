@@ -8912,6 +8912,8 @@ enum ScienceSubtype {
 
   LARGE_PROGRAM
 
+  POOR_WEATHER
+
   QUEUE
 
   DEMO_SCIENCE
