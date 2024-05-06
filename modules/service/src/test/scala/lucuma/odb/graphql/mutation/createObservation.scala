@@ -44,6 +44,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.CallForProposalsType.DemoScience
 import lucuma.odb.data.PosAngleConstraintMode
 
 import java.time.LocalDateTime
@@ -156,8 +157,9 @@ class createObservation extends OdbSuite {
 
   test("[general] can create observation with a program reference") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) *>
-      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+        addDemoScienceProposal(pi, pid, cid)
+      } *>
       submitProposal(pi, pid) *>
       query(pi,
         s"""
@@ -188,8 +190,9 @@ class createObservation extends OdbSuite {
 
   test("[general] can create an observation when both ref and pid are supplied if they correspond") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) *>
-      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+        addDemoScienceProposal(pi, pid, cid)
+      } *>
       submitProposal(pi, pid) *>
       query(pi,
         s"""
@@ -221,8 +224,9 @@ class createObservation extends OdbSuite {
 
   test("[general] cannot create an observation when both ref and pid are supplied if they do not correspond") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) *>
-      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+        addDemoScienceProposal(pi, pid, cid)
+      } *>
       submitProposal(pi, pid) *>
       expect(
         pi,
@@ -250,8 +254,9 @@ class createObservation extends OdbSuite {
 
   test("[general] cannot create an observation without a ref or pid") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) *>
-      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+        addDemoScienceProposal(pi, pid, cid)
+      } *>
       submitProposal(pi, pid) *>
       expect(
         pi,

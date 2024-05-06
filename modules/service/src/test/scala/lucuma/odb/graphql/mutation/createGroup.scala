@@ -4,16 +4,19 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.effect.IO
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Semester
+import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class createGroup extends OdbSuite {
 
   val pi = TestUsers.Standard.pi(nextId, nextId)
+  val staff = TestUsers.Standard.staff(nextId, nextId)
 
-  lazy val validUsers = List(pi)
+  lazy val validUsers = List(pi, staff)
 
   test("simple group creation") {
     createProgramAs(pi).flatMap { pid =>
@@ -149,10 +152,7 @@ class createGroup extends OdbSuite {
   }
 
   test("create group with a proposal reference") {
-    createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) *>
-      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
-      submitProposal(pi, pid) *>
+    val createWithReference: IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -181,6 +181,13 @@ class createGroup extends OdbSuite {
           }
         """)
       )
-    }
+
+    for {
+      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      pid <- createProgramAs(pi)
+      _   <- addDemoScienceProposal(pi, pid, cid)
+      _   <- submitProposal(pi, pid)
+      _   <- createWithReference
+    } yield ()
   }
 }

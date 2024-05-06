@@ -12,6 +12,10 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
+/*
+TODO: Delete me.
+ */
+
 object ProposalClassInput {
 
   object TypeA {

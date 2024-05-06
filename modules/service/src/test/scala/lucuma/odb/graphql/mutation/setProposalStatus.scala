@@ -5,14 +5,18 @@ package lucuma.odb.graphql
 
 package mutation
 
+import cats.effect.IO
+import cats.syntax.either.*
+import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ProgramType
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
-import lucuma.odb.service.ProposalService.UpdateProposalError
+import lucuma.odb.service.ProposalService.error
 
 class setProposalStatus extends OdbSuite {
   
@@ -45,7 +49,7 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NoProposalForStatusChange(pid).message))
+          Left(List(error.missingProposal(pid).message))
       )
     }
   }
@@ -71,7 +75,7 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NotAuthorizedNewProposalStatus(pid, pi, Tag("accepted")).message))
+          Left(List(error.notAuthorizedNew(pid, pi, Tag("accepted")).message))
       )
     }
   }
@@ -103,7 +107,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("no semester for proposal submission") {
+  test("no CfP for proposal submission") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       expect(
@@ -124,7 +128,7 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NoSemesterForSubmittedProposal(pid).message))
+          Left(List(error.missingCfP(pid).message))
       )
     }
   }
@@ -151,15 +155,37 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.InvalidProgramType(pid, ProgramType.Calibration).message))
+          Left(List(error.invalidProgramType(pid, ProgramType.Calibration).message))
       )
     }
   }
 
+  def setCallId(pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateProposal(
+            input: {
+              programId: "$pid",
+              SET: {
+                callProperties: {
+                  queue: {
+                    callId: "$cid"
+                  }
+                }
+              }
+            }
+          ) {
+            proposal { title }
+          }
+        }
+      """
+    ).void
+
   test("edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
-    createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) >>
-      setSemester(pi, pid, Semester.unsafeFromString("2024B")) >>
+
+    def submit(pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -178,20 +204,21 @@ class setProposalStatus extends OdbSuite {
             }
           }
         """,
-        expected = Right(
+        expected =
           json"""
             {
               "setProposalStatus" : {
-                "program": { 
+                "program": {
                   "id" : $pid,
                   "proposalStatus": "SUBMITTED",
-                  "proposal": { "reference": { "label": "G-2024B-0001" } }
+                  "proposal": { "reference": { "label": "G-2025A-0001" } }
                  }
               }
             }
-          """
-        )
-      ) >>
+          """.asRight
+      )
+
+    def recall(pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -209,20 +236,20 @@ class setProposalStatus extends OdbSuite {
             }
           }
         """,
-        expected = Right(
+        expected =
           json"""
             {
               "setProposalStatus" : {
-                "program" : { 
+                "program" : {
                   "id" : $pid,
                   "proposalStatus": "NOT_SUBMITTED"
                 }
               }
             }
-          """
-        )
-      ) >>
-      chronProgramUpdates(pid).map(_.drop(3)).assertEquals(
+          """.asRight
+      )
+
+    def expected(pid: Program.Id): List[Json] =
         List(
           json"""
           {
@@ -275,14 +302,21 @@ class setProposalStatus extends OdbSuite {
           }
           """
         )
-      )
-    }
+
+    for {
+      c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      p <- createProgramAs(pi)
+      _ <- addProposal(pi, p)
+      _ <- setCallId(p, c)
+      _ <- submit(p)
+      _ <- recall(p)
+      l <- chronProgramUpdates(p)
+    } yield assertEquals(l.drop(3), expected(p))
   }
 
   test("edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
-    createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) >>
-      setSemester(pi, pid, Semester.unsafeFromString("2024B")) >>
+
+    def accept(pid: Program.Id): IO[Unit] =
       expect(
         user = staff,
         query = s"""
@@ -300,19 +334,20 @@ class setProposalStatus extends OdbSuite {
             }
           }
         """,
-        expected = Right(
+        expected =
           json"""
             {
               "setProposalStatus" : {
-                "program": { 
+                "program": {
                   "id" : $pid,
                   "proposalStatus": "ACCEPTED"
                  }
               }
             }
-          """
-        )
-      ) >>
+          """.asRight
+      )
+
+    def recall(pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -331,9 +366,17 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NotAuthorizedOldProposalStatus(pid, pi, Tag("accepted")).message))
+          List(error.notAuthorizedOld(pid, pi, Tag("accepted")).message).asLeft
       )
-    }
+
+    for {
+      c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      p <- createProgramAs(pi)
+      _ <- addProposal(pi, p)
+      _ <- setCallId(p, c)
+      _ <- accept(p)
+      _ <- recall(p)
+    } yield ()
   }
 
   test("user cannot set status of another user's proposal") {

@@ -7,13 +7,13 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table.ProposalTable
+import table.ProposalView
 
-trait UpdateProposalResultMapping[F[Unit]] extends ProposalTable[F] {
+trait UpdateProposalResultMapping[F[Unit]] extends ProposalView[F] {
 
   lazy val UpdateProposalResultMapping =
     ObjectMapping(UpdateProposalResultType)(
-      SqlField("programId", ProposalTable.ProgramId, key = true, hidden = true),
+      SqlField("programId", ProposalView.ProgramId, key = true, hidden = true),
       SqlObject("proposal")
     )
   
