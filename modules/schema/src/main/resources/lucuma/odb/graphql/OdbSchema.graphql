@@ -3202,6 +3202,32 @@ interface CallProperties {
 }
 
 """
+Proposal properties for Regular Semester (Classical) CallForProposals.
+"""
+type CallPropertiesClassical implements CallProperties {
+
+  "The corresponding CallForProposals definition itself."
+  call: CallForProposals!
+
+  """
+  Minimum percentage of observing time (first semester) required to consider this
+  proposal successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Describes how time for the program will be apportioned across partners.
+  """
+  partnerSplits: [PartnerSplit!]!
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+  # TODO: Visitors?
+
+}
+
+"""
 Proposal properties for Demo Science CallForProposals.
 """
 type CallPropertiesDemoScience implements CallProperties {
@@ -3320,35 +3346,9 @@ type CallPropertiesPoorWeather implements CallProperties {
 }
 
 """
-Proposal properties for Regular Semester (Classical) CallForProposals.
-"""
-type CallPropertiesRegularClassical implements CallProperties {
-
-  "The corresponding CallForProposals definition itself."
-  call: CallForProposals!
-
-  """
-  Minimum percentage of observing time (first semester) required to consider this
-  proposal successful.
-  """
-  minPercentTime: IntPercent!
-
-  """
-  Describes how time for the program will be apportioned across partners.
-  """
-  partnerSplits: [PartnerSplit!]!
-
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
-  # TODO: Visitors?
-
-}
-
-"""
 Proposal properties for Regular Semester (Queue) CallForProposals.
 """
-type CallPropertiesRegularQueue implements CallProperties {
+type CallPropertiesQueue implements CallProperties {
 
   "The corresponding CallForProposals definition itself."
   call: CallForProposals!
@@ -3411,6 +3411,8 @@ input CallPropertiesInput {
   """
   callId: CallForProposalsId
 
+  classical: CallPropertiesClassicalInput
+
   demoScience: CallPropertiesDemoScienceInput
 
   directorsTime: CallPropertiesDirectorsTimeInput
@@ -3421,11 +3423,30 @@ input CallPropertiesInput {
 
   poorWeather: CallPropertiesPoorWeatherInput
 
-  regularClassical: CallPropertiesRegularClassicalInput
-
-  regularQueue: CallPropertiesRegularQueueInput
+  queue: CallPropertiesQueueInput
 
   systemVerification: CallPropertiesSystemVerificationInput
+
+}
+
+input CallPropertiesClassicalInput {
+
+  """
+  The minPercentTime field is required when creating a new instance, but
+  optional when editing.
+  """
+  minPercentTime: IntPercent
+
+  """
+  The partnerSplits field is required when creating a new instance of proposal,
+  but optional when editing. When specified, must sum to 100%.
+  """
+  partnerSplits: [PartnerSplitInput!]
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+  # TODO: Visitors?
 
 }
 
@@ -3518,28 +3539,7 @@ input CallPropertiesLargeProgramInput {
 input CallPropertiesPoorWeatherInput {
 }
 
-input CallPropertiesRegularClassicalInput {
-
-  """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
-  """
-  minPercentTime: IntPercent
-
-  """
-  The partnerSplits field is required when creating a new instance of proposal,
-  but optional when editing. When specified, must sum to 100%.
-  """
-  partnerSplits: [PartnerSplitInput!]
-
-  # TODO: AEON / Multi-facility
-  # TODO: JWST Synergy
-  # TODO: US Long Term
-  # TODO: Visitors?
-
-}
-
-input CallPropertiesRegularQueueInput {
+input CallPropertiesQueueInput {
 
   """
   The minPercentTime field is required when creating a new instance, but
