@@ -9,7 +9,6 @@ import grackle.Cursor
 import grackle.Predicate
 import grackle.Result
 import grackle.Type
-import grackle.TypeRef
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.graphql.table.TimingWindowView
 
@@ -35,7 +34,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
       tpe = TimingWindowEndType,
       fieldMappings =
         List(
-          SqlField("id", TimingWindowView.End.SyntheticId, key = true),
+          SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
           SqlField("endType", TimingWindowView.End.Type, discriminator = true, hidden = true),
         ),
       discriminator = endDiscriminator
@@ -67,7 +66,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
       tpe = TimingWindowEndAtType,
       fieldMappings =
         List(
-          SqlField("id", TimingWindowView.End.SyntheticId, key = true),
+          SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
           SqlField("atUtc", TimingWindowView.End.At),
         )
     )
@@ -78,7 +77,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
       tpe = TimingWindowEndAfterType,
       fieldMappings =
         List(
-          SqlField("id", TimingWindowView.End.SyntheticId, key = true),
+          SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
           SqlObject("after"),
           SqlObject("repeat")
         )
@@ -90,7 +89,7 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
       tpe = TimingWindowRepeatType,
       fieldMappings =
         List(
-          SqlField("id", TimingWindowView.End.Repeat.SyntheticId, key = true),
+          SqlField("id", TimingWindowView.End.Repeat.SyntheticId, key = true, hidden = true),
           SqlObject("period"),
           SqlField("times", TimingWindowView.End.Repeat.Times),
         )

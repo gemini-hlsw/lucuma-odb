@@ -17,7 +17,7 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id",       table.Id, key = true),
+        SqlField("id",       table.Id, key = true, hidden = true),
         SqlObject("exposure"),
         SqlObject("readout"),
         SqlField("dtax",     table.Dtax),
@@ -34,7 +34,7 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
     name:        String,
     dynamicType: TypeRef,
     table:       GmosDynamicTable[G, L, U]
-  ): TypeMapping =
+  ): List[TypeMapping] =
     SwitchMapping(
       dynamicType,
       List(
@@ -42,10 +42,10 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
       )
     )
 
-  lazy val GmosNorthDynamicMapping: TypeMapping =
+  lazy val GmosNorthDynamicMappings: List[TypeMapping] =
     dynamicSwitchMapping("gmosNorth", GmosNorthDynamicType, GmosNorthDynamicTable)
 
-  lazy val GmosSouthDynamicMapping: TypeMapping =
+  lazy val GmosSouthDynamicMappings: List[TypeMapping] =
     dynamicSwitchMapping("gmosSouth", GmosSouthDynamicType, GmosSouthDynamicTable)
 
 }

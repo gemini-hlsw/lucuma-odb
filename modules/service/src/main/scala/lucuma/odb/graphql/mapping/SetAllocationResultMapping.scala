@@ -15,7 +15,7 @@ trait SetAllocationResultMapping[F[_]] extends AllocationTable[F] {
       tpe = SetAllocationResultType,
       fieldMappings = List(
         SqlField("programId", AllocationTable.ProgramId, key = true, hidden = true),
-        SqlField("partner", AllocationTable.Partner, key = true),
+        SqlField("partner", AllocationTable.Partner, key = true, hidden = true),
         SqlObject("allocation"),
       )
     )

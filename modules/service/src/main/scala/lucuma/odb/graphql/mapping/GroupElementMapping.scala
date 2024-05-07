@@ -17,8 +17,8 @@ trait GroupElementMapping[F[_]] extends GroupElementView[F] with GroupView[F] wi
     ObjectMapping(
       tpe = GroupElementType,
       fieldMappings = List(
-        SqlField("id", GroupElementView.Id, key = true),
-        SqlField("programId", GroupElementView.ProgramId),
+        SqlField("id", GroupElementView.Id, key = true, hidden = true),
+        SqlField("programId", GroupElementView.ProgramId, hidden = true),
         SqlField("parentGroupId", GroupElementView.GroupId),
         SqlField("parentIndex", GroupElementView.Index),
         SqlObject("group", Join(GroupElementView.ChildGroupId, GroupView.Id)),

@@ -30,7 +30,7 @@ trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
     name:              String,
     gratingConfigType: TypeRef,
     table:             GmosDynamicTable[G, L, U]
-  ): TypeMapping =
+  ): List[TypeMapping] =
     SwitchMapping(
       gratingConfigType,
       List(
@@ -38,10 +38,10 @@ trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
       )
     )
 
-  lazy val GmosNorthGratingConfigMapping: TypeMapping =
+  lazy val GmosNorthGratingConfigMappings: List[TypeMapping] =
     gratingSwitchMapping("gmosNorth", GmosNorthGratingConfigType, GmosNorthDynamicTable)
 
-  lazy val GmosSouthGratingConfigMapping: TypeMapping =
+  lazy val GmosSouthGratingConfigMappings: List[TypeMapping] =
     gratingSwitchMapping("gmosSouth", GmosSouthGratingConfigType, GmosSouthDynamicTable)
 
 }

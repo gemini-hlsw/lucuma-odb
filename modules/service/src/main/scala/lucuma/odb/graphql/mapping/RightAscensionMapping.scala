@@ -35,7 +35,7 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       )
     )
 
-  lazy val RightAscensionMapping: TypeMapping =
+  lazy val RightAscensionMappings: List[TypeMapping] =
     SwitchMapping(
       RightAscensionType,
       List(

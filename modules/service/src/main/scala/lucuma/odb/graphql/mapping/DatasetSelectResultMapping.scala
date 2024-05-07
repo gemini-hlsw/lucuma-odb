@@ -18,7 +18,7 @@ trait DatasetSelectResultMapping[F[_]]
      with StepRecordView[F]
      with VisitTable[F] {
 
-  lazy val DatasetSelectResultMapping: TypeMapping = {
+  lazy val DatasetSelectResultMappings: List[TypeMapping] = {
 
     val fromExecution: ObjectMapping =
       nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))

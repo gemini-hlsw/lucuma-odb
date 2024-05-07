@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 
 package mapping
 
-import eu.timepit.refined.types.numeric.NonNegBigDecimal
-import eu.timepit.refined.types.numeric.NonNegLong
+// import eu.timepit.refined.types.numeric.NonNegBigDecimal
+// import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.numeric.PosShort
+// import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
@@ -78,7 +78,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
       LeafMapping[Tag](ConditionsMeasurementSourceType),
-      LeafMapping[Tag](ConditionsSourceType),
+      // LeafMapping[Tag](ConditionsSourceType),
       LeafMapping[NonEmptyString](DatasetFilenameType),
       LeafMapping[Dataset.Id](DatasetIdType),
       LeafMapping[DatasetStage](DatasetStageType),
@@ -126,8 +126,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
-      LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
-      LeafMapping[NonNegLong](NonNegLongType),
+      // LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
+      // LeafMapping[NonNegLong](NonNegLongType),
       LeafMapping[NonNegShort](NonNegShortType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
       LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),
@@ -141,7 +141,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),
-      LeafMapping[PosShort](PosShortType),
+      // LeafMapping[PosShort](PosShortType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramType](ProgramTypeType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
@@ -174,6 +174,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[ToOActivation](ToOActivationType),
+      LeafMapping[Long](TransactionIdType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[String](UserInvitationKeyType),
       LeafMapping[UserInvitation.Id](UserInvitationIdType),

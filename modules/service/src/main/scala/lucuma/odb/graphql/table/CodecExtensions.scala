@@ -7,7 +7,7 @@ import grackle.sql.FailedJoin
 import skunk.Codec
 
 extension [A](self: Codec[A])
-  def embedded: Codec[Any] =
-    self.opt.imap(_.getOrElse(FailedJoin))(x => Some(x.asInstanceOf[A])) // whee
+  def embedded: Codec[A] =
+    self.opt.imap(_.getOrElse(FailedJoin))(x => Some(x.asInstanceOf[A])).asInstanceOf[Codec[A]] // whee
 
 

@@ -31,7 +31,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with VisitTable[F]
                                with ChronConditionsEntryView[F] {
 
-  lazy val TimeSpanMapping: TypeMapping =
+  lazy val TimeSpanMappings: List[TypeMapping] =
     SwitchMapping(
       TimeSpanType,
       List(

@@ -29,7 +29,7 @@ trait TimestampIntervalMapping[F[_]] extends CallForProposalsView[F] {
     )
   }
 
-  lazy val TimestampIntervalMapping: TypeMapping =
+  lazy val TimestampIntervalMappings: List[TypeMapping] =
     SwitchMapping(
       TimestampIntervalType,
       List(

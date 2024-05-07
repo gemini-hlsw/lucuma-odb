@@ -12,7 +12,7 @@
      ObjectMapping(
        tpe = RecordGmosSouthVisitResultType,
        fieldMappings = List(
-         SqlField("id", VisitTable.Id, key = true),
+         SqlField("id", VisitTable.Id, key = true, hidden = true),
          SqlObject("visit")
        )
      )

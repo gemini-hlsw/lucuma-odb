@@ -16,7 +16,7 @@ trait RecordGmosStepResultMapping[F[_]] extends StepRecordView[F] {
     ObjectMapping(
       tpe = typeRef,
       fieldMappings = List(
-        SqlField("id", StepRecordView.Id, key = true),
+        SqlField("id", StepRecordView.Id, key = true, hidden = true),
         SqlObject("stepRecord")
       )
     )

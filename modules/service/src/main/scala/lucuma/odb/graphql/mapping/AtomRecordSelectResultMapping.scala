@@ -14,7 +14,7 @@ trait AtomRecordSelectResultMapping[F[_]]
      with ResultMapping[F]
      with VisitTable[F] {
 
-  lazy val AtomRecordSelectResultMapping: TypeMapping = {
+  lazy val AtomRecordSelectResultMappings: List[TypeMapping] = {
 
     val fromExecution: ObjectMapping =
       nestedSelectResultMapping(AtomRecordSelectResultType, ObservationView.Id, Join(ObservationView.Id, AtomRecordTable.ObservationId))

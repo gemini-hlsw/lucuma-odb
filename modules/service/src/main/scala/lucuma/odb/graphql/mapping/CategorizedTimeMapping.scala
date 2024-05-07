@@ -10,7 +10,7 @@ import lucuma.odb.json.time.query.given
 
 trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
 
-  lazy val CategorizedTimeMapping: TypeMapping =
+  lazy val CategorizedTimeMappings: List[TypeMapping] =
     SwitchMapping(
       CategorizedTimeType,
       List(

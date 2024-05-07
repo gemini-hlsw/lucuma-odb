@@ -55,7 +55,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
 
   import ObservationView.ScienceRequirements.Spectroscopy
 
-  lazy val AngleMapping: TypeMapping =
+  lazy val AngleMappings: List[TypeMapping] =
     SwitchMapping(
       AngleType,
       List(
