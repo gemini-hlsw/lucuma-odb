@@ -55,7 +55,7 @@ private class Remapper(s: Schema) {
   }
 
   def remapNamedType: NamedType => NamedType = {
-    case TypeRef(_, name)                                    => TypeRef(s, name)
+    case r @ TypeRef(_, name)                                => r.withSchema(s)
     case ScalarType(name, desc, dirs)                        => ScalarType(name, desc, dirs)
     case UnionType(name, desc, members, dirs)                => UnionType(name, desc, members.map(remapNamedType), dirs)
     case EnumType(name, desc, enumValues, dirs)              => EnumType(name, desc, enumValues, dirs)
