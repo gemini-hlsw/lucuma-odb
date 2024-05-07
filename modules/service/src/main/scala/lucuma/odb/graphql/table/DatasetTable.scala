@@ -13,8 +13,8 @@ import lucuma.odb.util.Codecs.observation_reference
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.visit_id
+import lucuma.odb.util.Codecs.text_nonempty
 import skunk.codec.temporal.date
-import skunk.codec.text.varchar
 
 
 trait DatasetTable[F[_]] extends BaseMapping[F] {
@@ -33,7 +33,7 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
       val Site: ColumnRef  = col("c_file_site",  site)
       val Date: ColumnRef  = col("c_file_date",  date)
       val Index: ColumnRef = col("c_file_index", int4_pos)
-      val Name: ColumnRef  = col("c_filename",   varchar)
+      val Name: ColumnRef  = col("c_filename",   text_nonempty)
     }
 
     val QaState: ColumnRef     = col("c_qa_state", dataset_qa_state.opt)

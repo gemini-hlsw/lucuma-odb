@@ -32,7 +32,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
     typeRef:     TypeRef,
     idColumn:    ColumnRef,
     valueColumn: ColumnRef
-  ): TypeMapping =
+  ): List[TypeMapping] =
     SwitchMapping(
       typeRef,
       List(
@@ -40,10 +40,10 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
       )
     )
 
-  lazy val OffsetPMapping: TypeMapping =
+  lazy val OffsetPMappings: List[TypeMapping] =
     offsetComponentSwitchMapping("p", OffsetPType, StepRecordView.Id, StepRecordView.Science.OffsetP)
 
-  lazy val OffsetQMapping: TypeMapping =
+  lazy val OffsetQMappings: List[TypeMapping] =
     offsetComponentSwitchMapping("q", OffsetQType, StepRecordView.Id, StepRecordView.Science.OffsetQ)
 
   private def offsetMapping(
@@ -58,7 +58,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
       )
     )
 
-  lazy val OffsetMapping: TypeMapping =
+  lazy val OffsetMappings: List[TypeMapping] =
     SwitchMapping(
       OffsetType,
       List(

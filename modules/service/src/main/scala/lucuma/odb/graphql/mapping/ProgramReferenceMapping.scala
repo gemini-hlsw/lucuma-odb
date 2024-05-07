@@ -13,6 +13,7 @@ import grackle.Result
 import grackle.Type
 
 import table.ProgramReferenceView
+import grackle.NamedType
 
 trait ProgramReferenceMapping[F[_]]
   extends BaseMapping[F]
@@ -68,7 +69,7 @@ trait ProgramReferenceMapping[F[_]]
         }
     }
 
-  private def semesterInstrumentReferenceMapping(tpe: Type): ObjectMapping =
+  private def semesterInstrumentReferenceMapping(tpe: NamedType): ObjectMapping =
     ObjectMapping(
       tpe = tpe,
       fieldMappings = List(

@@ -33,7 +33,7 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       )
     )
 
-  lazy val DeclinationMapping: TypeMapping =
+  lazy val DeclinationMapping: List[TypeMapping] =
     SwitchMapping(
       DeclinationType,
       List(

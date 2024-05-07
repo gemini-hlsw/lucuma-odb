@@ -12,7 +12,7 @@ trait RecordAtomResultMapping[F[_]] extends AtomRecordTable[F] {
     ObjectMapping(
       tpe = RecordAtomResultType,
       fieldMappings = List(
-        SqlField("id", AtomRecordTable.Id, key = true),
+        SqlField("id", AtomRecordTable.Id, key = true, hidden = true),
         SqlObject("atomRecord")
       )
     )

@@ -15,7 +15,7 @@ trait UpdateProposalResultMapping[F[Unit]] extends ProposalTable[F] {
     ObjectMapping(
       tpe = UpdateProposalResultType,
       fieldMappings = List(
-        SqlField("programId", ProposalTable.ProgramId, key = true),
+        SqlField("programId", ProposalTable.ProgramId, key = true, hidden = true),
         SqlObject("proposal")
       )
     )

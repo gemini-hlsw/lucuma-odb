@@ -16,7 +16,7 @@ trait CreateTargetResultMapping[F[_]] extends ProgramTable[F] with TargetView[F]
     ObjectMapping(
       tpe = CreateTargetResultType,
       fieldMappings = List(
-        SqlField("id", TargetView.TargetId, key = true),
+        SqlField("id", TargetView.TargetId, key = true, hidden = true),
         SqlObject("target"),
       ),
     )

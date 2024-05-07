@@ -18,7 +18,7 @@ trait ExecutionEventSelectResultMapping[F[_]]
      with StepRecordView[F]
      with VisitTable[F] {
 
-  lazy val ExecutionEventSelectResultMapping: TypeMapping = {
+  lazy val ExecutionEventSelectResultMapping: List[TypeMapping] = {
 
     val fromDataset: ObjectMapping =
       nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventTable.DatasetId))

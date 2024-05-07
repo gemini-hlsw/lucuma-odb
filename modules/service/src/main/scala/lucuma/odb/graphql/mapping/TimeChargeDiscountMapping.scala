@@ -77,7 +77,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
     ObjectMapping(
       tpe = TimeChargeDaylightDiscountType,
       fieldMappings = List(
-        SqlField("id",   TimeChargeDiscountTable.Id, key = true),
+        SqlField("id",   TimeChargeDiscountTable.Id, key = true, hidden = true),
         SqlField("site", TimeChargeDiscountTable.Daylight.Site)
       )
     )
@@ -86,7 +86,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
     ObjectMapping(
       tpe = TimeChargeNoDataDiscountType,
       fieldMappings = List(
-        SqlField("id", TimeChargeDiscountTable.Id, key = true)
+        SqlField("id", TimeChargeDiscountTable.Id, key = true, hidden = true)
       )
     )
 
@@ -94,7 +94,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
     ObjectMapping(
       tpe = TimeChargeQaDiscountType,
       fieldMappings = List(
-        SqlField("id",        TimeChargeDiscountTable.Id, key = true),
+        SqlField("id",        TimeChargeDiscountTable.Id, key = true, hidden = true),
         SqlObject("datasets", Join(TimeChargeDiscountTable.Id, TimeChargeDiscountDatasetTable.DiscountId), Join(TimeChargeDiscountDatasetTable.DatasetId, DatasetTable.Id))
       )
     )

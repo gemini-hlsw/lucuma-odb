@@ -11,7 +11,7 @@ trait ChronConditionsEntryView[F[_]] extends BaseMapping[F] {
 
   object ChronConditionsEntryView extends TableDef("v_chron_conditions_entry") {
     val ChronId      = col("c_chron_id", int8)
-    val Timestamp    = col("c_timestamp", timestamptz)
+    val Timestamp    = col("c_timestamp", core_timestamp)
     val UserId       = col("c_user", user_id.opt)
     val TransationId = col("c_transaction_id", int8) // xid8
     object Measurement {

@@ -25,7 +25,7 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
   private def stepConfigSwitchMapping(
     typeRef:    TypeRef,
     underlying: ObjectMapping
-  ): TypeMapping =
+  ): List[TypeMapping] =
     SwitchMapping(
       typeRef,
       List(StepRecordType / "stepConfig" -> underlying)
@@ -134,22 +134,22 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
       )
     )
 
-  lazy val StepConfigMapping: TypeMapping =
+  lazy val StepConfigMappings: List[TypeMapping] =
     stepConfigSwitchMapping(StepConfigType, stepConfigInterfaceMapping)
 
-  lazy val StepConfigBiasMapping: TypeMapping =
+  lazy val StepConfigBiasMappings: List[TypeMapping] =
     stepConfigSwitchMapping(BiasType, stepConfigBiasMapping)
 
-  lazy val StepConfigDarkMapping: TypeMapping =
+  lazy val StepConfigDarkMappings: List[TypeMapping] =
     stepConfigSwitchMapping(DarkType, stepConfigDarkMapping)
 
-  lazy val StepConfigGcalMapping: TypeMapping =
+  lazy val StepConfigGcalMappings: List[TypeMapping] =
     stepConfigSwitchMapping(GcalType, stepConfigGcalMapping)
 
-  lazy val StepConfigScienceMapping: TypeMapping =
+  lazy val StepConfigScienceMappings: List[TypeMapping] =
     stepConfigSwitchMapping(ScienceType, stepConfigScienceMapping)
 
-  lazy val StepConfigSmartGcalMapping: TypeMapping =
+  lazy val StepConfigSmartGcalMappings: List[TypeMapping] =
     stepConfigSwitchMapping(SmartGcalType, stepConfigSmartGcalMapping)
 
 }

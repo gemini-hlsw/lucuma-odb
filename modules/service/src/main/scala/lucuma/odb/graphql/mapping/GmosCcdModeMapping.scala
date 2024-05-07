@@ -23,7 +23,7 @@ trait GmosCcdModeMapping[F[_]] extends GmosDynamicTables[F] {
       )
     )
 
-  lazy val GmosCcdModeMapping: TypeMapping =
+  lazy val GmosCcdModeMappings: List[TypeMapping] =
     SwitchMapping(
       GmosCcdModeType,
       List(

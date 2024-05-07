@@ -373,7 +373,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     query:     String,
     expected:  Either[List[String], Json],
     variables: Option[JsonObject] = None,
-    client:    ClientOption = ClientOption.Ws,
+    client:    ClientOption = ClientOption.Http,
   ): IO[Unit] = {
     val op = this.query(user, query, variables, client)
     expected.fold(errors => {
@@ -393,7 +393,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     query:     String,
     expected:  Json,
     variables: Option[JsonObject] = None,
-    client:    ClientOption = ClientOption.Ws,
+    client:    ClientOption = ClientOption.Http,
   ): IO[Unit] =
     this.query(user, query, variables, client)
       .map(_.spaces2)
@@ -405,7 +405,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     query:     String,
     expected:  PartialFunction[OdbError, Unit],
     variables: Option[JsonObject] = None,
-    client:    ClientOption = ClientOption.Ws,
+    client:    ClientOption = ClientOption.Http,
   ): IO[Unit] =
     this.query(user, query, variables, client)
       .intercept[ResponseException[Any]]
@@ -420,7 +420,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     query:     String,
     expected:  Either[PartialFunction[OdbError, Unit], Json],
     variables: Option[JsonObject] = None,
-    client:    ClientOption = ClientOption.Ws,
+    client:    ClientOption = ClientOption.Http,
   ): IO[Unit] =
     expected.fold(
       expectOdbError(user, query, _, variables, client),
@@ -432,7 +432,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     query:     String,
     expected:  Ior[List[String], Json],
     variables: Option[JsonObject] = None,
-    client:    ClientOption = ClientOption.Ws,
+    client:    ClientOption = ClientOption.Http,
   ): IO[Unit] = {
     val op = this.query(user, query, variables, client)
     expected.fold(
@@ -459,7 +459,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     user:      User,
     query:     String,
     variables: Option[JsonObject] = None,
-    client:    ClientOption = ClientOption.Ws,
+    client:    ClientOption = ClientOption.Http,
   ): IO[Json] =
     Resource.eval(IO(serverFixture()))
       .flatMap(client.connection(user))

@@ -12,13 +12,13 @@ import grackle.Cursor
 import grackle.Mapping
 import grackle.Path
 import grackle.Result
-import grackle.Type
 import grackle.circe.CirceMappingLike
 import io.circe.Encoder
 import io.circe.Json
 import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
+import grackle.NamedType
 
 trait MappingExtras[F[_]] extends CirceMappingLike[F] {
 
@@ -38,39 +38,10 @@ trait MappingExtras[F[_]] extends CirceMappingLike[F] {
     }
   }
 
-  /**
-    * A dispatching `TypeMapping` that selects a different underlying mapping based on the GraphQL
-    * `Type` and field name.
-    */
-    case class SwitchMapping(tpe: Type, lookup: List[(Path, ObjectMapping)])(
-      using val pos: SourcePos
-    ) extends TypeMapping {
-
-      def apply(cx: Context): Option[ObjectMapping] = {
-
-        // All paths that lead here; i.e., Query / "foo" / "bar"; FooType / "bar", BarType
-        val allPaths: List[Path] = 
-          (cx.rootTpe :: cx.typePath.reverse)          // All the types we traversed
-            .map(_.underlying)                         // with List/Nullable removed
-            .zip(cx.path.reverse.tails)                // zipped with the (remaining) path to where we are now
-            .map { (t, p) => Path.from(t).prepend(p) } // turned into Path objects.
-
-        lookup.collectFirst { case (p, m) if allPaths.exists(_ === p) => m }
-
-      }
-
-    }
-
-  // Add fallback logic here to check for `SwitchMapping`s
-  override def objectMapping(context: Context): Option[ObjectMapping] =
-    super.objectMapping(context) orElse {
-      context.tpe.underlyingObject.flatMap { obj =>
-        obj.asNamed.flatMap(typeMapping) match {
-          case Some(sm: SwitchMapping) => sm.apply(context)
-          case _ => None
-        }
-      }
-    }
+  object SwitchMapping:
+    def apply(tpe: NamedType, lookup: List[(Path, ObjectMapping)])(using SourcePos): List[TypeMapping] = 
+      lookup.map: (p, m) =>
+        ObjectMapping(MappingPredicate.PathMatch(p, tpe))(m.fieldMappings*)  
 
   // If the parent is a CirceCursor we just walk down and don't look to see if a defined mapping
   // for the type we're sitting on. This lets us treat json results as opaque, terminal results.

@@ -47,7 +47,7 @@ trait WavelengthMapping[F[_]]
 
   import ObservationView.ScienceRequirements.Spectroscopy
 
-  lazy val WavelengthMapping: TypeMapping =
+  lazy val WavelengthMappings: List[TypeMapping] =
     SwitchMapping(
       WavelengthType,
       List(

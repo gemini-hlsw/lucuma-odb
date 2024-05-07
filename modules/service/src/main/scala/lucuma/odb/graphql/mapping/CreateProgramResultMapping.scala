@@ -16,7 +16,7 @@ trait CreateProgramResultMapping[F[_]] extends ProgramTable[F] {
     ObjectMapping(
       tpe = CreateProgramResultType,
       fieldMappings = List(
-        SqlField("id", ProgramTable.Id, key = true),
+        SqlField("id", ProgramTable.Id, key = true, hidden = true),
         SqlObject("program"),
       )
     )

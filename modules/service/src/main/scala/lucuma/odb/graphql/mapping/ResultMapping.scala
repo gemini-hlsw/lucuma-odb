@@ -10,10 +10,10 @@ import grackle.Env
 import grackle.Query
 import grackle.Query.*
 import grackle.Result
-import grackle.Type
 import io.circe.Encoder
 import lucuma.odb.graphql.BaseMapping
 import skunk.codec.numeric.int8
+import grackle.NamedType
 
 object ResultMapping {
 
@@ -92,7 +92,7 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
     val bogus = col("<bogus root column>", int8)
   }
 
-  private def resultMapping(tpe: Type, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
+  private def resultMapping(tpe: NamedType, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
     ObjectMapping(
       tpe = tpe,
       fieldMappings = List(
@@ -102,13 +102,13 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
       )
     )
 
-  def topLevelSelectResultMapping(tpe: Type): ObjectMapping =
+  def topLevelSelectResultMapping(tpe: NamedType): ObjectMapping =
     resultMapping(tpe, "matches", root.bogus)
 
-  def nestedSelectResultMapping(tpe: Type, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
+  def nestedSelectResultMapping(tpe: NamedType, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
     resultMapping(tpe, "matches", parentKeyColumn, joins*)
 
-  def updateResultMapping(tpe: Type, collectionField: String): ObjectMapping =
+  def updateResultMapping(tpe: NamedType, collectionField: String): ObjectMapping =
     resultMapping(tpe, collectionField, root.bogus)
 
 }

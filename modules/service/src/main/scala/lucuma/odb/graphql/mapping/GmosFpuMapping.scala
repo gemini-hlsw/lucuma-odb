@@ -29,7 +29,7 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
     name:    String,
     fpuType: TypeRef,
     table:   GmosDynamicTable[G, L, U]
-  ): TypeMapping =
+  ): List[TypeMapping] =
     SwitchMapping(
       fpuType,
       List(
@@ -37,11 +37,11 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
       )
     )
 
-  lazy val GmosNorthFpuMapping: TypeMapping =
+  lazy val GmosNorthFpuMappings: List[TypeMapping] =
     fpuSwitchMapping("gmosNorth", GmosNorthFpuType, GmosNorthDynamicTable)
 
 
-  lazy val GmosSouthFpuMapping: TypeMapping =
+  lazy val GmosSouthFpuMappings: List[TypeMapping] =
     fpuSwitchMapping("gmosSouth", GmosSouthFpuType, GmosSouthDynamicTable)
 
 

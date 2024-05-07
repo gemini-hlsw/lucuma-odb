@@ -20,7 +20,7 @@ trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
       )
     )
 
-  lazy val GmosCustomMaskMapping: TypeMapping =
+  lazy val GmosCustomMaskMapping: List[TypeMapping] =
     SwitchMapping(
       GmosCustomMaskType,
       List(

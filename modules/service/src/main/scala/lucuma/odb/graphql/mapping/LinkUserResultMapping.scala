@@ -16,7 +16,7 @@ trait LinkUserResultMapping[F[_]] extends ProgramUserTable[F]  {
       tpe = LinkUserResultType,
       fieldMappings = List(
         SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
-        SqlField("userId", ProgramUserTable.UserId, key = true),
+        SqlField("userId", ProgramUserTable.UserId, key = true, hidden = true),
         SqlObject("user"),
       )
     )

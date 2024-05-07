@@ -50,7 +50,7 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
     ObjectMapping(
       tpe           = SpectroscopyConfigOptionGmosNorthType,
       fieldMappings = List(
-        SqlField("instrument", SpectrsocopyConfigOptionGmosNorthTable.Instrument, key = true),
+        SqlField("instrument", SpectrsocopyConfigOptionGmosNorthTable.Instrument, key = true, hidden = true),
         SqlField("index",      SpectrsocopyConfigOptionGmosNorthTable.Index, key = true, hidden = true),
 
         SqlField("fpu",        SpectrsocopyConfigOptionGmosNorthTable.Fpu),
@@ -63,7 +63,7 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
     ObjectMapping(
       tpe           = SpectroscopyConfigOptionGmosSouthType,
       fieldMappings = List(
-        SqlField("instrument", SpectrsocopyConfigOptionGmosSouthTable.Instrument, key = true),
+        SqlField("instrument", SpectrsocopyConfigOptionGmosSouthTable.Instrument, key = true, hidden = true),
         SqlField("index",      SpectrsocopyConfigOptionGmosSouthTable.Index, key = true, hidden = true),
 
         SqlField("fpu",        SpectrsocopyConfigOptionGmosSouthTable.Fpu),

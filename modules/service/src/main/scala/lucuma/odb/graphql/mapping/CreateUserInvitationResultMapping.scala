@@ -16,7 +16,7 @@ trait CreateUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
     ObjectMapping(
       tpe = CreateUserInvitationResultType,
       fieldMappings = List(
-        SqlField("id", UserInvitationTable.InvitationId, key = true),
+        SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
         SqlObject("invitation"),
         CursorField("key", c => c.envR[UserInvitation]("inv").map(UserInvitation.fromString.reverseGet), List("id"))
       ),
