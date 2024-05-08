@@ -31,7 +31,8 @@ trait AsterismGroupMapping[F[_]]
 
         // User-visible fields
         SqlObject("program", Join(AsterismGroupView.ProgramId, ProgramTable.Id)),
-        SqlObject("observations", Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
+        // SqlObject("observations", Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
+        SqlObject("observations"),
         SqlObject("asterism", Join(AsterismGroupView.ExampleObservationId, AsterismTargetTable.ObservationId), Join(AsterismTargetTable.TargetId, TargetView.TargetId)),
 
       )

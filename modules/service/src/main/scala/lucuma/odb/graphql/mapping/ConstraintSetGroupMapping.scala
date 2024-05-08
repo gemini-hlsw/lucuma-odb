@@ -33,7 +33,8 @@ trait ConstraintSetGroupMapping[F[_]]
       fieldMappings = List(
         SqlField("key", ConstraintSetGroupView.ConstraintSetKey, key = true, hidden = true),
         SqlObject("program", Join(ConstraintSetGroupView.ProgramId, ProgramTable.Id)),
-        SqlObject("observations", Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
+        // SqlObject("observations", Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
+        SqlObject("observations"),
         SqlObject("constraintSet", Join(ConstraintSetGroupView.ObservationId, ObservationView.Id)),
       )
     )

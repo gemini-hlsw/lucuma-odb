@@ -25,7 +25,9 @@ trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
       GmosCustomMaskType,
       List(
         StepRecordType / "gmosNorth" / "fpu" / "customMask" -> customMaskMapping(GmosNorthDynamicTable),
-        StepRecordType / "gmosSouth" / "fpu" / "customMask" -> customMaskMapping(GmosSouthDynamicTable)
+        StepRecordType / "gmosSouth" / "fpu" / "customMask" -> customMaskMapping(GmosSouthDynamicTable),
+        GmosNorthStepType / "instrumentConfig" / "fpu" / "customMask" -> customMaskMapping(GmosNorthDynamicTable),
+        GmosSouthStepType / "instrumentConfig" / "fpu" / "customMask" -> customMaskMapping(GmosSouthDynamicTable)
       )
     )
 
