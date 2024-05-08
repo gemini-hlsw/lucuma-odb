@@ -6,6 +6,7 @@ package mapping
 
 import cats.syntax.option.*
 import grackle.Cursor
+import grackle.NamedType
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
@@ -13,7 +14,6 @@ import grackle.Result
 import grackle.Type
 
 import table.ProgramReferenceView
-import grackle.NamedType
 
 trait ProgramReferenceMapping[F[_]]
   extends BaseMapping[F]

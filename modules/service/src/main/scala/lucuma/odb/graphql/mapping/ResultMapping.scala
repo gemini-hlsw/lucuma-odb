@@ -7,13 +7,14 @@ import cats.syntax.all.*
 import grackle.Cursor
 import grackle.Cursor.ListTransformCursor
 import grackle.Env
+import grackle.NamedType
+import grackle.Path
 import grackle.Query
 import grackle.Query.*
 import grackle.Result
 import io.circe.Encoder
 import lucuma.odb.graphql.BaseMapping
 import skunk.codec.numeric.int8
-import grackle.NamedType
 
 object ResultMapping {
 
@@ -102,6 +103,13 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
       )
     )
 
+  private def resultMappingAtPath(path: Path, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
+    ObjectMapping(PathMatch(path))(
+      SqlObject(collectionField, joins*),
+      CursorField("hasMore", ResultMapping.hasMore(collectionField)),
+      SqlField("<key>", parentKeyColumn, key = (parentKeyColumn ne root.bogus), hidden = true)
+    )
+
   def topLevelSelectResultMapping(tpe: NamedType): ObjectMapping =
     resultMapping(tpe, "matches", root.bogus)
 
@@ -110,5 +118,14 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
 
   def updateResultMapping(tpe: NamedType, collectionField: String): ObjectMapping =
     resultMapping(tpe, collectionField, root.bogus)
+
+  def topLevelSelectResultMappingAtPath(path: Path): ObjectMapping =
+    resultMappingAtPath(path, "matches", root.bogus)
+
+  def nestedSelectResultMappingAtPath(path: Path, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
+    resultMappingAtPath(path, "matches", parentKeyColumn, joins*)
+
+  def updateResultMappingAtPath(path: Path, collectionField: String): ObjectMapping =
+    resultMappingAtPath(path, collectionField, root.bogus)
 
 }

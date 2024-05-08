@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.Declination
@@ -18,30 +19,25 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
                                   with ObservationView[F]
                                   with TargetView[F] {
 
-  private def declinationMapping(
+  private def declinationMappingAtPath(
+    path: Path,
     idColumn:    ColumnRef,
     valueColumn: ColumnRef
   ): ObjectMapping =
-    ObjectMapping(
-      tpe = DeclinationType,
-      fieldMappings = List(
-        SqlField("synthetic_id", idColumn, key = true, hidden = true),
-        SqlField("value", valueColumn, hidden = true),
-        FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
-        FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
-        FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
-      )
+    ObjectMapping(PathMatch(path))(
+      SqlField("synthetic_id", idColumn, key = true, hidden = true),
+      SqlField("value", valueColumn, hidden = true),
+      FieldRef[Declination]("value").as("dms", Declination.fromStringSignedDMS.reverseGet),
+      FieldRef[Declination]("value").as("degrees", c => BigDecimal(c.toAngle.toDoubleDegrees)),
+      FieldRef[Declination]("value").as("microarcseconds", _.toAngle.toMicroarcseconds),
     )
 
   lazy val DeclinationMapping: List[TypeMapping] =
-    SwitchMapping(
-      DeclinationType,
-      List(
-        CallForProposalsType / "decLimitStart" -> declinationMapping(CallForProposalsView.DecStartId, CallForProposalsView.DecStart),
-        CallForProposalsType / "decLimitEnd"   -> declinationMapping(CallForProposalsView.DecEndId, CallForProposalsView.DecEnd),
-        CoordinatesType / "dec" -> declinationMapping(ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
-        SiderealType / "dec"    -> declinationMapping(TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
-      )
+    List(
+      declinationMappingAtPath(CallForProposalsType / "decLimitStart", CallForProposalsView.DecStartId, CallForProposalsView.DecStart),
+      declinationMappingAtPath(CallForProposalsType / "decLimitEnd", CallForProposalsView.DecEndId, CallForProposalsView.DecEnd),
+      declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
+      declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
     )
 
 }
