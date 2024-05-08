@@ -15,12 +15,11 @@ import grackle.Result
 import grackle.circe.CirceMappingLike
 import io.circe.Encoder
 import io.circe.Json
-import org.tpolecat.sourcepos.SourcePos
 
 import scala.reflect.ClassTag
-import grackle.NamedType
 
 trait MappingExtras[F[_]] extends CirceMappingLike[F] {
+  export MappingPredicate.*
 
   given Order[NonNegShort] = Order.by(_.value) // y u not exist already
 
@@ -37,11 +36,6 @@ trait MappingExtras[F[_]] extends CirceMappingLike[F] {
         CursorField(field, _.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
     }
   }
-
-  object SwitchMapping:
-    def apply(tpe: NamedType, lookup: List[(Path, ObjectMapping)])(using SourcePos): List[TypeMapping] = 
-      lookup.map: (p, m) =>
-        ObjectMapping(MappingPredicate.PathMatch(p, tpe))(m.fieldMappings*)  
 
   // If the parent is a CirceCursor we just walk down and don't look to see if a defined mapping
   // for the type we're sitting on. This lets us treat json results as opaque, terminal results.

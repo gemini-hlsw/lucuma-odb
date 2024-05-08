@@ -12,8 +12,8 @@ import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.observation_reference
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
-import lucuma.odb.util.Codecs.visit_id
 import lucuma.odb.util.Codecs.varchar_nonempty
+import lucuma.odb.util.Codecs.visit_id
 import skunk.codec.temporal.date
 
 

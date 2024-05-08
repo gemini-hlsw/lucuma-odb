@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
 import table.AtomRecordTable
 import table.DatasetTable
 import table.ObservationView
@@ -20,24 +22,22 @@ trait DatasetSelectResultMapping[F[_]]
 
   lazy val DatasetSelectResultMappings: List[TypeMapping] = {
 
-    val fromExecution: ObjectMapping =
-      nestedSelectResultMapping(DatasetSelectResultType, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
+    def fromExecutionAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, ObservationView.Id, Join(ObservationView.Id, DatasetTable.ObservationId))
 
-    val fromStepRecord: ObjectMapping =
-      nestedSelectResultMapping(DatasetSelectResultType, StepRecordView.Id,  Join(StepRecordView.Id, DatasetTable.StepId))
+    def fromStepRecordAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, StepRecordView.Id, Join(StepRecordView.Id, DatasetTable.StepId))
 
-    val fromVisit: ObjectMapping =
-      nestedSelectResultMapping(DatasetSelectResultType, VisitTable.Id,      Join(VisitTable.Id, DatasetTable.VisitId))
+    def fromVisitAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, VisitTable.Id, Join(VisitTable.Id, DatasetTable.VisitId))
 
-    SwitchMapping(
-      DatasetSelectResultType,
-      List(
-        QueryType      / "datasets" -> topLevelSelectResultMapping(DatasetSelectResultType),
-        ExecutionType  / "datasets" -> fromExecution,
-        StepRecordType / "datasets" -> fromStepRecord,
-        VisitType      / "datasets" -> fromVisit
-      )
+    List(
+      topLevelSelectResultMappingAtPath(QueryType / "datasets"),
+      fromExecutionAtPath(ExecutionType  / "datasets"),
+      fromStepRecordAtPath(StepRecordType / "datasets"),
+      fromVisitAtPath(VisitType / "datasets"),
     )
+
   }
 
 }

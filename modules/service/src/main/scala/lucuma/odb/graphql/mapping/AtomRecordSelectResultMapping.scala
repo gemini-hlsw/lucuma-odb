@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
 import table.AtomRecordTable
 import table.ObservationView
 import table.VisitTable
@@ -16,19 +18,17 @@ trait AtomRecordSelectResultMapping[F[_]]
 
   lazy val AtomRecordSelectResultMappings: List[TypeMapping] = {
 
-    val fromExecution: ObjectMapping =
-      nestedSelectResultMapping(AtomRecordSelectResultType, ObservationView.Id, Join(ObservationView.Id, AtomRecordTable.ObservationId))
+    def fromExecutionAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, ObservationView.Id, Join(ObservationView.Id, AtomRecordTable.ObservationId))
 
-    val fromVisit: ObjectMapping =
-      nestedSelectResultMapping(AtomRecordSelectResultType, VisitTable.Id, Join(VisitTable.Id, AtomRecordTable.VisitId))
+    def fromVisitAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, VisitTable.Id, Join(VisitTable.Id, AtomRecordTable.VisitId))
 
-    SwitchMapping(
-      AtomRecordSelectResultType,
-      List(
-        ExecutionType / "atomRecords" -> fromExecution,
-        VisitType     / "atomRecords" -> fromVisit
-      )
+    List(
+      fromExecutionAtPath(ExecutionType / "atomRecords"),
+      fromVisitAtPath(VisitType     / "atomRecords")
     )
+
   }
 
 }

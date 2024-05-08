@@ -6,8 +6,8 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import skunk.codec.text.varchar
 import org.tpolecat.typename.TypeName
+import skunk.codec.text.varchar
 
 trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 

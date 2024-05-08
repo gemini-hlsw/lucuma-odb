@@ -4,34 +4,31 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
 import table.GmosDynamicTables
 
 trait GmosCcdModeMapping[F[_]] extends GmosDynamicTables[F] {
 
-  private def ccdModeMapping[G, L, U](
+  private def ccdModeMappingAtPath[G, L, U](
+    path: Path,
     table: GmosDynamicTable[G, L, U]
   ): ObjectMapping =
-    ObjectMapping(
-      tpe = GmosCcdModeType,
-      fieldMappings = List(
-        SqlField("id", table.Id, key = true, hidden = true),
-        SqlField("xBin",        table.CcdMode.Xbin),
-        SqlField("yBin",        table.CcdMode.Ybin),
-        SqlField("ampCount",    table.CcdMode.AmpCount),
-        SqlField("ampGain",     table.CcdMode.AmpGain),
-        SqlField("ampReadMode", table.CcdMode.AmpReadMode)
-      )
+    ObjectMapping(PathMatch(path))(
+      SqlField("id", table.Id, key = true, hidden = true),
+      SqlField("xBin",        table.CcdMode.Xbin),
+      SqlField("yBin",        table.CcdMode.Ybin),
+      SqlField("ampCount",    table.CcdMode.AmpCount),
+      SqlField("ampGain",     table.CcdMode.AmpGain),
+      SqlField("ampReadMode", table.CcdMode.AmpReadMode)
     )
 
   lazy val GmosCcdModeMappings: List[TypeMapping] =
-    SwitchMapping(
-      GmosCcdModeType,
-      List(
-        StepRecordType / "gmosNorth" / "readout" -> ccdModeMapping(GmosNorthDynamicTable),
-        StepRecordType / "gmosSouth" / "readout" -> ccdModeMapping(GmosSouthDynamicTable),
-        GmosNorthStepType / "instrumentConfig" / "readout" -> ccdModeMapping(GmosNorthDynamicTable),
-        GmosSouthStepType / "instrumentConfig" / "readout" -> ccdModeMapping(GmosSouthDynamicTable)
-      )
+    List(
+      ccdModeMappingAtPath(StepRecordType / "gmosNorth" / "readout", GmosNorthDynamicTable),
+      ccdModeMappingAtPath(StepRecordType / "gmosSouth" / "readout", GmosSouthDynamicTable),
+      ccdModeMappingAtPath(GmosNorthStepType / "instrumentConfig" / "readout", GmosNorthDynamicTable),
+      ccdModeMappingAtPath(GmosSouthStepType / "instrumentConfig" / "readout", GmosSouthDynamicTable)
     )
 
 }
