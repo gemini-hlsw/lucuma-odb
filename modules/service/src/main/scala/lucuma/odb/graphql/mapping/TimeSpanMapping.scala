@@ -64,7 +64,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
     FieldRef("value").as(name, f.reverseGet)
 
   private def timeSpanMappingAtPath(path: Path, data: ColumnRef)(keys: ColumnRef*): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       keyFields(keys*) ++ List(
       SqlField("value", data, hidden = true),
       valueAs("microseconds")(Format.fromPrism(TimeSpan.FromMicroseconds)),

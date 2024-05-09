@@ -19,28 +19,28 @@ trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
   lazy val ProposalClassMappings =
     List(
 
-      SqlInterfaceMapping(TypeMatch(ProposalClassType), ProposalClassDiscriminator)(
+      SqlInterfaceMapping(ProposalClassType, ProposalClassDiscriminator)(
         SqlField("synthetic-id", ProposalTable.ProgramId, key = true, hidden = true),
         SqlField("discriminator", ProposalTable.Clazz, discriminator = true, hidden = true),
         SqlField("minPercentTime", ProposalTable.MinPercent),
       ),
 
       // These have no extra fields.
-      ObjectMapping(TypeMatch(ClassicalType))(),
-      ObjectMapping(TypeMatch(DemoScienceType))(),
-      ObjectMapping(TypeMatch(DirectorsTimeType))(),
-      ObjectMapping(TypeMatch(ExchangeType))(),
-      ObjectMapping(TypeMatch(FastTurnaroundType))(),
-      ObjectMapping(TypeMatch(PoorWeatherType))(),
-      ObjectMapping(TypeMatch(QueueType))(),
-      ObjectMapping(TypeMatch(SystemVerificationType))(),
+      ObjectMapping(ClassicalType)(),
+      ObjectMapping(DemoScienceType)(),
+      ObjectMapping(DirectorsTimeType)(),
+      ObjectMapping(ExchangeType)(),
+      ObjectMapping(FastTurnaroundType)(),
+      ObjectMapping(PoorWeatherType)(),
+      ObjectMapping(QueueType)(),
+      ObjectMapping(SystemVerificationType)(),
 
       // These do.
-      ObjectMapping(TypeMatch(LargeProgramType))(
+      ObjectMapping(LargeProgramType)(
         SqlField("minPercentTotalTime", ProposalTable.MinPercentTotal),
         SqlObject("totalTime"),
       ),
-      ObjectMapping(TypeMatch(IntensiveType))(
+      ObjectMapping(IntensiveType)(
         SqlField("minPercentTotalTime", ProposalTable.MinPercentTotal),
         SqlObject("totalTime"),
       ),

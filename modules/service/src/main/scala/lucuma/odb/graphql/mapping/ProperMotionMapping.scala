@@ -13,7 +13,7 @@ import table.ProgramTable
 trait ProperMotionMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ProperMotionMapping =
-    ObjectMapping(TypeMatch(ProperMotionType))(
+    ObjectMapping(ProperMotionType)(
       SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
       SqlObject("ra"),
       SqlObject("dec"),

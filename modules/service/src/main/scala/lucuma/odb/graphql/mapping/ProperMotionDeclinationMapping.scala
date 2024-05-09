@@ -14,7 +14,7 @@ import table.ProgramTable
 trait ProperMotionDeclinationMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ProperMotionDeclinationMapping: ObjectMapping =
-    ObjectMapping(TypeMatch(ProperMotionDeclinationType))(
+    ObjectMapping(ProperMotionDeclinationType)(
       SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
       SqlField("value", TargetView.Sidereal.ProperMotion.Dec, hidden = true),
       FieldRef[Angle]("value").as("microarcsecondsPerYear", Angle.signedMicroarcseconds.get),

@@ -31,7 +31,7 @@ trait WavelengthMapping[F[_]]
 
     val value = FieldRef[Wavelength]("value")
 
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       (idColumns.toList.zipWithIndex.map { (ref, idx) =>
         SqlField(s"synthetic_id$idx", ref, key = true, hidden = true)
       }) ++

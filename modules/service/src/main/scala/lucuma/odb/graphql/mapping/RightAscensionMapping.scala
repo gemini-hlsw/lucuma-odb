@@ -24,7 +24,7 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
     idColumn:    ColumnRef,
     valueColumn: ColumnRef
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField("synthetic_id", idColumn, key = true, hidden = true),
       SqlField("value", valueColumn, hidden = true),
       FieldRef[RightAscension]("value").as("hms", RightAscension.fromStringHMS.reverseGet),

@@ -14,7 +14,7 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
     path: Path,
     table:   GmosDynamicTable[G, L, U]
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField("id",       table.Id, key = true, hidden = true),
       SqlObject("exposure"),
       SqlObject("readout"),

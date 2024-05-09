@@ -101,7 +101,7 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
     )
 
   private def resultMappingAtPath(path: Path, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlObject(collectionField, joins*),
       CursorField("hasMore", ResultMapping.hasMore(collectionField)),
       SqlField("<key>", parentKeyColumn, key = (parentKeyColumn ne root.bogus), hidden = true)

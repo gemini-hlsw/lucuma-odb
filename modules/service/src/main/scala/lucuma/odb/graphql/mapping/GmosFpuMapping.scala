@@ -14,7 +14,7 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
     path: Path,
     table:   GmosDynamicTable[G, L, U]
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField("synthetic_id", table.Fpu.SyntheticId, key = true, hidden = true),
       SqlObject("customMask"),
       SqlField("builtin", table.Fpu.Builtin)

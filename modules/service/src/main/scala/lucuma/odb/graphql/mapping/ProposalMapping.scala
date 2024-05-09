@@ -25,7 +25,7 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
                                with KeyValueEffectHandler[F] {
 
   lazy val ProposalMapping =
-    ObjectMapping(TypeMatch(ProposalType))(
+    ObjectMapping(ProposalType)(
       SqlField("program_id", ProposalTable.ProgramId, key = true, hidden = true),
       SqlField("title", ProposalTable.Title),
       SqlObject("reference", Join(ProposalTable.ProgramId, ProposalReferenceView.Id)),
