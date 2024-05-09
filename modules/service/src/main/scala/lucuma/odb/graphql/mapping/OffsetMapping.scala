@@ -30,7 +30,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
     valueColumn: ColumnRef
   ): List[TypeMapping] =
     List(
-      offsetComponentMappingAtPath(StepRecordType / "stepConfig" / "offset" / name, idColumn, valueColumn)
+      offsetComponentMappingAtPath(StepRecordType / "stepConfig" % ScienceType / "offset" / name, idColumn, valueColumn)
     )
 
   lazy val OffsetPMappings: List[TypeMapping] =
@@ -51,7 +51,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
 
   lazy val OffsetMappings: List[TypeMapping] =
     List(
-      offsetMappingAtPath(StepRecordType / "stepConfig" / "offset", StepRecordView.Id)
+      offsetMappingAtPath(StepRecordType / "stepConfig" % ScienceType / "offset", StepRecordView.Id)
     )
 
 }

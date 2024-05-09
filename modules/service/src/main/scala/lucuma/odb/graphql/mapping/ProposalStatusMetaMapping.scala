@@ -11,12 +11,10 @@ import lucuma.odb.graphql.table.ProposalStatusTable
 trait ProposalStatusMetaMapping[F[_]] extends ProposalStatusTable[F] {
   
   lazy val ProposalStatusMetaMapping = 
-    ObjectMapping(
-      tpe = ProposalStatusMetaType,
-      fieldMappings = List(
-        SqlField("tag", ProposalStatusTable.Tag, key = true),
-        SqlField("name", ProposalStatusTable.Name),
-        SqlField("ordinal", ProposalStatusTable.Ordinal, hidden = true)
-      )
+    ObjectMapping(ProposalStatusMetaType)(
+      SqlField("tag", ProposalStatusTable.Tag, key = true),
+      SqlField("name", ProposalStatusTable.Name),
+      SqlField("ordinal", ProposalStatusTable.Ordinal, hidden = true)
     )
+
 }

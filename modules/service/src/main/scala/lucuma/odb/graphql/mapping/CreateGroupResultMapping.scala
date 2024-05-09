@@ -11,12 +11,9 @@ import table.GroupView
 trait CreateGroupResultMapping[F[_]] extends GroupView[F] {
 
   lazy val CreateGroupResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = CreateGroupResultType,
-      fieldMappings = List(
-        SqlField("id", GroupView.Id, key = true, hidden = true),
-        SqlObject("group"),
-      )
+    ObjectMapping(CreateGroupResultType)(
+      SqlField("id", GroupView.Id, key = true, hidden = true),
+      SqlObject("group"),
     )
 
 }

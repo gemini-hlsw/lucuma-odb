@@ -13,18 +13,15 @@ import table.ProgramTable
 trait SiderealMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val SiderealMapping =
-    ObjectMapping(
-      tpe = SiderealType,
-      fieldMappings = List(
-        SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
-        SqlObject("ra"),
-        SqlObject("dec"),
-        SqlField("epoch", TargetView.Sidereal.Epoch),
-        SqlObject("properMotion"),
-        SqlObject("radialVelocity"),
-        SqlObject("parallax"),
-        SqlObject("catalogInfo"),
-      ),
+    ObjectMapping(SiderealType)(
+      SqlField("synthetic_id", TargetView.Sidereal.SyntheticId, key = true, hidden = true),
+      SqlObject("ra"),
+      SqlObject("dec"),
+      SqlField("epoch", TargetView.Sidereal.Epoch),
+      SqlObject("properMotion"),
+      SqlObject("radialVelocity"),
+      SqlObject("parallax"),
+      SqlObject("catalogInfo"),
     )
 
   }

@@ -11,14 +11,11 @@ import lucuma.odb.graphql.table.PartnerTable
 trait PartnerMetaMapping[F[_]] extends PartnerTable[F] {
 
   lazy val PartnerMetaMapping =
-    ObjectMapping(
-      tpe = PartnerMetaType,
-      fieldMappings = List(
-        SqlField("tag", PartnerTable.Tag, key = true),
-        SqlField("shortName", PartnerTable.ShortName),
-        SqlField("longName", PartnerTable.LongName),
-        SqlField("active", PartnerTable.Active),
-      )
+    ObjectMapping(PartnerMetaType)(
+      SqlField("tag", PartnerTable.Tag, key = true),
+      SqlField("shortName", PartnerTable.ShortName),
+      SqlField("longName", PartnerTable.LongName),
+      SqlField("active", PartnerTable.Active),
     )
 
 }

@@ -58,32 +58,29 @@ trait ProgramMapping[F[_]]
   def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   lazy val ProgramMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ProgramType,
-      fieldMappings = List(
-        SqlField("id", ProgramTable.Id, key = true),
-        SqlField("existence", ProgramTable.Existence, hidden = true),
-        SqlField("name", ProgramTable.Name),
+    ObjectMapping(ProgramType)(
+      SqlField("id", ProgramTable.Id, key = true),
+      SqlField("existence", ProgramTable.Existence, hidden = true),
+      SqlField("name", ProgramTable.Name),
 
-        SqlField("type", ProgramTable.ProgramType),
-        SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
+      SqlField("type", ProgramTable.ProgramType),
+      SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
 
-        SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
-        SqlField("proposalStatus", ProgramTable.ProposalStatus),
-        SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
-        SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
-        SqlObject("observations"),
-        SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
-        SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
-        SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
-        SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
-        SqlObject("proposalAttachments", Join(ProgramTable.Id, ProposalAttachmentTable.ProgramId)),
-        EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
-        EffectField("timeCharge", timeChargeHandler, List("id")),
-        SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
-      )
+      SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
+      SqlField("proposalStatus", ProgramTable.ProposalStatus),
+      SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
+      SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
+      SqlObject("observations"),
+      SqlObject("proposal", Join(ProgramTable.Id, ProposalTable.ProgramId)),
+      SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
+      SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
+      SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
+      SqlObject("proposalAttachments", Join(ProgramTable.Id, ProposalAttachmentTable.ProgramId)),
+      EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
+      EffectField("timeCharge", timeChargeHandler, List("id")),
+      SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
     )
-
+    
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
 
     case (ProgramType, "observations", List(

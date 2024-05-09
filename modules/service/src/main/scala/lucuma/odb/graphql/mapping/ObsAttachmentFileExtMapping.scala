@@ -10,11 +10,9 @@ import table.ObsAttachmentFileExtTable
 trait ObsAttachmentFileExtMapping[F[_]] extends ObsAttachmentFileExtTable[F] {
 
   lazy val ObsAttachmentFileExtMapping =
-    ObjectMapping(
-      tpe = ObsAttachmentFileExtType,
-      fieldMappings = List(
-        SqlField("attachmentType", ObsAttachmentFileExtTable.AttachmentType, key = true, hidden = true),
-        SqlField("fileExtension", ObsAttachmentFileExtTable.FileExtension, key = true)
-      )
+    ObjectMapping(ObsAttachmentFileExtType)(
+      SqlField("attachmentType", ObsAttachmentFileExtTable.AttachmentType, key = true, hidden = true),
+      SqlField("fileExtension", ObsAttachmentFileExtTable.FileExtension, key = true)
     )
+
 }

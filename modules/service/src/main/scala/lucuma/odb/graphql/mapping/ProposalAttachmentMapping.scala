@@ -11,15 +11,13 @@ import table.ProposalAttachmentTable
 trait ProposalAttachmentMapping[F[_]] extends ProposalAttachmentTable[F] with ProgramTable[F] {
 
   lazy val ProposalAttachmentMapping =
-    ObjectMapping(
-      tpe = ProposalAttachmentType,
-      fieldMappings = List(
-        SqlField("program_id", ProposalAttachmentTable.ProgramId, key = true, hidden = true),
-        SqlField("attachmentType", ProposalAttachmentTable.AttachmentType, key = true),
-        SqlField("fileName", ProposalAttachmentTable.FileName),
-        SqlField("fileSize", ProposalAttachmentTable.FileSize),
-        SqlField("updatedAt", ProposalAttachmentTable.UpdatedAt),
-        SqlObject("program", Join(ProposalAttachmentTable.ProgramId, ProgramTable.Id))
-      )
+    ObjectMapping(TypeMatch(ProposalAttachmentType))(
+      SqlField("program_id", ProposalAttachmentTable.ProgramId, key = true, hidden = true),
+      SqlField("attachmentType", ProposalAttachmentTable.AttachmentType, key = true),
+      SqlField("fileName", ProposalAttachmentTable.FileName),
+      SqlField("fileSize", ProposalAttachmentTable.FileSize),
+      SqlField("updatedAt", ProposalAttachmentTable.UpdatedAt),
+      SqlObject("program", Join(ProposalAttachmentTable.ProgramId, ProgramTable.Id))
     )
+
 }

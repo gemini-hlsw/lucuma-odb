@@ -11,13 +11,10 @@ import lucuma.odb.graphql.table.AllocationTable
 trait SetAllocationResultMapping[F[_]] extends AllocationTable[F] {
 
   lazy val SetAllocationResultMapping =
-    ObjectMapping(
-      tpe = SetAllocationResultType,
-      fieldMappings = List(
-        SqlField("programId", AllocationTable.ProgramId, key = true, hidden = true),
-        SqlField("partner", AllocationTable.Partner, key = true, hidden = true),
-        SqlObject("allocation"),
-      )
+    ObjectMapping(SetAllocationResultType)(
+      SqlField("programId", AllocationTable.ProgramId, key = true, hidden = true),
+      SqlField("partner", AllocationTable.Partner, key = true, hidden = true),
+      SqlObject("allocation"),
     )
 
 }

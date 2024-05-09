@@ -94,13 +94,10 @@ trait ResultMapping[F[_]] extends BaseMapping[F] {
   }
 
   private def resultMapping(tpe: NamedType, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =
-    ObjectMapping(
-      tpe = tpe,
-      fieldMappings = List(
-        SqlObject(collectionField, joins*),
-        CursorField("hasMore", ResultMapping.hasMore(collectionField)),
-        SqlField("<key>", parentKeyColumn, key = (parentKeyColumn ne root.bogus), hidden = true)
-      )
+    ObjectMapping(tpe)(
+      SqlObject(collectionField, joins*),
+      CursorField("hasMore", ResultMapping.hasMore(collectionField)),
+      SqlField("<key>", parentKeyColumn, key = (parentKeyColumn ne root.bogus), hidden = true)
     )
 
   private def resultMappingAtPath(path: Path, collectionField: String, parentKeyColumn: ColumnRef, joins: Join*): ObjectMapping =

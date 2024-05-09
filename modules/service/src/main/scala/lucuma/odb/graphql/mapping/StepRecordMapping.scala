@@ -46,25 +46,22 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
   def services: Resource[F, Services[F]]
 
   lazy val StepRecordMapping: ObjectMapping =
-    ObjectMapping(
-      tpe           = StepRecordType,
-      fieldMappings = List(
-        SqlField("id",           StepRecordView.Id, key = true),
-        SqlField("index",        StepRecordView.StepIndex),
-        SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
-        SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
-        SqlField("created",      StepRecordView.Created),
-        EffectField("executionState", executionStateHandler, List("id")),
-        EffectField("interval",  intervalHandler, List("id")),
-        SqlObject("stepConfig"),
-        SqlField("observeClass", StepRecordView.ObserveClass),
-        SqlObject("estimate"),
-        EffectField("qaState", qaStateHandler, List("id")),
-        SqlObject("datasets"),
-        SqlObject("events"),
-        SqlObject("gmosNorth", Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
-        SqlObject("gmosSouth", Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
-      )
+    ObjectMapping(StepRecordType)(
+      SqlField("id",           StepRecordView.Id, key = true),
+      SqlField("index",        StepRecordView.StepIndex),
+      SqlField("instrument",   StepRecordView.Instrument, discriminator = true),
+      SqlObject("atom",        Join(StepRecordView.AtomId, AtomRecordTable.Id)),
+      SqlField("created",      StepRecordView.Created),
+      EffectField("executionState", executionStateHandler, List("id")),
+      EffectField("interval",  intervalHandler, List("id")),
+      SqlObject("stepConfig"),
+      SqlField("observeClass", StepRecordView.ObserveClass),
+      SqlObject("estimate"),
+      EffectField("qaState", qaStateHandler, List("id")),
+      SqlObject("datasets"),
+      SqlObject("events"),
+      SqlObject("gmosNorth", Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
+      SqlObject("gmosSouth", Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
     )
 
   lazy val StepRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

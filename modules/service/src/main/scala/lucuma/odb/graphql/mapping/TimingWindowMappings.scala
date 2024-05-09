@@ -18,14 +18,11 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
 
   // TimingWindow
   lazy val TimingWindowMapping =
-    ObjectMapping(
-      tpe = TimingWindowType,
-      fieldMappings = List(
-        SqlField("id", TimingWindowView.Id, key = true, hidden = true),
-        SqlField("inclusion", TimingWindowView.Inclusion),
-        SqlField("startUtc", TimingWindowView.Start),
-        SqlObject("end")
-      )
+    ObjectMapping(TimingWindowType)(
+      SqlField("id", TimingWindowView.Id, key = true, hidden = true),
+      SqlField("inclusion", TimingWindowView.Inclusion),
+      SqlField("startUtc", TimingWindowView.Start),
+      SqlObject("end")
     )
 
   // TimingWindowEnd
@@ -62,37 +59,26 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
 
   // TimingWindowEntAt
   lazy val TimingWindowEndAtMapping =
-    ObjectMapping(
-      tpe = TimingWindowEndAtType,
-      fieldMappings =
-        List(
-          SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
-          SqlField("atUtc", TimingWindowView.End.At),
-        )
+    ObjectMapping(TimingWindowEndAtType)(
+      SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
+      SqlField("atUtc", TimingWindowView.End.At),
     )
 
   // TimingWindowEntAfter
   lazy val TimingWindowEndAfterMapping =
-    ObjectMapping(
-      tpe = TimingWindowEndAfterType,
-      fieldMappings =
-        List(
-          SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
-          SqlObject("after"),
-          SqlObject("repeat")
-        )
+    ObjectMapping(TimingWindowEndAfterType)(
+      SqlField("id", TimingWindowView.End.SyntheticId, key = true, hidden = true),
+      SqlObject("after"),
+      SqlObject("repeat")
     )
 
   // TimingWindowRepeat
   lazy val TimingWindowRepeatMapping =
-    ObjectMapping(
-      tpe = TimingWindowRepeatType,
-      fieldMappings =
-        List(
-          SqlField("id", TimingWindowView.End.Repeat.SyntheticId, key = true, hidden = true),
-          SqlObject("period"),
-          SqlField("times", TimingWindowView.End.Repeat.Times),
-        )
+    ObjectMapping(TimingWindowRepeatType)(
+      SqlField("id", TimingWindowView.End.Repeat.SyntheticId, key = true, hidden = true),
+      SqlObject("period"),
+      SqlField("times", TimingWindowView.End.Repeat.Times),
     )
+
 }
 

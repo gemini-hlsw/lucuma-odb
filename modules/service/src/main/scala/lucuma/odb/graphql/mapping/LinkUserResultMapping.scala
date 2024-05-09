@@ -12,13 +12,10 @@ import table.ProgramUserTable
 trait LinkUserResultMapping[F[_]] extends ProgramUserTable[F]  {
 
   lazy val LinkUserResultMapping =
-    ObjectMapping(
-      tpe = LinkUserResultType,
-      fieldMappings = List(
-        SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
-        SqlField("userId", ProgramUserTable.UserId, key = true, hidden = true),
-        SqlObject("user"),
-      )
+    ObjectMapping(LinkUserResultType)(
+      SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
+      SqlField("userId", ProgramUserTable.UserId, key = true, hidden = true),
+      SqlObject("user"),
     )
 
 }

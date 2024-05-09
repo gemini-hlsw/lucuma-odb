@@ -9,12 +9,9 @@
  trait RecordGmosSouthVisitResultMapping[F[_]] extends VisitTable[F] {
 
    lazy val RecordGmosSouthVisitResultMapping: ObjectMapping =
-     ObjectMapping(
-       tpe = RecordGmosSouthVisitResultType,
-       fieldMappings = List(
-         SqlField("id", VisitTable.Id, key = true, hidden = true),
-         SqlObject("visit")
-       )
-     )
+      ObjectMapping(RecordGmosSouthVisitResultType)(
+        SqlField("id", VisitTable.Id, key = true, hidden = true),
+        SqlObject("visit")
+      )
 
  }

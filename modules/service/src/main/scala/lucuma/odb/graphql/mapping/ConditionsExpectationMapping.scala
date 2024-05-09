@@ -11,13 +11,10 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 trait ConditionsExpectationMapping[F[_]] extends ChronConditionsEntryView[F] {
 
   lazy val ConditionsExpectationMapping =
-    ObjectMapping(
-      tpe = ConditionsExpectationType,
-      fieldMappings = List(
-        SqlField("synthetic-id", ChronConditionsEntryView.Intuition.Expectation.SyntheticId, key = true, hidden = true),
-        SqlField("type", ChronConditionsEntryView.Intuition.Expectation.Expectation),
-        SqlObject("timeframe"),
-      )
+    ObjectMapping(ConditionsExpectationType)(
+      SqlField("synthetic-id", ChronConditionsEntryView.Intuition.Expectation.SyntheticId, key = true, hidden = true),
+      SqlField("type", ChronConditionsEntryView.Intuition.Expectation.Expectation),
+      SqlObject("timeframe"),
     )
 
 }

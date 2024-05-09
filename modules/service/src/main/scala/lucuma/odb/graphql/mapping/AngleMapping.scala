@@ -12,7 +12,6 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.util.MappingExtras
-import org.http4s.CharsetRange.*
 
 trait AngleMapping[F[_]] extends ObservationView[F]
                             with ChronConditionsEntryView[F]

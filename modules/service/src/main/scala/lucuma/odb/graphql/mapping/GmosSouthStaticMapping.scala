@@ -9,14 +9,11 @@
  trait GmosSouthStaticMapping[F[_]] extends GmosStaticTables[F] {
 
   lazy val GmosSouthStaticMapping: ObjectMapping =
-     ObjectMapping(
-       tpe = GmosSouthStaticType,
-       fieldMappings = List(
-         SqlField("id",            GmosSouthStaticTable.Id, key = true, hidden = true),
-         SqlField("detector",      GmosSouthStaticTable.Detector),
-         SqlField("mosPreImaging", GmosSouthStaticTable.MosPreImaging),
-         SqlField("stageMode",     GmosSouthStaticTable.StageMode)
-       )
-     )
+     ObjectMapping(GmosSouthStaticType)(
+        SqlField("id",            GmosSouthStaticTable.Id, key = true, hidden = true),
+        SqlField("detector",      GmosSouthStaticTable.Detector),
+        SqlField("mosPreImaging", GmosSouthStaticTable.MosPreImaging),
+        SqlField("stageMode",     GmosSouthStaticTable.StageMode)
+      )
 
  }

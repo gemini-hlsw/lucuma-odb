@@ -28,15 +28,12 @@ trait ConstraintSetGroupMapping[F[_]]
      with Predicates[F] {
 
   lazy val ConstraintSetGroupMapping =
-    ObjectMapping(
-      tpe = ConstraintSetGroupType,
-      fieldMappings = List(
-        SqlField("key", ConstraintSetGroupView.ConstraintSetKey, key = true, hidden = true),
-        SqlObject("program", Join(ConstraintSetGroupView.ProgramId, ProgramTable.Id)),
-        // SqlObject("observations", Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
-        SqlObject("observations"),
-        SqlObject("constraintSet", Join(ConstraintSetGroupView.ObservationId, ObservationView.Id)),
-      )
+    ObjectMapping(ConstraintSetGroupType)(
+      SqlField("key", ConstraintSetGroupView.ConstraintSetKey, key = true, hidden = true),
+      SqlObject("program", Join(ConstraintSetGroupView.ProgramId, ProgramTable.Id)),
+      // SqlObject("observations", Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
+      SqlObject("observations"),
+      SqlObject("constraintSet", Join(ConstraintSetGroupView.ObservationId, ObservationView.Id)),
     )
 
   lazy val ConstraintSetGroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
