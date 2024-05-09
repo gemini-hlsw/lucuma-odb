@@ -41,22 +41,19 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
   def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   lazy val GroupMapping =
-    ObjectMapping(
-      tpe = GroupType,
-      fieldMappings = List(
-        SqlField("id", GroupView.Id, key = true),
-        SqlField("parentId", GroupView.ParentId),
-        SqlField("parentIndex", GroupView.ParentIndex),
-        SqlField("name", GroupView.Name),
-        SqlField("description", GroupView.Description),
-        SqlField("minimumRequired", GroupView.MinRequired),
-        SqlField("ordered", GroupView.Ordered),
-        SqlObject("minimumInterval"),
-        SqlObject("maximumInterval"),
-        SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
-        SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
-        EffectField("timeEstimateRange", timeEstimateHandler, List("id"))
-      )
+    ObjectMapping(GroupType)(
+      SqlField("id", GroupView.Id, key = true),
+      SqlField("parentId", GroupView.ParentId),
+      SqlField("parentIndex", GroupView.ParentIndex),
+      SqlField("name", GroupView.Name),
+      SqlField("description", GroupView.Description),
+      SqlField("minimumRequired", GroupView.MinRequired),
+      SqlField("ordered", GroupView.Ordered),
+      SqlObject("minimumInterval"),
+      SqlObject("maximumInterval"),
+      SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
+      SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
+      EffectField("timeEstimateRange", timeEstimateHandler, List("id"))
     )
 
   lazy val GroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

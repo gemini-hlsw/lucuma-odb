@@ -16,18 +16,15 @@ trait UserMapping[F[_]]
   lazy val UserType = schema.ref("User")
 
   lazy val UserMapping =
-    ObjectMapping(
-      tpe = UserType,
-      fieldMappings = List(
-        SqlField("id", UserTable.UserId, key = true),
-        SqlField("type", UserTable.UserType),
-        SqlField("serviceName", UserTable.ServiceName),
-        SqlField("orcidId", UserTable.OrcidId),
-        SqlField("orcidGivenName", UserTable.OrcidGivenName),
-        SqlField("orcidCreditName", UserTable.OrcidCreditName),
-        SqlField("orcidFamilyName", UserTable.OrcidFamilyName),
-        SqlField("orcidEmail", UserTable.OrcidEmail)
-      )
+    ObjectMapping(UserType)(
+      SqlField("id", UserTable.UserId, key = true),
+      SqlField("type", UserTable.UserType),
+      SqlField("serviceName", UserTable.ServiceName),
+      SqlField("orcidId", UserTable.OrcidId),
+      SqlField("orcidGivenName", UserTable.OrcidGivenName),
+      SqlField("orcidCreditName", UserTable.OrcidCreditName),
+      SqlField("orcidFamilyName", UserTable.OrcidFamilyName),
+      SqlField("orcidEmail", UserTable.OrcidEmail)
     )
 
 }

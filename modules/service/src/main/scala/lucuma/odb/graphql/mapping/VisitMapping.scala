@@ -39,21 +39,18 @@ trait VisitMapping[F[_]] extends VisitTable[F]
   def services: Resource[F, Services[F]]
 
   lazy val VisitMapping: ObjectMapping =
-    ObjectMapping(
-      tpe           = VisitType,
-      fieldMappings = List(
-        SqlField("id",           VisitTable.Id,         key = true),
-        SqlField("instrument",   VisitTable.Instrument, discriminator = true),
-        SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
-        SqlField("created",      VisitTable.Created),
-        EffectField("interval", intervalHandler, List("id")),
-        SqlObject("atomRecords"),
-        SqlObject("datasets"),
-        SqlObject("events"),
-        SqlObject("timeChargeInvoice"),
-        SqlObject("gmosNorth", Join(VisitTable.Id, GmosNorthStaticTable.VisitId)),
-        SqlObject("gmosSouth", Join(VisitTable.Id, GmosSouthStaticTable.VisitId))
-      )
+    ObjectMapping(VisitType)(
+      SqlField("id",           VisitTable.Id,         key = true),
+      SqlField("instrument",   VisitTable.Instrument, discriminator = true),
+      SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
+      SqlField("created",      VisitTable.Created),
+      EffectField("interval", intervalHandler, List("id")),
+      SqlObject("atomRecords"),
+      SqlObject("datasets"),
+      SqlObject("events"),
+      SqlObject("timeChargeInvoice"),
+      SqlObject("gmosNorth", Join(VisitTable.Id, GmosNorthStaticTable.VisitId)),
+      SqlObject("gmosSouth", Join(VisitTable.Id, GmosSouthStaticTable.VisitId))
     )
 
   lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

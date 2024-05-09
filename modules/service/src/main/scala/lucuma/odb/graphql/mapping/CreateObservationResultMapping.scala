@@ -12,12 +12,9 @@ import table.ObservationView
 trait CreateObservationResultMapping[F[_]] extends ObservationView[F] {
 
   lazy val CreateObservationResultMapping =
-    ObjectMapping(
-      tpe = CreateObservationResultType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlObject("observation"),
-      )
+    ObjectMapping(CreateObservationResultType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlObject("observation"),
     )
 
 }

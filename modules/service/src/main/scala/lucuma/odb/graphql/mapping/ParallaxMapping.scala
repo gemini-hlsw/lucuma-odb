@@ -16,14 +16,11 @@ import table.ProgramTable
 trait ParallaxMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ParallaxMapping =
-    ObjectMapping(
-      tpe = ParallaxType,
-      fieldMappings = List(
-        SqlField("synthetic_id", TargetView.Sidereal.Parallax.SyntheticId, key = true, hidden = true),
-        SqlField("value", TargetView.Sidereal.Parallax.Value, hidden = true),
-        FieldRef[Parallax]("value").as("microarcseconds", _.μas.value.value),
-        FieldRef[Parallax]("value").as("milliarcseconds", a => a.mas.value.toBigDecimal(MathContext.DECIMAL128)),
-      )
+    ObjectMapping(ParallaxType)(
+      SqlField("synthetic_id", TargetView.Sidereal.Parallax.SyntheticId, key = true, hidden = true),
+      SqlField("value", TargetView.Sidereal.Parallax.Value, hidden = true),
+      FieldRef[Parallax]("value").as("microarcseconds", _.μas.value.value),
+      FieldRef[Parallax]("value").as("milliarcseconds", a => a.mas.value.toBigDecimal(MathContext.DECIMAL128)),
     )
 
   }

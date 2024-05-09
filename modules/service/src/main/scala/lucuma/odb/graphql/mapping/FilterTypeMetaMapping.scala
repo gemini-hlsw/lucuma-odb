@@ -11,13 +11,10 @@ import lucuma.odb.graphql.table.FilterTypeTable
 trait FilterTypeMetaMapping[F[_]] extends FilterTypeTable[F] {
 
   lazy val FilterTypeMetaMapping =
-    ObjectMapping(
-      tpe = FilterTypeMetaType,
-      fieldMappings = List(
-        SqlField("tag", FilterTypeTable.Tag, key = true),
-        SqlField("shortName", FilterTypeTable.ShortName),
-        SqlField("longName", FilterTypeTable.LongName),
-      )
+    ObjectMapping(FilterTypeMetaType)(
+      SqlField("tag", FilterTypeTable.Tag, key = true),
+      SqlField("shortName", FilterTypeTable.ShortName),
+      SqlField("longName", FilterTypeTable.LongName),
     )
 
 }

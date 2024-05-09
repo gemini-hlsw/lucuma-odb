@@ -14,16 +14,13 @@ import table.ProgramTable
 trait RadialVelocityMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val RadialVelocityMapping =
-    ObjectMapping(
-      tpe = RadialVelocityType,
-      fieldMappings = List(
-        SqlField("synthetic_id", TargetView.Sidereal.RadialVelocity.SyntheticId, key = true, hidden = true),
-        SqlField("value", TargetView.Sidereal.RadialVelocity.Value, hidden = true),
-        FieldRef[RadialVelocity]("value").as("metersPerSecond", _.rv.value),
-        FieldRef[RadialVelocity]("value").as("kilometersPerSecond", _.rv.value / BigDecimal(1000)),
-        FieldRef[RadialVelocity]("value").as("centimetersPerSecond", v => (v.rv.value * BigDecimal(100)).toLong),
-      )
+    ObjectMapping(RadialVelocityType)(
+      SqlField("synthetic_id", TargetView.Sidereal.RadialVelocity.SyntheticId, key = true, hidden = true),
+      SqlField("value", TargetView.Sidereal.RadialVelocity.Value, hidden = true),
+      FieldRef[RadialVelocity]("value").as("metersPerSecond", _.rv.value),
+      FieldRef[RadialVelocity]("value").as("kilometersPerSecond", _.rv.value / BigDecimal(1000)),
+      FieldRef[RadialVelocity]("value").as("centimetersPerSecond", v => (v.rv.value * BigDecimal(100)).toLong),
     )
 
-  }
+}
 

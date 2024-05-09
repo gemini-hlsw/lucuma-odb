@@ -12,13 +12,10 @@ import table.AllocationTable
 trait AllocationMapping[F[_]] extends AllocationTable[F]  {
 
   lazy val AllocationMapping =
-    ObjectMapping(
-      tpe = AllocationType,
-      fieldMappings = List(
-        SqlField("programId", AllocationTable.ProgramId, key = true, hidden = true),
-        SqlField("partner", AllocationTable.Partner, key = true),
-        SqlObject("duration"),
-      )
+    ObjectMapping(AllocationType)(
+      SqlField("programId", AllocationTable.ProgramId, key = true, hidden = true),
+      SqlField("partner", AllocationTable.Partner, key = true),
+      SqlObject("duration"),
     )
 
 }

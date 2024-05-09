@@ -9,12 +9,9 @@ import table.ExecutionEventTable
 trait AddDatasetEventResultMapping[F[_]] extends ExecutionEventTable[F] {
 
   lazy val AddDatasetEventResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = AddDatasetEventResultType,
-      fieldMappings = List(
-        SqlField("id", ExecutionEventTable.Id, key = true, hidden = true),
-        SqlObject("event")
-      )
+    ObjectMapping(AddDatasetEventResultType)(
+      SqlField("id", ExecutionEventTable.Id, key = true, hidden = true),
+      SqlObject("event")
     )
 
 }

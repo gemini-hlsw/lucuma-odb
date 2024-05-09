@@ -9,11 +9,9 @@ import table.ExecutionEventTable
 trait AddStepEventResultMapping[F[_]] extends ExecutionEventTable[F] {
 
   lazy val AddStepEventResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = AddStepEventResultType,
-      fieldMappings = List(
-        SqlField("id", ExecutionEventTable.Id, key = true, hidden = true),
-        SqlObject("event")
-      )
+    ObjectMapping(AddStepEventResultType)(
+      SqlField("id", ExecutionEventTable.Id, key = true, hidden = true),
+      SqlObject("event")
     )
+    
 }

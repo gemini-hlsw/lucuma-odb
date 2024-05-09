@@ -70,14 +70,11 @@ trait ProgramReferenceMapping[F[_]]
     }
 
   private def semesterInstrumentReferenceMapping(tpe: NamedType): ObjectMapping =
-    ObjectMapping(
-      tpe = tpe,
-      fieldMappings = List(
-        SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
-        SqlField("instrument",    ProgramReferenceView.Instrument),
-        SqlField("semester",      ProgramReferenceView.Semester),
-        SqlField("semesterIndex", ProgramReferenceView.SemesterIndex)
-      )
+    ObjectMapping(TypeMatch(tpe))(
+      SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
+      SqlField("instrument",    ProgramReferenceView.Instrument),
+      SqlField("semester",      ProgramReferenceView.Semester),
+      SqlField("semesterIndex", ProgramReferenceView.SemesterIndex)
     )
 
   lazy val CalibrationProgramReferenceMapping: ObjectMapping =
@@ -90,35 +87,27 @@ trait ProgramReferenceMapping[F[_]]
     semesterInstrumentReferenceMapping(EngineeringProgramReferenceType)
 
   lazy val ExampleProgramReferenceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ExampleProgramReferenceType,
-      fieldMappings = List(
-        SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
-        SqlField("instrument",    ProgramReferenceView.Instrument)
-      )
+    ObjectMapping(ExampleProgramReferenceType)(
+      SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
+      SqlField("instrument",    ProgramReferenceView.Instrument)
     )
 
   lazy val LibraryProgramReferenceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = LibraryProgramReferenceType,
-      fieldMappings = List(
-        SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
-        SqlField("description",   ProgramReferenceView.LibraryDesciption),
-        SqlField("instrument",    ProgramReferenceView.Instrument)
-      )
+    ObjectMapping(LibraryProgramReferenceType)(
+      SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
+      SqlField("description",   ProgramReferenceView.LibraryDesciption),
+      SqlField("instrument",    ProgramReferenceView.Instrument)
     )
 
   lazy val MonitoringProgramReferenceMapping: ObjectMapping =
     semesterInstrumentReferenceMapping(MonitoringProgramReferenceType)
 
   lazy val ScienceProgramReferenceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ScienceProgramReferenceType,
-      fieldMappings = List(
-        SqlField("id",             ProgramReferenceView.Id, key = true, hidden = true),
-        SqlField("scienceSubtype", ProgramReferenceView.ScienceSubtype),
-        SqlField("semester",       ProgramReferenceView.Semester),
-        SqlField("semesterIndex",  ProgramReferenceView.SemesterIndex)
-      )
+    ObjectMapping(ScienceProgramReferenceType)(
+      SqlField("id",             ProgramReferenceView.Id, key = true, hidden = true),
+      SqlField("scienceSubtype", ProgramReferenceView.ScienceSubtype),
+      SqlField("semester",       ProgramReferenceView.Semester),
+      SqlField("semesterIndex",  ProgramReferenceView.SemesterIndex)
     )
+
 }

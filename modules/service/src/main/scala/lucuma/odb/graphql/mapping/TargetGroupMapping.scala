@@ -25,14 +25,11 @@ trait TargetGroupMapping[F[_]]
      with Predicates[F] {
 
   lazy val TargetGroupMapping =
-    ObjectMapping(
-      tpe = TargetGroupType,
-      fieldMappings = List(
-        SqlField("key", TargetView.TargetId, key = true, hidden = true),
-        SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
-        SqlObject("observations"),
-        SqlObject("target"),
-      )
+    ObjectMapping(TargetGroupType)(
+      SqlField("key", TargetView.TargetId, key = true, hidden = true),
+      SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
+      SqlObject("observations"),
+      SqlObject("target"),
     )
 
   lazy val TargetGroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

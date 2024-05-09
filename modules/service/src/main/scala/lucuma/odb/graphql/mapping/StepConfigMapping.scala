@@ -21,7 +21,7 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
 
   lazy val StepConfigMapping: ObjectMapping =
     SqlInterfaceMapping(
-      predicate     = PathMatch(StepRecordType / "stepConfig", StepConfigType),
+      predicate     = PathMatch(StepRecordType / "stepConfig" % StepConfigType),
       discriminator = stepConfigDiscriminator
     )(
       SqlField("id",       StepRecordView.Id,       key = true, hidden = true),
@@ -56,12 +56,12 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
     }
 
   lazy val StepConfigBiasMapping: ObjectMapping =
-    ObjectMapping(PathMatch(StepRecordType / "stepConfig", BiasType))(
+    ObjectMapping(PathMatch(StepRecordType / "stepConfig" % BiasType))(
       SqlField("id", StepRecordView.Id, key = true, hidden = true)
     )
 
   lazy val StepConfigDarkMapping: ObjectMapping =
-    ObjectMapping(PathMatch(StepRecordType / "stepConfig", DarkType))(
+    ObjectMapping(PathMatch(StepRecordType / "stepConfig" % DarkType))(
       SqlField("id", StepRecordView.Id, key = true, hidden = true)
     )
 
@@ -69,7 +69,7 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
     def arc(c: Cursor, n: String, a: GcalArc): Result[Option[GcalArc]] =
       c.fieldAs[Boolean](n).map(b => Option.when(b)(a))
 
-    ObjectMapping(PathMatch(StepRecordType / "stepConfig", GcalType))(
+    ObjectMapping(PathMatch(StepRecordType / "stepConfig" % GcalType))(
       SqlField("id", StepRecordView.Id, key = true, hidden = true),
       SqlField("continuum", StepRecordView.Gcal.Continuum),
       SqlField("arArc",     StepRecordView.Gcal.ArArc,   hidden = true),
@@ -94,14 +94,14 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
   }
 
   lazy val StepConfigScienceMapping: ObjectMapping =
-    ObjectMapping(PathMatch(StepRecordType / "stepConfig", ScienceType))(
+    ObjectMapping(PathMatch(StepRecordType / "stepConfig" % ScienceType))(
       SqlField("synthetic_id", StepRecordView.Id, key = true, hidden = true),
       SqlObject("offset"),
       SqlField("guiding", StepRecordView.Science.GuideState)
     )
 
   lazy val StepConfigSmartGcalMapping: ObjectMapping =
-    ObjectMapping(PathMatch(StepRecordType / "stepConfig", SmartGcalType))(
+    ObjectMapping(PathMatch(StepRecordType / "stepConfig" % SmartGcalType))(
       SqlField("id", StepRecordView.Id, key = true, hidden = true),
       SqlField("smartGcalType", StepRecordView.SmartGcal.Type)
     )

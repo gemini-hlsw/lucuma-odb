@@ -76,42 +76,30 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
     }
 
   lazy val SequenceEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = SequenceEventType,
-      fieldMappings = List(
-        SqlField("id",      ExecutionEventTable.Id, key = true),
-        SqlField("command", ExecutionEventTable.SequenceCommand)
-      )
+    ObjectMapping(SequenceEventType)(
+      SqlField("id",      ExecutionEventTable.Id, key = true),
+      SqlField("command", ExecutionEventTable.SequenceCommand)
     )
 
   lazy val SlewEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = SlewEventType,
-      fieldMappings = List(
-        SqlField("id",        ExecutionEventTable.Id, key = true),
-        SqlField("slewStage", ExecutionEventTable.SlewStage)
-      )
+    ObjectMapping(SlewEventType)(
+      SqlField("id",        ExecutionEventTable.Id, key = true),
+      SqlField("slewStage", ExecutionEventTable.SlewStage)
     )
 
   lazy val StepEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = StepEventType,
-      fieldMappings = List(
-        SqlField("id",        ExecutionEventTable.Id, key = true),
-        SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
-        SqlField("stepStage", ExecutionEventTable.StepStage)
-      )
+    ObjectMapping(StepEventType)(
+      SqlField("id",        ExecutionEventTable.Id, key = true),
+      SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
+      SqlField("stepStage", ExecutionEventTable.StepStage)
     )
 
   lazy val DatasetEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = DatasetEventType,
-      fieldMappings = List(
-        SqlField("id",           ExecutionEventTable.Id, key = true),
-        SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
-        SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
-        SqlField("datasetStage", ExecutionEventTable.DatasetStage)
-      )
+    ObjectMapping(DatasetEventType)(
+      SqlField("id",           ExecutionEventTable.Id, key = true),
+      SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
+      SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
+      SqlField("datasetStage", ExecutionEventTable.DatasetStage)
     )
 
 }

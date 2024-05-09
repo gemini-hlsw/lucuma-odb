@@ -21,15 +21,12 @@ trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
                                         with TimeChargeDiscountTable[F] {
 
   lazy val TimeChargeInvoiceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TimeChargeInvoiceType,
-      fieldMappings = List(
-        SqlField("id", VisitTable.Id, key = true, hidden = true),
-        SqlObject("executionTime"),
-        SqlObject("discounts",     Join(VisitTable.Id, TimeChargeDiscountTable.VisitId)),
-        SqlObject("corrections",   Join(VisitTable.Id, TimeChargeCorrectionTable.VisitId)),
-        SqlObject("finalCharge")
-      )
+    ObjectMapping(TimeChargeInvoiceType)(
+      SqlField("id", VisitTable.Id, key = true, hidden = true),
+      SqlObject("executionTime"),
+      SqlObject("discounts",     Join(VisitTable.Id, TimeChargeDiscountTable.VisitId)),
+      SqlObject("corrections",   Join(VisitTable.Id, TimeChargeCorrectionTable.VisitId)),
+      SqlObject("finalCharge")
     )
 
   lazy val TimeChargeInvoiceElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

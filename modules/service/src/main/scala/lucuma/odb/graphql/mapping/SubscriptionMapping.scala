@@ -47,7 +47,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     )
 
   lazy val SubscriptionMapping =
-    ObjectMapping(tpe = SubscriptionType, fieldMappings = subscriptionFields.map(_.FieldMapping))
+    ObjectMapping(SubscriptionType)(subscriptionFields.map(_.FieldMapping)*)
 
   lazy val SubscriptionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     subscriptionFields.foldMap(_.elaborator)

@@ -11,16 +11,14 @@ trait TimeChargeCorrectionMapping[F[_]] extends UserTable[F]
                                         with TimeChargeCorrectionTable[F] {
 
   lazy val TimeChargeCorrectionMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TimeChargeCorrectionType,
-      fieldMappings = List(
-        SqlField("id", TimeChargeCorrectionTable.Id, key = true, hidden = true),
-        SqlField("created",     TimeChargeCorrectionTable.Created),
-        SqlField("chargeClass", TimeChargeCorrectionTable.ChargeClass),
-        SqlField("op",          TimeChargeCorrectionTable.Op),
-        SqlObject("amount"),
-        SqlObject("user",       Join(TimeChargeCorrectionTable.UserId, UserTable.UserId)),
-        SqlField("comment",     TimeChargeCorrectionTable.Comment)
-      )
+    ObjectMapping(TimeChargeCorrectionType)(
+      SqlField("id", TimeChargeCorrectionTable.Id, key = true, hidden = true),
+      SqlField("created",     TimeChargeCorrectionTable.Created),
+      SqlField("chargeClass", TimeChargeCorrectionTable.ChargeClass),
+      SqlField("op",          TimeChargeCorrectionTable.Op),
+      SqlObject("amount"),
+      SqlObject("user",       Join(TimeChargeCorrectionTable.UserId, UserTable.UserId)),
+      SqlField("comment",     TimeChargeCorrectionTable.Comment)
     )
+    
 }
