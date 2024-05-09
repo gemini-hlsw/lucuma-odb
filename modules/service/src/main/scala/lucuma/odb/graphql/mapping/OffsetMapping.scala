@@ -16,7 +16,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
     idColumn:    ColumnRef,
     valueColumn: ColumnRef
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField("synthetic_id", idColumn, key = true, hidden = true),
       SqlField("value", valueColumn, hidden = true),
       FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
@@ -43,7 +43,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
     path: Path,
     idColumn: ColumnRef
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField("id", idColumn, key = true, hidden = true),
       SqlObject("p"),
       SqlObject("q")

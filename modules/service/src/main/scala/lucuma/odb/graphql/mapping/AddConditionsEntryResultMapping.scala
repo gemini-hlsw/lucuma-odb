@@ -10,7 +10,7 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 trait AddConditionsEntryResultMapping[F[_]] extends ChronConditionsEntryView[F] {
 
   lazy val AddConditionsEntryResultMapping: ObjectMapping =
-    ObjectMapping(TypeMatch(AddConditionsEntryResultType))(
+    ObjectMapping(AddConditionsEntryResultType)(
       SqlField("id", ChronConditionsEntryView.ChronId, key = true, hidden = true),
       SqlObject("conditionsEntry"),
     )

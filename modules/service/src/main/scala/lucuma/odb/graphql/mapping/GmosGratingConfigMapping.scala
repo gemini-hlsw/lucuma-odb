@@ -14,7 +14,7 @@ trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
     path: Path,
     table:   GmosDynamicTable[G, L, U]
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField("synthetic_id", table.Grating.SyntheticId, key = true, hidden = true),
       SqlField("grating",      table.Grating.Disperser),
       SqlField("order",        table.Grating.Order),

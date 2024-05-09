@@ -31,7 +31,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
     valueColumn: ColumnRef,
     idColumns: ColumnRef*
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       (idColumns.toList.zipWithIndex.map { (ref, idx) =>
         SqlField(s"synthetic_id$idx", ref, key = true, hidden = true)
       }) ++ List(

@@ -37,7 +37,7 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
     partner:    ColumnRef,
     program:    ColumnRef
   ): ObjectMapping =
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField(s"key", key, key = true, hidden = true),
 
       SqlObject("nonCharged"),

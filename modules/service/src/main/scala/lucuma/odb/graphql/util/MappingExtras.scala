@@ -19,7 +19,6 @@ import io.circe.Json
 import scala.reflect.ClassTag
 
 trait MappingExtras[F[_]] extends CirceMappingLike[F] {
-  export MappingPredicate.*
 
   given Order[NonNegShort] = Order.by(_.value) // y u not exist already
 

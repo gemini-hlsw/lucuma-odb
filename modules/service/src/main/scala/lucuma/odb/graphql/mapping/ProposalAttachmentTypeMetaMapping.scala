@@ -11,7 +11,7 @@ import lucuma.odb.graphql.table.ProposalAttachmentTypeTable
 trait ProposalAttachmentTypeMetaMapping[F[_]] extends ProposalAttachmentTypeTable[F] {
 
   lazy val ProposalAttachmentTypeMetaMapping =
-    ObjectMapping(TypeMatch(ProposalAttachmentTypeMetaType))(
+    ObjectMapping(ProposalAttachmentTypeMetaType)(
       SqlField("tag", ProposalAttachmentTypeTable.Tag, key = true),
       SqlField("shortName", ProposalAttachmentTypeTable.ShortName),
       SqlField("longName", ProposalAttachmentTypeTable.LongName)

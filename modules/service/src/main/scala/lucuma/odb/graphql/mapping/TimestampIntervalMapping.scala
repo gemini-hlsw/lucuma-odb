@@ -18,7 +18,7 @@ trait TimestampIntervalMapping[F[_]] extends CallForProposalsView[F] {
     idColumn: ColumnRef
   ): ObjectMapping =
     val value = FieldRef[TimestampInterval]("value")
-    ObjectMapping(PathMatch(path))(
+    ObjectMapping(path)(
       SqlField(s"synthetic_id", idColumn, key = true, hidden = true),
       SqlField("value", valueColumn, hidden = true),
       value.as("start", _.start),

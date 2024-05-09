@@ -11,7 +11,7 @@ import table.ProposalAttachmentTable
 trait ProposalAttachmentMapping[F[_]] extends ProposalAttachmentTable[F] with ProgramTable[F] {
 
   lazy val ProposalAttachmentMapping =
-    ObjectMapping(TypeMatch(ProposalAttachmentType))(
+    ObjectMapping(ProposalAttachmentType)(
       SqlField("program_id", ProposalAttachmentTable.ProgramId, key = true, hidden = true),
       SqlField("attachmentType", ProposalAttachmentTable.AttachmentType, key = true),
       SqlField("fileName", ProposalAttachmentTable.FileName),

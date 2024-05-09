@@ -70,7 +70,7 @@ trait ProgramReferenceMapping[F[_]]
     }
 
   private def semesterInstrumentReferenceMapping(tpe: NamedType): ObjectMapping =
-    ObjectMapping(TypeMatch(tpe))(
+    ObjectMapping(tpe)(
       SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
       SqlField("instrument",    ProgramReferenceView.Instrument),
       SqlField("semester",      ProgramReferenceView.Semester),
