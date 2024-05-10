@@ -13,12 +13,9 @@ trait RecordGmosStepResultMapping[F[_]] extends StepRecordView[F] {
   private def recordStepResultMapping(
     typeRef: TypeRef
   ): ObjectMapping =
-    ObjectMapping(
-      tpe = typeRef,
-      fieldMappings = List(
-        SqlField("id", StepRecordView.Id, key = true),
-        SqlObject("stepRecord")
-      )
+    ObjectMapping(typeRef)(
+      SqlField("id", StepRecordView.Id, key = true, hidden = true),
+      SqlObject("stepRecord")
     )
 
   lazy val RecordGmosNorthStepResultMapping: ObjectMapping =

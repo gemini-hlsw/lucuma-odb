@@ -138,7 +138,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   lazy val MutationMapping: ObjectMapping =
-    ObjectMapping(tpe = MutationType, fieldMappings = mutationFields.map(_.FieldMapping))
+    ObjectMapping(MutationType)(mutationFields.map(_.FieldMapping)*)
 
   lazy val MutationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     mutationFields.foldMap(_.elaborator)

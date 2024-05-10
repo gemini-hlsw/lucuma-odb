@@ -11,17 +11,14 @@ trait ProposalReferenceMapping[F[_]]
      with ProposalReferenceView[F] {
 
   lazy val ProposalReferenceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ProposalReferenceType,
-      fieldMappings = List(
-        SqlField("id",            ProposalReferenceView.Id, key = true, hidden = true),
-        SqlField("label",         ProposalReferenceView.ProposalReference),
-        SqlField("semester",      ProposalReferenceView.Semester),
-        SqlField("semesterIndex", ProposalReferenceView.SemesterIndex),
+    ObjectMapping(ProposalReferenceType)(
+      SqlField("id",            ProposalReferenceView.Id, key = true, hidden = true),
+      SqlField("label",         ProposalReferenceView.ProposalReference),
+      SqlField("semester",      ProposalReferenceView.Semester),
+      SqlField("semesterIndex", ProposalReferenceView.SemesterIndex),
 
-        // Used for WHERE clause matching
-        SqlField("labelString",   ProposalReferenceView.ProposalReferenceString, hidden = true)
-      )
+      // Used for WHERE clause matching
+      SqlField("labelString",   ProposalReferenceView.ProposalReferenceString, hidden = true)
     )
-
+    
 }

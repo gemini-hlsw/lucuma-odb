@@ -47,31 +47,28 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   def services: Resource[F, Services[F]]
 
   lazy val QueryMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = QueryType,
-      fieldMappings = List(
-        SqlObject("asterismGroup"),
-        SqlObject("callForProposals"),
-        SqlObject("callsForProposals"),
-        SqlObject("constraintSetGroup"),
-        SqlObject("dataset"),
-        SqlObject("datasets"),
-        SqlObject("events"),
-        SqlObject("filterTypeMeta"),
-        SqlObject("group"),
-        SqlObject("obsAttachmentTypeMeta"),
-        SqlObject("observation"),
-        SqlObject("observations"),
-        SqlObject("partnerMeta"),
-        SqlObject("program"),
-        SqlObject("programs"),
-        SqlObject("proposalAttachmentTypeMeta"),
-        SqlObject("proposalStatusMeta"),
-        SqlObject("spectroscopyConfigOptions"),
-        SqlObject("target"),
-        SqlObject("targetGroup"),
-        SqlObject("targets"),
-      )
+    ObjectMapping(QueryType)(
+      SqlObject("asterismGroup"),
+      SqlObject("callForProposals"),
+      SqlObject("callsForProposals"),
+      SqlObject("constraintSetGroup"),
+      SqlObject("dataset"),
+      SqlObject("datasets"),
+      SqlObject("events"),
+      SqlObject("filterTypeMeta"),
+      SqlObject("group"),
+      SqlObject("obsAttachmentTypeMeta"),
+      SqlObject("observation"),
+      SqlObject("observations"),
+      SqlObject("partnerMeta"),
+      SqlObject("program"),
+      SqlObject("programs"),
+      SqlObject("proposalAttachmentTypeMeta"),
+      SqlObject("proposalStatusMeta"),
+      SqlObject("spectroscopyConfigOptions"),
+      SqlObject("target"),
+      SqlObject("targetGroup"),
+      SqlObject("targets"),
     )
 
   lazy val QueryElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

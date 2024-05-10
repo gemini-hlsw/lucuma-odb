@@ -13,18 +13,15 @@ import table.ProgramTable
 trait TargetMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val TargetMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TargetType,
-      fieldMappings = List(
-        SqlField("id", TargetView.TargetId, key = true),
-        SqlField("existence", TargetView.Existence),
-        SqlField("name", TargetView.Name),
-        SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
-        SqlJson("sourceProfile", TargetView.SourceProfile),
-        SqlField("role", TargetView.Role, hidden = true),
-        SqlObject("sidereal"),
-        SqlObject("nonsidereal")
-      )
+    ObjectMapping(TargetType)(
+      SqlField("id", TargetView.TargetId, key = true),
+      SqlField("existence", TargetView.Existence),
+      SqlField("name", TargetView.Name),
+      SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
+      SqlJson("sourceProfile", TargetView.SourceProfile),
+      SqlField("role", TargetView.Role, hidden = true),
+      SqlObject("sidereal"),
+      SqlObject("nonsidereal")
     )
 
 }

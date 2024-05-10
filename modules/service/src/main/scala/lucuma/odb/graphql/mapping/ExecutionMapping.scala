@@ -55,19 +55,16 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
   lazy val ExecutionMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ExecutionType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlField("programId", ObservationView.ProgramId, hidden = true),
-        EffectField("digest", digestHandler, List("id", "programId")),
-        EffectField("config", configHandler, List("id", "programId")),
-        SqlObject("atomRecords"),
-        SqlObject("datasets"),
-        SqlObject("events"),
-        SqlObject("visits"),
-        EffectField("timeCharge", timeChargeHandler, List("id", "programId"))
-      )
+    ObjectMapping(ExecutionType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlField("programId", ObservationView.ProgramId, hidden = true),
+      EffectField("digest", digestHandler, List("id", "programId")),
+      EffectField("config", configHandler, List("id", "programId")),
+      SqlObject("atomRecords"),
+      SqlObject("datasets"),
+      SqlObject("events"),
+      SqlObject("visits"),
+      EffectField("timeCharge", timeChargeHandler, List("id", "programId"))
     )
 
   lazy val ExecutionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

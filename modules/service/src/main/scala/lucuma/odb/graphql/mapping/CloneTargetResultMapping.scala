@@ -9,13 +9,10 @@ import lucuma.odb.graphql.table.TargetView
 trait CloneTargetResultMapping[F[_]] extends ResultMapping[F] with TargetView[F] with TargetPairsView[F] {
 
   lazy val CloneTargetResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = CloneTargetResultType ,
-      fieldMappings = List(
-        SqlField("synthetic-id", TargetPairsView.Left, key = true, hidden = true),
-        SqlObject("originalTarget", Join(TargetPairsView.Left, TargetView.TargetId)),
-        SqlObject("newTarget", Join(TargetPairsView.Right, TargetView.TargetId)),
-      )
+    ObjectMapping(CloneTargetResultType)(
+      SqlField("synthetic-id", TargetPairsView.Left, key = true, hidden = true),
+      SqlObject("originalTarget", Join(TargetPairsView.Left, TargetView.TargetId)),
+      SqlObject("newTarget", Join(TargetPairsView.Right, TargetView.TargetId)),
     )
 
 }

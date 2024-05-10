@@ -473,6 +473,9 @@ trait Codecs {
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
 
+  val varchar_nonempty: Codec[NonEmptyString] =
+    varchar.eimap(NonEmptyString.from)(_.value)
+
   val time_charge_correction_op: Codec[TimeChargeCorrection.Op] =
     enumerated(Type("e_time_charge_correction_op"))
 

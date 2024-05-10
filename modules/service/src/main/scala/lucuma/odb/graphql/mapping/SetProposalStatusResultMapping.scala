@@ -10,11 +10,9 @@ import lucuma.odb.graphql.table.ProgramTable
 trait SetProposalStatusResultMapping[F[_]] extends ProgramTable[F] {
   
   lazy val SetProposalStatusResultMapping =
-    ObjectMapping(
-      tpe = SetProposalStatusResultType,
-      fieldMappings = List (
-        SqlField("programId", ProgramTable.Id, key = true, hidden = true),
-        SqlObject("program")
-      )
+    ObjectMapping(SetProposalStatusResultType)(
+      SqlField("programId", ProgramTable.Id, key = true, hidden = true),
+      SqlObject("program")
     )
+
 }

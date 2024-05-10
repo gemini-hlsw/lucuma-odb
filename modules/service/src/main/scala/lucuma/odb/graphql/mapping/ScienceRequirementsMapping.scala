@@ -12,12 +12,10 @@ trait ScienceRequirementsMapping[F[_]] extends ObservationView[F] {
   import ObservationView.ScienceRequirements
 
   lazy val ScienceRequirementsMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ScienceRequirementsType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlField("mode", ScienceRequirements.Mode),
-        SqlObject("spectroscopy")
-      )
+    ObjectMapping(ScienceRequirementsType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlField("mode", ScienceRequirements.Mode),
+      SqlObject("spectroscopy")
     )
+
 }

@@ -12,16 +12,13 @@ import lucuma.odb.graphql.table.UserTable
 trait ConditionsEntryMapping[F[_]] extends ChronConditionsEntryView[F] with UserTable[F]  {
 
   lazy val ConditionsEntryMapping =
-    ObjectMapping(
-      tpe = ConditionsEntryType,
-      fieldMappings = List(
-        SqlField("id", ChronConditionsEntryView.ChronId, key = true),
-        SqlField("transactionId", ChronConditionsEntryView.TransationId),
-        SqlField("timestamp", ChronConditionsEntryView.Timestamp),
-        SqlObject("user", Join(ChronConditionsEntryView.UserId, UserTable.UserId)),
-        SqlObject("measurement"),
-        SqlObject("intuition"),
-      )
+    ObjectMapping(ConditionsEntryType)(
+      SqlField("id", ChronConditionsEntryView.ChronId, key = true),
+      SqlField("transactionId", ChronConditionsEntryView.TransationId),
+      SqlField("timestamp", ChronConditionsEntryView.Timestamp),
+      SqlObject("user", Join(ChronConditionsEntryView.UserId, UserTable.UserId)),
+      SqlObject("measurement"),
+      SqlObject("intuition"),
     )
 
 }

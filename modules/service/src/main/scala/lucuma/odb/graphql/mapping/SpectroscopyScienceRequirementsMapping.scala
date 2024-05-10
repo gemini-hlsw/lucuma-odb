@@ -13,19 +13,16 @@ trait SpectroscopyScienceRequirementsMapping[F[_]] extends ObservationView[F] {
   import ObservationView.ScienceRequirements.Spectroscopy
 
   lazy val SpectroscopyScienceRequirementsMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = SpectroscopyScienceRequirementsType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlObject("wavelength"),
-        SqlField("resolution",           Spectroscopy.Resolution),
-        SqlField("signalToNoise",        Spectroscopy.SignalToNoise),
-        SqlObject("signalToNoiseAt"),
-        SqlObject("wavelengthCoverage"),
-        SqlField("focalPlane",           Spectroscopy.FocalPlane),
-        SqlObject("focalPlaneAngle"),
-        SqlField("capability",           Spectroscopy.Capability)
-      )
+    ObjectMapping(SpectroscopyScienceRequirementsType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlObject("wavelength"),
+      SqlField("resolution",           Spectroscopy.Resolution),
+      SqlField("signalToNoise",        Spectroscopy.SignalToNoise),
+      SqlObject("signalToNoiseAt"),
+      SqlObject("wavelengthCoverage"),
+      SqlField("focalPlane",           Spectroscopy.FocalPlane),
+      SqlObject("focalPlaneAngle"),
+      SqlField("capability",           Spectroscopy.Capability)
     )
 
 }

@@ -12,11 +12,9 @@ import table.ProposalTable
 trait CreateProposalResultMapping[F[_]] extends ProposalTable[F] {
 
   lazy val CreateProposalResultMapping = 
-    ObjectMapping(
-      tpe = CreateProposalResultType,
-      fieldMappings = List(
-        SqlField("programId", ProposalTable.ProgramId, key = true),
-        SqlObject("proposal")
-      )
+    ObjectMapping(CreateProposalResultType)(
+      SqlField("programId", ProposalTable.ProgramId, key = true, hidden = true),
+      SqlObject("proposal")
     )
+
 }

@@ -12,13 +12,10 @@ import table.ObservationView
 trait CoordinatesMapping[F[_]] extends ObservationView[F] {
 
   lazy val CoordinatesMapping =
-    ObjectMapping(
-      tpe = CoordinatesType,
-      fieldMappings = List(
-        SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
-        SqlObject("ra"),
-        SqlObject("dec")
-      )
+    ObjectMapping(CoordinatesType)(
+      SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
+      SqlObject("ra"),
+      SqlObject("dec")
     )
 
 }

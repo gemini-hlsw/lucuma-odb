@@ -4,29 +4,28 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
 import table.GmosDynamicTables
 
 trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
 
-  private def customMaskMapping[G, L, U](
+  private def customMaskMappingAtPath[G, L, U](
+    path: Path,
     table: GmosDynamicTable[G, L, U]
   ): ObjectMapping =
-    ObjectMapping(
-      tpe = GmosCustomMaskType,
-      fieldMappings = List(
-        SqlField("synthetic_id", table.Fpu.CustomMask.SyntheticId, key = true, hidden = true),
-        SqlField("filename",     table.Fpu.CustomMask.Filename,  hidden = true),
-        SqlField("slitWidth",    table.Fpu.CustomMask.SlitWidth, hidden = true)
-      )
+    ObjectMapping(path)(
+      SqlField("synthetic_id", table.Fpu.CustomMask.SyntheticId, key = true, hidden = true),
+      SqlField("filename",     table.Fpu.CustomMask.Filename,  hidden = true),
+      SqlField("slitWidth",    table.Fpu.CustomMask.SlitWidth, hidden = true)
     )
 
-  lazy val GmosCustomMaskMapping: TypeMapping =
-    SwitchMapping(
-      GmosCustomMaskType,
-      List(
-        StepRecordType / "gmosNorth" / "fpu" / "customMask" -> customMaskMapping(GmosNorthDynamicTable),
-        StepRecordType / "gmosSouth" / "fpu" / "customMask" -> customMaskMapping(GmosSouthDynamicTable)
-      )
+  lazy val GmosCustomMaskMapping: List[TypeMapping] =
+    List(
+      customMaskMappingAtPath(StepRecordType / "gmosNorth" / "fpu" / "customMask", GmosNorthDynamicTable),
+      customMaskMappingAtPath(StepRecordType / "gmosSouth" / "fpu" / "customMask", GmosSouthDynamicTable),
+      customMaskMappingAtPath(GmosNorthStepType / "instrumentConfig" / "fpu" / "customMask", GmosNorthDynamicTable),
+      customMaskMappingAtPath(GmosSouthStepType / "instrumentConfig" / "fpu" / "customMask", GmosSouthDynamicTable)
     )
 
 }

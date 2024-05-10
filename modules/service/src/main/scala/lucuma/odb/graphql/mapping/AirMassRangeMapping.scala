@@ -12,13 +12,10 @@ import table.ObservationView
 trait AirMassRangeMapping[F[_]] extends ObservationView[F] {
 
   lazy val AirMassRangeMapping =
-    ObjectMapping(
-      tpe = AirMassRangeType,
-      fieldMappings = List(
-        SqlField("synthetic_id", ObservationView.ConstraintSet.ElevationRange.AirMassRange.SyntheticId, key = true, hidden = true),
-        SqlField("min", ObservationView.ConstraintSet.ElevationRange.AirMassRange.AirMassMin),
-        SqlField("max", ObservationView.ConstraintSet.ElevationRange.AirMassRange.AirMassMax)
-      )
+    ObjectMapping(AirMassRangeType)(
+      SqlField("synthetic_id", ObservationView.ConstraintSet.ElevationRange.AirMassRange.SyntheticId, key = true, hidden = true),
+      SqlField("min", ObservationView.ConstraintSet.ElevationRange.AirMassRange.AirMassMin),
+      SqlField("max", ObservationView.ConstraintSet.ElevationRange.AirMassRange.AirMassMax)
     )
 
 }

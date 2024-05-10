@@ -13,15 +13,12 @@ import table.ProgramTable
 trait NonsiderealMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val NonsiderealMapping =
-    ObjectMapping(
-      tpe = NonsiderealType,
-      fieldMappings = List(
-        SqlField("synthetic_id", TargetView.Nonsidereal.SyntheticId, key = true, hidden = true),
-        SqlField("des", TargetView.Nonsidereal.Des),
-        SqlField("keyType", TargetView.Nonsidereal.KeyType),
-        SqlField("key", TargetView.Nonsidereal.Key),
-      )
+    ObjectMapping(NonsiderealType)(
+      SqlField("synthetic_id", TargetView.Nonsidereal.SyntheticId, key = true, hidden = true),
+      SqlField("des", TargetView.Nonsidereal.Des),
+      SqlField("keyType", TargetView.Nonsidereal.KeyType),
+      SqlField("key", TargetView.Nonsidereal.Key),
     )
 
-  }
+}
 

@@ -11,7 +11,6 @@ import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
-import grackle.TypeRef
 
 import table.AtomRecordTable
 import table.DatasetTable
@@ -28,28 +27,24 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
                                      with VisitTable[F] {
 
   lazy val ExecutionEventMapping: ObjectMapping =
-    SqlInterfaceMapping(
-      tpe           = ExecutionEventType,
-      discriminator = executionEventTypeDiscriminator,
-      fieldMappings = List(
-        SqlField("id",           ExecutionEventTable.Id, key = true),
-        SqlObject("visit",       Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
-        SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
-        SqlField("received",     ExecutionEventTable.Received),
-        SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true),
+    SqlInterfaceMapping(ExecutionEventType, executionEventTypeDiscriminator)(
+      SqlField("id",           ExecutionEventTable.Id, key = true),
+      SqlObject("visit",       Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
+      SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
+      SqlField("received",     ExecutionEventTable.Received),
+      SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true),
 
-        // Hidden fields used in the WhereExecutionEvent predicate.  There
-        // appears to be no good way to create a predicate that matches on a
-        // particular interface implementation so this is the best we can do.
-        // We can match on fields that appear in the ExecutionEventTable.
-        SqlField("_atomId",          ExecutionEventTable.AtomId,          hidden = true),
-        SqlField("_sequenceCommand", ExecutionEventTable.SequenceCommand, hidden = true),
-        SqlField("_slewStage",       ExecutionEventTable.SlewStage,       hidden = true),
-        SqlField("_stepId",          ExecutionEventTable.StepId,          hidden = true),
-        SqlField("_stepStage",       ExecutionEventTable.StepStage,       hidden = true),
-        SqlField("_datasetId",       ExecutionEventTable.DatasetId,       hidden = true),
-        SqlField("_datasetStage",    ExecutionEventTable.DatasetStage,    hidden = true)
-      )
+      // Hidden fields used in the WhereExecutionEvent predicate.  There
+      // appears to be no good way to create a predicate that matches on a
+      // particular interface implementation so this is the best we can do.
+      // We can match on fields that appear in the ExecutionEventTable.
+      SqlField("_atomId",          ExecutionEventTable.AtomId,          hidden = true),
+      SqlField("_sequenceCommand", ExecutionEventTable.SequenceCommand, hidden = true),
+      SqlField("_slewStage",       ExecutionEventTable.SlewStage,       hidden = true),
+      SqlField("_stepId",          ExecutionEventTable.StepId,          hidden = true),
+      SqlField("_stepStage",       ExecutionEventTable.StepStage,       hidden = true),
+      SqlField("_datasetId",       ExecutionEventTable.DatasetId,       hidden = true),
+      SqlField("_datasetStage",    ExecutionEventTable.DatasetStage,    hidden = true)
     )
 
   private lazy val executionEventTypeDiscriminator: SqlDiscriminator =
@@ -81,54 +76,39 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
     }
 
   lazy val SequenceEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = SequenceEventType,
-      fieldMappings = List(
-        SqlField("id",      ExecutionEventTable.Id, key = true),
-        SqlField("command", ExecutionEventTable.SequenceCommand)
-      )
+    ObjectMapping(SequenceEventType)(
+      SqlField("id",      ExecutionEventTable.Id, key = true),
+      SqlField("command", ExecutionEventTable.SequenceCommand)
     )
 
   lazy val SlewEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = SlewEventType,
-      fieldMappings = List(
-        SqlField("id",        ExecutionEventTable.Id, key = true),
-        SqlField("slewStage", ExecutionEventTable.SlewStage)
-      )
+    ObjectMapping(SlewEventType)(
+      SqlField("id",        ExecutionEventTable.Id, key = true),
+      SqlField("slewStage", ExecutionEventTable.SlewStage)
     )
 
   lazy val AtomEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = AtomEventType,
-      fieldMappings = List(
-        SqlField("id",        ExecutionEventTable.Id, key = true),
-        SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
-        SqlField("atomStage", ExecutionEventTable.AtomStage)
-      )
+    ObjectMapping(AtomEventType)(
+      SqlField("id",        ExecutionEventTable.Id, key = true),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+      SqlField("atomStage", ExecutionEventTable.AtomStage)
     )
 
   lazy val StepEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = StepEventType,
-      fieldMappings = List(
-        SqlField("id",        ExecutionEventTable.Id, key = true),
-        SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
-        SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
-        SqlField("stepStage", ExecutionEventTable.StepStage)
-      )
+  ObjectMapping(StepEventType)(
+      SqlField("id",        ExecutionEventTable.Id, key = true),
+      SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+      SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
+      SqlField("stepStage", ExecutionEventTable.StepStage)
     )
 
   lazy val DatasetEventMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = DatasetEventType,
-      fieldMappings = List(
-        SqlField("id",           ExecutionEventTable.Id, key = true),
-        SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
-        SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
-        SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
-        SqlField("datasetStage", ExecutionEventTable.DatasetStage)
-      )
+    ObjectMapping(DatasetEventType)(
+      SqlField("id",           ExecutionEventTable.Id, key = true),
+      SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
+      SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
+      SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
+      SqlField("datasetStage", ExecutionEventTable.DatasetStage)
     )
 
 }

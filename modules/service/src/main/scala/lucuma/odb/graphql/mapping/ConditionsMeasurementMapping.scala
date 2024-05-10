@@ -11,17 +11,14 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 trait ConditionsMeasurementMapping[F[_]] extends ChronConditionsEntryView[F] {
 
   lazy val ConditionsMeasurementMapping =
-    ObjectMapping(
-      tpe = ConditionsMeasurementType,
-      fieldMappings = List(
-        SqlField("synthetic-id", ChronConditionsEntryView.Measurement.SyntheticId, key = true, hidden = true),
-        SqlField("source", ChronConditionsEntryView.Measurement.Source),
-        SqlObject("seeing"),
-        SqlField("extinction", ChronConditionsEntryView.Measurement.Extinction),
-        SqlObject("wavelength"),
-        SqlObject("azimuth"),
-        SqlObject("elevation"),
-      )
+    ObjectMapping(ConditionsMeasurementType)(
+      SqlField("synthetic-id", ChronConditionsEntryView.Measurement.SyntheticId, key = true, hidden = true),
+      SqlField("source", ChronConditionsEntryView.Measurement.Source),
+      SqlObject("seeing"),
+      SqlField("extinction", ChronConditionsEntryView.Measurement.Extinction),
+      SqlObject("wavelength"),
+      SqlObject("azimuth"),
+      SqlObject("elevation"),
     )
 
 }

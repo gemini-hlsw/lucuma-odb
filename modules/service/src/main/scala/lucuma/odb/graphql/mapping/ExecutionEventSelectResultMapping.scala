@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
+
 import table.DatasetTable
 import table.ObservationView
 import table.ExecutionEventTable
@@ -18,33 +20,31 @@ trait ExecutionEventSelectResultMapping[F[_]]
      with StepRecordView[F]
      with VisitTable[F] {
 
-  lazy val ExecutionEventSelectResultMapping: TypeMapping = {
+  lazy val ExecutionEventSelectResultMapping: List[TypeMapping] = {
 
-    val fromDataset: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventTable.DatasetId))
+    def fromDatasetAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, DatasetTable.Id,    Join(DatasetTable.Id,    ExecutionEventTable.DatasetId))
 
-    val fromExecution: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, ObservationView.Id, Join(ObservationView.Id, ExecutionEventTable.ObservationId))
+    def fromExecutionAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, ObservationView.Id, Join(ObservationView.Id, ExecutionEventTable.ObservationId))
 
-    val fromQuery: ObjectMapping =
-      topLevelSelectResultMapping(ExecutionEventSelectResultType)
+    def fromQueryAtPath(path: Path): ObjectMapping =
+      topLevelSelectResultMappingAtPath(path)
 
-    val fromStepRecord: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, StepRecordView.Id, Join(StepRecordView.Id, ExecutionEventTable.StepId))
+    def fromStepRecordAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, StepRecordView.Id, Join(StepRecordView.Id, ExecutionEventTable.StepId))
 
-    val fromVisit: ObjectMapping =
-      nestedSelectResultMapping(ExecutionEventSelectResultType, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventTable.VisitId))
+    def fromVisitAtPath(path: Path): ObjectMapping =
+      nestedSelectResultMappingAtPath(path, VisitTable.Id,      Join(VisitTable.Id,      ExecutionEventTable.VisitId))
 
-    SwitchMapping(
-      ExecutionEventSelectResultType,
-      List(
-        DatasetType    / "events" -> fromDataset,
-        ExecutionType  / "events" -> fromExecution,
-        QueryType      / "events" -> fromQuery,
-        StepRecordType / "events" -> fromStepRecord,
-        VisitType      / "events" -> fromVisit
-      )
+    List(
+      fromDatasetAtPath(DatasetType / "events"),
+      fromExecutionAtPath(ExecutionType / "events"),
+      fromQueryAtPath(QueryType / "events"),
+      fromStepRecordAtPath(StepRecordType / "events"),
+      fromVisitAtPath(VisitType / "events")
     )
+
   }
 
 }

@@ -671,14 +671,14 @@ scalar TransactionId
 
 interface ChronicleEntry {
   id: ChronicleId!
-  transactionId: TransactionId
+  transactionId: TransactionId!
   user: User
   timestamp: Timestamp!
 }
 
 type ConditionsEntry { # implements ChronicleEntry
   id: ChronicleId!
-  transactionId: TransactionId
+  transactionId: TransactionId!
   user: User
   timestamp: Timestamp!
   measurement: ConditionsMeasurement
@@ -6930,10 +6930,10 @@ type Group {
   program: Program!
 
   "Optionally, a name"
-  name: String
+  name: NonEmptyString
 
   "Optionally, a description."
-  description: String
+  description: NonEmptyString
 
   "How many do we need to complete? If this is null then it means we have to complete them all"
   minimumRequired: NonNegShort
@@ -7272,17 +7272,17 @@ enum Instrument {
 Describes an instrument configuration option for spectroscopy.
 """
 type SpectroscopyConfigOption {
-  name:               String!
+  name:               NonEmptyString!
   instrument:         Instrument!
 
   focalPlane:         FocalPlane!
 
-  fpuLabel:           String! # e.g., '0.25"'
+  fpuLabel:           NonEmptyString! # e.g., '0.25"'
   slitWidth:          Angle!
   slitLength:         Angle!
 
-  disperserLabel:     String! # e.g., 'B1200'
-  filterLabel:        String  # e.g., 'JH'
+  disperserLabel:     NonEmptyString! # e.g., 'B1200'
+  filterLabel:        NonEmptyString  # e.g., 'JH'
 
   wavelengthMin:      Wavelength!
   wavelengthMax:      Wavelength!
@@ -7639,7 +7639,7 @@ type Observation {
   """
   Observation title generated from id and targets
   """
-  title: String!
+  title: NonEmptyString!
 
   """
   User-supplied observation-identifying detail information
@@ -10256,7 +10256,7 @@ type TimeChargeCorrection {
   user:        User
 
   "Optional justification for the correction."
-  comment:     String
+  comment:     NonEmptyString
 }
 
 """

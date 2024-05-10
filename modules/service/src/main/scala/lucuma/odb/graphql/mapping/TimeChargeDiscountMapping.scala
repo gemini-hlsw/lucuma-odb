@@ -74,29 +74,20 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
     }
 
   lazy val TimeChargeDaylightDiscountMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TimeChargeDaylightDiscountType,
-      fieldMappings = List(
-        SqlField("id",   TimeChargeDiscountTable.Id, key = true),
-        SqlField("site", TimeChargeDiscountTable.Daylight.Site)
-      )
+    ObjectMapping(TimeChargeDaylightDiscountType)(
+      SqlField("id",   TimeChargeDiscountTable.Id, key = true, hidden = true),
+      SqlField("site", TimeChargeDiscountTable.Daylight.Site)
     )
 
   lazy val TimeChargeNoDataDiscountMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TimeChargeNoDataDiscountType,
-      fieldMappings = List(
-        SqlField("id", TimeChargeDiscountTable.Id, key = true)
-      )
+    ObjectMapping(TimeChargeNoDataDiscountType)(
+      SqlField("id", TimeChargeDiscountTable.Id, key = true, hidden = true)
     )
 
   lazy val TimeChargeQaDiscountMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TimeChargeQaDiscountType,
-      fieldMappings = List(
-        SqlField("id",        TimeChargeDiscountTable.Id, key = true),
-        SqlObject("datasets", Join(TimeChargeDiscountTable.Id, TimeChargeDiscountDatasetTable.DiscountId), Join(TimeChargeDiscountDatasetTable.DatasetId, DatasetTable.Id))
-      )
+    ObjectMapping(TimeChargeQaDiscountType)(
+      SqlField("id",        TimeChargeDiscountTable.Id, key = true, hidden = true),
+      SqlObject("datasets", Join(TimeChargeDiscountTable.Id, TimeChargeDiscountDatasetTable.DiscountId), Join(TimeChargeDiscountDatasetTable.DatasetId, DatasetTable.Id))
     )
 
 }

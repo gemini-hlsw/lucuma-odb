@@ -16,17 +16,13 @@ trait ObservationSelectResultMapping[F[_]]
      with ObsAttachmentAssignmentTable[F]
      with ResultMapping[F] {
 
-  lazy val ObservationSelectResultMapping: TypeMapping =
-    SwitchMapping(
-      ObservationSelectResultType,
-      List(
-        QueryType / "observations"              -> topLevelSelectResultMapping(ObservationSelectResultType),
-        ProgramType / "observations"            -> nestedSelectResultMapping(ObservationSelectResultType, ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)),
-        ConstraintSetGroupType / "observations" -> nestedSelectResultMapping(ObservationSelectResultType, ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
-        TargetGroupType / "observations"        -> nestedSelectResultMapping(ObservationSelectResultType, TargetView.TargetId, Join(TargetView.TargetId, AsterismTargetTable.TargetId), Join(AsterismTargetTable.ObservationId, ObservationView.Id)),
-        AsterismGroupType / "observations"      -> nestedSelectResultMapping(ObservationSelectResultType, AsterismGroupView.AsterismGroup, Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
-        ObsAttachmentType / "observations"      -> nestedSelectResultMapping(ObservationSelectResultType, ObsAttachmentTable.Id, Join(ObsAttachmentTable.Id, ObsAttachmentAssignmentTable.ObsAttachmentId), Join(ObsAttachmentAssignmentTable.ObservationId, ObservationView.Id))
-      )
+  lazy val ObservationSelectResultMappings: List[TypeMapping] =
+    List(
+      topLevelSelectResultMappingAtPath(QueryType / "observations"),
+      nestedSelectResultMappingAtPath(ProgramType / "observations", ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)),
+      nestedSelectResultMappingAtPath(ConstraintSetGroupType / "observations", ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
+      nestedSelectResultMappingAtPath(TargetGroupType / "observations", TargetView.TargetId, Join(TargetView.TargetId, AsterismTargetTable.TargetId), Join(AsterismTargetTable.ObservationId, ObservationView.Id)),
+      nestedSelectResultMappingAtPath(AsterismGroupType / "observations", AsterismGroupView.AsterismGroup, Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
     )
 
 }

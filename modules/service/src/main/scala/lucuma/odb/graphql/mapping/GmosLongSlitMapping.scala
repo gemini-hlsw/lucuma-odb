@@ -127,106 +127,105 @@ trait GmosLongSlitMapping[F[_]]
 
     val common = new CommonFieldMappings(GmosNorthLongSlitView.Common)
 
-    ObjectMapping(
-      tpe = GmosNorthLongSlitType,
-      fieldMappings = List(
-        SqlField("observationId", GmosNorthLongSlitView.Common.ObservationId, key = true, hidden = true),
+    ObjectMapping(GmosNorthLongSlitType)(
 
-        SqlField("grating", GmosNorthLongSlitView.Grating),
-        SqlField("filter",  GmosNorthLongSlitView.Filter),
-        SqlField("fpu",     GmosNorthLongSlitView.Fpu),
-        SqlObject("centralWavelength"),
+      SqlField("observationId", GmosNorthLongSlitView.Common.ObservationId, key = true, hidden = true),
 
-        // ---------------------
-        // xBin
-        // ---------------------
+      SqlField("grating", GmosNorthLongSlitView.Grating),
+      SqlField("filter",  GmosNorthLongSlitView.Filter),
+      SqlField("fpu",     GmosNorthLongSlitView.Fpu),
+      SqlObject("centralWavelength"),
 
-        common.xBin,
+      // ---------------------
+      // xBin
+      // ---------------------
 
-        CursorField[GmosXBinning](
-          "defaultXBin",
-          defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
-          List("fpu", "grating", "imageQuality", "sourceProfile")
-        ),
+      common.xBin,
 
-        common.explicitXBin,
+      CursorField[GmosXBinning](
+        "defaultXBin",
+        defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
+        List("fpu", "grating", "imageQuality", "sourceProfile")
+      ),
 
-        common.yBin,
+      common.explicitXBin,
 
-        CursorField[GmosYBinning](
-          "defaultYBin",
-          defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
-          List("fpu", "grating", "imageQuality", "sourceProfile")
-        ),
+      common.yBin,
 
-        common.explicitYBin,
+      CursorField[GmosYBinning](
+        "defaultYBin",
+        defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
+        List("fpu", "grating", "imageQuality", "sourceProfile")
+      ),
 
-        common.ampReadMode,
-        common.defaultAmpReadMode,
-        common.explicitAmpReadMode,
+      common.explicitYBin,
 
-        common.ampGain,
-        common.defaultAmpGain,
-        common.explicitAmpGain,
+      common.ampReadMode,
+      common.defaultAmpReadMode,
+      common.explicitAmpReadMode,
 
-        common.roi,
-        common.defaultRoi,
-        common.explicitRoi,
+      common.ampGain,
+      common.defaultAmpGain,
+      common.explicitAmpGain,
 
-        // ---------------------
-        // wavelengthDithers
-        // ---------------------
+      common.roi,
+      common.defaultRoi,
+      common.explicitRoi,
 
-        common.wavelengthDithersString,
+      // ---------------------
+      // wavelengthDithers
+      // ---------------------
 
-        CursorFieldJson(
-          "wavelengthDithers",
-          cursor =>
-            for {
-               e <- cursor.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(decodeWavelengthDithers)))
-               d <- cursor.field("grating", None).flatMap(_.as[GmosNorthGrating]).map(g => defaultWavelengthDithersNorthJson(g))
-            } yield e.getOrElse(d),
-          List("wavelengthDithersString", "grating")
-        ),
+      common.wavelengthDithersString,
 
-        common.explicitWavelengthDithers,
+      CursorFieldJson(
+        "wavelengthDithers",
+        cursor =>
+          for {
+              e <- cursor.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(decodeWavelengthDithers)))
+              d <- cursor.field("grating", None).flatMap(_.as[GmosNorthGrating]).map(g => defaultWavelengthDithersNorthJson(g))
+          } yield e.getOrElse(d),
+        List("wavelengthDithersString", "grating")
+      ),
 
-        CursorFieldJson(
-          "defaultWavelengthDithers",
-          cursor =>
-            cursor
-              .field("grating", None)
-              .flatMap(_.as[GmosNorthGrating])
-              .map(g => defaultWavelengthDithersNorthJson(g)),
-          List("grating")
-        ),
+      common.explicitWavelengthDithers,
 
-        // ---------------------
-        // spatialOffsets
-        // ---------------------
-        common.spatialOffsetsString,
-        common.spatialOffsets,
-        common.explicitSpatialOffsets,
-        common.defaultSpatialOffsets,
+      CursorFieldJson(
+        "defaultWavelengthDithers",
+        cursor =>
+          cursor
+            .field("grating", None)
+            .flatMap(_.as[GmosNorthGrating])
+            .map(g => defaultWavelengthDithersNorthJson(g)),
+        List("grating")
+      ),
 
-        // ---------------------
-        // hidden view fields
-        // ---------------------
-        common.imageQuality,
-        common.sourceProfile,
+      // ---------------------
+      // spatialOffsets
+      // ---------------------
+      common.spatialOffsetsString,
+      common.spatialOffsets,
+      common.explicitSpatialOffsets,
+      common.defaultSpatialOffsets,
 
-        // ---------------------
-        // initialValues
-        // ---------------------
+      // ---------------------
+      // hidden view fields
+      // ---------------------
+      common.imageQuality,
+      common.sourceProfile,
 
-        // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
-        // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
-        SqlField("initialGrating", GmosNorthLongSlitView.InitialGrating),
-        SqlField("initialFilter",  GmosNorthLongSlitView.InitialFilter),
-        SqlField("initialFpu",     GmosNorthLongSlitView.InitialFpu),
-        SqlObject("initialCentralWavelength")
-      )
+      // ---------------------
+      // initialValues
+      // ---------------------
+
+      // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
+      // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
+      SqlField("initialGrating", GmosNorthLongSlitView.InitialGrating),
+      SqlField("initialFilter",  GmosNorthLongSlitView.InitialFilter),
+      SqlField("initialFpu",     GmosNorthLongSlitView.InitialFpu),
+      SqlObject("initialCentralWavelength")
     )
+
   }
 
   lazy val GmosSouthLongSlitMapping: ObjectMapping = {
@@ -235,106 +234,105 @@ trait GmosLongSlitMapping[F[_]]
 
     val common = new CommonFieldMappings(GmosSouthLongSlitView.Common)
 
-    ObjectMapping(
-      tpe = GmosSouthLongSlitType,
-      fieldMappings = List(
-        SqlField("observationId", GmosSouthLongSlitView.Common.ObservationId, key = true, hidden = true),
+    ObjectMapping(GmosSouthLongSlitType)(
 
-        SqlField("grating", GmosSouthLongSlitView.Grating),
-        SqlField("filter",  GmosSouthLongSlitView.Filter),
-        SqlField("fpu",     GmosSouthLongSlitView.Fpu),
-        SqlObject("centralWavelength"),
+      SqlField("observationId", GmosSouthLongSlitView.Common.ObservationId, key = true, hidden = true),
 
-        // ---------------------
-        // xBin
-        // ---------------------
+      SqlField("grating", GmosSouthLongSlitView.Grating),
+      SqlField("filter",  GmosSouthLongSlitView.Filter),
+      SqlField("fpu",     GmosSouthLongSlitView.Fpu),
+      SqlObject("centralWavelength"),
 
-        common.xBin,
+      // ---------------------
+      // xBin
+      // ---------------------
 
-        CursorField[GmosXBinning](
-          "defaultXBin",
-          defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
-          List("fpu", "grating", "imageQuality", "sourceProfile")
-        ),
+      common.xBin,
 
-        common.explicitXBin,
+      CursorField[GmosXBinning](
+        "defaultXBin",
+        defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
+        List("fpu", "grating", "imageQuality", "sourceProfile")
+      ),
 
-        common.yBin,
+      common.explicitXBin,
 
-        CursorField[GmosYBinning](
-          "defaultYBin",
-          defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
-          List("fpu", "grating", "imageQuality", "sourceProfile")
-        ),
+      common.yBin,
 
-        common.explicitYBin,
+      CursorField[GmosYBinning](
+        "defaultYBin",
+        defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
+        List("fpu", "grating", "imageQuality", "sourceProfile")
+      ),
 
-        common.ampReadMode,
-        common.defaultAmpReadMode,
-        common.explicitAmpReadMode,
+      common.explicitYBin,
 
-        common.ampGain,
-        common.defaultAmpGain,
-        common.explicitAmpGain,
+      common.ampReadMode,
+      common.defaultAmpReadMode,
+      common.explicitAmpReadMode,
 
-        common.roi,
-        common.defaultRoi,
-        common.explicitRoi,
+      common.ampGain,
+      common.defaultAmpGain,
+      common.explicitAmpGain,
 
-        // ---------------------
-        // wavelengthDithers
-        // ---------------------
+      common.roi,
+      common.defaultRoi,
+      common.explicitRoi,
 
-        common.wavelengthDithersString,
+      // ---------------------
+      // wavelengthDithers
+      // ---------------------
 
-        CursorFieldJson(
-          "wavelengthDithers",
-          cursor =>
-            for {
-               e <- cursor.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(decodeWavelengthDithers)))
-               d <- cursor.field("grating", None).flatMap(_.as[GmosSouthGrating]).map(g => defaultWavelengthDithersSouthJson(g))
-            } yield e.getOrElse(d),
-          List("wavelengthDithersString", "grating")
-        ),
+      common.wavelengthDithersString,
 
-        common.explicitWavelengthDithers,
+      CursorFieldJson(
+        "wavelengthDithers",
+        cursor =>
+          for {
+              e <- cursor.field("wavelengthDithersString", None).flatMap(_.as[Option[String]].map(_.map(decodeWavelengthDithers)))
+              d <- cursor.field("grating", None).flatMap(_.as[GmosSouthGrating]).map(g => defaultWavelengthDithersSouthJson(g))
+          } yield e.getOrElse(d),
+        List("wavelengthDithersString", "grating")
+      ),
 
-        CursorFieldJson(
-          "defaultWavelengthDithers",
-          cursor =>
-            cursor
-              .field("grating", None)
-              .flatMap(_.as[GmosSouthGrating])
-              .map(g => defaultWavelengthDithersSouthJson(g)),
-          List("grating")
-        ),
+      common.explicitWavelengthDithers,
 
-        // ---------------------
-        // spatialOffsets
-        // ---------------------
-        common.spatialOffsetsString,
-        common.spatialOffsets,
-        common.explicitSpatialOffsets,
-        common.defaultSpatialOffsets,
+      CursorFieldJson(
+        "defaultWavelengthDithers",
+        cursor =>
+          cursor
+            .field("grating", None)
+            .flatMap(_.as[GmosSouthGrating])
+            .map(g => defaultWavelengthDithersSouthJson(g)),
+        List("grating")
+      ),
 
-        // ---------------------
-        // hidden view fields
-        // ---------------------
-        common.imageQuality,
-        common.sourceProfile,
+      // ---------------------
+      // spatialOffsets
+      // ---------------------
+      common.spatialOffsetsString,
+      common.spatialOffsets,
+      common.explicitSpatialOffsets,
+      common.defaultSpatialOffsets,
 
-        // ---------------------
-        // initialValues
-        // ---------------------
+      // ---------------------
+      // hidden view fields
+      // ---------------------
+      common.imageQuality,
+      common.sourceProfile,
 
-        // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
-        // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
-        SqlField("initialGrating", GmosSouthLongSlitView.InitialGrating),
-        SqlField("initialFilter",  GmosSouthLongSlitView.InitialFilter),
-        SqlField("initialFpu",     GmosSouthLongSlitView.InitialFpu),
-        SqlObject("initialCentralWavelength")
-      )
+      // ---------------------
+      // initialValues
+      // ---------------------
+
+      // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
+      // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
+      SqlField("initialGrating", GmosSouthLongSlitView.InitialGrating),
+      SqlField("initialFilter",  GmosSouthLongSlitView.InitialFilter),
+      SqlField("initialFpu",     GmosSouthLongSlitView.InitialFpu),
+      SqlObject("initialCentralWavelength")
     )
+
   }
 }
 

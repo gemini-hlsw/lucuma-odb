@@ -14,16 +14,14 @@ trait ObservationReferenceMapping[F[_]]
      with ProgramReferenceView[F] {
 
   lazy val ObservationReferenceMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ObservationReferenceType,
-      fieldMappings = List(
-        SqlField("id",       ObservationReferenceView.Id, key = true, hidden = true),
-        SqlObject("program", Join(ObservationReferenceView.ProgramId, ProgramReferenceView.Id)),
-        SqlField("index",    ObservationReferenceView.ObservationIndex),
-        SqlField("label",    ObservationReferenceView.ObservationReference),
+    ObjectMapping(ObservationReferenceType)(
+      SqlField("id",       ObservationReferenceView.Id, key = true, hidden = true),
+      SqlObject("program", Join(ObservationReferenceView.ProgramId, ProgramReferenceView.Id)),
+      SqlField("index",    ObservationReferenceView.ObservationIndex),
+      SqlField("label",    ObservationReferenceView.ObservationReference),
 
-        // Used for WHERE clause matching
-        SqlField("labelString", ObservationReferenceView.ObservationReferenceString, hidden = true)
-      )
+      // Used for WHERE clause matching
+      SqlField("labelString", ObservationReferenceView.ObservationReferenceString, hidden = true)
     )
+
 }

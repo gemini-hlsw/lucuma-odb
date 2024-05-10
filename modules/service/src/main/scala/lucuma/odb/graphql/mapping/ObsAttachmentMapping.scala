@@ -16,18 +16,16 @@ trait ObsAttachmentMapping[F[_]]
      with Predicates[F] {
 
   lazy val ObsAttachmentMapping =
-    ObjectMapping(
-      tpe = ObsAttachmentType,
-      fieldMappings = List(
-        SqlField("id", ObsAttachmentTable.Id, key = true),
-        SqlField("program_id", ObsAttachmentTable.ProgramId, hidden = true),
-        SqlField("attachmentType", ObsAttachmentTable.AttachmentType),
-        SqlField("fileName", ObsAttachmentTable.FileName),
-        SqlField("description", ObsAttachmentTable.Description),
-        SqlField("checked", ObsAttachmentTable.Checked),
-        SqlField("fileSize", ObsAttachmentTable.FileSize),
-        SqlField("updatedAt", ObsAttachmentTable.UpdatedAt),
-        SqlObject("program", Join(ObsAttachmentTable.ProgramId, ProgramTable.Id)),
-      )
+    ObjectMapping(ObsAttachmentType)(
+      SqlField("id", ObsAttachmentTable.Id, key = true),
+      SqlField("program_id", ObsAttachmentTable.ProgramId, hidden = true),
+      SqlField("attachmentType", ObsAttachmentTable.AttachmentType),
+      SqlField("fileName", ObsAttachmentTable.FileName),
+      SqlField("description", ObsAttachmentTable.Description),
+      SqlField("checked", ObsAttachmentTable.Checked),
+      SqlField("fileSize", ObsAttachmentTable.FileSize),
+      SqlField("updatedAt", ObsAttachmentTable.UpdatedAt),
+      SqlObject("program", Join(ObsAttachmentTable.ProgramId, ProgramTable.Id)),
     )
+
 }

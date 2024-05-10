@@ -19,40 +19,30 @@ trait ProposalClassMapping[F[_]] extends ProposalTable[F] with Predicates[F] {
   lazy val ProposalClassMappings =
     List(
 
-      SqlInterfaceMapping(
-        tpe = ProposalClassType,
-        fieldMappings = List(
-          SqlField("synthetic-id", ProposalTable.ProgramId, key = true, hidden = true),
-          SqlField("discriminator", ProposalTable.Clazz, discriminator = true, hidden = true),
-          SqlField("minPercentTime", ProposalTable.MinPercent),
-        ),
-        discriminator = ProposalClassDiscriminator,
+      SqlInterfaceMapping(ProposalClassType, ProposalClassDiscriminator)(
+        SqlField("synthetic-id", ProposalTable.ProgramId, key = true, hidden = true),
+        SqlField("discriminator", ProposalTable.Clazz, discriminator = true, hidden = true),
+        SqlField("minPercentTime", ProposalTable.MinPercent),
       ),
 
       // These have no extra fields.
-      ObjectMapping(ClassicalType, Nil),
-      ObjectMapping(DemoScienceType, Nil),
-      ObjectMapping(DirectorsTimeType, Nil),
-      ObjectMapping(ExchangeType, Nil),
-      ObjectMapping(FastTurnaroundType, Nil),
-      ObjectMapping(PoorWeatherType, Nil),
-      ObjectMapping(QueueType, Nil),
-      ObjectMapping(SystemVerificationType, Nil),
+      ObjectMapping(ClassicalType)(),
+      ObjectMapping(DemoScienceType)(),
+      ObjectMapping(DirectorsTimeType)(),
+      ObjectMapping(ExchangeType)(),
+      ObjectMapping(FastTurnaroundType)(),
+      ObjectMapping(PoorWeatherType)(),
+      ObjectMapping(QueueType)(),
+      ObjectMapping(SystemVerificationType)(),
 
       // These do.
-      ObjectMapping(
-        tpe = LargeProgramType,
-        fieldMappings = List(
-          SqlField("minPercentTotalTime", ProposalTable.MinPercentTotal),
-          SqlObject("totalTime"),
-        )
+      ObjectMapping(LargeProgramType)(
+        SqlField("minPercentTotalTime", ProposalTable.MinPercentTotal),
+        SqlObject("totalTime"),
       ),
-      ObjectMapping(
-        tpe = IntensiveType,
-        fieldMappings = List(
-          SqlField("minPercentTotalTime", ProposalTable.MinPercentTotal),
-          SqlObject("totalTime"),
-        )
+      ObjectMapping(IntensiveType)(
+        SqlField("minPercentTotalTime", ProposalTable.MinPercentTotal),
+        SqlObject("totalTime"),
       ),
 
     )
