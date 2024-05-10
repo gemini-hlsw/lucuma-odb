@@ -44,6 +44,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
@@ -55,6 +56,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ProgramUserSupportType
+import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -161,8 +163,14 @@ trait Codecs {
       Type("_d_angle_µas", List(Type("d_angle_µas")))
     )
 
+  val atom_execution_state: Codec[AtomExecutionState] =
+    enumerated(Type("e_atom_execution_state"))
+
   val atom_id: Codec[Atom.Id] =
     uid[Atom.Id]
+
+  val atom_stage: Codec[AtomStage] =
+    enumerated(Type("e_atom_stage"))
 
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
@@ -440,6 +448,9 @@ trait Codecs {
     numeric(10,3).eimap(
      bd => SignalToNoise.FromBigDecimalExact.getOption(bd).toRight(s"Invalid signal-to-noise value: $bd")
     )(_.toBigDecimal)
+
+  val step_execution_state: Codec[StepExecutionState] =
+    enumerated(Type("e_step_execution_state"))
 
   val step_id: Codec[Step.Id] =
     uid[Step.Id]

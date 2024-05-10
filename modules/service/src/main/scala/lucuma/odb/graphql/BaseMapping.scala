@@ -15,6 +15,7 @@ trait BaseMapping[F[_]]
      with CirceMappingLike[F] {
 
   // TODO: auto-generate this
+  lazy val AddAtomEventResultType              = schema.ref("AddAtomEventResult")
   lazy val AddConditionsEntryResultType        = schema.ref("AddConditionsEntryResult")
   lazy val AddDatasetEventResultType           = schema.ref("AddDatasetEventResult")
   lazy val AddSequenceEventResultType          = schema.ref("AddSequenceEventResult")
@@ -26,9 +27,12 @@ trait BaseMapping[F[_]]
   lazy val AsterismGroupType                   = schema.ref("AsterismGroup")
   lazy val AsterismGroupSelectResultType       = schema.ref("AsterismGroupSelectResult")
   lazy val AngleType                           = schema.ref("Angle")
+  lazy val AtomExecutionStateType              = schema.ref("AtomExecutionState")
+  lazy val AtomEventType                       = schema.ref("AtomEvent")
   lazy val AtomIdType                          = schema.ref("AtomId")
   lazy val AtomRecordType                      = schema.ref("AtomRecord")
   lazy val AtomRecordSelectResultType          = schema.ref("AtomRecordSelectResult")
+  lazy val AtomStageType                       = schema.ref("AtomStage")
   lazy val BiasType                            = schema.ref("Bias")
   lazy val BigDecimalType                      = schema.ref("BigDecimal")
   lazy val CalibrationProgramReferenceType     = schema.ref("CalibrationProgramReference")
