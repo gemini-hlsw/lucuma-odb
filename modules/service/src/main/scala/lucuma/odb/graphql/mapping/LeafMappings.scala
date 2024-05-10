@@ -5,8 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-// import eu.timepit.refined.types.numeric.NonNegBigDecimal
-// import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -80,7 +78,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
       LeafMapping[Tag](ConditionsMeasurementSourceType),
-      // LeafMapping[Tag](ConditionsSourceType),
       LeafMapping[NonEmptyString](DatasetFilenameType),
       LeafMapping[Dataset.Id](DatasetIdType),
       LeafMapping[DatasetStage](DatasetStageType),
@@ -128,8 +125,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
-      // LeafMapping[NonNegBigDecimal](NonNegBigDecimalType),
-      // LeafMapping[NonNegLong](NonNegLongType),
       LeafMapping[NonNegShort](NonNegShortType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
       LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),
@@ -143,7 +138,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),
-      // LeafMapping[PosShort](PosShortType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramType](ProgramTypeType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
