@@ -58,6 +58,7 @@ import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.Response
+import org.http4s.Uri
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -237,7 +238,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       apiKey            = "apiKey".refined,
       domain            = "gpp.com".refined,
       webhookSigningKey = "webhookKey".refined,
-      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com")
+      invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
+      exploreUrl = Uri.fromString("https://nonsense.kom").toOption.get
     )
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.

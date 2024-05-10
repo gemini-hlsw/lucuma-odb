@@ -19,9 +19,11 @@ import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
 import grackle.Result
+import lucuma.core.enums.AtomStage
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepStage
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
@@ -35,8 +37,10 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.StepExecutionState
 import lucuma.odb.logic.EstimatorState
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.Completion
@@ -65,9 +69,15 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id
   )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]]
 
-  def setStepCompleted(
+  def setAtomExecutionState(
+    atomId: Atom.Id,
+    stage:  AtomStage
+  )(using Transaction[F]): F[Unit]
+
+  def setStepExecutionState(
     stepId: Step.Id,
-    time:   Option[Timestamp]
+    stage:  StepStage,
+    time:   Timestamp
   )(using Transaction[F]): F[Unit]
 
   def insertAtomRecord(
@@ -278,11 +288,31 @@ object SequenceService {
           .onlyOrError
           .map(_.build)
 
-      override def setStepCompleted(
+      override def setAtomExecutionState(
+        atomId: Atom.Id,
+        stage:  AtomStage
+      )(using Transaction[F]): F[Unit] = {
+        val state = stage match {
+          case AtomStage.StartAtom => AtomExecutionState.Ongoing
+          case AtomStage.EndAtom   => AtomExecutionState.Completed
+        }
+        session.execute(Statements.SetAtomExecutionState)(state, atomId).void
+      }
+
+      override def setStepExecutionState(
         stepId: Step.Id,
-        time:   Option[Timestamp]
-      )(using Transaction[F]): F[Unit] =
-        session.execute(Statements.SetStepCompleted)(time, stepId).void
+        stage:  StepStage,
+        time:   Timestamp
+      )(using Transaction[F]): F[Unit] = {
+        val state = stage match {
+          case StepStage.EndStep => StepExecutionState.Completed
+          case StepStage.Abort   => StepExecutionState.Aborted
+          case StepStage.Stop    => StepExecutionState.Stopped
+          case _                 => StepExecutionState.Ongoing
+        }
+        val completedTime = Option.when(stage === StepStage.EndStep)(time)
+        session.execute(Statements.SetStepExecutionState)(state, completedTime, stepId).void
+      }
 
       def insertAtomRecordImpl(
         visitId:      Visit.Id,
@@ -592,11 +622,19 @@ object SequenceService {
         WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
       ).query(step_id *: step_config)
 
-    val SetStepCompleted: Command[(Option[Timestamp], Step.Id)] =
+    val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
       sql"""
         UPDATE t_step_record
-           SET c_completed = ${core_timestamp.opt}
+           SET c_execution_state = $step_execution_state,
+               c_completed       = ${core_timestamp.opt}
          WHERE c_step_id = $step_id
+      """.command
+
+    val SetAtomExecutionState: Command[(AtomExecutionState, Atom.Id)] =
+      sql"""
+        UPDATE t_atom_record
+           SET c_execution_state = $atom_execution_state
+         WHERE c_atom_id = $atom_id
       """.command
 
     val SelectLastVisit: Query[Observation.Id, Visit.Id] =

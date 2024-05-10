@@ -30,17 +30,17 @@ trait ArbTimeAccountingState {
 
   import TimeAccounting.*
 
-  val genAtom: Gen[List[Option[StepContext]]] =
+  val genAtom: Gen[List[Option[AtomContext]]] =
     for {
-      a  <- arbitrary[Atom.Id]
-      n  <- Gen.chooseNum(0, 10)
-      s0 <- Gen.listOfN(n, arbitrary[StepContext].map(StepContext.atomId.replace(a)))
-      s1 <- s0.flatTraverse { sc =>
+      aid <- arbitrary[Atom.Id]
+      n   <- Gen.chooseNum(0, 10)
+      a0  <- Gen.listOfN(n, arbitrary[AtomContext].map(AtomContext.atomId.replace(aid)))
+      a1  <- a0.flatTraverse { ac =>
               Gen.chooseNum(0, 10).flatMap { n =>
-                Gen.listOfN(n, Gen.frequency(19 -> sc.some, 1 -> none[StepContext]))
+                Gen.listOfN(n, Gen.frequency(19 -> ac.some, 1 -> none[AtomContext]))
               }
             }
-    } yield s1
+    } yield a1
 
   def genVisit(min: Timestamp, vid: Visit.Id): Gen[List[Event]] =
     for {

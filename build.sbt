@@ -1,25 +1,25 @@
 val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.6"
+val circeVersion               = "0.14.7"
 val cirisVersion               = "3.5.0"
 val clueVersion                = "0.35.2"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
-val fs2AwsVersion              = "6.1.2"
+val fs2AwsVersion              = "6.1.3"
 val fs2Version                 = "3.10.2"
 val grackleVersion             = "0.19.0"
 val http4sBlazeVersion         = "0.23.16"
-val http4sEmberVersion         = "0.23.26"
+val http4sEmberVersion         = "0.23.27"
 val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.6"
-val log4catsVersion            = "2.6.0"
-val lucumaCatalogVersion       = "0.45.3"
-val lucumaItcVersion           = "0.21.8"
-val lucumaCoreVersion          = "0.96.3"
+val log4catsVersion            = "2.7.0"
+val lucumaCatalogVersion       = "0.46.1"
+val lucumaItcVersion           = "0.21.9"
+val lucumaCoreVersion          = "0.97.1"
 val lucumaGraphQLRoutesVersion = "0.8.9"
-val lucumaSsoVersion           = "0.6.16"
+val lucumaSsoVersion           = "0.6.17"
 val munitVersion               = "0.7.29"
 val munitCatsEffectVersion     = "1.0.7"
 val munitDisciplineVersion     = "1.0.9"
@@ -135,7 +135,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.703"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.715"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,

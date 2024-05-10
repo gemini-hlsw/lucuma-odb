@@ -25,18 +25,18 @@ trait ArbTimeAccounting {
 
   import TimeAccounting.*
 
-  given Arbitrary[StepContext] =
+  given Arbitrary[AtomContext] =
     Arbitrary {
       for {
         a <- arbitrary[Atom.Id]
-        s <- arbitrary[Step.Id]
-      } yield StepContext(a, s)
+        s <- arbitrary[Option[Step.Id]]
+      } yield AtomContext(a, s)
     }
 
-  given Cogen[StepContext] =
+  given Cogen[AtomContext] =
     Cogen[(
       Atom.Id,
-      Step.Id,
+      Option[Step.Id],
     )].contramap { a => (
       a.atomId,
       a.stepId,
@@ -47,19 +47,19 @@ trait ArbTimeAccounting {
       for {
         v <- arbitrary[Visit.Id]
         c <- arbitrary[ChargeClass]
-        s <- arbitrary[Option[StepContext]]
-      } yield Context(v, c, s)
+        a <- arbitrary[Option[AtomContext]]
+      } yield Context(v, c, a)
     }
 
   given Cogen[Context] =
     Cogen[(
       Visit.Id,
       ChargeClass,
-      Option[StepContext]
+      Option[AtomContext]
     )].contramap { a => (
       a.visitId,
       a.chargeClass,
-      a.step
+      a.atom
     )}
 
   given Arbitrary[Event] =

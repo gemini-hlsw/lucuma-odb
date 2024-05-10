@@ -42,6 +42,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.Config
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.AddAtomEventInput
 import lucuma.odb.graphql.input.AddDatasetEventInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
@@ -97,6 +98,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val mutationFields: List[MutationField] =
     List(
       AddConditionsEntry,
+      AddAtomEvent,
       AddDatasetEvent,
       AddSequenceEvent,
       AddSlewEvent,
@@ -393,6 +395,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         requireServiceAccess:
           insert(input).nestMap: e =>
             Unique(Filter(pred.id.eql(e.id), child))
+
+  private lazy val AddAtomEvent: MutationField =
+    addEvent("addAtomEvent", AddAtomEventInput.Binding, Predicates.atomEvent) { input =>
+      executionEventService.insertAtomEvent(input.atomId, input.atomStage)
+    }
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>

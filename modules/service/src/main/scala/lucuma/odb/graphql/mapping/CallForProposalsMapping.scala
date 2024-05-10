@@ -25,6 +25,7 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
   lazy val CallForProposalsMapping: TypeMapping =
     ObjectMapping(CallForProposalsType)(
       SqlField("id",       CallForProposalsView.Id, key = true),
+      SqlField("title",    CallForProposalsView.Title),
       SqlField("type",     CallForProposalsView.Type),
       SqlField("semester", CallForProposalsView.Semester),
       SqlObject("raLimitStart"),
@@ -32,7 +33,6 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
       SqlObject("decLimitStart"),
       SqlObject("decLimitEnd"),
       SqlObject("active"),
-
       SqlObject("partners",   Join(CallForProposalsView.Id, CallForProposalsPartnerTable.CfpId)),
       SqlField("instruments", CallForProposalsView.Instruments),
       SqlField("existence",   CallForProposalsView.Existence),

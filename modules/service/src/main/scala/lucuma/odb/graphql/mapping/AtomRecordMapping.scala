@@ -32,13 +32,14 @@ trait AtomRecordMapping[F[_]] extends AtomRecordTable[F]
 
   lazy val AtomRecordMapping: ObjectMapping =
     ObjectMapping(AtomRecordType)(
-      SqlField("id",           AtomRecordTable.Id, key = true),
-      SqlField("instrument",   AtomRecordTable.Instrument),
-      SqlObject("visit",       Join(AtomRecordTable.VisitId, VisitTable.Id)),
-      SqlField("created",      AtomRecordTable.Created),
-      EffectField("interval",  intervalHandler, List("id")),
-      SqlField("sequenceType", AtomRecordTable.SequenceType),
-      SqlField("stepCount",    AtomRecordTable.StepCount),
+      SqlField("id",             AtomRecordTable.Id, key = true),
+      SqlField("instrument",     AtomRecordTable.Instrument),
+      SqlObject("visit",         Join(AtomRecordTable.VisitId, VisitTable.Id)),
+      SqlField("created",        AtomRecordTable.Created),
+      SqlField("executionState", AtomRecordTable.ExecutionState),
+      EffectField("interval",    intervalHandler, List("id")),
+      SqlField("sequenceType",   AtomRecordTable.SequenceType),
+      SqlField("stepCount",      AtomRecordTable.StepCount),
       SqlObject("steps")
     )
 

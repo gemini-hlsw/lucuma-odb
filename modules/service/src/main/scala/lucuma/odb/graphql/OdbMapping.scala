@@ -83,6 +83,7 @@ object OdbMapping {
   ):  Mapping[F] =
         new SkunkMapping[F](database, monitor)
           with BaseMapping[F]
+          with AddAtomEventResultMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
           with AddSequenceEventResultMapping[F]
@@ -244,6 +245,7 @@ object OdbMapping {
           override val typeMappings: TypeMappings =
             TypeMappings(
               List[TypeMapping](
+                AddAtomEventResultMapping,
                 AddConditionsEntryResultMapping,
                 AddDatasetEventResultMapping,
                 AddSequenceEventResultMapping,
@@ -254,6 +256,7 @@ object OdbMapping {
                 AllocationMapping,
                 AsterismGroupMapping,
                 AsterismGroupSelectResultMapping,
+                AtomEventMapping,
                 AtomRecordMapping,
                 CalibrationProgramReferenceMapping,
                 CallForProposalsMapping,

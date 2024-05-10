@@ -180,8 +180,8 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
       assertEquals(
         d.state.atomsIntersecting(d.interval),
         d.state.toList.foldLeft(SortedSet.empty[Atom.Id]) { case (s, (interval, ctx)) =>
-          ctx.step.fold(s) { step =>
-            if (interval.intersects(d.interval)) s + step.atomId else s
+          ctx.atom.fold(s) { atom =>
+            if (interval.intersects(d.interval)) s + atom.atomId else s
           }
         }
       )

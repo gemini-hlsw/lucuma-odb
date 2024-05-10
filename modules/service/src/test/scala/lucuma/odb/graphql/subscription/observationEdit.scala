@@ -8,8 +8,11 @@ import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.math.Epoch
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 
@@ -57,7 +60,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     """
   }
 
-  def observationEdit(
+  def subtitleObservationEdit(
     editType: EditType,
     subtitle: String
   ): Json =
@@ -70,11 +73,77 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       )
     )
 
-  def created(subtitle: String): Json =
-    observationEdit(EditType.Created, subtitle)
+  def subtitleCreated(subtitle: String): Json =
+    subtitleObservationEdit(EditType.Created, subtitle)
 
-  def updated(subtitle: String): Json =
-    observationEdit(EditType.Updated, subtitle)
+  def subtitleUpdated(subtitle: String): Json =
+    subtitleObservationEdit(EditType.Updated, subtitle)
+
+  val titleSubscription = 
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            id
+            title
+          }
+        }
+      }
+    """
+
+  def titleUpdated(oid: Observation.Id, title: String): Json =
+    Json.obj(
+      "observationEdit" -> Json.obj(
+        "editType" -> Json.fromString(EditType.Updated.tag.toUpperCase),
+        "value"    -> Json.obj(
+          "id"    -> oid.asJson,
+          "title" -> Json.fromString(title)
+        )
+      )
+    )
+  
+  def updateTargetName(user: User, tid: Target.Id, name: String) =
+    sleep >>
+      query(
+        user = user,
+        query = s"""
+          mutation {
+            updateTargets(input: {
+              SET: { name: "$name" }
+              WHERE: {
+                id: { EQ: "$tid"}
+              }
+            }) {
+              targets {
+                id
+                name
+              }
+            }
+          }
+        """
+      ).void
+
+  def updateTargetEpoch(user: User, tid: Target.Id, epoch: Epoch) =
+    sleep >>
+      query(
+        user = user,
+        query = s"""
+          mutation {
+            updateTargets(input: {
+              SET: { sidereal: { epoch: "${Epoch.fromString.reverseGet(epoch)}" }}
+              WHERE: {
+                id: { EQ: "$tid" }
+              }
+            }) {
+              targets {
+                id
+                name
+              }
+            }
+          }
+        """
+      ).void
 
   test("trigger for my own new observations") {
     import Group1._
@@ -88,7 +157,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
               createObservation(user, "foo subtitle 0", pid) >> createObservation(user, "foo subtitle 1", pid)
             }
           ),
-        expected  = List(created("foo subtitle 0"), created("foo subtitle 1"))
+        expected  = List(subtitleCreated("foo subtitle 0"), subtitleCreated("foo subtitle 1"))
       )
     }
   }
@@ -104,7 +173,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           createProgram(pi,      "bar").flatMap(createObservation(pi,      "bar subtitle", _)) >>
           createProgram(service, "baz").flatMap(createObservation(service, "baz subtitle", _))
         ),
-      expected  = List(created("foo subtitle"))
+      expected  = List(subtitleCreated("foo subtitle"))
     )
   }
 
@@ -119,7 +188,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           createProgram(pi,      "bar").flatMap(createObservation(pi,      "bar subtitle", _)) >>
           createProgram(service, "baz").flatMap(createObservation(service, "baz subtitle", _))
         ),
-      expected  = List(created("foo subtitle"), created("bar subtitle"), created("baz subtitle"))
+      expected  = List(subtitleCreated("foo subtitle"), subtitleCreated("bar subtitle"), subtitleCreated("baz subtitle"))
     )
   }
 
@@ -138,7 +207,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
             updateObservation(pi, "obs 0 - edit", oid0) >>
               updateObservation(pi, "obs 1 - edit", oid1)
           ),
-        expected  = List(updated("obs 1 - edit"))
+        expected  = List(subtitleUpdated("obs 1 - edit"))
       )
     } yield ()
   }
@@ -158,7 +227,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
             createObservation(pi, "prog 0 - edit", pid0) >>
               createObservation(pi, "obs 1 - edit", pid1)
           ),
-        expected  = List(created("prog 0 - edit"))
+        expected  = List(subtitleCreated("prog 0 - edit"))
       )
     } yield ()
 
@@ -183,5 +252,98 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED","id":0}}""")
     )
   }
+  
+  test("triggers for adding target to observation") {
+    import Group1.pi
 
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid0 <- createObservationAs(pi, pid, None, tid0)
+      oid1 <- createObservationAs(pi, pid)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(
+            sleep >>
+              updateAsterisms(
+                pi,
+                List(oid0, oid1),
+                add = List(tid1),
+                del = List.empty,
+                exp = List((oid0, List(tid0, tid1)), (oid1, List(tid1)))
+              )
+          ),
+        expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "One"))
+      )
+    } yield ()
+  }
+
+  test("triggers for deleting target from observation") {
+    import Group1.pi
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
+      oid1 <- createObservationAs(pi, pid, None, tid0)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(
+            sleep >>
+              updateAsterisms(
+                pi,
+                List(oid0, oid1),
+                add = List.empty,
+                del = List(tid0),
+                exp = List((oid0, List(tid1)), (oid1, List.empty))
+              )
+          ),
+        expected  = List(titleUpdated(oid0, "One"), titleUpdated(oid1, "Untargeted"))
+      )
+    } yield ()
+  }
+
+  test("triggers for changing target name in asterism") {
+    import Group1.pi
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
+      oid1 <- createObservationAs(pi, pid, None, tid0)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(updateTargetName(pi, tid0, "New Name")),
+        expected  = List(titleUpdated(oid0, "New Name, One"), titleUpdated(oid1, "New Name"))
+      )
+    } yield ()
+  }
+
+  test("triggers for changing target epoch in asterism") {
+    import Group1.pi
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
+      oid1 <- createObservationAs(pi, pid, None, tid0)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(updateTargetEpoch(pi, tid0, Epoch.B1950)),
+        expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "Zero"))
+      )
+    } yield ()
+  }
 }
