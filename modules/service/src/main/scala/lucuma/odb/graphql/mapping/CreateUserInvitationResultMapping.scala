@@ -13,14 +13,11 @@ import table.UserInvitationTable
 trait CreateUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
 
   lazy val CreateUserInvitationResultMapping =
-    ObjectMapping(
-      tpe = CreateUserInvitationResultType,
-      fieldMappings = List(
-        SqlField("id", UserInvitationTable.InvitationId, key = true),
-        SqlObject("invitation"),
-        CursorField("key", c => c.envR[UserInvitation]("inv").map(UserInvitation.fromString.reverseGet), List("id"))
-      ),
+    ObjectMapping(CreateUserInvitationResultType)(
+      SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
+      SqlObject("invitation"),
+      CursorField("key", c => c.envR[UserInvitation]("inv").map(UserInvitation.fromString.reverseGet), List("id"))
     )
 
-  }
+}
 

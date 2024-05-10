@@ -12,12 +12,9 @@ import table.UserInvitationTable
 trait RedeemUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
 
   lazy val RedeemUserInvitationResultMapping =
-    ObjectMapping(
-      tpe = RedeemUserInvitationResultType,
-      fieldMappings = List(
-        SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
-        SqlObject("invitation")
-      ),
+    ObjectMapping(RedeemUserInvitationResultType)(
+      SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
+      SqlObject("invitation")
     )
 
   }

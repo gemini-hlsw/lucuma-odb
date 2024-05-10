@@ -15,17 +15,14 @@ trait ObservingModeMapping[F[_]]
      with GmosLongSlitView[F] { this: SkunkMapping[F] =>
 
   lazy val ObservingModeMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ObservingModeType,
-      fieldMappings = List(
-        SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
+    ObjectMapping(ObservingModeType)(
+      SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
 
-        FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
-        SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 
-        SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),
-        SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId))
-      )
+      SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),
+      SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId))
     )
 
 }

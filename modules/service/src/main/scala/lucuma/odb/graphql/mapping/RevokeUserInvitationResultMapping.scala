@@ -12,12 +12,9 @@ import table.UserInvitationTable
 trait RevokeUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
 
   lazy val RevokeUserInvitationResultMapping =
-    ObjectMapping(
-      tpe = RevokeUserInvitationResultType,
-      fieldMappings = List(
-        SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
-        SqlObject("invitation")
-      ),
+    ObjectMapping(RevokeUserInvitationResultType)(
+      SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
+      SqlObject("invitation")
     )
 
   }

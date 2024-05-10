@@ -17,14 +17,11 @@ trait ProgramUserMapping[F[_]]
   lazy val ProgramUserType = schema.ref("ProgramUser")
 
   lazy val ProgramUserMapping =
-    ObjectMapping(
-      tpe = ProgramUserType,
-      fieldMappings = List(
-        SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
-        SqlField("userId", ProgramUserTable.UserId, key = true),
-        SqlField("role", ProgramUserTable.Role),
-        SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId))
-      )
+    ObjectMapping(ProgramUserType)(
+      SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
+      SqlField("userId", ProgramUserTable.UserId, key = true),
+      SqlField("role", ProgramUserTable.Role),
+      SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId))
     )
 
 }

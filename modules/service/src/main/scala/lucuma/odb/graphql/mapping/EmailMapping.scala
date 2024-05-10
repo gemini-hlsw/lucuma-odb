@@ -14,19 +14,16 @@ trait EmailMapping[F[_]]
   with EmailTable[F] {
 
   lazy val EmailMapping = 
-    ObjectMapping(
-      tpe = EmailType,
-      fieldMappings = List(
-        SqlField("id", EmailTable.EmailId, key = true, hidden = true),
-        SqlField("senderEmail", EmailTable.SenderEmail),
-        SqlField("recipientEmail", EmailTable.RecipientEmail),
-        SqlField("subject", EmailTable.Subject),
-        SqlField("textMessage", EmailTable.TextMessage),
-        SqlField("htmlMessage", EmailTable.HtmlMessage),
-        SqlField("originalTime", EmailTable.OriginalTime),
-        SqlField("status", EmailTable.Status),
-        SqlField("statusTime", EmailTable.StatusTime)
-      )
+    ObjectMapping(EmailType)(
+      SqlField("id", EmailTable.EmailId, key = true, hidden = true),
+      SqlField("senderEmail", EmailTable.SenderEmail),
+      SqlField("recipientEmail", EmailTable.RecipientEmail),
+      SqlField("subject", EmailTable.Subject),
+      SqlField("textMessage", EmailTable.TextMessage),
+      SqlField("htmlMessage", EmailTable.HtmlMessage),
+      SqlField("originalTime", EmailTable.OriginalTime),
+      SqlField("status", EmailTable.Status),
+      SqlField("statusTime", EmailTable.StatusTime)
     )
   
 }

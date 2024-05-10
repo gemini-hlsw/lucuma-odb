@@ -15,14 +15,11 @@ trait ProgramEditMapping[F[_]] extends ProgramTable[F]  {
 
   // N.B. env is populated by the subscription elaborator
   lazy val ProgramEditMapping =
-    ObjectMapping(
-      tpe = ProgramEditType,
-      fieldMappings = List(
-        SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
-        CursorField("id", _ => Result(0L), List("synthetic-id")),
-        CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
-        SqlObject("value")
-      )
+    ObjectMapping(ProgramEditType)(
+      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+      CursorField("id", _ => Result(0L), List("synthetic-id")),
+      CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
+      SqlObject("value")
     )
 
 }

@@ -13,12 +13,9 @@ import table.ProgramTable
 trait CreateTargetResultMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val CreateTargetResultMapping =
-    ObjectMapping(
-      tpe = CreateTargetResultType,
-      fieldMappings = List(
-        SqlField("id", TargetView.TargetId, key = true),
-        SqlObject("target"),
-      ),
+    ObjectMapping(CreateTargetResultType)(
+      SqlField("id", TargetView.TargetId, key = true, hidden = true),
+      SqlObject("target"),
     )
 
   }

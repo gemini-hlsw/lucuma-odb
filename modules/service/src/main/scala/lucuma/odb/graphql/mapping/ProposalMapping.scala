@@ -25,18 +25,15 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
                                with KeyValueEffectHandler[F] {
 
   lazy val ProposalMapping =
-    ObjectMapping(
-      tpe = ProposalType,
-      fieldMappings = List(
-        SqlField("program_id", ProposalTable.ProgramId, key = true, hidden = true),
-        SqlField("title", ProposalTable.Title),
-        SqlObject("reference", Join(ProposalTable.ProgramId, ProposalReferenceView.Id)),
-        SqlField("category", ProposalTable.Category),
-        SqlField("toOActivation", ProposalTable.TooActivation),
-        SqlField("abstract", ProposalTable.Abstrakt),
-        SqlObject("proposalClass"),
-        SqlObject("partnerSplits", Join(ProposalTable.ProgramId, PartnerSplitTable.ProgramId))
-      )
+    ObjectMapping(ProposalType)(
+      SqlField("program_id", ProposalTable.ProgramId, key = true, hidden = true),
+      SqlField("title", ProposalTable.Title),
+      SqlObject("reference", Join(ProposalTable.ProgramId, ProposalReferenceView.Id)),
+      SqlField("category", ProposalTable.Category),
+      SqlField("toOActivation", ProposalTable.TooActivation),
+      SqlField("abstract", ProposalTable.Abstrakt),
+      SqlObject("proposalClass"),
+      SqlObject("partnerSplits", Join(ProposalTable.ProgramId, PartnerSplitTable.ProgramId))
     )
 
   lazy val ProposalElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

@@ -12,16 +12,13 @@ import table.ObservationView
 trait ConstraintSetMapping[F[_]] extends ObservationView[F] {
 
   lazy val ConstraintSetMapping =
-    ObjectMapping(
-      tpe = ConstraintSetType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlField("cloudExtinction", ObservationView.ConstraintSet.CloudExtinction),
-        SqlField("imageQuality",    ObservationView.ConstraintSet.ImageQuality),
-        SqlField("skyBackground",   ObservationView.ConstraintSet.SkyBackground),
-        SqlField("waterVapor",      ObservationView.ConstraintSet.WaterVapor),
-        SqlObject("elevationRange")
-      )
+    ObjectMapping(ConstraintSetType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlField("cloudExtinction", ObservationView.ConstraintSet.CloudExtinction),
+      SqlField("imageQuality",    ObservationView.ConstraintSet.ImageQuality),
+      SqlField("skyBackground",   ObservationView.ConstraintSet.SkyBackground),
+      SqlField("waterVapor",      ObservationView.ConstraintSet.WaterVapor),
+      SqlObject("elevationRange")
     )
 
 }

@@ -60,17 +60,14 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     )
 
   lazy val TargetEnvironmentMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = TargetEnvironmentType,
-      fieldMappings = List(
-        SqlField("programId", ObservationView.ProgramId, hidden = true),
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        asterismObject("asterism"),
-        asterismObject("firstScienceTarget"),
-        SqlObject("explicitBase"),
-        EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId")),
-        EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId"))
-      )
+    ObjectMapping(TargetEnvironmentType)(
+      SqlField("programId", ObservationView.ProgramId, hidden = true),
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      asterismObject("asterism"),
+      asterismObject("firstScienceTarget"),
+      SqlObject("explicitBase"),
+      EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId")),
+      EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId"))
     )
 
   private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =

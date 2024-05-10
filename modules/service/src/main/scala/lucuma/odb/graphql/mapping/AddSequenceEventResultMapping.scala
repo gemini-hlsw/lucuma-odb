@@ -9,12 +9,9 @@ import table.ExecutionEventTable
 trait AddSequenceEventResultMapping[F[_]] extends ExecutionEventTable[F] {
 
   lazy val AddSequenceEventResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = AddSequenceEventResultType,
-      fieldMappings = List(
-        SqlField("id", ExecutionEventTable.Id, key = true, hidden = true),
-        SqlObject("event")
-      )
+    ObjectMapping(AddSequenceEventResultType)(
+      SqlField("id", ExecutionEventTable.Id, key = true, hidden = true),
+      SqlObject("event")
     )
 
 }

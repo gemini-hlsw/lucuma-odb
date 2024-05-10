@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.mapping
 
+import grackle.Path
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
@@ -31,54 +32,48 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with VisitTable[F]
                                with ChronConditionsEntryView[F] {
 
-  lazy val TimeSpanMapping: TypeMapping =
-    SwitchMapping(
-      TimeSpanType,
-      List(
-        AllocationType / "duration"                               -> timeSpanMapping(AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
-        ConditionsExpectationType / "timeframe"                   -> timeSpanMapping(ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
-        GroupType / "maximumInterval"                             -> timeSpanMapping(GroupView.MaxInterval)(GroupView.MaxIntervalId),
-        GroupType / "minimumInterval"                             -> timeSpanMapping(GroupView.MinInterval)(GroupView.MinIntervalId),
-        IntensiveType / "totalTime"                               -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        LargeProgramType / "totalTime"                            -> timeSpanMapping(ProposalTable.TotalTime)(ProposalTable.ProgramId),
-        StepRecordType / "estimate"                               -> timeSpanMapping(StepRecordView.TimeEstimate)(StepRecordView.Id),
-        StepRecordType / "gmosNorth" / "exposure"                 -> timeSpanMapping(GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
-        StepRecordType / "gmosSouth" / "exposure"                 -> timeSpanMapping(GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
-        TimeChargeCorrectionType / "amount"                       -> timeSpanMapping(TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
-        TimeChargeDiscountType / "partner"                        -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
-        TimeChargeDiscountType / "program"                        -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
-        TimeChargeDaylightDiscountType / "partner"                -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
-        TimeChargeDaylightDiscountType / "program"                -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
-        TimeChargeQaDiscountType / "partner"                      -> timeSpanMapping(TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
-        TimeChargeQaDiscountType / "program"                      -> timeSpanMapping(TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
-        TimeChargeInvoiceType / "executionTime" / "nonCharged"    -> timeSpanMapping(VisitTable.Raw.NonChargedTime)(VisitTable.Id),
-        TimeChargeInvoiceType / "executionTime" / "partner"       -> timeSpanMapping(VisitTable.Raw.PartnerTime)(VisitTable.Id),
-        TimeChargeInvoiceType / "executionTime" / "program"       -> timeSpanMapping(VisitTable.Raw.ProgramTime)(VisitTable.Id),
-        TimeChargeInvoiceType / "finalCharge" / "nonCharged"      -> timeSpanMapping(VisitTable.Final.NonChargedTime)(VisitTable.Id),
-        TimeChargeInvoiceType / "finalCharge" / "partner"         -> timeSpanMapping(VisitTable.Final.PartnerTime)(VisitTable.Id),
-        TimeChargeInvoiceType / "finalCharge" / "program"         -> timeSpanMapping(VisitTable.Final.ProgramTime)(VisitTable.Id),
-        TimingWindowEndAfterType / "after"                        -> timeSpanMapping(TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
-        TimingWindowRepeatType / "period"                         -> timeSpanMapping(TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
-      )
+  lazy val TimeSpanMappings: List[TypeMapping] =
+    List(
+      timeSpanMappingAtPath(AllocationType / "duration", AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Partner),
+      timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
+      timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
+      timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
+      timeSpanMappingAtPath(IntensiveType / "totalTime", ProposalTable.TotalTime)(ProposalTable.ProgramId),
+      timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalTable.TotalTime)(ProposalTable.ProgramId),
+      timeSpanMappingAtPath(StepRecordType / "estimate", StepRecordView.TimeEstimate)(StepRecordView.Id),
+      timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
+      timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
+      timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
+      timeSpanMappingAtPath(TimeChargeDiscountType / "partner", TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeDaylightDiscountType / "partner", TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeDaylightDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeQaDiscountType / "partner", TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeQaDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeInvoiceType / "executionTime" / "nonCharged", VisitTable.Raw.NonChargedTime)(VisitTable.Id),
+      timeSpanMappingAtPath(TimeChargeInvoiceType / "executionTime" / "partner", VisitTable.Raw.PartnerTime)(VisitTable.Id),
+      timeSpanMappingAtPath(TimeChargeInvoiceType / "executionTime" / "program", VisitTable.Raw.ProgramTime)(VisitTable.Id),
+      timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "nonCharged", VisitTable.Final.NonChargedTime)(VisitTable.Id),
+      timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "partner", VisitTable.Final.PartnerTime)(VisitTable.Id),
+      timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "program", VisitTable.Final.ProgramTime)(VisitTable.Id),
+      timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
+      timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Format[A, TimeSpan]): CursorField[A] =
     FieldRef("value").as(name, f.reverseGet)
 
-  private def timeSpanMapping(data: ColumnRef)(keys: ColumnRef*): ObjectMapping =
-    ObjectMapping(
-      tpe = TimeSpanType,
-      fieldMappings =
-        keyFields(keys*) ++ List(
-        SqlField("value", data, hidden = true),
-        valueAs("microseconds")(Format.fromPrism(TimeSpan.FromMicroseconds)),
-        valueAs("milliseconds")(TimeSpan.FromMilliseconds),
-        valueAs("seconds")(TimeSpan.FromSeconds),
-        valueAs("minutes")(TimeSpan.FromMinutes),
-        valueAs("hours")(TimeSpan.FromHours),
-        valueAs("iso")(TimeSpan.FromString)
-      )
-    )
+  private def timeSpanMappingAtPath(path: Path, data: ColumnRef)(keys: ColumnRef*): ObjectMapping =
+    ObjectMapping(path)(
+      keyFields(keys*) ++ List(
+      SqlField("value", data, hidden = true),
+      valueAs("microseconds")(Format.fromPrism(TimeSpan.FromMicroseconds)),
+      valueAs("milliseconds")(TimeSpan.FromMilliseconds),
+      valueAs("seconds")(TimeSpan.FromSeconds),
+      valueAs("minutes")(TimeSpan.FromMinutes),
+      valueAs("hours")(TimeSpan.FromHours),
+      valueAs("iso")(TimeSpan.FromString)
+    )*)
 
   private def keyFields(keys: ColumnRef*): List[FieldMapping] =
     keys.toList.zipWithIndex.map { (col, n) =>

@@ -9,12 +9,9 @@ import table.DatasetTable
 trait RecordDatasetResultMapping[F[_]] extends DatasetTable[F] {
 
   lazy val RecordDatasetResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = RecordDatasetResultType,
-      fieldMappings = List(
-        SqlField("id", DatasetTable.Id, key = true, hidden = true),
-        SqlObject("dataset")
-      )
+    ObjectMapping(RecordDatasetResultType)(
+      SqlField("id", DatasetTable.Id, key = true, hidden = true),
+      SqlObject("dataset")
     )
 
 }

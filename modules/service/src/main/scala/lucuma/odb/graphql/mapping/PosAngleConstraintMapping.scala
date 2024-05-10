@@ -11,13 +11,10 @@ import table.ObservationView
 trait PosAngleConstraintMapping[F[_]] extends ObservationView[F] {
 
   lazy val PosAngleConstraintMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = PosAngleConstraintType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlField("mode",  ObservationView.PosAngleConstraint.Mode),
-        SqlObject("angle")
-      )
+    ObjectMapping(PosAngleConstraintType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlField("mode",  ObservationView.PosAngleConstraint.Mode),
+      SqlObject("angle")
     )
 
 }

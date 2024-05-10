@@ -11,13 +11,10 @@ import lucuma.odb.graphql.table.PartnerSplitTable
 trait PartnerSplitMapping[F[_]] extends PartnerSplitTable[F] {
 
   lazy val PartnerSplitMapping =
-    ObjectMapping(
-      tpe = PartnerSplitType,
-      fieldMappings = List(
-        SqlField("program_id", PartnerSplitTable.ProgramId, key = true, hidden = true),
-        SqlField("partner", PartnerSplitTable.Partner, key = true),
-        SqlField("percent", PartnerSplitTable.Percent),
-      )
+    ObjectMapping(PartnerSplitType)(
+      SqlField("program_id", PartnerSplitTable.ProgramId, key = true, hidden = true),
+      SqlField("partner", PartnerSplitTable.Partner, key = true),
+      SqlField("percent", PartnerSplitTable.Percent),
     )
 
   }

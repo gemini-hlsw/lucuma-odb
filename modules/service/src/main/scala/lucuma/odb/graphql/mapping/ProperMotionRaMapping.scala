@@ -14,14 +14,11 @@ import table.ProgramTable
 trait ProperMotionRaMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
 
   lazy val ProperMotionRaMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = ProperMotionRaType,
-      fieldMappings = List(
-        SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
-        SqlField("value", TargetView.Sidereal.ProperMotion.Ra, hidden = true),
-        FieldRef[Angle]("value").as("microarcsecondsPerYear", Angle.signedMicroarcseconds.get),
-        FieldRef[Angle]("value").as("milliarcsecondsPerYear", Angle.signedDecimalMilliarcseconds.get),
-      )
+    ObjectMapping(ProperMotionRaType)(
+      SqlField("synthetic_id", TargetView.Sidereal.ProperMotion.SyntheticId, key = true, hidden = true),
+      SqlField("value", TargetView.Sidereal.ProperMotion.Ra, hidden = true),
+      FieldRef[Angle]("value").as("microarcsecondsPerYear", Angle.signedMicroarcseconds.get),
+      FieldRef[Angle]("value").as("milliarcsecondsPerYear", Angle.signedDecimalMilliarcseconds.get),
     )
 
 }

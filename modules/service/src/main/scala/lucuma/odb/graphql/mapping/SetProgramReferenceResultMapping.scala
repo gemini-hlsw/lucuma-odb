@@ -12,12 +12,9 @@ trait SetProgramReferenceResultMapping[F[_]] extends BaseMapping[F]
                                                 with ProgramTable[F] {
 
   lazy val SetProgramReferenceResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = SetProgramReferenceResultType,
-      fieldMappings = List(
-        SqlField("programId", ProgramTable.Id, key = true, hidden = true),
-        SqlObject("reference", Join(ProgramTable.Id, ProgramReferenceView.Id))
-      )
+    ObjectMapping(SetProgramReferenceResultType)(
+      SqlField("programId", ProgramTable.Id, key = true, hidden = true),
+      SqlObject("reference", Join(ProgramTable.Id, ProgramReferenceView.Id))
     )
-
+    
 }

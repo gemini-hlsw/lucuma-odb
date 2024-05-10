@@ -22,19 +22,17 @@ trait AsterismGroupMapping[F[_]]
     with Predicates[F] {
 
   lazy val AsterismGroupMapping: TypeMapping =
-    ObjectMapping(
-      tpe = AsterismGroupType,
-      fieldMappings = List(
+    ObjectMapping(AsterismGroupType)(
 
-        // Our key, which is hidden
-        SqlField("asterismGroup", AsterismGroupView.AsterismGroup, key = true, hidden = true),
+      // Our key, which is hidden
+      SqlField("asterismGroup", AsterismGroupView.AsterismGroup, key = true, hidden = true),
 
-        // User-visible fields
-        SqlObject("program", Join(AsterismGroupView.ProgramId, ProgramTable.Id)),
-        SqlObject("observations", Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
-        SqlObject("asterism", Join(AsterismGroupView.ExampleObservationId, AsterismTargetTable.ObservationId), Join(AsterismTargetTable.TargetId, TargetView.TargetId)),
+      // User-visible fields
+      SqlObject("program", Join(AsterismGroupView.ProgramId, ProgramTable.Id)),
+      // SqlObject("observations", Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
+      SqlObject("observations"),
+      SqlObject("asterism", Join(AsterismGroupView.ExampleObservationId, AsterismTargetTable.ObservationId), Join(AsterismTargetTable.TargetId, TargetView.TargetId)),
 
-      )
     )
 
   // Make sure the asterism is filtered by existence

@@ -36,30 +36,27 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
   def user: User
 
   lazy val DatasetMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = DatasetType,
-      fieldMappings = List(
-        SqlField("id",           DatasetTable.Id,   key = true),
-        SqlObject("step",        Join(DatasetTable.StepId, StepRecordView.Id)),
-        SqlField("index",        DatasetTable.ExposureIndex),
-        SqlObject("reference",   Join(DatasetTable.Id, DatasetReferenceView.Id)),
-        SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
-        SqlObject("visit",       Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
-        SqlObject("events"),
-        SqlField("filename",     DatasetTable.File.Name),
-        SqlField("qaState",      DatasetTable.QaState),
+    ObjectMapping(DatasetType)(
+      SqlField("id",           DatasetTable.Id,   key = true),
+      SqlObject("step",        Join(DatasetTable.StepId, StepRecordView.Id)),
+      SqlField("index",        DatasetTable.ExposureIndex),
+      SqlObject("reference",   Join(DatasetTable.Id, DatasetReferenceView.Id)),
+      SqlObject("observation", Join(DatasetTable.ObservationId, ObservationView.Id)),
+      SqlObject("visit",       Join(DatasetTable.StepId, StepRecordView.Id), Join(StepRecordView.AtomId, AtomRecordTable.Id), Join(AtomRecordTable.VisitId, VisitTable.Id)),
+      SqlObject("events"),
+      SqlField("filename",     DatasetTable.File.Name),
+      SqlField("qaState",      DatasetTable.QaState),
 
-        SqlField("start",        DatasetTable.Time.Start, hidden = true),
-        SqlField("end",          DatasetTable.Time.End, hidden = true),
+      SqlField("start",        DatasetTable.Time.Start, hidden = true),
+      SqlField("end",          DatasetTable.Time.End, hidden = true),
 
-        CursorFieldJson("interval",
-           cursor =>
-             for {
-               s <- cursor.fieldAs[Option[Timestamp]]("start")
-               e <- cursor.fieldAs[Option[Timestamp]]("end")
-             } yield (s, e).mapN { (ts, te) => TimestampInterval.between(ts, te) }.asJson,
-           List("start", "end")
-        )
+      CursorFieldJson("interval",
+          cursor =>
+            for {
+              s <- cursor.fieldAs[Option[Timestamp]]("start")
+              e <- cursor.fieldAs[Option[Timestamp]]("end")
+            } yield (s, e).mapN { (ts, te) => TimestampInterval.between(ts, te) }.asJson,
+          List("start", "end")
       )
     )
 

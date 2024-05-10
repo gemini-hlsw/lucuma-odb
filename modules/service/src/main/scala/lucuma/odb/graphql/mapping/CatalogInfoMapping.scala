@@ -13,14 +13,11 @@ import table.ProgramTable
 trait CatalogInfoMapping[F[_]] extends ProgramTable[F] with TargetView[F]  {
 
   lazy val CatalogInfoMapping =
-    ObjectMapping(
-      tpe = CatalogInfoType,
-      fieldMappings = List(
-        SqlField("synthetic_id", TargetView.Sidereal.Catalog.SyntheticId, key = true, hidden = true),
-        SqlField("name", TargetView.Sidereal.Catalog.Name),
-        SqlField("id", TargetView.Sidereal.Catalog.Id),
-        SqlField("objectType", TargetView.Sidereal.Catalog.ObjectType),
-      )
+    ObjectMapping(CatalogInfoType)(
+      SqlField("synthetic_id", TargetView.Sidereal.Catalog.SyntheticId, key = true, hidden = true),
+      SqlField("name", TargetView.Sidereal.Catalog.Name),
+      SqlField("id", TargetView.Sidereal.Catalog.Id),
+      SqlField("objectType", TargetView.Sidereal.Catalog.ObjectType),
     )
 
 }

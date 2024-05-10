@@ -13,12 +13,9 @@ trait CreateProgramResultMapping[F[_]] extends ProgramTable[F] {
 
 
   lazy val CreateProgramResultMapping =
-    ObjectMapping(
-      tpe = CreateProgramResultType,
-      fieldMappings = List(
-        SqlField("id", ProgramTable.Id, key = true),
-        SqlObject("program"),
-      )
+    ObjectMapping(CreateProgramResultType)(
+      SqlField("id", ProgramTable.Id, key = true, hidden = true),
+      SqlObject("program"),
     )
 
 }

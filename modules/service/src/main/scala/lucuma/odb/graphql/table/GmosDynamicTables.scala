@@ -6,6 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import org.tpolecat.typename.TypeName
 import skunk.codec.text.varchar
 
 trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
@@ -15,7 +16,7 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
     grating: skunk.Codec[G],
     filter:  skunk.Codec[L],
     fpu:     skunk.Codec[U]
-  ) extends TableDef(name) {
+  )(implicit gratingName: TypeName[G], filterName: TypeName[L], fpuName: TypeName[U]) extends TableDef(name) {
     val Id: ColumnRef            = col("c_step_id",           step_id)
     val Instrument: ColumnRef    = col("c_instrument",        instrument)
 

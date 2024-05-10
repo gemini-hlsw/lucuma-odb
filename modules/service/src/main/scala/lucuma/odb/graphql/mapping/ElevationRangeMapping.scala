@@ -11,15 +11,11 @@ import table.ObservationView
 
 trait ElevationRangeMapping[F[_]] extends ObservationView[F] {
 
-
   lazy val ElevationRangeMapping =
-    ObjectMapping(
-      tpe = ElevationRangeType,
-      fieldMappings = List(
-        SqlField("id", ObservationView.Id, key = true, hidden = true),
-        SqlObject("airMass"),
-        SqlObject("hourAngle")
-      )
+    ObjectMapping(ElevationRangeType)(
+      SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlObject("airMass"),
+      SqlObject("hourAngle")
     )
 
 }

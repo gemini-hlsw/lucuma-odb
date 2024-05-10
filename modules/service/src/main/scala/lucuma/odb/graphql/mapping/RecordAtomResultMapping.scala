@@ -9,12 +9,9 @@ import table.AtomRecordTable
 trait RecordAtomResultMapping[F[_]] extends AtomRecordTable[F] {
 
   lazy val RecordAtomResultMapping: ObjectMapping =
-    ObjectMapping(
-      tpe = RecordAtomResultType,
-      fieldMappings = List(
-        SqlField("id", AtomRecordTable.Id, key = true),
-        SqlObject("atomRecord")
-      )
+    ObjectMapping(RecordAtomResultType)(
+      SqlField("id", AtomRecordTable.Id, key = true, hidden = true),
+      SqlObject("atomRecord")
     )
 
 }

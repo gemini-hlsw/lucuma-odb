@@ -16,21 +16,18 @@ trait UserInvitationMapping[F[_]]
   with EmailTable[F] {
 
   lazy val UserInvitationMapping =
-    ObjectMapping(
-      tpe = UserInvitationType,
-      fieldMappings = List(
-        SqlField("id", UserInvitationTable.InvitationId, key = true),
-        SqlField("status", UserInvitationTable.Status),
-        SqlObject("issuer", Join(UserInvitationTable.IssuerId, UserTable.UserId)),
-        SqlObject("program", Join(UserInvitationTable.ProgramId, ProgramTable.Id)),
-        SqlField("recipientEmail", UserInvitationTable.RecipientEmail),
-        SqlField("role", UserInvitationTable.Role),
-        SqlField("supportType", UserInvitationTable.SupportType),
-        SqlField("supportPartner", UserInvitationTable.SupportPartner),
-        SqlObject("redeemer", Join(UserInvitationTable.RedeemerId, UserTable.UserId)),
-        SqlObject("email", Join(UserInvitationTable.EmailId, EmailTable.EmailId))
-      )
+    ObjectMapping(UserInvitationType)(
+      SqlField("id", UserInvitationTable.InvitationId, key = true),
+      SqlField("status", UserInvitationTable.Status),
+      SqlObject("issuer", Join(UserInvitationTable.IssuerId, UserTable.UserId)),
+      SqlObject("program", Join(UserInvitationTable.ProgramId, ProgramTable.Id)),
+      SqlField("recipientEmail", UserInvitationTable.RecipientEmail),
+      SqlField("role", UserInvitationTable.Role),
+      SqlField("supportType", UserInvitationTable.SupportType),
+      SqlField("supportPartner", UserInvitationTable.SupportPartner),
+      SqlObject("redeemer", Join(UserInvitationTable.RedeemerId, UserTable.UserId)),
+      SqlObject("email", Join(UserInvitationTable.EmailId, EmailTable.EmailId))
     )
 
-  }
+}
 
