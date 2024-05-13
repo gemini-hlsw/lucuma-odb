@@ -40,6 +40,7 @@ class createGroup extends OdbSuite {
             ) {
               group {
                 name
+                existence
                 description
                 minimumRequired
                 ordered
@@ -64,6 +65,7 @@ class createGroup extends OdbSuite {
             "createGroup" : {
               "group" : {
                 "name" : "My Group",
+                "existence" : "PRESENT",
                 "description" : "A description",
                 "minimumRequired" : 4,
                 "ordered" : true,

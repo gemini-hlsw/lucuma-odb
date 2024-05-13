@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
 import lucuma.core.model.Group
 import lucuma.core.model.Program
+import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -112,7 +113,8 @@ object GroupService {
         c_min_required,
         c_ordered,
         c_min_interval,
-        c_max_interval
+        c_max_interval,
+        c_existence
       ) values (
         $program_id,
         ${group_id.opt},
@@ -122,7 +124,8 @@ object GroupService {
         ${int2_nonneg.opt},
         $bool,
         ${time_span.opt},
-        ${time_span.opt}
+        ${time_span.opt},
+        $existence
       ) returning c_group_id
       """.query(group_id)
          .contramap[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort] { case ((pid, c), index) => (
@@ -134,7 +137,8 @@ object GroupService {
           c.minimumRequired,
           c.ordered,
           c.minimumInterval,
-          c.maximumInterval
+          c.maximumInterval,
+          c.existence
         )}
 
     val OpenHole: Query[(Program.Id, Option[Group.Id], Option[NonNegShort]), NonNegShort] =
@@ -150,13 +154,26 @@ object GroupService {
           SET.minimumRequired.toOptionOption.map(sql"c_min_required = ${int2_nonneg.opt}"),
           SET.minimumInterval.toOptionOption.map(sql"c_min_interval = ${time_span.opt}"),
           SET.maximumInterval.toOptionOption.map(sql"c_max_interval = ${time_span.opt}"),
+          SET.existence.map(sql"c_existence = $existence"),
         ).flatten
+
+      val deletionPredicate: AppliedFragment =        
+        SET.existence
+          .filter(_ === Existence.Deleted)
+          .as(void" AND NOT EXISTS (SELECT * FROM v_group_element WHERE c_group_id = v_group.c_group_id)")
+          .orEmpty
+
+      val idPredicate: AppliedFragment =
+        void" c_group_id IN (" |+| which |+| deletionPredicate |+| void")";
+
+      val coda: AppliedFragment =
+        void" WHERE" |+| idPredicate |+| void" RETURNING c_group_id"
 
       NonEmptyList.fromList(fieldUpdates).map { updates =>
         updates.foldSmash(
           void"UPDATE t_group SET ",
           void", ",
-          void" WHERE c_group_id IN (" |+| which |+| void") RETURNING c_group_id"
+          coda
         )
       }
 

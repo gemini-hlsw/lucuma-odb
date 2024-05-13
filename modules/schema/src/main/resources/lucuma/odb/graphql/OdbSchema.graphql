@@ -6946,7 +6946,7 @@ type Group {
   maximumInterval: TimeSpan
 
   "Contained elements"
-  elements: [GroupElement!]!
+  elements(includeDeleted: Boolean! = false): [GroupElement!]!
 
   """
   Remaining execution time estimate range, assuming it can be calculated.  In
@@ -6956,6 +6956,8 @@ type Group {
   cannot be calculated.
   """
   timeEstimateRange: CategorizedTimeRange
+
+  existence: Existence!
 
 }
 
@@ -6967,6 +6969,7 @@ type GroupElement {
   parentIndex: NonNegShort!
   group: Group
   observation: Observation
+  existence: Existence!
 }
 
 input GroupPropertiesInput {
@@ -6994,6 +6997,9 @@ input GroupPropertiesInput {
 
   "Parent index. If unspecified then the element will appear first in the program or parent group (if specified). Cannot be set to null."
   parentGroupIndex: NonNegShort
+
+  "Existence. Defaults to 'present' on creation. Change this value to delete a group (must be empty)."
+  existence: Existence
 
 }
 
@@ -8038,10 +8044,10 @@ type Program {
   proposalAttachments: [ProposalAttachment!]!
 
   "Top-level group elements (observations and sub-groups) in the program."
-  groupElements: [GroupElement!]!
+  groupElements(includeDeleted: Boolean! = false): [GroupElement!]!
 
   "All group elements (observations and sub-groups) in the program."
-  allGroupElements: [GroupElement!]!
+  allGroupElements(includeDeleted: Boolean! = false): [GroupElement!]!
 
   """
   Remaining execution time estimate range, assuming it can be calculated.  In

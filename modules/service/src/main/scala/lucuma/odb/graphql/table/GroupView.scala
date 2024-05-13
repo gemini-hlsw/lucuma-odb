@@ -24,6 +24,7 @@ trait GroupView[F[_]] extends BaseMapping[F] {
     val MaxInterval = col("c_max_interval", time_span.embedded)
     val MinIntervalId = col("c_min_interval_id", group_id.embedded)
     val MaxIntervalId = col("c_max_interval_id", group_id.embedded)
+    val Existence    = col("c_existence", existence)
   }
 
 }
