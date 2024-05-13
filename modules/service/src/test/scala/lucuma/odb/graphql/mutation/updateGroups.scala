@@ -240,4 +240,95 @@ class updateGroups extends OdbSuite {
     } yield ()
   }
 
+  def deleteGroupAs(user: User, gid: Group.Id): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: {
+              existence: DELETED
+            },
+            WHERE: {
+              id: { IN: [${gid.asJson}] }
+            }
+          }) {
+            groups {
+              id
+              existence
+            }
+          }
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateGroups": {
+            "groups": [
+              {
+                "id": $gid,
+                "existence": "DELETED"
+              }
+            ]
+          }
+        }
+      """)
+    )
+
+  test("update existence - can't delete a non-empty group".fail) {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      -   <- createGroupAs(pi, pid, Some(g1), None)
+      _   <- deleteGroupAs(pi, g1)
+    yield ()
+  }
+
+  test("update existence - can delete a non-empty group") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      _   <- deleteGroupAs(pi, g1)
+    yield ()
+  }
+
+  test("update existence - deleted group shouldn't be visible at top level") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      _   <- deleteGroupAs(pi, g1)
+      _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g2)))
+    yield ()
+  }
+  
+  test("update existence - deleted group should be visible at top level, if you ask") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      _   <- deleteGroupAs(pi, g1)
+      _   <- assertIO(groupElementsAs(pi, pid, None, includeDeleted = true), List(Left(g1), Left(g2)))
+    yield ()
+  }
+
+  test("update existence - deleted group shouldn't be visible at nested level") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid, Some(g1))
+      _   <- deleteGroupAs(pi, g2)
+      _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g1)))
+    yield ()
+  }
+  
+  test("update existence - deleted group should be visible at nested level, if you ask") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid, Some(g1))
+      _   <- deleteGroupAs(pi, g2)
+      _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g1), Left(g2)))
+    yield ()
+  }
+
 }

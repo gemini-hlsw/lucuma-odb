@@ -15,12 +15,13 @@ trait GroupElementMapping[F[_]] extends GroupElementView[F] with GroupView[F] wi
 
   lazy val GroupElementMapping =
     ObjectMapping(GroupElementType)(
-      SqlField("id", GroupElementView.Id, key = true, hidden = true),
-      SqlField("programId", GroupElementView.ProgramId, hidden = true),
+      SqlField("id", GroupElementView.Id, key = true),
+      SqlField("programId", GroupElementView.ProgramId),
       SqlField("parentGroupId", GroupElementView.GroupId),
       SqlField("parentIndex", GroupElementView.Index),
       SqlObject("group", Join(GroupElementView.ChildGroupId, GroupView.Id)),
       SqlObject("observation", Join(GroupElementView.ChildObservationId, ObservationView.Id)),
+      SqlField("existence", GroupElementView.Existence),
     )
 
 }

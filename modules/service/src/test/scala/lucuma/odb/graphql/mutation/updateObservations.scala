@@ -1784,6 +1784,12 @@ class updateObservations extends OdbSuite
     } yield ()
   }
 
+  test("update existence (grouping, 1)") {
+  }
+
+  test("update existence (grouping, 2)") {
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

@@ -12,4 +12,6 @@ class GroupElementPredicates(path: Path) {
   lazy val parentIndex = LeafPredicates[NonNegShort](path / "parentIndex")
   lazy val group = GroupPredicates(path / "group")
   lazy val observation = ObservationPredicates(path / "group")
+  lazy val existence = ExistencePredicates(path / "existence")
+
 }

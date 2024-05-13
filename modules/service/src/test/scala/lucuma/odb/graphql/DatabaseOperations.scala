@@ -683,8 +683,8 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createGroup", "group", "id").require[Group.Id]
     }
 
-  def groupElementsAs(user: User, pid: Program.Id, gid: Option[Group.Id]): IO[List[Either[Group.Id, Observation.Id]]] =
-    query(user, s"""query { program(programId: "$pid") { allGroupElements { parentGroupId group { id } observation { id } } } }""")
+  def groupElementsAs(user: User, pid: Program.Id, gid: Option[Group.Id], includeDeleted: Boolean = false): IO[List[Either[Group.Id, Observation.Id]]] =
+    query(user, s"""query { program(programId: "$pid") { allGroupElements(includeDeleted: $includeDeleted) { existence parentGroupId group { id } observation { id } } } }""")
       .map(_
         .hcursor
         .downFields("program", "allGroupElements")
