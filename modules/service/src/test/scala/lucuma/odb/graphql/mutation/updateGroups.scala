@@ -317,7 +317,7 @@ class updateGroups extends OdbSuite {
       g1  <- createGroupAs(pi, pid)
       g2  <- createGroupAs(pi, pid, Some(g1))
       _   <- deleteGroupAs(pi, g2)
-      _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g1)))
+      _   <- assertIO(groupElementsAs(pi, pid, Some(g1)), Nil)
     yield ()
   }
   
@@ -327,7 +327,7 @@ class updateGroups extends OdbSuite {
       g1  <- createGroupAs(pi, pid)
       g2  <- createGroupAs(pi, pid, Some(g1))
       _   <- deleteGroupAs(pi, g2)
-      _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g1), Left(g2)))
+      _   <- assertIO(groupElementsAs(pi, pid, Some(g1), includeDeleted = true), List(Left(g2)))
     yield ()
   }
 
