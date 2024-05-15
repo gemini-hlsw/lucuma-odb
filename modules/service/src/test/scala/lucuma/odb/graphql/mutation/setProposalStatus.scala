@@ -169,7 +169,7 @@ class setProposalStatus extends OdbSuite {
             input: {
               programId: "$pid",
               SET: {
-                callProperties: {
+                type: {
                   queue: {
                     callId: "$cid"
                   }

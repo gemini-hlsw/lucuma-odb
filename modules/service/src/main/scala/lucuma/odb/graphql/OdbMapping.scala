@@ -99,7 +99,6 @@ object OdbMapping {
           with AtomRecordSelectResultMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
-          with CallPropertiesMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
           with CloneObservationResultMapping[F]
@@ -171,6 +170,7 @@ object OdbMapping {
           with ProposalAttachmentTypeMetaMapping[F]
           with ProposalReferenceMapping[F]
           with ProposalStatusMetaMapping[F]
+          with ProposalTypeMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
@@ -262,16 +262,8 @@ object OdbMapping {
                 CallForProposalsMapping,
                 CallForProposalsPartnerMapping,
                 CallsForProposalsSelectResultMapping,
-                CallPropertiesClassicalMapping,
-                CallPropertiesDemoScienceMapping,
-                CallPropertiesDirectorsTimeMapping,
-                CallPropertiesFastTurnaroundMapping,
-                CallPropertiesLargeProgramMapping,
-                CallPropertiesMapping,
-                CallPropertiesPoorWeatherMapping,
-                CallPropertiesQueueMapping,
-                CallPropertiesSystemVerificationMapping,
                 CatalogInfoMapping,
+                ClassicalMapping,
                 CloneObservationResultMapping,
                 CloneTargetResultMapping,
                 CommissioningProgramReferenceMapping,
@@ -293,12 +285,15 @@ object OdbMapping {
                 DatasetEventMapping,
                 DatasetMapping,
                 DatasetReferenceMapping,
+                DemoScienceMapping,
+                DirectorsTimeMapping,
                 EmailMapping,
                 EngineeringProgramReferenceMapping,
                 ElevationRangeMapping,
                 ExampleProgramReferenceMapping,
                 ExecutionMapping,
                 ExecutionEventMapping,
+                FastTurnaroundMapping,
                 FilterTypeMetaMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
@@ -308,6 +303,7 @@ object OdbMapping {
                 GroupEditMapping,
                 GroupElementMapping,
                 HourAngleRangeMapping,
+                LargeProgramMapping,
                 LibraryProgramReferenceMapping,
                 LinkUserResultMapping,
                 MonitoringProgramReferenceMapping,
@@ -323,6 +319,7 @@ object OdbMapping {
                 ParallaxMapping,
                 PartnerMetaMapping,
                 PartnerSplitMapping,
+                PoorWeatherMapping,
                 PosAngleConstraintMapping,
                 ProgramMapping,
                 ProgramEditMapping,
@@ -337,7 +334,9 @@ object OdbMapping {
                 ProposalMapping,
                 ProposalReferenceMapping,
                 ProposalStatusMetaMapping,
+                ProposalTypeMapping,
                 QueryMapping,
+                QueueMapping,
                 RadialVelocityMapping,
                 RecordAtomResultMapping,
                 RecordDatasetResultMapping,
@@ -369,6 +368,7 @@ object OdbMapping {
                 StepRecordMapping,
                 StepRecordSelectResultMapping,
                 SubscriptionMapping,
+                SystemVerificationMapping,
                 TargetEditMapping,
                 TargetEnvironmentMapping,
                 TargetGroupMapping,
@@ -434,7 +434,7 @@ object OdbMapping {
                 AsterismGroupElaborator,
                 AtomRecordElaborator,
                 CallForProposalsElaborator,
-                CallPropertiesElaborator,
+                ProposalTypeElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,

@@ -26,15 +26,15 @@ import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalView
 
-trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
-                                     with CallForProposalsView[F]
-                                     with PartnerSplitTable[F]
-                                     with ProposalView[F] {
+trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
+                                   with CallForProposalsView[F]
+                                   with PartnerSplitTable[F]
+                                   with ProposalView[F] {
 
-  lazy val CallPropertiesMapping: ObjectMapping =
+  lazy val ProposalTypeMapping: ObjectMapping =
     SqlInterfaceMapping(
-      tpe = CallPropertiesType,
-      discriminator = callPropertiesTypeDiscriminator,
+      tpe = ProposalTypeType,
+      discriminator = proposalTypeDiscriminator,
       fieldMappings = List(
         SqlField("id", ProposalView.ProgramId, key = true, hidden = true),
         SqlField("scienceSubtype", ProposalView.ScienceSubtype, discriminator = true),
@@ -42,39 +42,39 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       )
     )
 
-  private lazy val callPropertiesTypeDiscriminator: SqlDiscriminator =
+  private lazy val proposalTypeDiscriminator: SqlDiscriminator =
     new SqlDiscriminator {
       override def discriminate(c:  Cursor): Result[Type] =
         c.fieldAs[ScienceSubtype]("scienceSubtype").flatMap {
-          case ScienceSubtype.Classical          => Result(CallPropertiesClassicalType)
-          case ScienceSubtype.DemoScience        => Result(CallPropertiesDemoScienceType)
-          case ScienceSubtype.DirectorsTime      => Result(CallPropertiesDirectorsTimeType)
-          case ScienceSubtype.FastTurnaround     => Result(CallPropertiesFastTurnaroundType)
-          case ScienceSubtype.LargeProgram       => Result(CallPropertiesLargeProgramType)
-          case ScienceSubtype.PoorWeather        => Result(CallPropertiesPoorWeatherType)
-          case ScienceSubtype.Queue              => Result(CallPropertiesQueueType)
-          case ScienceSubtype.SystemVerification => Result(CallPropertiesSystemVerificationType)
+          case ScienceSubtype.Classical          => Result(ClassicalType)
+          case ScienceSubtype.DemoScience        => Result(DemoScienceType)
+          case ScienceSubtype.DirectorsTime      => Result(DirectorsTimeType)
+          case ScienceSubtype.FastTurnaround     => Result(FastTurnaroundType)
+          case ScienceSubtype.LargeProgram       => Result(LargeProgramType)
+          case ScienceSubtype.PoorWeather        => Result(PoorWeatherType)
+          case ScienceSubtype.Queue              => Result(QueueType)
+          case ScienceSubtype.SystemVerification => Result(SystemVerificationType)
         }
 
       private def mkPredicate(tpe: ScienceSubtype): Option[Predicate] =
-        Eql(CallPropertiesType / "scienceSubtype", Const(tpe)).some
+        Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).some
 
       override def narrowPredicate(tpe:  Type): Option[Predicate] =
         tpe match {
-          case CallPropertiesClassicalType          => mkPredicate(ScienceSubtype.Classical)
-          case CallPropertiesDemoScienceType        => mkPredicate(ScienceSubtype.DemoScience)
-          case CallPropertiesDirectorsTimeType      => mkPredicate(ScienceSubtype.DirectorsTime)
-          case CallPropertiesFastTurnaroundType     => mkPredicate(ScienceSubtype.FastTurnaround)
-          case CallPropertiesLargeProgramType       => mkPredicate(ScienceSubtype.LargeProgram)
-          case CallPropertiesPoorWeatherType        => mkPredicate(ScienceSubtype.PoorWeather)
-          case CallPropertiesQueueType              => mkPredicate(ScienceSubtype.Queue)
-          case CallPropertiesSystemVerificationType => mkPredicate(ScienceSubtype.SystemVerification)
-          case _                                    => none
+          case ClassicalType          => mkPredicate(ScienceSubtype.Classical)
+          case DemoScienceType        => mkPredicate(ScienceSubtype.DemoScience)
+          case DirectorsTimeType      => mkPredicate(ScienceSubtype.DirectorsTime)
+          case FastTurnaroundType     => mkPredicate(ScienceSubtype.FastTurnaround)
+          case LargeProgramType       => mkPredicate(ScienceSubtype.LargeProgram)
+          case PoorWeatherType        => mkPredicate(ScienceSubtype.PoorWeather)
+          case QueueType              => mkPredicate(ScienceSubtype.Queue)
+          case SystemVerificationType => mkPredicate(ScienceSubtype.SystemVerification)
+          case _                      => none
         }
     }
 
-  lazy val CallPropertiesClassicalMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesClassicalType)(
+  lazy val ClassicalMapping: ObjectMapping =
+    ObjectMapping(ClassicalType)(
       SqlField("id", ProposalView.Classical.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -82,8 +82,8 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       SqlObject("partnerSplits",  Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
 
-  lazy val CallPropertiesDemoScienceMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesDemoScienceType)(
+  lazy val DemoScienceMapping: ObjectMapping =
+    ObjectMapping(DemoScienceType)(
       SqlField("id", ProposalView.DemoScience.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -91,8 +91,8 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
 
-  lazy val CallPropertiesDirectorsTimeMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesDirectorsTimeType)(
+  lazy val DirectorsTimeMapping: ObjectMapping =
+    ObjectMapping(DirectorsTimeType)(
       SqlField("id", ProposalView.DirectorsTime.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -100,8 +100,8 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
 
-  lazy val CallPropertiesFastTurnaroundMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesFastTurnaroundType)(
+  lazy val FastTurnaroundMapping: ObjectMapping =
+    ObjectMapping(FastTurnaroundType)(
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -110,8 +110,8 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate)
     )
 
-  lazy val CallPropertiesLargeProgramMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesLargeProgramType)(
+  lazy val LargeProgramMapping: ObjectMapping =
+    ObjectMapping(LargeProgramType)(
       SqlField("id", ProposalView.LargeProgram.Id, key = true, hidden = true),
       SqlField("scienceSubtype",      ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -121,15 +121,15 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       SqlObject("totalTime")
     )
 
-  lazy val CallPropertiesPoorWeatherMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesPoorWeatherType)(
+  lazy val PoorWeatherMapping: ObjectMapping =
+    ObjectMapping(PoorWeatherType)(
       SqlField("id", ProposalView.PoorWeather.Id, key = true, hidden = true),
       SqlField("scienceSubtype", ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id))
     )
 
-  lazy val CallPropertiesQueueMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesQueueType)(
+  lazy val QueueMapping: ObjectMapping =
+    ObjectMapping(QueueType)(
       SqlField("id", ProposalView.Queue.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -138,8 +138,8 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       SqlObject("partnerSplits",  Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
     )
 
-  lazy val CallPropertiesSystemVerificationMapping: ObjectMapping =
-    ObjectMapping(CallPropertiesSystemVerificationType)(
+  lazy val SystemVerificationMapping: ObjectMapping =
+    ObjectMapping(SystemVerificationType)(
       SqlField("id", ProposalView.SystemVerification.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
@@ -160,9 +160,9 @@ trait CallPropertiesMapping[F[_]] extends BaseMapping[F]
       )
     }
 
-  lazy val CallPropertiesElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    case (CallPropertiesClassicalType, "partnerSplits", Nil) => SortSplits
-    case (CallPropertiesQueueType,     "partnerSplits", Nil) => SortSplits
+  lazy val ProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (ClassicalType, "partnerSplits", Nil) => SortSplits
+    case (QueueType,     "partnerSplits", Nil) => SortSplits
   }
 
 }

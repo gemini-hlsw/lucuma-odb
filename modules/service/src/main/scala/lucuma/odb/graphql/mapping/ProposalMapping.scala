@@ -25,7 +25,7 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
       SqlObject("reference", Join(ProposalView.ProgramId, ProposalReferenceView.Id)),
       SqlField("category", ProposalView.Category),
       SqlField("abstract", ProposalView.Abstract),
-      SqlObject("callProperties")
+      SqlObject("type")
     )
 
 }

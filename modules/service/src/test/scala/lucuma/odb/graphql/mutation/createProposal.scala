@@ -39,9 +39,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesQueue {
+                  ... on Queue {
                     toOActivation
                     minPercentTime
                   }
@@ -56,7 +56,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Queue Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "QUEUE",
                   "toOActivation": "NONE",
                   "minPercentTime": 0
@@ -81,7 +81,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Demo Science Proposal"
-                  callProperties: {
+                  type: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -111,7 +111,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Demo Science Proposal"
-                  callProperties: {
+                  type: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -129,7 +129,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected =
-          List("Argument 'input.SET.callProperties' is invalid: Only one of 'classical', 'demoScience', 'directorsTime', 'fastTurnaround', 'largeProgram', 'poorWeather', 'queue' or 'systemVerfication' may be provided.").asLeft
+          List("Argument 'input.SET.type' is invalid: Only one of 'classical', 'demoScience', 'directorsTime', 'fastTurnaround', 'largeProgram', 'poorWeather', 'queue' or 'systemVerfication' may be provided.").asLeft
       )
     }
   }
@@ -145,7 +145,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Demo Science Proposal"
-                  callProperties: {
+                  type: {
                     demoScience: {
                       callId: "c-123"
                       toOActivation: NONE
@@ -176,7 +176,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Demo Science Proposal"
-                  callProperties: {
+                  type: {
                     demoScience: {
                       callId: "$cid"
                       toOActivation: NONE
@@ -212,7 +212,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Demo Science Proposal"
-                  callProperties: {
+                  type: {
                     demoScience: {
                       callId: "$cid"
                       toOActivation: NONE
@@ -224,7 +224,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             ) {
               proposal {
                 title
-                callProperties {
+                type {
                   call { id }
                 }
               }
@@ -237,7 +237,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "createProposal" : {
                 "proposal" : {
                   "title" : "My Demo Science Proposal",
-                  "callProperties": {
+                  "type": {
                     "call": {
                       "id": $cid
                     }
@@ -267,7 +267,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Classical Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     classical: {
                       minPercentTime: 50
                       partnerSplits: [
@@ -288,9 +288,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesClassical {
+                  ... on Classical {
                     minPercentTime
                     partnerSplits {
                       partner
@@ -308,7 +308,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Classical Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "CLASSICAL",
                   "minPercentTime": 50,
                   "partnerSplits": [
@@ -342,7 +342,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Demo Science Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     demoScience: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -354,9 +354,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesDemoScience {
+                  ... on DemoScience {
                     toOActivation
                     minPercentTime
                   }
@@ -371,7 +371,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Demo Science Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
@@ -396,7 +396,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Director's Time Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     directorsTime: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -408,9 +408,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesDirectorsTime {
+                  ... on DirectorsTime {
                     toOActivation
                     minPercentTime
                   }
@@ -425,7 +425,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Director's Time Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "DIRECTORS_TIME",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
@@ -450,7 +450,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Fast Turnaround Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     fastTurnaround: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -463,9 +463,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesFastTurnaround {
+                  ... on FastTurnaround {
                     toOActivation
                     minPercentTime
                     piAffiliation
@@ -481,7 +481,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Fast Turnaround Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -507,7 +507,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Large Program Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     largeProgram: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -521,9 +521,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesLargeProgram {
+                  ... on LargeProgram {
                     toOActivation
                     minPercentTime
                     minPercentTotalTime
@@ -540,7 +540,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Large Program Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "LARGE_PROGRAM",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -569,7 +569,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Poor Weather Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     poorWeather: {}
                   }
                 }
@@ -578,7 +578,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
                 }
               }
@@ -591,7 +591,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Poor Weather Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "POOR_WEATHER"
                 }
               }
@@ -614,7 +614,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My Queue Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -636,9 +636,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesQueue {
+                  ... on Queue {
                     toOActivation
                     minPercentTime
                     partnerSplits {
@@ -657,7 +657,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My Queue Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "QUEUE",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -692,7 +692,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 SET: {
                   title: "My System Verification Proposal"
                   category: COSMOLOGY
-                  callProperties: {
+                  type: {
                     systemVerification: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -704,9 +704,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesSystemVerification {
+                  ... on SystemVerification {
                     toOActivation
                     minPercentTime
                   }
@@ -721,7 +721,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "proposal" : {
                 "title" : "My System Verification Proposal",
                 "category" : "COSMOLOGY",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "SYSTEM_VERIFICATION",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
@@ -745,7 +745,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Queue Proposal"
-                  callProperties: {
+                  type: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -769,7 +769,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected =
-          List("Argument 'input.SET.callProperties.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
       )
     }
   }
@@ -785,7 +785,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Queue Proposal"
-                  callProperties: {
+                  type: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -800,7 +800,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected =
-          List("Argument 'input.SET.callProperties.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
       )
     }
   }
@@ -816,7 +816,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   title: "My Queue Proposal"
-                  callProperties: {
+                  type: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -827,8 +827,8 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             ) {
               proposal {
                 title
-                callProperties {
-                  ... on CallPropertiesQueue {
+                type {
+                  ... on Queue {
                     partnerSplits {
                       partner
                       percent
@@ -844,7 +844,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             "createProposal" : {
               "proposal" : {
                 "title" : "My Queue Proposal",
-                "callProperties": {
+                "type": {
                   "partnerSplits": []
                 }
               }
