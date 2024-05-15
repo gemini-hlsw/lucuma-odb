@@ -197,7 +197,7 @@ object ProgramService {
         Trace[F].span("insertProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
 
-          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, SETʹ.semester, user))
+          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user))
         }
 
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
@@ -297,9 +297,6 @@ object ProgramService {
                 .toList
                 .map(_.success)
             }
-          }.recover {
-            case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
-              UpdateProgramsError.InvalidSemester(SET.semester).failure
           }
 
         (for {
@@ -423,8 +420,7 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.name.map(sql"c_name = $text_nonempty"),
-          SET.semester.map(sql"c_semester = $semester"),
+          SET.name.map(sql"c_name = $text_nonempty")
         ).flatten
       )
 
@@ -492,15 +488,15 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[(Option[NonEmptyString], Option[Semester], User), Program.Id] =
+    val InsertProgram: Query[(Option[NonEmptyString], User), Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name, c_semester, c_pi_user_id, c_pi_user_type)
-        VALUES (${text_nonempty.opt}, ${semester.opt}, ${(user_id ~ user_type).opt})
+        INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
+        VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
         RETURNING c_program_id
       """.query(program_id)
          .contramap {
-            case (oNes, oSem, ServiceUser(_, _)) => (oNes, oSem, None)
-            case (oNes, oSem, nonServiceUser   ) => (oNes, oSem, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
+            case (oNes, ServiceUser(_, _)) => (oNes, None)
+            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
          }
 
     /** Link a user to a program, without any access checking. */

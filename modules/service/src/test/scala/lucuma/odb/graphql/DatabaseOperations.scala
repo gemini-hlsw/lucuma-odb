@@ -184,25 +184,6 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  // Temporary until there is a Call for Proposal mutation that also sets the semester. At that time,
-  // ability to set the semester via updatePrograms will be removed.
-  def setSemester(user: User, pid: Program.Id, semester: Semester): IO[Unit] =
-    query(
-      user,
-      s"""
-        mutation {
-          updatePrograms(
-            input: {
-              WHERE: { id: { EQ: "$pid" } }
-              SET: { semester: "${semester.format}" }
-            }
-          ) {
-            programs { id }
-          }
-        }
-      """
-    ).void
-
   def setProgramReference(user: User, pid: Program.Id, set: String): IO[Option[ProgramReference]] =
     query(
       user,

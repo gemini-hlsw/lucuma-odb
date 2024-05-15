@@ -3118,13 +3118,6 @@ input ProgramPropertiesInput {
   name: NonEmptyString
 
   """
-  The semester associated with the program, if any. If this value is
-  subsequently edited it will result in a new reference, with (likely) a
-  different index. Cannot be unset.
-  """
-  semester: Semester
-
-  """
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
   """
   existence: Existence
