@@ -130,12 +130,10 @@ class reference extends OdbSuite {
       cid0 <- createCallForProposalsAs(staff, semester = sem2024B)
       pid0 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid0, cid0)
-      _    <- setSemester(pi, pid0, sem2024B)
       ref0 <- submitProposal(pi, pid0)
 
       pid1 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid1, cid0)
-      _    <- setSemester(pi, pid1, sem2024B)
       ref1 <- submitProposal(pi, pid1)
 
       cid1 <- createCallForProposalsAs(staff, semester = sem2025A)
@@ -209,8 +207,6 @@ class reference extends OdbSuite {
     for {
       pid0 <- createProgramAs(pi)
       pid1 <- createProgramAs(pi)
-      _    <- setSemester(pi, pid0, "2020A".semester)
-      _    <- setSemester(pi, pid1, "2020A".semester)
       _    <- addProposal(pi, pid1)
       res0 <- pidsWhere("{ proposal: { IS_NULL: true } }")
       res1 <- pidsWhere("{ proposal: { reference: { IS_NULL: true } } }")
@@ -267,57 +263,6 @@ class reference extends OdbSuite {
       assertEquals(ref0, ref2010A1)
       assertEquals(ref1, ref2010A1)
     }
-  }
-
-  // You won't be able to change the semester without first unsubmitting, and changing
-  // the semester will be via setProgramReference or a new setCallForProposal mutation.
-  test("TEMP: change semester, changes reference") {
-    // G-2010A-0001 -> assign semester 2024B
-    // G-2024B-0001 and 00002 already taken, so we get G-2024B-0003
-    expect(
-      user = pi,
-      query = s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET: {
-                semester: "2024B"
-              }
-              WHERE: {
-                proposal: {
-                  reference: {
-                    label: {
-                      EQ: "${ref2010A1.label}"
-                    }
-                  }
-                }
-              }
-            }
-          ) {
-            programs {
-              proposal { reference { label } }
-            }
-          }
-        }
-        """,
-      expected = Right(
-        json"""
-          {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "proposal": {
-                    "reference": {
-                      "label": ${ref2024B3.label}
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        """
-      )
-    )
   }
 
   test("accept proposal") {
