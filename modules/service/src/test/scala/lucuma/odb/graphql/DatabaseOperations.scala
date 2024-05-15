@@ -272,7 +272,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 category: COSMOLOGY
                 ${callProps.fold("") { c =>
                   s"""
-                    callProperties: {
+                    type: {
                       $c
                     }
                   """

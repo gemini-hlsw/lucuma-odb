@@ -382,7 +382,7 @@ class reference extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  callProperties: {
+                  type: {
                     classical: {
                       callId: "$cid"
                       minPercentTime: 50

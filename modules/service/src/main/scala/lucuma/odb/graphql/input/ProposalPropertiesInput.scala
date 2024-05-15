@@ -13,17 +13,17 @@ import lucuma.odb.graphql.binding.*
 object ProposalPropertiesInput {
 
   case class Create(
-    title:    Option[NonEmptyString],
-    category: Option[Tag],
-    abstrakt: Option[NonEmptyString],
-    call:     CallPropertiesInput.Create
+    title:     Option[NonEmptyString],
+    category:  Option[Tag],
+    abstractʹ: Option[NonEmptyString],
+    typeʹ:     ProposalTypeInput.Create
   )
 
   case class Edit(
-    title:    Nullable[NonEmptyString],
-    category: Nullable[Tag],
-    abstrakt: Nullable[NonEmptyString],
-    call:     Option[CallPropertiesInput.Edit]
+    title:     Nullable[NonEmptyString],
+    category:  Nullable[Tag],
+    abstractʹ: Nullable[NonEmptyString],
+    typeʹ:     Option[ProposalTypeInput.Edit]
   )
 
   val CreateBinding: Matcher[Create] =
@@ -32,10 +32,10 @@ object ProposalPropertiesInput {
         NonEmptyStringBinding.Option("title", rTitle),
         TagBinding.Option("category", rCategory),
         NonEmptyStringBinding.Option("abstract", rAbstract),
-        CallPropertiesInput.Create.Binding.Option("callProperties", rCall)
+        ProposalTypeInput.Create.Binding.Option("type", rType)
       ) =>
-        val c = rCall.map(_.getOrElse(CallPropertiesInput.Create.Default))
-        (rTitle, rCategory, rAbstract, c).parMapN(Create.apply)
+        val t = rType.map(_.getOrElse(ProposalTypeInput.Create.Default))
+        (rTitle, rCategory, rAbstract, t).parMapN(Create.apply)
     }
 
   val EditBinding: Matcher[Edit] =
@@ -44,9 +44,9 @@ object ProposalPropertiesInput {
         NonEmptyStringBinding.Nullable("title", rTitle),
         TagBinding.Nullable("category", rCategory),
         NonEmptyStringBinding.Nullable("abstract", rAbstract),
-        CallPropertiesInput.Edit.Binding.Option("callProperties", rCall)
+        ProposalTypeInput.Edit.Binding.Option("type", rType)
       ) =>
-        (rTitle, rCategory, rAbstract, rCall).parMapN(Edit.apply)
+        (rTitle, rCategory, rAbstract, rType).parMapN(Edit.apply)
     }
 
 }

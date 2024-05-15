@@ -282,8 +282,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
               value {
                 name
                 proposal {
-                  callProperties {
-                    ... on CallPropertiesQueue {
+                  type {
+                    ... on Queue {
                       partnerSplits {
                         partner
                         percent
@@ -308,7 +308,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                 updateProposal(input: {
                   programId: "$pid"
                   SET: {
-                    callProperties: {
+                    type: {
                       queue: {
                         partnerSplits: [
                           {
@@ -336,8 +336,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "proposal": null } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "callProperties": { "partnerSplits": [] } } } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "callProperties": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } } }"""
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [] } } } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } } }"""
         )
     )
   }

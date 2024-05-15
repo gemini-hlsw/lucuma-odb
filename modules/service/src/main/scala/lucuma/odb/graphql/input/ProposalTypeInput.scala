@@ -23,7 +23,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
-object CallPropertiesInput {
+object ProposalTypeInput {
 
   private val fieldNames: List[String] =
     List(

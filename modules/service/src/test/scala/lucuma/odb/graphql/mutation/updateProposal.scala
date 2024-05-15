@@ -69,7 +69,7 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  callProperties: {
+                  type: {
                     queue: {
                       partnerSplits: [
                         {
@@ -87,8 +87,8 @@ class updateProposal extends OdbSuite {
               }
             ) {
               proposal {
-                callProperties {
-                  ... on CallPropertiesQueue {
+                type {
+                  ... on Queue {
                     partnerSplits {
                       partner
                       percent
@@ -103,7 +103,7 @@ class updateProposal extends OdbSuite {
           {
             "updateProposal": {
               "proposal": {
-                "callProperties": {
+                "type": {
                   "partnerSplits": [
                     {
                       "partner": "US",
@@ -136,7 +136,7 @@ class updateProposal extends OdbSuite {
                 SET: {
                   title: "updated title"
                   category: SMALL_BODIES
-                  callProperties: {
+                  type: {
                     demoScience: {
                       toOActivation: STANDARD
                       minPercentTime: 50
@@ -148,9 +148,9 @@ class updateProposal extends OdbSuite {
               proposal {
                 title
                 category
-                callProperties {
+                type {
                   scienceSubtype
-                  ... on CallPropertiesDemoScience {
+                  ... on DemoScience {
                     toOActivation
                     minPercentTime
                   }
@@ -165,7 +165,7 @@ class updateProposal extends OdbSuite {
               "proposal": {
                 "title": "updated title",
                 "category": "SMALL_BODIES",
-                "callProperties": {
+                "type": {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "toOActivation": "STANDARD",
                   "minPercentTime": 50
@@ -191,7 +191,7 @@ class updateProposal extends OdbSuite {
                 SET: {
                   title: "updated title"
                   category: SMALL_BODIES
-                  callProperties: {
+                  type: {
                     fastTurnaround: {
                       toOActivation: STANDARD
                       minPercentTime: 50
@@ -202,7 +202,7 @@ class updateProposal extends OdbSuite {
             ) {
               proposal {
                 title
-                callProperties {
+                type {
                   scienceSubtype
                 }
               }
@@ -248,7 +248,7 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  callProperties: {
+                  type: {
                     queue: {
                       partnerSplits: [
                         {
@@ -270,7 +270,7 @@ class updateProposal extends OdbSuite {
           }
         """,
         expected =
-          List("Argument 'input.SET.callProperties.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
       )
     }
   }

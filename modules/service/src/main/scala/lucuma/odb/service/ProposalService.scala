@@ -203,15 +203,15 @@ object ProposalService {
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
         def lookupCfpProperties: ResultT[F, Option[CfpProperties]] =
-          input.SET.call.callId.traverse(cid => ResultT(CfpProperties.lookup(cid)))
+          input.SET.typeʹ.callId.traverse(cid => ResultT(CfpProperties.lookup(cid)))
 
         // Make sure the indicated CfP is compatible with the inputs.
         def checkCfpCompatibility(o: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.fromResult(o.fold(Result.unit)(_.validateSubtype(input.SET.call.scienceSubtype)))
+          ResultT.fromResult(o.fold(Result.unit)(_.validateSubtype(input.SET.typeʹ.scienceSubtype)))
 
         // Update the program's science subtype and/or semester to match inputs.
         def updateProgram(p: ProposalContext, c: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.liftF(p.updateProgram(input.programId, input.SET.call.scienceSubtype.some, c.map(_.semester)))
+          ResultT.liftF(p.updateProgram(input.programId, input.SET.typeʹ.scienceSubtype.some, c.map(_.semester)))
 
         val insert: ResultT[F, Unit] =
           val af = Statements.insertProposal(input.programId, input.SET)
@@ -223,7 +223,7 @@ object ProposalService {
 
         val insertSplits: ResultT[F, Unit] =
           ResultT.liftF(
-            partnerSplitsService.insertSplits(input.SET.call.partnerSplits, input.programId)
+            partnerSplitsService.insertSplits(input.SET.typeʹ.partnerSplits, input.programId)
           )
 
         (for {
@@ -241,7 +241,7 @@ object ProposalService {
         input: UpdateProposalInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
-        val callId = input.SET.call.flatMap(_.callId.toOption)
+        val callId = input.SET.typeʹ.flatMap(_.callId.toOption)
 
         def lookupCfpProperties: ResultT[F, Option[CfpProperties]] =
           callId.traverse(cid => ResultT(CfpProperties.lookup(cid)))
@@ -249,7 +249,7 @@ object ProposalService {
         // Make sure the indicated CfP is compatible with the inputs.
         def checkCfpCompatibility(o: Option[CfpProperties]): ResultT[F, Unit] =
           ResultT.fromResult(
-            (o, input.SET.call.map(_.scienceSubtype)).tupled.fold(Result.unit) { (c, s) =>
+            (o, input.SET.typeʹ.map(_.scienceSubtype)).tupled.fold(Result.unit) { (c, s) =>
               c.validateSubtype(s)
             }
           )
@@ -263,11 +263,11 @@ object ProposalService {
 
         // Update the program's science subtype and/or semester to match inputs.
         def updateProgram(pid: Program.Id, p: ProposalContext, c: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.liftF(p.updateProgram(pid, input.SET.call.map(_.scienceSubtype), c.map(_.semester)))
+          ResultT.liftF(p.updateProgram(pid, input.SET.typeʹ.map(_.scienceSubtype), c.map(_.semester)))
 
         def handleTypeChange(pid: Program.Id, oldType: Option[ScienceSubtype]): ResultT[F, ProposalPropertiesInput.Edit] =
-          input.SET.call.filterNot(c => oldType.exists(_ === c.scienceSubtype)).fold(ResultT.pure(input.SET)) { call =>
-            ResultT.fromResult(call.asCreate.map(create => input.SET.copy(call = create.asEdit.some)))
+          input.SET.typeʹ.filterNot(c => oldType.exists(_ === c.scienceSubtype)).fold(ResultT.pure(input.SET)) { call =>
+            ResultT.fromResult(call.asCreate.map(create => input.SET.copy(typeʹ = create.asEdit.some)))
           }
 
         def updateProposal(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
@@ -282,7 +282,7 @@ object ProposalService {
           })
 
         def updateSplits(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
-          ResultT(set.call.map(_.partnerSplits).traverse_ { splits =>
+          ResultT(set.typeʹ.map(_.partnerSplits).traverse_ { splits =>
             partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
           }.map(_.success))
 
@@ -343,13 +343,13 @@ object ProposalService {
     def updates(SET: ProposalPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
       val mainUpdates: List[AppliedFragment] =
         List(
-          SET.abstrakt.foldPresent(sql"c_abstract = ${text_nonempty.opt}"),
+          SET.abstractʹ.foldPresent(sql"c_abstract = ${text_nonempty.opt}"),
           SET.category.foldPresent(sql"c_category = ${tag.opt}"),
           SET.title.foldPresent(sql"c_title = ${text_nonempty.opt}"),
         ).flatten
 
       val callUpdates: List[AppliedFragment] =
-        SET.call.toList.flatMap { call =>
+        SET.typeʹ.toList.flatMap { call =>
           List(
             call.callId.foldPresent(sql"c_cfp_id = ${cfp_id.opt}"),
             call.tooActivation.map(sql"c_too_activation = ${too_activation}"),
@@ -400,14 +400,14 @@ object ProposalService {
       """.apply(
         pid,
         c.title,
-        c.abstrakt,
+        c.abstractʹ,
         c.category,
-        c.call.scienceSubtype,
-        c.call.callId,
-        c.call.tooActivation,
-        c.call.minPercentTime,
-        c.call.minPercentTotal,
-        c.call.totalTime
+        c.typeʹ.scienceSubtype,
+        c.typeʹ.callId,
+        c.typeʹ.tooActivation,
+        c.typeʹ.minPercentTime,
+        c.typeʹ.minPercentTotal,
+        c.typeʹ.totalTime
       )
 
     val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Option[Semester])] =
