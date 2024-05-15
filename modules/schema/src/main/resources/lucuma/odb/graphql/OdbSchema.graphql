@@ -3179,12 +3179,6 @@ with this proposal.
 interface ProposalType {
 
   """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
-
-  """
   The science type of this Call for Proposals.
   """
   scienceSubtype: ScienceSubtype!
@@ -3195,12 +3189,6 @@ interface ProposalType {
 Proposal properties for Regular Semester (Classical) CallForProposals.
 """
 type Classical implements ProposalType {
-
-  """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
 
   """
   The science type of this Call for Proposals.
@@ -3231,12 +3219,6 @@ Proposal properties for Demo Science CallForProposals.
 type DemoScience implements ProposalType {
 
   """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
-
-  """
   The science type of this Call for Proposals.
   """
   scienceSubtype: ScienceSubtype!
@@ -3261,12 +3243,6 @@ Proposal properties for Director's Time CallForProposals.
 type DirectorsTime implements ProposalType {
 
   """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
-
-  """
   The science type of this Call for Proposals.
   """
   scienceSubtype: ScienceSubtype!
@@ -3289,12 +3265,6 @@ type DirectorsTime implements ProposalType {
 Proposal properties for Fast Turnaround CallForProposals.
 """
 type FastTurnaround implements ProposalType {
-
-  """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
 
   """
   The science type of this Call for Proposals.
@@ -3325,12 +3295,6 @@ type FastTurnaround implements ProposalType {
 Proposal properties for Large Program CallForProposals.
 """
 type LargeProgram implements ProposalType {
-
-  """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
 
   """
   The science type of this Call for Proposals.
@@ -3370,12 +3334,6 @@ Proposal properties for Regular Semester (Poor Weather) CallForProposals.
 """
 type PoorWeather implements ProposalType {
   """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
-
-  """
   The science type of this Call for Proposals.
   """
   scienceSubtype: ScienceSubtype!
@@ -3385,12 +3343,6 @@ type PoorWeather implements ProposalType {
 Proposal properties for Regular Semester (Queue) CallForProposals.
 """
 type Queue implements ProposalType {
-
-  """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
 
   """
   The science type of this Call for Proposals.
@@ -3425,12 +3377,6 @@ type Queue implements ProposalType {
 Proposal properties for System Verification CallForProposals.
 """
 type SystemVerification implements ProposalType {
-
-  """
-  The corresponding CallForProposals definition itself, if the call id has been
-  set.
-  """
-  call: CallForProposals
 
   """
   The science type of this Call for Proposals.
@@ -3478,13 +3424,6 @@ input ProposalTypeInput {
 input ClassicalInput {
 
   """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Regular Semester Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
-
-  """
   The minPercentTime field is required when creating a new instance, but
   optional when editing.
   """
@@ -3506,13 +3445,6 @@ input ClassicalInput {
 input DemoScienceInput {
 
   """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Demo Science Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
-
-  """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
   """
@@ -3529,13 +3461,6 @@ input DemoScienceInput {
 input DirectorsTimeInput {
 
   """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Director's Time Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
-
-  """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
   """
@@ -3550,13 +3475,6 @@ input DirectorsTimeInput {
 }
 
 input FastTurnaroundInput {
-
-  """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Fast Turnaround Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3581,13 +3499,6 @@ input FastTurnaroundInput {
 }
 
 input LargeProgramInput {
-
-  """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Large Program Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3618,23 +3529,20 @@ input LargeProgramInput {
 
 }
 
+"""
+The GraphQL specification requires that types and inputs have fields, even when
+there is no useful data to include.  This enumeration provides a placeholder
+value for an ignored field to satisfy the specification.
+"""
+enum Ignore {
+  IGNORE
+}
+
 input PoorWeatherInput {
-  """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Poor Weather Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
+  ignore: Ignore
 }
 
 input QueueInput {
-
-  """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a Regular Semester Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3663,13 +3571,6 @@ input QueueInput {
 }
 
 input SystemVerificationInput {
-
-  """
-  Sets the associated Call for Proposals. This is optional upon creation, but
-  upon when set it must refer to a System Verification Call for Proposals.
-  Required for a successful submission.
-  """
-  callId: CallForProposalsId
 
   """
   The toOActivation field is optional. If not specified when creating a
@@ -3706,11 +3607,20 @@ input ProposalPropertiesInput {
   abstract: NonEmptyString
 
   """
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  must be set for a successful submission.  Also, the Call for Proposals type
+  must agree with the proposal type (see 'type' below).  For example a Queue
+  proposal must be submitted to a Regular Semester Call and a Demo Science
+  proposal must be submitted to a Demo Science Call, etc.
+  """
+  callId: CallForProposalsId
+
+  """
   Specifies the properties that depend on the call type. If not set on creation,
   a regular semester queue proposal is assumed.  The selected call properties
-  must match the call or a submission attempt will fail with an error. Call
-  properties can be edited, but when switching the call type itself, all
-  properties required for that type must be included.
+  must match the call (see 'callId' above) or a submission attempt will fail
+  with an error. Call properties can be edited, but when switching the call
+  type itself, all properties required for that type must be included.
   """
   type: ProposalTypeInput
 
@@ -8449,6 +8359,12 @@ type Proposal {
   assigned a semester.
   """
   reference: ProposalReference
+
+  """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
 
   """
   Proposal title

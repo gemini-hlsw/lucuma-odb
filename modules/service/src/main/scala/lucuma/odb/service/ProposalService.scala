@@ -203,7 +203,7 @@ object ProposalService {
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
         def lookupCfpProperties: ResultT[F, Option[CfpProperties]] =
-          input.SET.typeʹ.callId.traverse(cid => ResultT(CfpProperties.lookup(cid)))
+          input.SET.callId.traverse(cid => ResultT(CfpProperties.lookup(cid)))
 
         // Make sure the indicated CfP is compatible with the inputs.
         def checkCfpCompatibility(o: Option[CfpProperties]): ResultT[F, Unit] =
@@ -241,10 +241,8 @@ object ProposalService {
         input: UpdateProposalInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
-        val callId = input.SET.typeʹ.flatMap(_.callId.toOption)
-
         def lookupCfpProperties: ResultT[F, Option[CfpProperties]] =
-          callId.traverse(cid => ResultT(CfpProperties.lookup(cid)))
+          input.SET.callId.toOption.traverse(cid => ResultT(CfpProperties.lookup(cid)))
 
         // Make sure the indicated CfP is compatible with the inputs.
         def checkCfpCompatibility(o: Option[CfpProperties]): ResultT[F, Unit] =
@@ -346,12 +344,12 @@ object ProposalService {
           SET.abstractʹ.foldPresent(sql"c_abstract = ${text_nonempty.opt}"),
           SET.category.foldPresent(sql"c_category = ${tag.opt}"),
           SET.title.foldPresent(sql"c_title = ${text_nonempty.opt}"),
+          SET.callId.foldPresent(sql"c_cfp_id = ${cfp_id.opt}")
         ).flatten
 
       val callUpdates: List[AppliedFragment] =
         SET.typeʹ.toList.flatMap { call =>
           List(
-            call.callId.foldPresent(sql"c_cfp_id = ${cfp_id.opt}"),
             call.tooActivation.map(sql"c_too_activation = ${too_activation}"),
             call.minPercentTime.map(sql"c_min_percent = ${int_percent}"),
             call.minPercentTotal.foldPresent(sql"c_min_percent_total = ${int_percent.opt}"),
@@ -377,33 +375,33 @@ object ProposalService {
       sql"""
         INSERT INTO t_proposal (
           c_program_id,
+          c_cfp_id,
           c_title,
           c_abstract,
           c_category,
           c_science_subtype,
-          c_cfp_id,
           c_too_activation,
           c_min_percent,
           c_min_percent_total,
           c_total_time
         ) SELECT
           ${program_id},
+          ${cfp_id.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
           ${tag.opt},
           ${science_subtype},
-          ${cfp_id.opt},
           ${too_activation},
           ${int_percent},
           ${int_percent.opt},
           ${time_span.opt}
       """.apply(
         pid,
+        c.callId,
         c.title,
         c.abstractʹ,
         c.category,
         c.typeʹ.scienceSubtype,
-        c.typeʹ.callId,
         c.typeʹ.tooActivation,
         c.typeʹ.minPercentTime,
         c.typeʹ.minPercentTotal,

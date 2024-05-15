@@ -382,9 +382,9 @@ class reference extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
+                  callId: "$cid"
                   type: {
                     classical: {
-                      callId: "$cid"
                       minPercentTime: 50
                       partnerSplits: [
                         {
