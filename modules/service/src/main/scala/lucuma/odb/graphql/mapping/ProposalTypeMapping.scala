@@ -22,12 +22,10 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
 import lucuma.odb.data.Tag
-import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalView
 
 trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
-                                   with CallForProposalsView[F]
                                    with PartnerSplitTable[F]
                                    with ProposalView[F] {
 
@@ -38,7 +36,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       fieldMappings = List(
         SqlField("id", ProposalView.ProgramId, key = true, hidden = true),
         SqlField("scienceSubtype", ProposalView.ScienceSubtype, discriminator = true),
-        SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id))
       )
     )
 
@@ -77,7 +74,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(ClassicalType)(
       SqlField("id", ProposalView.Classical.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlObject("partnerSplits",  Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
@@ -86,7 +82,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(DemoScienceType)(
       SqlField("id", ProposalView.DemoScience.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
@@ -95,7 +90,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(DirectorsTimeType)(
       SqlField("id", ProposalView.DirectorsTime.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
@@ -104,7 +98,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(FastTurnaroundType)(
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate)
@@ -114,7 +107,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(LargeProgramType)(
       SqlField("id", ProposalView.LargeProgram.Id, key = true, hidden = true),
       SqlField("scienceSubtype",      ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("toOActivation",       ProposalView.TooActivation),
       SqlField("minPercentTime",      ProposalView.MinPercent),
       SqlField("minPercentTotalTime", ProposalView.LargeProgram.MinPercentTotal),
@@ -125,14 +117,12 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(PoorWeatherType)(
       SqlField("id", ProposalView.PoorWeather.Id, key = true, hidden = true),
       SqlField("scienceSubtype", ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id))
     )
 
   lazy val QueueMapping: ObjectMapping =
     ObjectMapping(QueueType)(
       SqlField("id", ProposalView.Queue.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlObject("partnerSplits",  Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
@@ -142,7 +132,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(SystemVerificationType)(
       SqlField("id", ProposalView.SystemVerification.Id, key = true, hidden = true),
       SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
-      SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )

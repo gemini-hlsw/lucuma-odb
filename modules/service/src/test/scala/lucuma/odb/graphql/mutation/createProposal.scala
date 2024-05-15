@@ -144,10 +144,10 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
+                  callId: "c-123"
                   title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
-                      callId: "c-123"
                       toOActivation: NONE
                       minPercentTime: 0
                     }
@@ -175,10 +175,10 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
+                  callId: "$cid"
                   title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
-                      callId: "$cid"
                       toOActivation: NONE
                       minPercentTime: 0
                     }
@@ -211,10 +211,10 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
+                  callId: "$cid"
                   title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
-                      callId: "$cid"
                       toOActivation: NONE
                       minPercentTime: 0
                     }
@@ -224,8 +224,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             ) {
               proposal {
                 title
+                call { id }
                 type {
-                  call { id }
+                  scienceSubtype
                 }
               }
             }
@@ -237,10 +238,11 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               "createProposal" : {
                 "proposal" : {
                   "title" : "My Demo Science Proposal",
+                  "call": {
+                    "id": $cid
+                  },
                   "type": {
-                    "call": {
-                      "id": $cid
-                    }
+                    "scienceSubtype": "DEMO_SCIENCE"
                   }
                 }
               }
@@ -602,6 +604,53 @@ class createProposal extends OdbSuite with DatabaseOperations  {
     }
   }
 
+  test("✓ poor weather explicit dummy") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Poor Weather Proposal 2"
+                  category: COSMOLOGY
+                  type: {
+                    poorWeather: {
+                      ignore: IGNORE
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                title
+                category
+                type {
+                  scienceSubtype
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "title" : "My Poor Weather Proposal 2",
+                "category" : "COSMOLOGY",
+                "type": {
+                  "scienceSubtype": "POOR_WEATHER"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
   test("✓ queue") {
     createProgramAs(pi).flatMap { pid =>
       expect(
@@ -935,7 +984,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             }
           }
         """,
-        expected = List(s"Program p-113 is of type Example. Only Science programs can have proposals.").asLeft
+        expected = List(s"Program $pid is of type Example. Only Science programs can have proposals.").asLeft
       )
     }
   }

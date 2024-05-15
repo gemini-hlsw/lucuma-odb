@@ -229,9 +229,9 @@ trait DatabaseOperations { this: OdbSuite =>
     addProposal(
       user,
       pid,
+      cid.some,
       s"""
         queue: {
-          callId: "$cid"
           toOActivation: NONE
           minPercentTime: 0
         }
@@ -244,9 +244,9 @@ trait DatabaseOperations { this: OdbSuite =>
     addProposal(
       user,
       pid,
+      cid.some,
       s"""
         demoScience: {
-          callId: "$cid"
           toOActivation: NONE
           minPercentTime: 0
         }
@@ -257,6 +257,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def addProposal(
     user: User,
     pid: Program.Id,
+    callId: Option[CallForProposals.Id] = None,
     callProps: Option[String] = None,
     title: String = "my proposal"
   ): IO[Unit] =
@@ -270,6 +271,7 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 title: "$title"
                 category: COSMOLOGY
+                ${callId.fold("")(c => s"callId: \"$c\"")}
                 ${callProps.fold("") { c =>
                   s"""
                     type: {

@@ -29,7 +29,7 @@ class setProposalStatus extends OdbSuite {
 
   val validUsers = List(pi, pi2, ngo, staff, admin, guest)
   
-  test("edit proposal status (attempt update proposalStatus with no proposal)") {
+  test("⨯ edit proposal status (attempt update proposalStatus with no proposal)") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -54,7 +54,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("edit proposal status (pi attempts update proposalStatus to unauthorized status)") {
+  test("⨯ edit proposal status (pi attempts update proposalStatus to unauthorized status)") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       expect(
@@ -80,7 +80,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("edit proposal status (guests cannot submit proposals)") {
+  test("⨯ edit proposal status (guests cannot submit proposals)") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       // the non-guest requirement gets caught before it even gets to the service.
@@ -107,7 +107,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("no CfP for proposal submission") {
+  test("⨯ no CfP for proposal submission") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       expect(
@@ -133,7 +133,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("non-science program type for proposal submission") {
+  test("⨯ non-science program type for proposal submission") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
@@ -169,11 +169,7 @@ class setProposalStatus extends OdbSuite {
             input: {
               programId: "$pid",
               SET: {
-                type: {
-                  queue: {
-                    callId: "$cid"
-                  }
-                }
+                callId: "$cid"
               }
             }
           ) {
@@ -183,7 +179,7 @@ class setProposalStatus extends OdbSuite {
       """
     ).void
 
-  test("edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
+  test("✓ edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
 
     def submit(pid: Program.Id): IO[Unit] =
       expect(
@@ -314,7 +310,7 @@ class setProposalStatus extends OdbSuite {
     } yield assertEquals(l.drop(3), expected(p))
   }
 
-  test("edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
+  test("⨯ edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
 
     def accept(pid: Program.Id): IO[Unit] =
       expect(
@@ -379,7 +375,7 @@ class setProposalStatus extends OdbSuite {
     } yield ()
   }
 
-  test("user cannot set status of another user's proposal") {
+  test("⨯ user cannot set status of another user's proposal") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi2,
@@ -404,7 +400,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("attempt to set proposal status in non-existent program") {
+  test("⨯ attempt to set proposal status in non-existent program") {
     val badPid = Program.Id.fromLong(Long.MaxValue).get
     expect(
       user = pi,
