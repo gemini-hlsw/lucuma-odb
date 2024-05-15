@@ -297,28 +297,32 @@ object ProposalService {
         } yield pid).value
       }
 
+      private def validateSubmission(
+        pid: Program.Id,
+        ctx: ProposalContext,
+        newStatus: enumsVal.ProposalStatus
+      ): Result[Unit] =
+        (
+          missingProposal(pid).asFailure.unlessA(ctx.hasProposal),
+          missingCfP(pid).asFailure.unlessA(ctx.cfpId.isDefined),
+          missingSemester(pid).asFailure.unlessA(ctx.semester.isDefined),
+          missingScienceSubtype(pid).asFailure.unlessA(ctx.scienceSubtype.isDefined)
+        ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
+
       def setProposalStatus(
         input: SetProposalStatusInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
-        def validateProgramReference(pid: Program.Id, info: ProposalContext, newStatus: enumsVal.ProposalStatus): Result[Unit] =
-          (
-            missingCfP(pid).asFailure.unlessA(info.cfpId.isDefined),
-            missingSemester(pid).asFailure.unlessA(info.semester.isDefined),
-            missingScienceSubtype(pid).asFailure.unlessA(info.scienceSubtype.isDefined)
-          ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
-
         def validate(
           pid: Program.Id,
-          info: ProposalContext,
+          ctx: ProposalContext,
           oldStatus: enumsVal.ProposalStatus,
           newStatus: enumsVal.ProposalStatus
         ): Result[Unit] =
           for {
-            _ <- missingProposal(pid).asFailure.unlessA(info.hasProposal)
             _ <- notAuthorizedNew(pid, user, Tag(newStatus.tag)).asFailure.unlessA(newStatus.userCanChangeStatus)
-            _ <- notAuthorizedOld(pid, user, info.statusTag).asFailure.unlessA(oldStatus.userCanChangeStatus)
-            _ <- validateProgramReference(pid, info, newStatus)
+            _ <- notAuthorizedOld(pid, user, ctx.statusTag).asFailure.unlessA(oldStatus.userCanChangeStatus)
+            _ <- validateSubmission(pid, ctx, newStatus)
           } yield ()
 
         def update(pid: Program.Id, tag: Tag): F[Unit] =
@@ -437,7 +441,18 @@ object ProposalService {
         WHERE prog.c_program_id = $program_id
       """.apply(pid) |+|
       ProgramService.Statements.andWhereUserAccess(user, pid)
+/*
+WANT TO ADD these CfP properties into ProposalContext, replacing the cfpId for
+a CfpProperties instance.  That will allow me to use it in submission validation
+along with CfpType checking already happening in create and update.
 
+    val SelectTypeAndSemester: Query[CallForProposals.Id, (CallForProposalsType, Semester)] =
+      sql"""
+        SELECT c_type, c_semester
+          FROM t_cfp
+         WHERE c_cfp_id = $cfp_id AND c_existence = 'present'::e_existence
+      """.query(cfp_type *: semester)
+ */
     def updateProposalStatus(user: User, pid: Program.Id, status: Tag): AppliedFragment =
       sql"""
         UPDATE t_program
