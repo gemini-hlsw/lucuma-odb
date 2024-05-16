@@ -59,7 +59,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 "type": {
                   "scienceSubtype": "QUEUE",
                   "toOActivation": "NONE",
-                  "minPercentTime": 0
+                  "minPercentTime": 100
                 }
               }
             }
@@ -160,7 +160,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected =
-          List("The specified Call for Proposals (c-123) was not found.").asLeft
+          List("The specified Call for Proposals c-123 was not found.").asLeft
       )
     }
   }
@@ -191,7 +191,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected =
-          List(s"The Call for Proposals ($cid) is a Poor Weather call and cannot be used with a Demo Science proposal.").asLeft
+          List(s"The Call for Proposals $cid is a Poor Weather call and cannot be used with a Demo Science proposal.").asLeft
       )
 
     for {
@@ -332,6 +332,58 @@ class createProposal extends OdbSuite with DatabaseOperations  {
     }
   }
 
+  test("✓ classical defaults") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Classical Proposal"
+                  category: COSMOLOGY
+                  type: { classical: { } }
+                }
+              }
+            ) {
+              proposal {
+                title
+                category
+                type {
+                  scienceSubtype
+                  ... on Classical {
+                    minPercentTime
+                    partnerSplits {
+                      partner
+                      percent
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "title" : "My Classical Proposal",
+                "category" : "COSMOLOGY",
+                "type": {
+                  "scienceSubtype": "CLASSICAL",
+                  "minPercentTime": 100,
+                  "partnerSplits": []
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
   test("✓ demo science") {
     createProgramAs(pi).flatMap { pid =>
       expect(
@@ -377,6 +429,57 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ demo science defaults") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Demo Science Proposal"
+                  category: COSMOLOGY
+                  type: {
+                    demoScience: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                title
+                category
+                type {
+                  scienceSubtype
+                  ... on DemoScience {
+                    toOActivation
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "title" : "My Demo Science Proposal",
+                "category" : "COSMOLOGY",
+                "type": {
+                  "scienceSubtype": "DEMO_SCIENCE",
+                  "toOActivation": "NONE",
+                  "minPercentTime": 100
                 }
               }
             }
@@ -497,6 +600,59 @@ class createProposal extends OdbSuite with DatabaseOperations  {
     }
   }
 
+  test("✓ fast turnaround defaults") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Fast Turnaround Proposal"
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                title
+                category
+                type {
+                  scienceSubtype
+                  ... on FastTurnaround {
+                    toOActivation
+                    minPercentTime
+                    piAffiliation
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "title" : "My Fast Turnaround Proposal",
+                "category" : "COSMOLOGY",
+                "type": {
+                  "scienceSubtype": "FAST_TURNAROUND",
+                  "toOActivation": "NONE",
+                  "minPercentTime": 100,
+                  "piAffiliation": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
   test("✓ large program") {
     createProgramAs(pi).flatMap { pid =>
       expect(
@@ -549,6 +705,64 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                   "minPercentTotalTime": 75,
                   "totalTime": {
                     "hours": 500.000000
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+
+  test("✓ large program defaults") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "My Large Program Proposal"
+                  category: COSMOLOGY
+                  type: {
+                    largeProgram: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                title
+                category
+                type {
+                  scienceSubtype
+                  ... on LargeProgram {
+                    toOActivation
+                    minPercentTime
+                    minPercentTotalTime
+                    totalTime { hours }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "title" : "My Large Program Proposal",
+                "category" : "COSMOLOGY",
+                "type": {
+                  "scienceSubtype": "LARGE_PROGRAM",
+                  "toOActivation": "NONE",
+                  "minPercentTime": 100,
+                  "minPercentTotalTime": 100,
+                  "totalTime": {
+                    "hours": 0.000000
                   }
                 }
               }

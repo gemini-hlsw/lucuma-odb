@@ -25,24 +25,30 @@ UPDATE t_proposal AS s
  WHERE s.c_program_id = g.c_program_id;
 
 ALTER TABLE t_proposal
---  ADD COLUMN c_science_subtype SET NOT NULL,
   ADD CONSTRAINT t_proposal_pid_subtype_fkey
     FOREIGN KEY (c_program_id, c_science_subtype)
       REFERENCES t_program(c_program_id, c_science_subtype) ON UPDATE CASCADE;
 
-ALTER TABLE t_proposal
-  ADD CONSTRAINT t_proposal_check_min_total CHECK (
-    (c_min_percent_total IS NOT NULL) = (c_science_subtype IS NULL) OR (c_science_subtype = 'large_program')
-  ),
-  ADD CONSTRAINT t_proposal_check_total CHECK (
-    (c_total_time IS NOT NULL) = (c_science_subtype IS NULL) OR (c_science_subtype = 'large_program')
-  ),
-  ADD CONSTRAINT t_proposal_science_subtype CHECK (
-    CASE
-      WHEN c_science_subtype = 'classical'    THEN (c_too_activation = 'none')
-      WHEN c_science_subtype = 'poor_weather' THEN (c_too_activation = 'none') AND (c_min_percent = 0)
-    END
-  );
+-- These checks cannot be deferred because, I think, they depend on the FK
+-- reference to t_program(c_science_subtype). When updating the subtype the
+-- checks are performed immediately and fail because the proposal table update
+-- is still pending.  We'll need to drop the checks and add them back after the
+-- proposal update.
+
+--ALTER TABLE t_proposal
+--  ADD CONSTRAINT t_proposal_check_min_total CHECK (
+--    (c_min_percent_total IS NULL) OR (c_science_subtype = 'large_program')
+--  ),
+--  ADD CONSTRAINT t_proposal_check_total CHECK (
+--    (c_total_time IS NULL) OR (c_science_subtype = 'large_program')
+--  ),
+--  ADD CONSTRAINT t_proposal_science_subtype CHECK (
+--    CASE
+--      WHEN c_science_subtype = 'classical'     THEN (c_too_activation = 'none')
+--      WHEN c_science_subtype = 'large_program' THEN (c_min_percent_total IS NOT NULL) AND (c_total_time IS NOT NULL)
+--      WHEN c_science_subtype = 'poor_weather'  THEN (c_too_activation = 'none') AND (c_min_percent = 0)
+--    END
+--  );
 
 DROP TABLE t_proposal_class;
 

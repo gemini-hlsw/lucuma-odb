@@ -71,7 +71,7 @@ object ProposalService {
       def noAuth(uid: User.Id): OdbError = OdbError.NotAuthorized(uid, s.some)
 
     def cfpNotFound(cid: CallForProposals.Id): OdbError =
-      s"The specified Call for Proposals ($cid) was not found.".invalidArg
+      s"The specified Call for Proposals $cid was not found.".invalidArg
 
     def creationFailed(pid: Program.Id): OdbError =
       s"Proposal creation failed because program $pid already has a proposal.".invalidArg
@@ -80,7 +80,7 @@ object ProposalService {
       s"Proposal update failed because program $pid does not have a proposal.".invalidArg
 
     def mismatchedCfp(cid:  CallForProposals.Id, cfpType: CallForProposalsType, sub:  ScienceSubtype): OdbError =
-      s"The Call for Proposals ($cid) is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".invalidArg
+      s"The Call for Proposals $cid is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".invalidArg
 
     def invalidProposalStatus(ps: Tag): OdbError =
       s"Invalid proposal status: ${ps.value}".invalidArg
@@ -89,10 +89,13 @@ object ProposalService {
       s"A Call for Proposals must be selected for $pid before submitting a proposal.".invalidArg
 
     def missingSemester(pid: Program.Id): OdbError =
-      s"Submitted program $pid must be associated with a semester.".invalidArg
+      s"Submitted proposal $pid must be associated with a semester.".invalidArg
 
     def missingScienceSubtype(pid: Program.Id): OdbError =
-      s"Submitted program $pid must have a science subtype.".invalidArg
+      s"Submitted proposal $pid must have a science subtype.".invalidArg
+
+    def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
+      s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
 
     def invalidProgramType(pid: Program.Id, progType: ProgramType): OdbError =
       s"Program $pid is of type $progType. Only Science programs can have proposals.".invalidArg
@@ -170,6 +173,25 @@ object ProposalService {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
 
+        def validateSubmission(
+          pid: Program.Id,
+          newStatus: enumsVal.ProposalStatus
+        ): Result[Unit] =
+          (
+            missingProposal(pid).asFailure.unlessA(hasProposal),
+            missingCfP(pid).asFailure.unlessA(cfp.isDefined),
+            missingSemester(pid).asFailure.unlessA(semester.isDefined),
+            missingScienceSubtype(pid).asFailure.unlessA(scienceSubtype.isDefined),
+            scienceSubtype.fold(().success) { s =>
+              missingOrInvalidSplits(pid, s).asFailure.whenA(
+                splitsSum =!= 100 &&
+                ((s === ScienceSubtype.Classical)      ||
+                 (s === ScienceSubtype.FastTurnaround) ||
+                 (s === ScienceSubtype.Queue))
+              )
+            }
+          ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
+
         def updateProgram(
           pid:         Program.Id,
           newType:     Option[ScienceSubtype],
@@ -190,7 +212,7 @@ object ProposalService {
           )
 
           val eSum = set.typeʹ.fold(splitsSum) { t =>
-            t.partnerSplits.fold(splitsSum) { m => m.values.map(_.value.toLong).sum }
+            t.partnerSplits.fold(0.toLong, splitsSum, m => m.values.map(_.value.toLong).sum)
           }
 
           (for {
@@ -277,9 +299,9 @@ object ProposalService {
         def updateProgram(pid: Program.Id, before: ProposalContext, after: ProposalContext): ResultT[F, Unit] =
           ResultT.liftF(before.updateProgram(pid, after.scienceSubtype, after.semester))
 
-        def handleTypeChange(pid: Program.Id, before: ProposalContext): ResultT[F, ProposalPropertiesInput.Edit] =
-          input.SET.typeʹ.filterNot(c => before.scienceSubtype.exists(_ === c.scienceSubtype)).fold(ResultT.pure(input.SET)) { call =>
-            ResultT.fromResult(call.asCreate.map(create => input.SET.copy(typeʹ = create.asEdit.some)))
+        def handleTypeChange(pid: Program.Id, before: ProposalContext): ProposalPropertiesInput.Edit =
+          input.SET.typeʹ.filterNot(c => before.scienceSubtype.exists(_ === c.scienceSubtype)).fold(input.SET) { call =>
+            input.SET.copy(typeʹ = call.asCreate.asEdit.some)
           }
 
         def updateProposal(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
@@ -294,9 +316,9 @@ object ProposalService {
           })
 
         def updateSplits(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
-          ResultT(set.typeʹ.map(_.partnerSplits).traverse_ { splits =>
+          ResultT.liftF(Nullable.orAbsent(set.typeʹ).flatMap(_.partnerSplits).foldPresent( splits =>
             partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
-          }.map(_.success))
+          ).sequence.void)
 
         (for {
           pid    <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
@@ -304,24 +326,13 @@ object ProposalService {
           after  <- ResultT(before.edit(input.SET))
           _      <- checkCfpCompatibility(after)
           _      <- checkUserAccess(pid, after)
+          _      <- ResultT.fromResult(after.status.flatMap(s => after.validateSubmission(pid, s)))
           _      <- updateProgram(pid, before, after)
-          set    <- handleTypeChange(pid, before)
+          set     = handleTypeChange(pid, before)
           _      <- updateProposal(pid, set)
           _      <- updateSplits(pid, set)
         } yield pid).value
       }
-
-      private def validateSubmission(
-        pid: Program.Id,
-        ctx: ProposalContext,
-        newStatus: enumsVal.ProposalStatus
-      ): Result[Unit] =
-        (
-          missingProposal(pid).asFailure.unlessA(ctx.hasProposal),
-          missingCfP(pid).asFailure.unlessA(ctx.cfp.isDefined),
-          missingSemester(pid).asFailure.unlessA(ctx.semester.isDefined),
-          missingScienceSubtype(pid).asFailure.unlessA(ctx.scienceSubtype.isDefined)
-        ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
 
       def setProposalStatus(
         input: SetProposalStatusInput
@@ -336,7 +347,7 @@ object ProposalService {
           for {
             _ <- notAuthorizedNew(pid, user, Tag(newStatus.tag)).asFailure.unlessA(newStatus.userCanChangeStatus)
             _ <- notAuthorizedOld(pid, user, ctx.statusTag).asFailure.unlessA(oldStatus.userCanChangeStatus)
-            _ <- validateSubmission(pid, ctx, newStatus)
+            _ <- ctx.validateSubmission(pid, newStatus)
           } yield ()
 
         def update(pid: Program.Id, tag: Tag): F[Unit] =
