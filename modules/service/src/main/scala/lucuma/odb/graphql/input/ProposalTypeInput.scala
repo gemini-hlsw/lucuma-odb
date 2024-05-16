@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.data.State
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.eq.*
@@ -16,12 +17,14 @@ import grackle.syntax.*
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
+import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
+import monocle.Focus
+import monocle.Lens
+
 
 object ProposalTypeInput {
 
@@ -62,12 +65,13 @@ object ProposalTypeInput {
 
   case class Create(
     scienceSubtype:  ScienceSubtype,
-    tooActivation:   ToOActivation,
-    minPercentTime:  IntPercent,
-    minPercentTotal: Option[IntPercent]   = None,
-    totalTime:       Option[TimeSpan]     = None,
+    tooActivation:   ToOActivation        = ToOActivation.None,
+    minPercentTime:  IntPercent           = HundredPercent,
+    minPercentTotal: Option[IntPercent]   = none,
+    totalTime:       Option[TimeSpan]     = none,
     partnerSplits:   Map[Tag, IntPercent] = Map.empty
   ) {
+
     def asEdit: Edit =
       Edit(
         scienceSubtype,
@@ -75,30 +79,58 @@ object ProposalTypeInput {
         minPercentTime.some,
         Nullable.orNull(minPercentTotal),
         Nullable.orNull(totalTime),
-        partnerSplits.some
+        Nullable.NonNull(partnerSplits)
       )
+
+    def update(s: State[Create, Unit]): Create =
+      s.runS(this).value
+
   }
 
   object Create {
 
-    val Default: Create =
-      Create(ScienceSubtype.Queue, ToOActivation.None, ZeroPercent)
+    val DefaultFor: ScienceSubtype => Create = {
+      case ScienceSubtype.LargeProgram =>
+        Create(ScienceSubtype.LargeProgram, minPercentTotal = HundredPercent.some, totalTime = TimeSpan.Zero.some)
+      case s                           =>
+        Create(s)
+    }
+
+    val Default: Create = DefaultFor(ScienceSubtype.Queue)
+
+    val tooActivation: Lens[Create, ToOActivation]        = Focus[Create](_.tooActivation)
+    val minPercentTime: Lens[Create, IntPercent]          = Focus[Create](_.minPercentTime)
+    val minPercentTotal: Lens[Create, Option[IntPercent]] = Focus[Create](_.minPercentTotal)
+    val totalTime: Lens[Create, Option[TimeSpan]]         = Focus[Create](_.totalTime)
+    val partnerSplits: Lens[Create, Map[Tag, IntPercent]] = Focus[Create](_.partnerSplits)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          ToOActivationBinding("toOActivation", rToo),
-          IntPercentBinding("minPercentTime", rMin)
-        ) => (rToo, rMin).parMapN { (too, min) => Create(s, too, min) }
+          ToOActivationBinding.Option("toOActivation", rToo),
+          IntPercentBinding.Option("minPercentTime", rMin)
+        ) => (rToo, rMin).parMapN { (too, min) =>
+          Create(s).update(
+            for {
+              _ <- tooActivation  := too
+              _ <- minPercentTime := min
+            } yield ()
+          )
+        }
       }
 
     private val Classical: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          IntPercentBinding("minPercentTime", rMin),
+          IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Option("partnerSplits", rSplits)
         ) => (rMin, rSplits).parMapN { (min, splits) =>
-          Create(ScienceSubtype.Classical, ToOActivation.None, min, partnerSplits = splits.getOrElse(Map.empty))
+          Create(ScienceSubtype.Classical).update(
+            for {
+              _ <- minPercentTime := min
+              _ <- partnerSplits  := splits
+            } yield ()
+          )
         }
       }
 
@@ -111,23 +143,36 @@ object ProposalTypeInput {
     private val FastTurnaround: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          ToOActivationBinding("toOActivation", rToo),
-          IntPercentBinding("minPercentTime", rMin),
-          TagBinding("piAffiliation", rPartner)
+          ToOActivationBinding.Option("toOActivation", rToo),
+          IntPercentBinding.Option("minPercentTime", rMin),
+          TagBinding.Option("piAffiliation", rPartner)
         ) => (rToo, rMin, rPartner).parMapN { (too, min, partner) =>
-          Create(ScienceSubtype.FastTurnaround, too, min, partnerSplits = Map(partner -> HundredPercent))
+          Create(ScienceSubtype.FastTurnaround).update(
+            for {
+              _ <- tooActivation  := too
+              _ <- minPercentTime := min
+              _ <- partnerSplits  := partner.map(p => Map(p -> HundredPercent))
+            } yield ()
+          )
         }
       }
 
     private val LargeProgram: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          ToOActivationBinding("toOActivation", rToo),
-          IntPercentBinding("minPercentTime", rMin),
-          IntPercentBinding("minPercentTotalTime", rMinTotal),
-          TimeSpanInput.Binding("totalTime", rTotal)
+          ToOActivationBinding.Option("toOActivation", rToo),
+          IntPercentBinding.Option("minPercentTime", rMin),
+          IntPercentBinding.Option("minPercentTotalTime", rMinTotal),
+          TimeSpanInput.Binding.Option("totalTime", rTotal)
         ) => (rToo, rMin, rMinTotal, rTotal).parMapN { (too, min, minTotal, total) =>
-          Create(ScienceSubtype.LargeProgram, too, min, minTotal.some, total.some)
+          Create(ScienceSubtype.LargeProgram).update {
+            for {
+              _ <- tooActivation   := too
+              _ <- minPercentTime  := min
+              _ <- minPercentTotal := minTotal.orElse(HundredPercent.some)
+              _ <- totalTime       := total.orElse(TimeSpan.Zero.some)
+            } yield ()
+          }
         }
       }
 
@@ -135,17 +180,23 @@ object ProposalTypeInput {
       ObjectFieldsBinding.rmap {
         case List(
           EnumBinding.Option("ignore", rIgnore)
-        ) => rIgnore.as(Create(ScienceSubtype.PoorWeather, ToOActivation.None, ZeroPercent))
+        ) => rIgnore.as(Create(ScienceSubtype.PoorWeather, minPercentTime = ZeroPercent))
       }
 
     private val Queue: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          ToOActivationBinding("toOActivation", rToo),
-          IntPercentBinding("minPercentTime", rMin),
-          PartnerSplitsInput("partnerSplits", rSplits)
+          ToOActivationBinding.Option("toOActivation", rToo),
+          IntPercentBinding.Option("minPercentTime", rMin),
+          PartnerSplitsInput.Option("partnerSplits", rSplits)
         ) => (rToo, rMin, rSplits).parMapN { (too, min, splits) =>
-          Create(ScienceSubtype.Queue, too, min, partnerSplits = splits)
+          Create(ScienceSubtype.Queue).update(
+            for {
+              _ <- tooActivation  := too
+              _ <- minPercentTime := min
+              _ <- partnerSplits  := splits
+            } yield ()
+          )
         }
       }
 
@@ -167,57 +218,24 @@ object ProposalTypeInput {
 
   case class Edit(
     scienceSubtype:  ScienceSubtype,
-    tooActivation:   Option[ToOActivation]        = None,
-    minPercentTime:  Option[IntPercent]           = None,
-    minPercentTotal: Nullable[IntPercent]         = Nullable.Null,
-    totalTime:       Nullable[TimeSpan]           = Nullable.Null,
-    partnerSplits:   Option[Map[Tag, IntPercent]] = None
+    tooActivation:   Option[ToOActivation]          = None,
+    minPercentTime:  Option[IntPercent]             = None,
+    minPercentTotal: Nullable[IntPercent]           = Nullable.Null,
+    totalTime:       Nullable[TimeSpan]             = Nullable.Null,
+    partnerSplits:   Nullable[Map[Tag, IntPercent]] = Nullable.Null
   ) {
-
-
-    def asCreate: Result[Create] = {
-      def toResult[A](oa: Option[A], s:  => String)(f: A => Create): Result[Create] =
-        Result.fromOption(oa, OdbError.InvalidArgument(s.some).asProblem).map(f)
-
-      scienceSubtype match {
-        case ScienceSubtype.Classical          =>
-          toResult(
-            (minPercentTime, partnerSplits).tupled,
-            "'minPercentTime' and 'partnerSplits' are required for classical proposals."
-          ) { case (min, splits) => Create(scienceSubtype, ToOActivation.None, min, partnerSplits = splits) }
-
-        case ScienceSubtype.DemoScience   |
-             ScienceSubtype.DirectorsTime |
-             ScienceSubtype.SystemVerification =>
-          toResult(
-            (tooActivation, minPercentTime).tupled,
-            s"'toOActivation' and 'minPercentTime' are required for ${scienceSubtype.tag.replace('_', ' ')} proposals."
-          ) { case (too, min) => Create(scienceSubtype, too, min) }
-
-        case ScienceSubtype.FastTurnaround     =>
-          toResult(
-            (tooActivation, minPercentTime, partnerSplits).tupled,
-            "'toOActivation', 'minPercentTime' and 'piAffiliate' are required for fast turnaround proposals."
-          ) { case (too, min, splits) => Create(scienceSubtype, too, min, partnerSplits = splits) }
-
-        case ScienceSubtype.LargeProgram       =>
-          toResult(
-            (tooActivation, minPercentTime, minPercentTotal.toOption, totalTime.toOption).tupled,
-            "'toOActivation', 'minPercentTime', 'minPercentTotal' and 'totalTime' are required for large program proposals."
-          ) { case (too, min, minTotal, total) => Create(scienceSubtype, too, min, minTotal.some, total.some) }
-
-        case ScienceSubtype.PoorWeather        =>
-          Create(scienceSubtype, ToOActivation.None, ZeroPercent).success
-
-        case ScienceSubtype.Queue              =>
-          toResult(
-            (tooActivation, minPercentTime, partnerSplits).tupled,
-            "'toOActivation', 'minPercentTime' and 'partnerSplits' are required for queue proposals."
-          ) { case (too, min, splits) => Create(scienceSubtype, too, min, partnerSplits = splits) }
+    def asCreate: Create =
+      Create.DefaultFor(scienceSubtype).update {
+        for {
+          _ <- Create.tooActivation   := tooActivation
+          _ <- Create.minPercentTime  := minPercentTime
+          _ <- Create.minPercentTotal := minPercentTotal.toOptionOption
+          _ <- Create.totalTime       := totalTime.toOptionOption
+          _ <- Create.partnerSplits   := partnerSplits.toOption
+        } yield ()
       }
-    }
-
   }
+
 
   object Edit {
     private def simpleEditBinding(s: ScienceSubtype): Matcher[Edit] =
@@ -234,7 +252,7 @@ object ProposalTypeInput {
       ObjectFieldsBinding.rmap {
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Option("partnerSplits", rSplits)
+          PartnerSplitsInput.Nullable("partnerSplits", rSplits)
         ) => (rMin, rSplits).parMapN { (min, splits) =>
           Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits)
         }
@@ -251,7 +269,7 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          TagBinding.Option("piAffiliation", rPartner)
+          TagBinding.Nullable("piAffiliation", rPartner)
         ) => (rToo, rMin, rPartner).parMapN { (too, min, partner) =>
           Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)))
         }
@@ -262,10 +280,10 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          IntPercentBinding.Option("minPercentTotalTime", rMinTotal),
-          TimeSpanInput.Binding.Option("totalTime", rTotal)
+          IntPercentBinding.Nullable("minPercentTotalTime", rMinTotal),
+          TimeSpanInput.Binding.Nullable("totalTime", rTotal)
         ) => (rToo, rMin, rMinTotal, rTotal).parMapN { (too, min, minTotal, total) =>
-          Edit(ScienceSubtype.LargeProgram, too, min, Nullable.orAbsent(minTotal), Nullable.orAbsent(total))
+          Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total)
         }
       }
 
@@ -281,7 +299,7 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Option("partnerSplits", rSplits)
+          PartnerSplitsInput.Nullable("partnerSplits", rSplits)
         ) => (rToo, rMin, rSplits).parMapN { (too, min, splits) =>
           Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits)
         }

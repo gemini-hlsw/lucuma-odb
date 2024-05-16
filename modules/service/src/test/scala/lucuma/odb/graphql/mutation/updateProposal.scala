@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.literal.*
 import lucuma.core.model.Program
 import lucuma.odb.data.CallForProposalsType
@@ -177,7 +178,7 @@ class updateProposal extends OdbSuite {
     }
   }
 
-  test("⨯ missing properties") {
+  test("✓ change type to LP") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid, title = "initial title") *>
       expect(
@@ -191,9 +192,8 @@ class updateProposal extends OdbSuite {
                   title: "updated title"
                   category: SMALL_BODIES
                   type: {
-                    fastTurnaround: {
-                      toOActivation: STANDARD
-                      minPercentTime: 50
+                    largeProgram: {
+                      minPercentTotalTime: 25
                     }
                   }
                 }
@@ -201,15 +201,86 @@ class updateProposal extends OdbSuite {
             ) {
               proposal {
                 title
+                category
                 type {
                   scienceSubtype
+                  ... on LargeProgram {
+                    minPercentTotalTime
+                    totalTime { hours }
+                  }
                 }
               }
             }
           }
         """,
-        expected =
-          List("'toOActivation', 'minPercentTime' and 'piAffiliate' are required for fast turnaround proposals.").asLeft
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "title": "updated title",
+                "category": "SMALL_BODIES",
+                "type": {
+                  "scienceSubtype": "LARGE_PROGRAM",
+                  "minPercentTotalTime": 25,
+                  "totalTime": { "hours": 0.000000 }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type from LP") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, callProps =
+        s"""
+          largeProgram: {
+             minPercentTotalTime: 25
+             totalTime: { hours: 10.0 }
+          }
+        """.some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    demoScience: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on DemoScience {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "DEMO_SCIENCE",
+                  "minPercentTime": 100
+                }
+              }
+            }
+          }
+        """.asRight
       )
     }
   }
@@ -292,7 +363,7 @@ class updateProposal extends OdbSuite {
           }
         """,
         expected =
-          List("The specified Call for Proposals (c-123) was not found.").asLeft
+          List("The specified Call for Proposals c-123 was not found.").asLeft
       )
     }
   }
@@ -316,7 +387,7 @@ class updateProposal extends OdbSuite {
             }
           """,
           expected =
-            List(s"The Call for Proposals ($cid) is a Demo Science call and cannot be used with a Queue proposal.").asLeft
+            List(s"The Call for Proposals $cid is a Demo Science call and cannot be used with a Queue proposal.").asLeft
         )
       }
     }
@@ -397,7 +468,7 @@ class updateProposal extends OdbSuite {
             }
           """,
           expected =
-            List(s"The Call for Proposals ($cid) is a Regular Semester call and cannot be used with a Demo Science proposal.").asLeft
+            List(s"The Call for Proposals $cid is a Regular Semester call and cannot be used with a Demo Science proposal.").asLeft
         )
       }
     }
@@ -519,34 +590,6 @@ class updateProposal extends OdbSuite {
     }
 
   }
-
-/*
-  test("partner splits cannot be empty") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
-      expect(
-        user = pi2,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  partnerSplits: []
-                }
-              }
-            ) {
-              proposal {
-                title
-              }
-            }
-          }
-        """,
-        expected =
-          Left(List("Argument 'input.SET.partnerSplits' is invalid: Percentages must sum to exactly 100."))
-      )
-    }
-  }
-*/
 
   test("⨯ update proposal in another user's program") {
     createProgramAs(pi).flatMap { pid =>

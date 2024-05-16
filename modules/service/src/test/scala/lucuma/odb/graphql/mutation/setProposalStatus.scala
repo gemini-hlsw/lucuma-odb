@@ -7,6 +7,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ProgramType
@@ -14,6 +15,7 @@ import lucuma.core.model.CallForProposals
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
 import lucuma.odb.service.ProposalService.error
@@ -28,8 +30,98 @@ class setProposalStatus extends OdbSuite {
   val guest    = TestUsers.guest(6)
 
   val validUsers = List(pi, pi2, ngo, staff, admin, guest)
-  
-  test("⨯ edit proposal status (attempt update proposalStatus with no proposal)") {
+
+  def addPartnerSplits(pid: Program.Id): IO[Unit] =
+    query(pi, s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              type: {
+                queue: {
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 70
+                    },
+                    {
+                      partner: CA
+                      percent: 30
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ) {
+          proposal { title }
+        }
+      }
+    """).void
+
+  test("✓ valid submission") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "proposal": {
+                      "reference": { "label": "G-2025A-0001" }
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
+      }
+    }
+  }
+
+  test("⨯ missing partner splits") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            List(s"Submitted proposal $pid of type Queue must specify partner time percentages which sum to 100%.").asLeft
+        )
+      }
+    }
+  }
+
+  test("⨯ update proposalStatus with no proposal") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -54,7 +146,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("⨯ edit proposal status (pi attempts update proposalStatus to unauthorized status)") {
+  test("⨯ pi update proposalStatus to unauthorized status") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       expect(
@@ -80,7 +172,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("⨯ edit proposal status (guests cannot submit proposals)") {
+  test("⨯ guest submit") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       // the non-guest requirement gets caught before it even gets to the service.
@@ -207,7 +299,7 @@ class setProposalStatus extends OdbSuite {
                 "program": {
                   "id" : $pid,
                   "proposalStatus": "SUBMITTED",
-                  "proposal": { "reference": { "label": "G-2025A-0001" } }
+                  "proposal": { "reference": { "label": "G-2025A-0002" } }
                  }
               }
             }
@@ -304,6 +396,7 @@ class setProposalStatus extends OdbSuite {
       p <- createProgramAs(pi)
       _ <- addProposal(pi, p)
       _ <- setCallId(p, c)
+      _ <- addPartnerSplits(p)
       _ <- submit(p)
       _ <- recall(p)
       l <- chronProgramUpdates(p)
@@ -369,6 +462,7 @@ class setProposalStatus extends OdbSuite {
       c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
       p <- createProgramAs(pi)
       _ <- addProposal(pi, p)
+      _ <- addPartnerSplits(p)
       _ <- setCallId(p, c)
       _ <- accept(p)
       _ <- recall(p)
