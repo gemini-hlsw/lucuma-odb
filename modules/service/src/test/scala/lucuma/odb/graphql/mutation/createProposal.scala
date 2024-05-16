@@ -191,7 +191,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected =
-          List(s"The indicated Call for Proposals ($cid) is a Poor Weather call and cannot be used with a Demo Science proposal.").asLeft
+          List(s"The Call for Proposals ($cid) is a Poor Weather call and cannot be used with a Demo Science proposal.").asLeft
       )
 
     for {

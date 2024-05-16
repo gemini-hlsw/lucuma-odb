@@ -7,20 +7,19 @@ package mutation
 
 import cats.syntax.either.*
 import io.circe.literal.*
-//import lucuma.core.enums.ProgramType
-//import lucuma.core.model.Program
-//import lucuma.odb.data.OdbError
-//import lucuma.odb.service.ProposalService.UpdateProposalError
+import lucuma.core.model.Program
+import lucuma.odb.data.CallForProposalsType
 
 class updateProposal extends OdbSuite {
   
-  val pi       = TestUsers.Standard.pi(1, 101)
-  val pi2      = TestUsers.Standard.pi(2, 102)
-  val guest    = TestUsers.guest(3)
+  val pi    = TestUsers.Standard.pi(nextId, nextId)
+  val pi2   = TestUsers.Standard.pi(nextId, nextId)
+  val guest = TestUsers.guest(nextId)
+  val staff = TestUsers.Standard.staff(nextId, nextId)
 
-  val validUsers = List(pi, pi2, guest)
+  val validUsers = List(pi, pi2, guest, staff)
 
-  test("✓ non-call properties") {
+  test("✓ generic properties") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid, title = "initial title") *>
       // Now update it, but not the call type
@@ -58,7 +57,7 @@ class updateProposal extends OdbSuite {
     }
   }
 
-  test("✓ call properties") {
+  test("✓ type-specific properties") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid, title = "initial title") *>
       expect(
@@ -123,7 +122,7 @@ class updateProposal extends OdbSuite {
     }
   }
 
-  test("✓ change call") {
+  test("✓ change type") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid, title = "initial title") *>
       expect(
@@ -275,6 +274,252 @@ class updateProposal extends OdbSuite {
     }
   }
 
+  test("⨯ set invalid cfp id") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "c-123" }
+              }
+            ) {
+              proposal { title }
+            }
+          }
+        """,
+        expected =
+          List("The specified Call for Proposals (c-123) was not found.").asLeft
+      )
+    }
+  }
+
+  test("⨯ set mismatched cfp") {
+    createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """,
+          expected =
+            List(s"The Call for Proposals ($cid) is a Demo Science call and cannot be used with a Queue proposal.").asLeft
+        )
+      }
+    }
+  }
+
+  test("✓ set matching cfp") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { type { scienceSubtype } }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "updateProposal": {
+                "proposal": {
+                  "type": {
+                    "scienceSubtype": "QUEUE"
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+      }
+    }
+  }
+
+  test("⨯ invalid type change") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """
+        ) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: {
+                    type: {
+                      demoScience: {
+                        toOActivation: STANDARD
+                        minPercentTime: 50
+                      }
+                    }
+                  }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """,
+          expected =
+            List(s"The Call for Proposals ($cid) is a Regular Semester call and cannot be used with a Demo Science proposal.").asLeft
+        )
+      }
+    }
+  }
+
+  test("✓ change call and type") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """
+        ) *>
+        createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid2 =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                updateProposal(
+                  input: {
+                    programId: "$pid"
+                    SET: {
+                      callId: "$cid2"
+                      type: {
+                        demoScience: {
+                          toOActivation: STANDARD
+                          minPercentTime: 50
+                        }
+                      }
+                    }
+                  }
+                ) {
+                  proposal { type { scienceSubtype } }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "updateProposal": {
+                  "proposal": {
+                    "type": {
+                      "scienceSubtype": "DEMO_SCIENCE"
+                    }
+                  }
+                }
+              }
+            """.asRight
+          )
+        }
+      }
+    }
+  }
+
+  test("✓ delete cfp") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """
+        ) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: {
+                    callId: null
+                    type: {
+                      demoScience: {
+                        toOActivation: STANDARD
+                        minPercentTime: 50
+                      }
+                    }
+                  }
+                }
+              ) {
+                proposal { type { scienceSubtype } }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "updateProposal": {
+                "proposal": {
+                  "type": {
+                    "scienceSubtype": "DEMO_SCIENCE"
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+      }
+    }
+
+  }
+
 /*
   test("partner splits cannot be empty") {
     createProgramWithProposalAs(pi).flatMap { pid =>
@@ -301,9 +546,11 @@ class updateProposal extends OdbSuite {
       )
     }
   }
-  
-  test("user cannot update proposal in another user's program") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
+*/
+
+  test("⨯ update proposal in another user's program") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       expect(
         user = pi2,
         query = s"""
@@ -316,19 +563,19 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal {
-                title
-              }
+              proposal { title }
             }
           }
         """,
-        expected = Left(List(OdbError.InvalidProgram(pid).message))
+        expected =
+          List(s"Program $pid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
       )
     }
   }
-  
-  test("guest cannot update proposal") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
+
+  test("⨯ guest update proposal") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       // the non-guest requirement gets caught before it even gets to the service.
       expect(
         user = guest,
@@ -342,18 +589,17 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal {
-                title
-              }
+              proposal { title }
             }
           }
         """,
-        expected = Left(List(OdbError.NotAuthorized(guest.id).message))
+        expected =
+          List(s"User ${guest.id} is not authorized to perform this operation.").asLeft
       )
     }
   }
-  
-  test("attempt to update proposal in non-existent program") {
+
+  test("⨯ update proposal in non-existent program") {
     val badPid = Program.Id.fromLong(Long.MaxValue).get
     expect(
       user = pi,
@@ -367,18 +613,18 @@ class updateProposal extends OdbSuite {
               }
             }
           ) {
-            proposal {
-              title
-            }
+            proposal { title }
           }
         }
       """,
-      expected = Left(List(OdbError.InvalidProgram(badPid).message))
+      expected =
+        List(s"Program $badPid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
     )
   }
-  
-  test("Attempt to update proposal in non-science program") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
+
+  test("⨯ update proposal in non-science program") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       setProgramReference(pi, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
       expect(
         user = pi,
@@ -392,15 +638,14 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal {
-                title
-              }
+              proposal { title }
             }
           }
         """,
-        expected = Left(List(UpdateProposalError.InvalidProgramType(pid, ProgramType.Engineering).message))
+        expected =
+          List(s"Program $pid is of type Engineering. Only Science programs can have proposals.").asLeft
       )
     }
   }
- */
+
 }

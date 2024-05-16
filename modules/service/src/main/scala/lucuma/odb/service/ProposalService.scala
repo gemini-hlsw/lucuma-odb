@@ -80,7 +80,7 @@ object ProposalService {
       s"Proposal update failed because program $pid does not have a proposal.".invalidArg
 
     def mismatchedCfp(cid:  CallForProposals.Id, cfpType: CallForProposalsType, sub:  ScienceSubtype): OdbError =
-      s"The indicated Call for Proposals ($cid) is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".invalidArg
+      s"The Call for Proposals ($cid) is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".invalidArg
 
     def invalidProposalStatus(ps: Tag): OdbError =
       s"Invalid proposal status: ${ps.value}".invalidArg
@@ -134,12 +134,38 @@ object ProposalService {
           ps < enumsVal.ProposalStatus.Submitted ||
           user.role.access >= Access.Ngo
 
+      case class CfpProperties(
+        cid:       CallForProposals.Id,
+        callType:  CallForProposalsType,
+        semester:  Semester
+      ) {
+        def validateSubtype(sub: ScienceSubtype): Result[Unit] =
+          mismatchedCfp(cid, callType, sub)
+            .asFailure
+            .unlessA(sub.isCompatibleWith(callType))
+      }
+
+      object CfpProperties:
+        val codec: Codec[CfpProperties] =
+          (cfp_id *: cfp_type *: semester).to[CfpProperties]
+
+        def lookup(cid: CallForProposals.Id)(using Transaction[F]): F[Result[CfpProperties]] =
+          callForProposalsService
+            .typeAndSemesterOf(cid)
+            .map { o =>
+              Result.fromOption(
+                o.map(CfpProperties(cid, _, _)),
+                cfpNotFound(cid).asProblem
+              )
+            }
+
       case class ProposalContext(
         statusTag:      Tag,
         hasProposal:    Boolean,
-        cfpId:          Option[CallForProposals.Id],
         semester:       Option[Semester],
-        scienceSubtype: Option[ScienceSubtype]
+        scienceSubtype: Option[ScienceSubtype],
+        splitsSum:      Long,
+        cfp:            Option[CfpProperties]
       ) {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
@@ -155,17 +181,34 @@ object ProposalService {
               newType.exists(t => scienceSubtype.forall(_ =!= t)) ||
               newSemester.exists(s => semester.forall(_ =!= s))
             )
+
+        def edit(set: ProposalPropertiesInput.Edit)(using Transaction[F]): F[Result[ProposalContext]] = {
+          val eCfp = set.callId.fold(
+            ResultT.pure(none[CfpProperties]),                  // delete
+            ResultT.pure(cfp),                                  // don't change
+            id => ResultT(CfpProperties.lookup(id)).map(_.some) // update if possible
+          )
+
+          val eSum = set.typeʹ.fold(splitsSum) { t =>
+            t.partnerSplits.fold(splitsSum) { m => m.values.map(_.value.toLong).sum }
+          }
+
+          (for {
+            c <- eCfp
+            s <- eCfp.map(_.map(_.semester))
+            t  = set.typeʹ.fold(scienceSubtype)(_.scienceSubtype.some)
+          } yield copy(semester = s, scienceSubtype = t, splitsSum = eSum, cfp = c)).value
+        }
       }
 
       object ProposalContext {
-
-        private val proposal_context: Codec[ProposalContext] =
-          (tag *: bool *: cfp_id.opt *: semester.opt *: science_subtype.opt).to[ProposalContext]
+        val codec: Codec[ProposalContext] =
+          (tag *: bool *: semester.opt *: science_subtype.opt *: int8 *: CfpProperties.codec.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
           session.prepareR(
-            af.fragment.query(program_type *: proposal_context)
+            af.fragment.query(program_type *: codec)
           ).use { ps =>
             ps.option(af.argument).map {
               case Some((ProgramType.Science, pc)) => pc.success
@@ -175,28 +218,6 @@ object ProposalService {
           }
 
       }
-
-      case class CfpProperties(
-        cid:      CallForProposals.Id,
-        callType: CallForProposalsType,
-        semester: Semester
-      ) {
-        def validateSubtype(sub: ScienceSubtype): Result[Unit] =
-          mismatchedCfp(cid, callType, sub)
-            .asFailure
-            .unlessA(sub.isCompatibleWith(callType))
-      }
-
-      object CfpProperties:
-        def lookup(cid: CallForProposals.Id)(using Transaction[F]): F[Result[CfpProperties]] =
-          callForProposalsService
-            .typeAndSemesterOf(cid)
-            .map { o =>
-              Result.fromOption(
-                o.map(CfpProperties(cid, _, _)),
-                cfpNotFound(cid).asProblem
-              )
-            }
 
       def createProposal(
         input: CreateProposalInput
@@ -241,16 +262,9 @@ object ProposalService {
         input: UpdateProposalInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
-        def lookupCfpProperties: ResultT[F, Option[CfpProperties]] =
-          input.SET.callId.toOption.traverse(cid => ResultT(CfpProperties.lookup(cid)))
-
         // Make sure the indicated CfP is compatible with the inputs.
-        def checkCfpCompatibility(o: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.fromResult(
-            (o, input.SET.typeʹ.map(_.scienceSubtype)).tupled.fold(Result.unit) { (c, s) =>
-              c.validateSubtype(s)
-            }
-          )
+        def checkCfpCompatibility(p: ProposalContext): ResultT[F, Unit] =
+          ResultT.fromResult((p.cfp, p.scienceSubtype).tupled.fold(Result.unit) { (c, s) => c.validateSubtype(s) })
 
         def checkUserAccess(pid: Program.Id, p: ProposalContext): ResultT[F, Unit] =
           ResultT.fromResult(
@@ -260,11 +274,11 @@ object ProposalService {
           )
 
         // Update the program's science subtype and/or semester to match inputs.
-        def updateProgram(pid: Program.Id, p: ProposalContext, c: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.liftF(p.updateProgram(pid, input.SET.typeʹ.map(_.scienceSubtype), c.map(_.semester)))
+        def updateProgram(pid: Program.Id, before: ProposalContext, after: ProposalContext): ResultT[F, Unit] =
+          ResultT.liftF(before.updateProgram(pid, after.scienceSubtype, after.semester))
 
-        def handleTypeChange(pid: Program.Id, oldType: Option[ScienceSubtype]): ResultT[F, ProposalPropertiesInput.Edit] =
-          input.SET.typeʹ.filterNot(c => oldType.exists(_ === c.scienceSubtype)).fold(ResultT.pure(input.SET)) { call =>
+        def handleTypeChange(pid: Program.Id, before: ProposalContext): ResultT[F, ProposalPropertiesInput.Edit] =
+          input.SET.typeʹ.filterNot(c => before.scienceSubtype.exists(_ === c.scienceSubtype)).fold(ResultT.pure(input.SET)) { call =>
             ResultT.fromResult(call.asCreate.map(create => input.SET.copy(typeʹ = create.asEdit.some)))
           }
 
@@ -285,15 +299,15 @@ object ProposalService {
           }.map(_.success))
 
         (for {
-          pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-          c   <- lookupCfpProperties
-          _   <- checkCfpCompatibility(c)
-          p   <- ResultT(ProposalContext.lookup(pid))
-          _   <- checkUserAccess(pid, p)
-          _   <- updateProgram(pid, p, c)
-          set <- handleTypeChange(pid, p.scienceSubtype)
-          _   <- updateProposal(pid, set)
-          _   <- updateSplits(pid, set)
+          pid    <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
+          before <- ResultT(ProposalContext.lookup(pid))
+          after  <- ResultT(before.edit(input.SET))
+          _      <- checkCfpCompatibility(after)
+          _      <- checkUserAccess(pid, after)
+          _      <- updateProgram(pid, before, after)
+          set    <- handleTypeChange(pid, before)
+          _      <- updateProposal(pid, set)
+          _      <- updateSplits(pid, set)
         } yield pid).value
       }
 
@@ -304,7 +318,7 @@ object ProposalService {
       ): Result[Unit] =
         (
           missingProposal(pid).asFailure.unlessA(ctx.hasProposal),
-          missingCfP(pid).asFailure.unlessA(ctx.cfpId.isDefined),
+          missingCfP(pid).asFailure.unlessA(ctx.cfp.isDefined),
           missingSemester(pid).asFailure.unlessA(ctx.semester.isDefined),
           missingScienceSubtype(pid).asFailure.unlessA(ctx.scienceSubtype.isDefined)
         ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
@@ -432,27 +446,23 @@ object ProposalService {
           prog.c_program_type,
           prog.c_proposal_status,
           prop.c_program_id IS NOT NULL,
-          prop.c_cfp_id,
           prog.c_semester,
-          prog.c_science_subtype
+          prog.c_science_subtype,
+          COALESCE((SELECT SUM(c_percent) FROM t_partner_split WHERE c_program_id = prog.c_program_id), 0) AS c_splits_sum,
+          cfp.c_cfp_id,
+          cfp.c_type,
+          cfp.c_semester
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id
-        WHERE prog.c_program_id = $program_id
+        LEFT JOIN t_cfp cfp
+          ON prop.c_cfp_id = cfp.c_cfp_id
+        WHERE
+          prog.c_program_id = $program_id AND
+          (prop.c_cfp_id IS NULL OR cfp.c_existence = 'present'::e_existence)
       """.apply(pid) |+|
       ProgramService.Statements.andWhereUserAccess(user, pid)
-/*
-WANT TO ADD these CfP properties into ProposalContext, replacing the cfpId for
-a CfpProperties instance.  That will allow me to use it in submission validation
-along with CfpType checking already happening in create and update.
 
-    val SelectTypeAndSemester: Query[CallForProposals.Id, (CallForProposalsType, Semester)] =
-      sql"""
-        SELECT c_type, c_semester
-          FROM t_cfp
-         WHERE c_cfp_id = $cfp_id AND c_existence = 'present'::e_existence
-      """.query(cfp_type *: semester)
- */
     def updateProposalStatus(user: User, pid: Program.Id, status: Tag): AppliedFragment =
       sql"""
         UPDATE t_program
