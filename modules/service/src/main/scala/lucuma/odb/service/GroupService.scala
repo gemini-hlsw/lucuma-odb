@@ -157,14 +157,8 @@ object GroupService {
           SET.existence.map(sql"c_existence = $existence"),
         ).flatten
 
-      val deletionPredicate: AppliedFragment =        
-        SET.existence
-          .filter(_ === Existence.Deleted)
-          .as(void" AND NOT EXISTS (SELECT * FROM v_group_element WHERE c_group_id = v_group.c_group_id)")
-          .orEmpty
-
       val idPredicate: AppliedFragment =
-        void" c_group_id IN (" |+| which |+| deletionPredicate |+| void")";
+        void" c_group_id IN (" |+| which |+| void")";
 
       val coda: AppliedFragment =
         void" WHERE" |+| idPredicate |+| void" RETURNING c_group_id"
