@@ -86,6 +86,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
           case Tag.ItcError               => OdbError.ItcError(detail).pure[Gen]
           case Tag.GuideEnvironmentError  => OdbError.GuideEnvironmentError(detail).pure[Gen]
           case Tag.EmailSendError         => OdbError.EmailSendError(detail).pure[Gen]
+          case Tag.InconsistentGroup      => OdbError.InconsistentGroupError(detail).pure[Gen]
                       
   checkAll("OdbErrorCodec", CodecTests[OdbError].codec)
 

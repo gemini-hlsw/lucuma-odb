@@ -18,6 +18,7 @@ trait GroupElementView[F[_]] extends BaseMapping[F] {
     val Index              = col("c_index", int2_nonneg)
     val ChildGroupId       = col("c_child_group_id", group_id.opt)
     val ChildObservationId = col("c_child_observation_id", observation_id.opt)
+    val Existence          = col("c_existence", existence)
   }
 
 }

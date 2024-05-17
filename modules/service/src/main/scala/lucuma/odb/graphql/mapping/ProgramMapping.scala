@@ -106,30 +106,39 @@ trait ProgramMapping[F[_]]
         }
       }
 
-    case (ProgramType, "groupElements", Nil) =>
+    case (ProgramType, "groupElements", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted),
+    )) =>
       Elab.transformChild { child =>
-        FilterOrderByOffsetLimit(
-          pred = Some(Predicates.groupElement.parentGroupId.isNull(true)),
-          oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
-          offset = None,
-          limit = None,
-          child
-        )
+        rIncludeDeleted.map: includeDeleted =>
+          FilterOrderByOffsetLimit(
+            pred = And(
+              Predicates.groupElement.parentGroupId.isNull(true),
+              Predicates.groupElement.existence.includeDeleted(includeDeleted)
+            ).some,
+            oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true))),
+            offset = None,
+            limit = None,
+            child
+          )
       }
 
-    case (ProgramType, "allGroupElements", Nil) =>
+    case (ProgramType, "allGroupElements", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted),
+    )) =>
       Elab.transformChild { child =>
-        FilterOrderByOffsetLimit(
-          pred = None,
-          oss = Some(List(
-            OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
-            OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
-          )),
-          offset = None,
-          limit = None,
-          child
-        )
-      }
+        rIncludeDeleted.map: includeDeleted =>
+          FilterOrderByOffsetLimit(
+            pred = Some(Predicates.groupElement.existence.includeDeleted(includeDeleted)),
+            oss = Some(List(
+              OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
+              OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
+            )),
+            offset = None,
+            limit = None,
+            child
+          )
+        }
 
     case (ProgramType, "obsAttachments", Nil) =>
       Elab.transformChild { child =>

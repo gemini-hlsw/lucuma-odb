@@ -12,6 +12,8 @@ import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.odb.data.Existence
+import lucuma.odb.data.OdbError
 
 class updateGroups extends OdbSuite {
 
@@ -238,6 +240,127 @@ class updateGroups extends OdbSuite {
       g3  <- createGroupAs(pi, pid)
       _   <- moveGroupsAs(pi, List(g1), Some(g3), None)
     } yield ()
+  }
+
+  def updateGroupExistenceAs(user: User, gid: Group.Id, existence: Existence): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: {
+              existence: ${existence.tag.toUpperCase}
+            },
+            WHERE: {
+              id: { IN: [${gid.asJson}] }
+            }
+          }) {
+            groups {
+              id
+              existence
+            }
+          }
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateGroups": {
+            "groups": [
+              {
+                "id": $gid,
+                "existence": ${existence.asJson}
+              }
+            ]
+          }
+        }
+      """)
+    )
+
+  test("update existence - can't delete a non-empty group") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid, Some(g1))
+      _   <- expectOdbError(
+              user = pi,
+              query = s"""
+                mutation {
+                  updateGroups(input: {
+                    SET: {
+                      existence: DELETED
+                    },
+                    WHERE: {
+                      id: { IN: [${g1.asJson}] }
+                    }
+                  }) {
+                    groups {
+                      id
+                    }
+                  }
+                }
+              """,
+              expected = {
+                case OdbError.InconsistentGroupError(Some("Deleted group contains non-deleted element(s).")) => ()
+              }
+            )
+    yield ()
+  }
+
+  test("update existence - can delete an empty group") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      _   <- updateGroupExistenceAs(pi, g1, Existence.Deleted)
+    yield ()
+  }
+
+  test("update existence - deleted group shouldn't be visible at top level") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      _   <- updateGroupExistenceAs(pi, g1, Existence.Deleted)
+      _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g2)))
+    yield ()
+  }
+  
+  test("update existence - deleted group should be visible at top level, if you ask") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      _   <- updateGroupExistenceAs(pi, g1, Existence.Deleted)
+      _   <- assertIO(groupElementsAs(pi, pid, None, includeDeleted = true), List(Left(g1), Left(g2)))
+    yield ()
+  }
+
+  test("update existence - deleted group shouldn't be visible at nested level") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid, Some(g1))
+      _   <- updateGroupExistenceAs(pi, g2, Existence.Deleted)
+      _   <- assertIO(groupElementsAs(pi, pid, Some(g1)), Nil)
+    yield ()
+  }
+  
+  test("update existence - deleted group should be visible at nested level, if you ask") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid, Some(g1))
+      _   <- updateGroupExistenceAs(pi, g2, Existence.Deleted)
+      _   <- assertIO(groupElementsAs(pi, pid, Some(g1), includeDeleted = true), List(Left(g2)))
+    yield ()
+  }
+
+  test("update existence - can undelete a deleted group") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      _   <- updateGroupExistenceAs(pi, g1, Existence.Deleted)
+      _   <- updateGroupExistenceAs(pi, g1, Existence.Present)
+    yield ()
   }
 
 }

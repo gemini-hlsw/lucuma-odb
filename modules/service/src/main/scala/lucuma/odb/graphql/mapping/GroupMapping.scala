@@ -10,9 +10,8 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
-import grackle.Query.OrderBy
+import grackle.Query.FilterOrderByOffsetLimit
 import grackle.Query.OrderSelection
-import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
@@ -20,6 +19,8 @@ import lucuma.core.model.Group
 import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.binding.BooleanBinding
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable
@@ -32,7 +33,7 @@ import lucuma.odb.service.Services
 import Services.Syntax.*
 
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] with KeyValueEffectHandler[F] {
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F] {
 
   def user: User
   def itcClient: ItcClient[F]
@@ -53,13 +54,23 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       SqlObject("maximumInterval"),
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
-      EffectField("timeEstimateRange", timeEstimateHandler, List("id"))
+      EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
+      SqlField("existence", GroupView.Existence),
     )
 
   lazy val GroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GroupType, "elements", Nil) =>
+    case (GroupType, "elements", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    )) =>
       Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))), child)
+        rIncludeDeleted.map: includeDeleted =>
+          FilterOrderByOffsetLimit(
+            pred = Some(Predicates.groupElement.existence.includeDeleted(includeDeleted)),
+            oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))),
+            offset = None,
+            limit = None,
+            child = child
+          )
       }
 
   private lazy val timeEstimateHandler: EffectHandler[F] =
