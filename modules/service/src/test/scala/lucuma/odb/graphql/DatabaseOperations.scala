@@ -279,6 +279,39 @@ trait DatabaseOperations { this: OdbSuite =>
         ).asRight
     )
 
+  def addPartnerSplits(
+    user: User,
+    pid: Program.Id,
+    proposalType: String = "queue"
+  ): IO[Unit] =
+    query(user, s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              type: {
+                $proposalType: {
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 70
+                    },
+                    {
+                      partner: CA
+                      percent: 30
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ) {
+          proposal { title }
+        }
+      }
+    """).void
+
   def setProposalStatus(user: User, pid: Program.Id, status: String): IO[(Option[ProgramReference], Option[ProposalReference])] =
     query(user,  s"""
         mutation {
