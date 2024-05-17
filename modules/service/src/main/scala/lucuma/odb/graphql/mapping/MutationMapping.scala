@@ -40,6 +40,8 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.Config
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddAtomEventInput
@@ -89,6 +91,7 @@ import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
+import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
@@ -779,7 +782,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             r.flatMap: selected =>
               groupResultSubquery(selected, input.LIMIT, child)
 
-      }
+      } .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
+        case SqlState.RaiseException(ex) =>
+          OdbError.InconsistentGroupError(Some(ex.message)).asFailure
+          
     }
 
 }

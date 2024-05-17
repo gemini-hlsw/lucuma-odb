@@ -21,6 +21,7 @@ trait GroupElementMapping[F[_]] extends GroupElementView[F] with GroupView[F] wi
       SqlField("parentIndex", GroupElementView.Index),
       SqlObject("group", Join(GroupElementView.ChildGroupId, GroupView.Id)),
       SqlObject("observation", Join(GroupElementView.ChildObservationId, ObservationView.Id)),
+      SqlField("existence", GroupElementView.Existence),
     )
 
 }
