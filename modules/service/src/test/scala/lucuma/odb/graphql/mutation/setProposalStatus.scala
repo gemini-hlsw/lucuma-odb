@@ -31,40 +31,11 @@ class setProposalStatus extends OdbSuite {
 
   val validUsers = List(pi, pi2, ngo, staff, admin, guest)
 
-  def addPartnerSplits(pid: Program.Id): IO[Unit] =
-    query(pi, s"""
-      mutation {
-        updateProposal(
-          input: {
-            programId: "$pid"
-            SET: {
-              type: {
-                queue: {
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 70
-                    },
-                    {
-                      partner: CA
-                      percent: 30
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        ) {
-          proposal { title }
-        }
-      }
-    """).void
-
   test("✓ valid submission") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
-        addPartnerSplits(pid) *>
+        addPartnerSplits(pi, pid) *>
         expect(
           user = pi,
           query = s"""
@@ -396,7 +367,7 @@ class setProposalStatus extends OdbSuite {
       p <- createProgramAs(pi)
       _ <- addProposal(pi, p)
       _ <- setCallId(p, c)
-      _ <- addPartnerSplits(p)
+      _ <- addPartnerSplits(pi, p)
       _ <- submit(p)
       _ <- recall(p)
       l <- chronProgramUpdates(p)
@@ -462,7 +433,7 @@ class setProposalStatus extends OdbSuite {
       c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
       p <- createProgramAs(pi)
       _ <- addProposal(pi, p)
-      _ <- addPartnerSplits(p)
+      _ <- addPartnerSplits(pi, p)
       _ <- setCallId(p, c)
       _ <- accept(p)
       _ <- recall(p)

@@ -95,7 +95,12 @@ object ProposalService {
       s"Submitted proposal $pid must have a science subtype.".invalidArg
 
     def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
-      s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
+      subtype match {
+        case ScienceSubtype.FastTurnaround =>
+          s"Submitted proposal $pid of type ${subtype.title} must specify the piAffiliate".invalidArg
+        case _ =>
+          s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
+      }
 
     def invalidProgramType(pid: Program.Id, progType: ProgramType): OdbError =
       s"Program $pid is of type $progType. Only Science programs can have proposals.".invalidArg
