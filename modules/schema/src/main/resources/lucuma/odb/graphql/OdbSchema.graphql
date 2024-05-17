@@ -3171,9 +3171,7 @@ with this proposal.
 """
 interface ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
 }
@@ -3183,20 +3181,16 @@ Proposal properties for Regular Semester (Classical) CallForProposals.
 """
 type Classical implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
-  Minimum percentage of observing time (first semester) required to consider this
-  proposal successful.
+  Minimum percentage of observing time required to consider this proposal
+  successful.
   """
   minPercentTime: IntPercent!
 
-  """
-  Describes how time for the program will be apportioned across partners.
-  """
+  "Describes how time for the program will be apportioned across partners."
   partnerSplits: [PartnerSplit!]!
 
   # TODO: AEON / Multi-facility
@@ -3211,9 +3205,7 @@ Proposal properties for Demo Science CallForProposals.
 """
 type DemoScience implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
@@ -3235,9 +3227,7 @@ Proposal properties for Director's Time CallForProposals.
 """
 type DirectorsTime implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
@@ -3259,9 +3249,7 @@ Proposal properties for Fast Turnaround CallForProposals.
 """
 type FastTurnaround implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
@@ -3277,7 +3265,8 @@ type FastTurnaround implements ProposalType {
   minPercentTime: IntPercent!
 
   """
-  Partner associated with this FT proposal.
+  Partner associated with this FT proposal.  This is optional until submission,
+  by which time it must be defined.
   """
   piAffiliation: Partner
 
@@ -3289,9 +3278,7 @@ Proposal properties for Large Program CallForProposals.
 """
 type LargeProgram implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
@@ -3326,9 +3313,7 @@ type LargeProgram implements ProposalType {
 Proposal properties for Regular Semester (Poor Weather) CallForProposals.
 """
 type PoorWeather implements ProposalType {
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 }
 
@@ -3337,9 +3322,7 @@ Proposal properties for Regular Semester (Queue) CallForProposals.
 """
 type Queue implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
@@ -3349,8 +3332,8 @@ type Queue implements ProposalType {
   toOActivation: ToOActivation!
 
   """
-  Minimum percentage of observing time (first semester) required to consider this
-  proposal successful.
+  Minimum percentage of observing time required to consider this proposal
+  successful.
   """
   minPercentTime: IntPercent!
 
@@ -3371,9 +3354,7 @@ Proposal properties for System Verification CallForProposals.
 """
 type SystemVerification implements ProposalType {
 
-  """
-  The science type of this Call for Proposals.
-  """
+  "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
   """
@@ -3423,8 +3404,9 @@ input ClassicalInput {
   minPercentTime: IntPercent
 
   """
-  The partnerSplits field is required when creating a new instance of proposal,
-  but optional when editing. When specified, must sum to 100%.
+  The partnerSplits field specifies how time is apportioned over partners. This
+  will default to empty but if specified, the partner percents must sum to 100.
+  By submission time, it must be specified.
   """
   partnerSplits: [PartnerSplitInput!]
 
@@ -3444,8 +3426,8 @@ input DemoScienceInput {
   toOActivation: ToOActivation
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
 
@@ -3460,8 +3442,8 @@ input DirectorsTimeInput {
   toOActivation: ToOActivation
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
 
@@ -3476,13 +3458,14 @@ input FastTurnaroundInput {
   toOActivation: ToOActivation
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
 
   """
-  Partner associated with this FT proposal.
+  Partner associated with this FT proposal.  This is optional on creation but
+  must be specified upon submission.
   """
   piAffiliation: Partner
 
@@ -3499,20 +3482,20 @@ input LargeProgramInput {
   toOActivation: ToOActivation
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  The minimum percentage of time required (first semester) to consider this
+  proposal a success. If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
 
   """
-  The minPercentTotalTime field is required when creating a new instance of
-  largeProgram, but optional when editing.
+  The minimum percentage of time required over the lifetime of the program to
+  consider this proposal a success.  If not set, 100% is assumed.
   """
   minPercentTotalTime: IntPercent
 
   """
-  The totalTime field is required when creating a new instance of largeProgram,
-  but optional when editing.
+  The total time requested over the lifetime of the program.  If not set, zero
+  hours are assumed.
   """
   totalTime: TimeSpanInput
 
@@ -3530,8 +3513,19 @@ enum Ignore {
   IGNORE
 }
 
+"""
+Input for a poor weather proposal.  There are no fields to further specify a
+poor weather proposal but GraphQL requires at least one field.  Therefore this
+input includes a single optional 'ignore' field which need not be set.
+"""
 input PoorWeatherInput {
+
+  """
+  This field is not intended to be used (and may be left unset), but is required
+  by the GraphQL specification.
+  """
   ignore: Ignore
+
 }
 
 input QueueInput {
@@ -3543,15 +3537,15 @@ input QueueInput {
   toOActivation: ToOActivation
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
 
   """
-  The partnerSplits field is optional when creating a new instance of proposal
-  or editing an existing instance, but when specified, must sum to 100%.  On
-  submit partner splits must be present.
+  The partnerSplits field specifies how time is apportioned over partners. This
+  will default to empty but if specified, the partner percents must sum to 100.
+  By submission time, it must be specified.
   """
   partnerSplits: [PartnerSplitInput!]
 
@@ -3571,8 +3565,8 @@ input SystemVerificationInput {
   toOActivation: ToOActivation
 
   """
-  The minPercentTime field is required when creating a new instance, but
-  optional when editing.
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
 
