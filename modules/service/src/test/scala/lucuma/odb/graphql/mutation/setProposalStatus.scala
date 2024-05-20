@@ -198,8 +198,7 @@ class setProposalStatus extends OdbSuite {
 
   test("⨯ non-science program type for proposal submission") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) >>
-      setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
+      setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
       expect(
         user = pi,
         query = s"""

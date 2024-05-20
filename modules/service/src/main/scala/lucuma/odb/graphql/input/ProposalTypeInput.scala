@@ -92,6 +92,8 @@ object ProposalTypeInput {
     val DefaultFor: ScienceSubtype => Create = {
       case ScienceSubtype.LargeProgram =>
         Create(ScienceSubtype.LargeProgram, minPercentTotal = HundredPercent.some, totalTime = TimeSpan.Zero.some)
+      case ScienceSubtype.PoorWeather =>
+        Create(ScienceSubtype.PoorWeather, minPercentTime = ZeroPercent)
       case s                           =>
         Create(s)
     }

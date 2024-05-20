@@ -1183,7 +1183,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
 
   test("⨯ create a proposal in a non-science program") {
     createProgramAs(pi).flatMap { pid =>
-      setProgramReference(pi, pid, """example: { instrument: GMOS_SOUTH }""") >>
+      setProgramReference(staff, pid, """example: { instrument: GMOS_SOUTH }""") >>
       expect(
         user = pi,
         query = s"""

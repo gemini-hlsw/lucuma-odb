@@ -79,6 +79,7 @@ trait BaseMapping[F[_]]
   lazy val DatasetSelectResultType             = schema.ref("DatasetSelectResult")
   lazy val DatasetStageType                    = schema.ref("DatasetStage")
   lazy val DeclinationType                     = schema.ref("Declination")
+  lazy val DeleteProposalResultType            = schema.ref("DeleteProposalResult")
   lazy val DemoScienceType                     = schema.ref("DemoScience")
   lazy val DirectorsTimeType                   = schema.ref("DirectorsTime")
   lazy val DmsStringType                       = schema.ref("DmsString")

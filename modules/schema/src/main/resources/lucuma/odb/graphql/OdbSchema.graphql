@@ -844,6 +844,17 @@ input DeclinationInput {
   dms: DmsString
 }
 
+"Input for deleting a proposal."
+input DeleteProposalInput {
+  programId: ProgramId!
+}
+
+"The result of deleting a proposal."
+type DeleteProposalResult {
+  "`true` if a proposal was deleted, `false` otherwise."
+  result: Boolean!
+}
+
 """
 Add or delete targets in an asterism
 """
@@ -2707,6 +2718,13 @@ type Mutation {
     """
     input: CreateTargetInput!
   ): CreateTargetResult!
+
+  """
+  Deletes the given program's proposal, if any.
+  """
+  deleteProposal(
+    input: DeleteProposalInput!
+  ): DeleteProposalResult!
 
   """
   Link a user to a program. Any existing link will be replaced.

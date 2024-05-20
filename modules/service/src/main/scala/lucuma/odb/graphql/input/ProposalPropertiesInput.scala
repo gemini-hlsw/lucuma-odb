@@ -29,6 +29,11 @@ object ProposalPropertiesInput {
     typeʹ:     Option[ProposalTypeInput.Edit]
   )
 
+  object Edit {
+    val Empty: Edit =
+      Edit(Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None)
+  }
+
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
