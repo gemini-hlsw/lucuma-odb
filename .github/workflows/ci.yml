@@ -82,11 +82,6 @@ jobs:
         with:
           path: modules/service/src/main/resources/db/migration/
 
-      - name: Install Postgres client.
-        run: |
-          apt-get update
-          apt-get install --yes postgresql-client
-
       - name: Test backup/restore.
         run: |
           chmod a+X test-backup-restore.sh
