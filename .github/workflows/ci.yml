@@ -82,6 +82,11 @@ jobs:
         with:
           path: modules/service/src/main/resources/db/migration/
 
+      - name: Test backup/restore.
+        run: |
+          chmod a+X test-backup-restore.sh
+          ./test-backup-restore.sh
+
       - name: Aggregate coverage reports
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 

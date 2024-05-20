@@ -40,13 +40,18 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
-ThisBuild / githubWorkflowBuild +=
+ThisBuild / githubWorkflowBuild ++= Seq(
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
     name = Some("Validate Migrations"),
     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
     cond = Some("github.event_name == 'pull_request'")
+  ),
+  WorkflowStep.Run(
+    commands = List("chmod a+X test-backup-restore.sh", "./test-backup-restore.sh"),
+    name = Some("Test backup/restore.")
   )
+)
 
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
