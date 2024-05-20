@@ -37,7 +37,7 @@ RETRIES=100
 until psql -w -h $PG_HOST -U $PG_USER -d $PG_DATABASE -c "select 1" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
   sleep 1
 done
- 
+
 # Dump our database
 echo "🍏 Performing pg_dump."
 pg_dump -w -h $PG_HOST -U $PG_USER -Fc $PG_DATABASE > $PG_BACKUP
