@@ -22,11 +22,19 @@ ALTER TABLE t_proposal
    ADD COLUMN c_science_subtype e_science_subtype,
    ADD COLUMN c_cfp_id d_cfp_id REFERENCES t_cfp(c_cfp_id);
 
+-- Assume 'queue' until told otherwise.
+UPDATE t_program AS p
+   SET c_science_subtype = 'queue'
+  FROM t_proposal r
+ WHERE p.c_program_id = r.c_program_id AND p.c_science_subtype IS NULL;
+
+-- Set the proposal science subtype to match the program's value.
 UPDATE t_proposal AS s
    SET c_science_subtype = g.c_science_subtype
   FROM t_program g
  WHERE s.c_program_id = g.c_program_id;
 
+-- Add a FK constraint on the subtype.
 ALTER TABLE t_proposal
   ADD CONSTRAINT t_proposal_pid_subtype_fkey
     FOREIGN KEY (c_program_id, c_science_subtype)
