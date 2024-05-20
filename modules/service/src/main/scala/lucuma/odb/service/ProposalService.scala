@@ -24,6 +24,7 @@ import lucuma.odb.data.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CreateProposalInput
+import lucuma.odb.graphql.input.DeleteProposalInput
 import lucuma.odb.graphql.input.ProposalPropertiesInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UpdateProposalInput
@@ -33,6 +34,7 @@ import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
+import skunk.data.Completion.Delete
 import skunk.data.Completion.Update
 import skunk.syntax.all.*
 
@@ -53,6 +55,21 @@ private[service] trait ProposalService[F[_]] {
   def updateProposal(
     input: UpdateProposalInput
   )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]]
+
+  /**
+   * Checks whether a proposal is defined for the given program.
+   */
+  def hasProposal(
+    pid: Program.Id
+  )(using Transaction[F]): F[Boolean]
+
+  /**
+   * Deletes a proposal associated with the given pid, if any.
+   * @return `true`` if a proposal is deleted, `false` otherwise
+   */
+  def deleteProposal(
+    input: DeleteProposalInput
+  )(using Transaction[F], Services.StaffAccess): F[Result[Boolean]]
 
   /**
    * Set the proposal status associated with the program specified in the `input`.
@@ -246,6 +263,9 @@ object ProposalService {
 
       }
 
+      def deferConstraints: F[Unit] =
+        session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command).void
+
       def createProposal(
         input: CreateProposalInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
@@ -278,6 +298,7 @@ object ProposalService {
           c <- lookupCfpProperties
           _ <- checkCfpCompatibility(c)
           p <- ResultT(ProposalContext.lookup(input.programId))
+          _ <- ResultT.liftF(deferConstraints)
           _ <- updateProgram(p, c)
           _ <- insert
           _ <- insertSplits
@@ -332,12 +353,27 @@ object ProposalService {
           _      <- checkCfpCompatibility(after)
           _      <- checkUserAccess(pid, after)
           _      <- ResultT.fromResult(after.status.flatMap(s => after.validateSubmission(pid, s)))
-          _      <- updateProgram(pid, before, after)
+          _      <- ResultT.liftF(deferConstraints)
           set     = handleTypeChange(pid, before)
           _      <- updateProposal(pid, set)
+          _      <- updateProgram(pid, before, after)
           _      <- updateSplits(pid, set)
         } yield pid).value
       }
+
+      override def hasProposal(pid: Program.Id)(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.HasProposal)(pid)
+
+      override def deleteProposal(
+        input: DeleteProposalInput
+      )(using Transaction[F], Services.StaffAccess): F[Result[Boolean]] =
+        session
+          .execute(Statements.DeleteProposal)(input.programId)
+          .map {
+            case Delete(0) => false.success
+            case Delete(1) => true.success
+            case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure
+          }
 
       def setProposalStatus(
         input: SetProposalStatusInput
@@ -372,6 +408,16 @@ object ProposalService {
 
   private object Statements {
 
+    val HasProposal: Query[Program.Id, Boolean] =
+      sql"""
+        SELECT COUNT(1) FROM t_proposal WHERE c_program_id = $program_id
+      """.query(int8.map(_ >= 1))
+
+    val DeleteProposal: Command[Program.Id] =
+      sql"""
+        DELETE FROM t_proposal WHERE c_program_id = $program_id
+      """.command
+
     def updates(SET: ProposalPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
       val mainUpdates: List[AppliedFragment] =
         List(
@@ -383,6 +429,7 @@ object ProposalService {
 
       val callUpdates: List[AppliedFragment] =
         SET.typeʹ.toList.flatMap { call =>
+          sql"c_science_subtype = $science_subtype"(call.scienceSubtype) ::
           List(
             call.tooActivation.map(sql"c_too_activation = ${too_activation}"),
             call.minPercentTime.map(sql"c_min_percent = ${int_percent}"),

@@ -12,6 +12,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Guest
@@ -61,7 +62,7 @@ trait ProgramService[F[_]] {
     prog: Option[ProgramReference]
   ): F[Result[Program.Id]]
 
-  def setProgramReference(input: SetProgramReferenceInput): F[Result[(Program.Id, Option[ProgramReference])]]
+  def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -187,11 +188,22 @@ object ProgramService {
                 .failure
           }
 
-      override def setProgramReference(input: SetProgramReferenceInput): F[Result[(Program.Id, Option[ProgramReference])]] =
+      override def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]] = {
+        def validateProposal(pid: Program.Id): F[Result[Unit]] =
+          proposalService.hasProposal(pid).map { hasProposal =>
+            OdbError
+              .InvalidProgram(pid, s"Cannot set the program reference for $pid until its proposal is removed.".some)
+              .asFailure
+              .whenA(hasProposal && input.SET.programType != ProgramType.Science)
+          }
+
         programService.resolvePid(input.programId,input.proposalReference, input.programReference).flatMap: r =>
           r.flatTraverse: pid =>
-            setProgramReferenceImpl(pid, input.SET).map: oref =>
-              oref.map((pid, _))
+            (for {
+              _ <- ResultT(validateProposal(pid))
+              r <- ResultT(setProgramReferenceImpl(pid, input.SET).map(_.map((pid, _))))
+            } yield r).value
+      }
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {

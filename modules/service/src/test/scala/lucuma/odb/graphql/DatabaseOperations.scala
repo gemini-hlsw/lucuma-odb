@@ -345,6 +345,21 @@ trait DatabaseOperations { this: OdbSuite =>
   def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     setProposalStatus(user, pid, "ACCEPTED").map(_._1)
 
+  def deleteProposal(user: User, pid: Program.Id): IO[Boolean] =
+    query(user, s"""
+      mutation {
+        deleteProposal(
+          input: {
+            programId: "$pid"
+          }
+        ) {
+          result
+        }
+      }
+    """).flatMap { js =>
+      js.hcursor.downFields("deleteProposal", "result").as[Boolean].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+    }
+
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)
 

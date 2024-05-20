@@ -60,6 +60,7 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProposalInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.CreateUserInvitationInput
+import lucuma.odb.graphql.input.DeleteProposalInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.RecordAtomInput
 import lucuma.odb.graphql.input.RecordDatasetInput
@@ -116,6 +117,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProposal,
       CreateTarget,
       CreateUserInvitation,
+      DeleteProposal,
       LinkUser,
       RecordAtom,
       RecordDataset,
@@ -355,6 +357,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               Unique(Filter(Predicates.userInvitation.id.eql(inv.id), child))
             )
 
+  private lazy val DeleteProposal =
+    MutationField.json("deleteProposal", DeleteProposalInput.Binding): input =>
+      services.useTransactionally:
+        requireStaffAccess:
+          proposalService.deleteProposal(input).nestMap: b =>
+            Json.obj("result" -> b.asJson)
+
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding): (input, child) =>
       services.useTransactionally:
@@ -524,8 +533,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
       services.useTransactionally:
-        programService.setProgramReference(input).nestMap: (pid, _) =>
-          Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+        requireStaffAccess:
+          programService.setProgramReference(input).nestMap: (pid, _) =>
+            Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>

@@ -34,32 +34,50 @@ UPDATE t_proposal AS s
   FROM t_program g
  WHERE s.c_program_id = g.c_program_id;
 
--- Add a FK constraint on the subtype.
-ALTER TABLE t_proposal
-  ADD CONSTRAINT t_proposal_pid_subtype_fkey
-    FOREIGN KEY (c_program_id, c_science_subtype)
-      REFERENCES t_program(c_program_id, c_science_subtype) ON UPDATE CASCADE;
+CREATE OR REPLACE FUNCTION t_proposal_science_subtype_checks()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF (NEW.c_science_subtype IS NULL) THEN
+    RAISE EXCEPTION 'All proposals must be associated with a science subypte.';
+  END IF;
 
--- These checks cannot be deferred because, I think, they depend on the FK
--- reference to t_program(c_science_subtype). When updating the subtype the
--- checks are performed immediately and fail because the proposal table update
--- is still pending.  We'll need to drop the checks and add them back after the
--- proposal update.
+  IF (NEW.c_science_subtype != 'large_program') AND (NEW.c_min_percent_total IS NOT NULL) THEN
+    RAISE EXCEPTION 'Only Large Programs have a min percent total';
+  END IF;
 
---ALTER TABLE t_proposal
---  ADD CONSTRAINT t_proposal_check_min_total CHECK (
---    (c_min_percent_total IS NULL) OR (c_science_subtype = 'large_program')
---  ),
---  ADD CONSTRAINT t_proposal_check_total CHECK (
---    (c_total_time IS NULL) OR (c_science_subtype = 'large_program')
---  ),
---  ADD CONSTRAINT t_proposal_science_subtype CHECK (
---    CASE
---      WHEN c_science_subtype = 'classical'     THEN (c_too_activation = 'none')
---      WHEN c_science_subtype = 'large_program' THEN (c_min_percent_total IS NOT NULL) AND (c_total_time IS NOT NULL)
---      WHEN c_science_subtype = 'poor_weather'  THEN (c_too_activation = 'none') AND (c_min_percent = 0)
---    END
---  );
+  IF (NEW.c_science_subtype != 'large_program') AND (NEW.c_total_time IS NOT NULL) THEN
+    RAISE EXCEPTION 'Only Large Programs have a total time';
+  END IF;
+
+  IF (NEW.c_science_subtype = 'classical') AND (NEW.c_too_activation != 'none') THEN
+    RAISE EXCEPTION 'Classical proposals must set TOO activation to None';
+  END IF;
+
+  IF (NEW.c_science_subtype = 'large_program') AND (NEW.c_min_percent_total IS NULL) THEN
+    RAISE EXCEPTION 'Large Program proposals must define the min percent total.';
+  END IF;
+
+  IF (NEW.c_science_subtype = 'large_program') AND (NEW.c_total_time IS NULL) THEN
+    RAISE EXCEPTION 'Large Program proposals must define the total time.';
+  END IF;
+
+  IF (NEW.c_science_subtype = 'poor_weather') AND (NEW.c_too_activation != 'none') THEN
+    RAISE EXCEPTION 'Poor Weather proposals must set TOO activation to None';
+  END IF;
+
+  IF (NEW.c_science_subtype = 'poor_weather') AND (NEW.c_min_percent != 0) THEN
+    RAISE EXCEPTION 'Poor Weather proposals must set min percent to 0';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ch_proposal_science_subtype
+AFTER INSERT OR UPDATE OF c_science_subtype ON t_proposal
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION t_proposal_science_subtype_checks();
 
 DROP TABLE t_proposal_class;
 
