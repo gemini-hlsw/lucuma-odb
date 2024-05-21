@@ -28,7 +28,7 @@ docker-compose up -d > /dev/null 2>&1
 # Wait for PG to restart
 echo "🍏 Waiting for postgres to start."
 RETRIES=100
-until docker-compose run -v `pwd`:/local -e PGPASSWORD=$PG_PASS db psql -w -h db -U $PG_USER -d $PG_DATABASE -c "select 1" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
+until docker-compose run -v `pwd`:/local -e PGPASSWORD=$PG_PASS db psql -w -h db -U $PG_USER -d $PG_DATABASE -c "select 1" || [ $RETRIES -eq 0 ]; do
   sleep 1
 done
 
