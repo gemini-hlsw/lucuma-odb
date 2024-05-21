@@ -40,14 +40,13 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
-ThisBuild / githubWorkflowBuild ++= Seq(
+ThisBuild / githubWorkflowBuild +=
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
     name = Some("Validate Migrations"),
     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
     cond = Some("github.event_name == 'pull_request'")
   )
-)
 
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
