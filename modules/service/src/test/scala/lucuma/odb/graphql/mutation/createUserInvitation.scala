@@ -71,7 +71,7 @@ class createUserInvitation extends OdbSuite {
       Resource.eval(response)
     }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Observer).foreach { role =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
     test(s"invite ${role.toString.toLowerCase} (key)") {
       createProgramAs(pi).flatMap { pid =>
         createUserInvitationAs(pi, pid, role)
@@ -79,7 +79,7 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Observer).foreach { pur =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
     test(s"invite ${pur.toString.toLowerCase} (metadata)") {
       createProgramAs(pi).flatMap { pid =>
         expect(

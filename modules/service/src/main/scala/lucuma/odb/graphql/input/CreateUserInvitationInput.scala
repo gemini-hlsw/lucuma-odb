@@ -30,7 +30,7 @@ object CreateUserInvitationInput:
   sealed abstract class Support(val supportType: ProgramUserSupportType) extends CreateUserInvitationInput(ProgramUserRole.Support)
 
   final case class Coi(programId: Program.Id, recipientEmail: EmailAddress) extends CreateUserInvitationInput(ProgramUserRole.Coi)
-  final case class Observer(programId: Program.Id, recipientEmail: EmailAddress) extends CreateUserInvitationInput(ProgramUserRole.Observer)
+  final case class Observer(programId: Program.Id, recipientEmail: EmailAddress) extends CreateUserInvitationInput(ProgramUserRole.CoiRO)
   final case class StaffSupport(programId: Program.Id, recipientEmail: EmailAddress) extends Support(ProgramUserSupportType.Staff)
   final case class NgoSupportSupport(programId: Program.Id, supportPartner: Tag, recipientEmail: EmailAddress) extends Support(ProgramUserSupportType.Partner)
 
@@ -45,7 +45,7 @@ object CreateUserInvitationInput:
       ) =>
         (rProgramId, rRecipientEmail, rRole, rSupport, rPartner).parTupled.flatMap:
           case (pid, recip, ProgramUserRole.Coi, None, None)                   => Result(Coi(pid, recip))
-          case (pid, recip, ProgramUserRole.Observer, None, None)              => Result(Observer(pid, recip))
+          case (pid, recip, ProgramUserRole.CoiRO, None, None)              => Result(Observer(pid, recip))
           case (pid, recip, ProgramUserRole.Support, Some(Staff), None)        => Result(StaffSupport(pid, recip))
           case (pid, recip, ProgramUserRole.Support, Some(Partner), Some(tag)) => Result(NgoSupportSupport(pid, tag, recip))
           case _                                                               => Matcher.validationFailure("Invalid combination of role, support type, and partner.")

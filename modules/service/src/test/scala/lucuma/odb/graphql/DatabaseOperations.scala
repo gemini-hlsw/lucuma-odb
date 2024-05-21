@@ -508,7 +508,7 @@ trait DatabaseOperations { this: OdbSuite =>
     val partner:     Option[Partner] = None
   ):
     case Coi extends Link(ProgramUserRole.Coi)
-    case Observer extends Link(ProgramUserRole.Observer)
+    case Observer extends Link(ProgramUserRole.CoiRO)
     case StaffSupport extends Link(ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
     case PartnerSupport(p: Partner) extends Link(ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(p))
 
@@ -527,7 +527,7 @@ trait DatabaseOperations { this: OdbSuite =>
     linkCoiAs(user, arrow._1, arrow._2)
 
   def linkObserverAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Observer)
+    linkAs(user, uid, pid, ProgramUserRole.CoiRO)
 
   def linkObserverAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
     linkObserverAs(user, arrow._1, arrow._2)

@@ -86,7 +86,7 @@ object UserInvitationService:
           .use: pq =>
             pq.unique(emailId, invitationId).as(Result.unit)
 
-      def createPiInvitation(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.Observer.type): F[Result[UserInvitation]] =
+      def createPiInvitation(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.CoiRO.type): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createPiInvitation)
           .use: pq =>
@@ -128,7 +128,7 @@ object UserInvitationService:
           case StandardRole.Pi(_)     =>
             input match
               case CreateUserInvitationInput.Coi(pid, e)      => createPiInvitation(pid, e, ProgramUserRole.Coi)
-              case CreateUserInvitationInput.Observer(pid, e) => createPiInvitation(pid, e, ProgramUserRole.Observer)
+              case CreateUserInvitationInput.Observer(pid, e) => createPiInvitation(pid, e, ProgramUserRole.CoiRO)
               case _                                          => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
 
       def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
@@ -190,7 +190,7 @@ object UserInvitationService:
         .query(user_invitation)
         .contramap {
           case (u, CreateUserInvitationInput.Coi(pid, e))                  => (u.id, pid, e, ProgramUserRole.Coi, None, None, pid)
-          case (u, CreateUserInvitationInput.Observer(pid, e))             => (u.id, pid, e, ProgramUserRole.Observer, None, None, pid)
+          case (u, CreateUserInvitationInput.Observer(pid, e))             => (u.id, pid, e, ProgramUserRole.CoiRO, None, None, pid)
           case (u, CreateUserInvitationInput.NgoSupportSupport(pid, p, e)) => (u.id, pid, e, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(p), pid)
           case (u, CreateUserInvitationInput.StaffSupport(pid, e))         => (u.id, pid, e, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff), None, pid)
         }
