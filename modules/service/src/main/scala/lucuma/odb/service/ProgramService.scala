@@ -97,7 +97,7 @@ object ProgramService {
   object LinkUserRequest {
 
     case class Coi(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.Coi)
-    case class Observer(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.Observer)
+    case class Observer(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.CoiRO)
     case class StaffSupport(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
     case class PartnerSupport(programId: Program.Id, userId: User.Id, partnerTag: Tag) extends LinkUserRequest(ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partnerTag))
 
@@ -114,7 +114,7 @@ object ProgramService {
           (supportType orElse supportPartner)
             .as("Support type/partner must not be specified for COI role.")
             .toLeft(Coi(programId, userId))
-        case ProgramUserRole.Observer =>
+        case ProgramUserRole.CoiRO =>
           (supportType orElse supportPartner)
             .as("Support type/partner must not be specified for OBSERVER role.")
             .toLeft(Observer(programId, userId))
@@ -327,7 +327,7 @@ object ProgramService {
           pq.option(af.argument).flatMap:
             case None                                           => Result(false).pure[F] // no such link, or not visible
             case Some((R.Coi, None, None))                      => unlinkCoi(input)
-            case Some((R.Observer, None, None))                 => unlinkObserver(input)
+            case Some((R.CoiRO, None, None))                 => unlinkObserver(input)
             case Some((R.Support, Some(T.Staff), None))         => requireStaffAccess(unlinkUnconditionally(input))
             case Some((R.Support, Some(T.Partner), Some(ptag))) => requireNgoAccess(unlinkNgoSupport(input, ptag))
             case Some(other)                                    => Result.internalError(s"Nonsensical link type: $other").pure[F]
@@ -600,7 +600,7 @@ object ProgramService {
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Observer, None, None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, None, None)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
