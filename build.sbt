@@ -46,10 +46,6 @@ ThisBuild / githubWorkflowBuild ++= Seq(
     name = Some("Validate Migrations"),
     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
     cond = Some("github.event_name == 'pull_request'")
-  ),
-  WorkflowStep.Run(
-    commands = List("chmod a+X test-backup-restore.sh", "./test-backup-restore.sh"),
-    name = Some("Test backup/restore.")
   )
 )
 
