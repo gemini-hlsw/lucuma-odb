@@ -1,8 +1,3 @@
--- Add a unique constraint on the pid, science subtype combination so that we
--- can reference it in t_proposal.
-ALTER TABLE t_program
-  ADD CONSTRAINT t_program_unique_pid_subtype UNIQUE (c_program_id, c_science_subtype);
-
 -- We'll deal with intensive and exchange "later"
 DELETE FROM t_proposal
   WHERE c_class = 'intensive' OR
