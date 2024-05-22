@@ -34,8 +34,6 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UnlinkUserInput
-import lucuma.odb.service.ProgramService.LinkUserRequest.PartnerSupport
-import lucuma.odb.service.ProgramService.LinkUserRequest.StaffSupport
 import lucuma.odb.service.ProgramService.LinkUserResponse.Success
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -90,45 +88,7 @@ trait ProgramService[F[_]] {
 
 object ProgramService {
 
-  sealed abstract class LinkUserRequest(val role: ProgramUserRole, val supportType: Option[ProgramUserSupportType] = None, val supportPartner: Option[Tag] = None) {
-    def programId: Program.Id
-    def userId: User.Id
-  }
-  object LinkUserRequest {
-
-    case class Coi(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.Coi)
-    case class Observer(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.Observer)
-    case class StaffSupport(programId: Program.Id, userId: User.Id) extends LinkUserRequest(ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
-    case class PartnerSupport(programId: Program.Id, userId: User.Id, partnerTag: Tag) extends LinkUserRequest(ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partnerTag))
-
-    /** Construct a LinkedUserRequest from unvalidated inputs, if possible. */
-    def validate(
-      programId: Program.Id,
-      userId: User.Id,
-      role: ProgramUserRole,
-      supportType: Option[ProgramUserSupportType],
-      supportPartner: Option[Tag]
-    ): Either[String, LinkUserRequest] =
-      role match {
-        case ProgramUserRole.Coi =>
-          (supportType orElse supportPartner)
-            .as("Support type/partner must not be specified for COI role.")
-            .toLeft(Coi(programId, userId))
-        case ProgramUserRole.Observer =>
-          (supportType orElse supportPartner)
-            .as("Support type/partner must not be specified for OBSERVER role.")
-            .toLeft(Observer(programId, userId))
-        case ProgramUserRole.Support =>
-          (supportType, supportPartner) match {
-            case (Some(ProgramUserSupportType.Staff), None)        => Right(StaffSupport(programId, userId))
-            case (Some(ProgramUserSupportType.Staff), _)           => Left("Support partner must not be specified if support type is STAFF.")
-            case (Some(ProgramUserSupportType.Partner), Some(tag)) => Right(PartnerSupport(programId, userId, tag))
-            case (Some(ProgramUserSupportType.Partner), _)         => Left("Support partner must be specified if support type is PARTNER.")
-            case (None, _)                                         => Left("Support type must be specifed if role is SUPPORT.")
-          }
-      }
-
-  }
+  case class LinkUserRequest(role: ProgramUserRole, programId: Program.Id, userId: User.Id)
 
   sealed trait LinkUserResponse extends Product with Serializable
   object LinkUserResponse {
@@ -243,10 +203,9 @@ object ProgramService {
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
-            case LinkUserRequest.Coi(programId, userId) => Statements.linkCoi(programId, userId, user)
-            case LinkUserRequest.Observer(programId, userId) => Statements.linkObserver(programId, userId, user)
-            case StaffSupport(programId, userId) => Statements.linkStaffSupport(programId, userId, user)
-            case PartnerSupport(programId, userId, partnerTag) => Statements.linkPartnerSupport(programId, userId, user, partnerTag)
+            case LinkUserRequest(ProgramUserRole.Coi, programId, userId) => Statements.linkCoi(programId, userId, user)
+            case LinkUserRequest(ProgramUserRole.CoiRO, programId, userId) => Statements.linkObserver(programId, userId, user)
+            case LinkUserRequest(ProgramUserRole.Support, programId, userId) => Statements.linkSupport(programId, userId, user)
           }
         af match {
           case None     =>  Monad[F].pure(LinkUserResponse.NotAuthorized(user))
@@ -306,31 +265,17 @@ object ProgramService {
                 case Completion.Delete(0) => OdbError.NotAuthorized(user.id).asFailure
                 case other                => Result.internalError(s"unlinkCoi: unexpected completion: $other")
 
-      private def unlinkNgoSupport(input: UnlinkUserInput, ptag: Tag)(using Transaction[F], Services.NgoAccess): F[Result[Boolean]] =
-        user.role match
-          case GuestRole             => Result.internalError("unlinkNgoSupport: guest user seen; should be impossible").pure[F]
-          case Pi(_)                 => Result.internalError("unlinkNgoSupport: pi user seen; should be impossible").pure[F]
-          case StandardRole.Staff(_) |
-               StandardRole.Admin(_) |              
-               ServiceRole(_)        => unlinkUnconditionally(input)
-          case Ngo(_, partner)       =>
-            if partner.tag === ptag.value then unlinkUnconditionally(input)
-            else OdbError.NotAuthorized(user.id).asFailureF
-
       def unlinkUser(input: UnlinkUserInput)(using Transaction[F], Services.PiAccess): F[Result[Boolean]] = {
         // Figure out how the specified user is linked to the specified program, then call the appropriate
         // unlink method (which will verify that the *calling* user is allowed to perform the unlink).
         val R  = ProgramUserRole
-        val T  = ProgramUserSupportType
         val af = Statements.selectLinkType(user, input.programId, input.userId)
-        session.prepareR(af.fragment.query(program_user_role *: program_user_support_type.opt *: tag.opt)).use: pq =>
+        session.prepareR(af.fragment.query(program_user_role)).use: pq =>
           pq.option(af.argument).flatMap:
-            case None                                           => Result(false).pure[F] // no such link, or not visible
-            case Some((R.Coi, None, None))                      => unlinkCoi(input)
-            case Some((R.Observer, None, None))                 => unlinkObserver(input)
-            case Some((R.Support, Some(T.Staff), None))         => requireStaffAccess(unlinkUnconditionally(input))
-            case Some((R.Support, Some(T.Partner), Some(ptag))) => requireNgoAccess(unlinkNgoSupport(input, ptag))
-            case Some(other)                                    => Result.internalError(s"Nonsensical link type: $other").pure[F]
+            case None             => Result(false).pure[F] // no such link, or not visible
+            case Some(R.Coi)      => unlinkCoi(input)
+            case Some(R.CoiRO)    => unlinkObserver(input)
+            case Some(R.Support)  => requireStaffAccess(unlinkUnconditionally(input))
       }
       
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
@@ -393,9 +338,7 @@ object ProgramService {
     def selectLinkType(user: User, pid: Program.Id, uid: User.Id): AppliedFragment =
       sql"""
         SELECT
-          c_role,           
-          c_support_type,   
-          c_support_partner
+          c_role
         FROM t_program_user
         WHERE
           c_program_id = $program_id
@@ -433,7 +376,7 @@ object ProgramService {
         WHERE p.c_program_id = u.c_program_id
         AND   p.c_program_id = $program_id        
         AND   (p.c_pi_user_id = $user_id OR exists(SELECT * FROM t_program_user x WHERE x.c_role = 'coi' AND x.c_user_id = $user_id))
-        AND   u.c_role = 'observer'
+        AND   u.c_role = 'coi_ro'
         AND   u.c_user_id = $user_id
       """
         .command
@@ -561,10 +504,10 @@ object ProgramService {
          }
 
     /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, Option[ProgramUserSupportType], Option[Tag])] =
+    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole)] =
       sql"""
-         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_support_type, c_support_partner)
-         SELECT $program_id, $user_id, 'standard', $program_user_role, ${program_user_support_type.opt}, ${tag.opt}
+         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role)
+         SELECT $program_id, $user_id, 'standard', $program_user_role
         """
 
     /**
@@ -578,7 +521,7 @@ object ProgramService {
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, None, None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -600,7 +543,7 @@ object ProgramService {
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Observer, None, None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -620,32 +563,13 @@ object ProgramService {
      * - Staff, Admin, and Service users can always do this.
      * - Nobody else can do this.
      */
-    def linkStaffSupport(
+    def linkSupport(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff), None)
-      user.role.access match {
-        case Admin | Staff | Service => Some(up) // ok
-        case _                       => None // nobody else can do this
-      }
-    }
-
-    /**
-     * Link partner support to a program.
-     * - Staff, Admin, and Service users can always do this.
-     * - Nobody else can do this.
-     */
-    def linkPartnerSupport(
-      targetProgram: Program.Id,
-      targetUser: User.Id, // user to link
-      user: User, // current user
-      partner: Tag, // partner
-    ): Option[AppliedFragment] = {
-      import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partner))
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this

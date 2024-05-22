@@ -34,7 +34,6 @@ import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -58,7 +57,6 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
@@ -469,8 +467,6 @@ trait DatabaseOperations { this: OdbSuite =>
     uid: User.Id,
     pid: Program.Id,
     role: ProgramUserRole,
-    supportType: Option[ProgramUserSupportType] = None,
-    partner: Option[Partner] = None,
   ): IO[Unit] =
     expect(
       user = user,
@@ -480,8 +476,6 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: ${pid.asJson}
             userId: ${uid.asJson}
             role: ${role.tag.toUpperCase}
-            supportType: ${supportType.fold("null")(_.tag.toUpperCase)}
-            supportPartner: ${partner.fold("null")(_.tag.toUpperCase)}
           }) {
             user {
               role
@@ -502,24 +496,6 @@ trait DatabaseOperations { this: OdbSuite =>
       """.asRight
     )
 
-  enum Link(
-    val role:        ProgramUserRole,
-    val supportType: Option[ProgramUserSupportType] = None,
-    val partner:     Option[Partner] = None
-  ):
-    case Coi extends Link(ProgramUserRole.Coi)
-    case Observer extends Link(ProgramUserRole.Observer)
-    case StaffSupport extends Link(ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
-    case PartnerSupport(p: Partner) extends Link(ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(p))
-
-  def linkAs(
-    user: User,
-    uid: User.Id,
-    pid: Program.Id,
-    link: Link
-  ): IO[Unit] =
-    linkAs(user, uid, pid, link.role, link.supportType, link.partner)
-
   def linkCoiAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
     linkAs(user, uid, pid, ProgramUserRole.Coi)
 
@@ -527,22 +503,16 @@ trait DatabaseOperations { this: OdbSuite =>
     linkCoiAs(user, arrow._1, arrow._2)
 
   def linkObserverAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Observer)
+    linkAs(user, uid, pid, ProgramUserRole.CoiRO)
 
   def linkObserverAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
     linkObserverAs(user, arrow._1, arrow._2)
 
-  def linkStaffSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Staff))
+  def linkSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.Support)
 
-  def linkStaffSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkStaffSupportAs(user, arrow._1, arrow._2)
-
-  def linkNgoSupportAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(partner))
-
-  def linkNgoSupportAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
-    linkNgoSupportAs(user, arrow._1, arrow._2, partner)
+  def linkSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
+    linkSupportAs(user, arrow._1, arrow._2)
 
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs(_)) // TODO: something cheaper
@@ -1232,8 +1202,6 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     pid: Program.Id,
     role: ProgramUserRole = ProgramUserRole.Coi,
-    supportType: Option[ProgramUserSupportType] = None,
-    supportPartner: Option[Tag] = None,
     recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get
   ): IO[UserInvitation] =
     query(
@@ -1245,8 +1213,6 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: "$pid"
             recipientEmail: "$recipientEmail"
             role: ${role.tag.toUpperCase}
-            ${supportType.map(_.tag.toUpperCase).foldMap(s => s"supportType: $s")}
-            ${supportPartner.map(_.value.toUpperCase).foldMap(s => s"supportPartner: $s")}
           }
         ) {
           key

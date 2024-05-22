@@ -9,8 +9,10 @@ import io.circe.syntax.*
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 
 class unlinkUser extends OdbSuite {
@@ -67,13 +69,13 @@ class unlinkUser extends OdbSuite {
 
   // What can a Guest do?
 
-  List(Link.Observer, Link.Coi, Link.StaffSupport, Link.PartnerSupport(Partner.Ca)).foreach: link =>
-    test(s"Guest can't unlink $link (NotAuthorized).") {
+  Enumerated[ProgramUserRole].all.foreach: role =>
+    test(s"Guest can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(guest, pi2, admin)
           pid <- createProgramAs(guest)
-          _   <- linkAs(admin, pi2.id, pid, link)
+          _   <- linkAs(admin, pi2.id, pid, role)
           _   <- unlinkAs(guest, pi2.id, pid)
         yield ()
       } {
@@ -83,7 +85,7 @@ class unlinkUser extends OdbSuite {
 
   // What can a PI do?
 
-  List(Link.Observer, Link.Coi).foreach: link =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: link =>
     test(s"PI can unlink $link") {
       for
         _   <- createUsers(pi1, pi2, pi3)
@@ -93,8 +95,8 @@ class unlinkUser extends OdbSuite {
       yield ()
     }
 
-  List(Link.StaffSupport, Link.PartnerSupport(Partner.Ca)).foreach: link =>
-    test(s"PI can't unlink $link (NotAuthorized).") {    
+  List(ProgramUserRole.Support).foreach: link =>
+    test(s"PI can't unlink $link (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, pi3, admin)
@@ -119,8 +121,8 @@ class unlinkUser extends OdbSuite {
     yield ()
   }
 
-  List(Link.Coi, Link.StaffSupport, Link.PartnerSupport(Partner.Ca)).foreach: link =>
-    test(s"Coi can't unlink $link (NotAuthorized).") {    
+  List(ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
+    test(s"Coi can't unlink $link (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, pi3, admin)
@@ -136,18 +138,8 @@ class unlinkUser extends OdbSuite {
 
   // What can NGO user do?
 
-  test(s"Ngo (Ca) can unlink PartnerSupport(Ca).") {
-      for
-        _   <- createUsers(pi1, pi2, admin, ngo)
-        pid <- createProgramAs(pi1)
-        _   <- linkAs(admin, pi2.id, pid, Link.PartnerSupport(Partner.Ca))
-        _   <- setAllocationAs(admin, pid, Tag(Partner.Ca.tag), TimeSpan.Max) // so ngo can see the program
-        x   <- unlinkAs(ngo, pi2.id, pid)
-      yield println(x)
-  }
-
-  List(Link.Observer, Link.Coi, Link.StaffSupport, Link.PartnerSupport(Partner.Ar)).foreach: link =>
-    test(s"Ngo (Ca) can't unlink $link (NotAuthorized).") {    
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
+    test(s"Ngo (Ca) can't unlink $link (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
@@ -164,7 +156,7 @@ class unlinkUser extends OdbSuite {
   // What can superusers do?
 
   List(staff, admin, service).foreach: u =>
-    List(Link.Observer, Link.Coi, Link.StaffSupport, Link.PartnerSupport(Partner.Ca)).foreach: link =>
+    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
       test(s"${u.role.access} can unlink $link.") {
         for
           _   <- createUsers(pi1, pi2, u)
