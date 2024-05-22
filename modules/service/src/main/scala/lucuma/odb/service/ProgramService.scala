@@ -192,7 +192,7 @@ object ProgramService {
         def validateProposal(pid: Program.Id): F[Result[Unit]] =
           proposalService.hasProposal(pid).map { hasProposal =>
             OdbError
-              .InvalidProgram(pid, s"Cannot set the program reference for $pid until its proposal is removed.".some)
+              .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${input.SET.programType.abbreviation} until its proposal is removed.".some)
               .asFailure
               .whenA(hasProposal && input.SET.programType != ProgramType.Science)
           }

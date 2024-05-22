@@ -703,6 +703,25 @@ class reference extends OdbSuite {
     } yield assertEquals(ref, "G-2025B-0001-C".programReference.some)
   }
 
+  test("attempt setProposalReference CAL, though it has a proposal") {
+    fetchPid(pi, "G-2025B-0001-C".programReference).flatMap { pid =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            setProgramReference(input: {
+              programId: "$pid"
+              SET: { calibration: { semester: "2025B", instrument: GMOS_SOUTH } }
+            }) {
+              reference { label }
+            }
+          }
+        """,
+        List(s"Cannot set the program reference for $pid to CAL until its proposal is removed.").asLeft
+      )
+    }
+  }
+
   test("setProposalReference SCI -> CAL -> SCI, index increases") {
     for {
       cid <- createCallForProposalsAs(staff, semester = sem2025B)
