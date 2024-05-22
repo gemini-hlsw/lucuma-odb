@@ -20,7 +20,8 @@ import lucuma.odb.data.ObservingModeType
 
 class cloneObservation extends OdbSuite {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
-  lazy val validUsers = List(pi, pi2)
+  val staff   = TestUsers.Standard.staff(nextId, nextId)
+  lazy val validUsers = List(pi, pi2, staff)
 
   val ObservationGraph = s"""
     { 
@@ -356,11 +357,11 @@ class cloneObservation extends OdbSuite {
   private def referenceTest(f: (Observation.Id, ObservationReference) => String): IO[Unit] =
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
       oid <- createObservationAs(pi, pid)
       jsn <- query(
-          user = pi,
+          user = staff,
           query = s"""
             mutation {
               cloneObservation(input: {
@@ -403,7 +404,7 @@ class cloneObservation extends OdbSuite {
   test("fail if no ids are provided") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
       oid <- createObservationAs(pi, pid)
       _   <- expect(
@@ -424,7 +425,7 @@ class cloneObservation extends OdbSuite {
   test("fail if the id and reference do not correspond") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
       oid <- createObservationAs(pi, pid)
       oidx = Observation.Id.fromLong(oid.value.value - 1).get
