@@ -11,7 +11,7 @@ sealed abstract class ProgramUserRole(val tag: String) extends Product with Seri
 object ProgramUserRole {
 
   case object Coi      extends ProgramUserRole("coi")
-  case object CoiRO extends ProgramUserRole("coi/ro")
+  case object CoiRO    extends ProgramUserRole("coi_ro")
   case object Support  extends ProgramUserRole("support")
 
   implicit val EnumeratedProgramUserRole: Enumerated[ProgramUserRole] =

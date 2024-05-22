@@ -19,14 +19,9 @@ object LinkUserInput {
         ProgramIdBinding("programId", rProgramId),
         UserIdBinding("userId", rUserId),
         ProgramUserRoleBinding("role", rRole),
-        ProgramUserSupportRoleTypeBinding.Option("supportType", rSupportType),
-        TagBinding.Option("supportPartner", rPartner),
       ) =>
-        (rProgramId, rUserId, rRole, rSupportType, rPartner).parTupled.flatMap { (pid, uid, role, tpe, tag) =>
-          ProgramService.LinkUserRequest.validate(pid, uid, role, tpe, tag) match {
-            case Left(err)  => Matcher.validationFailure(err)
-            case Right(req) => Result(req)
-          }
+        (rProgramId, rUserId, rRole).parTupled.map { (pid, uid, role) =>
+          ProgramService.LinkUserRequest(role, pid, uid) 
         }
     }
 

@@ -2511,12 +2511,6 @@ input LinkUserInput {
   "The role this user will play in the program."
   role: ProgramUserRole!
 
-  "Must be specified if and only if 'role' is SUPPORT"
-  supportType: ProgramUserSupportRoleType
-
-  "Must be specified if and only if 'supportType' is PARTNER"
-  supportPartner: Partner
-
 }
 
 
@@ -2534,12 +2528,6 @@ input CreateUserInvitationInput {
 
   "The role this user will play in the program."
   role: ProgramUserRole!
-
-  "Must be specified if and only if 'role' is SUPPORT"
-  supportType: ProgramUserSupportRoleType
-
-  "Must be specified if and only if 'supportType' is PARTNER"
-  supportPartner: Partner
 
 }
 
@@ -2582,12 +2570,6 @@ type UserInvitation {
 
   "The role the redeemer will play in the program."
   role: ProgramUserRole!
-
-  "Null unless 'role' is SUPPORT"
-  supportType: ProgramUserSupportRoleType
-
-  "Null unless 'supportType' is PARTNER"
-  supportPartner: Partner
 
   "The email sent for the invitation"
   email: Email
@@ -3250,7 +3232,7 @@ The role a user a plays when assigned to a program.
 """
 enum ProgramUserRole {
   "Co-Investigator"             COI
-  "Observer (read-only access)" OBSERVER
+  "Co-Investigator (read-only access)" COI_RO
   "Staff/Partner Support"       SUPPORT
 }
 

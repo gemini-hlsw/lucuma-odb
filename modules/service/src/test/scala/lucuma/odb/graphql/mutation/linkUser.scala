@@ -11,6 +11,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
+import lucuma.odb.data.OdbError
 
 class linkUser extends OdbSuite {
 
@@ -93,8 +94,10 @@ class linkUser extends OdbSuite {
   test("[observer] guest user can't link an observer") {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
+      interceptOdbError {
         linkObserverAs(guest, pi.id -> pid)
+      } {
+        case OdbError.NotAuthorized(guest.id, _) =>
       }
     }
   }
@@ -159,13 +162,13 @@ class linkUser extends OdbSuite {
     }
   }
 
-  // LINKING STAFF SUPPORT
+  // LINKING SUPPORT
 
   test("[staff support] guest user can't link a staff support user") {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
       interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
-        linkStaffSupportAs(guest, pi.id -> pid)
+        linkSupportAs(guest, pi.id -> pid)
       }
     }
   }
@@ -174,7 +177,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
-        linkStaffSupportAs(pi, pi2.id -> pid)
+        linkSupportAs(pi, pi2.id -> pid)
       }
     }
   }
@@ -183,7 +186,7 @@ class linkUser extends OdbSuite {
     List(service, admin, staff).traverse_ { user =>
       createUsers(user) >>
       createProgramAs(pi).flatMap { pid =>
-        linkStaffSupportAs(user, pi2.id -> pid)
+        linkSupportAs(user, pi2.id -> pid)
       }
     }
   }
@@ -193,45 +196,7 @@ class linkUser extends OdbSuite {
     createProgramAs(pi).flatMap { pid =>
       setAllocationAs(admin, pid, Tag("ca"), 42.hourTimeSpan) >>
       interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkStaffSupportAs(ngo, pi2.id -> pid)
-      }
-    }
-  }
-
-  // LINKING NGO SUPPORT
-
-  test("[ngo support] guest user can't link a ngo support user") {
-    createUsers(guest, pi) >>
-    createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
-        linkNgoSupportAs(guest, pi.id -> pid, Partner.Br)
-      }
-    }
-  }
-
-  test("[ngo support] pi user can't link a ngo support user") {
-    createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
-        linkNgoSupportAs(pi, pi2.id -> pid, Partner.Br)
-      }
-    }
-  }
-
-  test("[ngo support] staff, admin, and service users can add a ngo support user to any program") {
-    createUsers(pi, pi2) >>
-    List(staff, service, admin).traverse { u =>
-      createProgramAs(pi).flatMap { pid =>
-        linkNgoSupportAs(u, pi2.id -> pid, Partner.Br)
-      }
-    }
-  }
-
-  test("[ngo support] ngo user can't link a ngo support user") {
-    createUsers(ngo, pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkNgoSupportAs(ngo, pi2.id -> pid, Partner.Br)
+        linkSupportAs(ngo, pi2.id -> pid)
       }
     }
   }
