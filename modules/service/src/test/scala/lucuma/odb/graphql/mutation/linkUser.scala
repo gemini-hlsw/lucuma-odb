@@ -10,8 +10,8 @@ import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Tag
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.Tag
 
 class linkUser extends OdbSuite {
 

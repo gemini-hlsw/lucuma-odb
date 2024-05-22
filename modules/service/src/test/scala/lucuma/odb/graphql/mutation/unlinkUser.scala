@@ -9,11 +9,11 @@ import io.circe.syntax.*
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.Tag
 import lucuma.odb.data.ProgramUserRole
-import lucuma.core.util.Enumerated
+import lucuma.odb.data.Tag
 
 class unlinkUser extends OdbSuite {
 
