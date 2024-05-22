@@ -20,11 +20,11 @@ import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.ProgramUserRole
 import org.http4s.Charset
 import org.http4s.UrlForm
 import org.http4s.dsl.Http4sDsl
-import lucuma.odb.data.OdbError
 
 class createUserInvitation extends OdbSuite {
 
