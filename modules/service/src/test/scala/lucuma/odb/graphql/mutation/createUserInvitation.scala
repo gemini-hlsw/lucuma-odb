@@ -20,10 +20,8 @@ import lucuma.core.enums.InvitationStatus
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.util.TimeSpan
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.ProgramUserSupportType
-import lucuma.odb.data.Tag
 import org.http4s.Charset
 import org.http4s.UrlForm
 import org.http4s.dsl.Http4sDsl
@@ -71,7 +69,7 @@ class createUserInvitation extends OdbSuite {
       Resource.eval(response)
     }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Observer).foreach { role =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
     test(s"invite ${role.toString.toLowerCase} (key)") {
       createProgramAs(pi).flatMap { pid =>
         createUserInvitationAs(pi, pid, role)
@@ -79,7 +77,7 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Observer).foreach { pur =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
     test(s"invite ${pur.toString.toLowerCase} (metadata)") {
       createProgramAs(pi).flatMap { pid =>
         expect(
@@ -100,8 +98,6 @@ class createUserInvitation extends OdbSuite {
                 redeemer { id }
                 program { id }
                 role
-                supportType
-                supportPartner
                 email {
                   senderEmail
                   status
@@ -125,8 +121,6 @@ class createUserInvitation extends OdbSuite {
                       "id" : $pid
                     },
                     "role" : ${pur: ProgramUserRole},
-                    "supportType" : null,
-                    "supportPartner" : null,
                     "email": {
                       "senderEmail": ${emailConfig.invitationFrom},
                       "status": ${EmailStatus.Queued}
@@ -141,7 +135,7 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
-  test("invite staff support (metadata)") {
+  test("invite support (metadata)") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = staff,
@@ -152,7 +146,6 @@ class createUserInvitation extends OdbSuite {
               programId: "$pid"
               recipientEmail: "$successRecipient"
               role: ${ProgramUserRole.Support.tag.toUpperCase}
-              supportType: ${ProgramUserSupportType.Staff.tag.toUpperCase()}
             }
           ) {
             invitation {
@@ -162,8 +155,6 @@ class createUserInvitation extends OdbSuite {
               redeemer { id }
               program { id }
               role
-              supportType
-              supportPartner
               email {
                 senderEmail
                 status
@@ -187,8 +178,6 @@ class createUserInvitation extends OdbSuite {
                     "id" : $pid
                   },
                   "role" : ${ProgramUserRole.Support: ProgramUserRole},
-                  "supportType" : ${ProgramUserSupportType.Staff: ProgramUserSupportType},
-                  "supportPartner" : null,
                   "email": {
                     "senderEmail": ${emailConfig.invitationFrom},
                     "status": ${EmailStatus.Queued}
@@ -202,92 +191,6 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
-  test("invite partner support (metadata)") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = admin,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$successRecipient"
-              role: ${ProgramUserRole.Support.tag.toUpperCase}
-              supportType: ${ProgramUserSupportType.Partner.tag.toUpperCase()}
-              supportPartner: CA
-            }
-          ) {
-            invitation {
-              status
-              issuer { id }
-              redeemer { id }
-              program { id }
-              role
-              supportType
-              supportPartner
-              email {
-                senderEmail
-                status
-              }
-            }
-          }
-        }
-        """,
-        expected = Right(
-          json"""
-            {
-              "createUserInvitation" : {
-                "invitation" : {
-                  "status" : ${InvitationStatus.Pending},
-                  "issuer" : {
-                    "id" : ${admin.id}
-                  },
-                  "redeemer" : null,
-                  "program" : {
-                    "id" : $pid
-                  },
-                  "role" : ${ProgramUserRole.Support: ProgramUserRole},
-                  "supportType" : ${ProgramUserSupportType.Partner: ProgramUserSupportType},
-                  "supportPartner" : "CA",
-                  "email": {
-                    "senderEmail": ${emailConfig.invitationFrom},
-                    "status": ${EmailStatus.Queued}
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-  }
-
-  test("can't invite partner support without a partner") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$successRecipient"
-              role: ${ProgramUserRole.Support.tag.toUpperCase}
-              supportType: ${ProgramUserSupportType.Partner.tag.toUpperCase()}
-            }
-          ) {
-            invitation {
-              status
-            }
-          }
-        }
-        """,
-        expected = Left(List(
-          "Argument 'input' is invalid: Invalid combination of role, support type, and partner."
-        ))
-      )
-    }
-  }
 
   test("can't invite a user to a non-existent program") {
     expect(
@@ -336,29 +239,32 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
-  test("guest can't invite a user") {
-    createProgramAs(guest).flatMap { pid =>
-      expect(
-        user = guest,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$successRecipient"
-              role: ${ProgramUserRole.Coi.tag.toUpperCase}
+  List(guest, ngo).foreach: user =>
+    test(s"${user.role.access} can't invite a user") {
+      createProgramAs(user).flatMap { pid =>
+        expectOdbError(
+          user = user,
+          query = s"""
+          mutation {
+            createUserInvitation(
+              input: {
+                programId: "$pid"
+                recipientEmail: "$successRecipient"
+                role: ${ProgramUserRole.Coi.tag.toUpperCase}
+              }
+            ) {
+              key
             }
-          ) {
-            key
           }
-        }
-        """,
-        expected = Left(
-          List(s"Guest users cannot create invitations.")
+          """,
+          expected = 
+            val Id = user.id
+            {
+              case OdbError.NotAuthorized(Id, _) =>
+            }
         )
-      )
+      }
     }
-  }
 
   test("staff, admin, service can create an invitation for any program") {
     createProgramAs(pi).flatMap { pid =>
@@ -368,38 +274,6 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
-  test("ngo user can create invitation if time is allocated") {
-    createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Tag(partner.tag), TimeSpan.FromHours.getOption(1).get) >>
-      createUserInvitationAs(ngo, pid, ProgramUserRole.Support, Some(ProgramUserSupportType.Partner), Some(Tag(partner.tag)))
-    }
-  }
-
-  test("ngo can't create an invitation if no time allocated") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = ngo,
-        query = s"""
-          mutation {
-            createUserInvitation(
-              input: {
-                programId: "$pid"
-                recipientEmail: "bob@dobbs.com"
-                role: SUPPORT
-                supportType: PARTNER
-                supportPartner: ${partner.tag.toUpperCase}
-              }
-            ) {
-              key
-            }
-          }
-          """,
-        expected = Left(List(
-          "Specified program does not exist, or has no partner-allocated time."
-        ))
-      )
-    }
-  }
 
   test("Bad response from sending email results in failure") {
     createProgramAs(pi).flatMap { pid =>
@@ -412,7 +286,6 @@ class createUserInvitation extends OdbSuite {
               programId: "$pid"
               recipientEmail: "$badResponseRecipient"
               role: ${ProgramUserRole.Support.tag.toUpperCase}
-              supportType: ${ProgramUserSupportType.Staff.tag.toUpperCase()}
             }
           ) {
             invitation {

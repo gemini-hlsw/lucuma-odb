@@ -55,7 +55,6 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.ProgramUserSupportType
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
@@ -392,9 +391,6 @@ trait Codecs {
 
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
-
-  val program_user_support_type: Codec[ProgramUserSupportType] =
-    enumerated(Type("e_program_user_support_type"))
 
   val radial_velocity: Codec[RadialVelocity] =
     numeric.eimap(
