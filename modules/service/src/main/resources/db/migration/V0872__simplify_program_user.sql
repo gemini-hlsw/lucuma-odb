@@ -1,6 +1,6 @@
 
 -- Observer becomes Coi (read-only)
-ALTER TYPE e_program_user_role RENAME VALUE 'observer' TO 'coi/ro';
+ALTER TYPE e_program_user_role RENAME VALUE 'observer' TO 'coi_ro';
 
 -- Remove support type and support partner from t_program_user
 ALTER TABLE t_program_user DROP CONSTRAINT t_program_user_check;
